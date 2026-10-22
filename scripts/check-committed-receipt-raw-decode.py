@@ -5,16 +5,23 @@ A raw `serde_json` decode keeps the last of two duplicate keys inside any
 `serde_json::Value` member, so production code decodes these types through
 `UntrustedJsonText::decode_signed` (or `decode_document`), and HTTP routes use
 the `SignedJson` extractor. A type that contains a strict type, at any depth,
-is strict too.
+or a top-level `type` alias of one, is strict too.
 
 Source is scanned with comments, literals and `#[cfg(test)]` items masked, so
 multi-line calls and production items after a test module are both seen. A
-raw decode is flagged when its target is strict by turbofish, by a `let`
-annotation, or by the strict return type of the function that holds it, and
-an extractor is flagged when its type argument is strict. Each exception in
-ALLOWED names one exact `from_value` call in one function together with the
-duplicate-refusing reader that produced its `Value`. The script checks itself
+raw decode is a `serde_json::from_*` call, a direct `Deserialize::deserialize`
+call outside a `deserialize` function, or a call to a function of the same
+crate that is generic over a `Deserialize` parameter and raw decodes it. It is
+flagged when its target is strict by turbofish, by a `let` annotation, or by
+the strict return type of the function that holds it, either directly or
+through an unannotated `let` binding that the function returns. An extractor
+is flagged when its type argument is strict. Each exception in ALLOWED names
+one exact call in one function that reads an already parsed `Value`, together
+with the duplicate-refusing reader that produced it. The script checks itself
 against fixture trees on every run before it scans the workspace.
+
+The scan is lexical. It does not resolve imports, trait dispatch, or helpers
+in other crates, so a pass is evidence for the listed forms only.
 """
 
 from __future__ import annotations
@@ -131,12 +138,21 @@ ALLOWED = (
         "call": "serde_json::from_value::<chio_core::receipt::body::ChioReceipt>(evidence[ ].clone(),)",
         "producer": "BroadcastJsonRpcWriter::flush_complete_lines decodes each worker line with decode_json, the lib.rs alias of input::decode, which calls decode_signed",
     },
+    {
+        "path": "crates/products/chio-cli/src/active_defense_migration.rs",
+        "owner": "verify_backfill_receipts",
+        "call": "strict_typed_value(&registered.receipt,)",
+        "producer": "parse_shadow_migration_input calls decode_signed; strict_typed_value reads that Value with from_value and refuses a noncanonical round trip",
+    },
 )
 
 RAW_CALL = re.compile(r"(?<![\w.:])(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
 EXTRACTOR = re.compile(r"(?<![\w:])(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
+TYPE_ALIAS = re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
+TRAIT_CALL = re.compile(r"(?<![\w:.])(?:(?:serde\s*::\s*)?(?:de\s*::\s*)?Deserialize|<\s*([\w:]+)\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\(")
+GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*[^,>{]*\bDeserialize")
 
 
 def without_test_items(code: str) -> str:
@@ -178,6 +194,8 @@ def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
             close = _contracts.closing(code, opening, code[opening], right)
             if not match.group(1).endswith("Error"):
                 definitions.setdefault(match.group(1), []).append(code[opening:close])
+        for match in TYPE_ALIAS.finditer(code):
+            definitions.setdefault(match.group(1), []).append(match.group(2))
     strict = set(STRICT_TYPES)
     changed = True
     while changed:
@@ -251,9 +269,101 @@ def returned(fn_code: str, offset: int) -> bool:
     return rest.strip() == "}"
 
 
+def let_binding(fn_code: str, offset: int) -> str:
+    """The name an unannotated `let` binds to the call at `offset`, if any."""
+    statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
+    match = re.fullmatch(r"\s*let\s+(?:mut\s+)?(\w+)\s*=\s*", fn_code[statement_start:offset])
+    return match.group(1) if match else ""
+
+
+def binding_returned(fn_code: str, offset: int, name: str) -> bool:
+    """Whether `name` is the function's value after the statement at `offset`."""
+    rest = fn_code[offset:]
+    word = re.escape(name)
+    if re.search(r"\breturn\s+(?:(?:Ok|Some)\(\s*)?" + word + r"\b", rest):
+        return True
+    if re.search(r"(?<![\w.])(?:Ok|Some)\(\s*" + word + r"\s*\)\s*}\s*$", rest):
+        return True
+    return bool(re.search(r"(?<![\w.])" + word + r"\s*}\s*$", rest))
+
+
+def generic_parameters(fn_code: str) -> set[str]:
+    signature_end = fn_code.find("{")
+    return set(GENERIC_BOUND.findall(fn_code[:signature_end if signature_end >= 0 else len(fn_code)]))
+
+
+def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str]):
+    """Yield (offset, explicit target or None, input kind) for each raw decode in a body.
+
+    The input kind is "value" when the decode reads an already parsed Value and
+    "text" when it reads wire text or a deserializer.
+    """
+    for match in RAW_CALL.finditer(fn_code, body_start):
+        kind = "value" if match.group(0).rstrip().endswith("from_value") else "text"
+        after = fn_code[match.end():].lstrip()
+        if after.startswith("::"):
+            target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
+            yield match.start(), target, kind
+        else:
+            yield match.start(), None, kind
+    for match in TRAIT_CALL.finditer(fn_code, body_start):
+        yield match.start(), match.group(1) or match.group(2), "text"
+    if helpers:
+        pattern = re.compile(r"(?<![\w.])(?:\w+\s*::\s*)*(" + "|".join(sorted(map(re.escape, helpers))) + r")\s*(?=::\s*<|\()")
+        for match in pattern.finditer(fn_code, body_start):
+            after = fn_code[match.end():].lstrip()
+            kind = helpers[match.group(1)]
+            if after.startswith("::"):
+                target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
+                yield match.start(), target, kind
+            else:
+                yield match.start(), None, kind
+
+
+def targets(fn_code: str, offset: int, explicit, returns: str) -> str:
+    """The decode target text: explicit, annotated, or the function's value type."""
+    if explicit is not None:
+        return explicit
+    annotation = let_annotation(fn_code, offset)
+    if annotation:
+        return annotation
+    if returned(fn_code, offset):
+        return returns
+    name = let_binding(fn_code, offset)
+    if name and binding_returned(fn_code, offset, name):
+        return returns
+    return ""
+
+
+def crate_of(rel: str) -> str:
+    return rel.split("/src/")[0]
+
+
+def generic_raw_helpers(files: list[tuple[str, str]]) -> dict[str, dict[str, str]]:
+    """Per crate, functions generic over a `Deserialize` parameter that raw decode it.
+
+    Each helper maps to "value" when every such decode reads a Value, else "text".
+    """
+    helpers: dict[str, dict[str, str]] = {}
+    for rel, code in files:
+        for row in _contracts.functions(code):
+            fn_code = _contracts.owner_code(code, row)
+            parameters = generic_parameters(fn_code)
+            if not parameters:
+                continue
+            returns = return_type(fn_code)
+            for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], {}):
+                if set(IDENTIFIER.findall(targets(fn_code, offset, explicit, returns))) & parameters:
+                    crate = helpers.setdefault(crate_of(rel), {})
+                    name = row[0].split("#")[0]
+                    crate[name] = "text" if "text" in (kind, crate.get(name)) else "value"
+    return helpers
+
+
 def scan(root: Path) -> list[str]:
     files = production_files(root)
     strict = strict_closure(files)
+    helpers = generic_raw_helpers(files)
     findings = []
     for rel, code in files:
         for row in _contracts.functions(code):
@@ -264,34 +374,24 @@ def scan(root: Path) -> list[str]:
             for match in EXTRACTOR.finditer(arguments):
                 target, _ = angle_argument(arguments, match.end() - 1)
                 if mentions_strict(target, strict):
-                    findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor"))
-            returns_strict = mentions_strict(return_type(fn_code), strict)
-            body_start = row[2] - row[1]
-            for match in RAW_CALL.finditer(fn_code, body_start):
-                after = fn_code[match.end():].lstrip()
-                if after.startswith("::"):
-                    turbofish = fn_code.index("<", match.end())
-                    target, _ = angle_argument(fn_code, turbofish)
-                    strict_target = mentions_strict(target, strict)
-                else:
-                    annotation = let_annotation(fn_code, match.start())
-                    if annotation:
-                        strict_target = mentions_strict(annotation, strict)
-                    else:
-                        strict_target = returns_strict and returned(fn_code, match.start())
-                if strict_target:
-                    findings.append((rel, owner, call_text(fn_code, match.start()), "decode"))
+                    findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor", "text"))
+            if owner.split("#")[0] == "deserialize":
+                continue
+            returns = return_type(fn_code)
+            for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], helpers.get(crate_of(rel), {})):
+                if mentions_strict(targets(fn_code, offset, explicit, returns), strict):
+                    findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
     errors = []
     remaining = list(findings)
     for entry in ALLOWED:
-        key = (entry["path"], entry["owner"], normalized(entry["call"]), "decode")
+        key = (entry["path"], entry["owner"], normalized(entry["call"]), "decode", "value")
         count = entry.get("count", 1)
         matched = [finding for finding in remaining if finding == key]
-        if len(matched) != count or not entry["call"].startswith("serde_json::from_value"):
+        if len(matched) != count:
             errors.append(f"{entry['path']}::{entry['owner']}: approved call {entry['call']} expects {count}, found {len(matched)}")
         for finding in matched:
             remaining.remove(finding)
-    errors.extend(f"{rel}::{owner}: raw {kind} {text}" for rel, owner, text, kind in remaining)
+    errors.extend(f"{rel}::{owner}: raw {site} {text}" for rel, owner, text, site, _ in remaining)
     return errors
 
 
@@ -309,6 +409,17 @@ FIXTURES = {
     "multi-line extractor": ("async fn h(\n    Json(r): Json<\n        ChioReceipt,\n    >,\n) {}", 1),
     "decode_signed": ("fn f(t: &str) -> Result<ChioReceipt, E> { UntrustedJsonText::new(t).decode_signed() }", 0),
     "unrelated decode": ("fn f(t: &str) -> Result<Other, E> { serde_json::from_str(t) }", 0),
+    "inferred local returned": ("fn f(t: &str) -> Result<ChioReceipt, E> { let receipt = serde_json::from_str(t)?; Ok(receipt) }", 1),
+    "inferred local returned by return": ("fn f(t: &str) -> Result<ChioReceipt, E> {\n    let receipt = serde_json::from_str(t)?;\n    check(&receipt);\n    return Ok(receipt);\n}", 1),
+    "inferred local not returned": ("fn f(t: &str) -> Result<ChioReceipt, E> { let other = serde_json::from_str(t)?; use_it(other); build() }", 0),
+    "type alias": ("type Receipt = ChioReceipt;\nfn f(t: &str) { serde_json::from_str::<Receipt>(t); }", 1),
+    "associated type": ("impl Visitor for V {\n    type Value = ChioReceipt;\n}\nfn f(t: &str) { serde_json::from_str::<Value>(t); }", 0),
+    "generic helper": ("fn decode<T: serde::de::DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 1),
+    "generic helper turbofish": ("fn decode<T>(t: &str) -> Result<T, E> where T: serde::de::DeserializeOwned { serde_json::from_slice(t) }\nfn f(t: &[u8]) { let r = crate::input::decode::<ChioReceipt>(t); }", 1),
+    "strict generic helper": ("fn decode<T: serde::de::DeserializeOwned>(t: &str) -> Result<T, E> { UntrustedJsonText::new(t).decode_signed() }\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 0),
+    "direct trait": ("fn f(d: &mut serde_json::Deserializer<serde_json::de::StrRead>) -> Result<ChioReceipt, E> { ChioReceipt::deserialize(d) }", 1),
+    "qualified trait": ("fn f(d: D) -> Result<ChioReceipt, E> { let r = serde::Deserialize::deserialize(d)?; Ok(r) }", 1),
+    "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
 
@@ -332,6 +443,36 @@ def self_test() -> None:
         ):
             target.write_text(
                 f"fn {allowed['owner']}(raw: &str, value: Value) -> Result<ChioReceipt, E> {{\n    {body}\n    Ok(receipt)\n}}\n",
+                encoding="utf-8",
+            )
+            found = len(scan(root)) - (len(ALLOWED) - 1)
+            if found != expected:
+                raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
+        target.write_text("\n", encoding="utf-8")
+        other = root / "crates/other/src/lib.rs"
+        other.parent.mkdir(parents=True)
+        other.write_text("fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\n", encoding="utf-8")
+        for label, code, expected in (
+            ("same-named helper in another crate", "fn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 0),
+            ("helper in the same crate", "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 1),
+        ):
+            source.write_text(code + "\n", encoding="utf-8")
+            found = len(scan(root)) - len(ALLOWED)
+            if found != expected:
+                raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
+        other.write_text("\n", encoding="utf-8")
+        source.write_text("\n", encoding="utf-8")
+        helper_entry = ALLOWED[-1]
+        target = root / helper_entry["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        for label, reader, expected in (
+            ("approved Value helper", "serde_json::from_value(value.clone())", 0),
+            ("approved helper reading text", "serde_json::from_str(value.as_str())", 2),
+        ):
+            target.write_text(
+                f"fn strict_typed_value<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, E> {{ Ok({reader}?) }}\n"
+                f"fn {helper_entry['owner']}(registered: Registered) -> Result<(), E> {{\n"
+                f"    let receipt: ChioReceipt = strict_typed_value(&registered.receipt, \"label\")?;\n    Ok(())\n}}\n",
                 encoding="utf-8",
             )
             found = len(scan(root)) - (len(ALLOWED) - 1)
