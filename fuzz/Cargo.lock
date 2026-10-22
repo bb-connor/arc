@@ -1417,6 +1417,7 @@ dependencies = [
  "chio-core",
  "chio-egress-contract",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-metrics-spec",
  "chio-security-types",
  "chio-web3-bindings",
@@ -1495,6 +1496,20 @@ name = "chio-bounded"
 version = "0.1.0"
 dependencies = [
  "loom",
+]
+
+[[package]]
+name = "chio-bundle-verify"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-errors",
+ "chio-kernel-core",
+ "chio-security-types",
+ "clap",
+ "rustix",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1589,6 +1604,7 @@ dependencies = [
  "base64 0.22.1",
  "chio-agent-web-interop",
  "chio-appraisal",
+ "chio-bundle-verify",
  "chio-commerce-order",
  "chio-conformance",
  "chio-core",
@@ -1614,6 +1630,7 @@ dependencies = [
  "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-log-redact",
  "chio-manifest",
@@ -2002,6 +2019,7 @@ dependencies = [
  "chio-finding",
  "chio-finding-verifier",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-open-market",
  "serde",
  "serde_json",
@@ -2087,6 +2105,7 @@ dependencies = [
  "chio-finding",
  "chio-fiscal",
  "chio-kernel",
+ "chio-kernel-core",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
