@@ -874,7 +874,6 @@ struct IntrospectionBearerVerifier {
     /// dispatch. Production deployments must populate this; without a
     /// contract the verifier substrate will fail closed if introspection is
     /// invoked.
-    #[allow(dead_code)]
     egress_contract: Option<HttpEgressContract>,
 }
 
