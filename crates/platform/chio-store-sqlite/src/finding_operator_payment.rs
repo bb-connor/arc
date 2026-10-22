@@ -6,7 +6,6 @@
 //! operator's venue ledger is the settlement rail.
 
 use chio_security_types::clock::{Clock, SystemClock};
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -25,7 +24,6 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
-const SCHEMA_KEY: &str = "finding_operator_payment";
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
     authorization_id TEXT PRIMARY KEY,
@@ -64,10 +62,9 @@ impl SqliteFindingOperatorPaymentAdapter {
     /// Open with the time authority shared by the composing service.
     pub fn open_with_clock(path: impl AsRef<Path>, clock: Arc<dyn Clock>) -> Result<Self, String> {
         let path = path.as_ref();
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-        }
-        let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
+        let manager = SqliteConnectionManager::file(path)
+            .with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .with_init(configure_pooled_connection);
         let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)
@@ -76,7 +73,7 @@ impl SqliteFindingOperatorPaymentAdapter {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        store.validate_schema()?;
         Ok(store)
     }
 
@@ -94,13 +91,18 @@ impl SqliteFindingOperatorPaymentAdapter {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        {
+            let mut connection = store.pool.get().map_err(|error| error.to_string())?;
+            crate::finding_operator_database::initialize_connection(&mut connection)
+                .map_err(|error| error.to_string())?;
+        }
+        store.validate_schema()?;
         Ok(store)
     }
 
-    fn initialize_schema(&self) -> Result<(), String> {
+    fn validate_schema(&self) -> Result<(), String> {
         let mut connection = self.pool.get().map_err(|error| error.to_string())?;
-        crate::finding_operator_database::initialize_component(&mut connection, SCHEMA_KEY, SCHEMA)
+        crate::finding_operator_database::validate_component(&mut connection)
             .map_err(|error| error.to_string())
     }
 
@@ -749,6 +751,7 @@ mod tests {
     fn capture_is_restart_safe_and_exactly_once() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
         let first = adapter.authorize(&request("purchase-1")).unwrap();
         let captured = adapter
@@ -768,8 +771,9 @@ mod tests {
     #[test]
     fn every_pooled_connection_has_busy_timeout() {
         let dir = tempfile::tempdir().unwrap();
-        let adapter =
-            SqliteFindingOperatorPaymentAdapter::open(dir.path().join("operator.db")).unwrap();
+        let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
+        let adapter = SqliteFindingOperatorPaymentAdapter::open(&path).unwrap();
         let first = adapter.pool.get().unwrap();
         let second = adapter.pool.get().unwrap();
 
@@ -953,6 +957,7 @@ mod tests {
     fn payment_schema_other_than_current_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         drop(SqliteFindingOperatorPaymentAdapter::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
         conn.execute_batch("PRAGMA ignore_check_constraints = ON;
@@ -971,6 +976,7 @@ mod tests {
     fn current_stamp_over_a_retired_payment_table_shape_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         drop(SqliteFindingOperatorPaymentAdapter::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
         conn.execute_batch("DROP INDEX chio_finding_operator_payments_governed_intent;")

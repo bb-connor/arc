@@ -516,7 +516,7 @@ pub use governed_approval_replay_store::{
     GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
-pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
+pub use iou_store::SqliteIouEnvelopeStore;
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{
     collect_retained_session_receipts_read_only, BackgroundCheckpointSigner,
@@ -866,7 +866,7 @@ impl chio_kernel::receipt_store::AnchoredAdmissionProjectionStore
         .map_err(admission_operation_store::receipt_projection_error)
     }
 }
-pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
+pub use settle_attempts::SqliteSettlementOutcomeStore;
 pub use tool_outcome_store::{
     SqliteToolOutcomeStore, ToolOutcomeCompactionLimits, ToolOutcomeCompactionPage,
 };

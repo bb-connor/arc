@@ -6,10 +6,6 @@
 //! receipt maps to exactly one row. Re-processing the same finalized
 //! receipt is idempotent: a byte-identical envelope returns `Ok(false)`;
 //! a different envelope returns [`IouEnvelopeStoreError::Conflict`].
-//!
-//! The migration is `CREATE TABLE IF NOT EXISTS` plus
-//! `CREATE INDEX IF NOT EXISTS`, so it can run repeatedly against a
-//! receipt-store database that already holds other tables.
 
 use std::sync::Arc;
 
@@ -23,9 +19,8 @@ use crate::receipt_store::{receipt_pool_connection, verify_rollback, ReceiptSink
 
 const MAX_IOU_ENVELOPE_BYTES: usize = 1024 * 1024;
 
-/// SQL migration applied by [`SqliteIouEnvelopeStore::open_with_pool`]
-/// to create the `iou_envelope` table.
-pub const IOU_ENVELOPE_MIGRATION: &str = r#"
+/// IOU table schema used during receipt database creation.
+pub(crate) const IOU_ENVELOPE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS iou_envelope (
     receipt_id TEXT PRIMARY KEY,
     iou_id TEXT NOT NULL,
@@ -57,15 +52,14 @@ pub struct SqliteIouEnvelopeStore {
 
 impl SqliteIouEnvelopeStore {
     /// Open a store backed by the same pool as a sibling receipt
-    /// store. Runs the additive migration if the table is absent.
+    /// store. Validates the complete receipt schema.
     pub fn open_with_pool(
         pool: Pool<SqliteConnectionManager>,
     ) -> Result<Self, IouEnvelopeStoreError> {
-        let connection = pool
+        let mut connection = pool
             .get()
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
-        connection
-            .execute_batch(IOU_ENVELOPE_MIGRATION)
+        crate::receipt_store::validate_receipt_database(&mut connection)
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
         Ok(Self {
             pool,
@@ -86,14 +80,10 @@ impl SqliteIouEnvelopeStore {
         store: &crate::SqliteReceiptStore,
     ) -> Result<Self, IouEnvelopeStoreError> {
         let writer = store.writer_handle();
-        // Run the additive migration on the writer connection so the reader
-        // pool never executes DDL.
-        writer
-            .run_write_anchored_metadata(|connection| {
-                connection
-                    .execute_batch(IOU_ENVELOPE_MIGRATION)
-                    .map_err(chio_kernel::ReceiptStoreError::from)
-            })
+        let mut connection = store
+            .connection()
+            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+        crate::receipt_store::validate_receipt_database(&mut connection)
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
         Ok(Self {
             pool: store.pool.clone(),
@@ -406,8 +396,7 @@ mod tests {
     fn open_store() -> SqliteIouEnvelopeStore {
         let dir = tempdir().unwrap();
         let path = dir.path().join("iou.sqlite");
-        // Construct a pool directly so the test does not require a
-        // sibling receipt store.
+        drop(crate::SqliteReceiptStore::open(&path).unwrap());
         let manager = SqliteConnectionManager::file(path);
         let pool = crate::pool::sqlite_pool_builder()
             .max_size(2)
@@ -447,6 +436,7 @@ mod tests {
         let envelope = account.evaluate(&receipt).unwrap().unwrap();
         let directory = tempdir().unwrap();
         let path = directory.path().join("signed-iou.sqlite");
+        drop(crate::SqliteReceiptStore::open(&path).unwrap());
         let open = || {
             let pool = crate::pool::sqlite_pool_builder()
                 .max_size(2)

@@ -169,6 +169,7 @@ mod tests {
     async fn durable_resolver_reveals_after_store_restart() {
         let dir = chio_test_support::private_tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        chio_store_sqlite::initialize_finding_operator_database(&path).unwrap();
         let tenant_id = TenantId::new("operator-alpha");
         let key = TenantKey::from_bytes([9; 32]);
         let payload = b"diff --git a/a.rs b/a.rs\n";

@@ -495,8 +495,8 @@ fn initial_provision_refuses_nonempty_standalone_authority_state() {
     assert!(
         matches!(
             &error,
-            SqliteServingOwnerError::Invalid(message)
-                if message == "schema namespace admission_operation is missing"
+            SqliteServingOwnerError::PartialProvision(path)
+                if path == &database.display().to_string()
         ),
         "unexpected error: {error}"
     );
@@ -527,8 +527,8 @@ fn initial_provision_refuses_nonempty_standalone_authority_state() {
     assert!(
         matches!(
             &repeated,
-            SqliteServingOwnerError::Invalid(message)
-                if message == "schema namespace admission_operation is missing"
+            SqliteServingOwnerError::PartialProvision(path)
+                if path == &database.display().to_string()
         ),
         "unexpected error: {repeated}"
     );
@@ -1550,7 +1550,10 @@ fn offline_provision_is_fenced_idempotent_and_refuses_noncurrent_budget() {
         .expect_err("noncurrent budget schema must be refused");
     assert!(matches!(
         error,
-        SqliteServingOwnerError::Invalid(message) if message == "database schema version 3 is not the current schema version 1; refusing to open"
+        SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+            found: 3,
+            current: 1
+        })
     ));
     assert_eq!(
         crate::schema_version::read_store_schema_version(&connection, "budget")

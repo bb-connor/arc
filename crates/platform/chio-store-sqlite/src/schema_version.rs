@@ -9,6 +9,8 @@ const SCHEMA_VERSION_TABLE: &str = "chio_store_schema_versions";
 
 #[derive(Debug, thiserror::Error)]
 pub enum SchemaVersionError {
+    #[error("filesystem error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
     #[error("schema creation requires distinct nonempty namespace keys")]

@@ -35,8 +35,8 @@ fn serving_reopen_refuses_missing_namespace_without_repair() -> TestResult {
         [],
     )?;
     assert!(
-        matches!(SqliteAuthorityStore::open_serving(&database, &locks), Err(SqliteServingOwnerError::Invalid(message))
-        if message == "schema namespace budget is missing")
+        matches!(SqliteAuthorityStore::open_serving(&database, &locks), Err(SqliteServingOwnerError::Schema(chio_store_sqlite::SchemaVersionError::MissingSchema { store_key }))
+        if store_key == "budget")
     );
     let present: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM chio_store_schema_versions WHERE store_key = 'budget')",

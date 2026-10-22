@@ -211,6 +211,9 @@ impl Fixture {
             kernel.set_caller_executor(executor.clone())?;
         }
         if self.local_payment_rail {
+            chio_store_sqlite::initialize_finding_operator_database(
+                self.directory.path().join("local-payments.db"),
+            )?;
             kernel.set_payment_adapter(Box::new(
                 chio_store_sqlite::SqliteFindingOperatorPaymentAdapter::open(
                     self.directory.path().join("local-payments.db"),

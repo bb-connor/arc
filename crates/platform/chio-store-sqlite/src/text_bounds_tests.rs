@@ -406,8 +406,8 @@ fn sealed_decoy_registry_refuses_nul_padding() -> TestResult {
 
 #[test]
 fn settle_attempts_refuse_nul_padding() -> TestResult {
-    let catalog = catalog(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-    catalog.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    let catalog = catalog(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
+    catalog.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
     assert_column_refuses_nul_padding(
         &catalog,
         "settle_attempts",

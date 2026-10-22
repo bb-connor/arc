@@ -242,8 +242,8 @@ fn settlement_projection_schema_is_installed(
     connection: &Connection,
 ) -> Result<bool, ReceiptStoreError> {
     let reference = Connection::open_in_memory()?;
-    reference.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-    reference.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    reference.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
+    reference.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
     Ok(settlement_schema_manifest(connection)? == settlement_schema_manifest(&reference)?)
 }
 
@@ -831,6 +831,39 @@ fn begin_receipt_creation<'a>(
         }
     }
     crate::schema_version::SchemaTransaction::from_transaction(transaction, namespaces)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+}
+
+pub(crate) fn validate_receipt_database(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let transaction = connection.transaction()?;
+    let (namespaces, state) = receipt_namespaces(&transaction)?;
+    if state == crate::SchemaState::Empty {
+        return Err(ReceiptStoreError::Conflict(
+            crate::SchemaVersionError::CreationNotAllowed.to_string(),
+        ));
+    }
+    validate_receipt_catalog(&transaction, namespaces == RECEIPT_APPROVAL_NAMESPACES)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn initialize_test_receipt_database(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let schema = crate::schema_version::SchemaTransaction::begin(connection, RECEIPT_NAMESPACES)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    if schema.is_fresh() {
+        create_receipt_schema(schema.connection())?;
+        schema
+            .stamp("receipt")
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    }
+    validate_receipt_catalog(schema.connection(), false)?;
+    schema
+        .commit()
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
 }
 
@@ -1716,9 +1749,9 @@ fn create_receipt_schema(transaction: &rusqlite::Transaction<'_>) -> Result<(), 
 
             "#,
         )?;
-    transaction.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
-    transaction.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-    transaction.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    transaction.execute_batch(crate::iou_store::IOU_ENVELOPE_SCHEMA)?;
+    transaction.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
+    transaction.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
     super::support::install_receipt_cost_indexes(transaction)?;
     super::support::validate_indexed_security_evidence_schema(transaction)?;
     super::support::ensure_receipt_retention_watermark_table(transaction)?;
