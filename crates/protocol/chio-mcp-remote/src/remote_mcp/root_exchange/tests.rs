@@ -13,7 +13,8 @@ use crate::root_exchange::{
     jws::{CompactJws, VerifyingKey},
     ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore, ExchangeServices,
     IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding,
-    ReplayKey, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    ReplayKey, RequestedTokenType, RootExchange, RootExchangeError,
+    CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -485,6 +486,69 @@ async fn token_exchange_grant_with_an_id_jag_subject_token_is_accepted() {
         ("client_assertion", &assertion),
     ]);
     harness.run_body(&body, None, NOW).await.unwrap();
+}
+
+#[test]
+fn capability_requested_token_type_is_accepted_on_token_exchange() {
+    let body = |requested: Option<&str>| {
+        let mut pairs = vec![
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
+            ("subject_token", "token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:id-jag",
+            ),
+        ];
+        if let Some(requested) = requested {
+            pairs.push(("requested_token_type", requested));
+        }
+        form(&pairs)
+    };
+    let capability = IdJagGrant::parse(&body(Some(
+        "urn:chio:params:oauth:token-type:capability-v1",
+    )))
+    .unwrap();
+    assert_eq!(
+        capability.requested_token_type(),
+        RequestedTokenType::ChioCapability
+    );
+    let access =
+        IdJagGrant::parse(&body(Some("urn:ietf:params:oauth:token-type:access_token"))).unwrap();
+    assert_eq!(
+        access.requested_token_type(),
+        RequestedTokenType::AccessToken
+    );
+    let absent = IdJagGrant::parse(&body(None)).unwrap();
+    assert_eq!(
+        absent.requested_token_type(),
+        RequestedTokenType::AccessToken
+    );
+    assert_ne!(capability.request_digest(), access.request_digest());
+    assert_eq!(access.request_digest(), absent.request_digest());
+}
+
+#[test]
+fn request_digest_excludes_client_authentication() {
+    let body = |assertion: &str| {
+        form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", "id-jag"),
+            ("client_assertion_type", CLIENT_ASSERTION_TYPE_JWT_BEARER),
+            ("client_assertion", assertion),
+        ])
+    };
+    let first = IdJagGrant::parse(&body("first-assertion")).unwrap();
+    let retry = IdJagGrant::parse(&body("fresh-assertion")).unwrap();
+    assert_eq!(first.request_digest(), retry.request_digest());
+    let other = IdJagGrant::parse(&form(&[
+        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+        ("assertion", "other-id-jag"),
+    ]))
+    .unwrap();
+    assert_ne!(first.request_digest(), other.request_digest());
 }
 
 #[test]
