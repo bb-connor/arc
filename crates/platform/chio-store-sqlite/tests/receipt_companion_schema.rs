@@ -4,6 +4,7 @@ use chio_store_sqlite::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStor
 use chio_store_sqlite::{SqliteIouEnvelopeStore, SqliteSettlementOutcomeStore};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+type Catalog = Vec<(String, String, Option<String>)>;
 
 #[test]
 fn companion_openers_refuse_empty_catalog_without_creating_tables() -> TestResult {
@@ -76,9 +77,11 @@ fn companion_openers_accept_complete_schema_and_refuse_missing_objects() -> Test
                 "DROP {object_type} \"{}\"",
                 name.replace('"', "\"\"")
             ))?;
-            let catalog = |connection: &rusqlite::Connection| -> rusqlite::Result<Vec<(String, String, Option<String>)>> {
-                connection.prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
-                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?.collect()
+            let catalog = |connection: &rusqlite::Connection| -> rusqlite::Result<Catalog> {
+                connection
+                    .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+                    .collect()
             };
             let before = catalog(&connection)?;
             drop(connection);
