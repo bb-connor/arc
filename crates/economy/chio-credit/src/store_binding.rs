@@ -22,6 +22,8 @@ use crate::hook::IouEnvelope;
 /// match without taking a hard dep on a specific store crate.
 #[derive(Debug, Error)]
 pub enum IouEnvelopeStoreError {
+    #[error(transparent)]
+    Schema(#[from] chio_security_types::schema::SchemaRefusal),
     #[error("IOU envelope integrity failure: {0}")]
     Integrity(&'static str),
     /// The store rejected the envelope as malformed or as having

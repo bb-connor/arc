@@ -130,6 +130,8 @@ pub enum SettlementRouteErrorClass {
 /// Failure returned by the durable settlement router.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum SettlementRouteError {
+    #[error(transparent)]
+    Schema(#[from] chio_security_types::schema::SchemaRefusal),
     #[error("settlement routing backend failure: {detail}")]
     Backend { detail: String },
     #[error("settlement routing conflict: {detail}")]
@@ -145,7 +147,9 @@ impl SettlementRouteError {
         match self {
             Self::Backend { .. } => SettlementRouteErrorClass::Backend,
             Self::Conflict { .. } => SettlementRouteErrorClass::Conflict,
-            Self::InvalidRecord { .. } => SettlementRouteErrorClass::InvalidRecord,
+            Self::InvalidRecord { .. } | Self::Schema(_) => {
+                SettlementRouteErrorClass::InvalidRecord
+            }
         }
     }
 }

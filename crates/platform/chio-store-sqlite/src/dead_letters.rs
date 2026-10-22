@@ -42,6 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_settle_dead_letters_finalized_at
 #[derive(Debug, Error)]
 pub enum DeadLetterStoreError {
     #[error(transparent)]
+    Schema(#[from] chio_security_types::schema::SchemaRefusal),
+    #[error(transparent)]
     UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),
     /// Connection-pool or SQLite error.
     #[error("dead letter backend error: {0}")]
@@ -304,6 +306,7 @@ fn dead_letter_error_into_receipt_store(
     error: DeadLetterStoreError,
 ) -> chio_kernel::ReceiptStoreError {
     match error {
+        DeadLetterStoreError::Schema(error) => chio_kernel::ReceiptStoreError::Schema(error),
         DeadLetterStoreError::UntrustedInput(error) => {
             chio_kernel::ReceiptStoreError::UntrustedInput(error)
         }
@@ -323,6 +326,7 @@ fn dead_letter_error_from_receipt_store(
     error: chio_kernel::ReceiptStoreError,
 ) -> DeadLetterStoreError {
     match error {
+        chio_kernel::ReceiptStoreError::Schema(error) => DeadLetterStoreError::Schema(error),
         chio_kernel::ReceiptStoreError::UntrustedInput(error) => {
             DeadLetterStoreError::UntrustedInput(error)
         }
@@ -361,7 +365,7 @@ impl SqliteDeadLetterStore {
             .get()
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
         crate::receipt_store::validate_receipt_database(&mut connection)
-            .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
+            .map_err(dead_letter_error_from_receipt_store)?;
         Ok(Self {
             pool,
             writer: None,

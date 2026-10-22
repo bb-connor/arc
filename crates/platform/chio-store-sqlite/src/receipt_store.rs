@@ -3099,6 +3099,7 @@ fn execute_anchored_receipt_write(
 
 fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError {
     match error {
+        ReceiptStoreError::Schema(error) => ReceiptStoreError::Schema(error.clone()),
         ReceiptStoreError::Clock(error) => ReceiptStoreError::Clock(*error),
         ReceiptStoreError::UntrustedInput(error) => {
             ReceiptStoreError::UntrustedInput(Arc::clone(error))

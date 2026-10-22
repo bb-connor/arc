@@ -60,7 +60,7 @@ impl SqliteIouEnvelopeStore {
             .get()
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
         crate::receipt_store::validate_receipt_database(&mut connection)
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+            .map_err(receipt_error_to_iou)?;
         Ok(Self {
             pool,
             writer: None,
@@ -80,11 +80,9 @@ impl SqliteIouEnvelopeStore {
         store: &crate::SqliteReceiptStore,
     ) -> Result<Self, IouEnvelopeStoreError> {
         let writer = store.writer_handle();
-        let mut connection = store
-            .connection()
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+        let mut connection = store.connection().map_err(receipt_error_to_iou)?;
         crate::receipt_store::validate_receipt_database(&mut connection)
-            .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
+            .map_err(receipt_error_to_iou)?;
         Ok(Self {
             pool: store.pool.clone(),
             writer: Some(writer),
@@ -98,9 +96,9 @@ impl SqliteIouEnvelopeStore {
     ) -> Result<r2d2::PooledConnection<SqliteConnectionManager>, IouEnvelopeStoreError> {
         let connection =
             receipt_pool_connection(&self.pool, self.receipt_sink_qualification.as_deref())
-                .map_err(|error| IouEnvelopeStoreError::Backend(error.to_string()))?;
+                .map_err(receipt_error_to_iou)?;
         verify_rollback(&connection, self.rollback_anchor.as_deref(), false)
-            .map_err(|error| IouEnvelopeStoreError::Backend(error.to_string()))?;
+            .map_err(receipt_error_to_iou)?;
         Ok(connection)
     }
 }
@@ -256,6 +254,9 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                             &canonical,
                         )
                         .map_err(|err| match err {
+                            IouEnvelopeStoreError::Schema(error) => {
+                                chio_kernel::ReceiptStoreError::Schema(error)
+                            }
                             IouEnvelopeStoreError::Integrity(rule) => {
                                 chio_kernel::ReceiptStoreError::Canonical(rule.to_owned())
                             }
@@ -268,6 +269,9 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
                         })
                     })
                     .map_err(|err| match err {
+                        chio_kernel::ReceiptStoreError::Schema(error) => {
+                            IouEnvelopeStoreError::Schema(error)
+                        }
                         chio_kernel::ReceiptStoreError::Conflict(message) => {
                             IouEnvelopeStoreError::Conflict(message)
                         }
@@ -328,6 +332,13 @@ impl IouEnvelopeStore for SqliteIouEnvelopeStore {
             }
             None => Ok(None),
         }
+    }
+}
+
+fn receipt_error_to_iou(error: chio_kernel::ReceiptStoreError) -> IouEnvelopeStoreError {
+    match error {
+        chio_kernel::ReceiptStoreError::Schema(error) => IouEnvelopeStoreError::Schema(error),
+        other => IouEnvelopeStoreError::Backend(other.to_string()),
     }
 }
 

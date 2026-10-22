@@ -107,7 +107,8 @@ impl SqliteSettlementOutcomeStore {
         pool: Pool<SqliteConnectionManager>,
     ) -> Result<Self, SettlementRouteError> {
         let mut connection = pool.get().map_err(backend_error)?;
-        crate::receipt_store::validate_receipt_database(&mut connection).map_err(backend_error)?;
+        crate::receipt_store::validate_receipt_database(&mut connection)
+            .map_err(receipt_error_to_route)?;
         Ok(Self {
             pool,
             writer: None,
@@ -187,6 +188,7 @@ const WRITER_ROUTE_INVALID_TAG: &str = "chio-store-sqlite/settlement-route/inval
 
 fn route_error_to_receipt(error: SettlementRouteError) -> ReceiptStoreError {
     match error {
+        SettlementRouteError::Schema(error) => ReceiptStoreError::Schema(error),
         SettlementRouteError::Backend { detail } => {
             ReceiptStoreError::Pool(format!("{WRITER_ROUTE_BACKEND_TAG}{detail}"))
         }
@@ -201,6 +203,7 @@ fn route_error_to_receipt(error: SettlementRouteError) -> ReceiptStoreError {
 
 fn receipt_error_to_route(error: ReceiptStoreError) -> SettlementRouteError {
     match error {
+        ReceiptStoreError::Schema(error) => SettlementRouteError::Schema(error),
         ReceiptStoreError::Pool(detail) => match detail.strip_prefix(WRITER_ROUTE_BACKEND_TAG) {
             Some(detail) => backend_error(detail),
             None => backend_error(format!("receipt writer pool error: {detail}")),
@@ -235,6 +238,7 @@ fn attempt_projection_read_error(error: rusqlite::Error) -> ReceiptStoreError {
 
 fn dead_letter_error_to_route(error: DeadLetterStoreError) -> SettlementRouteError {
     match error {
+        DeadLetterStoreError::Schema(error) => SettlementRouteError::Schema(error),
         DeadLetterStoreError::Backend(detail) => backend_error(detail),
         DeadLetterStoreError::Conflict(detail) => conflict(detail),
         DeadLetterStoreError::InvalidRecord(detail) => invalid_record(detail),
