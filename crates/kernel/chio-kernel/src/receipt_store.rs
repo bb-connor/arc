@@ -455,6 +455,8 @@ fn receipt_writer_liveness_unknown_label() -> String {
     ReceiptWriterLiveness::Unknown.as_label().to_string()
 }
 
+/// Append calls may overlap. The store owns atomic insertion and commit ordering.
+/// A successful append acknowledges its commit; an error does not prove non-commit.
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
     /// Whether this store is an authoritative durable sink for signed native

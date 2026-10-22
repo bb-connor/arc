@@ -9,7 +9,7 @@ impl ChioKernel {
     /// revocation store).
     pub fn revoke_capability(&self, capability_id: &CapabilityId) -> Result<(), KernelError> {
         info!(capability_id = %capability_id, "revoking capability");
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.publication_sync.fence(true, true)?;
         let newly_revoked = self.with_revocation_store(|store| Ok(store.revoke(capability_id)?))?;
         let trace_event = if self.runtime_trace_observer.is_some() {
             Some(RuntimeTraceEvent::RevocationCommitted {
@@ -32,7 +32,7 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<(), KernelError> {
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.publication_sync.fence(false, true)?;
         let result = self.check_revocation(&request.capability);
         let revoked_capability_id = match &result {
             Err(KernelError::CapabilityRevoked(capability_id))

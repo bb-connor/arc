@@ -8,11 +8,11 @@ struct RevocationWindowServer {
     invocations: std::sync::Arc<AtomicU64>,
 }
 
-struct PausingRevocationReadStore {
-    revoked: AtomicBool,
-    pause_next_read: AtomicBool,
-    read_observed: mpsc::SyncSender<()>,
-    release_read: Mutex<mpsc::Receiver<()>>,
+pub(super) struct PausingRevocationReadStore {
+    pub(super) revoked: AtomicBool,
+    pub(super) pause_next_read: AtomicBool,
+    pub(super) read_observed: mpsc::SyncSender<()>,
+    pub(super) release_read: Mutex<mpsc::Receiver<()>>,
 }
 
 impl RevocationStore for PausingRevocationReadStore {

@@ -121,11 +121,11 @@ notes = "Models approval attachment and pending reversal racing for one operatio
 
 [[harness]]
 crate = "chio-kernel"
-test = "loom_concurrency::loom_post_admission_drop_guards_race_on_receipt_store_write_lock"
+test = "loom_concurrency::loom_recovery_waits_for_acknowledged_publication_projection"
 max_preemptions = 3
 lane = "nightly"
 scope = "bounded_abstract_model"
-notes = "Models two armed post-dispatch guards serializing non-atomic receipt appends."
+notes = "Models recovery exclusion through acknowledged publication projection, assuming an atomic store commit."
 
 [[harness]]
 crate = "chio-kernel"

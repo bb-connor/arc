@@ -39,6 +39,7 @@ mod kernel_scopes;
 mod kernel_struct;
 mod nonce_admission;
 mod output_guard;
+mod publication_sync;
 mod receipt_identity;
 use receipt_identity::{IdentityDisposition, RefusalReceiptMetadata};
 mod rejection_metadata;

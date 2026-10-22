@@ -22,8 +22,6 @@
 use std::collections::{BTreeSet, VecDeque};
 
 #[cfg(any(loom, chio_kernel_loom))]
-use loom::cell::UnsafeCell;
-#[cfg(any(loom, chio_kernel_loom))]
 use loom::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 #[cfg(any(loom, chio_kernel_loom))]
 use loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -268,48 +266,34 @@ fn loom_parent_signs_receipt_while_child_spawns() {
 #[test]
 fn loom_revocation_race_eval() {
     loom::model(|| {
-        #[derive(Default)]
-        struct RevocationModel {
-            revoked: bool,
-            events: Vec<&'static str>,
+        let fence = Arc::new(RwLock::new(()));
+        let revoked = Arc::new(AtomicBool::new(false));
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let mut evaluators = Vec::new();
+        for _ in 0..2 {
+            let fence = Arc::clone(&fence);
+            let revoked = Arc::clone(&revoked);
+            let events = Arc::clone(&events);
+            evaluators.push(thread::spawn(move || {
+                let _publication = read_lock(&fence);
+                let allowed = !revoked.load(Ordering::Acquire);
+                thread::yield_now();
+                lock_mutex(&events).push(if allowed { "allow" } else { "deny" });
+            }));
         }
-
-        let store = Arc::new(Mutex::new(RevocationModel::default()));
-
-        let eval_a_store = Arc::clone(&store);
-        let eval_a = thread::spawn(move || {
-            let mut store = lock_mutex(&eval_a_store);
-            if store.revoked {
-                store.events.push("deny");
-            } else {
-                store.events.push("allow");
-            }
-        });
-
-        let eval_b_store = Arc::clone(&store);
-        let eval_b = thread::spawn(move || {
-            let mut store = lock_mutex(&eval_b_store);
-            if store.revoked {
-                store.events.push("deny");
-            } else {
-                store.events.push("allow");
-            }
-        });
-
-        let revoke_store = Arc::clone(&store);
+        let revoke_events = Arc::clone(&events);
         let revoke = thread::spawn(move || {
-            let mut store = lock_mutex(&revoke_store);
-            store.revoked = true;
-            store.events.push("revoke");
+            let _revocation = write_lock(&fence);
+            revoked.store(true, Ordering::Release);
+            lock_mutex(&revoke_events).push("revoke");
         });
-
-        join_ok(eval_a);
-        join_ok(eval_b);
+        for evaluator in evaluators {
+            join_ok(evaluator);
+        }
         join_ok(revoke);
-
-        let store = lock_mutex(&store);
+        let events = lock_mutex(&events);
         let mut revoked_seen = false;
-        for event in &store.events {
+        for event in events.iter() {
             if *event == "revoke" {
                 revoked_seen = true;
                 continue;
@@ -1010,82 +994,35 @@ struct ModelDropGuard {
 }
 
 #[cfg(any(loom, chio_kernel_loom))]
-/// Models the kernel's receipt store (see
-/// chio-kernel/src/kernel/responses/receipt_persistence.rs::record_chio_receipt
-/// and dispatch.rs::record_child_receipt) as a non-atomic check-then-write:
-/// snapshot the next free slot, yield (so loom can schedule a competing
-/// append between the read and the write), then write the receipt into
-/// that slot and publish the new length. A single call is race-free only
-/// because the caller holds `receipt_store_write_lock` (a bare
-/// `Mutex<()>`, matching the kernel's `receipt_store_write_lock` field)
-/// for the whole call, exactly as the kernel serializes
-/// `append_chio_receipt_returning_seq` / `append_child_receipt_returning_seq`
-/// under that lock. If a future edit moved the append outside the lock,
-/// or split its critical section, two concurrent appends could snapshot
-/// the same slot and one receipt would silently overwrite (lose) the
-/// other.
-struct NonAtomicReceiptStore {
-    len: UnsafeCell<usize>,
-    slots: UnsafeCell<[u8; 2]>,
+struct ModelReceiptStore {
+    receipts: Mutex<Vec<u8>>,
 }
 
 #[cfg(any(loom, chio_kernel_loom))]
-impl NonAtomicReceiptStore {
+impl ModelReceiptStore {
     fn new() -> Self {
         Self {
-            len: UnsafeCell::new(0),
-            slots: UnsafeCell::new([0; 2]),
+            receipts: Mutex::new(Vec::new()),
         }
     }
 
-    /// Appends `receipt_id`. Callers must hold the paired
-    /// `receipt_store_write_lock` for the duration of this call; the
-    /// read-modify-write below is not atomic on its own.
     fn append(&self, receipt_id: u8) {
-        // Step 1: snapshot the next free slot (the check).
-        // SAFETY: the caller holds `receipt_store_write_lock`, so no other
-        // thread accesses `len` while this read runs.
-        let idx = self.len.with(|len| unsafe { *len });
-        // Step 2: yield so loom explores schedules where a competing
-        // append runs between the snapshot and the write-back below.
+        let mut receipts = lock_mutex(&self.receipts);
         thread::yield_now();
-        // Step 3: write the receipt into the snapshotted slot and
-        // publish the new length (the write). Two racing appends that
-        // both snapshotted the same idx both land here; the later write
-        // wins and the earlier receipt is lost.
-        // SAFETY: the caller holds `receipt_store_write_lock`, so this is the
-        // only access to `slots`; the index is bounds-checked.
-        self.slots
-            .with_mut(|slots| unsafe { (*slots)[idx] = receipt_id });
-        // SAFETY: the caller holds `receipt_store_write_lock`, so this is the
-        // only access to `len`.
-        self.len.with_mut(|len| unsafe { *len = idx + 1 });
+        receipts.push(receipt_id);
     }
 
-    /// Callers must have joined every appending thread.
     fn snapshot(&self) -> Vec<u8> {
-        // SAFETY: every appending thread has joined, so no write to `len`
-        // can run concurrently with this read.
-        let len = self.len.with(|len| unsafe { *len });
-        // SAFETY: every appending thread has joined, so no write to `slots`
-        // can run concurrently with this read.
-        let slots = self.slots.with(|slots| unsafe { *slots });
-        slots[..len].to_vec()
+        lock_mutex(&self.receipts).clone()
     }
 }
 
 #[cfg(any(loom, chio_kernel_loom))]
 impl ModelDropGuard {
-    /// Models PostAdmissionDropGuard::drop: disarmed guards do
-    /// nothing; pre-dispatch drops release reservations and write no
-    /// receipt; post-dispatch drops retain reservations and append exactly
-    /// one receipt while holding the store write lock (models the
-    /// kernel's receipt_store_write_lock std::sync::Mutex guarding the
-    /// non-atomic receipt store append).
     fn run_drop(
         &self,
-        receipt_store_write_lock: &Mutex<()>,
-        receipt_store: &NonAtomicReceiptStore,
+        receipt_barrier: &RwLock<()>,
+        receipt_store: &ModelReceiptStore,
         released_reservations: &AtomicUsize,
     ) {
         if !self.armed {
@@ -1095,59 +1032,42 @@ impl ModelDropGuard {
             released_reservations.fetch_add(1, Ordering::AcqRel);
             return;
         }
-        let _write_lock = lock_mutex(receipt_store_write_lock);
+        let _receipt_guard = read_lock(receipt_barrier);
         receipt_store.append(self.receipt_id);
     }
 }
 
 #[cfg(any(loom, chio_kernel_loom))]
 #[test]
-fn loom_post_admission_drop_guards_race_on_receipt_store_write_lock() {
+fn loom_recovery_waits_for_acknowledged_publication_projection() {
     loom::model(|| {
-        let receipt_store_write_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-        let receipt_store = Arc::new(NonAtomicReceiptStore::new());
-        let released = Arc::new(AtomicUsize::new(0));
-
-        let lock_a = Arc::clone(&receipt_store_write_lock);
-        let store_a = Arc::clone(&receipt_store);
-        let released_a = Arc::clone(&released);
-        let guard_a = thread::spawn(move || {
-            ModelDropGuard {
-                armed: true,
-                dispatch_started: true,
-                receipt_id: 1,
-            }
-            .run_drop(&lock_a, &store_a, &released_a);
+        let barrier = Arc::new(RwLock::new(()));
+        let committed = Arc::new(AtomicBool::new(false));
+        let mirrored = Arc::new(Mutex::new(Vec::new()));
+        let publication_barrier = Arc::clone(&barrier);
+        let publication_commit = Arc::clone(&committed);
+        let publication_mirror = Arc::clone(&mirrored);
+        let publication = thread::spawn(move || {
+            let _publication = read_lock(&publication_barrier);
+            publication_commit.store(true, Ordering::Release);
+            thread::yield_now();
+            lock_mutex(&publication_mirror).push(1_u8);
         });
-
-        let lock_b = Arc::clone(&receipt_store_write_lock);
-        let store_b = Arc::clone(&receipt_store);
-        let released_b = Arc::clone(&released);
-        let guard_b = thread::spawn(move || {
-            ModelDropGuard {
-                armed: true,
-                dispatch_started: true,
-                receipt_id: 2,
+        let recovery_commit = Arc::clone(&committed);
+        let recovery_mirror = Arc::clone(&mirrored);
+        let recovery = thread::spawn(move || {
+            let _recovery = write_lock(&barrier);
+            if recovery_commit.load(Ordering::Acquire) {
+                let mut mirror = lock_mutex(&recovery_mirror);
+                if !mirror.contains(&1) {
+                    mirror.push(1);
+                }
             }
-            .run_drop(&lock_b, &store_b, &released_b);
         });
-
-        join_ok(guard_a);
-        join_ok(guard_b);
-
-        let receipts = receipt_store.snapshot();
-        let ids: BTreeSet<u8> = receipts.iter().copied().collect();
-        assert_eq!(receipts.len(), 2, "a concurrent drop lost a receipt");
-        assert_eq!(
-            ids,
-            BTreeSet::from([1, 2]),
-            "each dropped call must record its own receipt exactly once"
-        );
-        assert_eq!(
-            released.load(Ordering::Acquire),
-            0,
-            "post-dispatch drops must never release reservations"
-        );
+        join_ok(publication);
+        join_ok(recovery);
+        assert!(committed.load(Ordering::Acquire));
+        assert_eq!(*lock_mutex(&mirrored), vec![1]);
     });
 }
 
@@ -1155,11 +1075,11 @@ fn loom_post_admission_drop_guards_race_on_receipt_store_write_lock() {
 #[test]
 fn loom_disarmed_drop_guard_is_noop() {
     loom::model(|| {
-        let receipt_store_write_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-        let receipt_store = Arc::new(NonAtomicReceiptStore::new());
+        let receipt_barrier: Arc<RwLock<()>> = Arc::new(RwLock::new(()));
+        let receipt_store = Arc::new(ModelReceiptStore::new());
         let released = Arc::new(AtomicUsize::new(0));
 
-        let lock = Arc::clone(&receipt_store_write_lock);
+        let lock = Arc::clone(&receipt_barrier);
         let store = Arc::clone(&receipt_store);
         let released_worker = Arc::clone(&released);
         let worker = thread::spawn(move || {
