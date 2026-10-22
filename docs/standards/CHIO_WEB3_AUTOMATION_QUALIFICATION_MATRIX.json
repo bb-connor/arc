@@ -71,7 +71,7 @@
       "scenario": "x402_circle_4337_policy_evaluation",
       "expectedOutcome": "pass",
       "observedOutcome": "pass",
-      "notes": "x402, Circle, EIP-3009, and ERC-4337 hooks stay subordinate to governed dispatch truth and explicit custody or reimbursement policy."
+      "notes": "x402, Circle, and ERC-4337 hooks stay subordinate to governed dispatch truth and explicit custody or reimbursement policy."
     }
   ]
 }

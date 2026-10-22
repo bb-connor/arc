@@ -104,8 +104,8 @@ observation unless the signed Chio verifier report also accepts the bound claim.
   jobs
 - `docs/standards/CHIO_CCIP_PROFILE.md` for cross-chain settlement
   coordination messages
-- `docs/standards/CHIO_PAYMENT_INTEROP_PROFILE.md` for x402, EIP-3009,
-  Circle, and ERC-4337 compatibility
+- `docs/standards/CHIO_PAYMENT_INTEROP_PROFILE.md` for x402, Circle, and
+  ERC-4337 compatibility
 
 ## Supported Lanes
 

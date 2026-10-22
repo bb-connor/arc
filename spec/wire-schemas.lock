@@ -5345,11 +5345,6 @@ files = ["crates/kernel/chio-kernel/src/kernel/settlement_observer.rs"]
 first_seen = "0438fca5d3"
 
 [[schema]]
-value = "chio.settle.offchain_receipt.v1"
-files = ["crates/economy/chio-settle/src/payments.rs"]
-first_seen = "d91c44dcc7"
-
-[[schema]]
 value = "chio.settle.outcome.v1"
 files = ["crates/economy/chio-settle/src/hook.rs"]
 first_seen = "9173b4c589"

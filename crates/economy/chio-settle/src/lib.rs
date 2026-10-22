@@ -115,14 +115,9 @@ pub use outcome_store::{
     MAX_SETTLEMENT_LEASE_MS, MAX_SETTLEMENT_WORKER_ID_BYTES,
 };
 pub use payments::{
-    approval_binding_from_governed, build_x402_payment_requirements, evaluate_circle_nanopayment,
-    prepare_paymaster_compatibility, prepare_transfer_with_authorization,
-    validate_offchain_settlement_receipt, ApprovalBinding, CircleNanopaymentPolicy, Eip3009Domain,
-    Eip3009NonceStore, Erc4337PaymasterPolicy, InMemoryEip3009NonceStore, NonceOutcome,
-    OffchainSettlementReceiptArtifact, PreparedCircleNanopayment, PreparedPaymasterCompatibility,
-    PreparedTransferWithAuthorization, RailBinding, TransferWithAuthorizationInput,
-    X402PaymentRequirements, X402SettlementMode, CHIO_OFFCHAIN_SETTLEMENT_RECEIPT_SCHEMA,
-    DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
+    build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,
+    ApprovalBinding, CircleNanopaymentPolicy, Erc4337PaymasterPolicy, PreparedCircleNanopayment,
+    PreparedPaymasterCompatibility, X402PaymentRequirements, X402SettlementMode,
 };
 pub use retry::{
     classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,

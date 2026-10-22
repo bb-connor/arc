@@ -303,7 +303,7 @@ EVM and Solana, projects on-chain state back into the Chio receipt family.
   commitment comparison, and binding verification
 - `ccip` -- Chainlink CCIP cross-chain messaging for cross-chain settlement
 - `payments` -- x402 payment requirements, Circle nanopayment evaluation,
-  EIP-3009 `transferWithAuthorization`, ERC-4337 paymaster compatibility
+  ERC-4337 paymaster compatibility
 - `automation` -- settlement and bond watchdog jobs for monitoring on-chain
   state
 - `observe` -- finality inspection, escrow execution projection, bond
@@ -732,8 +732,6 @@ chio-settle also provides adapters for HTTP-native payment protocols:
 
 - **x402:** `build_x402_payment_requirements` -- projects governed settlement
   into x402 HTTP payment requirements
-- **EIP-3009:** `prepare_transfer_with_authorization` -- prepares ERC-20
-  meta-transaction authorization digests
 - **Circle nanopayments:** `evaluate_circle_nanopayment` -- evaluates
   Circle-managed-custody nanopayment policies
 - **ERC-4337:** `prepare_paymaster_compatibility` -- assesses paymaster

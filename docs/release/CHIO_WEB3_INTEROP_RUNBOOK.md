@@ -88,7 +88,7 @@ Recovery:
 
 ## Payment Interop
 
-Use x402, Circle, EIP-3009, and ERC-4337 compatibility only when the operator
+Use x402, Circle, and ERC-4337 compatibility only when the operator
 has already accepted the explicit settlement and custody posture.
 
 Expected behavior:
