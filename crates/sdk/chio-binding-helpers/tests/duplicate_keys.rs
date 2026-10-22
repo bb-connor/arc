@@ -1,0 +1,77 @@
+//! Signed JSON entry points refuse a repeated object key or a non-canonical
+//! number token before typed decoding.
+
+use chio_binding_helpers::{
+    canonicalize_json_str, parse_capability_json, parse_signed_manifest_json,
+    sign_json_str_ed25519, verify_json_str_signature_ed25519, ErrorCode, Result,
+};
+
+const REPEATED_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+const SEED_HEX: &str = "0101010101010101010101010101010101010101010101010101010101010101";
+
+fn assert_refused<T: std::fmt::Debug>(result: Result<T>) {
+    let error = result
+        .err()
+        .unwrap_or_else(|| panic!("repeated key accepted"));
+    assert_eq!(error.code(), ErrorCode::UntrustedInput);
+    assert_eq!(error.to_string(), REPEATED_KEY);
+}
+
+#[test]
+fn json_entry_points_refuse_a_repeated_key() -> Result<()> {
+    let repeated = r#"{"a":{"b":1,"b":2}}"#;
+
+    assert_eq!(
+        canonicalize_json_str(r#"{"a":{"b":1}}"#)?,
+        r#"{"a":{"b":1}}"#
+    );
+    assert_refused(canonicalize_json_str(repeated));
+
+    let signed = sign_json_str_ed25519(r#"{"a":{"b":2}}"#, SEED_HEX)?;
+    assert_refused(sign_json_str_ed25519(repeated, SEED_HEX));
+    assert!(verify_json_str_signature_ed25519(
+        r#"{"a":{"b":2}}"#,
+        &signed.public_key_hex,
+        &signed.signature_hex
+    )?);
+    assert_refused(verify_json_str_signature_ed25519(
+        repeated,
+        &signed.public_key_hex,
+        &signed.signature_hex,
+    ));
+
+    assert_refused(parse_capability_json(r#"{"id":"cap","id":"cap"}"#));
+    assert_refused(parse_signed_manifest_json(
+        r#"{"manifest":{},"manifest":{}}"#,
+    ));
+    Ok(())
+}
+
+#[test]
+fn json_entry_points_refuse_a_non_canonical_number() -> Result<()> {
+    let exponent = r#"{"a":{"b":2e0}}"#;
+
+    assert_refused(canonicalize_json_str(exponent));
+    assert_refused(sign_json_str_ed25519(exponent, SEED_HEX));
+    let signed = sign_json_str_ed25519(r#"{"a":{"b":2}}"#, SEED_HEX)?;
+    assert_refused(verify_json_str_signature_ed25519(
+        exponent,
+        &signed.public_key_hex,
+        &signed.signature_hex,
+    ));
+    assert_refused(parse_capability_json(r#"{"issued_at":1e0}"#));
+    assert_refused(parse_signed_manifest_json(r#"{"version":1e0}"#));
+    Ok(())
+}
+
+#[test]
+fn json_entry_points_refuse_input_over_the_bound() {
+    let error = canonicalize_json_str(&" ".repeat(1024 * 1024 + 1))
+        .err()
+        .unwrap_or_else(|| panic!("oversized input accepted"));
+    assert_eq!(error.code(), ErrorCode::UntrustedInput);
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:attest:signed-json-too-large"
+    );
+}

@@ -7,9 +7,11 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{features::CapabilityNegotiation, token::CapabilityToken};
 use chio_core_types::rng::Rng as _;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::pure::{
@@ -35,17 +37,12 @@ fn to_js_error(error: &BindingError) -> JsValue {
     to_plain_js(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
 }
 
-fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T, JsValue> {
-    serde_json::from_str::<T>(raw).map_err(|error| {
-        let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
-        to_js_error(&err)
-    })
-}
+/// Bound on each JSON text argument, matching the mobile receipt inspection.
+const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
 
-/// Signed receipt input: repeated keys refuse and integers keep their signed domain.
-fn parse_signed_json<T: serde::de::DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
-    chio_core_types::canonical::UntrustedJsonText::new(raw)
-        .decode_signed()
+fn parse_json<T: DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
+    UntrustedJsonText::from_wire(raw.as_bytes(), MAX_JSON_INPUT_BYTES)
+        .and_then(|text| text.decode_signed())
         .map_err(|error| {
             let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
             to_js_error(&err)
@@ -120,7 +117,7 @@ pub fn evaluate(request_json: &str) -> Result<JsValue, JsValue> {
 /// [`sign_receipt_relaying_trusted_body`].
 #[wasm_bindgen]
 pub fn sign_receipt(body_json: &str, signing_seed_hex: &str) -> Result<JsValue, JsValue> {
-    let input: SignReceiptRequestJson = parse_signed_json("sign_receipt body", body_json)?;
+    let input: SignReceiptRequestJson = parse_json("sign_receipt body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt = sign_receipt_pure(input, &seed).map_err(|err| to_js_error(&err))?;
     encode_signed_receipt(&receipt)
@@ -139,7 +136,7 @@ pub fn sign_receipt_relaying_trusted_body(
     signing_seed_hex: &str,
 ) -> Result<JsValue, JsValue> {
     let input: SignReceiptRequestJson =
-        parse_signed_json("sign_receipt_relaying_trusted_body body", body_json)?;
+        parse_json("sign_receipt_relaying_trusted_body body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt =
         sign_receipt_relaying_trusted_body_pure(input, &seed).map_err(|err| to_js_error(&err))?;

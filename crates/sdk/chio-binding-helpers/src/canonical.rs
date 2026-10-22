@@ -4,7 +4,12 @@ use crate::Result;
 
 /// Parse a raw JSON string and return its RFC 8785 canonical form.
 pub fn canonicalize_json_str(input: &str) -> Result<String> {
-    let value: Value = serde_json::from_str(input)?;
+    let value: Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        input.as_bytes(),
+        crate::MAX_JSON_INPUT_BYTES,
+    )
+    .and_then(|text| text.decode_signed())
+    .map_err(|error| chio_core::Error::UntrustedInput(error.into()))?;
     Ok(chio_core::canonicalize(&value)?)
 }
 
