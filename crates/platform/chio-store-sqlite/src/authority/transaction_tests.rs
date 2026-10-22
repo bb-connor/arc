@@ -1,4 +1,5 @@
 use super::*;
+use chio_security_types::schema::SchemaRefusal;
 use std::collections::BTreeSet;
 use std::sync::{Arc, Barrier};
 
@@ -27,8 +28,12 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
     )?;
     assert!(matches!(
         SqliteCapabilityAuthority::open(&path),
-        Err(AuthorityStoreError::Schema(message))
-            if message == "database application_id 0x0 is not a Chio store (expected 0x4348494f)"
+        Err(AuthorityStoreError::Schema(
+            SchemaRefusal::ForeignDatabase {
+                found: 0,
+                expected: crate::schema_version::CHIO_SQLITE_APPLICATION_ID
+            }
+        ))
     ));
     let trusted_keys: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = 'authority_trusted_keys')",
@@ -47,8 +52,10 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
     )?;
     assert!(matches!(
         SqliteCapabilityAuthority::open(&path),
-        Err(AuthorityStoreError::Schema(message))
-            if message == "database schema version 2 is not the current schema version 1; refusing to open"
+        Err(AuthorityStoreError::Schema(SchemaRefusal::StaleSchema {
+            found: 2,
+            current: 1
+        }))
     ));
     connection.execute_batch("PRAGMA ignore_check_constraints = OFF;")?;
     connection.execute(
@@ -57,8 +64,8 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
     )?;
     assert!(matches!(
         SqliteCapabilityAuthority::open(&path),
-        Err(AuthorityStoreError::Schema(message))
-            if message == "schema namespace authority is missing"
+        Err(AuthorityStoreError::Schema(SchemaRefusal::MissingSchema { store_key }))
+            if store_key == "authority"
     ));
     Ok(())
 }
@@ -345,5 +352,41 @@ fn authority_identity_refuses_when_status_cannot_be_read() -> TestResult {
         Err(KernelError::CapabilityIssuanceFailed(message)) if message == expected
     ));
     assert!(authority.trusted_public_keys().is_empty());
+    Ok(())
+}
+
+#[test]
+fn authority_missing_required_state_has_distinct_typed_refusals() -> TestResult {
+    for table in [
+        "authority_state",
+        "authority_cluster_fence",
+        "authority_trusted_keys",
+    ] {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("authority.db");
+        drop(SqliteCapabilityAuthority::open(&path)?);
+        let connection = Connection::open(&path)?;
+        connection.execute(&format!("DELETE FROM {table}"), [])?;
+        let result = SqliteCapabilityAuthority::open(&path);
+        match table {
+            "authority_state" => {
+                assert!(matches!(result, Err(AuthorityStoreError::MissingIdentity)))
+            }
+            "authority_cluster_fence" => assert!(matches!(
+                result,
+                Err(AuthorityStoreError::MissingClusterFence)
+            )),
+            "authority_trusted_keys" => assert!(matches!(
+                result,
+                Err(AuthorityStoreError::MissingIssuerHistory)
+            )),
+            _ => unreachable!(),
+        }
+        let rows: i64 =
+            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })?;
+        assert_eq!(rows, 0);
+    }
     Ok(())
 }

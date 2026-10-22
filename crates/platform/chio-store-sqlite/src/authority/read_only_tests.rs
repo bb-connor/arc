@@ -1,5 +1,6 @@
 use super::*;
 use chio_security_types::clock::{ClockError, FixedClock};
+use chio_security_types::schema::SchemaRefusal;
 use rusqlite::OpenFlags;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -191,8 +192,12 @@ fn inspection_refuses_storage_outside_schema_v1() -> TestResult {
     raw.execute_batch("PRAGMA ignore_check_constraints = OFF;")?;
     assert!(matches!(
         SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
-        Err(AuthorityInspectionError::Store(AuthorityStoreError::Schema(message)))
-            if message == "database schema version 2 is not the current schema version 1; refusing to open"
+        Err(AuthorityInspectionError::Store(
+            AuthorityStoreError::Schema(SchemaRefusal::StaleSchema {
+                found: 2,
+                current: 1
+            })
+        ))
     ));
     let version: i32 = raw.query_row(
         "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
@@ -408,5 +413,70 @@ fn final_f11_verification_view_binds_exact_envelope_history_and_exclusive_expiry
             .chain_commitment
     ));
     assert!(updated.matches_imported_envelope(&next.envelope_digest()?));
+    Ok(())
+}
+
+#[test]
+fn inspection_preserves_unsupported_journal_mode_without_writes() -> TestResult {
+    let (_directory, path, owner) = provisioned()?;
+    drop(owner);
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("PRAGMA journal_mode = DELETE;")?;
+    let witness = Witness::open(&path)?;
+    let before = witness.data_version()?;
+    assert!(matches!(
+        SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
+        Err(AuthorityInspectionError::Store(AuthorityStoreError::UnsupportedJournalMode { found })) if found == "delete"
+    ));
+    assert_eq!(witness.data_version()?, before);
+    let mode: String = connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
+    assert_eq!(mode, "delete");
+    Ok(())
+}
+
+#[test]
+fn inspection_missing_issuer_history_is_typed_and_not_repaired() -> TestResult {
+    let (_directory, path, owner) = provisioned()?;
+    drop(owner);
+    let connection = Connection::open(&path)?;
+    connection.execute("DELETE FROM authority_trusted_keys", [])?;
+    let witness = Witness::open(&path)?;
+    let before = witness.data_version()?;
+    assert!(matches!(
+        SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
+        Err(AuthorityInspectionError::Store(
+            AuthorityStoreError::MissingIssuerHistory
+        ))
+    ));
+    assert_eq!(witness.data_version()?, before);
+    let count: i64 =
+        connection.query_row("SELECT COUNT(*) FROM authority_trusted_keys", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(count, 0);
+    Ok(())
+}
+
+#[test]
+fn inspection_missing_application_stamp_preserves_typed_refusal() -> TestResult {
+    let (_directory, path, owner) = provisioned()?;
+    drop(owner);
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("PRAGMA application_id = 0;")?;
+    let witness = Witness::open(&path)?;
+    let before = witness.data_version()?;
+    assert!(matches!(
+        SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
+        Err(AuthorityInspectionError::Store(
+            AuthorityStoreError::Schema(SchemaRefusal::ForeignDatabase {
+                found: 0,
+                expected: crate::schema_version::CHIO_SQLITE_APPLICATION_ID
+            })
+        ))
+    ));
+    assert_eq!(witness.data_version()?, before);
+    let application_id: i32 =
+        connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    assert_eq!(application_id, 0);
     Ok(())
 }
