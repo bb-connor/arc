@@ -34,7 +34,7 @@ pub use exchange::{
     ContextOpening, EntropyFailure, ExchangeEntropy, ExchangeServices, PreparedAnchoredRoot,
     RootExchange,
 };
-pub use grant::IdJagGrant;
+pub use grant::{IdJagGrant, RequestedTokenType};
 pub use id_jag::ID_JAG_MEDIA_TYPE;
 pub use key_lookup::{IdpKey, IdpKeyLookup};
 pub use provider::ProviderRecord;

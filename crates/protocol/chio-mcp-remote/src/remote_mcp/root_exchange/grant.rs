@@ -1,7 +1,6 @@
 //! Token requests that carry an ID-JAG.
 
 use chio_core::root_authority::Sha256Digest;
-use chio_core::sha256;
 
 use super::client_auth::ClientCredentials;
 use super::error::RootExchangeError;
@@ -10,6 +9,19 @@ pub const GRANT_TYPE_JWT_BEARER: &str = "urn:ietf:params:oauth:grant-type:jwt-be
 pub const GRANT_TYPE_TOKEN_EXCHANGE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
 pub const TOKEN_TYPE_ID_JAG: &str = "urn:ietf:params:oauth:token-type:id-jag";
 pub const TOKEN_TYPE_ACCESS_TOKEN: &str = "urn:ietf:params:oauth:token-type:access_token";
+pub const TOKEN_TYPE_CHIO_CAPABILITY: &str = "urn:chio:params:oauth:token-type:capability-v1";
+
+const REQUEST_DIGEST_DOMAIN: &[u8] = b"chio.root-exchange-request.v1\0";
+
+/// What the token response carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RequestedTokenType {
+    /// A local access token naming the root (the default).
+    AccessToken,
+    /// The canonical root capability itself.
+    ChioCapability,
+}
 
 /// Upper bound on a token request body.
 pub const MAX_TOKEN_REQUEST_BYTES: usize = 32 * 1024;
@@ -32,7 +44,18 @@ pub struct IdJagGrant {
     client_id: Option<String>,
     client_assertion_type: Option<String>,
     client_assertion: Option<String>,
+    requested_token_type: RequestedTokenType,
     request_digest: Sha256Digest,
+}
+
+/// The request members the digest binds. Client authentication is excluded,
+/// so a retry with a fresh client assertion names the same request.
+#[derive(serde::Serialize)]
+struct RequestDigestInput<'a> {
+    grant_type: &'a str,
+    id_jag: &'a str,
+    requested_token_type: RequestedTokenType,
+    client_id: Option<&'a str>,
 }
 
 impl IdJagGrant {
@@ -71,6 +94,7 @@ impl IdJagGrant {
         }
         let [grant_type, assertion, subject_token, subject_token_type, requested_token_type, client_id, client_assertion_type, client_assertion] =
             values;
+        let mut requested = RequestedTokenType::AccessToken;
         let id_jag = match grant_type.as_deref() {
             Some(GRANT_TYPE_JWT_BEARER) => {
                 if subject_token.is_some()
@@ -92,24 +116,33 @@ impl IdJagGrant {
                 if subject_token_type.as_deref() != Some(TOKEN_TYPE_ID_JAG) {
                     return Err(RootExchangeError::UnsupportedSubjectTokenType);
                 }
-                if requested_token_type
-                    .as_deref()
-                    .is_some_and(|requested| requested != TOKEN_TYPE_ACCESS_TOKEN)
-                {
-                    return Err(RootExchangeError::UnsupportedRequestedTokenType);
-                }
+                requested = match requested_token_type.as_deref() {
+                    None | Some(TOKEN_TYPE_ACCESS_TOKEN) => RequestedTokenType::AccessToken,
+                    Some(TOKEN_TYPE_CHIO_CAPABILITY) => RequestedTokenType::ChioCapability,
+                    Some(_) => return Err(RootExchangeError::UnsupportedRequestedTokenType),
+                };
                 subject_token.ok_or(RootExchangeError::MalformedRequest(
                     "subject_token is missing",
                 ))?
             }
             _ => return Err(RootExchangeError::UnsupportedGrantType),
         };
+        let digest_input = RequestDigestInput {
+            grant_type: grant_type.as_deref().unwrap_or_default(),
+            id_jag: &id_jag,
+            requested_token_type: requested,
+            client_id: client_id.as_deref(),
+        };
+        let canonical = chio_core::canonical_json_bytes(&digest_input)
+            .map_err(|_| RootExchangeError::MalformedRequest("request does not canonicalize"))?;
+        let request_digest = Sha256Digest::of_domain(REQUEST_DIGEST_DOMAIN, &canonical);
         Ok(Self {
             id_jag,
             client_id,
             client_assertion_type,
             client_assertion,
-            request_digest: Sha256Digest::from_hash(sha256(body)),
+            requested_token_type: requested,
+            request_digest,
         })
     }
 
@@ -119,7 +152,14 @@ impl IdJagGrant {
         &self.id_jag
     }
 
-    /// SHA-256 of the exact request body.
+    #[must_use]
+    pub fn requested_token_type(&self) -> RequestedTokenType {
+        self.requested_token_type
+    }
+
+    /// `SHA-256("chio.root-exchange-request.v1\0" || canonical_json(request))`
+    /// over the grant type, the ID-JAG, the requested token type and the
+    /// client id. Client authentication is not part of it.
     #[must_use]
     pub fn request_digest(&self) -> &Sha256Digest {
         &self.request_digest
