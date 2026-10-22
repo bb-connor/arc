@@ -10,10 +10,6 @@
 //! MUST NOT replay the failed settlement until an operator clears
 //! the row via [`SqliteDeadLetterStore::clear`]. There is no
 //! auto-retry past the documented bound.
-//!
-//! The migration is `CREATE TABLE IF NOT EXISTS` plus
-//! `CREATE INDEX IF NOT EXISTS`, so it can run repeatedly against a
-//! receipt-store database that already holds other tables.
 
 use std::sync::Arc;
 
