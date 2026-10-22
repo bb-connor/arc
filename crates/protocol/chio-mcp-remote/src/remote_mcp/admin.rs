@@ -785,15 +785,7 @@ fn control_client(
     };
     trust_control::service_runtime::client::build_client(url, token)
         .map(Some)
-        .map_err(|error| {
-            input::with_source(
-                plain_http_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "trust admin backend unavailable",
-                ),
-                error,
-            )
-        })
+        .map_err(admin_backend_failure)
 }
 
 /// A trust backend failure answers the fixed 500 URN. The cause stays in the
@@ -815,15 +807,7 @@ fn open_receipt_store(
             "remote receipt admin requires --receipt-db",
         ));
     };
-    chio_store_sqlite::SqliteReceiptStore::open(path).map_err(|error| {
-        input::with_source(
-            plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "trust admin backend unavailable",
-            ),
-            error,
-        )
-    })
+    chio_store_sqlite::SqliteReceiptStore::open(path).map_err(admin_backend_failure)
 }
 
 fn open_revocation_store(
@@ -840,15 +824,7 @@ fn open_revocation_store(
             "remote trust admin requires durable revocation state",
         ));
     };
-    chio_store_sqlite::SqliteRevocationStore::open(path).map_err(|error| {
-        input::with_source(
-            plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "trust admin backend unavailable",
-            ),
-            error,
-        )
-    })
+    chio_store_sqlite::SqliteRevocationStore::open(path).map_err(admin_backend_failure)
 }
 
 fn open_budget_store(
