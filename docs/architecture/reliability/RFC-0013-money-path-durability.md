@@ -667,8 +667,10 @@ the evidence for them:
   journal is resolved only by the no-authorization path in
   `admission_coordinator/payment_compensation.rs`, so evidence insert, journal
   closure and exposure release cannot be split across APIs or crashes.
-- A reserved hold that never reached dispatch is reaped by
-  `reap_expired_reserved_budget_holds`.
+- An expired reserved hold the caller never reconciled is settled at its reserved
+  worst case by `reap_expired_reserved_budget_holds`. The reaper cannot prove the
+  call never ran, so the reserved amount is forfeited to realized spend, never
+  released.
 - `chio api protect` runs the recovery batch and the reserved-hold reaper on its
   admission maintenance tick. `serve-http` and the control plane reconcile at
   startup only; their periodic tick lands with their payment adapter wiring.
@@ -762,11 +764,14 @@ The hook contract is that a hook never mutates receipt rows or receipt bytes.
 database written through the serving writer.
 
 `ChioKernel::install_settlement_ledger(outcome_store, retry_policy)` builds the
-hook and installs it through `set_settlement_observer_runtime`. A host that
-configures a payment adapter installs the ledger, and startup refuses when the
-install fails (no atomic projection support, store binding mismatch). A host with
-no payment adapter installs nothing. There is no driver flag: an opt-in setting
-that defaults to off recreates the silent unpaid path that F68 and F69 close.
+hook and installs it through `set_settlement_observer_runtime`. `chio api protect`
+installs the ledger whenever it configures a payment adapter, and its startup
+refuses when the install fails (no atomic projection support, store binding
+mismatch). `chio mcp wrap`, the governed sim lane and the control-plane finding
+purchase configure a payment adapter without installing the ledger; F69 stays
+partially implemented until they do. A host with no payment adapter installs
+nothing. There is no driver flag: an opt-in setting that defaults to off recreates
+the silent unpaid path that F68 and F69 close.
 
 `ChioKernel::drain_settlement_attempts(limit)` claims due rows through
 `SettlementOutcomeStore::claim_due`, rebuilds each observation from the stored
@@ -920,8 +925,8 @@ has been removed, so no process-local budget counter remains.
 - Staged rollout. The payment participant is the money-path specialization of RFC-0003's
   `DurableAdmissionMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled
-  (it only adds logging, metrics, and dead-letter rows). The F69 ledger installs
-  whenever a payment adapter is configured.
+  (it only adds logging, metrics, and dead-letter rows). `chio api protect` installs
+  the F69 ledger whenever it configures a payment adapter.
 - Operator-visible behavior changes to document in release notes: newly surfaced
   dead-letter rows and `ReconcileFailed` incidents are "recovery working", not
   "new fault"; an old hold without terminal recovery remains frozen and visible
@@ -994,9 +999,9 @@ has been removed, so no process-local budget counter remains.
 - After a clean run's reconcile, `list_incomplete_payment_journal` returns empty
   and every remaining open hold has a named, nonterminal incident.
 - An open hold is released only by recovery after a matching terminal no-movement
-  resolution, or by the reserved-hold reaper for a hold that never reached
-  dispatch. Age alone, `ReconcileFailed`, or unknown rail state never releases
-  capacity.
+  resolution. The reserved-hold reaper forfeits an expired unreconciled reserved
+  hold to realized spend at its reserved worst case. Age alone, `ReconcileFailed`,
+  or unknown rail state never releases capacity.
 - A settlement hook returning `Retryable`/`Permanent`/error for a money-bearing receipt
   produces a `settle_attempts` or `settle_dead_letters` row plus a warn and a metric;
   `chio settle status` reports it. Nothing is dropped at `receipt_persistence.rs:185`.
@@ -1046,6 +1051,6 @@ has been removed, so no process-local budget counter remains.
    `DurableAdmissionMode::Monetary`. RFC-0003 later releases with cumulative
    `SideEffecting` as the compiled production default after the kill-injection
    soak is green; RFC-0013 does not define a competing default.
-4. The F69 ledger hook installs whenever a payment adapter is configured, turning
-   eligible F68 work into reconciliation rows and draining retryable attempts on
-   the host maintenance tick.
+4. The F69 ledger hook installs in every host that configures a payment adapter,
+   turning eligible F68 work into reconciliation rows and draining retryable
+   attempts on the host maintenance tick. `chio api protect` does this today.
