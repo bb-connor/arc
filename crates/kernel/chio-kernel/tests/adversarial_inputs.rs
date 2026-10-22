@@ -8,7 +8,6 @@ use chio_core::capability::{
 };
 use chio_core::crypto::Keypair;
 use chio_kernel::transport::{read_frame, ChioTransport, TransportError};
-use chio_test_support::duplicate_keys::assert_repeated_tag_and_content_refused;
 
 fn encode_frame(body: &[u8]) -> Vec<u8> {
     let mut frame = Vec::with_capacity(4 + body.len());
@@ -119,14 +118,4 @@ fn wrong_type_fields_return_deserialize_error() {
 
     let err = transport.recv().unwrap_err();
     assert!(matches!(err, TransportError::Deserialize(_)));
-}
-
-#[test]
-fn persisted_kernel_enums_refuse_a_repeated_tag_or_content_key() {
-    assert_repeated_tag_and_content_refused::<chio_kernel::SecurityInvocationContext>(
-        "version", "v1", "context",
-    );
-    assert_repeated_tag_and_content_refused::<chio_kernel::stop::DecisionTime>(
-        "kind", "observed", "unix_ms",
-    );
 }

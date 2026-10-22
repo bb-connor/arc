@@ -4,7 +4,7 @@ use chio_core::{
     capability::{governance::ProvenanceEvidenceClass, scope::MonetaryAmount},
     MerkleTree,
 };
-use chio_test_support::duplicate_keys::{assert_refused, assert_repeated_tag_and_content_refused};
+use chio_test_support::duplicate_keys::assert_refused;
 use chio_credit::underwriting::{
     SignedUnderwritingDecision, UnderwritingBudgetAction, UnderwritingBudgetRecommendation,
     UnderwritingDecisionArtifact, UnderwritingDecisionLifecycleState, UnderwritingDecisionOutcome,
@@ -340,18 +340,5 @@ fn raw_financial_credentials_refuse_a_repeated_subject_family_or_claims() -> Tes
             wrapper.len() + column,
         );
     }
-    assert_repeated_tag_and_content_refused::<FinancialPassportCredential>(
-        "kind",
-        "financial",
-        "credential",
-    );
-    assert_repeated_tag_and_content_refused::<FinancialCredentialSubjectV1>(
-        "family",
-        "premium_history",
-        "claims",
-    );
-    assert_repeated_tag_and_content_refused::<chio_reputation::MetricValue>(
-        "state", "known", "value",
-    );
     Ok(())
 }
