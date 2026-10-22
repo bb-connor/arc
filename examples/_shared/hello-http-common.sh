@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/trust-access.sh"
+
 # Smoke runs create authority databases and bearer tokens. Their fresh state
 # must be private; the authority still rejects unsafe existing ancestors.
 umask 077

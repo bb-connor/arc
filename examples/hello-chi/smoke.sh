@@ -32,9 +32,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
+write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access.toml" "${SERVICE_TOKEN}"
 "${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" \
-  --service-token "${SERVICE_TOKEN}" \
+  --access-config "${STATE_DIR}/trust-access.toml" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \
   --revocation-db "${STATE_DIR}/trust-revocations.sqlite3" \
   --authority-db "${STATE_DIR}/trust-authority.sqlite3" \

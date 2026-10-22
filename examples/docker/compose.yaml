@@ -33,6 +33,7 @@ services:
       CHIO_AUTH_TOKEN: ${CHIO_AUTH_TOKEN:-demo-token}
       CHIO_ADMIN_TOKEN: ${CHIO_ADMIN_TOKEN:-demo-admin-token}
       CHIO_CONTROL_URL: http://chio-trust-demo:8940
+      CHIO_CONTROL_INTERNAL_URL: http://chio-trust-demo:8941
       CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
       CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
       CHIO_CAGE_INIT: ${CHIO_CAGE_INIT:-}
