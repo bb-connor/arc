@@ -421,22 +421,24 @@ pub(super) fn build_snapshot(
 }
 
 /// Provision the private snapshot. Contention for the snapshot location is
-/// retried until the walker busy timeout has passed on the store clock: no
-/// retry starts at or after that deadline, and a location still contended
+/// retried until the walker busy timeout has passed on the store clock's
+/// monotonic time, so wall clock steps neither shorten nor extend the wait:
+/// no retry starts at or after that deadline, and a location still contended
 /// then is unavailable with the last contention reason.
 fn provision(ctx: &WalkContext<'_>, quota_bytes: u64) -> Result<SnapshotDb, WalkError> {
-    let now_ms = || {
+    let now = || {
         ctx.store
-            .query_snapshot_unix_ms()
+            .query_snapshot_monotonic()
             .map_err(|error| WalkError::Unavailable(error.to_string()))
     };
-    let budget_ms = u64::try_from(ctx.limits.busy_timeout.as_millis()).unwrap_or(u64::MAX);
-    let deadline_ms = now_ms()?.saturating_add(budget_ms);
+    let deadline = now()?
+        .checked_add(ctx.limits.busy_timeout)
+        .map_err(|error| WalkError::Unavailable(error.to_string()))?;
     // The remaining budget, or the unavailable outcome once it is spent.
     let remaining = |reason: &str| -> Result<std::time::Duration, WalkError> {
         ctx.check_cancel()?;
-        match deadline_ms.checked_sub(now_ms()?) {
-            Some(left) if left > 0 => Ok(std::time::Duration::from_millis(left)),
+        match deadline.duration_since(now()?) {
+            Ok(left) if !left.is_zero() => Ok(left),
             _ => Err(WalkError::Unavailable(reason.to_owned())),
         }
     };

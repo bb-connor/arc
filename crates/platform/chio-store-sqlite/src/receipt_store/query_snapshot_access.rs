@@ -7,6 +7,14 @@ impl SqliteReceiptStore {
         Ok(self.clock.unix_millis()?.get())
     }
 
+    /// Monotonic time from the store's fenced clock, for local waits.
+    pub(crate) fn query_snapshot_monotonic(
+        &self,
+    ) -> Result<chio_security_types::clock::MonotonicInstant, ReceiptStoreError> {
+        use chio_security_types::clock::Clock;
+        Ok(self.clock.monotonic()?)
+    }
+
     /// True when the writer's own verification of the receipt chain failed and
     /// every append is refused until an operator reseeds the head.
     pub(crate) fn writer_head_poisoned(&self) -> bool {

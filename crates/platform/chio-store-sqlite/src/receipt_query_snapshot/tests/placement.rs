@@ -278,20 +278,21 @@ fn a_build_waits_out_parent_lock_contention_until_cancelled() {
     drop(db);
 }
 
-/// Wall time scripted for the builder thread: its first read is `script[0]`,
-/// its second releases `holder` and reads `script[1]`, and later ones read
-/// `script[2]`. Every other thread reads `script[0]`.
+/// Time scripted for the builder thread as (wall, monotonic) milliseconds:
+/// its first read is `script[0]`, its second releases `holder` and reads
+/// `script[1]`, and later ones read `script[2]`. Every other thread reads
+/// `script[0]`.
 struct ScriptedClock {
     builder: std::sync::Mutex<Option<std::thread::ThreadId>>,
     reads: std::sync::atomic::AtomicUsize,
-    script: [u64; 3],
+    script: [(u64, u64); 3],
     holder: std::sync::Mutex<Option<File>>,
 }
 
 impl Clock for ScriptedClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
         let builder = *self.builder.lock().unwrap() == Some(std::thread::current().id());
-        let millis = if builder {
+        let (wall, monotonic) = if builder {
             let read = self.reads.fetch_add(1, Ordering::SeqCst);
             if read == 1 {
                 drop(self.holder.lock().unwrap().take());
@@ -301,8 +302,8 @@ impl Clock for ScriptedClock {
             self.script[0]
         };
         Ok(ClockReading::new(
-            UnixMillis::new(millis),
-            MonotonicInstant::from_nanos(millis.saturating_mul(1_000_000)),
+            UnixMillis::new(wall),
+            MonotonicInstant::from_nanos(monotonic.saturating_mul(1_000_000)),
         ))
     }
 }
@@ -310,7 +311,7 @@ impl Clock for ScriptedClock {
 /// Build while the snapshot parent is locked; the lock is released at the
 /// builder's second clock read. The outcome carries the number of snapshot
 /// databases the built snapshot left in place.
-fn build_released_by_the_clock(script: [u64; 3]) -> Result<usize, WalkError> {
+fn build_released_by_the_clock(script: [(u64, u64); 3]) -> Result<usize, WalkError> {
     let directory = tempfile::Builder::new()
         .permissions(std::fs::Permissions::from_mode(0o700))
         .tempdir()
@@ -355,20 +356,52 @@ fn build_released_by_the_clock(script: [u64; 3]) -> Result<usize, WalkError> {
 }
 
 const START_MS: u64 = 1_760_000_000_000;
+const HOUR_MS: u64 = 3_600_000;
+
+/// Wall and monotonic time `elapsed` milliseconds after the start.
+const fn after(elapsed: u64) -> (u64, u64) {
+    (START_MS + elapsed, START_MS + elapsed)
+}
+
+fn budget_ms() -> u64 {
+    u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap()
+}
 
 #[test]
 fn a_parent_lock_released_after_the_deadline_is_not_retried() {
-    let budget = u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap();
+    let budget = budget_ms();
     // Within budget before the backoff, past the deadline after it.
-    let outcome =
-        build_released_by_the_clock([START_MS, START_MS + budget - 1, START_MS + budget + 1]);
+    let outcome = build_released_by_the_clock([after(0), after(budget - 1), after(budget + 1)]);
     assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
 }
 
 #[test]
 fn a_parent_lock_released_within_the_budget_is_provisioned() {
-    let outcome = build_released_by_the_clock([START_MS, START_MS + 1_000, START_MS + 2_000]);
+    let outcome = build_released_by_the_clock([after(0), after(1_000), after(2_000)]);
     assert_eq!(outcome, Ok(1));
+}
+
+#[test]
+fn a_wall_clock_step_forward_does_not_spend_the_budget() {
+    // Wall time jumps an hour ahead while monotonic time stays within budget.
+    let outcome = build_released_by_the_clock([
+        after(0),
+        (START_MS + HOUR_MS, START_MS + 1_000),
+        (START_MS + HOUR_MS, START_MS + 2_000),
+    ]);
+    assert_eq!(outcome, Ok(1));
+}
+
+#[test]
+fn a_frozen_wall_clock_does_not_extend_the_budget() {
+    let budget = budget_ms();
+    // Wall time stands still while monotonic time passes the deadline.
+    let outcome = build_released_by_the_clock([
+        after(0),
+        (START_MS, START_MS + budget - 1),
+        (START_MS, START_MS + budget + 1),
+    ]);
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
 }
 
 #[test]
