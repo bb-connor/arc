@@ -5,10 +5,9 @@ use super::utils::*;
 pub(crate) fn build_proof_package(
     input: &Path,
     bundle_manifest_paths: &[PathBuf],
-    trusted_kernel_keys: &[String],
+    trust: &chio_core::root_authority::VerifierTrust,
 ) -> Result<MercuryProofPackage, CliError> {
-    let trust = kernel_key_trust(trusted_kernel_keys)?;
-    let verified = evidence_export::load_verified_evidence_package(input, &trust)?;
+    let verified = evidence_export::load_verified_evidence_package(input, trust)?;
     let bundle_manifests = load_bundle_manifests(bundle_manifest_paths)?;
     MercuryProofPackage::build(
         verified.package.bundle,
@@ -21,32 +20,6 @@ pub(crate) fn build_proof_package(
         bundle_manifests,
     )
     .map_err(|error| CliError::Other(error.to_string()))
-}
-
-/// A trust file pinning only `trusted_kernel_keys`.
-fn kernel_key_trust(
-    trusted_kernel_keys: &[String],
-) -> Result<chio_core::root_authority::VerifierTrust, CliError> {
-    let kernel_keys = trusted_kernel_keys
-        .iter()
-        .map(|key| chio_core::crypto::PublicKey::from_hex(key))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| CliError::Other(format!("invalid trusted kernel key: {error}")))?;
-    let trust = chio_core::root_authority::VerifierTrust {
-        schema: chio_core::root_authority::CHIO_VERIFIER_TRUST_SCHEMA.to_string(),
-        kernel_keys,
-        exchange_keys: Vec::new(),
-        root_policy_keys: Vec::new(),
-        idp_keys: Default::default(),
-        pep_keys: Default::default(),
-        checkpoint_keys: Vec::new(),
-        checkpoint_trust_anchor: None,
-        required_columns: Vec::new(),
-    };
-    trust
-        .validate()
-        .map_err(|error| CliError::Other(error.to_string()))?;
-    Ok(trust)
 }
 
 pub(crate) fn build_inquiry_package(

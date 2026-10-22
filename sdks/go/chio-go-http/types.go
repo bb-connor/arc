@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 00ebdde14e4eff0fd408dec500b8ffd91c9219f379866c3dea79a1ee566dd730
+// Schema content SHA-256: 56417727bb73de0840ae810948542b04bd5537a9099f1d6520ce38ea48a10d79
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -13911,7 +13911,7 @@ type RootAuthorityVerifierTrust struct {
 	CheckpointKeys        *[]RootAuthorityRootAnchorPublicKeyHex                  `json:"checkpoint_keys,omitempty"`
 	CheckpointTrustAnchor *RootAuthorityVerifierTrustCheckpointTrustAnchorBinding `json:"checkpoint_trust_anchor,omitempty"`
 
-	// ExchangeKeys Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
+	// ExchangeKeys Keys that may sign anchored roots.
 	ExchangeKeys []RootAuthorityRootAnchorPublicKeyHex `json:"exchange_keys"`
 
 	// IdpKeys Issuer to the identity-provider keys the verifier pins itself.
@@ -13922,7 +13922,7 @@ type RootAuthorityVerifierTrust struct {
 	PepKeys         *map[string]RootAuthorityRootAnchorPublicKeyHex `json:"pep_keys,omitempty"`
 	RequiredColumns *[]RootAuthorityVerifierTrustRequiredColumns    `json:"required_columns,omitempty"`
 
-	// RootPolicyKeys Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
+	// RootPolicyKeys Keys that may sign root policies.
 	RootPolicyKeys []RootAuthorityRootAnchorPublicKeyHex `json:"root_policy_keys"`
 	Schema         RootAuthorityVerifierTrustSchema      `json:"schema"`
 }

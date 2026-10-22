@@ -2879,8 +2879,8 @@ codes:
   - urn: "urn:chio:error:attest:bundle-trust-missing"
     domain: attest
     severity: error
-    summary: "The evidence bundle needs a key role the verifier trust file leaves empty."
-    help: "Pin the keys for the role the bundle needs in the trust file."
+    summary: "A signer the evidence bundle needs is not pinned in the verifier trust file."
+    help: "Pin the kernel key that signed the bundle in the trust file, obtained independently of the bundle."
     string_code: "CHIO-ATTEST-BUNDLE-TRUST-MISSING"
     since: "0.1.0"
     stability: stable

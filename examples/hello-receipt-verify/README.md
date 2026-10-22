@@ -16,11 +16,14 @@ This example does not start trust, issue capabilities, or run an app surface. It
 
 ## Files
 
+`verifier-trust.json` is the `chio.verifier-trust.v1` file `chio evidence verify --trust` reads; it pins the kernel key that signed the captured receipt.
+
 ```text
 ARCHITECTURE.md
 README.md
 fixtures/minimal-evidence/
 smoke.sh
+verifier-trust.json
 test_verify_artifacts.py
 verify_artifacts.py
 ```

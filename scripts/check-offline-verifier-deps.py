@@ -3,9 +3,10 @@
 
 Reads `cargo metadata --format-version 1 --locked` output and walks the
 normal (non-dev, non-build) dependency closure of `chio-bundle-verify`. The
-gate fails when that closure contains an async runtime, an HTTP client, a
-SQLite binding or a hosted Chio crate, or a package whose license expression
-is not satisfiable from the `deny.toml` `[licenses] allow` list. A package
+gate fails when that closure contains a Chio crate outside the portable
+allowlist, an async runtime or event loop, an HTTP client or protocol stack,
+a SQLite or SQL binding, or a package whose license expression is not
+satisfiable from the `deny.toml` `[licenses] allow` list. A package
 without a `license` field must have a `[[licenses.clarify]]` entry.
 """
 
@@ -20,16 +21,38 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = "chio-bundle-verify"
+# The only Chio crates the offline verifier may reach.
+CHIO_ALLOWED = frozenset(
+    {
+        "chio-bundle-verify",
+        "chio-core-types",
+        "chio-errors",
+        "chio-kernel-core",
+        "chio-security-types",
+    }
+)
 DENIED = frozenset(
     {
+        # async runtimes and event loops
         "tokio",
-        "rusqlite",
+        "async-std",
+        "smol",
+        "mio",
+        # HTTP clients and protocol stacks
         "reqwest",
         "ureq",
         "hyper",
-        "chio-kernel",
-        "chio-control-plane",
-        "chio-store-sqlite",
+        "hyper-util",
+        "h2",
+        "isahc",
+        "surf",
+        "attohttpc",
+        "curl",
+        "curl-sys",
+        # SQL bindings
+        "rusqlite",
+        "libsqlite3-sys",
+        "sqlx",
     }
 )
 
@@ -121,6 +144,10 @@ def check(metadata: dict, deny_toml: Path, package: str = PACKAGE) -> list[str]:
         name = entry["name"]
         if name in DENIED:
             errors.append(f"{package} must not depend on {name} {entry['version']}")
+        if name.startswith("chio-") and name not in CHIO_ALLOWED:
+            errors.append(
+                f"{package} must not depend on the hosted Chio crate {name} {entry['version']}"
+            )
         expression = entry.get("license") or clarify.get(name)
         if expression is None:
             errors.append(f"{name} {entry['version']} declares no license")

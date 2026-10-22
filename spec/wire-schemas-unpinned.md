@@ -146,14 +146,14 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:17` `FINDING_OPERATOR_BUYER_CLIENT_SCHEMA` = `chio.finding.buyer-client.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:18` `FINDING_OPERATOR_SELLER_CLIENT_SCHEMA` = `chio.finding.seller-client.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs:19` `FINDING_VOLUNTARY_RETRACTION_REQUEST_SCHEMA` = `chio.finding.voluntary-retraction-request.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs:69` `RESERVATION_DOMAIN` = `chio.finding.reservation.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs:71` `RESERVATION_DOMAIN` = `chio.finding.reservation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:50` `FINDING_PURCHASE_REQUEST_SCHEMA` = `chio.finding.purchase-request.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:54` `FINDING_PURCHASE_ERROR_SCHEMA` = `chio.finding.purchase-error.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:25` `FINDING_STATUS_INTENT_SCHEMA` = `chio.finding.status-intent-submission.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:26` `FINDING_STATUS_INTENT_ID_DOMAIN` = `chio.finding.status-intent-id.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:27` `FINDING_VOLUNTARY_RETRACTION_RECEIPT_SCHEMA` = `chio.finding.voluntary-retraction-receipt.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:69` `VERIFIED_FIX_DRAFT_SCHEMA` = `chio.finding.verified-fix-draft.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:71` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:71` `VERIFIED_FIX_DRAFT_SCHEMA` = `chio.finding.verified-fix-draft.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:73` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
 - `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs:4` `STRUCTURED_BUDGET_RESPONSE_SCHEMA` = `chio.structured-budget-response.v1`
 
 ## crates/platform/chio-store-sqlite (16)

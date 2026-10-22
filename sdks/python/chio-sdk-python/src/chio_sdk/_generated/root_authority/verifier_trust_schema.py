@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f9c25e1eb1ce1c8ea4083ef04968d45682cd9f79d853175aac0d03e295257b73
+# Schema sha256: b1327961d337a6880e1c267862d3778078a72c85788c98de91fd5bb2d4c74079
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -83,13 +83,13 @@ class ChioVerifierTrust(BaseModel):
     )
     exchange_keys: list[root_anchor_schema.PublicKeyHex] = Field(
         ...,
-        description="Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
+        description="Keys that may sign anchored roots.",
         max_length=64,
         min_length=0,
     )
     root_policy_keys: list[root_anchor_schema.PublicKeyHex] = Field(
         ...,
-        description="Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
+        description="Keys that may sign root policies.",
         max_length=64,
         min_length=0,
     )

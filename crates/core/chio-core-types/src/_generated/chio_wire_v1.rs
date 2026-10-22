@@ -150891,7 +150891,7 @@ pub mod root_authority_verifier_trust {
     ///      "$ref": "#/$defs/CheckpointTrustAnchorBinding"
     ///    },
     ///    "exchange_keys": {
-    ///      "description": "Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
+    ///      "description": "Keys that may sign anchored roots.",
     ///      "type": "array",
     ///      "items": {
     ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
@@ -151041,7 +151041,7 @@ pub mod root_authority_verifier_trust {
     ///      "uniqueItems": true
     ///    },
     ///    "root_policy_keys": {
-    ///      "description": "Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
+    ///      "description": "Keys that may sign root policies.",
     ///      "type": "array",
     ///      "items": {
     ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
@@ -151069,7 +151069,7 @@ pub mod root_authority_verifier_trust {
         ///The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub checkpoint_trust_anchor: ::std::option::Option<CheckpointTrustAnchorBinding>,
-        ///Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
+        ///Keys that may sign anchored roots.
         pub exchange_keys: Vec<ChioVerifierTrustExchangeKeysItem>,
         ///Issuer to the identity-provider keys the verifier pins itself.
         #[serde(
@@ -151090,7 +151090,7 @@ pub mod root_authority_verifier_trust {
             ::std::collections::HashMap<ChioVerifierTrustPepKeysKey, ChioVerifierTrustPepKeysValue>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub required_columns: ::std::option::Option<Vec<ChioVerifierTrustRequiredColumnsItem>>,
-        ///Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
+        ///Keys that may sign root policies.
         pub root_policy_keys: Vec<ChioVerifierTrustRootPolicyKeysItem>,
         pub schema: ::std::string::String,
     }

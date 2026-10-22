@@ -26,7 +26,7 @@ has `verifierEquivalent: false`.
 
 | Command | Inputs and result |
 | --- | --- |
-| `proof export` | Evidence directory, bundle manifests, and explicit trusted kernel keys; writes proof-package v2. |
+| `proof export` | Evidence directory, bundle manifests, and a `chio.verifier-trust.v1` trust file (`--trust`); writes proof-package v2. |
 | `inquiry export` | Proof package and audience; writes inquiry-package v1 with a deterministic rendered projection. |
 | `verify` | Current proof or inquiry JSON; prints integrity checks, optionally with `--explain`. |
 | `pilot export` | Built-in scenario; creates signed synthetic receipts and checkpoints. |
@@ -41,8 +41,8 @@ These records describe the fixture exercise.
 
 ## Guarantees
 
-- `build_proof_package` verifies evidence through `chio-bundle-verify` with a
-  trust file pinning the supplied kernel keys.
+- `build_proof_package` verifies evidence through `chio-bundle-verify` with the
+  verifier-owned trust file.
 - `cmd_mercury_verify` calls the core package's `verify` method. This method
   checks receipt signatures and package bindings without selecting an external
   trusted kernel-key set. Authority-sensitive consumers should use the core
