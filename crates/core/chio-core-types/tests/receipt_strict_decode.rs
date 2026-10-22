@@ -214,6 +214,49 @@ fn the_direct_decoders_refuse_a_padded_unit_variant() {
 }
 
 #[test]
+fn a_raw_receipt_refuses_a_repeated_decision_member() -> TestResult {
+    let honest = serde_json::to_string(&signed_receipt(Decision::Deny {
+        reason: "blocked".to_string(),
+        guard: "ForbiddenPathGuard".to_string(),
+    })?)?;
+    serde_json::from_str::<ChioReceipt>(&honest)?;
+    for (original, padded, key) in [
+        (
+            r#""verdict":"deny""#,
+            r#""verdict":"allow","verdict":"deny""#,
+            "verdict",
+        ),
+        (
+            r#""reason":"blocked""#,
+            r#""reason":"other","reason":"blocked""#,
+            "reason",
+        ),
+    ] {
+        assert_eq!(honest.matches(original).count(), 1, "{original}");
+        let wire = honest.replacen(original, padded, 1);
+        let expected = format!(
+            "{}: {key:?}",
+            chio_security_types::strict_serde::DUPLICATE_KEY
+        );
+        let direct = <ChioReceipt>::deserialize(&mut serde_json::Deserializer::from_str(&wire))
+            .err()
+            .map(|error| error.to_string());
+        let decoded = serde_json::from_str::<ChioReceipt>(&wire)
+            .err()
+            .map(|error| error.to_string());
+        for error in [direct, decoded] {
+            assert!(
+                error
+                    .as_deref()
+                    .is_some_and(|error| error.starts_with(&expected)),
+                "{padded}: {error:?}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn the_receipt_enums_refuse_a_raw_duplicate_key() {
     for (decision, key) in [
         (r#"{"verdict":"allow","verdict":"allow"}"#, "verdict"),
