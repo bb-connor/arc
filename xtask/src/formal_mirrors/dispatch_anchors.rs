@@ -544,6 +544,15 @@ const REQUIRED_SOURCES: &[RequiredSource] = &[
 
 const REVOCATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/publication_sync.rs",
+        symbols: &[
+            "PublicationSync::fence",
+            "PublicationSync::receipts",
+            "PublicationSync::projection",
+            "PublicationSync::publication",
+        ],
+    },
+    RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/effect_obligation.rs",
         symbols: &["PostEffectObligation::commit_terminal_receipt"],
     },
@@ -553,7 +562,7 @@ const REVOCATION_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/construction.rs",
-        symbols: &["ChioKernel::lock_runtime_trace_transition"],
+        symbols: &["ChioKernel::lock_receipt_publication"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs",

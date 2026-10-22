@@ -281,8 +281,8 @@ fn append_callback_panic_retains_identity_without_poisoning_kernel_locks() {
     wait_until(|| kernel.ensure_post_effect_evidence_latch_clear().is_ok());
     assert_eq!(state.append_calls.load(Ordering::SeqCst), 1);
     assert_eq!(kernel.receipt_log().len(), 1);
-    assert!(kernel.receipt_store_write_lock.lock().is_ok());
-    assert!(kernel.runtime_trace_transition_lock.lock().is_ok());
+    assert!(kernel.publication_sync.receipts.write().is_ok());
+    assert!(kernel.publication_sync.fence.write().is_ok());
 }
 
 #[test]

@@ -628,7 +628,7 @@ pub struct ChioKernel {
     pub(super) post_effect_host_budget:
         Arc<super::effect_obligation::evidence::PostEffectEvidenceBudget>,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
-    pub(super) receipt_store_write_lock: Arc<Mutex<()>>,
+    pub(super) publication_sync: Arc<super::publication_sync::PublicationSync>,
     /// Retention maintenance worker, spawned at store attach when
     /// `config.retention_config` is `Some`. Owns a dedicated OS thread that
     /// calls `ReceiptStore::rotate_receipts` on `RetentionConfig.check_interval_secs`;
@@ -672,7 +672,6 @@ pub struct ChioKernel {
     pub(super) security_pre_dispatch_hook: Option<Arc<dyn SecurityPreDispatchHook>>,
     pub(super) runtime_admission_readiness_timeout: Duration,
     pub(super) runtime_trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
-    pub(super) runtime_trace_transition_lock: Arc<Mutex<()>>,
     pub(super) runtime_trace_sequence: Arc<AtomicU64>,
     pub(super) attestation_trust_policy: Option<AttestationTrustPolicy>,
     pub(super) capability_crypto_floor: KernelCryptoFloor,
