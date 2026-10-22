@@ -143,7 +143,7 @@ async fn evidence_startup_refuses_unknown_receipt_tables() -> Result<(), Box<dyn
     .err()
     .ok_or("unknown receipt table was admitted")?;
     assert!(
-        matches!(&error, ProtectError::ReceiptStore(message) if message == "conflict: schema catalog differs from its canonical definition"),
+        matches!(&error, ProtectError::ReceiptStore(message) if message == "schema catalog differs from its canonical definition"),
         "{error:?}"
     );
     let count: i64 = rusqlite::Connection::open(&database)?.query_row(
@@ -183,7 +183,7 @@ async fn evidence_startup_refuses_a_receipt_database_holding_revocations(
     )
     .await;
     assert!(
-        matches!(&outcome, Ok(Err(ProtectError::ReceiptStore(message))) if message == "conflict: schema catalog differs from its canonical definition"),
+        matches!(&outcome, Ok(Err(ProtectError::ReceiptStore(message))) if message == "schema catalog differs from its canonical definition"),
         "{outcome:?}"
     );
     let mut revocations = database.into_os_string();
