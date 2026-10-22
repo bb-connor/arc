@@ -1345,6 +1345,11 @@ files = ["crates/security/chio-decoy/src/registry.rs"]
 first_seen = "6ea79bb5da"
 
 [[schema]]
+value = "chio.delegation-context.v1"
+files = ["crates/core/chio-core-types/src/root_authority/delegation_context.rs"]
+first_seen = "61607d31ad"
+
+[[schema]]
 value = "chio.delivery-contract.v1"
 files = ["crates/core/chio-core-types/src/receipt/metadata.rs"]
 first_seen = "ed3755a96c"
@@ -1478,6 +1483,11 @@ first_seen = "51e46336b1"
 value = "chio.enterprise-migration-transition.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
+
+[[schema]]
+value = "chio.enterprise-provider-identity.v1"
+files = ["crates/core/chio-core-types/src/root_authority/provider_identity.rs"]
+first_seen = "61607d31ad"
 
 [[schema]]
 value = "chio.enterprise-providers.v1"
@@ -2798,6 +2808,11 @@ first_seen = "6d18cf0a57"
 value = "chio.identity-interop-qualification-matrix.v1"
 files = ["crates/core/chio-core/src/identity_network/types.rs"]
 first_seen = "11e573d2d7"
+
+[[schema]]
+value = "chio.idp-key-snapshot.v1"
+files = ["crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs"]
+first_seen = "61607d31ad"
 
 [[schema]]
 value = "chio.insurance.claim.v1"
@@ -4825,6 +4840,11 @@ files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"
 first_seen = "28d826e3e6"
 
 [[schema]]
+value = "chio.revocation-entry.v1"
+files = ["crates/core/chio-core-types/src/root_authority/revocation_entry.rs"]
+first_seen = "2b29bd987a"
+
+[[schema]]
 value = "chio.risk.adjudication-jurisdiction-receipt.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-enterprise-export/src/artifacts.rs", "crates/platform/chio-trust-market-context/src/evidence.rs", "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs", "crates/products/chio-proof-room/src/lib.rs"]
 first_seen = "1b9620751d"
@@ -4843,6 +4863,11 @@ first_seen = "1b9620751d"
 value = "chio.risk.guarantee-decision.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-enterprise-export/src/artifacts.rs", "crates/platform/chio-trust-market-context/src/evidence.rs", "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs", "crates/products/chio-proof-room/src/lib.rs"]
 first_seen = "1b9620751d"
+
+[[schema]]
+value = "chio.root-policy.v1"
+files = ["crates/core/chio-core-types/src/root_authority/root_policy.rs"]
+first_seen = "61607d31ad"
 
 [[schema]]
 value = "chio.runtime-attestation.appraisal-artifact-inventory.v1"
