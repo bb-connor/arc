@@ -3,5 +3,6 @@ mod explanations {
     mod basis;
     pub mod common;
     mod privacy;
+    mod projection_validation;
     mod verification;
 }

@@ -10,15 +10,14 @@ use chio_security_types::InformationLabel;
 
 /// The recipient's view: only facts and templates whose every label flows to
 /// `clearance` take part, and the projected registry carries the context
-/// classification rather than the hidden registry classification.
+/// classification rather than the hidden registry classification. Only the
+/// visible graph is validated; opaque contexts disclose no graph errors.
 pub fn project_explanation(
     snapshot: &RecoverySnapshotV1,
     registry: &RecoveryRemedyRegistryV1,
     limits: ExplanationLimitsV1,
     clearance: &InformationLabel,
 ) -> Result<ExplanationProjectionV1, ContractError> {
-    snapshot.validate()?;
-    registry.validate(snapshot)?;
     limits.validate()?;
     let visible = |label: &InformationLabel| {
         !matches!(label, InformationLabel::Top) && label.flows_to(clearance)
