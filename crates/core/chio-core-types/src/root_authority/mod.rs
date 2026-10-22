@@ -15,6 +15,7 @@ pub mod delegation_context;
 pub mod idp_key_snapshot;
 pub mod jwk;
 pub mod provider_identity;
+pub mod revocation_entry;
 pub mod root_policy;
 pub mod wire;
 
@@ -35,6 +36,10 @@ pub use jwk::{Jwk, JwkCurve, JwkFields, JwkKeyType, JwkUse, JwsAlgorithm};
 pub use provider_identity::{
     EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, InlineJwks, ProviderRecordKind,
     SubjectMapping, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
+};
+pub use revocation_entry::{
+    RevocationEntry, RevocationEntryId, RevocationReason, RevocationTarget, RevocationTargetKind,
+    CHIO_REVOCATION_ENTRY_SCHEMA, REVOCATION_ENTRY_ID_DOMAIN,
 };
 pub use root_policy::{
     DisclosureDefault, InlineFields, LoadedRootPolicy, RootPolicy, RootPolicyDisclosure,
