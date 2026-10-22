@@ -218,6 +218,11 @@ fn validate_signed(bytes: &[u8], bound: usize) -> Result<(), UntrustedJsonError>
     Ok(())
 }
 
+/// The bounded body [`validate`] already read and refused on, handed to
+/// [`SignedJson`] so the extractor decodes it without reading or copying it again.
+#[derive(Clone)]
+struct ValidatedSignedBody(axum::body::Bytes);
+
 /// Body extractor for a route whose contract is [`Mode::Signed`]. It decodes
 /// the original bytes through `decode_signed`, so a duplicate key at any depth,
 /// including inside a `Value` member, refuses before the handler runs.
@@ -230,7 +235,7 @@ where
 {
     type Rejection = Response;
 
-    async fn from_request(request: Request, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(mut request: Request, _state: &S) -> Result<Self, Self::Rejection> {
         let bound = match request_contract(&request)? {
             Some((Mode::Signed, bound, _)) => bound,
             Some((Mode::Document, _, _)) | None => {
@@ -246,9 +251,13 @@ where
                 "JSON request body requires an application/json media type",
             ));
         }
-        let bytes = read_body(request.into_body(), bound)
-            .await
-            .map_err(IntoResponse::into_response)?;
+        let bytes = match request.extensions_mut().remove::<ValidatedSignedBody>() {
+            Some(ValidatedSignedBody(bytes)) => bytes,
+            None => read_body(request.into_body(), bound)
+                .await
+                .map(axum::body::Bytes::from)
+                .map_err(IntoResponse::into_response)?,
+        };
         UntrustedJsonText::from_wire(&bytes, bound)
             .and_then(|input| input.decode_signed())
             .map(Self)
@@ -424,7 +433,7 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
     }
     let (parts, body) = request.into_parts();
     let bytes = match read_body(body, bound).await {
-        Ok(bytes) => bytes,
+        Ok(bytes) => axum::body::Bytes::from(bytes),
         Err(error) => return error.into_response(),
     };
     let parsed = match mode {
@@ -434,6 +443,9 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
     if let Err(error) = parsed {
         return InputError::Json(error).into_response();
     }
-    next.run(Request::from_parts(parts, Body::from(bytes)))
-        .await
+    let mut request = Request::from_parts(parts, Body::from(bytes.clone()));
+    if matches!(mode, Mode::Signed) {
+        request.extensions_mut().insert(ValidatedSignedBody(bytes));
+    }
+    next.run(request).await
 }
