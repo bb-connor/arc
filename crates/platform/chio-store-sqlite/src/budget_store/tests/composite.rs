@@ -810,11 +810,10 @@ fn provision_refuses_populated_standalone_budget_state() {
 
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
         .expect_err("populated standalone safety state must not acquire an unproven baseline");
+    let canonical_database = fs::canonicalize(&database).expect("canonical database path");
     assert!(
-        error
-            .to_string()
-            .contains("schema namespace admission_operation is missing"),
-        "unexpected provisioning error: {error}"
+        matches!(error, crate::SqliteServingOwnerError::PartialProvision(path)
+        if path == canonical_database)
     );
     let _ = fs::remove_dir_all(path);
 }
