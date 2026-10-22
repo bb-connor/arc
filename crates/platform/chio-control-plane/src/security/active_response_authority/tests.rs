@@ -8,6 +8,7 @@ use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 #[cfg(target_os = "linux")]
 use chio_security_types::ports::ErrorCode;
 use chio_security_types::ports::{Digest32, PortErrorKind, RequestId};
+use chio_test_support::duplicate_keys::assert_repeated_tag_and_content_refused;
 use chio_test_support::prelude::*;
 
 use super::client::ProductionActiveResponseAuthorityClient;
@@ -1079,4 +1080,16 @@ mod linux_uds {
         );
         assert!(started.elapsed() < Duration::from_millis(500));
     }
+}
+
+#[test]
+fn authority_operations_and_results_refuse_a_repeated_tag_or_content_key() {
+    assert_repeated_tag_and_content_refused::<ActiveResponseAuthorityOperation>(
+        "operation",
+        "health",
+        "input",
+    );
+    assert_repeated_tag_and_content_refused::<ActiveResponseAuthorityResult>(
+        "result", "ready", "output",
+    );
 }
