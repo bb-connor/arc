@@ -1,9 +1,9 @@
 //! Reclamation of abandoned snapshot files before the receipt store opens.
 //!
-//! Opening the receipt store writes: every open commits its schema stamp. On a
-//! data filesystem filled by snapshot files that owners abandoned when they
-//! died, that open can fail before the snapshot service, which reclaims too,
-//! ever starts. The owner of both calls this first, with the path it is about
+//! Opening the receipt store writes to its data filesystem: at least its WAL
+//! and shared-memory files. On a data filesystem filled by snapshot files that
+//! owners abandoned when they died, that open can fail before the snapshot
+//! service, which reclaims too, ever starts. The owner of both calls this first, with the path it is about
 //! to open.
 //!
 //! One attempt does bounded work (at most 256 directory entries read and 16
