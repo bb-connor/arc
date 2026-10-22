@@ -417,3 +417,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "trace_batch_diagnostic.rs"]
+mod trace_batch_diagnostic;

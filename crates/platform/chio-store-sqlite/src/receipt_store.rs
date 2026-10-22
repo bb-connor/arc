@@ -132,6 +132,13 @@ type FederatedShareSubjectCorpus = (
 );
 pub(crate) type SqliteStoreConnection = PooledConnection<SqliteConnectionManager>;
 
+static TRACE_BATCH_DIAGNOSTIC_MAX: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+pub fn trace_batch_diagnostic_max() -> usize {
+    TRACE_BATCH_DIAGNOSTIC_MAX.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 const RECEIPT_GROUP_COMMIT_MAX_BATCH: usize = 64;
 const RECEIPT_GROUP_COMMIT_FLUSH_DELAY: Duration = Duration::from_micros(500);
 const RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY: usize = RECEIPT_GROUP_COMMIT_MAX_BATCH * 16;
@@ -2355,6 +2362,18 @@ fn commit_receipt_batch_with_completions(
                     )
                 }) {
                 Ok(results) => {
+                    let committed_ids: Vec<_> = requests
+                        .iter()
+                        .zip(&results)
+                        .filter(|(_, result)| result.is_ok())
+                        .map(|(request, _)| request.receipt.id.as_str())
+                        .collect();
+                    TRACE_BATCH_DIAGNOSTIC_MAX
+                        .fetch_max(committed_ids.len(), std::sync::atomic::Ordering::SeqCst);
+                    eprintln!(
+                        "{}",
+                        serde_json::json!({"trace_batch_committed_receipts": committed_ids})
+                    );
                     health.store_head_snapshot(head);
                     Ok(results)
                 }
