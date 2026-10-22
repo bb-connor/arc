@@ -27,6 +27,7 @@ in other crates, so a pass is evidence for the listed forms only.
 from __future__ import annotations
 
 import argparse
+import functools
 import importlib.util
 import re
 import sys
@@ -61,88 +62,176 @@ STRICT_TYPES = frozenset({
     "ToolCallAction",
 })
 
-# Each entry names one call (whitespace-normalized) in one function, and the
-# reader that produced the decoded Value.
+# Each entry names one call (whitespace-normalized) in one function that reads
+# an already parsed Value, and the custody chain that produced that Value. Each
+# custody link (path, function, call) requires that function to make that call;
+# the last link must call decode_signed and hold no raw text decode, so a
+# producer that regresses to a raw serde_json read fails the gate.
 ALLOWED = (
     {
         "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
         "owner": "decode_verified_chio_receipt",
         "call": "serde_json::from_value(value)",
-        "producer": "decode_stored_json calls UntrustedJsonText::decode_signed",
+        "custody": (
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs", "decode_verified_chio_receipt", "decode_stored_json("),
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs", "decode_stored_json", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
         "owner": "decode_verified_child_receipt",
         "call": "serde_json::from_value(value)",
-        "producer": "decode_stored_json calls UntrustedJsonText::decode_signed",
+        "custody": (
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs", "decode_verified_child_receipt", "decode_stored_json("),
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs", "decode_stored_json", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-control-plane/src/trust_control/cluster/snapshots.rs",
         "owner": "recover_cluster_snapshot",
         "call": "serde_json::from_value(record.receipt.clone())",
-        "producer": "the peer snapshot response is read by json_input::read, which calls decode_signed",
         "count": 2,
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs", "sync_peer", "client.cluster_snapshot("),
+            ("crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs", "sync_peer", "recover_cluster_snapshot("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/cluster.rs", "cluster_snapshot", "get_internal_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_internal_json", "request_internal_get_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_internal_get_json", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs",
         "owner": "load_chio_receipt",
         "call": "serde_json::from_value(value)",
-        "producer": "the receipt list response is read by json_input::read, which calls decode_signed",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs", "load_chio_receipt", "list_tool_receipts("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/operations.rs", "list_tool_receipts", "get_json_with_query("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_json_with_query", "request_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json", "request_json_capped("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json_capped", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs",
         "owner": "load_child_receipt",
         "call": "serde_json::from_value(value)",
-        "producer": "the receipt list response is read by json_input::read, which calls decode_signed",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs", "load_child_receipt", "list_child_receipts("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/operations.rs", "list_child_receipts", "get_json_with_query("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_json_with_query", "request_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json", "request_json_capped("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json_capped", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs",
         "owner": "sync_peer_tool_receipts",
         "call": "serde_json::from_value(record.receipt)",
-        "producer": "the peer delta response is read by json_input::read, which calls decode_signed",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs", "sync_peer_tool_receipts", "tool_receipt_deltas("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/cluster.rs", "tool_receipt_deltas", "get_internal_json_with_query("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_internal_json_with_query", "request_internal_get_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_internal_get_json", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
     },
     {
         "path": "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs",
         "owner": "sync_peer_child_receipts",
         "call": "serde_json::from_value(record.receipt)",
-        "producer": "the peer delta response is read by json_input::read, which calls decode_signed",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs", "sync_peer_child_receipts", "child_receipt_deltas("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/cluster.rs", "child_receipt_deltas", "get_internal_json_with_query("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_internal_json_with_query", "request_internal_get_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_internal_get_json", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
     },
     {
         "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs",
         "owner": "verify_file",
         "call": "serde_json::from_value(signed.action.parameters.clone())",
-        "producer": "receipt_verify::verify_original_receipt decodes the receipt text with input::decode, which calls decode_signed",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
     },
     {
         "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
         "owner": "cmd_mercury_verify",
         "call": "serde_json::from_value(value)",
-        "producer": "read_json_file reads through read_json_file_bounded, which calls decode_signed",
         "count": 2,
+        "custody": (
+            ("crates/products/chio-mercury/src/commands/core_cli/commands.rs", "cmd_mercury_verify", "read_json_file("),
+            ("crates/products/chio-mercury/src/commands/shared/utils.rs", "read_json_file", "read_json_file_bounded("),
+            ("crates/products/chio-mercury/src/commands/shared/utils.rs", "read_json_file_bounded", "decode_signed("),
+        ),
     },
     {
         "path": "crates/kernel/chio-runtime-core/src/buyer/proof_package.rs",
         "owner": "proof_package_contains_signed_receipt",
         "call": "serde_json::from_value(value.clone())",
-        "producer": "buyer artifacts are hydrated by helpers::artifact_json, which calls decode_signed",
+        "custody": (
+            ("crates/kernel/chio-runtime-core/src/buyer/review_hydration.rs", "from_bound_sources", "parse_review_json("),
+            ("crates/kernel/chio-runtime-core/src/buyer/helpers.rs", "parse_review_json", "decode_signed("),
+        ),
     },
     {
         "path": "crates/kernel/chio-runtime-core/src/buyer/proof_package.rs",
         "owner": "proof_package_receipt_subject",
         "call": "serde_json::from_value(receipt_value.clone())",
-        "producer": "buyer artifacts are hydrated by helpers::artifact_json, which calls decode_signed",
+        "custody": (
+            ("crates/kernel/chio-runtime-core/src/buyer/review_hydration.rs", "from_bound_sources", "parse_review_json("),
+            ("crates/kernel/chio-runtime-core/src/buyer/helpers.rs", "parse_review_json", "decode_signed("),
+        ),
     },
     {
         "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs",
         "owner": "verified_receipt",
         "call": "serde_json::from_value::<chio_core::receipt::body::ChioReceipt>(evidence[ ].clone(),)",
-        "producer": "BroadcastJsonRpcWriter::flush_complete_lines decodes each worker line with decode_json, the lib.rs alias of input::decode, which calls decode_signed",
+        "custody": (
+            ("crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/writer.rs", "flush_complete_lines", "decode_json("),
+            ("crates/protocol/chio-mcp-remote/src/input.rs", "decode", "decode_signed("),
+        ),
     },
     {
         "path": "crates/products/chio-cli/src/active_defense_migration.rs",
         "owner": "verify_backfill_receipts",
         "call": "strict_typed_value(&registered.receipt,)",
-        "producer": "parse_shadow_migration_input calls decode_signed; strict_typed_value reads that Value with from_value and refuses a noncanonical round trip",
+        "custody": (
+            ("crates/products/chio-cli/src/active_defense_migration.rs", "load_and_build_report", "parse_shadow_migration_input("),
+            ("crates/products/chio-cli/src/active_defense_migration.rs", "parse_shadow_migration_input", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/replay/verify.rs",
+        "owner": "verify_receipt",
+        "call": "serde_json::from_value(value.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/replay.rs", "run_log_replay", "verify_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "verify_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/replay/reader.rs", "parse", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/replay.rs",
+        "owner": "run_log_replay",
+        "call": "serde_json::from_value(value.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/replay/reader.rs", "parse", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
     },
 )
 
@@ -151,8 +240,12 @@ EXTRACTOR = re.compile(r"(?<![\w:])(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
 TYPE_ALIAS = re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
-TRAIT_CALL = re.compile(r"(?<![\w:.])(?:(?:serde\s*::\s*)?(?:de\s*::\s*)?Deserialize|<\s*([\w:]+)\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\(")
-GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*[^,>{]*\bDeserialize")
+TRAIT_CALL = re.compile(
+    r"(?<![\w:.])(?:(?:serde\s*::\s*)?(?:de\s*::\s*)?Deserialize"
+    r"|<\s*([\w:]+)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
+)
+GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*(?:for\s*<[^<>]*>|[^,>{])*?\bDeserialize")
+LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
 
 
 def without_test_items(code: str) -> str:
@@ -171,9 +264,9 @@ def without_test_items(code: str) -> str:
 
 def production_files(root: Path) -> list[tuple[str, str]]:
     files = []
-    for path in sorted((root / "crates").rglob("*.rs")):
+    for path in sorted((root / "crates").rglob("*")):
         rel = path.relative_to(root).as_posix()
-        if not _gate.production(path) or "examples" in rel.split("/") or path.name == "fuzz.rs":
+        if path.suffix not in {".rs", ".inc"} or not _gate.production(path) or "examples" in rel.split("/") or path.name == "fuzz.rs":
             continue
         code = _lexer.blank_rust_noise(path.read_text(encoding="utf-8"))
         files.append((rel, without_test_items(code)))
@@ -247,11 +340,43 @@ def call_text(code: str, start: int) -> str:
     return normalized(code[start:_contracts.closing(code, paren)])
 
 
+@functools.lru_cache(maxsize=4096)
+def let_spans(fn_code: str) -> tuple[tuple[int, int, str, str], ...]:
+    """(initializer start, initializer end, pattern, annotation) for each `let`."""
+    spans = []
+    for match in LET.finditer(fn_code):
+        if re.search(r"(?:\bif|\bwhile|&&)\s*$", fn_code[:match.start()]):
+            continue
+        depth, index = 0, match.end()
+        while index < len(fn_code):
+            char = fn_code[index]
+            if char in "([{":
+                depth += 1
+            elif char in ")]}":
+                depth -= 1
+                if depth < 0:
+                    break
+            elif char == ";" and depth == 0:
+                break
+            index += 1
+        spans.append((match.end(), index, match.group(1).strip(), (match.group(2) or "").strip()))
+    return tuple(spans)
+
+
+def enclosing_let(fn_code: str, offset: int) -> tuple[str, str]:
+    """The pattern and annotation of the innermost `let` whose initializer holds `offset`.
+
+    The call may sit anywhere in that initializer, so a decode wrapped in a
+    `match`, an `if let` or a method chain still takes the binding's type."""
+    found = ("", "")
+    for start, end, pattern, annotation in let_spans(fn_code):
+        if start <= offset < end:
+            found = (pattern, annotation)
+    return found
+
+
 def let_annotation(fn_code: str, offset: int) -> str:
-    statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
-    statement = fn_code[statement_start:offset]
-    match = re.search(r"\blet\s+(?:mut\s+)?[\w()\s,]+:\s*(.+?)=\s*$", statement, re.S)
-    return match.group(1) if match else ""
+    return enclosing_let(fn_code, offset)[1]
 
 
 def returned(fn_code: str, offset: int) -> bool:
@@ -271,9 +396,8 @@ def returned(fn_code: str, offset: int) -> bool:
 
 def let_binding(fn_code: str, offset: int) -> str:
     """The name an unannotated `let` binds to the call at `offset`, if any."""
-    statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
-    match = re.fullmatch(r"\s*let\s+(?:mut\s+)?(\w+)\s*=\s*", fn_code[statement_start:offset])
-    return match.group(1) if match else ""
+    pattern, annotation = enclosing_let(fn_code, offset)
+    return pattern if not annotation and re.fullmatch(r"\w+", pattern) else ""
 
 
 def binding_returned(fn_code: str, offset: int, name: str) -> bool:
@@ -360,6 +484,29 @@ def generic_raw_helpers(files: list[tuple[str, str]]) -> dict[str, dict[str, str
     return helpers
 
 
+def custody_breaks(by_path: dict[str, str], custody) -> str:
+    """The first custody link its source does not satisfy, or an empty string."""
+    if not custody or "decode_signed" not in custody[-1][2]:
+        return "a chain that does not end in decode_signed"
+    for index, (path, function, call) in enumerate(custody):
+        code = by_path.get(path, "")
+        bodies = [
+            _contracts.owner_code(code, row)
+            for row in _contracts.functions(code)
+            if row[0].split("#")[0] == function
+        ]
+        token = re.sub(r"\s+", "", call)
+        holders = [body for body in bodies if token in re.sub(r"\s+", "", body)]
+        if index == len(custody) - 1:
+            holders = [
+                body for body in holders
+                if all(kind == "value" for _, _, kind in decode_sites(body, body.find("{"), {}))
+            ]
+        if not holders:
+            return f"{path}::{function} -> {call}"
+    return ""
+
+
 def scan(root: Path) -> list[str]:
     files = production_files(root)
     strict = strict_closure(files)
@@ -383,12 +530,16 @@ def scan(root: Path) -> list[str]:
                     findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
     errors = []
     remaining = list(findings)
+    by_path = dict(files)
     for entry in ALLOWED:
         key = (entry["path"], entry["owner"], normalized(entry["call"]), "decode", "value")
         count = entry.get("count", 1)
         matched = [finding for finding in remaining if finding == key]
+        broken = custody_breaks(by_path, entry["custody"])
         if len(matched) != count:
             errors.append(f"{entry['path']}::{entry['owner']}: approved call {entry['call']} expects {count}, found {len(matched)}")
+        elif broken:
+            errors.append(f"{entry['path']}::{entry['owner']}: custody broken at {broken}")
         for finding in matched:
             remaining.remove(finding)
     errors.extend(f"{rel}::{owner}: raw {site} {text}" for rel, owner, text, site, _ in remaining)
@@ -419,6 +570,14 @@ FIXTURES = {
     "strict generic helper": ("fn decode<T: serde::de::DeserializeOwned>(t: &str) -> Result<T, E> { UntrustedJsonText::new(t).decode_signed() }\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 0),
     "direct trait": ("fn f(d: &mut serde_json::Deserializer<serde_json::de::StrRead>) -> Result<ChioReceipt, E> { ChioReceipt::deserialize(d) }", 1),
     "qualified trait": ("fn f(d: D) -> Result<ChioReceipt, E> { let r = serde::Deserialize::deserialize(d)?; Ok(r) }", 1),
+    "match-wrapped annotation": ("fn f(value: Value) -> Result<(), E> { let receipt: ChioReceipt = match serde_json::from_value(value) { Ok(r) => r, Err(e) => return Err(e) }; consume(receipt); Ok(()) }", 1),
+    "if-let wrapped annotation": ("fn f(t: &str) {\n    let receipt: Option<ChioReceipt> = if let Ok(r) = serde_json::from_str(t) {\n        Some(r)\n    } else {\n        None\n    };\n}", 1),
+    "match-wrapped local returned": ("fn f(t: &str) -> Option<ChioReceipt> { let receipt = match serde_json::from_str(t) { Ok(r) => r, Err(_) => return None }; Some(receipt) }", 1),
+    "wrapped decode of another type": ("fn f(t: &str) { let body: Other = match serde_json::from_str(t) { Ok(r) => r, Err(_) => return }; }", 0),
+    "higher-ranked helper bound": ("fn decode<T: for<'de> Deserialize<'de>>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 1),
+    "higher-ranked where bound": ("fn decode<T>(t: &str) -> Result<T, E>\nwhere\n    T: Clone + for<'de> serde::Deserialize<'de>,\n{\n    serde_json::from_str(t)\n}\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 1),
+    "fully qualified trait": ("fn f(d: D) -> Result<ChioReceipt, E> { <ChioReceipt as serde::Deserialize>::deserialize(d) }", 1),
+    "fully qualified trait with lifetime": ("fn f(d: D) -> Result<(), E> { let r = <ChioReceiptBody as Deserialize<'_>>::deserialize(d)?; Ok(()) }", 1),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
@@ -433,16 +592,29 @@ def self_test() -> None:
             found = len(scan(root))
             if found != expected + len(ALLOWED):
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found - len(ALLOWED)}")
+        for label, name, expected in (("included fragment", "part.inc", 1), ("test fragment", "part_tests.inc", 0)):
+            fragment = root / "crates/demo/src" / name
+            fragment.write_text("fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
+            source.write_text("\n", encoding="utf-8")
+            found = len(scan(root)) - len(ALLOWED)
+            fragment.unlink()
+            if found != expected:
+                raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
         allowed = ALLOWED[0]
         target = root / allowed["path"]
         target.parent.mkdir(parents=True)
         source.write_text("\n", encoding="utf-8")
-        for label, body, expected in (
-            ("approved call", "let receipt: ChioReceipt = serde_json::from_value(value)?;", 0),
-            ("raw text at the approved path", "let receipt: ChioReceipt = serde_json::from_str(raw)?;", 2),
+        signed = "UntrustedJsonText::new(raw).decode_signed()"
+        for label, body, producer, expected in (
+            ("approved call", "let receipt: ChioReceipt = serde_json::from_value(value)?;", signed, 0),
+            ("raw text at the approved path", "let receipt: ChioReceipt = serde_json::from_str(raw)?;", signed, 2),
+            ("producer regressed to a raw decode", "let receipt: ChioReceipt = serde_json::from_value(value)?;", "serde_json::from_str(raw)", 1),
+            ("producer with a raw decode beside decode_signed", "let receipt: ChioReceipt = serde_json::from_value(value)?;", f"{{ let _: Value = serde_json::from_str(raw)?; {signed} }}", 1),
         ):
             target.write_text(
-                f"fn {allowed['owner']}(raw: &str, value: Value) -> Result<ChioReceipt, E> {{\n    {body}\n    Ok(receipt)\n}}\n",
+                f"fn decode_stored_json(raw: &str) -> Result<Value, E> {{ {producer} }}\n"
+                f"fn {allowed['owner']}(raw: &str) -> Result<ChioReceipt, E> {{\n"
+                f"    let value = decode_stored_json(raw)?;\n    {body}\n    Ok(receipt)\n}}\n",
                 encoding="utf-8",
             )
             found = len(scan(root)) - (len(ALLOWED) - 1)
@@ -462,7 +634,7 @@ def self_test() -> None:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
         other.write_text("\n", encoding="utf-8")
         source.write_text("\n", encoding="utf-8")
-        helper_entry = ALLOWED[-1]
+        helper_entry = next(entry for entry in ALLOWED if entry["owner"] == "verify_backfill_receipts")
         target = root / helper_entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
         for label, reader, expected in (
@@ -470,6 +642,8 @@ def self_test() -> None:
             ("approved helper reading text", "serde_json::from_str(value.as_str())", 2),
         ):
             target.write_text(
+                "fn load_and_build_report(bytes: &[u8]) { parse_shadow_migration_input(bytes); }\n"
+                "fn parse_shadow_migration_input(bytes: &[u8]) -> R { UntrustedJsonText::from_wire(bytes, 1)?.decode_signed() }\n"
                 f"fn strict_typed_value<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, E> {{ Ok({reader}?) }}\n"
                 f"fn {helper_entry['owner']}(registered: Registered) -> Result<(), E> {{\n"
                 f"    let receipt: ChioReceipt = strict_typed_value(&registered.receipt, \"label\")?;\n    Ok(())\n}}\n",
