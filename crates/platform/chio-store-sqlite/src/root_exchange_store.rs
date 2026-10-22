@@ -15,6 +15,7 @@ use chio_core::root_authority::{
     DelegationContext, EnterpriseProviderIdentity, IdpKeySnapshot, LoadedRootPolicy, SaltRef,
     Sha256Digest,
 };
+use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::{sha256_hex, StoreMutationFence};
 use rusqlite::{params, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -79,12 +80,19 @@ pub enum SqliteRootExchangeStoreError {
 type Result<T> = std::result::Result<T, SqliteRootExchangeStoreError>;
 
 /// The keyed tags of one root. Both values are derived under one tenant
-/// index key generation, named by `key_id`.
+/// index key generation, so both carry the same `key_id`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RootTags {
-    pub key_id: Sha256Digest,
-    pub subject_tag: Sha256Digest,
-    pub tenant_tag: Option<Sha256Digest>,
+    pub subject: KeyedIndexValue,
+    pub tenant: Option<KeyedIndexValue>,
+}
+
+impl RootTags {
+    /// The generation both tags were derived under.
+    #[must_use]
+    pub fn key_id(&self) -> Sha256Digest {
+        self.subject.key_id
+    }
 }
 
 /// The salt of one committed delegation-context value.
