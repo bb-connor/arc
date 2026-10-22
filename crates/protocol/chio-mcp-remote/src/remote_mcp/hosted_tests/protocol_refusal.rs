@@ -13,6 +13,8 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 mod call_completion;
 #[path = "protocol_refusal/projection_original.rs"]
 mod projection_original;
+#[path = "protocol_refusal/registry_recheck.rs"]
+mod registry_recheck;
 #[path = "protocol_refusal/reservation_original.rs"]
 mod reservation_original;
 #[path = "protocol_refusal/retry_rule.rs"]
@@ -61,11 +63,18 @@ fn fixture() -> TestResult<HttpFixture> {
     fixture_with(None)
 }
 fn fixture_with(gate: Option<Arc<CallGate>>) -> TestResult<HttpFixture> {
+    fixture_configured(gate, |_, _| Ok(()))
+}
+fn fixture_configured(
+    gate: Option<Arc<CallGate>>,
+    configure: impl FnOnce(&FsPath, &mut RemoteServeHttpConfig) -> TestResult,
+) -> TestResult<HttpFixture> {
     let directory = chio_test_support::private_tempdir()?;
     let mut config = support::base_remote_config(directory.path(), "127.0.0.1:0".parse()?);
     config.auth_token = Some("operator-fixture".into());
     config.admin_token = Some("admin-fixture".into());
     config.shared_hosted_owner = true;
+    configure(directory.path(), &mut config)?;
     let calls = Arc::new(AtomicUsize::new(0));
     config.test_transport = Some(Arc::new(CountedTransport {
         inner: config.test_transport.take().ok_or("transport")?,
@@ -92,7 +101,10 @@ fn fixture_with(gate: Option<Arc<CallGate>>) -> TestResult<HttpFixture> {
         auth_mode: Arc::new(RemoteAuthMode::StaticBearer {
             token: Arc::from("operator-fixture"),
         }),
-        enterprise_provider_registry: None,
+        enterprise_provider_registry: enterprise_provider_registry_file(
+            config.enterprise_providers_file.as_deref(),
+            "remote_mcp",
+        )?,
         admin_token: Some(Arc::from("admin-fixture")),
         protected_resource_metadata: None,
         authorization_server_metadata: None,
