@@ -215,6 +215,10 @@ const REJECTIONS: &[(&str, &str)] = &[
         "`digest` is not sha256:<64 lowercase hex>",
     ),
     (
+        "root-policy.projection-without-slash.json",
+        "`idp_scope_projection` is not server/tool",
+    ),
+    (
         "root-policy.inline-field-not-pointer.json",
         "`inline_fields` is not a non-empty RFC 6901 JSON pointer of at most 256 characters",
     ),

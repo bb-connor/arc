@@ -91,7 +91,11 @@
             "type": "array",
             "maxItems": 256,
             "items": {
-              "$ref": "root-anchor.schema.json#/$defs/Identifier"
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128,
+              "pattern": "^[^\\u0000/]+/[^\\u0000]+$",
+              "description": "A `server/tool` name: a non-empty server and a non-empty tool name around the first `/`, without NUL."
             }
           }
         },

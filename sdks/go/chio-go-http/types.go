@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 31a65888e7719daf2c6a5d229f4ef613552777519bf28f4512833e52c01d50f9
+// Schema content SHA-256: fe8ceb8f5d234e49e42f4e58b690fbb89853728a2f1eefd2661e30229edfbcb4
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -13787,7 +13787,7 @@ type RootAuthorityRootPolicyRootPolicyRule struct {
 	HolderClasses    []RootAuthorityRootAnchorHolderClass `json:"holder_classes"`
 
 	// IdpScopeProjection Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.
-	IdpScopeProjection *map[string][]RootAuthorityRootAnchorIdentifier `json:"idp_scope_projection,omitempty"`
+	IdpScopeProjection *map[string][]string `json:"idp_scope_projection,omitempty"`
 
 	// Match What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
 	Match RootAuthorityRootPolicyRootPolicyMatch `json:"match"`

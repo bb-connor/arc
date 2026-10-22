@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a2e478710c7df7c8aa19631f97c0ee5f72fd435e2d6c0963be6f0ab8122ed548
+# Schema sha256: 762578c96088419938225c2c4b88fbd19c43eb893686e68295264db18417432d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -15,7 +15,7 @@ from .enterprise_provider_identity_schema import ChioEnterpriseProviderIdentity,
 from .idp_key_snapshot_schema import ChioIdpKeySnapshot
 from .revocation_request_schema import ChioRevocationRequest
 from .root_anchor_schema import AnchorKind, ChioRootAnchor, ClaimValue, Commitment, Crv, Digest, HolderClass, HttpsUrl, Identifier, Jwk, JwsAlgorithm, Kty, PublicKeyHex, RecordedClaims, Salt, SaltRef, SignatureHex, Text, Uri, Use, X5cItem
-from .root_policy_schema import ChioRootPolicy, ClaimMode, InlineField, InlineFields, MatchClaims, RecordedClaimModes, RootPolicyDisclosure, RootPolicyMatch, RootPolicyRule, ToolDisclosure
+from .root_policy_schema import ChioRootPolicy, ClaimMode, IdpScopeProjectionItem, InlineField, InlineFields, MatchClaims, RecordedClaimModes, RootPolicyDisclosure, RootPolicyMatch, RootPolicyRule, ToolDisclosure
 from .verifier_trust_schema import ChioVerifierTrust, RequiredColumn
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "HolderClass",
     "HttpsUrl",
     "Identifier",
+    "IdpScopeProjectionItem",
     "InlineField",
     "InlineFields",
     "InlineJwks",
