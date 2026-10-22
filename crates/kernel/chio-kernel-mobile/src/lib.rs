@@ -84,6 +84,7 @@ pub use rng::MobileRng;
 
 use serde::{Deserialize, Serialize};
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{
     attenuation::ScopeHash, crypto_floor::CapabilityCryptoFloor, features::CapabilityNegotiation,
     scope::ToolGrant, token::CapabilityToken,
@@ -150,7 +151,7 @@ pub struct PortablePassportMetadata {
 #[derive(Debug, Deserialize)]
 struct EvaluateRequest {
     /// Capability token JSON (serialized `CapabilityToken`).
-    capability: serde_json::Value,
+    capability: CapabilityToken,
     /// Trusted issuer public keys, lowercase hex (Ed25519).
     trusted_issuers: Vec<String>,
     /// Portable tool-call request.
@@ -166,7 +167,7 @@ struct EvaluateRequest {
     peer_capabilities: Option<CapabilityNegotiation>,
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
-    direct_root_capability: Option<serde_json::Value>,
+    direct_root_capability: Option<CapabilityToken>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry; absent issuers fail-closed.
     #[serde(default)]
@@ -181,7 +182,7 @@ struct EvaluateRequest {
 #[derive(Debug, Deserialize)]
 struct VerifyCapabilityRequest {
     /// Capability token JSON (serialized `CapabilityToken`).
-    token: serde_json::Value,
+    token: CapabilityToken,
     /// Trusted issuer public keys, lowercase hex (Ed25519).
     trusted_issuers: Vec<String>,
     /// Optional Unix timestamp. `None` / missing / < 0 falls back to
@@ -193,7 +194,7 @@ struct VerifyCapabilityRequest {
     peer_capabilities: Option<CapabilityNegotiation>,
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
-    direct_root_capability: Option<serde_json::Value>,
+    direct_root_capability: Option<CapabilityToken>,
     /// Optional chain-binding trust roots, keyed by issuer hex.
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
@@ -343,6 +344,9 @@ fn decode_trusted_issuers(values: &[String]) -> Result<Vec<PublicKey>, ChioMobil
         .collect()
 }
 
+/// Bound on each JSON text argument, matching the mobile receipt inspection.
+const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
+
 const MEDIATED_AUTHORIZATION_REQUIRED: &str =
     "grant requires mediated authorization (DPoP/usage accounting) unavailable to the offline mobile gate";
 
@@ -367,28 +371,19 @@ fn requires_mediated_authorization(matched_grant: Option<&ToolGrant>) -> bool {
 /// unwrapping an exception.
 pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
     let parsed: EvaluateRequest =
-        serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("evaluate request: {error}"),
-        })?;
+        UntrustedJsonText::from_wire(request_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| ChioMobileError::InvalidJson {
+                message: format!("evaluate request: {error}"),
+            })?;
     if parsed.request.has_unsupported_authorization_extensions() {
         return Err(ChioMobileError::InvalidCapability {
             message: "mobile portable evaluation cannot authenticate governed approvals or supplemental authorization".to_string(),
         });
     }
 
-    let capability: CapabilityToken =
-        serde_json::from_value(parsed.capability).map_err(|error| {
-            ChioMobileError::InvalidJson {
-                message: format!("capability token: {error}"),
-            }
-        })?;
-    let direct_root_capability = parsed
-        .direct_root_capability
-        .map(serde_json::from_value)
-        .transpose()
-        .map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("direct root capability: {error}"),
-        })?;
+    let capability = parsed.capability;
+    let direct_root_capability = parsed.direct_root_capability;
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
 
@@ -554,9 +549,11 @@ pub fn sign_receipt(
     signing_seed_hex: String,
 ) -> Result<String, ChioMobileError> {
     let body: ChioReceiptBody =
-        serde_json::from_str(&body_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("receipt body: {error}"),
-        })?;
+        UntrustedJsonText::from_wire(body_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| ChioMobileError::InvalidJson {
+                message: format!("receipt body: {error}"),
+            })?;
 
     let canonical_content = decode_canonical_content_hex(&canonical_content_hex)?;
     let backend = backend_from_seed_hex(&signing_seed_hex)?;
@@ -587,9 +584,11 @@ pub fn sign_receipt_relaying_trusted_body(
     signing_seed_hex: String,
 ) -> Result<String, ChioMobileError> {
     let body: ChioReceiptBody =
-        serde_json::from_str(&body_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("receipt body: {error}"),
-        })?;
+        UntrustedJsonText::from_wire(body_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| ChioMobileError::InvalidJson {
+                message: format!("receipt body: {error}"),
+            })?;
 
     let backend = backend_from_seed_hex(&signing_seed_hex)?;
 
@@ -610,9 +609,11 @@ pub fn verify_capability(
     authority_pub_hex: String,
 ) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let token: CapabilityToken =
-        serde_json::from_str(&token_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("capability token: {error}"),
-        })?;
+        UntrustedJsonText::from_wire(token_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| ChioMobileError::InvalidJson {
+                message: format!("capability token: {error}"),
+            })?;
 
     let authority =
         PublicKey::from_hex(&authority_pub_hex).map_err(|error| ChioMobileError::InvalidHex {
@@ -639,20 +640,11 @@ pub fn verify_capability_with_context(
     request_json: String,
 ) -> Result<CapabilityVerificationRecord, ChioMobileError> {
     let parsed: VerifyCapabilityRequest =
-        serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("verify capability request: {error}"),
-        })?;
-    let token: CapabilityToken =
-        serde_json::from_value(parsed.token).map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("capability token: {error}"),
-        })?;
-    let direct_root_capability = parsed
-        .direct_root_capability
-        .map(serde_json::from_value)
-        .transpose()
-        .map_err(|error| ChioMobileError::InvalidJson {
-            message: format!("direct root capability: {error}"),
-        })?;
+        UntrustedJsonText::from_wire(request_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| ChioMobileError::InvalidJson {
+                message: format!("verify capability request: {error}"),
+            })?;
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     let peer_profile = parsed
         .peer_capabilities
@@ -660,11 +652,11 @@ pub fn verify_capability_with_context(
         .unwrap_or_else(CapabilityNegotiation::t1_default);
 
     verify_capability_with_parts(
-        token,
+        parsed.token,
         trusted,
         parsed.now_secs,
         peer_profile,
-        direct_root_capability,
+        parsed.direct_root_capability,
         parsed.capability_trust_roots,
         &parsed.parent_budget_snapshots,
     )
