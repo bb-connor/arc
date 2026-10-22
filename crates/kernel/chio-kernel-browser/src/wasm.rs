@@ -7,9 +7,11 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{features::CapabilityNegotiation, token::CapabilityToken};
 use chio_kernel_core::Rng as _;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::pure::{
@@ -35,11 +37,16 @@ fn to_js_error(error: &BindingError) -> JsValue {
     to_plain_js(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
 }
 
-fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T, JsValue> {
-    serde_json::from_str::<T>(raw).map_err(|error| {
-        let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
-        to_js_error(&err)
-    })
+/// Bound on each JSON text argument, matching the mobile receipt inspection.
+const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
+
+fn parse_json<T: DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
+    UntrustedJsonText::from_wire(raw.as_bytes(), MAX_JSON_INPUT_BYTES)
+        .and_then(|text| text.decode_signed())
+        .map_err(|error| {
+            let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
+            to_js_error(&err)
+        })
 }
 
 fn encode_result<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
