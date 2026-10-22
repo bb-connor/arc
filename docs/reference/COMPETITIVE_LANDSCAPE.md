@@ -515,7 +515,7 @@ operates with an unverified policy.
 
 ## 8. Key Gaps Chio Fills
 
-### 8.1 No protocol combines identity + capability delegation + economic primitives + receipts
+### 8.1 Identity, capability delegation, economic limits and receipts in one token
 
 The competitive landscape splits into three silos:
 
@@ -526,10 +526,10 @@ The competitive landscape splits into three silos:
 3. **Identity standards** (AIMS, UCAN, SPIFFE) define who agents are but not
    what scoped authority they hold or how to attest their actions.
 
-Chio is a protocol in which a single token simultaneously expresses
-identity (subject-bound Ed25519 key), authorization (scoped tool grants with
-argument constraints), economic limits (invocation budgets), and produces
-cryptographic proof (signed receipts in a Merkle log) for every decision.
+In Chio a single token expresses identity (subject-bound Ed25519 key),
+authorization (scoped tool grants with argument constraints) and economic
+limits (invocation budgets). The kernel signs a receipt for every decision it
+makes under that token.
 
 ### 8.2 The missing authorization layer between "user approves" and "payment executes"
 
