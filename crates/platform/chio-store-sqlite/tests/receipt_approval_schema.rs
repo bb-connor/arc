@@ -93,8 +93,21 @@ fn partial_pair_is_refused_without_restamping() -> TestResult {
             matches!(chio_store_sqlite::initialize_receipt_approval_database(&path), Err(ReceiptStoreError::Conflict(message))
             if message == format!("schema namespace {namespace} is missing"))
         );
-        assert!(SqliteReceiptStore::open(&path).is_err());
-        assert!(SqliteApprovalStore::open_colocated_with_receipt_store(&path).is_err());
+        let receipt_error = if namespace == "approval" {
+            "schema catalog differs from its canonical definition"
+        } else {
+            "schema namespace receipt is missing"
+        };
+        let receipt_result = SqliteReceiptStore::open(&path).map(drop);
+        assert!(
+            matches!(&receipt_result, Err(ReceiptStoreError::Conflict(message))
+                if message == receipt_error),
+            "{receipt_result:?}"
+        );
+        assert!(
+            matches!(SqliteApprovalStore::open_colocated_with_receipt_store(&path), Err(ApprovalStoreError::Backend(message))
+            if message == format!("schema namespace {namespace} is missing"))
+        );
         let count: i64 = connection.query_row(
             "SELECT COUNT(*) FROM chio_store_schema_versions",
             [],

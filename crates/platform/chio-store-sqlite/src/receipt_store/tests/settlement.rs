@@ -157,7 +157,7 @@ fn open_existing_rejects_unconstrained_settlement_table() -> Result<(), Box<dyn 
                  reason_detail_sha256 BLOB, updated_at_ms INTEGER\
              );",
         )?;
-        connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+        connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
         Ok(())
     })?;
     drop(store);

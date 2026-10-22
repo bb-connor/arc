@@ -21,6 +21,7 @@ pub(super) fn sqlite_error(error: rusqlite::Error) -> PortError {
 pub(super) fn schema_version_error(error: crate::SchemaVersionError) -> PortError {
     match error {
         crate::SchemaVersionError::Sqlite(error) => sqlite_error(error),
+        crate::SchemaVersionError::Io(_) => PortError::unavailable(),
         error @ crate::SchemaVersionError::StaleSchema { .. } => PortError::with_source(
             chio_security_types::ports::PortErrorKind::IntegrityFailure,
             "store.integrity_failure",

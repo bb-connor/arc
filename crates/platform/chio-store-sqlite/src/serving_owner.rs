@@ -157,6 +157,8 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
+    #[error(transparent)]
+    Schema(#[from] crate::SchemaVersionError),
     #[error("budget schema refused: {0}")]
     BudgetSchema(#[source] BudgetStoreError),
     #[error(transparent)]
@@ -422,8 +424,17 @@ impl SqliteAuthorityStore {
             return Ok(());
         }
         verify_path_available_for_new_identity(&lock_root, &canonical_database_path)?;
+        let has_catalog: bool =
+            connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema)", [], |row| {
+                row.get(0)
+            })?;
+        if has_catalog {
+            return Err(SqliteServingOwnerError::PartialProvision(
+                canonical_database_path.display().to_string(),
+            ));
+        }
         let state = crate::schema_version::inspect_schema(&connection, SERVING_NAMESPACES)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::Schema)?;
         if state != crate::SchemaState::Empty {
             return Err(SqliteServingOwnerError::PartialProvision(
                 canonical_database_path.display().to_string(),
@@ -450,7 +461,7 @@ impl SqliteAuthorityStore {
                 &mut connection,
                 SERVING_NAMESPACES,
             )
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::Schema)?;
             if !schema.is_fresh() {
                 return Err(SqliteServingOwnerError::Invalid(
                     "serving creation requires an empty database".into(),
@@ -609,7 +620,7 @@ impl SqliteAuthorityStore {
         let lease_id = next_lease_id()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         crate::schema_version::inspect_schema(&transaction, SERVING_NAMESPACES)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::Schema)?;
         SqliteBudgetStore::validate_schema(&transaction)
             .map_err(SqliteServingOwnerError::BudgetSchema)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
@@ -961,7 +972,7 @@ fn initialize_serving_components(
     if schema.is_fresh() {
         schema
             .stamp("serving_owner")
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::Schema)?;
     }
     Ok(())
 }
@@ -970,16 +981,23 @@ fn validate_serving_catalog(connection: &Connection) -> Result<(), SqliteServing
     let mut reference = Connection::open_in_memory()?;
     let schema =
         crate::schema_version::SchemaTransaction::begin(&mut reference, SERVING_NAMESPACES)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            .map_err(SqliteServingOwnerError::Schema)?;
     initialize_serving_components(&schema)?;
     schema.connection().execute_batch(SERVING_OWNER_SCHEMA)?;
     crate::schema_catalog::validate_against(connection, schema.connection())
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))
+        .map_err(SqliteServingOwnerError::Schema)
 }
 
 fn validate_serving_schema(connection: &mut Connection) -> Result<(), SqliteServingOwnerError> {
+    if let Some(found) = crate::schema_version::read_store_schema_version(connection, "budget")? {
+        if found != 1 {
+            return Err(SqliteServingOwnerError::BudgetSchema(
+                BudgetStoreError::StaleSchema { found, current: 1 },
+            ));
+        }
+    }
     let schema = crate::schema_version::SchemaTransaction::begin(connection, SERVING_NAMESPACES)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        .map_err(SqliteServingOwnerError::Schema)?;
     if schema.is_fresh() {
         return Err(SqliteServingOwnerError::Invalid(
             "serving database is not initialized".into(),
@@ -988,9 +1006,7 @@ fn validate_serving_schema(connection: &mut Connection) -> Result<(), SqliteServ
     verify_serving_owner_schema(schema.connection())?;
     initialize_serving_components(&schema)?;
     validate_serving_catalog(schema.connection())?;
-    schema
-        .commit()
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))
+    schema.commit().map_err(SqliteServingOwnerError::Schema)
 }
 
 pub(crate) fn verify_budget_fence(

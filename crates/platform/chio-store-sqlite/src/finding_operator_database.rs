@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use crate::schema_version::{inspect_schema, SchemaTransaction, SchemaVersionError};
+use crate::schema_version::{inspect_schema, SchemaState, SchemaTransaction, SchemaVersionError};
 
 const NAMESPACES: &[&str] = &[
     "finding_operator_bundle",
@@ -19,68 +19,41 @@ fn schema() -> String {
     .join("\n")
 }
 
-pub fn initialize_finding_operator_database(path: impl AsRef<Path>) -> Result<(), String> {
+pub fn initialize_finding_operator_database(
+    path: impl AsRef<Path>,
+) -> Result<(), SchemaVersionError> {
     let path = path.as_ref();
     if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        std::fs::create_dir_all(parent)?;
     }
-    let mut connection = Connection::open(path).map_err(|error| error.to_string())?;
-    let transaction =
-        SchemaTransaction::begin(&mut connection, NAMESPACES).map_err(|error| error.to_string())?;
+    let mut connection = Connection::open(path)?;
+    initialize_connection(&mut connection)
+}
+
+pub(crate) fn initialize_connection(connection: &mut Connection) -> Result<(), SchemaVersionError> {
+    let transaction = SchemaTransaction::begin(connection, NAMESPACES)?;
     let sql = schema();
     if transaction.is_fresh() {
-        transaction
-            .connection()
-            .execute_batch(&sql)
-            .map_err(|error| error.to_string())?;
+        transaction.connection().execute_batch(&sql)?;
         for namespace in NAMESPACES {
-            transaction
-                .stamp(namespace)
-                .map_err(|error| error.to_string())?;
+            transaction.stamp(namespace)?;
         }
     }
-    transaction
-        .validate_catalog(&sql)
-        .map_err(|error| error.to_string())?;
-    transaction.commit().map_err(|error| error.to_string())?;
+    transaction.validate_catalog(&sql)?;
+    transaction.commit()?;
     connection
         .execute_batch(
             "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )
-        .map_err(|error| error.to_string())
+        .map_err(SchemaVersionError::from)
 }
 
-pub(crate) fn initialize_component(
-    connection: &mut Connection,
-    namespace: &str,
-    sql: &str,
-) -> Result<(), SchemaVersionError> {
-    let standalone = [namespace];
-    let composite = match inspect_schema(connection, &standalone) {
-        Ok(_) => false,
-        Err(SchemaVersionError::UnexpectedNamespaces) => {
-            inspect_schema(connection, NAMESPACES)?;
-            true
-        }
-        Err(error) => return Err(error),
-    };
-    let declared = if composite { NAMESPACES } else { &standalone };
-    let transaction = SchemaTransaction::begin(connection, declared)?;
-    if transaction.is_fresh() {
-        transaction.connection().execute_batch(sql)?;
-        transaction.stamp(namespace)?;
+pub(crate) fn validate_component(connection: &mut Connection) -> Result<(), SchemaVersionError> {
+    let transaction = connection.transaction()?;
+    if inspect_schema(&transaction, NAMESPACES)? != SchemaState::Current {
+        return Err(SchemaVersionError::CreationNotAllowed);
     }
-    let composite_sql;
-    let expected = if composite {
-        composite_sql = schema();
-        composite_sql.as_str()
-    } else {
-        sql
-    };
-    transaction.validate_catalog(expected)?;
+    crate::schema_version::validate_catalog(&transaction, &schema())?;
     transaction.commit()?;
-    connection.execute_batch(
-        "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
-    )?;
     Ok(())
 }

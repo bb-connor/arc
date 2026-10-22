@@ -1241,7 +1241,8 @@ pub(super) fn load_profile(path: &Path) -> Result<(FindingOperatorProfile, PathB
 }
 
 fn initialize_operator_database(path: &Path) -> Result<(), CliError> {
-    chio_store_sqlite::initialize_finding_operator_database(path).map_err(CliError::cli_other_error)
+    chio_store_sqlite::initialize_finding_operator_database(path)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
 fn random_token(label: &str) -> String {

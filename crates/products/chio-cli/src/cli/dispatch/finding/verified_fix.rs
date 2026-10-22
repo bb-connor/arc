@@ -480,7 +480,7 @@ fn run_finding_admission(
     // inactive package, never an active listing whose reveal is unavailable.
     let bundle_bytes = canonical_json_bytes(&finalization.bundle)?;
     chio_store_sqlite::initialize_finding_operator_database(&paths.operator_database)
-        .map_err(CliError::cli_other_error)?;
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let bundle_store = SqliteFindingOperatorBundleStore::open(&paths.operator_database)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let artifact_indexes =

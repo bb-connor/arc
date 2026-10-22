@@ -332,10 +332,13 @@ fn budget_schema_reprovisioning_refuses_noncurrent_stamp_without_mutation() -> T
     let before = snapshot(&connection)?;
     let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
         .expect_err("a noncurrent budget stamp cannot be provisioned");
-    assert!(
-        matches!(error, crate::SqliteServingOwnerError::Invalid(message)
-        if message == "database schema version 12 is not the current schema version 1; refusing to open")
-    );
+    assert!(matches!(
+        error,
+        crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+            found: 12,
+            current: 1
+        })
+    ));
     assert_eq!(snapshot(&connection)?, before);
     Ok(())
 }
@@ -364,7 +367,7 @@ fn budget_schema_provisioning_refuses_unstamped_colocated_catalog_without_mutati
             );
         } else {
             assert!(
-                matches!(&error, crate::SqliteServingOwnerError::Invalid(message) if message == "schema namespace admission_operation is missing"),
+                matches!(&error, crate::SqliteServingOwnerError::PartialProvision(database) if database == &path.display().to_string()),
                 "unexpected budget refusal: {error:?}"
             );
         }
@@ -393,7 +396,10 @@ fn budget_schema_serving_refuses_noncurrent_stamp_without_mutation() -> TestResu
     };
     assert!(matches!(
         error,
-        crate::SqliteServingOwnerError::Invalid(message) if message == "database schema version 0 is not the current schema version 1; refusing to open"
+        crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+            found: 0,
+            current: 1
+        })
     ));
     assert_eq!(snapshot(&connection)?, before);
     Ok(())
@@ -440,8 +446,7 @@ fn budget_schema_reprovision_refuses_deleted_namespace_without_mutation() -> Tes
     let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
         .expect_err("reprovisioning cannot recreate deleted budget custody");
     assert!(matches!(error,
-        crate::SqliteServingOwnerError::Invalid(ref message)
-        if message == "schema namespace budget is missing"));
+        crate::SqliteServingOwnerError::Schema(crate::SchemaVersionError::MissingSchema { ref store_key }) if store_key == "budget"));
     assert_eq!(snapshot(&connection)?, before);
     Ok(())
 }
@@ -462,8 +467,7 @@ fn budget_schema_serving_refuses_catalog_drift_and_missing_stamp_without_mutatio
             Err(error) => error,
         };
         if missing_stamp {
-            assert!(matches!(error, crate::SqliteServingOwnerError::Invalid(ref message)
-                if message == "schema namespace budget is missing"));
+            assert!(matches!(error, crate::SqliteServingOwnerError::Schema(crate::SchemaVersionError::MissingSchema { ref store_key }) if store_key == "budget"));
         } else {
             assert!(matches!(error,
                 crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(ref message))

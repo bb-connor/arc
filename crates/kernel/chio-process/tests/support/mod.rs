@@ -179,6 +179,7 @@ fn kernel_with_artifacts_and_clock(
         );
     }
     if payment {
+        chio_store_sqlite::initialize_finding_operator_database(path.join("payments.db"))?;
         kernel.set_payment_adapter(Box::new(
             chio_store_sqlite::SqliteFindingOperatorPaymentAdapter::open(path.join("payments.db"))?,
         ));

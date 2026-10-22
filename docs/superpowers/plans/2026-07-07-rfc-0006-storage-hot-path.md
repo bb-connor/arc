@@ -625,7 +625,7 @@ pub struct SqliteIouEnvelopeStore {
         writer
             .run_write(|connection| {
                 connection
-                    .execute_batch(IOU_ENVELOPE_MIGRATION)
+                    .execute_batch(IOU_ENVELOPE_SCHEMA)
                     .map_err(chio_kernel::ReceiptStoreError::from)
             })
             .map_err(|err| IouEnvelopeStoreError::Backend(err.to_string()))?;
