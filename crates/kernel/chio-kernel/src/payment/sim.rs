@@ -7,7 +7,7 @@
 
 use crate::payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentRailMode, PaymentResult, RailSettlementStatus,
+    PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
 };
 
 /// Deterministic no-broadcast payment adapter.
@@ -102,6 +102,27 @@ impl PaymentAdapter for SimPaymentAdapter {
             metadata: serde_json::json!({ "adapter": "sim", "action": "refund" }),
         })
     }
+
+    /// The sim rail keeps no state and moves no funds, so a reference without
+    /// a journaled authorization id has no rail-side authorization to recover.
+    /// A known id is a final prepayment settled under that id.
+    fn settlement_state(
+        &self,
+        _reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<RailSettlementState, PaymentError> {
+        Ok(match authorization_id {
+            None => RailSettlementState::NoAuthorization,
+            Some(authorization_id) => RailSettlementState::Settled {
+                authorization_id: authorization_id.to_string(),
+                result: PaymentResult {
+                    transaction_id: authorization_id.to_string(),
+                    settlement_status: RailSettlementStatus::Settled,
+                    metadata: serde_json::json!({ "adapter": "sim", "action": "settlement_state" }),
+                },
+            },
+        })
+    }
 }
 
 #[cfg(test)]
@@ -145,5 +166,33 @@ mod tests {
         assert_eq!(captured.settlement_status, RailSettlementStatus::Settled);
         let released = adapter.release("sim-abc", "req-1").unwrap();
         assert_eq!(released.settlement_status, RailSettlementStatus::Released);
+    }
+
+    #[test]
+    fn settlement_state_without_an_authorization_id_has_no_authorization() {
+        let adapter = SimPaymentAdapter::new();
+        adapter.authorize(&request("req-1", 100)).unwrap();
+        assert!(matches!(
+            adapter.settlement_state("req-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        ));
+    }
+
+    #[test]
+    fn settlement_state_with_an_authorization_id_is_a_settled_prepayment() {
+        let adapter = SimPaymentAdapter::new();
+        let authorization = adapter.authorize(&request("req-1", 100)).unwrap();
+        let RailSettlementState::Settled {
+            authorization_id,
+            result,
+        } = adapter
+            .settlement_state("req-1", Some(&authorization.authorization_id))
+            .unwrap()
+        else {
+            panic!("a journaled sim authorization is a settled prepayment");
+        };
+        assert_eq!(authorization_id, authorization.authorization_id);
+        assert_eq!(result.transaction_id, authorization.authorization_id);
+        assert_eq!(result.settlement_status, RailSettlementStatus::Settled);
     }
 }
