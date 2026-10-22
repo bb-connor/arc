@@ -159,7 +159,7 @@ async fn session_credential_is_refused_after_the_registry_becomes_invalid() -> T
     fixture
         .assert_refused(
             StatusCode::SERVICE_UNAVAILABLE,
-            b"enterprise provider registry is invalid",
+            b"urn:chio:error:transport:provider-registry-invalid",
         )
         .await?;
     fixture.shutdown().await
@@ -172,7 +172,7 @@ async fn session_credential_is_refused_after_the_registry_becomes_unreadable() -
     fixture
         .assert_refused(
             StatusCode::SERVICE_UNAVAILABLE,
-            b"enterprise provider registry is unreadable",
+            b"urn:chio:error:transport:provider-registry-unreadable",
         )
         .await?;
     fixture.shutdown().await

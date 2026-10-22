@@ -3848,6 +3848,45 @@ pub const TRANSPORT_TOKEN_INTROSPECTION_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSp
     consumed_by: &["chio-mcp-remote"],
 };
 
+pub const TRANSPORT_PROVIDER_REGISTRY_UNREADABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:provider-registry-unreadable",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The remote MCP edge could not read its enterprise provider registry.",
+    help: "Retry later; the operator must restore the registry file, whose read failure is in the server log.",
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-UNREADABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_PROVIDER_REGISTRY_OVERSIZED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:provider-registry-oversized",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The enterprise provider registry exceeds the bounded read limit.",
+    help: "The operator must reduce the registry below the bounded read limit.",
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-OVERSIZED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_PROVIDER_REGISTRY_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:provider-registry-invalid",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The enterprise provider registry does not parse or validate.",
+    help: "The operator must repair the registry; the server log holds the validation failure.",
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -4136,6 +4175,9 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_APPROVAL_STORAGE_FAILED,
     TRANSPORT_APPROVAL_INTENT_UNBOUND,
     TRANSPORT_TOKEN_INTROSPECTION_UNAVAILABLE,
+    TRANSPORT_PROVIDER_REGISTRY_UNREADABLE,
+    TRANSPORT_PROVIDER_REGISTRY_OVERSIZED,
+    TRANSPORT_PROVIDER_REGISTRY_INVALID,
 ];
 
 #[must_use]

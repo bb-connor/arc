@@ -9,7 +9,10 @@ use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
 use chio_control_plane::CliError;
 use chio_core::canonical::{canonical_json_bytes, UntrustedJsonError};
 use chio_core::crypto::sha256_hex;
-use chio_errors::_generated::error_codes::{CLI_IO, CLI_JSON};
+use chio_errors::_generated::error_codes::{
+    CLI_IO, CLI_JSON, TRANSPORT_PROVIDER_REGISTRY_INVALID, TRANSPORT_PROVIDER_REGISTRY_OVERSIZED,
+    TRANSPORT_PROVIDER_REGISTRY_UNREADABLE,
+};
 use tracing::{info, warn};
 
 use crate::RemoteClock;
@@ -190,14 +193,15 @@ impl EnterpriseProviderRegistryFile {
 }
 
 /// Why a read of the enterprise provider registry admitted nothing. The
-/// message is the whole peer-visible text; the cause stays local.
+/// message is the whole peer-visible text, a registered URN; the cause stays
+/// local.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum EnterpriseProviderRegistryRefusal {
-    #[error("enterprise provider registry is unreadable")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_UNREADABLE.urn)]
     Unreadable(#[source] CliError),
-    #[error("enterprise provider registry exceeds the bounded read limit")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_OVERSIZED.urn)]
     Oversized(#[source] CliError),
-    #[error("enterprise provider registry is invalid")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_INVALID.urn)]
     Invalid(#[source] CliError),
 }
 
@@ -269,6 +273,7 @@ impl From<EnterpriseProviderRegistryRefusal> for CliError {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use chio_security_types::clock::{
@@ -338,6 +343,35 @@ mod tests {
             .unwrap()
             .as_ref()
             .map(|cached| cached.digest.clone())
+    }
+
+    #[test]
+    fn each_refusal_answers_its_registered_urn() {
+        let cause = || CliError::cli_io_error("/srv/chio/enterprise-providers.json");
+        for (refusal, urn, string_code) in [
+            (
+                EnterpriseProviderRegistryRefusal::Unreadable(cause()),
+                "urn:chio:error:transport:provider-registry-unreadable",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-UNREADABLE",
+            ),
+            (
+                EnterpriseProviderRegistryRefusal::Oversized(cause()),
+                "urn:chio:error:transport:provider-registry-oversized",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-OVERSIZED",
+            ),
+            (
+                EnterpriseProviderRegistryRefusal::Invalid(cause()),
+                "urn:chio:error:transport:provider-registry-invalid",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-INVALID",
+            ),
+        ] {
+            assert_eq!(refusal.to_string(), urn);
+            let spec = chio_errors::lookup_error_code(urn).unwrap();
+            assert_eq!(spec.domain, chio_errors::Domain::Transport);
+            assert_eq!(spec.severity, chio_errors::Severity::Error);
+            assert_eq!(spec.string_code, string_code);
+            assert!(spec.consumed_by.contains(&"chio-mcp-remote"));
+        }
     }
 
     #[test]

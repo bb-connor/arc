@@ -241,7 +241,11 @@ async fn a_provider_registry_corrupted_after_startup_refuses_the_next_request() 
     let refused = fixture
         .next_request()
         .expect_err("a corrupted provider registry still admitted");
-    let refusal = assert_registry_refusal(refused, "enterprise provider registry is invalid").await;
+    let refusal = assert_registry_refusal(
+        refused,
+        "urn:chio:error:transport:provider-registry-invalid",
+    )
+    .await;
     let EnterpriseProviderRegistryRefusal::Invalid(cause) = refusal.as_ref() else {
         panic!("expected an invalid registry refusal, got {refusal:?}");
     };
@@ -259,7 +263,7 @@ async fn a_provider_registry_oversized_at_request_time_refuses_the_request() {
         .expect_err("an oversized provider registry still admitted");
     let refusal = assert_registry_refusal(
         refused,
-        "enterprise provider registry exceeds the bounded read limit",
+        "urn:chio:error:transport:provider-registry-oversized",
     )
     .await;
     let EnterpriseProviderRegistryRefusal::Oversized(CliError::SignedJson(
@@ -284,8 +288,11 @@ async fn a_provider_registry_unreadable_at_request_time_refuses_the_request() {
     let refused = fixture
         .next_request()
         .expect_err("an unreadable provider registry still admitted");
-    let refusal =
-        assert_registry_refusal(refused, "enterprise provider registry is unreadable").await;
+    let refusal = assert_registry_refusal(
+        refused,
+        "urn:chio:error:transport:provider-registry-unreadable",
+    )
+    .await;
     let EnterpriseProviderRegistryRefusal::Unreadable(cause) = refusal.as_ref() else {
         panic!("expected an unreadable registry refusal, got {refusal:?}");
     };

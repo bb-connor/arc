@@ -3494,3 +3494,36 @@ codes:
     stability: stable
     consumed_by:
       - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:provider-registry-unreadable"
+    domain: transport
+    severity: error
+    summary: "The remote MCP edge could not read its enterprise provider registry."
+    help: "Retry later; the operator must restore the registry file, whose read failure is in the server log."
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-UNREADABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:provider-registry-oversized"
+    domain: transport
+    severity: error
+    summary: "The enterprise provider registry exceeds the bounded read limit."
+    help: "The operator must reduce the registry below the bounded read limit."
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-OVERSIZED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:provider-registry-invalid"
+    domain: transport
+    severity: error
+    summary: "The enterprise provider registry does not parse or validate."
+    help: "The operator must repair the registry; the server log holds the validation failure."
+    string_code: "CHIO-TRANSPORT-PROVIDER-REGISTRY-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
