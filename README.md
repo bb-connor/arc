@@ -79,8 +79,13 @@ The [docs](https://www.chio.computer/docs) walk through the SDK in TypeScript, P
 ## Start building
 
 ```sh
-curl -fsSL https://www.chio.computer/install.sh | sh
+git clone https://github.com/backbay-labs/chio.git
+cd chio
+cargo build --locked --release -p chio-cli --bin chio
+export PATH="$PWD/target/release:$PATH"
 ```
+
+No release is published yet, so the CLI is built from source. [Install](docs/install/README.md) lists the prerequisites (Rust and `protoc`).
 
 [Run a first request](https://www.chio.computer/docs/quickstart)&nbsp;&nbsp;&middot;&nbsp;&nbsp;[Embed the kernel](https://www.chio.computer/docs/deployment/in-process)&nbsp;&nbsp;&middot;&nbsp;&nbsp;[Delegate between agents](https://www.chio.computer/docs/guides/delegate-between-agents)&nbsp;&nbsp;&middot;&nbsp;&nbsp;[The long tour](docs/start-here/OVERVIEW.md)
 
