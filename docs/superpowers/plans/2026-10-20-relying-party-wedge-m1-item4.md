@@ -351,7 +351,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 
 - **Mint and release protocol.** `mint_anchored_root(MintRequest, &dyn MintRevocationCheck) -> MintOutcome`. The exchange signs the root before the call (PR E). Steps:
   1. Open an IMMEDIATE transaction through the serving writer; the serving-owner fence and authority-anchor checks run at begin, as for every serving write.
-  2. Run the transaction-bound revocation check (Decision 7) over the root's rule id, replay key and candidate tags under every loaded generation (Decision 10). A match refuses with the item 5 entry id. A checker error rolls back and denies.
+  2. Run the transaction-bound revocation check (Decision 7) over the root's rule id, replay key and candidate tags under every loaded generation (Decision 10): the `&dyn MintRevocationCheck` whose one production implementation is item 5's `refuse_revoked_root` on this transaction. A match refuses with `RootExchangeStoreError::Revoked { entry_id }`, naming the item 5 entry. A checker error rolls back and refuses with `RootExchangeStoreError::RevocationCheckUnavailable`, which the token endpoint and bearer intake answer 503 `temporarily_unavailable` with no description.
   3. Bind the replay key. An existing unexpired binding is resolved in this order:
      - the live binding names its root (`exchange_replay.capability_id`); that root, and only that root, is a recovery candidate when its `client_id`, `artifact_digest` and `request_digest` all equal the request's: the transaction rolls back its own rows and goes to Release with it. Recovery never looks a root up by replay key alone, so a retained historical root is never selected;
      - anything else refuses `AssertionReplay`.
