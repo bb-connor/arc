@@ -25,6 +25,8 @@ mod clock_custody;
 mod enterprise_provider_freshness;
 #[path = "tests/enterprise_provider_session_spawn.rs"]
 mod enterprise_provider_session_spawn;
+#[path = "tests/fixed_error_bodies.rs"]
+mod fixed_error_bodies;
 #[path = "tests/local_authorization.rs"]
 mod local_authorization;
 #[path = "tests/protocol_refusal.rs"]

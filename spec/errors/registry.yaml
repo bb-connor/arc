@@ -3439,3 +3439,58 @@ codes:
     stability: stable
     consumed_by:
       - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:admin-backend-failed"
+    domain: transport
+    severity: error
+    summary: "A remote MCP admin request could not complete against its trust backend."
+    help: "Retry later; the operator must inspect the server log for the backend failure."
+    string_code: "CHIO-TRANSPORT-ADMIN-BACKEND-FAILED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:session-send-failed"
+    domain: transport
+    severity: error
+    summary: "The remote MCP edge could not deliver an admitted message to its session."
+    help: "Retry the request; the operator must inspect the server log for the delivery failure."
+    string_code: "CHIO-TRANSPORT-SESSION-SEND-FAILED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:approval-storage-failed"
+    domain: transport
+    severity: error
+    summary: "The remote MCP edge could not read, write, or sign an operator approval record."
+    help: "Retry later; the operator must inspect the server log for the storage failure."
+    string_code: "CHIO-TRANSPORT-APPROVAL-STORAGE-FAILED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:approval-intent-unbound"
+    domain: transport
+    severity: error
+    summary: "The session kernel could not bind the operator approval request to its current policy and runtime authority."
+    help: "Re-establish the session under the current policy before requesting approval; the server log carries the binding failure."
+    string_code: "CHIO-TRANSPORT-APPROVAL-INTENT-UNBOUND"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:token-introspection-unavailable"
+    domain: transport
+    severity: error
+    summary: "The remote MCP edge could not complete token introspection with its authorization server."
+    help: "Retry later; the operator must inspect the server log for the introspection failure."
+    string_code: "CHIO-TRANSPORT-TOKEN-INTROSPECTION-UNAVAILABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote

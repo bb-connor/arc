@@ -69,7 +69,7 @@ pub(super) fn decision(
     let rebound = state
         .factory
         .bind_approval_intent(session, &request)
-        .map_err(|error| failure(StatusCode::CONFLICT, error))?;
+        .map_err(unbound)?;
     let intent_hash = record.intent.binding_hash().map_err(internal)?;
     if rebound.binding_hash().map_err(internal)? != intent_hash
         || record.expires_at > capability.expires_at
@@ -91,7 +91,10 @@ pub(super) fn decision(
     if !token
         .approver
         .verify_canonical_strict(&token.body(), &token.signature)
-        .map_err(|error| failure(StatusCode::BAD_REQUEST, error))?
+        .map_err(|error| {
+            warn!(error = %error, "operator approval signature could not be verified");
+            failure(StatusCode::BAD_REQUEST, "approval signature is invalid")
+        })?
     {
         return Err(failure(
             StatusCode::BAD_REQUEST,

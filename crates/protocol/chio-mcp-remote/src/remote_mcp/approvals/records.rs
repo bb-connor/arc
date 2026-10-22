@@ -18,9 +18,11 @@ pub(super) enum RecordLoadError {
 impl RecordLoadError {
     pub(super) fn response(self) -> Response {
         match self {
-            Self::Unknown => failure(StatusCode::NOT_FOUND, self),
-            Self::Integrity => failure(StatusCode::CONFLICT, self),
-            Self::Input(error) => input::with_source(internal(error.code()), error),
+            Self::Unknown => failure(StatusCode::NOT_FOUND, "unknown approval"),
+            Self::Integrity => failure(
+                StatusCode::CONFLICT,
+                "approval record integrity check failed",
+            ),
             other => internal(other),
         }
     }

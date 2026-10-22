@@ -1410,6 +1410,8 @@ mod http_service_tests {
     }
 }
 
+/// A send failure other than ingress capacity or a governed denial answers the
+/// fixed 500 URN; the cause stays in the server log.
 fn remote_session_send_error(error: CliError) -> Response {
     match error {
         CliError::Adapter(AdapterError::IngressCapacity) => jsonrpc_http_error(
@@ -1420,7 +1422,13 @@ fn remote_session_send_error(error: CliError) -> Response {
         CliError::Kernel(chio_kernel::KernelError::GovernedTransactionDenied(message)) => {
             jsonrpc_http_error(StatusCode::FORBIDDEN, -32003, &message)
         }
-        other => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &other.to_string()),
+        other => {
+            error!(error = %other, "remote MCP session send failed");
+            plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                chio_errors::_generated::error_codes::TRANSPORT_SESSION_SEND_FAILED.urn,
+            )
+        }
     }
 }
 

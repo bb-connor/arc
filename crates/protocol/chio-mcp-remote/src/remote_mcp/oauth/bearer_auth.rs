@@ -275,6 +275,16 @@ fn bearer_challenge_response(status: StatusCode, message: &str, challenge: &str)
     response
 }
 
+/// A token introspection exchange that fails answers the fixed 502 URN; the
+/// cause stays in the server log because it can name the endpoint URL.
+fn introspection_unavailable(error: impl std::fmt::Display) -> Response {
+    warn!(error = %error, "token introspection failed");
+    plain_http_error(
+        StatusCode::BAD_GATEWAY,
+        chio_errors::_generated::error_codes::TRANSPORT_TOKEN_INTROSPECTION_UNAVAILABLE.urn,
+    )
+}
+
 pub(super) fn validate_origin(headers: &HeaderMap) -> Result<(), Response> {
     let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) else {
         return Ok(());
@@ -614,40 +624,22 @@ impl IntrospectionBearerVerifier {
             request = request.basic_auth(client_id, Some(client_secret));
         }
         let contract = self.egress_contract.as_ref().ok_or_else(|| {
-            plain_http_error(
-                StatusCode::BAD_GATEWAY,
-                "token introspection requires an HttpEgressContract",
-            )
+            introspection_unavailable("token introspection requires an HttpEgressContract")
         })?;
-        let raw_request = request.build().map_err(|error| {
-            plain_http_error(
-                StatusCode::BAD_GATEWAY,
-                &format!("failed to build token introspection request: {error}"),
-            )
-        })?;
+        let raw_request = request.build().map_err(introspection_unavailable)?;
         let response = send_with_contract(contract, &self.client, raw_request)
             .await
-            .map_err(|error| {
-                plain_http_error(
-                    StatusCode::BAD_GATEWAY,
-                    &format!("token introspection endpoint unavailable: {error}"),
-                )
-            })?;
+            .map_err(introspection_unavailable)?;
         if !response.status().is_success() {
-            return Err(plain_http_error(
-                StatusCode::BAD_GATEWAY,
-                "token introspection endpoint returned an error",
-            ));
+            return Err(introspection_unavailable(format_args!(
+                "token introspection endpoint answered {}",
+                response.status()
+            )));
         }
         let introspection = response
             .json::<OAuthIntrospectionResponse>()
             .await
-            .map_err(|error| {
-                plain_http_error(
-                    StatusCode::BAD_GATEWAY,
-                    &format!("token introspection endpoint returned invalid JSON: {error}"),
-                )
-            })?;
+            .map_err(introspection_unavailable)?;
         self.session_auth_context_from_introspection(IntrospectionSessionAuthInput {
             token,
             headers,

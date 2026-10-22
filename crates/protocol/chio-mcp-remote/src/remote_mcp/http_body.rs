@@ -14,11 +14,14 @@ pub(super) async fn read_limited_mcp_post_body(
             -32600,
             &format!("request body exceeds {MCP_MAX_POST_BODY_BYTES}-byte limit"),
         )),
-        Err(error) => Err(jsonrpc_http_error(
-            StatusCode::BAD_REQUEST,
-            -32700,
-            &format!("failed to read request body: {error}"),
-        )),
+        Err(error) => {
+            warn!(error = %error, "remote MCP request body read failed");
+            Err(jsonrpc_http_error(
+                StatusCode::BAD_REQUEST,
+                -32700,
+                "failed to read request body",
+            ))
+        }
     }
 }
 

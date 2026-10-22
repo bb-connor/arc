@@ -67,12 +67,28 @@ struct SignedRecord {
     signature: Ed25519Signature,
 }
 
-fn failure(status: StatusCode, message: impl ToString) -> Response {
-    plain_http_error(status, &message.to_string())
+fn failure(status: StatusCode, message: &str) -> Response {
+    plain_http_error(status, message)
 }
 
-fn internal(error: impl ToString) -> Response {
-    failure(StatusCode::INTERNAL_SERVER_ERROR, error)
+/// Approval storage and signing failures answer the fixed 500 URN; the cause
+/// stays in the server log because it can name store paths and schema detail.
+fn internal(error: impl std::fmt::Display) -> Response {
+    error!(error = %error, "operator approval storage failed");
+    plain_http_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        chio_errors::_generated::error_codes::TRANSPORT_APPROVAL_STORAGE_FAILED.urn,
+    )
+}
+
+/// An approval request the session kernel cannot bind answers the fixed 409
+/// URN; the cause stays in the server log because it can name policy detail.
+fn unbound(error: impl std::fmt::Display) -> Response {
+    warn!(error = %error, "operator approval intent could not be bound");
+    plain_http_error(
+        StatusCode::CONFLICT,
+        chio_errors::_generated::error_codes::TRANSPORT_APPROVAL_INTENT_UNBOUND.urn,
+    )
 }
 
 fn storage(state: &RemoteAppState, headers: &HeaderMap) -> Result<(Connection, Keypair), Response> {
@@ -242,7 +258,7 @@ pub(super) async fn submit(
     );
     let intent = match state.factory.bind_approval_intent(&session, &invocation) {
         Ok(intent) => intent,
-        Err(error) => return failure(StatusCode::CONFLICT, error),
+        Err(error) => return unbound(error),
     };
     let Some(expires_at) = now.checked_add(request.ttl_seconds) else {
         return failure(StatusCode::BAD_REQUEST, "approval lifetime overflow");

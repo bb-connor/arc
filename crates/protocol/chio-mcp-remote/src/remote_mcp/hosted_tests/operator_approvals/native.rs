@@ -2,6 +2,8 @@ use crate::*;
 use chio_core::capability::governance::GovernedApprovalToken;
 use std::sync::atomic::AtomicUsize;
 
+#[path = "fixed_bodies.rs"]
+mod fixed_bodies;
 #[path = "fixture.rs"]
 mod fixture;
 #[path = "redemption.rs"]
