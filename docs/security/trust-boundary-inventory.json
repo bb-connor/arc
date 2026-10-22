@@ -7699,6 +7699,10 @@
     "crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs": [
       "serialize::custom_deserialize"
     ],
+    "crates/core/chio-core-types/src/root_authority/revocation_entry.rs": [
+      "serialize::custom_deserialize",
+      "validate::custom_deserialize"
+    ],
     "crates/core/chio-core-types/src/root_authority/wire.rs": [
       "new::custom_deserialize",
       "serialize::custom_deserialize",
@@ -12829,6 +12833,23 @@
             "serde::Deserializer"
           ],
           "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/root_authority/revocation_entry.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom deserialization of a revocation entry and its entry id after an outer original-byte reader. Unknown members, kinds and reasons reject, and an entry whose id is not derived from its target rejects; no authority token is constructed.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true,
+          "instances": 2
         }
       ]
     },

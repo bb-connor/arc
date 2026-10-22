@@ -17,6 +17,7 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 use crate::admission_operation_store as admission_store;
 
 mod projection_reference;
+mod revocation_entry;
 use projection_reference::projection_reference_digest;
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch', 'recovery', 'work_delegation', 'work_graph')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch', 'recovery', 'work_delegation', 'work_graph', 'revocation_entry')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -192,6 +193,7 @@ struct RevocationReference<'a> {
     commit_index: u64,
     capability_id: &'a str,
     revoked_at: i64,
+    revocation_entry_id: &'a str,
 }
 
 #[derive(Serialize)]
@@ -1091,17 +1093,17 @@ fn revocation_reference_digest(
     capability_id: &str,
     commit_index: u64,
 ) -> Result<String, SqliteServingOwnerError> {
-    let revoked_at = connection
+    let (revoked_at, revocation_entry_id) = connection
         .query_row(
             r#"
-            SELECT revoked_at FROM revoked_capabilities
+            SELECT revoked_at, revocation_entry_id FROM revoked_capabilities
             WHERE capability_id = ?1 AND admission_authority_commit_index = ?2
             "#,
             params![
                 capability_id,
                 sqlite_u64(commit_index, "revocation commit index")?,
             ],
-            |row| row.get::<_, i64>(0),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
         .optional()?
         .ok_or_else(|| invalid("revocation projection reference is absent"))?;
@@ -1110,6 +1112,7 @@ fn revocation_reference_digest(
         commit_index,
         capability_id,
         revoked_at,
+        revocation_entry_id: &revocation_entry_id,
     })
 }
 
@@ -1543,6 +1546,7 @@ fn verify_global_projection_coverage(
     verify_channel_release_projection_coverage(connection)?;
     verify_finding_challenge_projection_coverage(connection)?;
     verify_finding_status_projection_coverage(connection)?;
+    revocation_entry::verify_coverage(connection)?;
     let incomplete = connection.query_row(
         r#"
         SELECT

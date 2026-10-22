@@ -83,6 +83,7 @@ fn canonical_global_catalog_reopens_without_rewriting_history() -> TestResult {
 fn missing_projection_kinds_refuse_without_rewriting_catalog_or_history() -> TestResult {
     let mut schema = GLOBAL_COMMIT_SCHEMA.to_owned();
     for kind in [
+        "revocation_entry",
         "recovery",
         "stop_epoch",
         "security_participant_checkpoint",
