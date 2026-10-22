@@ -136,9 +136,6 @@ fn tampered_signature_is_rejected() {
 
 #[test]
 fn disabled_mode_allows_tool_calls_without_nonce() {
-    // A kernel with no execution_nonce_config installed: the allow
-    // response must still succeed and the nonce slot must be absent.
-    // This is the backward-compat guarantee for existing deployments.
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
     let agent_kp = make_keypair();

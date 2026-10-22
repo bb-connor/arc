@@ -43,9 +43,6 @@ fn cluster_replication_heads_reports_heads_without_materializing() {
 
 #[test]
 fn status_advertises_contiguous_ack_heads() {
-    // Wire shape: budgetAckHeads serializes as camelCase originId/eventSeq
-    // when non-empty, and is omitted entirely when empty (additive,
-    // backward-compatible with older peers who never witness).
     let response = ClusterStatusResponse {
         self_url: "https://node-a".to_string(),
         leader_url: None,
