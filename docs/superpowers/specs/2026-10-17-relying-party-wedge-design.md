@@ -926,8 +926,6 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 
 `serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; a provider-backed rule exists and `--enterprise-providers-file` is not set, or the registry is unreadable or invalid; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off; `--auth-token` is set without exactly one `operator_static_bearer` rule naming a `principal`, or such a rule exists without `--auth-token`; `--exchange-signer trust-control` is set and the trust-control authority key differs from `--control-authority-public-key`. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
 
-`serve-http` also refuses to start when the tenant index key's fingerprint differs from the one recorded in the state directory.
-
 ### 8.4 Privacy
 
 - Receipt assembly fails signing (the call denies) if `parameters_inline` or `result_inline` contains a pointer not authorized by the root policy for that tool, if any inline list is non-empty without a root policy, or if a receipt with `authority` carries `tenant_id`.
