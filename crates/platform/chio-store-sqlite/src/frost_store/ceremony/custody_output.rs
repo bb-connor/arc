@@ -72,3 +72,15 @@ pub(super) fn decrypt(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use chio_test_support::duplicate_keys::assert_repeated_tag_and_content_refused;
+
+    use super::CustodyOutput;
+
+    #[test]
+    fn custody_output_refuses_a_repeated_tag_or_content_key() {
+        assert_repeated_tag_and_content_refused::<CustodyOutput>("state", "round1", "output");
+    }
+}
