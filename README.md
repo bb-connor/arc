@@ -33,19 +33,23 @@ from agent to agent. Budgets are reserved before dispatch. Decision models insid
 evaluate each governed call before it runs. Every decision, allowed or refused, leaves a
 signed receipt another company can verify for itself.
 
-Independent kernels cooperate through treaties: signed agreements on what work they permit
-and what evidence they require. Each side keeps its own kernel, keys, and policy.
+Independent kernels cooperate through treaties: agreements on what work they permit and
+what evidence they require. Each side keeps its own kernel, keys, and policy.
 
-Their agents can fix your next bug while yours review the patch. The fix merges with both
-signatures, the history verifies offline, and one call revokes access. The permission can
-end. The evidence remains.
+The proposed [Computer API](docs/architecture/chio-computer/PROPOSAL.md) extends this to
+shared work. Their agents could fix your next bug while yours review the patch. The fix
+would merge with both kernels' signatures, and the history would verify offline. Each kernel
+revokes the grants it issued. The permission can end. The evidence remains.
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/kernel-boundary-mobile.svg" />
-    <img src="docs/assets/kernel-boundary.svg" alt="Two swarms under two kernels: their swarm runs under their kernel, joined by a treaty over iroh to your kernel, and both kernels sign. Your swarm, each grant narrower than its parent, runs under your kernel: a trusted compute base of capabilities, delegation, guards, approvals, revocation, budgets, settlement, processes, keys, secrets, information flow and receipts around its decision models. Your kernel dispatches through the adapter, the one door into the sandbox, to files, commands and services, and signs each decision into a Merkle checkpoint. Below: supported harnesses and interfaces." width="900" />
+    <img src="docs/assets/kernel-boundary.svg" alt="Two swarms under two kernels: their swarm runs under their kernel, joined by a treaty over iroh to your kernel, and both kernels sign. Your swarm, each grant narrower than its parent, runs under your kernel: a trusted compute base of capabilities, delegation, guards, approvals, revocation, budgets, settlement, processes, keys, secrets, information flow and receipts around its decision models. Your kernel dispatches through the adapter, the one door into the sandbox, to files, commands and services, and signs a receipt for each decision. Receipt batches can be committed to Merkle checkpoints. Below: supported harnesses and interfaces." width="900" />
   </picture>
 </p>
+
+A conceptual sketch of the proposed Computer API. `@chio-protocol/sdk` does not export
+these calls yet.
 
 ```ts
 import { Computer, USD } from "@chio-protocol/sdk";
@@ -56,19 +60,28 @@ const issue = await project.issues.get(417);
 const escrow = await project.escrow(USD(25));   // held by your kernel, released only on evidence
 
 // Every partner's agents write a fix in their own fork, under their own treaty.
-const patches = await Promise.all(partners.map((partner) =>
-  partner.exec(issue, { on: project.fork(), budget: USD(5), under: partner.treaty })));
+const patches = await Promise.all(partners.map(async (partner) => {
+  const fork = await project.fork();
+  return partner.exec(issue, {
+    on: fork,
+    grant: fork.grant(["read", "write"]),   // authority scoped to this fork
+    budget: USD(5),
+    under: partner.treaty,
+  });
+}));
 
 // Then every partner attacks every other partner's patch with new failing tests.
 const trial = await project.crossExamine(patches, { attackers: partners, budget: USD(2) });
 
-const winner = trial.unbroken().smallest();     // no rival could break it
+// Passes the project's own suite, and no rival could break it.
+const winner = trial.accepted(project.tests).unbroken().smallest();
 await project.apply(winner.changes, { cosign: winner.partner });   // both kernels sign the merge
 
 await escrow.settle({
-  merged: USD(15),    // to the partner whose patch shipped
-  perBreak: USD(2),   // to any partner who broke a rival's patch
-});                   // paid for outcomes, not effort
+  trial,                                                       // payouts follow this trial's evidence
+  merged: { to: winner.partner, amount: USD(15) },
+  perBreak: { to: trial.breakers(), amount: USD(2), max: 5 },  // 15 + 5 x 2 fits the escrow
+});
 
 const evidence = await project.history.export();
 await evidence.verify();   // every agent, attack, and dollar

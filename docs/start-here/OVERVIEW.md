@@ -98,7 +98,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="../assets/kernel-boundary-mobile.svg" />
-    <img src="../assets/kernel-boundary.svg" alt="Two swarms under two kernels: their swarm runs under their kernel, joined by a treaty over iroh to your kernel, and both kernels sign. Your swarm, each grant narrower than its parent, runs under your kernel: a trusted compute base of capabilities, delegation, guards, approvals, revocation, budgets, settlement, processes, keys, secrets, information flow and receipts around its decision models. Your kernel dispatches through the adapter, the one door into the sandbox, to files, commands and services, and signs each decision into a Merkle checkpoint. Below: supported harnesses and interfaces." width="900" />
+    <img src="../assets/kernel-boundary.svg" alt="Two swarms under two kernels: their swarm runs under their kernel, joined by a treaty over iroh to your kernel, and both kernels sign. Your swarm, each grant narrower than its parent, runs under your kernel: a trusted compute base of capabilities, delegation, guards, approvals, revocation, budgets, settlement, processes, keys, secrets, information flow and receipts around its decision models. Your kernel dispatches through the adapter, the one door into the sandbox, to files, commands and services, and signs a receipt for each decision. Receipt batches can be committed to Merkle checkpoints. Below: supported harnesses and interfaces." width="900" />
   </picture>
 </p>
 
@@ -424,7 +424,7 @@ any registry or artifact mismatch fails closed.
 | **5 &middot; Dispatch** | Only the kernel dispatches to the tool server. The agent never holds a handle to it. |
 | **6 &middot; Guard (out)** | The result passes back through output and post-invocation guards (PII/PHI sanitization, anomaly and data-transfer checks). |
 | **7 &middot; Meter and sign** | The kernel reconciles the budget hold to actual cost, assembles the receipt (decision, policy hash, guard evidence, economic metadata), recomputes the content hash inside its trust boundary, and signs it. A call it cannot sign is not allowed. |
-| **8 &middot; Commit** | The receipt is written to the content-addressed log and folded into a Merkle checkpoint, where its evidence is available to the trust and economy planes. |
+| **8 &middot; Commit** | The receipt is written to the content-addressed log, where receipt batches can be committed to a Merkle checkpoint and its evidence is available to the trust and economy planes. |
 
 Every outcome (`allow`, `deny`, `cancelled`, `incomplete`) produces a signed receipt.
 
