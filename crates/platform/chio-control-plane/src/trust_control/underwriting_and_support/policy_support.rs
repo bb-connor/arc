@@ -564,6 +564,9 @@ pub(crate) fn trust_http_error_from_receipt_store(error: ReceiptStoreError) -> T
     match error {
         ReceiptStoreError::NotFound(message) => TrustHttpError::new(StatusCode::NOT_FOUND, message),
         ReceiptStoreError::Conflict(message) => TrustHttpError::new(StatusCode::CONFLICT, message),
+        ReceiptStoreError::Schema(error) => {
+            TrustHttpError::new(StatusCode::CONFLICT, error.to_string())
+        }
         ReceiptStoreError::ReadBoundary(message) => {
             TrustHttpError::new(StatusCode::FORBIDDEN, message)
         }

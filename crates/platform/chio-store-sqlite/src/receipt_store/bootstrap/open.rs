@@ -564,8 +564,8 @@ impl SqliteReceiptStore {
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
             let (namespaces, state) = receipt_namespaces(&snapshot)?;
             if state != crate::SchemaState::Current {
-                return Err(ReceiptStoreError::Conflict(
-                    "receipt database is not initialized".into(),
+                return Err(ReceiptStoreError::Schema(
+                    chio_security_types::schema::SchemaRefusal::CreationNotAllowed,
                 ));
             }
             validate_receipt_catalog(&snapshot, namespaces.len() == 2)?;

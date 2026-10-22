@@ -26,11 +26,16 @@ fn empty_companion_opens_preserve_typed_creation_refusal() -> TestResult {
             SchemaRefusal::CreationNotAllowed
         ))
     ));
+    let Err(error) = SqliteSettlementOutcomeStore::open_with_pool(pool) else {
+        return Err("empty settlement companion was admitted".into());
+    };
+    assert_eq!(
+        error.class(),
+        chio_settle::SettlementRouteErrorClass::Backend
+    );
     assert!(matches!(
-        SqliteSettlementOutcomeStore::open_with_pool(pool),
-        Err(SettlementRouteError::Schema(
-            SchemaRefusal::CreationNotAllowed
-        ))
+        error,
+        SettlementRouteError::Schema(SchemaRefusal::CreationNotAllowed)
     ));
     Ok(())
 }

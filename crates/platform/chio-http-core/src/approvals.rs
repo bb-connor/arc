@@ -111,6 +111,11 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
+            ApprovalStoreError::Schema(_) => Self::Internal(
+                chio_errors::_generated::error_codes::KERNEL_INTERNAL_ERROR
+                    .urn
+                    .into(),
+            ),
             ApprovalStoreError::Clock(error) => Self::Internal(error.code().into()),
             ApprovalStoreError::UntrustedInput(error) => Self::Internal(error.code().into()),
         }

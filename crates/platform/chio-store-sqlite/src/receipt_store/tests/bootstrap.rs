@@ -556,7 +556,9 @@ fn open_refuses_foreign_database_without_switching_it_to_wal() {
     // Opening it as a receipt store must fail closed as foreign.
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
 
@@ -589,7 +591,9 @@ fn open_refuses_an_unstamped_db_with_a_lookalike_receipt_table() {
 
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
 
@@ -617,7 +621,9 @@ fn open_refuses_an_unstamped_db_carrying_a_receipt_payload_column() {
 
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
     let reopened = rusqlite::Connection::open(&path).test_unwrap();

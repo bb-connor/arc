@@ -4156,6 +4156,7 @@ dependencies = [
  "chio-core-types",
  "chio-cross-protocol",
  "chio-egress-contract",
+ "chio-errors",
  "chio-kernel",
  "chio-metrics-spec",
  "chio-security-types",

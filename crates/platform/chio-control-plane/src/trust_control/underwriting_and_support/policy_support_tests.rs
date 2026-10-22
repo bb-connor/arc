@@ -32,3 +32,15 @@ fn capability_budget_report_reads_all_matching_rows_before_display_limit(
     assert_eq!(absent.summary.matching_grants, 0);
     Ok(())
 }
+
+#[test]
+fn schema_refusal_retains_receipt_http_conflict_status() {
+    let error = super::trust_http_error_from_receipt_store(chio_kernel::ReceiptStoreError::Schema(
+        chio_security_types::schema::SchemaRefusal::CatalogMismatch,
+    ));
+    assert_eq!(error.status, axum::http::StatusCode::CONFLICT);
+    assert_eq!(
+        error.message,
+        "schema catalog differs from its canonical definition"
+    );
+}

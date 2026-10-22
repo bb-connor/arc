@@ -516,8 +516,9 @@ mod snapshot_recovery {
         .err()
         .ok_or("a foreign anchored receipt database was admitted")?;
         assert!(
-            matches!(&error, crate::CliError::ReceiptStore(chio_kernel::ReceiptStoreError::Conflict(reason))
-                if reason.contains("is not a Chio store")),
+            matches!(&error, crate::CliError::ReceiptStore(chio_kernel::ReceiptStoreError::Schema(
+                chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+            )) if *expected == chio_store_sqlite::CHIO_SQLITE_APPLICATION_ID),
             "{error}"
         );
         fixture.assert_reclaimed_before_open_refusal()

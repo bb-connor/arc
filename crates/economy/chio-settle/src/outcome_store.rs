@@ -145,11 +145,9 @@ impl SettlementRouteError {
     #[must_use]
     pub const fn class(&self) -> SettlementRouteErrorClass {
         match self {
-            Self::Backend { .. } => SettlementRouteErrorClass::Backend,
+            Self::Backend { .. } | Self::Schema(_) => SettlementRouteErrorClass::Backend,
             Self::Conflict { .. } => SettlementRouteErrorClass::Conflict,
-            Self::InvalidRecord { .. } | Self::Schema(_) => {
-                SettlementRouteErrorClass::InvalidRecord
-            }
+            Self::InvalidRecord { .. } => SettlementRouteErrorClass::InvalidRecord,
         }
     }
 }
@@ -264,6 +262,12 @@ mod tests {
     #[test]
     fn outcome_store_error_classes_are_bounded() {
         let cases = [
+            (
+                SettlementRouteError::Schema(
+                    chio_security_types::schema::SchemaRefusal::CatalogMismatch,
+                ),
+                SettlementRouteErrorClass::Backend,
+            ),
             (
                 SettlementRouteError::Backend {
                     detail: "db unavailable".to_string(),
