@@ -184,6 +184,12 @@ impl RootPolicyRuleFields {
             for (scope_value, tools) in projection {
                 check_nul_free("idp_scope_projection", scope_value, 128)?;
                 check_items("idp_scope_projection", tools.len(), 0, 256)?;
+                if !tools.iter().all(|tool| is_server_tool(tool.as_str())) {
+                    return Err(RootAuthorityShapeError::Pattern {
+                        field: "idp_scope_projection",
+                        expected: "server/tool",
+                    });
+                }
             }
         }
         check_items("holder_classes", self.holder_classes.len(), 1, 2)?;
@@ -266,6 +272,12 @@ impl InlineFields {
     }
 }
 
+/// A non-empty server and a non-empty tool name around the first `/`.
+fn is_server_tool(tool: &str) -> bool {
+    tool.split_once('/')
+        .is_some_and(|(server, name)| !server.is_empty() && !name.is_empty())
+}
+
 /// `^(/([^~/]|~[01])*)+$`.
 fn is_json_pointer(pointer: &str) -> bool {
     let Some(rest) = pointer.strip_prefix('/') else {
@@ -310,11 +322,8 @@ impl RootPolicyDisclosureFields {
         };
         check_items("disclosure.tools", tools.len(), 0, 1024)?;
         for (tool, disclosure) in tools {
-            let well_formed = tool.chars().count() <= 256
-                && !tool.contains('\0')
-                && tool
-                    .split_once('/')
-                    .is_some_and(|(server, name)| !server.is_empty() && !name.is_empty());
+            let well_formed =
+                tool.chars().count() <= 256 && !tool.contains('\0') && is_server_tool(tool);
             if !well_formed {
                 return Err(RootAuthorityShapeError::Pattern {
                     field: "disclosure.tools",
