@@ -101,7 +101,7 @@ status on every control surface reports these operations as
 |---|---|---|
 | `POST /admin/emergency-stop`, `POST /admin/emergency-resume`, `GET /admin/emergency-status` on `chio mcp serve-http` | admin bearer token, compared in constant time | `SharedCredential` for `hosted-mcp:admin-token` |
 | `POST /chio/emergency-stop`, `POST /chio/emergency-resume`, `GET /chio/emergency-status` on the api-protect sidecar | sidecar control token, compared in constant time | `SharedCredential` for `api-protect:sidecar-control-token` |
-| `POST /v1/admin/emergency-stop`, `POST /v1/admin/emergency-resume`, `GET /v1/admin/emergency-status` on trust control | service token, compared in constant time | `SharedCredential` for `trust-control:service-token` |
+| `POST /v1/admin/emergency-stop`, `POST /v1/admin/emergency-resume`, `GET /v1/admin/emergency-status` on trust control | credential with `admin:emergency` and deployment tenant authority, secret digest matched against `--access-config` | `SharedCredential` for `trust-control:<credential id>` |
 | process-host control socket (`control.sock` in the host state directory) | peer uid equal to the host's, plus the per-start `control.token` | `SharedCredential` for `process-host:control-socket` |
 | `chio process stop`, `resume`, `stop-status` | uses the control socket when the host serves; otherwise takes the host lease and appends offline | as above, or `process-host:offline-cli` |
 
