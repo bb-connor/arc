@@ -42,6 +42,16 @@ fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T,
     })
 }
 
+/// Signed receipt input: repeated keys refuse and integers keep their signed domain.
+fn parse_signed_json<T: serde::de::DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
+    chio_core_types::canonical::UntrustedJsonText::new(raw)
+        .decode_signed()
+        .map_err(|error| {
+            let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
+            to_js_error(&err)
+        })
+}
+
 fn encode_result<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
     to_plain_js(value).map_err(|error| {
         let err = BindingError::new(
@@ -110,7 +120,7 @@ pub fn evaluate(request_json: &str) -> Result<JsValue, JsValue> {
 /// [`sign_receipt_relaying_trusted_body`].
 #[wasm_bindgen]
 pub fn sign_receipt(body_json: &str, signing_seed_hex: &str) -> Result<JsValue, JsValue> {
-    let input: SignReceiptRequestJson = parse_json("sign_receipt body", body_json)?;
+    let input: SignReceiptRequestJson = parse_signed_json("sign_receipt body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt = sign_receipt_pure(input, &seed).map_err(|err| to_js_error(&err))?;
     encode_signed_receipt(&receipt)
@@ -129,7 +139,7 @@ pub fn sign_receipt_relaying_trusted_body(
     signing_seed_hex: &str,
 ) -> Result<JsValue, JsValue> {
     let input: SignReceiptRequestJson =
-        parse_json("sign_receipt_relaying_trusted_body body", body_json)?;
+        parse_signed_json("sign_receipt_relaying_trusted_body body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt =
         sign_receipt_relaying_trusted_body_pure(input, &seed).map_err(|err| to_js_error(&err))?;
