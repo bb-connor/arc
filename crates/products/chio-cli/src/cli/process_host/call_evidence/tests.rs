@@ -611,3 +611,32 @@ fn canonical_unknown_receipts_reject_substituted_signed_custody_references() -> 
     fixture.assert_runtime_rejected("unreferenced continuation episode remains live");
     Ok(())
 }
+
+#[test]
+fn signed_evidence_refuses_a_repeated_parameter_key_before_projection() -> Result<(), CliError> {
+    let fixture = SemanticRefusal::new(
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        kernel_denial(),
+    )?;
+    let mut body = fixture.call.body();
+    body.action =
+        ToolCallAction::from_parameters(json!({"capabilities": {"root": "cap"}})).map_err(error)?;
+    body.content_hash = hash(&body.action.parameters)?;
+    let text = serde_json::to_string(&ChioReceipt::sign(body, &fixture.key).map_err(error)?)
+        .map_err(error)?;
+    let key = fixture.key.public_key();
+    crate::receipt_verify::verify_original_receipt(&text, &key)?;
+
+    let member = r#""root":"cap""#;
+    assert_eq!(text.matches(member).count(), 1);
+    let repeated = text.replacen(member, &format!("{member},{member}"), 1);
+    assert!(matches!(
+        crate::receipt_verify::verify_original_receipt(&repeated, &key),
+        Err(CliError::SignedJson(
+            chio_core::canonical::UntrustedJsonError::Canonicalization(
+                chio_core::Error::CanonicalJson(message)
+            )
+        )) if message.starts_with(r#"invalid I-JSON input: duplicate object key: "root""#)
+    ));
+    Ok(())
+}
