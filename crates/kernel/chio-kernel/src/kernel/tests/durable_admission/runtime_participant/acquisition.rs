@@ -401,7 +401,7 @@ fn exhausted_budget_with_unconfirmed_runtime_release(nested: bool) {
 /// returns a decision naming a reserved key other than `chio_runtime`.
 struct ForgingClaimingVerifier {
     binding: RuntimeParticipantAuthorityBindingV1,
-    forged_key: &'static str,
+    metadata: serde_json::Value,
     allow: bool,
 }
 
@@ -431,10 +431,7 @@ impl RuntimeAdmissionHook for ForgingClaimingVerifier {
         authority: &RuntimeParticipantClaimAuthority<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
         authority.claim(digest('b'), vec![])?;
-        let metadata = Some(serde_json::json!({
-            "chio_runtime": {"admission_id": "operation-owned"},
-            self.forged_key: {"hook": "other-hook", "accepted": false}
-        }));
+        let metadata = Some(self.metadata.clone());
         Ok(if self.allow {
             RuntimeAdmissionDecision::allow(metadata)
         } else {
@@ -443,15 +440,20 @@ impl RuntimeAdmissionHook for ForgingClaimingVerifier {
     }
 }
 
-fn operation_owned_forgery_is_refused_and_released(forged_key: &'static str, allow: bool) {
+fn operation_owned_hook_is_refused_and_released(
+    metadata: serde_json::Value,
+    allow: bool,
+    expected_reason: &str,
+    absent_key: Option<&str>,
+) {
     let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("runtime-claim-forged-metadata");
+        durable_admission_fixture("runtime-claim-refused-metadata");
     kernel.set_runtime_admission_hook(Arc::new(ForgingClaimingVerifier {
         binding: RuntimeParticipantAuthorityBindingV1::new(
             AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
             AdmissionIdentifier::try_new("source", "test-source").expect("source"),
         ),
-        forged_key,
+        metadata: metadata.clone(),
         allow,
     }));
     *store.runtime_recovery.0.lock().expect("fixture") = RecoveryState {
@@ -463,34 +465,115 @@ fn operation_owned_forgery_is_refused_and_released(forged_key: &'static str, all
     let response = kernel
         .evaluate_tool_call_blocking(&request)
         .expect("runtime admission denial");
-    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(response.verdict, Verdict::Deny, "{metadata}");
     assert_eq!(
         response.reason.as_deref(),
-        Some(format!("{forged_key} is reserved for kernel-derived receipts").as_str())
+        Some(expected_reason),
+        "{metadata}"
     );
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(response
-        .receipt
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.get(forged_key))
-        .is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0, "{metadata}");
+    let signed = response.receipt.metadata.as_ref().expect("denial metadata");
+    assert!(signed.is_object(), "{metadata}");
+    assert!(signed.get("receipt_context").is_some(), "{metadata}");
+    if let Some(key) = absent_key {
+        assert!(signed.get(key).is_none(), "{metadata}");
+    }
     let state = store.runtime_recovery.0.lock().expect("fixture");
     let history = state.history.as_ref().expect("history");
-    assert_eq!(history.len(), 1);
+    assert_eq!(history.len(), 1, "{metadata}");
     assert_eq!(
         history[0].disposition,
-        RuntimeParticipantDisposition::ReleasedBeforeDispatch
+        RuntimeParticipantDisposition::ReleasedBeforeDispatch,
+        "{metadata}"
     );
-    assert_eq!(state.release_calls, 1);
+    assert_eq!(state.release_calls, 1, "{metadata}");
 }
+
+fn forged(key: &str) -> serde_json::Value {
+    serde_json::json!({
+        "chio_runtime": {"admission_id": "operation-owned"},
+        key: {"hook": "other-hook", "accepted": false}
+    })
+}
+
+const NON_OBJECT_REFUSAL: &str = "runtime admission hook metadata must be a JSON object";
 
 #[test]
 fn operation_owned_allow_naming_a_reserved_key_is_refused_and_released() {
-    operation_owned_forgery_is_refused_and_released("delivery_contract", true);
+    operation_owned_hook_is_refused_and_released(
+        forged("delivery_contract"),
+        true,
+        "delivery_contract is reserved for kernel-derived receipts",
+        Some("delivery_contract"),
+    );
 }
 
 #[test]
 fn operation_owned_deny_forging_the_kernel_runtime_admission_record_is_refused_and_released() {
-    operation_owned_forgery_is_refused_and_released("runtime_admission", false);
+    operation_owned_hook_is_refused_and_released(
+        forged("runtime_admission"),
+        false,
+        "runtime_admission is reserved for kernel-derived receipts",
+        Some("runtime_admission"),
+    );
+}
+
+#[test]
+fn operation_owned_allow_with_null_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::Value::Null,
+        true,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
+}
+
+#[test]
+fn operation_owned_allow_with_array_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::json!(["chio_runtime"]),
+        true,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
+}
+
+#[test]
+fn operation_owned_allow_with_scalar_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::json!(7),
+        true,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
+}
+
+#[test]
+fn operation_owned_deny_with_null_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::Value::Null,
+        false,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
+}
+
+#[test]
+fn operation_owned_deny_with_array_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::json!(["chio_runtime"]),
+        false,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
+}
+
+#[test]
+fn operation_owned_deny_with_scalar_metadata_is_refused_and_released() {
+    operation_owned_hook_is_refused_and_released(
+        serde_json::json!(7),
+        false,
+        NON_OBJECT_REFUSAL,
+        None,
+    );
 }
