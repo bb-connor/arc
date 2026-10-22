@@ -15,6 +15,7 @@ name = "mercury"
 path = "src/main.rs"
 
 [dependencies]
+chio-bundle-verify = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }

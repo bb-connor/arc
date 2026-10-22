@@ -200,15 +200,22 @@ pub(crate) fn dispatch_evidence(
                 }
             }
             EvidenceCommands::Import { input, trust } => {
-                let trust = chio_bundle_verify::read_trust_file(&trust)?;
-                evidence_export::cmd_evidence_import(
-                &input,
-                receipt_db.as_deref(),
-                control_url.as_deref(),
-                control_token.as_deref(),
-                json_output,
-                &trust,
-            )
+                let imported = chio_bundle_verify::read_trust_file(&trust)
+                    .map_err(CliError::from)
+                    .and_then(|trust| {
+                        evidence_export::cmd_evidence_import(
+                            &input,
+                            receipt_db.as_deref(),
+                            control_url.as_deref(),
+                            control_token.as_deref(),
+                            json_output,
+                            &trust,
+                        )
+                    });
+                match imported {
+                    Ok(()) => Ok(()),
+                    Err(error) => exit_evidence_verify_error(error, json_output),
+                }
             },
             EvidenceCommands::FederationPolicy { command } => match command {
                 EvidenceFederationPolicyCommands::Create {

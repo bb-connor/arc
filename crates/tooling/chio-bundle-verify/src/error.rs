@@ -51,8 +51,7 @@ pub enum BundleVerifyErrorKind {
     /// A listed file is missing, not a regular file, or differs from its
     /// manifest digest or length; or the inventory is not exact.
     FileHashMismatch,
-    /// A receipt or checkpoint signature does not verify, or its signer is
-    /// not pinned.
+    /// A receipt or checkpoint signature does not verify.
     SignatureInvalid,
     /// Signed parts of the bundle contradict each other: counts, scope,
     /// checkpoint chain, inclusion proofs, transparency or disclosure notice.
@@ -63,7 +62,7 @@ pub enum BundleVerifyErrorKind {
     SignedJson,
     /// The trust file fails to load.
     TrustInvalid,
-    /// The bundle needs a key role the trust file leaves empty.
+    /// A signer the bundle needs is not pinned in the trust file.
     TrustMissing,
     /// The bundle or the trust file asks for something this verifier does
     /// not support.

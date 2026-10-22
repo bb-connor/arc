@@ -33,7 +33,7 @@
       },
       "minItems": 0,
       "maxItems": 64,
-      "description": "Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust."
+      "description": "Keys that may sign anchored roots."
     },
     "root_policy_keys": {
       "type": "array",
@@ -43,7 +43,7 @@
       },
       "minItems": 0,
       "maxItems": 64,
-      "description": "Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust."
+      "description": "Keys that may sign root policies."
     },
     "idp_keys": {
       "type": "object",

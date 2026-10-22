@@ -35,6 +35,23 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
 }
 
+/// A `chio.verifier-trust.v1` file pinning `key` as the only kernel key.
+fn kernel_trust_file(dir: &Path, key: &chio_core::crypto::PublicKey) -> PathBuf {
+    let path = dir.join("verifier-trust.json");
+    let trust = serde_json::json!({
+        "schema": "chio.verifier-trust.v1",
+        "kernel_keys": [key.to_hex()],
+        "exchange_keys": [],
+        "root_policy_keys": [],
+    });
+    fs::write(
+        &path,
+        serde_json::to_vec(&trust).expect("encode trust file"),
+    )
+    .expect("write trust file");
+    path
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -116,8 +133,11 @@ fn mercury_proof_and_inquiry_packages_export_and_verify() {
         .current_dir(workspace_root())
         .arg("proof")
         .arg("export")
-        .arg("--trusted-kernel-pubkey")
-        .arg(Keypair::from_seed(&[58; 32]).public_key().to_hex())
+        .arg("--trust")
+        .arg(kernel_trust_file(
+            output_dir.parent().expect("package parent"),
+            &Keypair::from_seed(&[58; 32]).public_key(),
+        ))
         .arg("--input")
         .arg(&output_dir)
         .arg("--output")
