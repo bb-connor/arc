@@ -643,6 +643,10 @@ fn tenant_scoped_disclosure_notice_names_the_shared_batch_fields() {
         &EvidenceExportQuery::tenant_scoped("tenant-a"),
     )
     .test_unwrap();
+    assert_eq!(
+        notice.schema,
+        chio_core_types::receipt::evidence::EVIDENCE_DISCLOSURE_NOTICE_SCHEMA
+    );
     for required in [
         "batch_start_seq",
         "batch_end_seq",

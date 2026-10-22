@@ -399,21 +399,17 @@ smoke_core() {
 
   run_cmd "core" "evidence-export" "${CHIO_BIN}" \
     --receipt-db "${receipt_db}" \
-    evidence export --admin-all --kernel-seed-file "${dir}/evidence-kernel.seed" \
+    evidence export --admin-all --kernel-seed-file "${receipt_db}.kernel.seed" \
     --output "${evidence_dir}"
-  python3 - "${evidence_dir}" "${dir}/verifier-trust.json" <<PY
+  python3 - "${receipt_db}.kernel.pub" "${dir}/verifier-trust.json" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-package = Path(sys.argv[1])
-keys = {json.loads((package / "export-envelope.json").read_text())["signerKey"]}
-for line in (package / "receipts.ndjson").read_text().splitlines():
-    if line.strip():
-        keys.add(json.loads(line)["receipt"]["kernel_key"])
+key = Path(sys.argv[1]).read_text(encoding="utf-8").strip()
 trust = {
     "schema": "chio.verifier-trust.v1",
-    "kernel_keys": sorted(keys),
+    "kernel_keys": [key],
     "exchange_keys": [],
     "root_policy_keys": [],
 }

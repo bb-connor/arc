@@ -51,10 +51,8 @@ impl ReportColumn {
 
 /// A verifier-owned trust file. Unsigned; the verifying party writes it.
 ///
-/// Key bounds: `kernel_keys` holds 1 to 64 keys. `exchange_keys` and
-/// `root_policy_keys` hold 0 to 64, because a bundle without anchored roots
-/// needs neither; a verifier that meets an anchored root while the role it
-/// needs is empty refuses the bundle as missing trust.
+/// Key bounds: `kernel_keys` holds 1 to 64 keys; `exchange_keys` and
+/// `root_policy_keys` hold 0 to 64.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VerifierTrust {

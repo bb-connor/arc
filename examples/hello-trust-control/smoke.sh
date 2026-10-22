@@ -98,10 +98,28 @@ PY
 "${CHIO_BIN}" evidence export \
   --receipt-db "${CHECK_RECEIPT_DB}" \
   --admin-all \
+  --kernel-seed-file "${CHECK_RECEIPT_DB}.kernel.seed" \
   --output "${EVIDENCE_DIR}"
+
+TRUST_FILE="${ARTIFACT_ROOT}/verifier-trust.json"
+python3 - "${CHECK_RECEIPT_DB}.kernel.pub" "${TRUST_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+key = Path(sys.argv[1]).read_text(encoding="utf-8").strip()
+trust = {
+    "schema": "chio.verifier-trust.v1",
+    "kernel_keys": [key],
+    "exchange_keys": [],
+    "root_policy_keys": [],
+}
+Path(sys.argv[2]).write_text(json.dumps(trust), encoding="utf-8")
+PY
 
 "${CHIO_BIN}" evidence verify \
   --input "${EVIDENCE_DIR}" \
+  --trust "${TRUST_FILE}" \
   --json \
   > "${ARTIFACT_ROOT}/verify.json"
 

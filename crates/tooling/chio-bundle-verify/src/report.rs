@@ -3,6 +3,8 @@
 use std::path::Path;
 
 use chio_core_types::crypto::PublicKey;
+use chio_core_types::receipt::body::ChioReceipt;
+use chio_core_types::receipt::kinds::ReceiptKind;
 use chio_core_types::root_authority::{ReportColumn, VerifierTrust};
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +38,13 @@ impl ColumnResult {
         Self {
             class: EvidenceClass::Verified,
             reason: None,
+        }
+    }
+
+    fn with_reason(class: EvidenceClass, reason: &str) -> Self {
+        Self {
+            class,
+            reason: Some(reason.to_string()),
         }
     }
 
@@ -111,6 +120,27 @@ impl VerificationReport {
     }
 }
 
+const OBSERVATION_ONLY: &str =
+    "the receipt records an observation or advisory evaluation, not a mediated decision";
+const DECISION_MISSING: &str = "the mediated decision receipt carries no decision";
+
+/// `verified` only for a mediated decision that carries its decision; the
+/// signature under a pinned kernel key is checked before any column.
+fn decision_column(receipt: &ChioReceipt) -> ColumnResult {
+    match (
+        receipt.semantic_fields().receipt_kind,
+        receipt.decision.is_some(),
+    ) {
+        (ReceiptKind::MediatedDecision, true) => ColumnResult::verified(),
+        (ReceiptKind::MediatedDecision, false) => {
+            ColumnResult::with_reason(EvidenceClass::Rejected, DECISION_MISSING)
+        }
+        (ReceiptKind::TraceObservation | ReceiptKind::AdvisoryEvaluation, _) => {
+            ColumnResult::with_reason(EvidenceClass::Observed, OBSERVATION_ONLY)
+        }
+    }
+}
+
 const NO_ROOT_AUTHORITY: &str = "the receipt carries no root authority";
 const NO_DISCLOSURE: &str = "the bundle carries no content openings";
 const NO_SETTLEMENT: &str = "the bundle carries no settlement evidence";
@@ -147,7 +177,7 @@ pub fn report(verified: &VerifiedPackage, trust: &VerifierTrust) -> Verification
             columns: ReceiptColumns {
                 identity_root: ColumnResult::unverifiable(NO_ROOT_AUTHORITY),
                 delegation_chain: ColumnResult::unverifiable(NO_ROOT_AUTHORITY),
-                decision: ColumnResult::verified(),
+                decision: decision_column(&record.receipt),
                 content: ColumnResult::unverifiable(NO_DISCLOSURE),
                 settlement: ColumnResult::unverifiable(NO_SETTLEMENT),
             },

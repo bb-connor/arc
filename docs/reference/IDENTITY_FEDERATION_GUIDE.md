@@ -178,7 +178,8 @@ local truth.
 Use the local CLI surfaces to inspect imported trust:
 
 ```bash
-chio --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
+chio --receipt-db receipts.sqlite3 evidence import --input ./upstream-package \
+  --trust ./verifier-trust.json
 
 chio --json --receipt-db receipts.sqlite3 reputation local \
   --subject-public-key <agent-ed25519-hex>

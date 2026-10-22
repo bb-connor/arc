@@ -65,6 +65,21 @@ class OfflineVerifierDepsTests(unittest.TestCase):
         errors = GATE.check(metadata([(package("tokio", "MIT"), None)]), self.deny)
         self.assertTrue(any("tokio" in error for error in errors), errors)
 
+    def test_each_denied_class_fails(self) -> None:
+        for name in ("mio", "h2", "curl", "libsqlite3-sys", "sqlx", "async-std"):
+            errors = GATE.check(metadata([(package(name, "MIT"), None)]), self.deny)
+            self.assertTrue(any(name in error for error in errors), (name, errors))
+
+    def test_hosted_chio_crate_fails_and_portable_ones_pass(self) -> None:
+        errors = GATE.check(
+            metadata([(package("chio-http-core", "Apache-2.0"), None)]), self.deny
+        )
+        self.assertTrue(any("chio-http-core" in error for error in errors), errors)
+        errors = GATE.check(
+            metadata([(package("chio-kernel-core", "Apache-2.0"), None)]), self.deny
+        )
+        self.assertEqual(errors, [])
+
     def test_dev_only_dependency_is_outside_the_closure(self) -> None:
         errors = GATE.check(metadata([(package("tokio", "MIT"), "dev")]), self.deny)
         self.assertEqual(errors, [])

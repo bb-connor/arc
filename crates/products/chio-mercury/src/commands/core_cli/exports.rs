@@ -456,11 +456,18 @@ pub(super) fn export_mercury_run(
         &kernel,
     )?;
 
-    let proof_package = build_proof_package(
-        &evidence_dir,
-        &bundle_manifest_paths,
-        &[kernel.public_key().to_hex()],
-    )?;
+    let trust = chio_core::root_authority::VerifierTrust {
+        schema: chio_core::root_authority::CHIO_VERIFIER_TRUST_SCHEMA.to_string(),
+        kernel_keys: vec![kernel.public_key()],
+        exchange_keys: Vec::new(),
+        root_policy_keys: Vec::new(),
+        idp_keys: Default::default(),
+        pep_keys: Default::default(),
+        checkpoint_keys: Vec::new(),
+        checkpoint_trust_anchor: None,
+        required_columns: Vec::new(),
+    };
+    let proof_package = build_proof_package(&evidence_dir, &bundle_manifest_paths, &trust)?;
     let proof_report = proof_package
         .verify(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;

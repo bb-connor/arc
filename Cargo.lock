@@ -4598,6 +4598,7 @@ dependencies = [
 name = "chio-mercury"
 version = "0.1.0"
 dependencies = [
+ "chio-bundle-verify",
  "chio-control-plane",
  "chio-core-types",
  "chio-kernel",

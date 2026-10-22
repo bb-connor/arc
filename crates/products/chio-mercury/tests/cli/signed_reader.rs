@@ -48,8 +48,11 @@ fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
         .current_dir(workspace_root())
         .arg("proof")
         .arg("export")
-        .arg("--trusted-kernel-pubkey")
-        .arg(issuer.public_key().to_hex())
+        .arg("--trust")
+        .arg(kernel_trust_file(
+            output_dir.parent().expect("package parent"),
+            &issuer.public_key(),
+        ))
         .arg("--input")
         .arg(&output_dir)
         .arg("--output")

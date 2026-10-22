@@ -56,3 +56,39 @@ fn report_rejects_unknown_members() {
     value["unexpected"] = serde_json::json!(true);
     assert!(serde_json::from_value::<chio_bundle_verify::VerificationReport>(value).is_err());
 }
+
+#[test]
+fn observation_receipts_do_not_satisfy_a_required_decision_column() {
+    use chio_core_types::receipt::body::ChioReceipt;
+    use chio_core_types::receipt::evidence::EvidenceUncheckpointedReceipt;
+    use chio_core_types::receipt::kinds::{
+        BoundaryClass, ObservationOutcome, ReceiptKind, ToolOrigin, TrustLevel,
+    };
+
+    let directory = tempfile::tempdir().test_unwrap();
+    let mut bundle = sample_bundle();
+    let mut body = bundle.tool_receipts[0].receipt.body();
+    body.decision = None;
+    body.receipt_kind = ReceiptKind::AdvisoryEvaluation;
+    body.boundary_class = BoundaryClass::AdvisoryOnly;
+    body.observation_outcome = Some(ObservationOutcome::Observed);
+    body.trust_level = TrustLevel::Advisory;
+    body.tool_origin = ToolOrigin::HostExecutedUnmediated;
+    bundle.tool_receipts[0].receipt = ChioReceipt::sign(body, &package_keypair()).test_unwrap();
+    bundle.checkpoints.clear();
+    bundle.inclusion_proofs.clear();
+    bundle.uncheckpointed_receipts = vec![EvidenceUncheckpointedReceipt {
+        seq: 1,
+        receipt_id: bundle.tool_receipts[0].receipt.id.clone(),
+    }];
+    write(directory.path(), &bundle, &package_keypair());
+
+    let mut trust = package_trust();
+    trust.required_columns = vec![ReportColumn::Decision];
+    let report = verify_bundle(directory.path(), &trust, None).test_unwrap();
+    assert_eq!(
+        report.receipts[0].columns.decision.class,
+        EvidenceClass::Observed
+    );
+    assert_eq!(report.exit_class(&trust), ExitClass::RequiredColumn);
+}

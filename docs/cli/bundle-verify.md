@@ -24,10 +24,10 @@ The verifier reads no clock and opens no network or database connection.
 
 `kernel_keys` holds 1 to 64 keys: the package envelope, every tool receipt,
 every child receipt and every checkpoint must be signed by one of them
-(`checkpoint_keys` may add checkpoint-only signers). `exchange_keys` and
-`root_policy_keys` hold 0 to 64 keys; a package whose receipts carry anchored
-roots needs them, and a missing role refuses with
-`attest:bundle-trust-missing`. `checkpoint_trust_anchor` is the only input that
+(`checkpoint_keys` may add checkpoint-only signers); a signer outside them
+refuses with `attest:bundle-trust-missing`. `exchange_keys` and
+`root_policy_keys` hold 0 to 64 keys for anchored roots, which this verifier
+does not read. `checkpoint_trust_anchor` is the only input that
 can make publication claims `trust_anchored`; every publication must carry
 exactly that binding. No key may be pinned in two roles, and weak Ed25519 keys
 refuse.
@@ -44,7 +44,7 @@ One row per tool receipt with five columns, each `verified`, `observed`,
 |---|---|
 | `identity_root` | the receipt's root authority verifies against pinned exchange and root policy keys |
 | `delegation_chain` | every hop of the presented chain verifies and no exported revocation covers it |
-| `decision` | the receipt signature verifies under a pinned kernel key |
+| `decision` | the receipt signature verifies under a pinned kernel key and the receipt is a mediated decision that carries its decision; trace observations and advisory evaluations report `observed` |
 | `content` | the receipt's commitments open from data the verifier holds |
 | `settlement` | not supported by this verifier; requiring it exits 50 |
 
