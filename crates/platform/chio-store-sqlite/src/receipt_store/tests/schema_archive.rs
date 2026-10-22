@@ -62,9 +62,12 @@ fn archive_schema_is_stamped_with_the_current_version() -> Result<(), Box<dyn st
     assert_eq!(replayed_sink_id, first_sink_id);
     connection.execute_batch("DETACH DATABASE archive")?;
 
-    assert!(matches!(crate::SqliteReceiptStore::open_existing(&archive),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        crate::SqliteReceiptStore::open_existing(&archive),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
 
     let archived = rusqlite::Connection::open(&archive)?;
     let application_id: i32 = archived.query_row("PRAGMA application_id", [], |row| row.get(0))?;

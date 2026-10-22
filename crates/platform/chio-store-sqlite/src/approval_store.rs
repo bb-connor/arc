@@ -1172,10 +1172,13 @@ mod tests {
         drop(connection);
 
         let error = SqliteApprovalStore::open(&path).err().unwrap();
-        assert_eq!(
-            error.to_string(),
-            "storage backend error: database schema version 4 is not the current schema version 1; refusing to open"
-        );
+        assert!(matches!(
+            error,
+            ApprovalStoreError::Schema(chio_security_types::schema::SchemaRefusal::StaleSchema {
+                found: 4,
+                current: 1
+            })
+        ));
     }
 
     #[test]
@@ -1193,9 +1196,8 @@ mod tests {
         drop(connection);
 
         let error = SqliteApprovalStore::open(&path).err().unwrap();
-        assert_eq!(
-            error.to_string(),
-            "storage backend error: schema namespace approval is missing"
+        assert!(
+            matches!(error, ApprovalStoreError::Schema(chio_security_types::schema::SchemaRefusal::MissingSchema { store_key }) if store_key == "approval")
         );
     }
 
