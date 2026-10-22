@@ -107,7 +107,7 @@ Further constraints:
 | `crates/products/chio-mercury/src/commands/shared/builders.rs`, `README.md`, `ARCHITECTURE.md` | 6a | 5 | read verified packages through `chio-bundle-verify` |
 | `crates/products/chio-cli/tests/evidence_export.rs`, `tests/evidence_export/package_trust.rs`, `scripts/smoke/chio-cli-smoke.sh` | 6a | 5 | callers move to `--trust` |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs`, `session_core.rs` | 6c | 8 | `POST /admin/evidence/export` on `serve-http` |
-| `crates/platform/chio-store-sqlite/src/` (root-authority evidence reads) | 6c | 8 | `RootAuthorityEvidenceStore` implementation over the item 2, 4 and 5 tables |
+| `crates/platform/chio-control-plane/src/evidence_export/stores.rs` (new) | 6c | 8 | `ExportStores`: borrowed handles to the three sqlite stores, and the mapping from their typed read errors to `urn:chio:error:attest:export-evidence-incomplete`. No trait. chio-store-sqlite is not modified by this item |
 | `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (moved in), `spec/schemas/chio-wire/v1/export/bundle-verify-report.schema.json` (new), `spec/schemas/chio-wire/v1/export/verifier-caller-data.schema.json` (new), `spec/schemas/MANIFEST.sha256`, `spec/wire-schemas.lock`, generated code | 6a, 6b, 6c | 3, 4, 7, 8 | live schemas |
 | `spec/errors/registry.yaml` | 6a, 6b, 6c | 4, 7, 8 | `attest:bundle-*` and `attest:export-*` codes |
 | `spec/PROTOCOL.md` ("Export profiles" subsection moved in from the staged section 6 text) | 6c | 10 | contract text; the staged text already carries the `enterprise_provider_identity` role, the `tenant_tags` set and the enabled-state sentence (#1737) |
@@ -149,7 +149,7 @@ git grep -n -E "trusted-kernel-pubkey|trusted-anchor-file|trusted_kernel_pubkey|
 ```
   Expected at `a93a2f69a`: the evidence model in `crates/kernel/chio-kernel/src/{evidence_export,checkpoint,capability_lineage}.rs`; `verification.rs` 730 lines; verify consumers in `chio-cli` (`receipt_evidence.rs:194,198`, `tests/evidence_export.rs`, `tests/evidence_export/package_trust.rs`), trust-control (`receipt_handlers.rs:436`), `chio-mercury` (`builders.rs:11-12`) and `scripts/smoke/chio-cli-smoke.sh:337,405,416`. Record every hit with `file:line`.
 - [ ] **Step 3: Dependency census.** `cs cargo tree -p chio-kernel-core -e normal --prefix none | sort -u` and the same for `chio-core-types`: record that neither reaches `tokio`, `rusqlite` or an HTTP client (true at `a93a2f69a`).
-- [ ] **Step 4: For 6c only, the item 2, 4 and 5 store census.** Record the table and column names that hold disclosure openings, anchored roots (rule id, subject tag, tenant tag), delegation contexts, context salts (`anchor.sub`, `anchor.tenant`), IdP key snapshots, capability presentations, revocation entries and the receipt tenant tag with its `tag_key_id`. Each read in Task 8 names one of them. Include the item 4 tables that hold historical root policies and provider identity records by digest. A role without a store row is an item 4 or item 5 gap, reported to the lead before Task 8 starts; 6c adds no store table.
+- [ ] **Step 4: For 6c only, the item 2, 4 and 5 store census.** Record the table and column names that hold disclosure openings, anchored roots (rule id, subject tag, tenant tag), delegation contexts, context salts (`anchor.sub`, `anchor.tenant`), IdP key snapshots, capability presentations, revocation entries and the receipt tenant tag with its `tag_key_id`. Each read in Task 8 names one of them. Include the item 4 tables that hold historical root policies and provider identity records by digest. Also record the signature and error type of each plain read method Task 8 calls (the Interfaces block lists them); a method that is missing or returns another type is reported to the lead the same way. A role without a store row is an item 4 or item 5 gap, reported to the lead before Task 8 starts; 6c adds no store table.
 - [ ] **Step 5: Coordination.** Post `<UTC> <lane>: m1i6 <part> heads-up: <surfaces>; byte change: <none|list>` to `sync.md`.
 
 ---
@@ -421,7 +421,7 @@ Rules:
 
 ### Task 8: Provider export API, profiles and roles (6c)
 
-**Files:** `crates/platform/chio-control-plane/src/evidence_export.rs`, `evidence_export/{package_write,root_authority}.rs` (new module); `crates/platform/chio-store-sqlite/src/` (evidence reads); `crates/protocol/chio-mcp-remote/src/remote_mcp/{admin,session_core}.rs`; `crates/products/chio-cli/src/cli/{types/receipt,dispatch/receipt_evidence}.rs`; `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (moved in); `spec/errors/registry.yaml`
+**Files:** `crates/platform/chio-control-plane/src/evidence_export.rs`, `evidence_export/{package_write,root_authority,stores}.rs` (new module); `crates/protocol/chio-mcp-remote/src/remote_mcp/{admin,session_core}.rs`; `crates/products/chio-cli/src/cli/{types/receipt,dispatch/receipt_evidence}.rs`; `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (moved in); `spec/errors/registry.yaml`
 
 **Interfaces:**
 
@@ -447,29 +447,48 @@ pub enum ExportDisclosure {
     AuditorHashOnly,
 }
 
-/// Reads root-authority evidence and openings from the provider's state.
-/// Implemented by chio-store-sqlite over the serve-http state directory database.
-pub trait RootAuthorityEvidenceStore {
-    fn receipts_for_tenant(&self, tags: &[KeyedIndexValue], query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, EvidenceStoreError>;
-    fn presentation(&self, root_capability_id: &str) -> Result<CapabilityPresentation, EvidenceStoreError>;
-    fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext, EvidenceStoreError>;
-    fn root_policy(&self, digest: &Sha256Digest) -> Result<RootPolicy, EvidenceStoreError>;
-    fn provider_identity(&self, digest: &Sha256Digest) -> Result<EnterpriseProviderIdentity, EvidenceStoreError>;
-    fn idp_key_snapshot(&self, digest: &Sha256Digest) -> Result<IdpKeySnapshot, EvidenceStoreError>;
-    fn receipt_openings(&self, receipt_id: &str) -> Result<ReceiptDisclosure, EvidenceStoreError>;
-    fn context_openings(&self, context_digest: &Sha256Digest) -> Result<ContextOpenings, EvidenceStoreError>;
-    fn revocations_covering(&self, roots: &[AnchoredRootRef]) -> Result<Vec<ExportedRevocationEntry>, EvidenceStoreError>;
+/// The serve-http state database, as three borrowed store handles. A plain
+/// struct: the reads are inherent methods of the sqlite stores, which
+/// chio-control-plane depends on (the reverse edge would be a cycle), so no
+/// trait sits between them.
+pub struct ExportStores<'a> {
+    pub exchange: &'a SqliteRootExchangeStore,  // item 4
+    pub receipts: &'a SqliteReceiptStore,      // item 2
+    pub revocations: &'a SqliteRevocationStore, // item 5
 }
 
 /// Builds the unsigned bundle for one export. Every artifact is reached from a
 /// selected receipt; nothing else is read.
 pub fn assemble_export(
-    store: &dyn RootAuthorityEvidenceStore,
+    stores: ExportStores<'_>,
     receipts: &dyn ReceiptStore,
     query: EvidenceExportQuery,
     disclosure: ExportDisclosure,
 ) -> Result<EvidenceExportBundle, CliError>;
 ```
+
+The reads `assemble_export` calls are plain inherent methods that chio-store-sqlite owns. Items 2, 4 and 5 add them (item 4 F13 and its "Reads for item 6" list, item 5 Task 3); this item adds none and defines no store trait. Every method returns shared `chio-core-types` types and a typed error from chio-store-sqlite, with a typed missing-row variant and never `Option`:
+
+```rust
+// chio-store-sqlite, SqliteRootExchangeStore (item 4), error RootExchangeStoreError
+pub fn presentation(&self, root_capability_id: &str) -> Result<CapabilityPresentation, RootExchangeStoreError>;
+pub fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext, RootExchangeStoreError>;
+pub fn root_policy(&self, digest: &Sha256Digest) -> Result<RootPolicy, RootExchangeStoreError>;
+pub fn provider_identity(&self, digest: &Sha256Digest) -> Result<EnterpriseProviderIdentity, RootExchangeStoreError>;
+pub fn idp_key_snapshot(&self, digest: &Sha256Digest) -> Result<IdpKeySnapshot, RootExchangeStoreError>;
+pub fn context_openings(&self, context_digest: &Sha256Digest) -> Result<ContextOpenings, RootExchangeStoreError>;
+pub fn receipts_for_tenant(&self, tags: &[KeyedIndexValue], query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, RootExchangeStoreError>;
+
+// chio-store-sqlite, SqliteReceiptStore (item 2), error ReceiptStoreError
+pub fn receipt_openings(&self, receipt_id: &str) -> Result<ReceiptDisclosure, ReceiptStoreError>;
+
+// chio-store-sqlite, SqliteRevocationStore (item 5), error RevocationStoreError
+pub fn revocations_covering(&self, roots: &[RevocationCoverageRoot]) -> Result<Vec<RevocationCoverage>, RevocationStoreError>;
+```
+
+`CapabilityPresentation`, `DelegationContext`, `RootPolicy`, `EnterpriseProviderIdentity`, `IdpKeySnapshot`, `ContextOpenings`, `ReceiptDisclosure` and `EvidenceToolReceiptRecord` live in `chio-core-types` (the first five under `root_authority`, the rest in `receipt::evidence` from Task 2), and `RevocationCoverageRoot` and `RevocationCoverage` live in `chio-core-types` `root_authority::revocation_entry` beside `RevocationEntry` (item 5). The store errors stay in chio-store-sqlite: only control-plane maps them, and it already depends on that crate. No `EvidenceStoreError` exists.
+
+The mapping in `evidence_export/stores.rs` is the only glue. Control-plane builds `RevocationCoverageRoot` from each presentation's root capability id and the capability ids the bundle carries, and wraps each returned `RevocationCoverage` as an `ExportedRevocationEntry`. Any missing-row variant (`AnchoredRootMissing { capability_id }`, a missing context, policy, projection, snapshot or opening) fails the whole export with `urn:chio:error:attest:export-evidence-incomplete`, so a partial bundle is never written. A storage error maps to the existing internal export failure.
 
 Profile rules:
 - `caller`: receipts are exactly those whose stored `(tag_key_id, tag)` is in the tag set. The set holds `derive_in(key_id, tenant-tag, preimage)` for every `key_id` in `TenantIndexKeySet::key_ids()`, so receipts tagged under a retired generation are selected with the active one. The manifest's `tenant_tags` is that set, sorted by `key_id`. Openings carry the `params`, `content`, `anchor.sub` and `anchor.tenant` salts with `payload: null`; a receipt whose opening is marked lost (spec 8.4) is exported without an opening and reported in the manifest counts.
@@ -489,10 +508,10 @@ Provider side:
 
 Verifier side (`caller` bundles): `chio-bundle-verify` checks that `tenant_tags` is non-empty, sorted by `key_id` and has one entry per `key_id`, that `disclosure/receipt-tenant-tags.ndjson` has exactly one row for each exported receipt, and that every row's `(key_id, tag)` is in `tenant_tags`. Any failure is `urn:chio:error:attest:bundle-tenant-tag-outside-set` (exit 20, added to Task 4's code table and pinned by `every_bundle_error_has_its_exit_class`). The verifier has no index key, so it cannot recompute a tag or prove the set covers every generation; it proves that no exported receipt lies outside the exporter's declared set. Completeness across generations is the exporter's duty (the set is computed from `key_ids()` and the store query is bound to it) and is pinned by the rotation tests in Step 1.
 
-- [ ] **Step 1: Failing tests.** `chio-control-plane` `evidence_export/tests.rs`: `caller_bundle_contains_only_own_tenant` (two tenants with 16-byte random marker principals and tenant values; no marker, raw, hex or base64, from tenant B appears anywhere in tenant A's bundle, and no salt for a tenant B commitment appears); `caller_export_after_rotation_includes_older_generation_receipts` (append receipts for the tenant under generation N, rotate to N+1 with N retired and loaded, append more, export; every receipt from both generations is present, the manifest `tenant_tags` holds one entry per generation sorted by `key_id`, and `chio-bundle-verify` exits 0); `caller_export_after_rotation_excludes_other_tenant_in_every_generation` (a second tenant's receipts under both generations stay out); `manifest_omitting_a_generation_fails_verification` (the same bundle with the generation N entry removed from `tenant_tags` fails with `attest:bundle-tenant-tag-outside-set`, exit 20, and so does a bundle whose `receipt-tenant-tags.ndjson` row carries a tag outside the set or has no row for a receipt); `auditor_hash_only_has_no_salts`; `auditor_salt_only_opening_refused`; `caller_without_tenant_refused`; `auditor_full_refused`; `caller_with_plaintext_tenant_query_refused`; `missing_provider_identity_fails_export`; `projection_exported_by_digest_after_registry_identity_change` (record changes under a re-signed policy; the bundle carries the old projection for old roots and the new one for new roots); every exported bundle verifies with `chio-bundle-verify` and exits 0 with `required_columns = ["decision", "delegation_chain"]`. `chio-mcp-remote`: route refuses without admin auth; NUL refused; the index key never appears in the response or logs.
+- [ ] **Step 1: Failing tests.** `chio-control-plane` `evidence_export/tests.rs`: `caller_bundle_contains_only_own_tenant` (two tenants with 16-byte random marker principals and tenant values; no marker, raw, hex or base64, from tenant B appears anywhere in tenant A's bundle, and no salt for a tenant B commitment appears); `caller_export_after_rotation_includes_older_generation_receipts` (append receipts for the tenant under generation N, rotate to N+1 with N retired and loaded, append more, export; every receipt from both generations is present, the manifest `tenant_tags` holds one entry per generation sorted by `key_id`, and `chio-bundle-verify` exits 0); `caller_export_after_rotation_excludes_other_tenant_in_every_generation` (a second tenant's receipts under both generations stay out); `manifest_omitting_a_generation_fails_verification` (the same bundle with the generation N entry removed from `tenant_tags` fails with `attest:bundle-tenant-tag-outside-set`, exit 20, and so does a bundle whose `receipt-tenant-tags.ndjson` row carries a tag outside the set or has no row for a receipt); `auditor_hash_only_has_no_salts`; `auditor_salt_only_opening_refused`; `caller_without_tenant_refused`; `auditor_full_refused`; `caller_with_plaintext_tenant_query_refused`; `missing_provider_identity_fails_export`; `each_store_missing_row_variant_maps_to_export_evidence_incomplete` (one fixture per missing row kind, including `AnchoredRootMissing { capability_id }` from `revocations_covering`, each with no bundle written); `projection_exported_by_digest_after_registry_identity_change` (record changes under a re-signed policy; the bundle carries the old projection for old roots and the new one for new roots); every exported bundle verifies with `chio-bundle-verify` and exits 0 with `required_columns = ["decision", "delegation_chain"]`. `chio-mcp-remote`: route refuses without admin auth; NUL refused; the index key never appears in the response or logs.
 - [ ] **Step 2: Move the manifest schema in** per the staged README move-in rule (`git mv` over the live path; the staged role enum already carries `enterprise_provider_identity` (#1737); replace the single `tenantTag` member with a `tenantTags` array of keyed index values (`minItems` 1, present exactly for `caller`), refresh `MANIFEST.sha256`, regenerate code in four languages, make `wire_protocol_schema.rs` green).
 - [ ] **Step 3: Implement**; register the four `attest:export-*` codes.
-- [ ] **Step 4: Run** `cs cargo test -p chio-control-plane -p chio-store-sqlite -p chio-mcp-remote --no-fail-fast`, `cs cargo test -p chio-cli --test evidence_export --no-fail-fast`, `for lang in rust ts go python; do cs cargo xtask codegen --lang "$lang" || exit 1; done`, `cs make -C ~/lanes/m1i6 codegen-check`, `python3 scripts/check-wire-schemas.py`, `bash scripts/check-chio-schema-registry.sh`, `python3 scripts/check-error-urn-registry.py`. Expected: PASS.
+- [ ] **Step 4: Run** `cs cargo test -p chio-control-plane -p chio-mcp-remote --no-fail-fast`, `cs cargo tree -p chio-store-sqlite -e normal --prefix none | grep -c chio-control-plane` (expected: 0), `cs cargo test -p chio-cli --test evidence_export --no-fail-fast`, `for lang in rust ts go python; do cs cargo xtask codegen --lang "$lang" || exit 1; done`, `cs make -C ~/lanes/m1i6 codegen-check`, `python3 scripts/check-wire-schemas.py`, `bash scripts/check-chio-schema-registry.sh`, `python3 scripts/check-error-urn-registry.py`. Expected: PASS.
 
 ---
 
@@ -569,7 +588,7 @@ Spec 13.2 sizes item 6 at M, 7-11 engineer-days, including the provider identity
 | Integration, native-cage runs, review rounds across three PRs | 1-2 |
 | Total | 12.5-17.5 |
 
-Item 6 is L, 12.5-17.5 engineer-days (the range straddles 15, so it takes the larger label), against 13.2's M, 7-11. Historical policy and provider identity retention is item 4's work and is not counted here. The excess of 5.5 to 6.5 days has four sources 13.2 did not count: moving the evidence model out of the hosted kernel so the verifier can avoid `tokio` and `rusqlite` (2-3), replacing every verify and import caller of the control-plane verifier, including trust-control and `chio-mercury` (about 1), splitting the item into three PRs around items 1 to 5 (about 1), and rotation-safe caller selection (0.5). Dropping `auditor_hash_only` (spec 13.4, founder approval) would save about 1 day. This estimate is part of the M1 total of 152-218 engineer-days, which counts every merged M1 item plan, including item 2's 66-93.
+Item 6 is L, 12.5-17.5 engineer-days (the range straddles 15, so it takes the larger label), against 13.2's M, 7-11. Historical policy and provider identity retention is item 4's work and is not counted here, and so are the store read methods Task 8 calls (items 2, 4 and 5 own them); Task 8 adds the `ExportStores` mapping and no trait, so its 2.5 days are unchanged. The excess of 5.5 to 6.5 days has four sources 13.2 did not count: moving the evidence model out of the hosted kernel so the verifier can avoid `tokio` and `rusqlite` (2-3), replacing every verify and import caller of the control-plane verifier, including trust-control and `chio-mercury` (about 1), splitting the item into three PRs around items 1 to 5 (about 1), and rotation-safe caller selection (0.5). Dropping `auditor_hash_only` (spec 13.4, founder approval) would save about 1 day. This estimate is part of the M1 total of 152-218 engineer-days, which counts every merged M1 item plan, including item 2's 66-93.
 
 ## Decisions
 
