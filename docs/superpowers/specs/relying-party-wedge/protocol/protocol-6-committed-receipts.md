@@ -182,15 +182,22 @@ separate HTTP receipt artifact.
     payloads.
   - `auditor_full`: salts and payloads.
   - `auditor_hash_only`: no salts and no payloads.
-- `tenant_tag`: required for `caller`. The bundle contains only receipts whose
-  stored tag matches.
+- `tenant_tags`: required for `caller`, sorted by `key_id`, one keyed index
+  value per loaded tag generation. The bundle contains only receipts whose
+  stored `(tag_key_id, tag)` is in the set, and each receipt's stored tag is
+  listed in `disclosure/receipt-tenant-tags.ndjson`, so a verifier checks that
+  every exported receipt's tag is in the manifest set.
 - Artifact roles `capability_presentation`, `delegation_context`,
-  `root_policy`, `idp_key_snapshot`, `idp_artifact` (retained ID-JAG, auditor
-  profiles only), `receipt_disclosure`, `revocation_entry`,
-  `revocation_request`, `settlement_closure` and `pdp_decision_receipt`.
+  `root_policy`, `enterprise_provider_identity` (the identity projection of
+  every provider record a bundle's roots name), `idp_key_snapshot`,
+  `idp_artifact` (retained ID-JAG, auditor profiles only),
+  `receipt_disclosure`, `revocation_entry`, `revocation_request`,
+  `settlement_closure` and `pdp_decision_receipt`.
+
+The provider's enabled state is not in any bundle.
 
 The manifest is signed by the kernel key through
 `chio.evidence_export_commitment.v1`. Export refuses salt-only openings in
-auditor profiles, and refuses a `caller` export without a `tenant_tag`. A
+auditor profiles, and refuses a `caller` export without `tenant_tags`. A
 tenant confirms a bundle is its own by opening the subject and tenant
 commitments with the included salts.

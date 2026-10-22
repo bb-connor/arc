@@ -339,6 +339,7 @@
             "capability_presentation",
             "delegation_context",
             "root_policy",
+            "enterprise_provider_identity",
             "idp_key_snapshot",
             "idp_artifact",
             "receipt_disclosure",
@@ -347,7 +348,7 @@
             "settlement_closure",
             "pdp_decision_receipt"
           ],
-          "description": "`idp_artifact` (a retained ID-JAG) appears only in auditor profiles."
+          "description": "`enterprise_provider_identity` is the identity projection of every provider record a bundle's roots name. `idp_artifact` (a retained ID-JAG) appears only in auditor profiles."
         },
         "path": {
           "type": "string",
