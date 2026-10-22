@@ -255,6 +255,7 @@ chio-supervisor = { version = "=0.1.0", path = "crates/core/chio-supervisor" }
 chio-signing-remote = { version = "=0.1.0", path = "crates/trust/chio-signing-remote" }
 chio-cohere-tools-adapter = { version = "=0.1.0", path = "crates/protocol/chio-cohere-tools-adapter" }
 chio-config = { version = "=0.1.0", path = "crates/platform/chio-config" }
+chio-bundle-verify = { version = "=0.1.0", path = "crates/tooling/chio-bundle-verify" }
 chio-conformance = { version = "=0.1.0", path = "crates/tooling/chio-conformance" }
 chio-commerce-order = { version = "=0.1.0", path = "crates/platform/chio-commerce-order" }
 chio-control-plane = { version = "=0.1.0", path = "crates/platform/chio-control-plane" }
