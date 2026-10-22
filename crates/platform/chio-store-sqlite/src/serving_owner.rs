@@ -182,6 +182,8 @@ pub enum SqliteServingOwnerError {
     Invalid(String),
     #[error("sqlite authority durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+    #[error("root exchange store refused to open: {0}")]
+    RootExchange(#[from] crate::root_exchange_store::RootExchangeIntegrityError),
     #[error("sqlite authority store was exported for relocation ({0}); import it before serving")]
     Exported(String),
     #[error("relocation destination anchors history beyond the export seal: {0}")]

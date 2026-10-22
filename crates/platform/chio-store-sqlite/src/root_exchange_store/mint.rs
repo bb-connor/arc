@@ -11,8 +11,8 @@ use super::projection::{insert_root_row, read_root_row, required_root, RootRow};
 use super::reads::{retain_identity, retain_policy, retain_snapshot};
 use super::{
     canonical_blob, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintOutcome,
-    MintRequest, MintRevocationCheck, MintRevocationRefusal, Mutation, Result, RevocationCandidate,
-    SqliteRootExchangeStore, SqliteRootExchangeStoreError, StoredRoot,
+    MintRequest, MintRequestRefusal, MintRevocationCheck, MintRevocationRefusal, Mutation, Result,
+    RevocationCandidate, SqliteRootExchangeStore, SqliteRootExchangeStoreError, StoredRoot,
 };
 
 impl SqliteRootExchangeStore {
@@ -116,8 +116,8 @@ impl CheckedRequest<'_> {
     }
 }
 
-fn refuse(detail: &'static str) -> SqliteRootExchangeStoreError {
-    SqliteRootExchangeStoreError::InvalidMintRequest(detail)
+fn refuse(refusal: MintRequestRefusal) -> SqliteRootExchangeStoreError {
+    SqliteRootExchangeStoreError::InvalidMintRequest(refusal)
 }
 
 /// The request's members agree with each other before any durable step.
@@ -126,91 +126,87 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     let context = request.context;
     let anchor = &context.anchor;
     if root.id.is_empty() || root.id.len() > 256 || root.id.contains('\0') {
-        return Err(refuse("root capability id"));
+        return Err(refuse(MintRequestRefusal::RootCapabilityId));
     }
     if request.client_id.is_empty()
         || request.client_id.len() > 256
         || request.client_id.contains('\0')
     {
-        return Err(refuse("client id"));
+        return Err(refuse(MintRequestRefusal::ClientId));
     }
     if !root.delegation_chain.is_empty() {
-        return Err(refuse("root capability has a delegation chain"));
+        return Err(refuse(MintRequestRefusal::DelegationChain));
     }
     if root.issuer != context.exchange.exchange_key {
-        return Err(refuse("root issuer is not the exchange key"));
+        return Err(refuse(MintRequestRefusal::IssuerNotExchangeKey));
     }
     if !request.root_policy.lists_exchange_key(&root.issuer) {
-        return Err(refuse("root issuer is not in the policy exchange keys"));
+        return Err(refuse(MintRequestRefusal::IssuerNotInPolicy));
     }
     request
         .root_policy
         .check_valid_at(now)
-        .map_err(|_| refuse("root policy is not valid now"))?;
+        .map_err(|_| refuse(MintRequestRefusal::PolicyNotValid))?;
     let rule_id = context.root_policy_rule_id.as_str();
     let Some(rule) = request.root_policy.rule(&context.root_policy_rule_id) else {
-        return Err(refuse("root policy has no matched rule"));
+        return Err(refuse(MintRequestRefusal::UnknownRule));
     };
     if rule.match_.anchor_kind != anchor.kind {
-        return Err(refuse("rule anchor kind differs from the context"));
+        return Err(refuse(MintRequestRefusal::RuleKindMismatch));
     }
     let scope_hash = Sha256Digest::of_scope(&root.scope)
-        .map_err(|_| refuse("root scope does not canonicalize"))?;
+        .map_err(|_| refuse(MintRequestRefusal::ScopeNotCanonical))?;
     if scope_hash != context.effective_root_scope_hash {
-        return Err(refuse("root scope hash differs from the context"));
+        return Err(refuse(MintRequestRefusal::ScopeHashMismatch));
     }
     if root.expires_at <= now || root.expires_at <= request.root.issued_at {
-        return Err(refuse("root is already expired"));
+        return Err(refuse(MintRequestRefusal::RootExpired));
     }
     if request.replay_retain_until <= now {
-        return Err(refuse("replay retention is already past"));
+        return Err(refuse(MintRequestRefusal::ReplayRetentionPast));
     }
     match (anchor.kind.is_provider_backed(), request.provider_identity) {
         (true, Some(identity)) => {
             let digest = identity
                 .digest()
-                .map_err(|_| refuse("provider identity does not canonicalize"))?;
+                .map_err(|_| refuse(MintRequestRefusal::ProviderIdentityNotCanonical))?;
             if anchor.provider_identity_digest != Some(digest) {
-                return Err(refuse("provider identity differs from the context"));
+                return Err(refuse(MintRequestRefusal::ProviderIdentityMismatch));
             }
         }
         (false, None) if anchor.provider_identity_digest.is_none() => {}
-        _ => {
-            return Err(refuse(
-                "provider identity presence differs from the anchor kind",
-            ))
-        }
+        _ => return Err(refuse(MintRequestRefusal::ProviderIdentityPresence)),
     }
     let snapshot_digest = request
         .key_snapshot
         .map(|snapshot| snapshot.digest())
         .transpose()
-        .map_err(|_| refuse("key snapshot does not canonicalize"))?;
+        .map_err(|_| refuse(MintRequestRefusal::KeySnapshotNotCanonical))?;
     if snapshot_digest != anchor.key_snapshot_digest {
-        return Err(refuse("key snapshot differs from the context"));
+        return Err(refuse(MintRequestRefusal::KeySnapshotMismatch));
     }
     if anchor
         .artifact_digest
         .is_some_and(|digest| digest != request.artifact_digest)
     {
-        return Err(refuse("artifact digest differs from the context"));
+        return Err(refuse(MintRequestRefusal::ArtifactMismatch));
     }
     if !request.tag_candidates.contains(&request.tags) {
-        return Err(refuse("root tags are not among the loaded generations"));
+        return Err(refuse(MintRequestRefusal::TagsNotLoaded));
     }
     if request
         .tags
         .tenant
         .is_some_and(|tenant| tenant.key_id != request.tags.subject.key_id)
     {
-        return Err(refuse("root tags span two key generations"));
+        return Err(refuse(MintRequestRefusal::TagsSpanGenerations));
     }
     if request.tags.tenant.is_none() && anchor.kind != AnchorKind::ChioOperatorKey {
-        return Err(refuse("only an operator key root may omit the tenant tag"));
+        return Err(refuse(MintRequestRefusal::TenantTagRequired));
     }
     if let Some(mapping) = request.bearer {
         if mapping.retain_until < root.expires_at {
-            return Err(refuse("bearer mapping retention ends before the root"));
+            return Err(refuse(MintRequestRefusal::BearerRetentionShort));
         }
     }
     check_openings(request)?;
@@ -219,7 +215,7 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
         policy_digest: *request.root_policy.digest(),
         context_digest: context
             .digest()
-            .map_err(|_| refuse("delegation context does not canonicalize"))?,
+            .map_err(|_| refuse(MintRequestRefusal::ContextNotCanonical))?,
         context_bytes: canonical_blob(context)?,
         capability_bytes: canonical_blob(root)?,
     })
@@ -239,11 +235,11 @@ fn check_openings(request: &MintRequest<'_>) -> Result<()> {
     let mut supplied = BTreeSet::new();
     for opening in request.openings {
         if !supplied.insert(opening.salt_ref.as_str().to_owned()) {
-            return Err(refuse("duplicate context opening"));
+            return Err(refuse(MintRequestRefusal::DuplicateOpening));
         }
     }
     if supplied != expected {
-        return Err(refuse("context openings differ from the committed values"));
+        return Err(refuse(MintRequestRefusal::OpeningsMismatch));
     }
     Ok(())
 }
@@ -340,7 +336,7 @@ fn recover(
         .provider_identity
         .map(|identity| identity.digest())
         .transpose()
-        .map_err(|_| refuse("provider identity does not canonicalize"))?;
+        .map_err(|_| refuse(MintRequestRefusal::ProviderIdentityNotCanonical))?;
     if stored.context.anchor.provider_identity_digest != current {
         return Err(SqliteRootExchangeStoreError::ProviderIdentityChanged { capability_id });
     }

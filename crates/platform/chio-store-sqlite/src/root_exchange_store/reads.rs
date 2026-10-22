@@ -8,7 +8,7 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use super::projection::{read_root_row_by_context, required_root};
 use super::{
     canonical_blob, decode_blob, digest_column, parse_digest_column, sql_u64, sqlite_error,
-    BearerLookup, ContextOpenings, OpeningState, Result, SqliteRootExchangeStore,
+    BearerLookup, ContextOpenings, OpeningState, Result, RetainedArtifact, SqliteRootExchangeStore,
     SqliteRootExchangeStoreError, StoredRoot,
 };
 
@@ -23,11 +23,11 @@ pub(super) enum Retained {
 }
 
 impl Retained {
-    pub(super) const fn kind(self) -> &'static str {
+    pub(super) const fn artifact(self) -> RetainedArtifact {
         match self {
-            Self::Policy => "root policy",
-            Self::Identity => "provider identity",
-            Self::Snapshot => "key snapshot",
+            Self::Policy => RetainedArtifact::RootPolicy,
+            Self::Identity => RetainedArtifact::ProviderIdentity,
+            Self::Snapshot => RetainedArtifact::KeySnapshot,
         }
     }
 
@@ -76,7 +76,7 @@ fn retain(
     match retained_bytes(tx, retained, digest)? {
         Some(existing) if existing == bytes => Ok(()),
         Some(_) => Err(SqliteRootExchangeStoreError::RetainedDigestMismatch {
-            kind: retained.kind(),
+            kind: retained.artifact(),
         }),
         None => insert(),
     }
@@ -88,7 +88,7 @@ fn digest_of<T>(
     value: &T,
 ) -> Result<Sha256Digest> {
     digest(value).map_err(|_| SqliteRootExchangeStoreError::RetainedDigestMismatch {
-        kind: retained.kind(),
+        kind: retained.artifact(),
     })
 }
 
@@ -158,12 +158,12 @@ fn read_retained<T: serde::de::DeserializeOwned + serde::Serialize>(
 ) -> Result<T> {
     let bytes = retained_bytes(connection, retained, digest)?.ok_or_else(|| {
         SqliteRootExchangeStoreError::RetainedArtifactMissing {
-            kind: retained.kind(),
-            digest: digest.to_string(),
+            kind: retained.artifact(),
+            digest: *digest,
         }
     })?;
     let mismatch = || SqliteRootExchangeStoreError::RetainedDigestMismatch {
-        kind: retained.kind(),
+        kind: retained.artifact(),
     };
     let value: T = decode_blob(&bytes, retained.bound()).map_err(|_| mismatch())?;
     if recompute(&value).map_err(|_| mismatch())? != *digest {
@@ -221,9 +221,7 @@ impl SqliteRootExchangeStore {
     pub fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext> {
         self.read_only(|tx| {
             let row = read_root_row_by_context(tx, digest)?.ok_or_else(|| {
-                SqliteRootExchangeStoreError::DelegationContextMissing {
-                    digest: digest.to_string(),
-                }
+                SqliteRootExchangeStoreError::DelegationContextMissing { digest: *digest }
             })?;
             Ok(row.verify()?.context)
         })
@@ -313,7 +311,7 @@ impl SqliteRootExchangeStore {
             if stored.capability.expires_at <= now {
                 return Ok(BearerLookup::Expired { capability_id });
             }
-            Ok(BearerLookup::Live(stored))
+            Ok(BearerLookup::Live(Box::new(stored)))
         })
     }
 
@@ -329,7 +327,8 @@ impl SqliteRootExchangeStore {
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(sqlite_error)?;
             for key_id in referenced {
-                if !loaded.contains(&parse_digest_column(&key_id)?) {
+                let key_id = parse_digest_column(&key_id)?;
+                if !loaded.contains(&key_id) {
                     return Err(SqliteRootExchangeStoreError::TagGenerationMissing { key_id });
                 }
             }
