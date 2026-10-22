@@ -1202,35 +1202,38 @@ fn finding_status_snapshot_digest(
     })
 }
 
+const MARKET_SNAPSHOT_TABLES: &[&str] = &[
+    "challenges",
+    "dispute_lock_reservations",
+    "dispute_locks",
+    "liability_heads",
+    "governance_case_index",
+    "claim_snapshots",
+    "effect_intents",
+    "listing_sales_blocks",
+    "effect_root_bindings",
+    "effect_root_bindings_refreshes",
+    "finding_challenge_outcomes",
+    "finding_finalizing_authorizations",
+    "finding_finalizing_authorization_refreshes",
+    "finding_seller_impairment_reconciliations",
+    "finding_challenge_submissions",
+    "purchase_records",
+    "purchase_capture_intents",
+    "failed_delivery_records",
+    "purchase_reservations",
+    "public_purchase_requests",
+    "purchase_payout_bindings",
+    "seller_exposure_encumbrances",
+    "pending_purchase_slots",
+    "payout_destinations",
+];
+
 fn finding_market_snapshot_digest(
     connection: &Connection,
 ) -> Result<String, SqliteServingOwnerError> {
-    let tables = [
-        "challenges",
-        "dispute_lock_reservations",
-        "dispute_locks",
-        "liability_heads",
-        "governance_case_index",
-        "claim_snapshots",
-        "effect_intents",
-        "listing_sales_blocks",
-        "effect_root_bindings",
-        "finding_challenge_outcomes",
-        "finding_finalizing_authorizations",
-        "finding_finalizing_authorization_refreshes",
-        "finding_seller_impairment_reconciliations",
-        "finding_challenge_submissions",
-        "purchase_records",
-        "purchase_capture_intents",
-        "failed_delivery_records",
-        "purchase_reservations",
-        "purchase_payout_bindings",
-        "seller_exposure_encumbrances",
-        "pending_purchase_slots",
-        "payout_destinations",
-    ];
-    let mut snapshots = Vec::with_capacity(tables.len());
-    for table in tables {
+    let mut snapshots = Vec::with_capacity(MARKET_SNAPSHOT_TABLES.len());
+    for table in MARKET_SNAPSHOT_TABLES {
         snapshots.push(table_snapshot(connection, table, None)?);
     }
     digest(&AuthoritySnapshot {
@@ -1738,30 +1741,14 @@ pub(super) fn verify_finding_challenge_projection_coverage(
             "finding challenge global projection reference is orphaned",
         ));
     }
-    let has_state = connection.query_row(
-        r#"
-        SELECT EXISTS(SELECT 1 FROM challenges)
-            OR EXISTS(SELECT 1 FROM finding_challenge_submissions)
-            OR EXISTS(SELECT 1 FROM dispute_lock_reservations)
-            OR EXISTS(SELECT 1 FROM dispute_locks)
-            OR EXISTS(SELECT 1 FROM liability_heads)
-            OR EXISTS(SELECT 1 FROM finding_finalizing_authorizations)
-            OR EXISTS(SELECT 1 FROM finding_finalizing_authorization_refreshes)
-            OR EXISTS(SELECT 1 FROM governance_case_index)
-            OR EXISTS(SELECT 1 FROM claim_snapshots)
-            OR EXISTS(SELECT 1 FROM effect_intents)
-            OR EXISTS(SELECT 1 FROM finding_seller_impairment_reconciliations)
-            OR EXISTS(SELECT 1 FROM effect_root_bindings)
-            OR EXISTS(SELECT 1 FROM finding_challenge_outcomes)
-            OR EXISTS(SELECT 1 FROM listing_sales_blocks)
-            OR EXISTS(SELECT 1 FROM purchase_records)
-            OR EXISTS(SELECT 1 FROM failed_delivery_records)
-            OR EXISTS(SELECT 1 FROM purchase_reservations)
-            OR EXISTS(SELECT 1 FROM payout_destinations)
-        "#,
-        [],
-        |row| row.get::<_, bool>(0),
-    )?;
+    let mut has_state = false;
+    for table in MARKET_SNAPSHOT_TABLES {
+        has_state |= connection.query_row(
+            &format!("SELECT EXISTS(SELECT 1 FROM {table})"),
+            [],
+            |row| row.get::<_, bool>(0),
+        )?;
+    }
     match rows.last() {
         Some((_, _, snapshot_digest, _, _))
             if finding_market_snapshot_digest(connection)? != *snapshot_digest =>

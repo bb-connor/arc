@@ -180,12 +180,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # SQLite authority snapshots retain historical digest domains so an older
-  # on-disk projection cannot be reinterpreted under a newer table set. These
-  # are internal storage migration domains, not Chio wire or SDK versions.
-  if [[ "$text" =~ chio\.sqlite-finding-market-snapshot\.v[2-9][0-9]* ]]; then
-    continue
-  fi
   if [[ "$path" == "crates/platform/chio-store-sqlite/src/finding_challenge_store_tests.rs" ]] && \
      [[ "$text" =~ migrate\ v[2-9][0-9]*\ schema ]]; then
     continue
