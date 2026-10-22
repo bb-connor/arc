@@ -14,6 +14,9 @@ use chio_agent_web_interop::{
 use chio_core::sha256_hex;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
+const AGENT_WEB_REPLAY_SCHEMA_KEY: &str = "agent_web_replay";
+const AGENT_WEB_REPLAY_SCHEMA: &str = include_str!("agent_web_replay_schema.sql");
+
 const PRUNE_EXPIRED_REPLAYS_SQL: &str = r#"
     DELETE FROM chio_agent_web_replays
     WHERE expires_at < ?1
@@ -31,10 +34,12 @@ const PRUNE_EXPIRED_REPLAYS_SQL: &str = r#"
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteAgentWebReplayStoreError {
+    #[error(transparent)]
+    Schema(#[from] crate::SchemaVersionError),
+    #[error("Agent-Web replay limits row is missing")]
+    MissingLimits,
     #[error("sqlite Agent-Web replay store error: {0}")]
     Store(String),
-    #[error("Agent-Web replay catalog chio_agent_web_replays has no replay_scope column")]
-    UnscopedCatalog,
     #[error("Agent-Web replay catalog holds replay markers without a verifier clock high-water")]
     MissingClockHighWater,
     #[error(
@@ -140,109 +145,37 @@ impl SqliteAgentWebReplayStore {
     }
 
     fn initialize_schema(&self) -> Result<(), SqliteAgentWebReplayStoreError> {
-        let mut connection = self.connection()?;
-        connection.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            "#,
-        )?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let entries_exist = transaction.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                FROM sqlite_master
-                WHERE type = 'table' AND name = 'chio_agent_web_replays'
-            )
-            "#,
-            [],
-            |row| row.get::<_, bool>(0),
-        )?;
-        let has_replay_scope = if entries_exist {
-            let mut statement = transaction.prepare("PRAGMA table_info(chio_agent_web_replays)")?;
-            let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-            let mut found = false;
-            for column in columns {
-                if column? == "replay_scope" {
-                    found = true;
-                    break;
-                }
-            }
-            found
-        } else {
-            false
-        };
-        if entries_exist && !has_replay_scope {
-            return Err(SqliteAgentWebReplayStoreError::UnscopedCatalog);
-        }
-        transaction.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS chio_agent_web_replays (
-                replay_scope TEXT NOT NULL,
-                webhook_id  TEXT NOT NULL,
-                consumed_at INTEGER NOT NULL,
-                expires_at  INTEGER NOT NULL,
-                PRIMARY KEY (replay_scope, webhook_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_agent_web_replays_expires_at
-                ON chio_agent_web_replays(expires_at);
-
-            CREATE TABLE IF NOT EXISTS chio_agent_web_replay_reservations (
-                reservation_id TEXT PRIMARY KEY,
-                entries_digest TEXT NOT NULL,
-                entry_count    INTEGER NOT NULL CHECK (entry_count > 0),
-                expires_at     INTEGER NOT NULL,
-                state          TEXT NOT NULL CHECK (
-                    state IN ('pending', 'filesystem_finalized', 'complete')
+        let mut connection = Connection::open(&self.path)?;
+        connection.busy_timeout(Duration::from_secs(5))?;
+        let schema =
+            crate::SchemaTransaction::begin(&mut connection, &[AGENT_WEB_REPLAY_SCHEMA_KEY])?;
+        if schema.is_fresh() {
+            schema.connection().execute_batch(AGENT_WEB_REPLAY_SCHEMA)?;
+            let global_capacity = i64::try_from(self.global_capacity).map_err(|_| {
+                SqliteAgentWebReplayStoreError::Store(
+                    "global replay capacity exceeds SQLite integer range".to_string(),
                 )
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_agent_web_replay_reservations_expires_at
-                ON chio_agent_web_replay_reservations(expires_at);
-
-            CREATE TABLE IF NOT EXISTS chio_agent_web_replay_reservation_entries (
-                reservation_id TEXT NOT NULL,
-                replay_scope   TEXT NOT NULL,
-                webhook_id     TEXT NOT NULL,
-                expires_at     INTEGER NOT NULL,
-                PRIMARY KEY (reservation_id, replay_scope, webhook_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_agent_web_replay_reservation_entries_marker
-                ON chio_agent_web_replay_reservation_entries(
-                    replay_scope,
-                    webhook_id,
-                    expires_at
-                );
-
-            CREATE TABLE IF NOT EXISTS chio_agent_web_replay_clock (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                wall_clock_high_water INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_agent_web_replay_limits (
-                singleton          INTEGER PRIMARY KEY CHECK (singleton = 1),
-                global_capacity    INTEGER NOT NULL CHECK (global_capacity > 0),
-                per_scope_capacity INTEGER NOT NULL CHECK (per_scope_capacity > 0)
-            );
-            "#,
+            })?;
+            let per_scope_capacity = i64::try_from(self.per_scope_capacity).map_err(|_| {
+                SqliteAgentWebReplayStoreError::Store(
+                    "per-scope replay capacity exceeds SQLite integer range".to_string(),
+                )
+            })?;
+            schema.connection().execute(
+                "INSERT INTO chio_agent_web_replay_limits (singleton, global_capacity, per_scope_capacity) VALUES (1, ?1, ?2)",
+                params![global_capacity, per_scope_capacity],
+            )?;
+        }
+        schema.validate_catalog(AGENT_WEB_REPLAY_SCHEMA)?;
+        let transaction = schema.connection();
+        let has_limits: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM chio_agent_web_replay_limits WHERE singleton = 1)",
+            [],
+            |row| row.get(0),
         )?;
-        let global_capacity = i64::try_from(self.global_capacity).map_err(|_| {
-            SqliteAgentWebReplayStoreError::Store(
-                "global replay capacity exceeds SQLite integer range".to_string(),
-            )
-        })?;
-        let per_scope_capacity = i64::try_from(self.per_scope_capacity).map_err(|_| {
-            SqliteAgentWebReplayStoreError::Store(
-                "per-scope replay capacity exceeds SQLite integer range".to_string(),
-            )
-        })?;
-        transaction.execute(
-            "INSERT INTO chio_agent_web_replay_limits (singleton, global_capacity, per_scope_capacity) VALUES (1, ?1, ?2) ON CONFLICT(singleton) DO NOTHING",
-            params![global_capacity, per_scope_capacity],
-        )?;
+        if !has_limits {
+            return Err(SqliteAgentWebReplayStoreError::MissingLimits);
+        }
         let has_markers = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM chio_agent_web_replays)",
             [],
@@ -286,7 +219,11 @@ impl SqliteAgentWebReplayStore {
                 entry_count,
             });
         }
-        transaction.commit()?;
+        if schema.is_fresh() {
+            schema.stamp(AGENT_WEB_REPLAY_SCHEMA_KEY)?;
+        }
+        schema.commit()?;
+        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
         Ok(())
     }
 
@@ -453,7 +390,8 @@ impl SqliteAgentWebReplayStore {
     }
 
     fn connection(&self) -> Result<Connection, SqliteAgentWebReplayStoreError> {
-        let connection = Connection::open(&self.path)?;
+        let connection =
+            Connection::open_with_flags(&self.path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA synchronous = FULL;")?;
         Ok(connection)
@@ -1403,11 +1341,14 @@ mod tests {
             .test_expect_err("an unscoped replay catalog is refused at open");
         assert!(matches!(
             error,
-            SqliteAgentWebReplayStoreError::UnscopedCatalog
+            SqliteAgentWebReplayStoreError::Schema(crate::SchemaVersionError::ForeignDatabase {
+                found: 0,
+                expected: crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
+            })
         ));
         assert_eq!(
             error.to_string(),
-            "Agent-Web replay catalog chio_agent_web_replays has no replay_scope column"
+            "database application_id 0x0 is not a Chio store (expected 0x4348494f)"
         );
 
         let connection = Connection::open(&path).test_expect("refused database reopens");
