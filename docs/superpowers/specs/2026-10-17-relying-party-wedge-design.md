@@ -817,7 +817,7 @@ Provider-side revocation (M1). The existing `/admin/revocations` route (T17) gai
 
 Each anchored root row stores its rule id, subject tag and tenant tag, so every target is an indexed equality lookup at exchange and at admission.
 
-Linearization: the revocation write and the admission decision go through the serving writer of the same SQLite database. A revocation that has been acknowledged to the admin is visible to every admission that commits after the acknowledgement. Calls whose admission committed before it run to completion; in-flight streaming results are not cut off. "Next call" in this spec means exactly this.
+Linearization: a revocation is one serving-writer transaction on the state-directory database, acknowledged after it commits and the authority anchor syncs. Let T be that commit. (1) Every budget authorize-hold transaction, which is where an admission commits, that begins after T denies, and the call does not dispatch. (2) Every root-exchange mint transaction that begins after T and matches the entry refuses. (3) A call admitted before T may dispatch. Its budget capture and its native dispatch capture re-check revocation inside the capture transaction, and a capture that begins after T refuses. By then the upstream effect has run and streamed chunks may already have reached the caller; the remaining output is withheld and the call ends with a revocation denial. (4) A call that captured before T reaches the allowed-receipt check, which is a read separate from the receipt append. If that read begins after T the allowed receipt is refused; if it began before T the allowed receipt is appended even when the append lands after T. An acknowledgement therefore guarantees (1) to (3) and does not guarantee that no allowed receipt is appended after it, nor that a call admitted before it completes. 'Next call' in this spec means a call whose budget authorize-hold begins after the acknowledgement.
 
 A denied call's receipt names the matching revocation entry id in its guard evidence. Revocation entries are exported in bundles (with tags, never plaintext subjects or tenants).
 
@@ -925,6 +925,8 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 ### 8.3 Startup refusals
 
 `serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; a provider-backed rule exists and `--enterprise-providers-file` is not set, or the registry is unreadable or invalid; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off; `--auth-token` is set without exactly one `operator_static_bearer` rule naming a `principal`, or such a rule exists without `--auth-token`; `--exchange-signer trust-control` is set and the trust-control authority key differs from `--control-authority-public-key`. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
+
+`serve-http` also refuses to start when the tenant index key's fingerprint differs from the one recorded in the state directory.
 
 ### 8.4 Privacy
 
@@ -1162,7 +1164,7 @@ New categories under `crates/tooling/chio-conformance/verdict_matrix/scenarios/`
 |---|---|---|
 | `anchored_root` | M1 (24), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; section 8.1 and 8.2 denies (client authentication, replay, missing anchor, lifetime, unlisted exchange key, Entra issuer on an `oidc_jwt` rule); `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry; provider registry (provider disabled after the root was issued, provider removed, registry unreadable at exchange and at admission, provider identity changed without a re-signed policy); strict decoding (padded `root_anchor`, added `algorithm` member, padded root policy at load). All 24 are staged in M0 (section 2.5). M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
 | `receipt_disclosure` | M1 (12) | committed default; evidence allowlist drop; `tenant_id` exclusion; salt-only opening rejected in auditor profile; inline-field scenarios written in M1 as expected-deny at policy load and flipped in M2 |
-| `revocation_local` | M1 (12) | each provider revocation target denies the next call; cascade; concurrent revocation and admission |
+| `revocation_local` | M1 (14) | each provider revocation target denies the next call; cascade; concurrent revocation and admission |
 | `delegation_chain` | M2 (12) | depth 1-4 allow; reorder, gap, widened hop, mismatched anchor deny; offline verify equals online verdict; caller revocation of a descendant |
 | `pdp_decision` | M2 (12) | allow and deny with signed receipt; unlisted PEP; spend-bearing grant denied |
 | `x402_challenge` | M3 (12) | challenge issued; paid call allowed; over-cap and asset-mismatch denied before challenge; settle timeout to closure; same scenarios through `api protect` |
