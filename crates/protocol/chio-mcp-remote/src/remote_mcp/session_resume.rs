@@ -324,16 +324,17 @@ struct RemoteAuthContractFingerprint {
     enterprise_provider_registry_hash: Option<String>,
 }
 
-fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<String, CliError> {
+fn fingerprint_remote_auth_contract(
+    config: &RemoteServeHttpConfig,
+    registry: Option<&EnterpriseProviderRegistryFile>,
+) -> Result<String, CliError> {
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
     // Binds the session to the registry as it reads now; any provider change
     // refuses resume of a session admitted under an earlier registry.
-    let enterprise_provider_registry_hash = config
-        .enterprise_providers_file
-        .as_deref()
-        .map(|path| EnterpriseProviderRegistryFile::new(path).digest())
+    let enterprise_provider_registry_hash = registry
+        .map(|registry| registry.digest(&config.clock))
         .transpose()?;
     let fingerprint = if let Some(token) = config.auth_token.as_deref() {
         RemoteAuthContractFingerprint {

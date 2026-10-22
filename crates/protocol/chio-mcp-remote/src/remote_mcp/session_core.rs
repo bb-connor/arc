@@ -270,6 +270,8 @@ struct RemoteSessionFactory {
     durable_admission: Option<DurableAdmissionRuntime>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
+    /// The configured provider registry, bound into every auth contract.
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
     shared_upstream_owner: Arc<StdMutex<Option<Arc<SharedUpstreamOwner>>>>,
     lifecycle_policy: SessionLifecyclePolicy,
     /// One stop for every session kernel this edge constructs.
