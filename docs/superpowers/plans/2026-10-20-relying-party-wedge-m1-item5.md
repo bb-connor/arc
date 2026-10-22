@@ -438,9 +438,9 @@ pub struct AnchoredRootTargets<'a> {
 }
 
 impl SqliteRevocationStore {
-    /// Export coverage for item 6 (R15). Inherent method: chio-store-sqlite
-    /// cannot implement a chio-control-plane trait, because chio-control-plane
-    /// depends on chio-store-sqlite.
+    /// Export coverage for item 6 (R15), read through `ExportStores::revocations`.
+    /// A plain inherent method: chio-control-plane depends on chio-store-sqlite,
+    /// so no store trait sits between them.
     pub fn revocations_covering(&self, roots: &[RevocationCoverageRoot])
         -> Result<Vec<RevocationCoverage>, RevocationStoreError>;
 }
@@ -451,7 +451,7 @@ pub struct RevocationCoverage { pub entry: RevocationEntry, pub covered_capabili
 // RevocationStoreError::AnchoredRootMissing { capability_id }
 ```
 
-Item 6c owns the mapping in chio-control-plane (`evidence_export/stores.rs`, #1771): it builds `RevocationCoverageRoot` from each presentation, wraps each `RevocationCoverage` as an `ExportedRevocationEntry`, fails the export with `urn:chio:error:attest:export-evidence-incomplete` on `AnchoredRootMissing`, and fails it on every other `RevocationStoreError`; no store error becomes an empty list. On a store opened without a joint serving owner (no `anchored_roots`), the method refuses with `RevocationStoreError::CoverageRequiresServingOwner`, displayed `revocation coverage requires the serving-owner state directory`. PR 3 merges before item 6c and depends on no item 6 type; item 6c's Task 8 consumes these names as written here.
+Item 6 reads it through `ExportStores { exchange, receipts, revocations }` (item 6 plan, `evidence_export/stores.rs`), whose `revocations` member is a borrowed `&SqliteRevocationStore`; there is no store trait. The item 6 mapping builds `RevocationCoverageRoot` from each presentation, wraps each `RevocationCoverage` as an `ExportedRevocationEntry`, fails the export with `urn:chio:error:attest:export-evidence-incomplete` on `RevocationStoreError::AnchoredRootMissing`, and fails it with the internal export failure on every other `RevocationStoreError`; no store error becomes an empty list. On a store opened without a joint serving owner (no `anchored_roots`), the method refuses with `RevocationStoreError::CoverageRequiresServingOwner`, displayed `revocation coverage requires the serving-owner state directory`. PR 3 merges before item 6c and depends on no item 6 type; item 6c's Task 8 consumes these names as written here.
 
 - Fan-out: `INSERT` into `revoked_capabilities` for every `anchored_roots` row that matches the entry (target column equal to the entry value for `root_policy_rule` and `replay_key`; `(tag_key_id, tag)` in the entry's `revocation_entry_tags` rows for `anchor_subject` and `tenant_tag`) and is not already revoked, expired roots included; each through `record_revocation` (delta row, admission commit, global commit) with `revocation_entry_id`. Expiry is not a filter: composite capture rechecks revocation and supplemental expiry but not capability expiry (`composite/transitions/capture.rs:279-335`), so a call admitted before its root expired can still capture after it, and only a `revoked_capabilities` row refuses that capture (G-C). The fan-out therefore reads no clock and compares no `expires_at`. Rows for expired roots are bounded by the item 4 retention rule. `capability_id` targets keep the PR 1 path.
 - Retry with a different reason: the stored entry is returned unchanged with `newly_revoked = false`; the admin response sets `reason_conflict = true`.
