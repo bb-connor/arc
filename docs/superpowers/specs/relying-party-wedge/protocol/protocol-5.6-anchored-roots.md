@@ -414,10 +414,20 @@ state directory. Target kinds are closed:
 Each anchored root row stores its rule id, subject tag and tenant tag, so
 every target is an indexed equality lookup at exchange and at admission.
 
-The revocation write and the admission decision go through the serving writer
-of the same SQLite database. A revocation acknowledged to the admin is visible
-to every admission that commits after the acknowledgement. Calls whose
-admission committed before it run to completion. A denied call's receipt
+A revocation is one serving-writer transaction on the state-directory
+database, acknowledged after it commits and the authority anchor syncs. Let T
+be that commit. Every budget authorize-hold transaction (where an admission
+commits) that begins after T denies, and the call does not dispatch. Every
+root-exchange mint transaction that begins after T and matches the entry
+refuses. A call admitted before T may dispatch; its budget capture and native
+dispatch capture re-check revocation in the capture transaction, and a capture
+that begins after T refuses after the upstream effect has run, withholding the
+remaining output and ending the call with a revocation denial. The
+allowed-receipt check is a read separate from the receipt append: if it begins
+after T the allowed receipt is refused, and if it began before T the allowed
+receipt is appended even when the append lands after T. An acknowledgement
+does not guarantee that no allowed receipt is appended after it, nor that a
+call admitted before it completes. A denied call's receipt
 names the matching revocation entry id in its guard evidence. Revocation
 entries are exported in bundles with tags, never with plaintext subjects or
 tenants. No identity-provider push channel is consumed.

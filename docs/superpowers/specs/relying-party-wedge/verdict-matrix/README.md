@@ -1,6 +1,6 @@
 # Staged verdict-matrix scenarios: anchored_root, receipt_disclosure, revocation_local
 
-Planning material for the relying-party wedge (spec section 11.3, section 12 M0 exit "scenario files written (expected to fail)"). These 48 files (24 `anchored_root`, 12 `receipt_disclosure`, 12 `revocation_local`) are staged, not executed. The live corpus under `crates/tooling/chio-conformance/verdict_matrix/scenarios/` cannot hold them yet: `ScenarioCategory` (`crates/tooling/chio-conformance/verdict_matrix/src/lib.rs:49`) is a closed enum, `manifest.toml` pins the scenario count, per-category counts and the index hash, and no driver implements `rust-mcp-serve-http`. "Expected to fail" therefore means: staged here, and failing until the M1 code that implements each behavior lands.
+Planning material for the relying-party wedge (spec section 11.3, section 12 M0 exit "scenario files written (expected to fail)"). These 50 files (24 `anchored_root`, 12 `receipt_disclosure`, 14 `revocation_local`) are staged, not executed. The live corpus under `crates/tooling/chio-conformance/verdict_matrix/scenarios/` cannot hold them yet: `ScenarioCategory` (`crates/tooling/chio-conformance/verdict_matrix/src/lib.rs:49`) is a closed enum, `manifest.toml` pins the scenario count, per-category counts and the index hash, and no driver implements `rust-mcp-serve-http`. "Expected to fail" therefore means: staged here, and failing until the M1 code that implements each behavior lands.
 
 ## File shape
 
@@ -95,7 +95,9 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 | `revoke_before_exchange` | Writes a revocation entry that matches the would-be root (rule, subject tag, tenant tag or replay key), then exchanges. |
 | `revocation_store_read_error` | Fault injection that makes the revocation read inside the admission transaction fail. |
 | `revoke_and_acknowledge_then_call` | Waits for the admin route's acknowledgement of a revocation, then calls. |
-| `revoke_during_inflight_call` | Starts a streaming call, lets its admission commit, then revokes and waits for acknowledgement before the stream finishes. |
+| `revoke_before_capture` | Starts a streaming call, lets its admission commit, then revokes and waits for acknowledgement before the budget capture begins. |
+| `revoke_after_capture_before_receipt_check` | Lets the call's capture commit, then revokes and waits for acknowledgement before the allowed-receipt check begins. |
+| `revoke_after_receipt_check_before_append` | Lets the allowed-receipt check pass, then revokes and waits for acknowledgement before the receipt append runs. |
 | `revoke_anchor_subject_inspect_store` | As `revoke_anchor_subject`, then reads the stored revocation row and checks it holds the subject tag and no plaintext subject or tenant. |
 | `revoke_other_subject` | Revokes a different principal by `anchor_subject`, then calls under the fixture principal. |
 
@@ -141,7 +143,7 @@ No error domain is added. Exchange failures are token endpoint authentication fa
 
 ## Counts against spec 11.3
 
-Spec 11.3 lists `anchored_root` at 24 scenarios for M1, `receipt_disclosure` at 12 and `revocation_local` at 12. All 48 are staged here (spec section 2.5, "Count"). Scenarios 017 to 021 cover the provider registry (G17), 022 and 024 strict decoding (G18), and 023 the deleted `algorithm` member (G19). Padding negatives for the receipt blocks, the opening document and the other section 7 types are conformance vectors (spec 11.2), not scenarios. M2 adds four `anchored_root` scenarios for Entra Agent ID.
+Spec 11.3 lists `anchored_root` at 24 scenarios for M1, `receipt_disclosure` at 12 and `revocation_local` at 14. All 50 are staged here (spec section 2.5, "Count"). Scenarios 017 to 021 cover the provider registry (G17), 022 and 024 strict decoding (G18), and 023 the deleted `algorithm` member (G19). Padding negatives for the receipt blocks, the opening document and the other section 7 types are conformance vectors (spec 11.2), not scenarios. M2 adds four `anchored_root` scenarios for Entra Agent ID.
 
 ## Move-in checklist for M1
 

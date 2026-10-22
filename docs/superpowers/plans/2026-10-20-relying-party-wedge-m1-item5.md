@@ -68,7 +68,7 @@
 
 1. **A target revocation that misses a live root.** Expected: entry insert, fan-out into `revoked_capabilities` and the mint-side entry check all run in IMMEDIATE transactions on the serving owner's one connection, so for every pair (revocation W, mint M) either M commits first and W's fan-out marks M's root, or W commits first and M refuses. Pinned in PR 3 by the barrier schedules S5 and S6 (Linearization) and by `revocation_and_mint_interleavings_never_leave_a_live_matching_root` (500 iterations against real SQLite).
 2. **An in-transaction reader that stops seeing revocations.** Expected: no change to the R4 readers; every target revocation becomes `revoked_capabilities` rows that those readers already read. Pinned by schedules S1 to S3.
-3. **An overclaim about publication.** Expected: the plan, PROTOCOL and spec 7.11 state the guarantee G-A/G-C/G-M (Linearization) and the disclosed receipt gap; no text says an acknowledgement prevents every later allowed receipt or guarantees that an admitted call completes. Pinned by schedule S4, which asserts the gap as current behavior.
+3. **An overclaim about publication.** Expected: the plan, PROTOCOL and spec 7.11 state the guarantee G-A/G-C/G-M (Linearization) and the disclosed receipt gap; no text says an acknowledgement prevents every later allowed receipt or guarantees that an admitted call completes. Pinned by schedules S4 and S9, which assert the gap as current behavior, including a check whose per-id reads straddle the revocation.
 4. **Plaintext reaching disk, logs or exports.** Expected: only `subject_tag` and `tenant_tag` (64 lowercase hex) are stored; `reason` is a closed enum. Pinned in PR 3 by `subject_and_tenant_revocations_store_only_tags` (scans the database file, WAL and SHM bytes for the fixture marker) and in PR 4 by a log-capture test on the admin route.
 5. **An entry lost on backup restore, or orphaned by a key change.** Expected: every entry advances the global commit chain, including an entry that matches no root; startup refuses when a tenant index key generation that a stored entry references is not loaded, and an entry tag with an unknown `key_id` refuses. Pinned in PR 1 by `restored_snapshot_missing_an_entry_refuses_open` and in PR 3 by `startup_refuses_when_only_a_revocation_entry_references_a_generation` and `revoke_under_n_then_admit_under_n_plus_1_denies`.
 6. **A mis-attributed deny.** Expected: a deny names an entry only from evidence recorded by the read that refused, in the transaction that refused; no later read relabels an error. Pinned in PR 2 by `hold_denied_by_revocation_names_the_entry`, `capture_refused_by_revocation_names_the_entry`, `capture_failure_then_revoke_keeps_the_original_error` and `budget_denied_then_revoke_keeps_the_budget_denial`.
@@ -93,12 +93,15 @@
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/error.rs` | 3 | `RootExchangeError::Revoked { entry_id }` |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs`, `admin/revocation_targets.rs` (new), `session_forms.rs`, `admin/revocation_batch.rs` | 4 | admin POST and GET, fail-closed rules, fallback deletion |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/tests/revocation_admin.rs` (new) | 4 | HTTP tests |
+| `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs` and its client conversion | 2 | revoked member on the remote authorize-hold response |
+| `crates/platform/chio-control-plane/src/trust_control/{config_and_public,authority_handlers}.rs`, `service_runtime/{client,remote_stores}.rs` | 4 | forwarded capability revocation and listing on the entry wire |
+| `crates/platform/chio-control-plane/src/trust_control/service_types/cluster_budget.rs`, `cluster/snapshots.rs` | 1 | replicated entry reason |
 | `crates/products/chio-cli/src/cli/types/runtime.rs`, `src/cli/dispatch/mcp_revoke.rs` (new), `tests/mcp_revoke.rs` (new) | 4 | `chio mcp revoke` and `chio mcp revocations` |
 | `spec/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json`, `revocation-admin-request.schema.json` (new), examples, `spec/schemas/registry.json`, `MANIFEST.sha256`, `spec/wire-schemas.lock`, generated code | 4 | wire shapes |
 | `spec/PROTOCOL.md` (`/admin/revocations` section near line 2946), `spec/errors/registry.yaml` | 2, 3, 4 | contract text and URNs |
 | `scripts/check-domain-separation.py` inventory | 1, 3 | entry-id domain |
 | `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md` 7.11, 8.3, 11.3 | 0 | revocation boundaries, index-key refusal, scenario count |
-| staged `revocation_local` scenarios 010a, 010b, 010c | 2 | replace 010 once capture attribution exists |
+| staged `revocation_local` scenarios 010a, 010b, 010c | staged on `main` | replace 010; PR 2 names their tests |
 
 ## PR Grouping
 
@@ -142,7 +145,7 @@ git grep -n -E "revocation_db_path|ADMIN_REVOCATIONS_PATH|AdminRevokeCapabilityR
 
   "Linearization: a revocation is one serving-writer transaction on the state-directory database, acknowledged after it commits and the authority anchor syncs. Let T be that commit. (1) Every budget authorize-hold transaction, which is where an admission commits, that begins after T denies, and the call does not dispatch. (2) Every root-exchange mint transaction that begins after T and matches the entry refuses. (3) A call admitted before T may dispatch. Its budget capture and its native dispatch capture re-check revocation inside the capture transaction, and a capture that begins after T refuses. By then the upstream effect has run and streamed chunks may already have reached the caller; the remaining output is withheld and the call ends with a revocation denial. (4) A call that captured before T reaches the allowed-receipt check, which is a read separate from the receipt append. If that read begins after T the allowed receipt is refused; if it began before T the allowed receipt is appended even when the append lands after T. An acknowledgement therefore guarantees (1) to (3) and does not guarantee that no allowed receipt is appended after it, nor that a call admitted before it completes. 'Next call' in this spec means a call whose budget authorize-hold begins after the acknowledgement."
 - [ ] **Step 2 (8.3):** No 8.3 text: spec 7.12 (#1732) states the rotating key set, the referenced-generation startup refusal and the unknown `key_id` refusal.
-- [ ] **Step 3 (11.3):** `revocation_local` M1 count 12 becomes 14 (scenario 010 splits into 010a, 010b, 010c; the split itself lands in PR 2).
+- [ ] **Step 3 (11.3):** `revocation_local` M1 count 12 becomes 14 (scenario 010 splits into 010a, 010b, 010c). The split, the README mutations and counts, and the matching protocol 5.6 fragment text are staged with the PR 0 wording; PR 2 names the tests.
 - [ ] **Step 4:** `grep -rn $'\xe2\x80\x94' <changed files>; test $? -eq 1`.
 
 ---
@@ -155,6 +158,7 @@ git grep -n -E "revocation_db_path|ADMIN_REVOCATIONS_PATH|AdminRevokeCapabilityR
 - Create: `crates/platform/chio-store-sqlite/src/revocation_store/entry_tests.rs`
 - Modify (Root-held, Q2 ACK): `crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs`
 - Modify: `scripts/check-domain-separation.py` (one inventory row)
+- Modify (replicated reason): `crates/kernel/chio-kernel/src/revocation_store.rs` (`RevocationRecord`), CP `trust_control/service_types/cluster_budget.rs` (`RevocationDeltaResponse`), `trust_control/cluster/snapshots.rs` (`RevocationSnapshotExport`)
 
 **Types (core-types):**
 
@@ -192,19 +196,38 @@ impl RevocationTarget {
 }
 
 /// `chio.revocation-entry.v1`, unsigned. Exported by item 6 with role `revocation_entry`.
+/// Fields are private; a value exists only through `RevocationEntry::new` or a
+/// validated decode, so every held entry satisfies the invariants below.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RevocationEntryWire", into = "RevocationEntryWire")]
 pub struct RevocationEntry {
-    pub schema: String,                 // "chio.revocation-entry.v1"
-    pub entry_id: RevocationEntryId,
-    pub target_kind: RevocationTargetKind,
-    pub target_value: String,
-    pub revoked_at: u64,
-    pub reason: RevocationReason,
+    entry_id: RevocationEntryId,
+    target: RevocationTarget,
+    revoked_at: u64,
+    reason: RevocationReason,
 }
+
+/// Wire form. `deny_unknown_fields`; `schema` is a string only here.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevocationEntryWire {
+    schema: String,
+    entry_id: String,
+    target_kind: RevocationTargetKind,
+    target_value: String,
+    revoked_at: u64,
+    reason: RevocationReason,
+}
+
+/// `TryFrom<RevocationEntryWire>` refuses, with `invalid revocation entry: <rule>`:
+/// a `schema` other than "chio.revocation-entry.v1"; an `entry_id` that is not
+/// "rev_" plus 64 lowercase hex; a `target_value` that does not satisfy its kind
+/// (`RevocationTarget::capability` and `root_policy_rule` limits, or exactly 64
+/// lowercase hex for the three digest kinds); `revoked_at = 0`; and an `entry_id`
+/// not equal to `RevocationTarget { kind, value }.id()` (G18).
 ```
 
-A repeated revocation of one target is idempotent: the first write's `revoked_at` and `reason` stand. The id is equal across stores for `capability_id`, `root_policy_rule` and `replay_key` targets; tag targets are equal only under the same index key.
+A repeated revocation of one target is idempotent: the first write's `revoked_at` and `reason` stand. Every decode of an entry (admin response, export bundle, replication, store read) goes through the validated form; the store also re-derives the id on read and refuses a row whose `entry_id` does not match its target. The id is equal across stores for `capability_id`, `root_policy_rule` and `replay_key` targets; tag targets are equal only under the same index key.
 
 **Schema delta (in place, schema version 1):**
 
@@ -233,16 +256,26 @@ CREATE TABLE IF NOT EXISTS revocation_entries (
     )
 ) STRICT;
 
+-- One row per tenant index key generation loaded when a tag entry is written
+-- (Task 5). No rows for capability_id, root_policy_rule or replay_key entries.
+CREATE TABLE IF NOT EXISTS revocation_entry_tags (
+    entry_id TEXT NOT NULL REFERENCES revocation_entries(entry_id),
+    tag_key_id TEXT NOT NULL CHECK (length(tag_key_id) BETWEEN 1 AND 128),
+    tag TEXT NOT NULL CHECK (length(tag) = 64 AND tag NOT GLOB '*[^0-9a-f]*'),
+    PRIMARY KEY (entry_id, tag_key_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS idx_revocation_entry_tags_match ON revocation_entry_tags(tag_key_id, tag);
+
 -- revoked_capabilities gains, in its CREATE TABLE:
     revocation_entry_id TEXT NOT NULL REFERENCES revocation_entries(entry_id),
 CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_entry ON revoked_capabilities(revocation_entry_id);
 ```
 
-`revoked_capabilities.revocation_entry_id` names the first entry that reached the capability; it is the deny attribution, not the export coverage (Task 5). `revocation_delta_log`, `revocation_delta_meta`, `revocation_stream_meta`, `admission_authority_meta` and `admission_authority_commits` are unchanged. Replication peers keep receiving capability rows only; a follower applying `upsert_revocation_if_newer` writes the `capability_id` entry with reason `operator_request`.
+`revoked_capabilities.revocation_entry_id` names the first entry that reached the capability; it is the deny attribution, not the export coverage (Task 5). `revocation_delta_meta`, `revocation_stream_meta`, `admission_authority_meta` and `admission_authority_commits` are unchanged. Replication carries the source entry: `RevocationRecord` (`chio-kernel/src/revocation_store.rs:27`, today `{capability_id, revoked_at}`) gains `reason: RevocationReason`, `revocation_delta_log` gains a `reason` column under the same closed CHECK, and the trust-control delta and snapshot records (`RevocationDeltaResponse`, `RevocationSnapshotExport`) carry it. A follower applying `upsert_revocation_if_newer` writes the `capability_id` entry with the source's `revoked_at` and `reason`, so the peer's GET and export show the same entry as the source. Peers still receive capability rows only; target entries are local to the state directory (Q4).
 
 **Global commit chain (Root-held, Q2 ACK conditions):**
 - `'revocation_entry'` joins the closed `projection_kind` CHECK list. Mutation kind `revocation_entry_record`.
-- Reference digest, domain-separated: `chio.sqlite-authority-revocation-entry-reference.v1` over `{entry_seq, entry_id, target_kind, target_value, revoked_at, reason}`.
+- Reference digest, domain-separated: `chio.sqlite-authority-revocation-entry-reference.v1` over `{entry_seq, entry_id, target_kind, target_value, revoked_at, reason, tags}`, where `tags` is the entry's `revocation_entry_tags` rows as `(tag_key_id, tag)` pairs sorted by `tag_key_id` (empty for every entry PR 1 writes). A tag row added, removed or altered after the commit fails the digest.
 - Validation: every `revocation_entries` row has exactly one `authority_global_commits` row with `projection_kind = 'revocation_entry'`, `projection_key = entry_id`, `projection_sequence = entry_seq` (coverage); every such commit row has its entry (absence); no second commit row per entry (extra rows); each reference digest recomputes.
 - An entry that matches no root still gets its commit (zero-match coverage). A restored database missing an entry refuses open (restore-loss refusal).
 - The entry, its fan-out rows and every chain commit are written in one transaction; the serving-owner fence check, anchor verification and the existing anchor-sync failure semantics (`OutcomeUnknown`) apply unchanged.
@@ -251,7 +284,7 @@ CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_entry ON revoked_capabilitie
 **Behavior:**
 - `revoke(capability_id)` (trait) and `upsert_revocation_if_newer` write the `capability_id` entry (insert or keep) and the `revoked_capabilities` row with `revocation_entry_id` in one transaction; in joint mode the entry's global commit precedes the row's.
 - `pub fn revocation_entry(&self, capability_id: &str) -> Result<Option<RevocationEntryId>>`: one indexed read.
-- `pub fn list_revocation_entries_after(&self, after_seq: u64, limit: usize) -> Result<(Vec<RevocationEntry>, u64)>`: one read snapshot, page plus head (admin listing).
+- `pub fn list_revocation_entries_after(&self, after_seq: u64, kind: Option<RevocationTargetKind>, limit: usize) -> Result<RevocationEntryPage>`: one read snapshot, `entry_seq > after_seq` in ascending order, at most `limit` rows. `RevocationEntryPage { entries: Vec<SequencedRevocationEntry { entry_seq: u64, entry: RevocationEntry }>, next_after: u64, head: u64 }`: `next_after` is the `entry_seq` of the last returned row, or `after_seq` when the page is empty; `head` is the highest `entry_seq` in the store. A caller pages by passing `next_after` back until a page is empty; `head` is informational and is never a cursor.
 - Open refuses a `revoked_capabilities` row whose entry is absent (the FK check already runs at open, `verify_revocation_foreign_keys`).
 
 - [ ] **Step 1: Failing tests** in `entry_tests.rs` (RED: none of the names exist):
@@ -270,10 +303,16 @@ fn capability_revocation_records_and_names_one_entry() -> TestResult {
     assert!(store.revoke("cap-fixture-1")?);
     assert!(!store.revoke("cap-fixture-1")?);
     assert_eq!(store.revocation_entry("cap-fixture-1")?, Some(RevocationTarget::capability("cap-fixture-1")?.id()));
-    let (page, head) = store.list_revocation_entries_after(0, 10)?;
-    assert_eq!((page.len(), head), (1, 1));
+    let page = store.list_revocation_entries_after(0, None, 10)?;
+    assert_eq!((page.entries.len(), page.next_after, page.head), (1, 1, 1));
     Ok(())
 }
+#[test]
+fn listing_pages_by_next_after_without_gaps_or_repeats() // 5 entries, limit 2: pages 2, 2, 1, then empty; every entry_seq once
+#[test]
+fn decoding_refuses_an_entry_that_breaks_an_invariant()  // wrong schema, non-hex tag value, entry_id not derived from its target: each "invalid revocation entry: ..."
+#[test]
+fn replicated_capability_entry_keeps_the_source_reason()   // source revokes with credential_compromise; follower entry equals the source entry
 #[test]
 fn revoked_row_without_entry_refuses_open() -> TestResult {
     // insert a revoked_capabilities row with foreign_keys off, reopen
@@ -299,7 +338,7 @@ fn table_refuses_non_hex_tag_values_and_unknown_reasons() // "CHECK constraint f
 
 ### Task 4: Attribution at hold and capture, guard evidence, URN, scenario 010 split (PR 2)
 
-**Files:** `chio-kernel/src/revocation_runtime.rs`, `src/revocation_store.rs`, `src/kernel/validation.rs`, `src/kernel/validation/revocation_trace.rs`, `src/kernel/evaluation/{async_evaluation_core,nested_flow_evaluation}.rs`, `src/kernel/responses/deny_responses.rs`, `src/kernel/error.rs`, `src/kernel/admission_coordinator.rs` (capture error mapping), the 8 implementors (R14), every trait `is_revoked` caller, `spec/errors/registry.yaml`, `crates/core/chio-errors/src/_generated/error_codes.rs` (regenerated), `tests/durable_admission_sqlite/revocation_targets.rs` (new), the staged `revocation_local` scenarios and README.
+**Files:** `chio-kernel/src/revocation_runtime.rs`, `src/revocation_store.rs`, `src/kernel/validation.rs`, `src/kernel/validation/revocation_trace.rs`, `src/kernel/evaluation/{async_evaluation_core,nested_flow_evaluation}.rs`, `src/kernel/responses/deny_responses.rs`, `src/kernel/error.rs`, `src/kernel/admission_coordinator.rs` (capture error mapping), the 8 implementors (R14), every trait `is_revoked` caller, `spec/errors/registry.yaml`, `crates/core/chio-errors/src/_generated/error_codes.rs` (regenerated), `tests/durable_admission_sqlite/revocation_targets.rs` (new), the budget mutation event DDL and `budget_store/composite/model.rs` (persisted revoked member), CP `service_types/structured_budget.rs` and its client conversion (remote hold denial).
 
 **Interface:**
 
@@ -321,14 +360,15 @@ pub trait RevocationStore: Send + Sync {
 - The pre-dispatch deny and the receipt-persistence deny attach `GuardEvidence { guard_name: "chio.revocation", verdict: false, details: Some(<entry id>) }`. Item 2's evidence allowlist declares `chio.revocation` `details` safe under committed disclosure.
 - Attribution is causal: only typed evidence written by the refusing transaction names an entry. No read after the refusal attributes anything, so an unrelated error or budget denial followed by a revocation keeps its original error.
 - Hold: the authorize-hold transaction's revocation loop (`composite.rs:296-305`) selects `revocation_entry_id` from `revoked_capabilities` for each member in order, and the first revoked member is recorded on the denial: `DeniedBudgetHold { .., revoked_member: Option<RevokedMember> }` with `RevokedMember { capability_id, entry_id }`. The kernel converts a denial with `revoked_member` into `CapabilityRevoked` (leaf) or `DelegationChainRevoked` (chain member) with the guard evidence. A denial without it is a budget denial, unchanged, even when a member is revoked later.
+- Hold replay: the denial's member is persisted with the denied hold event in the refusing transaction. The budget mutation event row gains `revoked_member_capability_id` and `revoked_member_entry_id` (both NULL or both set, CHECK; the entry id under the `revocation_entries` id CHECK). `authorization_decision_from_event` (`composite.rs:952`) and `decision_from_persisted_event` (`composite/model.rs:1593`) rebuild `revoked_member` from those columns, so a retried request whose first response was lost gets the same attributed denial. A replay never reads `revoked_capabilities`; an event without the columns replays as a budget denial.
 - Capture: composite capture (`capture.rs:282-296`) returns `BudgetStoreError::Revoked { capability_id, entry_id }` in place of the revoked-member `Invariant`, and native dispatch capture (`dispatch_ledger/capture.rs:64-78`) returns its typed revoked refusal with the same two fields in place of `invalid("native capture capability or ancestor is revoked")`, each read in the capture transaction. The kernel attributes only those typed refusals. Every other capture error keeps its original error and path. The existing post-effect handling (output withholding, unknown-outcome custody, settlement idempotency) is unchanged for both.
 - Typed refusal definition and mapping closure (Q11 ACK). One shared value `RevokedMember { capability_id: String, entry_id: RevocationEntryId }` in `chio-kernel` (`budget_store.rs`), carried by:
   - store-side errors: `BudgetStoreError::Revoked(RevokedMember)` (kernel `budget_store.rs`), returned by composite capture; `AdmissionOperationStoreError::Revoked(RevokedMember)` (kernel `admission_operation/store.rs`), returned by native dispatch capture at `dispatch_ledger/capture.rs:76` in place of `invalid(..)`; `AdmissionCaptureError::Revoked(RevokedMember)` (kernel `admission_operation`), produced by the existing `BudgetStoreError` to `AdmissionCaptureError` conversion. Every other `invalid(..)` and `Invariant` use is unchanged.
-  - remote authority (trust-control joint admission RPC): `AdmissionAuthorityErrorCode::Revoked` and `AdmissionAuthorityWireError.revoked_member: Option<RevokedMemberWire>` (`service_types/admission_authority.rs`), present exactly when the code is `revoked`; a wire error with one and not the other fails decoding. The server mappings `operation_store_error`, `admission_capture_error` and the budget error mapping (`service_runtime/admission_authority.rs:852-881`) emit it; the client mappings `operation_error` (`remote_admission.rs:1091-1108`) and `into_budget_store_error` (`service_runtime/errors.rs:11`) restore the typed variant. A `revoked` code without a valid member maps to `Invariant` and is not attributed.
+  - remote authority (trust-control joint admission RPC): `AdmissionAuthorityErrorCode::Revoked` and `AdmissionAuthorityWireError.revoked_member: Option<RevokedMemberWire>` (`service_types/admission_authority.rs`), present exactly when the code is `revoked`; a wire error with one and not the other fails decoding. The server mappings `operation_store_error`, `admission_capture_error` and the budget error mapping (`service_runtime/admission_authority.rs:852-881`) emit it; the client mappings `operation_error` (`remote_admission.rs:1091-1108`) and `into_budget_store_error` (`service_runtime/errors.rs:11`) restore the typed variant. A `revoked` code without a valid member maps to `Invariant` and is not attributed. A revoked authorize-hold is not an error on this wire: the server returns it as a successful `StructuredBudgetAuthorizeResponse` built by `from_core` (`service_runtime/admission_authority.rs:766-823`). `StructuredBudgetAuthorizeResponse` (`service_types/structured_budget.rs:894-906`) therefore gains `revoked_member: Option<RevokedMemberWire>`, `from_core` copies it from `DeniedBudgetHold`, and the client conversion back to `BudgetAuthorizeHoldDecision` restores it. A member with a `decision` other than `denied` fails decoding.
   - kernel: `durable_store_error` keeps wrapping store errors; the deny mapping converts a `Revoked(member)` from hold, composite capture or native capture into `CapabilityRevoked` (member is the leaf) or `DelegationChainRevoked` (member is a chain id), only when `member.capability_id` is in the hold's `revocation_set`; otherwise the error stays as returned.
   - custody: a `Revoked` refusal is a definite refusal of a rolled-back transaction and takes exactly the path the revoked-member `Invariant` takes today (output withholding, custody retention, settlement idempotency); `OutcomeUnknown`, `Unavailable`, `Fenced` and every unrelated `Invariant` keep their paths. Task 1's census lists every match on these error enums in post-effect, custody and recovery code, and each gains `Revoked` on the arm that handled the revoked-member `Invariant`.
 - `KernelError::RevocationStore` reports `urn:chio:error:kernel:revocation-store` (G12); the code is registered in `spec/errors/registry.yaml`.
-- Scenario 010 is replaced by three staged scenarios with controlled schedules: `revocation-local-010a-revocation-before-capture-denies` (deny, `urn:chio:error:capability:revoked`), `010b-revocation-after-capture-before-receipt-check-denies` (deny, same code), `010c-revocation-after-receipt-check-appends-allowed` (allow, `urn:chio:error:none`, documents the gap). README mutations gain `revoke_before_capture`, `revoke_after_capture_before_receipt_check`, `revoke_after_receipt_check_before_append`; the category count becomes 14.
+- Scenarios 010a to 010c are already staged in place of 010 (`revocation-local-010a-revocation-before-capture-denies`, deny, `urn:chio:error:capability:revoked`; `010b-revocation-after-capture-before-receipt-check-denies`, deny, same code; `010c-revocation-after-receipt-check-appends-allowed`, allow, `urn:chio:error:none`, the disclosed gap), with README mutations `revoke_before_capture`, `revoke_after_capture_before_receipt_check` and `revoke_after_receipt_check_before_append` and the category count at 14. PR 2 names the test that asserts each one's `expected` block.
 
 - [ ] **Step 1: Failing tests.** Kernel lib tests (in-memory stores):
 ```rust
@@ -349,8 +389,10 @@ pub trait RevocationStore: Send + Sync {
 #[test] fn revoked_wire_code_without_member_is_not_attributed()     // and member without code fails decoding
 #[test] fn revoked_capture_refusal_takes_the_invariant_custody_path() // output withheld, custody and settlement state equal to the pre-change revoked-member Invariant run
 #[test] fn unrelated_native_invalid_keeps_its_error_and_custody()
+#[test] fn revoked_hold_denial_round_trips_the_remote_success_wire() // control_url: authorize-hold Denied with revoked_member -> StructuredBudgetAuthorizeResponse -> client: same RevokedMember, CapabilityRevoked with guard evidence
+#[test] fn replayed_revoked_hold_names_the_same_entry()             // first response dropped; retry of the same request replays the persisted event with the same RevokedMember
 ```
-- [ ] **Step 2:** Implement; regenerate error codes (`cs cargo xtask codegen`); stage 010a to 010c and remove 010.
+- [ ] **Step 2:** Implement; regenerate error codes (`cs cargo xtask codegen`); name the tests for staged 010a to 010c.
 - [ ] **Step 3: Verify** (PR 2 block). The full chio-kernel suite and native-cage chio-cli and chio-conformance run on the integrators.
 
 ---
@@ -360,22 +402,24 @@ pub trait RevocationStore: Send + Sync {
 **Files:** `chio-store-sqlite/src/revocation_store.rs`, `src/revocation_store/target_tests.rs` (new), item 4's anchored-root store module (the insert function), `chio-mcp-remote/src/remote_mcp/root_exchange/error.rs`, the mint call site item 4 owns, `tests/durable_admission_sqlite/revocation_schedules.rs` (new), `spec/errors/registry.yaml`, `scripts/check-domain-separation.py`.
 
 **Contract required from item 4** (item 4 owns these; PR 3 fails review if any is missing):
-- `anchored_roots`: `capability_id TEXT PRIMARY KEY`, `root_policy_rule_id TEXT NOT NULL`, `subject_tag TEXT NOT NULL` (64 hex, HMAC of the provider record's principal claim, R16), `tenant_tag TEXT` (64 hex or NULL when the rule has no tenant), `replay_key_digest TEXT NOT NULL` (64 hex, R11), `expires_at INTEGER NOT NULL`, one index on each of the four target columns.
+- `anchored_roots`: `capability_id TEXT PRIMARY KEY`, `root_policy_rule_id TEXT NOT NULL`, `tag_key_id TEXT NOT NULL` (the generation that computed both tags), `subject_tag TEXT NOT NULL` (64 hex, HMAC of the provider record's principal claim, R16), `tenant_tag TEXT` (64 hex or NULL when the rule has no tenant), `replay_key_digest TEXT NOT NULL` (64 hex, R11), `expires_at INTEGER NOT NULL`, one index on each of the four target columns.
 - Every insert goes through the serving owner's connection in an IMMEDIATE transaction; the root is returned to the client only after that transaction commits.
 - Rows are retained as long as any receipt under the root is retained, so export coverage stays computable (R15).
-- Index-key generations: the tenant index key set rotates (item 2 Task 5, all-generation match mode). Each `anchor_subject` and `tenant_tag` entry stores its tag with the `tag_key_id` of the generation that computed it. The fan-out and the mint check compute the candidate tag from the admin or request plaintext under every loaded generation (`key_ids()` with `derive_in`) and match on `(tag_key_id, tag)`. Startup refuses when a generation that any stored entry references is not loaded (`tenant index key generation <key_id> referenced by a revocation entry is not loaded`), and an entry or request naming an unknown `key_id` refuses. Tests: `startup_refuses_when_only_a_revocation_entry_references_a_generation`, `revoke_under_n_then_admit_under_n_plus_1_denies`, `revocation_entry_with_unknown_key_id_refuses`.
+- Index-key generations: the tenant index key set rotates (item 2 Task 5, all-generation match mode). Each `anchor_subject` and `tenant_tag` entry's `target_value` is the tag under the active generation, and the entry id derives from it. In the same transaction the entry writes one `revocation_entry_tags` row per loaded generation (`key_ids()` with `derive_in` over the admin plaintext), so the entry carries its tag under every generation that can have tagged a live or retained root. Every match is on `(tag_key_id, tag)` against those rows: the fan-out joins `anchored_roots (tag_key_id, subject_tag | tenant_tag)` to them, coverage does the same (below), and the mint check derives the request's tag under every loaded generation and looks each pair up, so a generation added after the revocation still refuses the target. Startup refuses when a generation that any `revocation_entry_tags` row references is not loaded (`tenant index key generation <key_id> referenced by a revocation entry is not loaded`), and an entry or request naming an unknown `key_id` refuses. Tests: `startup_refuses_when_only_a_revocation_entry_references_a_generation`, `revoke_under_n_then_admit_under_n_plus_1_denies`, `revocation_entry_with_unknown_key_id_refuses`, `rotation_to_a_new_active_generation_starts_and_keeps_old_entries_matching`, `entry_written_under_b_covers_a_root_tagged_under_a`.
 
 **Store API:**
 
 ```rust
 impl SqliteRevocationStore {
     /// Records the entry and marks every live matching anchored root revoked, in one
-    /// IMMEDIATE transaction. Returns the stored entry, whether it is new, and how
-    /// many roots this call marked.
+    /// IMMEDIATE transaction. Returns the stored entry, whether it is new, how many
+    /// anchored roots match the target, and how many of them this call marked.
     pub fn revoke_target(&self, target: &RevocationTarget, reason: RevocationReason)
         -> Result<TargetRevocation, RevocationStoreError>;
 }
-pub struct TargetRevocation { pub entry: RevocationEntry, pub newly_revoked: bool, pub roots_revoked: u64 }
+/// `roots_matched` counts every `anchored_roots` row matching the target, already
+/// revoked or not; `roots_revoked` counts the rows this call inserted.
+pub struct TargetRevocation { pub entry: RevocationEntry, pub newly_revoked: bool, pub roots_matched: u64, pub roots_revoked: u64 }
 
 /// Called inside item 4's anchored-root insert transaction, before the insert.
 pub(crate) fn refuse_revoked_root(tx: &Transaction<'_>, root: &AnchoredRootTargets<'_>)
@@ -383,20 +427,34 @@ pub(crate) fn refuse_revoked_root(tx: &Transaction<'_>, root: &AnchoredRootTarge
 
 pub struct AnchoredRootTargets<'a> {
     pub root_policy_rule_id: &'a str,
-    pub subject_tag: &'a Sha256Digest,
-    pub tenant_tag: Option<&'a Sha256Digest>,
+    /// The request's subject tag under every loaded generation.
+    pub subject_tags: &'a [(KeyId, Sha256Digest)],
+    /// The request's tenant tag under every loaded generation; empty when the rule has no tenant.
+    pub tenant_tags: &'a [(KeyId, Sha256Digest)],
     pub replay_key_digest: &'a Sha256Digest,
 }
 
-/// Item 6's `RootAuthorityEvidenceStore::revocations_covering` (R15), implemented here.
-fn revocations_covering(&self, roots: &[AnchoredRootRef]) -> Result<Vec<ExportedRevocationEntry>, EvidenceStoreError>;
+impl SqliteRevocationStore {
+    /// Export coverage for item 6 (R15). Inherent method: chio-store-sqlite
+    /// cannot implement a chio-control-plane trait, because chio-control-plane
+    /// depends on chio-store-sqlite.
+    pub fn revocations_covering(&self, roots: &[RevocationCoverageRoot])
+        -> Result<Vec<RevocationCoverage>, RevocationStoreError>;
+}
+
+// chio-core-types `root_authority::revocation_entry`, beside `RevocationEntry`.
+pub struct RevocationCoverageRoot { pub root_capability_id: String, pub capability_ids: Vec<String> }
+pub struct RevocationCoverage { pub entry: RevocationEntry, pub covered_capability_ids: Vec<String> }
+// RevocationStoreError::AnchoredRootMissing { capability_id }
 ```
 
-- Fan-out: `INSERT` into `revoked_capabilities` for every `anchored_roots` row whose target column equals the entry value, whose `expires_at` is after the authority time observed in the transaction, and that is not already revoked; each through `record_revocation` (delta row, admission commit, global commit) with `revocation_entry_id`. An expired root needs no row: every admission, capture and native capture already refuses an expired capability, and its descendants expire no later. `capability_id` targets keep the PR 1 path.
+Item 6c owns the adapter: its `RootAuthorityEvidenceStore` implementation lives in chio-control-plane beside the trait (item 6 plan, `evidence_export`), maps `AnchoredRootRef` to `RevocationCoverageRoot`, `RevocationCoverage` to `ExportedRevocationEntry` and `AnchoredRootMissing` to `EvidenceStoreError::AnchoredRootMissing`, and calls this method. PR 3 merges before item 6c and depends on no item 6 type; item 6c's Task 8 consumes these names as written here.
+
+- Fan-out: `INSERT` into `revoked_capabilities` for every `anchored_roots` row that matches the entry (target column equal to the entry value for `root_policy_rule` and `replay_key`; `(tag_key_id, tag)` in the entry's `revocation_entry_tags` rows for `anchor_subject` and `tenant_tag`) and is not already revoked, expired roots included; each through `record_revocation` (delta row, admission commit, global commit) with `revocation_entry_id`. Expiry is not a filter: composite capture rechecks revocation and supplemental expiry but not capability expiry (`composite/transitions/capture.rs:279-335`), so a call admitted before its root expired can still capture after it, and only a `revoked_capabilities` row refuses that capture (G-C). The fan-out therefore reads no clock and compares no `expires_at`. Rows for expired roots are bounded by the item 4 retention rule. `capability_id` targets keep the PR 1 path.
 - Retry with a different reason: the stored entry is returned unchanged with `newly_revoked = false`; the admin response sets `reason_conflict = true`.
-- Mint check: one indexed lookup `(target_kind, target_value) IN` the four pairs, `LIMIT 1`. A match raises `TargetRevoked { entry_id }`, displayed `anchored root matches revocation entry <entry id>`; the exchange maps it to `RootExchangeError::Revoked { entry_id }`, OAuth `invalid_grant`, URN `urn:chio:error:transport:exchange-revoked` (registered here).
+- Mint check: one indexed lookup of `(target_kind, target_value)` for the rule and replay-key pairs, plus one indexed lookup of `revocation_entry_tags (tag_key_id, tag)` joined to the entry's kind for the request's subject and tenant tags under every loaded generation; `LIMIT 1` each. `AnchoredRootTargets` carries those per-generation tags (`subject_tags`, `tenant_tags`: `&[(KeyId, Sha256Digest)]`). A match raises `TargetRevoked { entry_id }`, displayed `anchored root matches revocation entry <entry id>`; the exchange maps it to `RootExchangeError::Revoked { entry_id }`, OAuth `invalid_grant`, URN `urn:chio:error:transport:exchange-revoked` (registered here).
 - Bearer intake that maps a token digest to an existing root (`bearer_token_roots`) needs no check: the root is already in `revoked_capabilities`.
-- Coverage: for each `AnchoredRootRef` (root capability id plus the capability ids under it that the bundle carries), an entry covers the root when its target column in `anchored_roots` equals the entry value (`root_policy_rule`, `anchor_subject`, `tenant_tag`, `replay_key`), and covers an id when the entry is a `capability_id` entry for that id. The result lists each covering entry once with `covered_capability_ids` sorted and deduplicated. Coverage reads `anchored_roots` and `revocation_entries` only, in one read snapshot, never `revoked_capabilities`, and includes expired roots. Item 6 applies the `revoked_at` cut-off and the chain cascade (R15). A ref whose root capability id has no `anchored_roots` row (retention bug, restore, pruned row) fails the whole call with `EvidenceStoreError::AnchoredRootMissing { capability_id }`, displayed `anchored root row missing for <capability id>`, and the export fails; coverage is never computed from a partial set. The mint path inserts the row and never reads an existing one, and admission, capture and receipt checks read `revoked_capabilities`, not `anchored_roots`, so no other path needs this refusal; the fan-out reads `anchored_roots`, and a live root without its row cannot exist under the item 4 contract (the root is released only after its row commits; restore loss is caught by the chain).
+- Coverage: for each `RevocationCoverageRoot` (root capability id plus the capability ids under it that the bundle carries), an entry covers the root when the root's `anchored_roots` row matches it by the fan-out rule above (column equality for `root_policy_rule` and `replay_key`; the root's `(tag_key_id, subject_tag)` or `(tag_key_id, tenant_tag)` in the entry's `revocation_entry_tags` rows for `anchor_subject` and `tenant_tag`, so an entry written under generation B covers a root tagged under A), and covers an id when the entry is a `capability_id` entry for that id. The result lists each covering entry once with `covered_capability_ids` sorted and deduplicated. Coverage reads `anchored_roots`, `revocation_entries` and `revocation_entry_tags` only, in one read snapshot, never `revoked_capabilities`, and includes expired roots. Item 6 applies the `revoked_at` cut-off and the chain cascade (R15). A ref whose root capability id has no `anchored_roots` row (retention bug, restore, pruned row) fails the whole call with `RevocationStoreError::AnchoredRootMissing { capability_id }`, displayed `anchored root row missing for <capability id>`, and the export fails; coverage is never computed from a partial set. The mint path inserts the row and never reads an existing one, and admission, capture and receipt checks read `revoked_capabilities`, not `anchored_roots`, so no other path needs this refusal; the fan-out reads `anchored_roots`, and a live root without its row cannot exist under the item 4 contract (the root is released only after its row commits; restore loss is caught by the chain).
 
 - [ ] **Step 1: Failing tests** (`target_tests.rs`, joint serving-owner fixture with item 4's table):
 ```rust
@@ -404,28 +462,28 @@ fn revocations_covering(&self, roots: &[AnchoredRootRef]) -> Result<Vec<Exported
 #[test] fn anchor_subject_revocation_marks_every_live_root_with_the_tag_only()
 #[test] fn tenant_revocation_marks_every_live_root_in_the_tenant_only()
 #[test] fn replay_key_revocation_marks_the_one_root()
-#[test] fn fan_out_skips_expired_roots()
+#[test] fn fan_out_marks_expired_matching_roots()                 // a call admitted before its root expired: capture after W refuses
 #[test] fn repeated_target_revocation_is_idempotent()           // same entry, newly == false, no extra delta rows
 #[test] fn retry_with_a_different_reason_keeps_the_first()
-#[test] fn zero_match_revocation_reports_zero_roots()
+#[test] fn zero_match_revocation_reports_zero_roots()           // roots_matched == 0 and roots_revoked == 0
+#[test] fn already_revoked_roots_count_as_matched_not_revoked()  // second entry over the same roots: roots_matched == n, roots_revoked == 0
 #[test] fn mint_matching_an_entry_is_refused_with_the_entry()   // "anchored root matches revocation entry rev_..."
 #[test] fn revocation_and_mint_interleavings_never_leave_a_live_matching_root() // 500 iterations, barrier
 #[test] fn later_rule_entry_covers_a_root_revoked_earlier()      // capability entry first, rule entry second: both cover
 #[test] fn coverage_includes_expired_roots_and_ignores_unrelated_entries()
-#[test] fn coverage_refuses_when_anchored_root_row_missing()      // EvidenceStoreError::AnchoredRootMissing { capability_id }, exact display; no partial result
+#[test] fn coverage_refuses_when_anchored_root_row_missing()      // RevocationStoreError::AnchoredRootMissing { capability_id }, exact display; no partial result
 #[test] fn subject_and_tenant_revocations_store_only_tags()      // marker absent from db, -wal, -shm bytes
 #[test] fn fan_out_failure_rolls_back_the_entry()                // trigger RAISE(ABORT) on revoked_capabilities insert: no entry, no rows
-#[test] fn startup_refuses_a_different_index_key()               // "tenant index key does not match the state directory"
 ```
 - [ ] **Step 2:** Implement; wire `refuse_revoked_root` into item 4's insert; implement `revocations_covering`.
-- [ ] **Step 3:** The two-kernel schedules S1 to S7 (Linearization) in `revocation_schedules.rs`.
+- [ ] **Step 3:** The two-kernel schedules S1 to S9 (Linearization) in `revocation_schedules.rs`.
 - [ ] **Step 4: Verify** (PR 3 block).
 
 ---
 
 ### Task 6: Admin route (PR 4)
 
-**Files:** `remote_mcp/admin.rs`, `admin/revocation_targets.rs` (new), `session_forms.rs`, `admin/revocation_batch.rs`, `remote_mcp/tests/revocation_admin.rs` (new), schemas under `spec/schemas/chio-wire/v1/root_authority/`, `spec/PROTOCOL.md`.
+**Files:** `remote_mcp/admin.rs`, `admin/revocation_targets.rs` (new), `session_forms.rs`, `admin/revocation_batch.rs`, `remote_mcp/tests/revocation_admin.rs` (new), schemas under `spec/schemas/chio-wire/v1/root_authority/`, `spec/PROTOCOL.md`; for the forwarded path, CP `trust_control/config_and_public.rs` (`RevokeCapabilityRequest`, `RevokeCapabilityResponse`), `trust_control/authority_handlers.rs` (revoke and list handlers), `service_runtime/client.rs` and `service_runtime/remote_stores.rs`.
 
 **`POST /admin/revocations`** body (`revocation-admin-request.schema.json`, strict at every level, tagged union through `lossless_serde!`):
 
@@ -439,9 +497,9 @@ fn revocations_covering(&self, roots: &[AnchoredRootRef]) -> Result<Vec<Exported
 
 `reason` is required and closed. For `anchor_subject`, `subject` is the value of the provider record's principal claim (`subject_mapping.principal_source`, for example the Entra `oid`), the value item 4 tags; the issuer is the record's issuer.
 
-Response 200: `{"entry": <chio.revocation-entry.v1>, "newly_revoked": bool, "roots_revoked": <u64>, "reason_conflict": bool}`, sent only after the commit and the authority-anchor sync.
+Response 200: `{"entry": <chio.revocation-entry.v1>, "newly_revoked": bool, "roots_matched": <u64>, "roots_revoked": <u64>, "reason_conflict": bool}`, sent only after the commit and the authority-anchor sync. `roots_matched` and `roots_revoked` are the `TargetRevocation` counts (Task 5) and are 0 for a `capability_id` target.
 
-**`GET /admin/revocations`**: `?after=<seq>&limit=<n>&kind=<kind>` returns `{"entries": [...], "head": <seq>}`; `?capability_id=<id>` returns `{"capability_id", "revoked", "entry_id"}`. No GET takes a plaintext subject or tenant.
+**`GET /admin/revocations`**: `?after=<seq>&limit=<n>&kind=<kind>` returns `{"entries": [{"entry_seq": <seq>, "entry": <chio.revocation-entry.v1>}, ...], "next_after": <seq>, "head": <seq>}` from one `list_revocation_entries_after` snapshot; the caller passes `next_after` as the next `after` until `entries` is empty; `?capability_id=<id>` returns `{"capability_id", "revoked", "entry_id"}`. No GET takes a plaintext subject or tenant.
 
 **Fail-closed rules (status, exact body):**
 
@@ -456,15 +514,17 @@ Response 200: `{"entry": <chio.revocation-entry.v1>, "newly_revoked": bool, "roo
 | `control_url` (remote durable admission) and kind other than `capability_id` | 409 | `revocation target kind requires the local admission store` |
 | no local serving-owner store | 409 | `remote trust admin requires durable revocation state` (existing text; the path-open fallback is deleted) |
 | store error before commit, writer busy past `busy_timeout`, or tenant index unavailable | 503 | `revocation store unavailable` |
-| commit outcome unknown (anchor sync failed) | 503 | `revocation outcome unknown; retry the same request` |
+| commit outcome unknown (anchor sync failed), or any later request on the poisoned serving owner | 503 | `revocation outcome unknown; restart the provider, then retry the same request` |
 
 - Retry of the same request returns the same entry with `newly_revoked = false`.
+- Outcome unknown is not retryable in the same process. `outcome_unknown` poisons the serving owner (`serving_owner.rs:181-199`), and every later read and write on it, revocation, admission and mint alike, returns `OutcomeUnknown` until the process exits (`require_unpoisoned`, `:234-240`). Recovery is a provider restart: the reopen runs `reconcile_startup` (`serving_owner/rollback_anchor.rs:117`), which accepts a database one commit ahead of its anchor and re-anchors it, or refuses open. After the restart, a retry of the same request returns the committed entry with `newly_revoked = false`, or writes it fresh if the commit did not land.
+- With `control_url`, a `capability_id` revocation forwards to trust-control `POST /v1/revocations` over an upgraded wire: `RevokeCapabilityRequest` (`trust_control/config_and_public.rs:25`) becomes `{capabilityId, reason}` and `RevokeCapabilityResponse` (`:31`) becomes `{entry, newlyRevoked}`, written by trust-control's own `SqliteRevocationStore` through the PR 1 entry path. serve-http returns the same 200 body as the local path (`roots_matched = roots_revoked = 0`, `reason_conflict` against the returned entry). `GET` forwards to trust-control's list handler, which gains the same `after`, `kind` and `limit` page form and the per-capability check. `RemoteRevocationStore` (`service_runtime/remote_stores.rs:87`) reads `newlyRevoked` from the new response. The old `{capabilityId, revoked, newlyRevoked}` body is removed in the same PR.
 - Tags are computed with item 4's tenant index (`subject_tag(issuer, subject)`, `tenant_tag(issuer, tenant)`); the plaintext is dropped before the store call. The request body is not logged; tracing records the entry id, kind and reason only.
 - `revocation_batch.rs` (session trust revoke) writes `capability_id` entries with reason `operator_request` through the same store path.
 - The path-opened `SqliteRevocationStore::open(revocation_db_path)` fallback in `open_revocation_store` is deleted (it is a second writer outside the serving owner). If item 4 has already deleted `revocation_db_path`, this is a no-op.
 - The admin route takes no kernel fence. It does wait on the shared writer: the serving owner's connection lock and the SQLite writer lock, including any in-flight transaction and its fsync. No progress or fairness bound is claimed.
 
-- [ ] **Step 1: Failing tests** in `revocation_admin.rs`, one per table row with the exact status and body, plus `each_target_kind_round_trips_and_denies_the_next_call` (in-process serve-http harness), `plaintext_subject_never_appears_in_logs_or_responses` (tracing capture), `retry_after_outcome_unknown_returns_the_same_entry`, `retry_with_another_reason_reports_conflict`.
+- [ ] **Step 1: Failing tests** in `revocation_admin.rs`, one per table row with the exact status and body, plus `each_target_kind_round_trips_and_denies_the_next_call` (in-process serve-http harness), `plaintext_subject_never_appears_in_logs_or_responses` (tracing capture), `outcome_unknown_poisons_until_restart_then_retry_returns_the_same_entry` (fault-injected anchor sync: the retry before restart gets the outcome-unknown 503; after restart it gets the same entry with `newly_revoked = false`), `retry_with_another_reason_reports_conflict`, `listing_pages_through_next_after`, and with a trust-control fixture `control_url_capability_revocation_returns_the_entry_and_reason` and `control_url_listing_pages_through_next_after`.
 - [ ] **Step 2:** Implement; register `chio.revocation-entry.v1` and `chio.revocation-admin-request.v1` with positive and negative examples (padding, unknown kind, unknown reason, non-hex tag); `cs cargo xtask codegen`; PROTOCOL `/admin/revocations` subsection with the target table, the guarantee G-A/G-C/G-M with the disclosed receipt gap, and the status table.
 
 ---
@@ -486,9 +546,9 @@ chio mcp revocations check --url <base> --capability-id <id> [--json]
 - `--reason` takes the closed enum values (clap `ValueEnum`).
 - The admin token comes only from `CHIO_ADMIN_TOKEN`; there is no argv form. Missing token exits non-zero with `CHIO_ADMIN_TOKEN is required` before any request.
 - Plaintext subject and tenant come only from stdin (one line, trailing newline stripped, empty refused, 4096-byte cap).
-- For a non-`capability_id` kind with `roots_revoked = 0`, stderr prints `warning: no live root matched; the entry refuses future mints only`. `reason_conflict = true` prints `warning: target already revoked with reason <stored>; the stored reason is kept`. Both are also in `--json` output.
+- For a non-`capability_id` kind with `roots_matched = 0`, stderr prints `warning: no anchored root matched; the entry refuses future mints only`. `roots_matched > 0` with `roots_revoked = 0` (an idempotent retry, or roots already revoked by another entry) prints no warning. `reason_conflict = true` prints `warning: target already revoked with reason <stored>; the stored reason is kept`. Both are also in `--json` output.
 - The HTTP client uses the CLI's existing blocking client with a bounded response read and is added to the egress contract inventory; `scripts/check-http-egress-contract.sh` passes.
-- Any non-200 prints the server body and exits 2; outcome unknown exits 3 so scripts can retry.
+- Any non-200 prints the server body and exits 2; outcome unknown exits 3, and a script retries after the provider restarts.
 - `chio trust revoke` (trust-control and local revocation databases, capability only) is unchanged. Pointed at a serve-http state database it refuses through R9; `trust_revoke_refuses_a_serving_owner_database` pins that.
 
 - [ ] **Step 1: Failing tests** in `tests/mcp_revoke.rs` against a spawned `serve-http` (native-cage run on the integrator): each subcommand, token-missing refusal, stdin-only plaintext, both warnings, exit codes 2 and 3.
@@ -498,7 +558,7 @@ chio mcp revocations check --url <base> --capability-id <id> [--json]
 
 ## Linearization
 
-**Transactions.** A revocation is one IMMEDIATE transaction `W` on the serving owner's `Arc<StoreConnection>` (R2): entry insert, chain commit, fan-out rows (delta, admission commit, chain commit each), commit, then authority-anchor sync. The admin route acknowledges only after both. An admission commits in its budget authorize-hold transaction `A` (`claim_and_authorize_budget_and_commit_admission`, IMMEDIATE, same connection, R5), which reads `revoked_capabilities` for every id in `admission.revocation_set` (R4). A capture is one transaction `C` (composite capture or native dispatch capture) that reads the same set (R4). A mint is one IMMEDIATE transaction `M` that runs `refuse_revoked_root` and inserts the anchored root. The allowed-receipt check `R` is a deferred read per id (R2 `is_revoked`, R6), and the receipt append `P` is a separate operation (R6).
+**Transactions.** A revocation is one IMMEDIATE transaction `W` on the serving owner's `Arc<StoreConnection>` (R2): entry insert, chain commit, fan-out rows (delta, admission commit, chain commit each), commit, then authority-anchor sync. The admin route acknowledges only after both. An admission commits in its budget authorize-hold transaction `A` (`claim_and_authorize_budget_and_commit_admission`, IMMEDIATE, same connection, R5), which reads `revoked_capabilities` for every id in `admission.revocation_set` (R4). A capture is one transaction `C` (composite capture or native dispatch capture) that reads the same set (R4). A mint is one IMMEDIATE transaction `M` that runs `refuse_revoked_root` and inserts the anchored root. The allowed-receipt check `R` is a sequence of reads, `R_1` to `R_k`, each its own deferred read transaction: the leaf, then each `delegation_chain` id in order (`check_revocation`, `kernel/validation.rs:614-625`; R2 `is_revoked`, R6). `R` refuses at the first `R_i` that sees a revoked id. The receipt append `P` is a separate operation (R6).
 
 **Guarantee.** `W`, `A`, `C` and `M` serialize on one writer, so with T the commit of `W`:
 
@@ -506,7 +566,7 @@ chio mcp revocations check --url <base> --capability-id <id> [--json]
 - **G-C:** every `C` that begins after T refuses; the effect has already run; the kernel attributes the refusal (Task 4) and the existing post-effect handling applies.
 - **G-M:** every `M` that begins after T and matches the entry refuses; every `M` that committed before T has its root marked by `W`'s fan-out.
 
-**Disclosed gap.** `R` and `P` are not one transaction, and `W` is not excluded between them. If `R` reads before T and `P` runs after T, an allowed receipt is appended after the acknowledgement. Only a call whose `A` and `C` committed before T reaches this point. Item 5 does not close the gap: closing it needs a store-side revocation check coupled to the receipt append in one transaction, or a serialization spanning every writer path and the whole check-to-append boundary (Q10). The existing rechecks stay as they are. This guarantee is not equivalent to #1708's local fence guarantee and is not described as such.
+**Disclosed gap.** `R` is not one snapshot, `R` and `P` are not one transaction, and `W` is not excluded between any of them. With T inside or after `R`, the outcome depends on which `R_i` reads the id `W` marked (the named capability for a `capability_id` entry, the anchored root for the other kinds): if that `R_i` begins after T, `R` refuses; if it began before T, `R` passes even when a later `R_j` begins after T, and `P` appends an allowed receipt after the acknowledgement. Only a call whose `A` and `C` committed before T reaches this point. Item 5 does not close the gap: closing it needs a store-side revocation check coupled to the receipt append in one transaction, or a serialization spanning every writer path and the whole check-to-append boundary (Q10). The existing rechecks stay as they are. This guarantee is not equivalent to #1708's local fence guarantee and is not described as such.
 
 **Read path in kernel admission.**
 1. `check_tool_call_revocation_admission` (pre-dispatch): `revocation_entry` per id, early deny with entry evidence. Not a linearization point.
@@ -520,7 +580,7 @@ The hold and capture transactions record typed revocation evidence from their ow
 
 **Model scope.** The #1708 Loom harnesses and the `revocation_propagation` trace model cover kernel API events within one kernel. They are not claimed to cover store-level revocations, cross-kernel order or the admin route. G-A, G-C, G-M and the gap are evidenced by the deterministic real-store schedules below; no formal model is claimed for them in M1.
 
-**Deterministic schedules** (`tests/durable_admission_sqlite/revocation_schedules.rs`, PR 3; the capability-kind subset S1 to S4, S7 in PR 2). Two `ChioKernel`s share one real serving owner, as two serve-http sessions; revocation is the store-level admin path. Barriers come from delegating wrappers around the real stores (revocation store, budget store calls, receipt store append), never from sleeps:
+**Deterministic schedules** (`tests/durable_admission_sqlite/revocation_schedules.rs`, PR 3; the capability-kind subset S1 to S4, S7 in PR 2; S9 in PR 3). Two `ChioKernel`s share one real serving owner, as two serve-http sessions; revocation is the store-level admin path. Barriers come from delegating wrappers around the real stores (revocation store, budget store calls, receipt store append), never from sleeps:
 
 | # | Schedule | Asserts |
 |---|---|---|
@@ -530,8 +590,9 @@ The hold and capture transactions record typed revocation evidence from their ow
 | S4 | kernel 1 `R` returns not revoked; barrier before `P` (delayed receipt writer); `W` commits and acknowledges; `P` | allowed receipt appended after the acknowledgement (the disclosed gap); kernel 2's next `A` denies |
 | S5 | `W` commits; then kernel 2's exchange runs `M` for a matching root | mint refused with the entry |
 | S6 | `M` commits; then `W` | the new root is in `revoked_capabilities`; kernel 2's next `A` under it denies |
-| S7 | `W` commits; anchor sync fault-injected; admin returns 503 outcome unknown | kernel 2's next `A` denies; retry returns the same entry with `newly_revoked = false` |
+| S7 | `W` commits; anchor sync fault-injected; admin returns 503 outcome unknown | a retry and kernel 2's next `A` in the same process both get `OutcomeUnknown` (poisoned owner, no dispatch); after reopening the state directory, kernel 2's next `A` denies and the retry returns the same entry with `newly_revoked = false` |
 | S8 | delayed receipt writer holds kernel 1's `P`; `W` from the admin path | `W` does not wait on any kernel fence; the test asserts completion order only, no latency bound |
+| S9 | delegated leaf under a root, after `C`; barrier between `R_1` (leaf) and `R_2` (root); `W` for the root's rule; then `R_2` | allowed receipt refused (`R_2` began after T); the variant with a depth-2 leaf, the barrier after `R_2` (root) and `W` before `R_3` appends the allowed receipt (the disclosed gap with a mixed read) |
 
 ## Verification
 
@@ -566,7 +627,7 @@ cs cargo test -p chio-store-sqlite --no-fail-fast && cs cargo test -p chio-kerne
 cs cargo test -p chio-mcp-remote --no-fail-fast && cs cargo clippy -p chio-mcp-remote --all-targets -- -D warnings
 python3 scripts/check-error-urn-registry.py && python3 scripts/check-trust-boundaries.py && python3 scripts/check-security-clocks.py && python3 scripts/check-domain-separation.py
 # /usr/bin/sqlite3 on the crate DDL: EXPLAIN QUERY PLAN of the four fan-out selects, the mint lookup and the coverage selects shows SEARCH using an index
-# schedules S1 to S8 run 50 times each on the integrator; every run must pass
+# schedules S1 to S9 run 50 times each on the integrator; every run must pass
 ```
 
 **PR 4**
@@ -589,7 +650,7 @@ The 14 staged `revocation_local` scenarios move into the live corpus when the `r
 |---|---|---|---|
 | Q1 | owner | Spec 7.11 says calls admitted before the acknowledgement "run to completion". | Resolved by Root-2 and arc-5b review: keep both rechecks; PR 0 replaces the text with the exact boundaries (Task 2); PR 2 adds capture attribution and splits scenario 010 into 010a to 010c. |
 | Q2 | Root-2 | `revocation_entry` chain kind in `global_commit_chain.rs`. | ACK (review 1721) with conditions, all in Task 3. Source review and the normal merge window still apply. |
-| Q3 | Root-2 | Cross-kernel order without a kernel fence. | Revised per review 1721: the plan claims G-A, G-C and G-M only, discloses the receipt check-to-append gap, removes the claim that the admin route never blocks, adds schedules S1 to S8 and scopes the existing models to kernel API events. Re-review requested. |
+| Q3 | Root-2 | Cross-kernel order without a kernel fence. | Revised per review 1721: the plan claims G-A, G-C and G-M only, discloses the receipt check-to-append gap, removes the claim that the admin route never blocks, adds schedules S1 to S9 and scopes the existing models to kernel API events. Re-review requested. |
 | Q4 | owner | With remote durable admission (`control_url`), target kinds other than `capability_id` cannot be linearized, because anchored roots live in the local state directory. | Refuse them with 409 in M1. If item 4 forbids remote durable admission under a root policy, the 409 path is deleted with it. |
 | Q5 | owner | A revocation that names a rule id or issuer the provider does not know: refuse, or accept as a pre-revocation? | Refuse with 422. `capability_id` keeps today's accept-any-id behavior because a child id may never have been seen. |
 | Q6 | owner | Revocations are monotone: no un-revoke in M1. A wrong `tenant_tag` revocation blocks that tenant on this state directory permanently. | Keep monotone in M1 (it keeps the linearization and export coverage sound). A lift operation is an M2 candidate. |
@@ -610,7 +671,7 @@ Spec 13.2 sizes item 5 at M, 4-6 engineer-days.
 | PR 1 entry types, closed reason, DDL, capability entries, reads, chain kind with full validation, tests | 1.5-2 |
 | PR 2 trait replacement over 8 implementors, hold and capture attribution, guard evidence, URN, scenario split, real-SQLite tests | 1.5-2 |
 | PR 3 fan-out for four kinds with expiry, mint check in item 4's insert, exchange error, `revocations_covering`, per-generation tag matching, tests | 1.5-2 |
-| Schedules S1 to S8 with barrier wrappers over real stores | 1-1.5 |
+| Schedules S1 to S9 with barrier wrappers over real stores | 1-1.5 |
 | PR 4 admin route and status table, schemas, PROTOCOL, CLI with warnings, egress inventory, tests | 1-1.5 |
 | Integration, native-cage runs, review rounds | 0.5-1 |
 | Total | 7.25-10.25 |
@@ -629,7 +690,6 @@ Planning figure 8. The range agrees with arc-5b's 7-9 estimate at its low end an
 | 7.11 D17 reconciliation with coop2c | Store reconciliation, Task 1 |
 | 7.12 tags under the rotating tenant index key set; referenced-generation startup refusal | 5 (index-key generations) |
 | 8.2 any token in the chain matched by an entry denies; store error denies | 4, 5 |
-| 8.3 startup refusal on index-key mismatch | 2, 5 |
 | 10.7 existing revocation tables gain the target kinds, writes through the serving writer | 3, 5 |
 | 11.1 revocation unit tests (each kind, cascade, store error, tags only, acknowledged-before-pending) | 3, 4, 5, 6, Linearization schedules |
 | 11.3 `revocation_local` scenarios (14 after the split) | named tests in PRs 2 to 4; move-in with item 7 |
