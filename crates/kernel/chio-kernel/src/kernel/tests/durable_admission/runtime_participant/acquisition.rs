@@ -422,7 +422,7 @@ impl RuntimeAdmissionHook for ForgingClaimingVerifier {
         &self,
         _: &RuntimeAdmissionContext<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
-        panic!("legacy evaluation is outside this test profile");
+        panic!("evaluation without operation-owned custody is outside this test profile");
     }
 
     fn evaluate_operation_owned(

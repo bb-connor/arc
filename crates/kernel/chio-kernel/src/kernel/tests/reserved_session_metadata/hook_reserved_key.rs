@@ -203,9 +203,9 @@ fn hook_deny_forging_the_kernel_runtime_admission_record_is_refused() {
 
 const NON_OBJECT_REFUSAL: &str = "runtime admission hook metadata must be a JSON object";
 
-/// A legacy hook whose `Ok` decision carries metadata that is not a JSON
-/// object. Its release receives that same value, so it can still find what
-/// it reserved.
+/// A hook without operation-owned custody whose `Ok` decision carries
+/// metadata that is not a JSON object. Its release receives that same value,
+/// so it can still find what it reserved.
 struct NonObjectMetadataHook {
     metadata: serde_json::Value,
     allow: bool,
@@ -299,37 +299,37 @@ fn assert_non_object_refusal(
 }
 
 #[test]
-fn legacy_hook_allow_with_null_metadata_is_refused() {
+fn hook_allow_with_null_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::Value::Null, true);
 }
 
 #[test]
-fn legacy_hook_allow_with_array_metadata_is_refused() {
+fn hook_allow_with_array_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::json!(["chio_runtime"]), true);
 }
 
 #[test]
-fn legacy_hook_allow_with_scalar_metadata_is_refused() {
+fn hook_allow_with_scalar_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::json!("chio_runtime"), true);
 }
 
 #[test]
-fn legacy_hook_deny_with_null_metadata_is_refused() {
+fn hook_deny_with_null_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::Value::Null, false);
 }
 
 #[test]
-fn legacy_hook_deny_with_array_metadata_is_refused() {
+fn hook_deny_with_array_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::json!(["chio_runtime"]), false);
 }
 
 #[test]
-fn legacy_hook_deny_with_scalar_metadata_is_refused() {
+fn hook_deny_with_scalar_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::json!(7), false);
 }
 
 #[test]
-fn legacy_hook_scalar_metadata_is_released_as_returned_on_the_nested_path() {
+fn hook_scalar_metadata_is_released_as_returned_on_the_nested_path() {
     let (mut kernel, request, context, invocations) = fixture();
     let metadata = serde_json::json!("lease-7");
     let hook = non_object_hook(&metadata, true);
