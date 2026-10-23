@@ -17,7 +17,7 @@ use super::{TenantBindingError, TenantIndexKey, TenantIndexKeySet, TENANT_INDEX_
 const ACTIVE_FILE: &str = "active";
 const RETIRED_DIR: &str = "retired";
 /// One byte past the key length, so an oversized file reads as the wrong length.
-const KEY_READ_LIMIT: u64 = 33;
+const KEY_READ_LEN: usize = TENANT_INDEX_KEY_LEN + 1;
 
 /// Why a tenant index key set directory is refused.
 #[derive(Debug)]
@@ -184,7 +184,7 @@ fn read_key(path: &Path) -> Result<TenantIndexKey, TenantIndexKeyLoadError> {
             path: path.to_path_buf(),
         });
     }
-    let file = File::open(path).map_err(io_error(path))?;
+    let mut file = open_no_follow(path)?;
     let opened = file.metadata().map_err(io_error(path))?;
     require_private(path, &opened)?;
     if !opened.is_file() || !same_file(&before, &opened) {
@@ -192,17 +192,43 @@ fn read_key(path: &Path) -> Result<TenantIndexKey, TenantIndexKeyLoadError> {
             path: path.to_path_buf(),
         });
     }
-    let mut bytes = Zeroizing::new(Vec::with_capacity(TENANT_INDEX_KEY_LEN + 1));
-    file.take(KEY_READ_LIMIT)
-        .read_to_end(&mut bytes)
-        .map_err(io_error(path))?;
-    let set_key: Zeroizing<[u8; TENANT_INDEX_KEY_LEN]> =
-        Zeroizing::new(bytes.as_slice().try_into().map_err(|_| {
-            TenantIndexKeyLoadError::WrongLength {
-                path: path.to_path_buf(),
-            }
-        })?);
+    let mut bytes = Zeroizing::new([0_u8; KEY_READ_LEN]);
+    let mut filled = 0;
+    while let Some(rest) = bytes.get_mut(filled..).filter(|rest| !rest.is_empty()) {
+        let read = file.read(rest).map_err(io_error(path))?;
+        if read == 0 {
+            break;
+        }
+        filled += read;
+    }
+    let wrong_length = || TenantIndexKeyLoadError::WrongLength {
+        path: path.to_path_buf(),
+    };
+    if filled != TENANT_INDEX_KEY_LEN {
+        return Err(wrong_length());
+    }
+    let mut set_key = Zeroizing::new([0_u8; TENANT_INDEX_KEY_LEN]);
+    for (slot, byte) in set_key.iter_mut().zip(bytes.iter()) {
+        *slot = *byte;
+    }
     Ok(TenantIndexKey::from_set_key(&set_key)?)
+}
+
+#[cfg(unix)]
+fn open_no_follow(path: &Path) -> Result<File, TenantIndexKeyLoadError> {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let no_follow = i32::try_from(rustix::fs::OFlags::NOFOLLOW.bits())
+        .map_err(|_| TenantIndexKeyLoadError::UnsupportedPlatform)?;
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(no_follow)
+        .open(path)
+        .map_err(io_error(path))
+}
+
+#[cfg(not(unix))]
+fn open_no_follow(_path: &Path) -> Result<File, TenantIndexKeyLoadError> {
+    Err(TenantIndexKeyLoadError::UnsupportedPlatform)
 }
 
 #[cfg(unix)]

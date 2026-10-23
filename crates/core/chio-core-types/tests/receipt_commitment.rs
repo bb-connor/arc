@@ -258,17 +258,32 @@ fn receipt_commitment_wire_form_is_strict() {
     if let Some(object) = padded.as_object_mut() {
         object.insert("extra".to_owned(), Value::Null);
     }
-    assert!(serde_json::from_value::<ReceiptCommitment>(padded).is_err());
+    assert_eq!(
+        serde_json::from_value::<ReceiptCommitment>(padded)
+            .test_unwrap_err()
+            .to_string(),
+        "unknown field `extra`, expected one of `alg`, `value`, `salt_ref`"
+    );
     let mut other_alg = encoded.clone();
     if let Some(object) = other_alg.as_object_mut() {
         object.insert("alg".to_owned(), "sha256".into());
     }
-    assert!(serde_json::from_value::<ReceiptCommitment>(other_alg).is_err());
+    assert_eq!(
+        serde_json::from_value::<ReceiptCommitment>(other_alg)
+            .test_unwrap_err()
+            .to_string(),
+        "unknown variant `sha256`, expected `sha256-salted`"
+    );
     let mut bad_ref = encoded;
     if let Some(object) = bad_ref.as_object_mut() {
         object.insert("salt_ref".to_owned(), "Params".into());
     }
-    assert!(serde_json::from_value::<ReceiptCommitment>(bad_ref).is_err());
+    assert_eq!(
+        serde_json::from_value::<ReceiptCommitment>(bad_ref)
+            .test_unwrap_err()
+            .to_string(),
+        "`salt_ref` is not ^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    );
     let claim_ref = SaltRef::new("anchor.claims.client_id").test_unwrap();
     assert_eq!(claim_ref.as_str(), "anchor.claims.client_id");
     assert_eq!(digest(&commitment.value.to_string()), commitment.value);

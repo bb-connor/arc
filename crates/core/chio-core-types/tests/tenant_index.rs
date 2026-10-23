@@ -1,13 +1,11 @@
-//! Tenant index key set: purpose isolation, generations, string forms and loading.
+//! Tenant index key set: domain and purpose isolation, generations, string forms and loading.
 
 use chio_core_types::root_authority::Sha256Digest;
 use chio_core_types::tenant_index::{
-    IndexPurpose, KeyedIndexValue, TenantBinding, TenantBindingError, TenantIndexKey,
-    TenantIndexKeySet, TENANT_BINDING_DOMAIN,
+    IndexDomain, IndexPurpose, KeyedIndexValue, TenantBinding, TenantBindingError, TenantIndexKey,
+    TenantIndexKeySet,
 };
 use chio_test_support::prelude::*;
-
-const TAG_DOMAIN: &[u8] = b"chio.tenant-tag.v1\0";
 
 fn key(byte: u8) -> TenantIndexKey {
     TenantIndexKey::from_set_key(&[byte; 32]).test_unwrap()
@@ -23,24 +21,99 @@ fn set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
 }
 
 #[test]
+fn every_domain_belongs_to_one_purpose_and_is_nul_terminated_once() {
+    let expected = [
+        (
+            IndexDomain::TenantBinding,
+            IndexPurpose::TenantBinding,
+            &b"chio.receipt.tenant-binding.v1\0"[..],
+        ),
+        (
+            IndexDomain::TenantTag,
+            IndexPurpose::TenantTag,
+            &b"chio.tenant-tag.v1\0"[..],
+        ),
+        (
+            IndexDomain::SubjectTag,
+            IndexPurpose::SubjectTag,
+            &b"chio.subject-tag.v1\0"[..],
+        ),
+        (
+            IndexDomain::EnterpriseSubject,
+            IndexPurpose::EnterpriseSubject,
+            &b"chio.enterprise-subject.v1\0"[..],
+        ),
+        (
+            IndexDomain::ScimCapability,
+            IndexPurpose::EnterpriseSubject,
+            &b"chio.scim-capability.v1\0"[..],
+        ),
+        (
+            IndexDomain::ScimPolicy,
+            IndexPurpose::EnterpriseSubject,
+            &b"chio.scim-policy.v1\0"[..],
+        ),
+        (
+            IndexDomain::ActiveDefenseKeyedDigest,
+            IndexPurpose::ActiveDefenseDigest,
+            &b"chio.active-defense.keyed-digest.v1\0"[..],
+        ),
+    ];
+    assert_eq!(IndexDomain::ALL.len(), expected.len());
+    for (domain, purpose, bytes) in expected {
+        assert!(IndexDomain::ALL.contains(&domain));
+        assert_eq!(domain.purpose(), purpose);
+        assert_eq!(domain.as_bytes(), bytes);
+        assert_eq!(bytes.iter().filter(|byte| **byte == 0).count(), 1);
+        assert_eq!(bytes.last(), Some(&0));
+    }
+    for purpose in IndexPurpose::ALL {
+        assert!(IndexDomain::ALL
+            .iter()
+            .any(|domain| domain.purpose() == purpose));
+    }
+}
+
+#[test]
 fn index_value_never_verifies_under_another_purpose() {
     let keys = set(1, &[]);
     let preimage = b"issuer\0shared-preimage";
-    for derived_purpose in IndexPurpose::ALL {
-        let value = keys.derive(derived_purpose, TAG_DOMAIN, preimage);
-        for verify_purpose in IndexPurpose::ALL {
-            let verdict = keys.verify_value(verify_purpose, TAG_DOMAIN, preimage, &value);
-            if verify_purpose == derived_purpose {
+    for derived_domain in IndexDomain::ALL {
+        let value = keys.derive(derived_domain, preimage);
+        for verify_domain in IndexDomain::ALL {
+            let verdict = keys.verify_value(verify_domain, preimage, &value);
+            if verify_domain == derived_domain {
                 assert_eq!(verdict, Ok(()));
             } else {
                 assert_eq!(
                     verdict,
                     Err(TenantBindingError::Mismatch),
-                    "{derived_purpose:?} verified under {verify_purpose:?}"
+                    "{derived_domain:?} verified under {verify_domain:?}"
                 );
             }
         }
     }
+}
+
+#[test]
+fn a_binding_cannot_be_derived_from_a_caller_shaped_preimage() {
+    let keys = set(1, &[]);
+    let binding = keys.bind("acme");
+    for domain in IndexDomain::ALL {
+        let shaped = keys.derive(domain, b"chio.receipt.tenant-binding.v1\0acme");
+        assert_ne!(shaped, binding.keyed_value(), "{domain:?}");
+        let mut preimage = domain.as_bytes().to_vec();
+        preimage.extend_from_slice(b"acme");
+        assert_ne!(
+            keys.derive(domain, &preimage),
+            binding.keyed_value(),
+            "{domain:?}"
+        );
+    }
+    assert_eq!(
+        keys.derive(IndexDomain::TenantBinding, b"acme"),
+        binding.keyed_value()
+    );
 }
 
 #[test]
@@ -54,20 +127,11 @@ fn purpose_labels_and_prefixes_are_distinct() {
 }
 
 #[test]
-fn index_value_refuses_another_domain_or_preimage() {
+fn index_value_refuses_another_preimage() {
     let keys = set(1, &[]);
-    let value = keys.derive(IndexPurpose::TenantTag, TAG_DOMAIN, b"acme");
+    let value = keys.derive(IndexDomain::TenantTag, b"acme");
     assert_eq!(
-        keys.verify_value(
-            IndexPurpose::TenantTag,
-            b"chio.subject-tag.v1\0",
-            b"acme",
-            &value
-        ),
-        Err(TenantBindingError::Mismatch)
-    );
-    assert_eq!(
-        keys.verify_value(IndexPurpose::TenantTag, TAG_DOMAIN, b"acmf", &value),
+        keys.verify_value(IndexDomain::TenantTag, b"acmf", &value),
         Err(TenantBindingError::Mismatch)
     );
 }
@@ -75,18 +139,18 @@ fn index_value_refuses_another_domain_or_preimage() {
 #[test]
 fn index_value_verifies_across_generations() {
     let before = set(1, &[]);
-    let old = before.derive(IndexPurpose::SubjectTag, TAG_DOMAIN, b"user-1");
+    let old = before.derive(IndexDomain::SubjectTag, b"user-1");
     let after = set(2, &[1]);
-    let new = after.derive(IndexPurpose::SubjectTag, TAG_DOMAIN, b"user-1");
+    let new = after.derive(IndexDomain::SubjectTag, b"user-1");
     assert_eq!(old.key_id, key_id(1));
     assert_eq!(new.key_id, key_id(2));
     assert_ne!(old.value, new.value);
     assert_eq!(
-        after.verify_value(IndexPurpose::SubjectTag, TAG_DOMAIN, b"user-1", &old),
+        after.verify_value(IndexDomain::SubjectTag, b"user-1", &old),
         Ok(())
     );
     assert_eq!(
-        after.verify_value(IndexPurpose::SubjectTag, TAG_DOMAIN, b"user-1", &new),
+        after.verify_value(IndexDomain::SubjectTag, b"user-1", &new),
         Ok(())
     );
     let forged = KeyedIndexValue {
@@ -94,7 +158,7 @@ fn index_value_verifies_across_generations() {
         value: old.value,
     };
     assert_eq!(
-        after.verify_value(IndexPurpose::SubjectTag, TAG_DOMAIN, b"user-1", &forged),
+        after.verify_value(IndexDomain::SubjectTag, b"user-1", &forged),
         Err(TenantBindingError::Mismatch)
     );
 }
@@ -114,30 +178,16 @@ fn tenant_binding_verifies_after_rotation() {
 }
 
 #[test]
-fn tenant_binding_is_the_tenant_binding_purpose_value() {
-    let keys = set(3, &[]);
-    let binding = keys.bind("tenant-acme");
-    assert_eq!(
-        binding.keyed_value(),
-        keys.derive(
-            IndexPurpose::TenantBinding,
-            TENANT_BINDING_DOMAIN,
-            b"tenant-acme"
-        )
-    );
-}
-
-#[test]
 fn index_value_unknown_key_id_refuses() {
-    let retired_only = set(1, &[]).derive(IndexPurpose::TenantTag, TAG_DOMAIN, b"acme");
+    let retired_only = set(1, &[]).derive(IndexDomain::TenantTag, b"acme");
     let keys = set(2, &[3]);
     let unknown = TenantBindingError::TenantIndexKeyUnknown { key_id: key_id(1) };
     assert_eq!(
-        keys.verify_value(IndexPurpose::TenantTag, TAG_DOMAIN, b"acme", &retired_only),
+        keys.verify_value(IndexDomain::TenantTag, b"acme", &retired_only),
         Err(unknown)
     );
     assert_eq!(
-        keys.derive_in(&key_id(1), IndexPurpose::TenantTag, TAG_DOMAIN, b"acme"),
+        keys.derive_in(&key_id(1), IndexDomain::TenantTag, b"acme"),
         Err(unknown)
     );
 }
@@ -153,16 +203,16 @@ fn tenant_binding_unknown_key_id_refuses() {
 
 #[test]
 fn derive_in_uses_a_retired_generation() {
-    let old = set(1, &[]).derive(IndexPurpose::TenantTag, TAG_DOMAIN, b"acme");
+    let old = set(1, &[]).derive(IndexDomain::TenantTag, b"acme");
     let keys = set(2, &[1, 3]);
     assert_eq!(
-        keys.derive_in(&key_id(1), IndexPurpose::TenantTag, TAG_DOMAIN, b"acme"),
+        keys.derive_in(&key_id(1), IndexDomain::TenantTag, b"acme"),
         Ok(old)
     );
     let candidates: Vec<KeyedIndexValue> = keys
         .key_ids()
         .map(|id| {
-            keys.derive_in(id, IndexPurpose::TenantTag, TAG_DOMAIN, b"acme")
+            keys.derive_in(id, IndexDomain::TenantTag, b"acme")
                 .test_unwrap()
         })
         .collect();
@@ -195,7 +245,7 @@ fn key_set_refuses_duplicate_key_id() {
 
 #[test]
 fn index_value_string_form_parses_exactly() {
-    let value = set(1, &[]).derive(IndexPurpose::EnterpriseSubject, TAG_DOMAIN, b"alice");
+    let value = set(1, &[]).derive(IndexDomain::EnterpriseSubject, b"alice");
     let text = value.to_string_form(IndexPurpose::EnterpriseSubject);
     let key_hex = value.key_id.to_bare_hex();
     let value_hex = value.value.to_bare_hex();
@@ -265,13 +315,35 @@ fn tenant_binding_wire_form_is_strict() {
     if let Some(object) = padded.as_object_mut() {
         object.insert("extra".to_owned(), serde_json::Value::Bool(true));
     }
-    assert!(serde_json::from_value::<TenantBinding>(padded).is_err());
+    assert_eq!(
+        serde_json::from_value::<TenantBinding>(padded)
+            .test_unwrap_err()
+            .to_string(),
+        "unknown field `extra`, expected one of `alg`, `key_id`, `value`"
+    );
 
     let mut other_alg = encoded;
     if let Some(object) = other_alg.as_object_mut() {
         object.insert("alg".to_owned(), "hmac-sha256".into());
     }
-    assert!(serde_json::from_value::<TenantBinding>(other_alg).is_err());
+    assert_eq!(
+        serde_json::from_value::<TenantBinding>(other_alg)
+            .test_unwrap_err()
+            .to_string(),
+        "unknown variant `hmac-sha256`, expected `hkdf-hmac-sha256`"
+    );
+
+    let key_id = binding.key_id;
+    let value = binding.value;
+    let duplicated = format!(
+        r#"{{"alg":"hkdf-hmac-sha256","alg":"hkdf-hmac-sha256","key_id":"{key_id}","value":"{value}"}}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<TenantBinding>(&duplicated)
+            .test_unwrap_err()
+            .to_string(),
+        "duplicate field `alg` at line 1 column 31"
+    );
 }
 
 #[test]
@@ -285,9 +357,11 @@ fn key_debug_never_prints_key_material() {
 mod load {
     use std::fs;
     use std::os::unix::fs::{symlink, PermissionsExt};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
-    use chio_core_types::tenant_index::{TenantIndexKeyLoadError, TenantIndexKeySet};
+    use chio_core_types::tenant_index::{
+        TenantBindingError, TenantIndexKeyLoadError, TenantIndexKeySet,
+    };
     use chio_test_support::prelude::*;
 
     use super::key_id;
@@ -304,6 +378,27 @@ mod load {
             fs::create_dir(&retired_dir).test_unwrap();
             for byte in retired {
                 write_key(&retired_dir.join(key_id(*byte).to_bare_hex()), &[*byte; 32]);
+            }
+        }
+    }
+
+    fn refusal(dir: &Path) -> TenantIndexKeyLoadError {
+        TenantIndexKeySet::load_dir(dir).test_unwrap_err()
+    }
+
+    fn refused_path(error: &TenantIndexKeyLoadError) -> Option<&PathBuf> {
+        match error {
+            TenantIndexKeyLoadError::Io { path, .. }
+            | TenantIndexKeyLoadError::MissingActive { path }
+            | TenantIndexKeyLoadError::NotRegularFile { path }
+            | TenantIndexKeyLoadError::NotDirectory { path }
+            | TenantIndexKeyLoadError::WrongLength { path }
+            | TenantIndexKeyLoadError::LoosePermissions { path }
+            | TenantIndexKeyLoadError::NotOwned { path }
+            | TenantIndexKeyLoadError::UnexpectedEntry { path }
+            | TenantIndexKeyLoadError::RetiredNameMismatch { path } => Some(path),
+            TenantIndexKeyLoadError::UnsupportedPlatform | TenantIndexKeyLoadError::KeySet(_) => {
+                None
             }
         }
     }
@@ -334,10 +429,12 @@ mod load {
     fn tenant_index_keys_refuse_missing_active() {
         let dir = chio_test_support::private_tempdir().test_unwrap();
         fs::create_dir(dir.path().join("retired")).test_unwrap();
+        let error = refusal(dir.path());
         assert!(matches!(
-            TenantIndexKeySet::load_dir(dir.path()),
-            Err(TenantIndexKeyLoadError::MissingActive { .. })
+            error,
+            TenantIndexKeyLoadError::MissingActive { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&dir.path().to_path_buf()));
     }
 
     #[test]
@@ -345,13 +442,12 @@ mod load {
         for length in [0_usize, 31, 33, 64] {
             let dir = chio_test_support::private_tempdir().test_unwrap();
             write_key(&dir.path().join("active"), &vec![7; length]);
+            let error = refusal(dir.path());
             assert!(
-                matches!(
-                    TenantIndexKeySet::load_dir(dir.path()),
-                    Err(TenantIndexKeyLoadError::WrongLength { .. })
-                ),
+                matches!(error, TenantIndexKeyLoadError::WrongLength { .. }),
                 "accepted a {length}-byte key"
             );
+            assert_eq!(refused_path(&error), Some(&dir.path().join("active")));
         }
     }
 
@@ -362,13 +458,12 @@ mod load {
             provision(dir.path(), 5, &[]);
             let path = dir.path().join("active");
             fs::set_permissions(&path, fs::Permissions::from_mode(mode)).test_unwrap();
+            let error = refusal(dir.path());
             assert!(
-                matches!(
-                    TenantIndexKeySet::load_dir(dir.path()),
-                    Err(TenantIndexKeyLoadError::LoosePermissions { .. })
-                ),
+                matches!(error, TenantIndexKeyLoadError::LoosePermissions { .. }),
                 "accepted mode {mode:o}"
             );
+            assert_eq!(refused_path(&error), Some(&path));
         }
     }
 
@@ -378,10 +473,12 @@ mod load {
         provision(dir.path(), 5, &[3]);
         let path = dir.path().join("retired").join(key_id(3).to_bare_hex());
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).test_unwrap();
+        let error = refusal(dir.path());
         assert!(matches!(
-            TenantIndexKeySet::load_dir(dir.path()),
-            Err(TenantIndexKeyLoadError::LoosePermissions { .. })
+            error,
+            TenantIndexKeyLoadError::LoosePermissions { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&path));
     }
 
     #[test]
@@ -389,10 +486,9 @@ mod load {
         let dir = chio_test_support::private_tempdir().test_unwrap();
         provision(dir.path(), 5, &[5]);
         assert!(matches!(
-            TenantIndexKeySet::load_dir(dir.path()),
-            Err(TenantIndexKeyLoadError::KeySet(
-                chio_core_types::tenant_index::TenantBindingError::DuplicateKeyId { .. }
-            ))
+            refusal(dir.path()),
+            TenantIndexKeyLoadError::KeySet(TenantBindingError::DuplicateKeyId { key_id })
+                if key_id == super::key_id(5)
         ));
     }
 
@@ -402,22 +498,28 @@ mod load {
         provision(dir.path(), 5, &[]);
         let retired_dir = dir.path().join("retired");
         fs::create_dir(&retired_dir).test_unwrap();
-        write_key(&retired_dir.join(key_id(4).to_bare_hex()), &[3; 32]);
+        let path = retired_dir.join(key_id(4).to_bare_hex());
+        write_key(&path, &[3; 32]);
+        let error = refusal(dir.path());
         assert!(matches!(
-            TenantIndexKeySet::load_dir(dir.path()),
-            Err(TenantIndexKeyLoadError::RetiredNameMismatch { .. })
+            error,
+            TenantIndexKeyLoadError::RetiredNameMismatch { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&path));
     }
 
     #[test]
     fn tenant_index_keys_refuse_unexpected_entry() {
         let dir = chio_test_support::private_tempdir().test_unwrap();
         provision(dir.path(), 5, &[]);
-        write_key(&dir.path().join("active.bak"), &[5; 32]);
+        let path = dir.path().join("active.bak");
+        write_key(&path, &[5; 32]);
+        let error = refusal(dir.path());
         assert!(matches!(
-            TenantIndexKeySet::load_dir(dir.path()),
-            Err(TenantIndexKeyLoadError::UnexpectedEntry { .. })
+            error,
+            TenantIndexKeyLoadError::UnexpectedEntry { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&path));
     }
 
     #[test]
@@ -429,10 +531,12 @@ mod load {
         let keys_dir = dir.path().join("keys");
         fs::create_dir(&keys_dir).test_unwrap();
         symlink(target.join("key"), keys_dir.join("active")).test_unwrap();
+        let error = refusal(&keys_dir);
         assert!(matches!(
-            TenantIndexKeySet::load_dir(&keys_dir),
-            Err(TenantIndexKeyLoadError::NotRegularFile { .. })
+            error,
+            TenantIndexKeyLoadError::NotRegularFile { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&keys_dir.join("active")));
     }
 
     #[test]
@@ -440,9 +544,80 @@ mod load {
         let dir = chio_test_support::private_tempdir().test_unwrap();
         let path = dir.path().join("active");
         write_key(&path, &[5; 32]);
+        let error = refusal(&path);
         assert!(matches!(
-            TenantIndexKeySet::load_dir(&path),
-            Err(TenantIndexKeyLoadError::NotDirectory { .. })
+            error,
+            TenantIndexKeyLoadError::NotDirectory { .. }
         ));
+        assert_eq!(refused_path(&error), Some(&path));
+    }
+
+    #[test]
+    fn tenant_index_keys_refuse_retired_as_a_file() {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        provision(dir.path(), 5, &[]);
+        let path = dir.path().join("retired");
+        write_key(&path, &[3; 32]);
+        let error = refusal(dir.path());
+        assert!(matches!(
+            error,
+            TenantIndexKeyLoadError::NotDirectory { .. }
+        ));
+        assert_eq!(refused_path(&error), Some(&path));
+    }
+
+    #[test]
+    fn tenant_index_keys_refuse_a_subdirectory_inside_retired() {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        provision(dir.path(), 5, &[3]);
+        let path = dir.path().join("retired").join(key_id(4).to_bare_hex());
+        fs::create_dir(&path).test_unwrap();
+        let error = refusal(dir.path());
+        assert!(matches!(
+            error,
+            TenantIndexKeyLoadError::NotRegularFile { .. }
+        ));
+        assert_eq!(refused_path(&error), Some(&path));
+    }
+
+    #[test]
+    fn tenant_index_keys_refuse_a_symlink_inside_retired() {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        provision(dir.path(), 5, &[]);
+        let target = dir.path().join("elsewhere");
+        fs::create_dir(&target).test_unwrap();
+        write_key(&target.join("key"), &[3; 32]);
+        let keys_dir = dir.path().join("keys");
+        fs::create_dir(&keys_dir).test_unwrap();
+        write_key(&keys_dir.join("active"), &[5; 32]);
+        let retired_dir = keys_dir.join("retired");
+        fs::create_dir(&retired_dir).test_unwrap();
+        let path = retired_dir.join(key_id(3).to_bare_hex());
+        symlink(target.join("key"), &path).test_unwrap();
+        let error = refusal(&keys_dir);
+        assert!(matches!(
+            error,
+            TenantIndexKeyLoadError::NotRegularFile { .. }
+        ));
+        assert_eq!(refused_path(&error), Some(&path));
+    }
+
+    #[test]
+    fn tenant_index_keys_refuse_a_symlinked_retired_directory() {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        let elsewhere = dir.path().join("elsewhere");
+        fs::create_dir(&elsewhere).test_unwrap();
+        write_key(&elsewhere.join(key_id(3).to_bare_hex()), &[3; 32]);
+        let keys_dir = dir.path().join("keys");
+        fs::create_dir(&keys_dir).test_unwrap();
+        write_key(&keys_dir.join("active"), &[5; 32]);
+        let path = keys_dir.join("retired");
+        symlink(&elsewhere, &path).test_unwrap();
+        let error = refusal(&keys_dir);
+        assert!(matches!(
+            error,
+            TenantIndexKeyLoadError::NotDirectory { .. }
+        ));
+        assert_eq!(refused_path(&error), Some(&path));
     }
 }

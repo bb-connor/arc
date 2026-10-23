@@ -51,13 +51,14 @@ fips204 = { workspace = true, optional = true }
 # compile (it has no default source of randomness). Declaring `getrandom`
 # directly here with `features = ["js"]` folds into Cargo's feature unification
 # so both the hosted and browser/edge WASM targets link successfully.
-# Owner checks on tenant index key files compare against the effective uid.
-[target.'cfg(unix)'.dependencies]
-rustix = { version = "1.1", default-features = false, features = ["std", "process"], optional = true }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
 version = "0.2"
 features = ["js"]
+
+# Tenant index key files open without following symlinks, and their owner is
+# compared against the effective uid.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1", default-features = false, features = ["std", "fs", "process"], optional = true }
 
 [features]
 default = ["std"]

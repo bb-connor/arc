@@ -3,8 +3,8 @@
 //! Each generation of the set holds one 32-byte set key. Every purpose uses its own subkey,
 //! never the set key: `K[purpose] = HKDF-SHA256(IKM = set key, salt = TENANT_INDEX_HKDF_SALT,
 //! info = TENANT_INDEX_HKDF_SALT || "/" || label, L = 32)`. A value is
-//! `HMAC-SHA256(K[purpose], domain || preimage)`, where `domain` is a NUL-terminated
-//! `chio.<area>.v<N>` constant. A generation is named by
+//! `HMAC-SHA256(K[purpose], domain || preimage)`, where `domain` is one [`IndexDomain`]: a
+//! NUL-terminated `chio.<area>.v<N>` constant that fixes its purpose. A generation is named by
 //! `key_id = SHA-256(TENANT_INDEX_KEY_ID_DOMAIN || set key)`; every derived value carries it.
 
 use alloc::string::String;
@@ -32,6 +32,12 @@ pub const TENANT_INDEX_KEY_LEN: usize = 32;
 pub const TENANT_INDEX_KEY_ID_DOMAIN: &[u8] = b"chio.tenant-index-key-id.v1\0";
 pub const TENANT_INDEX_HKDF_SALT: &[u8] = b"chio.tenant-index.v1";
 pub const TENANT_BINDING_DOMAIN: &[u8] = b"chio.receipt.tenant-binding.v1\0";
+pub const TENANT_TAG_DOMAIN: &[u8] = b"chio.tenant-tag.v1\0";
+pub const SUBJECT_TAG_DOMAIN: &[u8] = b"chio.subject-tag.v1\0";
+pub const ENTERPRISE_SUBJECT_DOMAIN: &[u8] = b"chio.enterprise-subject.v1\0";
+pub const SCIM_CAPABILITY_DOMAIN: &[u8] = b"chio.scim-capability.v1\0";
+pub const SCIM_POLICY_DOMAIN: &[u8] = b"chio.scim-policy.v1\0";
+pub const ACTIVE_DEFENSE_KEYED_DIGEST_DOMAIN: &[u8] = b"chio.active-defense.keyed-digest.v1\0";
 
 const HKDF_INFO_SEPARATOR: &[u8] = b"/";
 const DIGEST_HEX_LEN: usize = 64;
@@ -82,6 +88,86 @@ impl IndexPurpose {
         }
     }
 }
+
+/// The closed set of keyed index value domains. Each domain belongs to exactly one purpose,
+/// so a value can only be derived under the subkey of its own domain's purpose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum IndexDomain {
+    TenantBinding,
+    TenantTag,
+    SubjectTag,
+    EnterpriseSubject,
+    ScimCapability,
+    ScimPolicy,
+    ActiveDefenseKeyedDigest,
+}
+
+impl IndexDomain {
+    pub const ALL: [Self; 7] = [
+        Self::TenantBinding,
+        Self::TenantTag,
+        Self::SubjectTag,
+        Self::EnterpriseSubject,
+        Self::ScimCapability,
+        Self::ScimPolicy,
+        Self::ActiveDefenseKeyedDigest,
+    ];
+
+    #[must_use]
+    pub const fn purpose(self) -> IndexPurpose {
+        match self {
+            Self::TenantBinding => IndexPurpose::TenantBinding,
+            Self::TenantTag => IndexPurpose::TenantTag,
+            Self::SubjectTag => IndexPurpose::SubjectTag,
+            Self::EnterpriseSubject | Self::ScimCapability | Self::ScimPolicy => {
+                IndexPurpose::EnterpriseSubject
+            }
+            Self::ActiveDefenseKeyedDigest => IndexPurpose::ActiveDefenseDigest,
+        }
+    }
+
+    /// `chio.<area>.v<N>` followed by exactly one NUL, which is the only NUL.
+    #[must_use]
+    pub const fn as_bytes(self) -> &'static [u8] {
+        match self {
+            Self::TenantBinding => TENANT_BINDING_DOMAIN,
+            Self::TenantTag => TENANT_TAG_DOMAIN,
+            Self::SubjectTag => SUBJECT_TAG_DOMAIN,
+            Self::EnterpriseSubject => ENTERPRISE_SUBJECT_DOMAIN,
+            Self::ScimCapability => SCIM_CAPABILITY_DOMAIN,
+            Self::ScimPolicy => SCIM_POLICY_DOMAIN,
+            Self::ActiveDefenseKeyedDigest => ACTIVE_DEFENSE_KEYED_DIGEST_DOMAIN,
+        }
+    }
+}
+
+const fn nul_count(bytes: &[u8]) -> usize {
+    match bytes {
+        [] => 0,
+        [first, rest @ ..] => {
+            if *first == 0 {
+                1 + nul_count(rest)
+            } else {
+                nul_count(rest)
+            }
+        }
+    }
+}
+
+const fn every_domain_nul_terminated_once(domains: &[IndexDomain]) -> bool {
+    match domains {
+        [] => true,
+        [first, rest @ ..] => {
+            let bytes = first.as_bytes();
+            matches!(bytes.last(), Some(&0))
+                && nul_count(bytes) == 1
+                && every_domain_nul_terminated_once(rest)
+        }
+    }
+}
+
+// Domains are prefix-free, so `domain || preimage` is unambiguous across domains.
+const _: () = assert!(every_domain_nul_terminated_once(&IndexDomain::ALL));
 
 /// One keyed value and the key generation it was derived under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -206,7 +292,8 @@ impl fmt::Display for TenantBindingError {
 impl core::error::Error for TenantBindingError {}
 
 /// One generation of the tenant index key set: its `key_id` and one HKDF subkey per
-/// purpose. The set key itself is not retained. Subkeys are zeroized on drop.
+/// purpose. The set key itself is not retained. Subkeys are zeroized on drop; the transient
+/// HKDF pseudorandom key and HMAC pad states inside the `hkdf` and `hmac` crates are not.
 pub struct TenantIndexKey {
     key_id: Sha256Digest,
     subkeys: [[u8; 32]; IndexPurpose::ALL.len()],
@@ -252,15 +339,18 @@ impl TenantIndexKey {
         }
     }
 
-    fn derive(&self, purpose: IndexPurpose, domain: &[u8], preimage: &[u8]) -> KeyedIndexValue {
+    fn derive(&self, domain: IndexDomain, preimage: &[u8]) -> KeyedIndexValue {
         // HMAC zero-pads a key shorter than its block, so the padded block key is the subkey.
         let mut block_key = hmac::digest::Key::<HmacSha256>::default();
-        for (slot, byte) in block_key.iter_mut().zip(self.subkey(purpose).iter()) {
+        for (slot, byte) in block_key
+            .iter_mut()
+            .zip(self.subkey(domain.purpose()).iter())
+        {
             *slot = *byte;
         }
         let mut mac = <HmacSha256 as Mac>::new(&block_key);
         block_key.as_mut_slice().zeroize();
-        mac.update(domain);
+        mac.update(domain.as_bytes());
         mac.update(preimage);
         let value: [u8; 32] = mac.finalize().into_bytes().into();
         KeyedIndexValue {
@@ -348,11 +438,9 @@ impl TenantIndexKeySet {
     /// Binds `tenant_id` under the active generation.
     #[must_use]
     pub fn bind(&self, tenant_id: &str) -> TenantBinding {
-        let keyed = self.active.derive(
-            IndexPurpose::TenantBinding,
-            TENANT_BINDING_DOMAIN,
-            tenant_id.as_bytes(),
-        );
+        let keyed = self
+            .active
+            .derive(IndexDomain::TenantBinding, tenant_id.as_bytes());
         TenantBinding {
             alg: TenantBindingAlg::HkdfHmacSha256,
             key_id: keyed.key_id,
@@ -367,40 +455,38 @@ impl TenantIndexKeySet {
         binding: &TenantBinding,
     ) -> Result<(), TenantBindingError> {
         self.verify_value(
-            IndexPurpose::TenantBinding,
-            TENANT_BINDING_DOMAIN,
+            IndexDomain::TenantBinding,
             tenant_id.as_bytes(),
             &binding.keyed_value(),
         )
     }
 
-    /// The keyed value of `domain || preimage` for `purpose` under the active generation.
+    /// The keyed value of `domain || preimage` under the active generation, keyed by the
+    /// subkey of the domain's purpose.
     #[must_use]
-    pub fn derive(&self, purpose: IndexPurpose, domain: &[u8], preimage: &[u8]) -> KeyedIndexValue {
-        self.active.derive(purpose, domain, preimage)
+    pub fn derive(&self, domain: IndexDomain, preimage: &[u8]) -> KeyedIndexValue {
+        self.active.derive(domain, preimage)
     }
 
     /// The keyed value under the generation named by `key_id`. An unknown `key_id` refuses.
     pub fn derive_in(
         &self,
         key_id: &Sha256Digest,
-        purpose: IndexPurpose,
-        domain: &[u8],
+        domain: IndexDomain,
         preimage: &[u8],
     ) -> Result<KeyedIndexValue, TenantBindingError> {
-        Ok(self.generation(key_id)?.derive(purpose, domain, preimage))
+        Ok(self.generation(key_id)?.derive(domain, preimage))
     }
 
-    /// Selects the generation by the value's `key_id`, derives under `purpose` and compares
+    /// Selects the generation by the value's `key_id`, derives under `domain` and compares
     /// in constant time. An unknown `key_id` refuses; there is no fallback generation.
     pub fn verify_value(
         &self,
-        purpose: IndexPurpose,
-        domain: &[u8],
+        domain: IndexDomain,
         preimage: &[u8],
         value: &KeyedIndexValue,
     ) -> Result<(), TenantBindingError> {
-        let expected = self.derive_in(&value.key_id, purpose, domain, preimage)?;
+        let expected = self.derive_in(&value.key_id, domain, preimage)?;
         if bool::from(expected.value.as_bytes().ct_eq(value.value.as_bytes())) {
             Ok(())
         } else {

@@ -6,7 +6,7 @@ use serde::Deserialize;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::{
-    IndexPurpose, KeyedIndexValue, TenantIndexKey, TenantIndexKeySet, TENANT_BINDING_DOMAIN,
+    IndexDomain, IndexPurpose, KeyedIndexValue, TenantIndexKey, TenantIndexKeySet,
     TENANT_INDEX_HKDF_SALT, TENANT_INDEX_KEY_ID_DOMAIN,
 };
 
@@ -124,7 +124,12 @@ fn hmac_values_match_reference() {
         let purpose = purpose_named(&case.purpose);
         let domain = hex::decode(&case.domain_hex).test_unwrap();
         let preimage = hex::decode(&case.preimage_hex).test_unwrap();
-        let derived = set.derive(purpose, &domain, &preimage);
+        let index_domain = IndexDomain::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_bytes() == domain.as_slice())
+            .test_unwrap();
+        assert_eq!(index_domain.purpose(), purpose);
+        let derived = set.derive(index_domain, &preimage);
         assert_eq!(derived.key_id.to_bare_hex(), generation.key_id_hex);
         assert_eq!(derived.value.to_bare_hex(), case.value_hex);
         assert_eq!(derived.to_string_form(purpose), case.string_form);
@@ -132,7 +137,7 @@ fn hmac_values_match_reference() {
             KeyedIndexValue::parse_string_form(purpose, &case.string_form).test_unwrap(),
             derived
         );
-        if purpose == IndexPurpose::TenantBinding && domain == TENANT_BINDING_DOMAIN {
+        if index_domain == IndexDomain::TenantBinding {
             let tenant = core::str::from_utf8(&preimage).test_unwrap();
             let binding = set.bind(tenant);
             assert_eq!(binding.keyed_value(), derived);
