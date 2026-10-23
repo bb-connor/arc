@@ -16,12 +16,11 @@ use uuid::Uuid;
 
 use crate::dead_letters::{
     insert_dead_letter_on_connection, read_dead_letter_on_connection, DeadLetterStoreError,
-    SETTLE_DEAD_LETTERS_MIGRATION,
 };
 use crate::receipt_store::{receipt_pool_connection, ReceiptSinkQualification};
 
-/// Additive schema for pending and retryable settlement work.
-pub const SETTLE_ATTEMPTS_MIGRATION: &str = r#"
+/// Settlement table schema used during receipt database creation.
+pub(crate) const SETTLE_ATTEMPTS_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS settle_attempts (
     receipt_id           TEXT PRIMARY KEY,
     finalized_at         INTEGER NOT NULL CHECK (finalized_at >= 0),
@@ -107,13 +106,8 @@ impl SqliteSettlementOutcomeStore {
     pub fn open_with_pool(
         pool: Pool<SqliteConnectionManager>,
     ) -> Result<Self, SettlementRouteError> {
-        let connection = pool.get().map_err(backend_error)?;
-        connection
-            .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
-            .map_err(backend_error)?;
-        connection
-            .execute_batch(SETTLE_ATTEMPTS_MIGRATION)
-            .map_err(backend_error)?;
+        let mut connection = pool.get().map_err(backend_error)?;
+        crate::receipt_store::validate_receipt_database(&mut connection).map_err(backend_error)?;
         Ok(Self {
             pool,
             writer: None,
@@ -128,12 +122,8 @@ impl SqliteSettlementOutcomeStore {
         let Some(binding) = writer.settlement_store_binding() else {
             return Err(invalid_record("receipt store lacks settlement projection"));
         };
-        writer
-            .run_write_anchored_metadata(|transaction| {
-                transaction.execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)?;
-                transaction.execute_batch(SETTLE_ATTEMPTS_MIGRATION)?;
-                Ok(())
-            })
+        let mut connection = store.connection().map_err(receipt_error_to_route)?;
+        crate::receipt_store::validate_receipt_database(&mut connection)
             .map_err(receipt_error_to_route)?;
         Ok(Self {
             pool: store.pool.clone(),
@@ -964,13 +954,20 @@ mod tests {
     use r2d2_sqlite::SqliteConnectionManager;
 
     use super::*;
-    use crate::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStore};
+    use crate::dead_letters::{
+        DeadLetterStoreError, SqliteDeadLetterStore, SETTLE_DEAD_LETTERS_SCHEMA,
+    };
 
     fn pool() -> Pool<SqliteConnectionManager> {
-        crate::pool::sqlite_pool_builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(SqliteConnectionManager::memory())
-            .test_expect("test pool builds")
+            .test_expect("test pool builds");
+        crate::receipt_store::initialize_test_receipt_database(
+            &mut pool.get().test_expect("test connection"),
+        )
+        .test_expect("receipt schema creation");
+        pool
     }
 
     fn file_pool(path: &std::path::Path) -> Pool<SqliteConnectionManager> {
@@ -979,10 +976,15 @@ mod tests {
             connection.pragma_update(None, "journal_mode", "WAL")?;
             Ok(())
         });
-        crate::pool::sqlite_pool_builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(1)
             .build(manager)
-            .test_expect("file-backed test pool builds")
+            .test_expect("file-backed test pool builds");
+        crate::receipt_store::initialize_test_receipt_database(
+            &mut pool.get().test_expect("test connection"),
+        )
+        .test_expect("receipt schema creation");
+        pool
     }
 
     fn seed(pool: &Pool<SqliteConnectionManager>, receipt_id: &str, visible_at_ms: u64) {
@@ -1028,7 +1030,7 @@ mod tests {
             )
             .test_expect("corrupt overlap seeds");
         connection
-            .execute_batch(SETTLE_ATTEMPTS_MIGRATION)
+            .execute_batch(SETTLE_ATTEMPTS_SCHEMA)
             .test_expect("attempt migration reinstalls");
     }
 
@@ -1081,7 +1083,7 @@ mod tests {
     }
 
     #[test]
-    fn settlement_migration_is_idempotent() {
+    fn settlement_open_is_idempotent() {
         let pool = pool();
         SqliteSettlementOutcomeStore::open_with_pool(pool.clone()).test_expect("first open");
         SqliteSettlementOutcomeStore::open_with_pool(pool).test_expect("second open");
@@ -1092,10 +1094,10 @@ mod tests {
         let pool = pool();
         let mut connection = pool.get().test_expect("test connection");
         connection
-            .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
+            .execute_batch(SETTLE_DEAD_LETTERS_SCHEMA)
             .test_expect("dead-letter schema installs");
         connection
-            .execute_batch(SETTLE_ATTEMPTS_MIGRATION)
+            .execute_batch(SETTLE_ATTEMPTS_SCHEMA)
             .test_expect("attempt schema installs");
         connection
             .execute_batch(

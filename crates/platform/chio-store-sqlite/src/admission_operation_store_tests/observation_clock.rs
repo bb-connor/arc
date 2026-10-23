@@ -34,7 +34,13 @@ fn current_version_cannot_silently_regenerate_a_missing_observation_column() -> 
     connection.execute_batch(
         "ALTER TABLE admission_operation_commits DROP COLUMN observed_at_unix_ms;",
     )?;
-    assert!(initialize_admission_operation_schema(&mut connection).is_err());
+    assert!(matches!(crate::test_schema::apply(
+        &mut connection,
+        crate::serving_owner::SERVING_NAMESPACES,
+        initialize_admission_operation_schema,
+        |error| invariant(error.to_string())
+    ), Err(AdmissionOperationStoreError::Invariant(message))
+        if message == "admission operation schema differs from the canonical definition"));
     Ok(())
 }
 

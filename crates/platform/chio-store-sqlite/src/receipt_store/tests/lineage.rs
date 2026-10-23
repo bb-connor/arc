@@ -664,7 +664,7 @@ fn store_admitting_unsigned_projection_lineage_is_refused_at_open(
             matches!(
                 &opened,
                 Err(ReceiptStoreError::Conflict(message))
-                    if message == "main.capability_lineage admits unsigned projection provenance; refusing to open"
+                    if message == "schema catalog differs from its canonical definition"
             ),
             "{opened:?}"
         );

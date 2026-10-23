@@ -139,13 +139,13 @@ fn logical_identity_survives_retention_restart_and_exact_retry() -> TestResult {
                 if error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER && message == "security evidence index entries are immutable")
             );
         }
-        drop(archived);
-        // Writable open rebuilds the archive's checkpoint projections before
-        // the normal indexed read API verifies the archived signed evidence.
-        let archived_store = SqliteReceiptStore::open(&archive)?;
-        let loaded = archived_store
-            .load_indexed_security_evidence(&id)?
-            .ok_or("archive lost logical identity")?;
+        let raw: String = archived.query_row(
+            "SELECT raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
+            [&mapped],
+            |row| row.get(0),
+        )?;
+        let loaded: ChioReceipt = serde_json::from_str(&raw)?;
+        validate_indexed_security_receipt(&id, &loaded)?;
         assert_eq!(
             serde_json::to_value(loaded)?,
             serde_json::to_value(&receipt)?
@@ -175,13 +175,18 @@ fn indexed_retention_rejects_missing_corrupt_and_replaced_archive_payloads() -> 
                 std::fs::metadata(&archive)?.ino()
             };
             let connection = rusqlite::Connection::open(&archive)?;
-            connection.execute(
+            tamper_archive_row(
+                &connection,
+                if fault == "missing" {
+                    "chio_tool_receipts_reject_delete"
+                } else {
+                    "chio_tool_receipts_reject_update"
+                },
                 if fault == "missing" {
                     "DELETE FROM chio_tool_receipts"
                 } else {
                     "UPDATE chio_tool_receipts SET raw_json = '{}'"
                 },
-                [],
             )?;
             #[cfg(unix)]
             {

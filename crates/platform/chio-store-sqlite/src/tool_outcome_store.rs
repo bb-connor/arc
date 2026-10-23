@@ -26,11 +26,6 @@ use crate::store_connection::{StoreConnection, StoreGuard};
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
 pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
-    "tool_outcomes",
-    "admission_operations",
-    "chio_serving_owner",
-];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
 #[path = "tool_outcome_native_output.rs"]
 mod native_output;
@@ -760,41 +755,20 @@ pub(crate) fn preflight_tool_outcome_schema(
 }
 
 pub(crate) fn initialize_tool_outcome_schema(
-    connection: &mut Connection,
-    allow_empty: bool,
-) -> Result<(), ToolOutcomeStoreError> {
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    preflight_tool_outcome_schema(&transaction, allow_empty)?;
-    let state = crate::check_current_schema(
-        &transaction,
-        TOOL_OUTCOME_SCHEMA_KEY,
-        TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
-        TOOL_OUTCOME_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| match error {
-        crate::SchemaVersionError::StaleSchema { found, current } => {
-            ToolOutcomeStoreError::NoncurrentSchema { found, current }
-        }
-        error => invariant(error.to_string()),
-    })?;
-    if state == crate::SchemaState::Unstamped {
-        if !tool_outcome_schema_catalog(&transaction)?.is_empty() {
-            return Err(invariant("unstamped tool outcome schema cannot be adopted"));
-        }
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), ToolOutcomeStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
         transaction
             .execute_batch(TOOL_OUTCOME_SCHEMA)
             .map_err(sqlite_error)?;
-        crate::stamp_schema_version(
-            &transaction,
-            TOOL_OUTCOME_SCHEMA_KEY,
-            TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| invariant(error.to_string()))?;
+
+        schema
+            .stamp(TOOL_OUTCOME_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    verify_tool_outcome_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_tool_outcome_invariants(transaction)
 }
 
 pub(crate) fn verify_tool_outcome_invariants(

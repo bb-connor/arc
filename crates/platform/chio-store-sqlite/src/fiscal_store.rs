@@ -20,7 +20,6 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 use crate::store_connection::StoreGuard;
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -2298,31 +2297,20 @@ fn finalize_rotation_mutation(
 }
 
 pub(crate) fn initialize_fiscal_schema(
-    connection: &mut Connection,
-) -> Result<(), FiscalStoreError> {
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    let state = crate::check_current_schema(
-        &transaction,
-        FISCAL_STORE_SCHEMA_KEY,
-        FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
-        &["fiscal_authority_state", "capability_grant_budgets"],
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Unstamped {
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), FiscalStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
         transaction
             .execute_batch(FISCAL_STORE_SCHEMA)
             .map_err(sqlite_error)?;
-        crate::stamp_schema_version(
-            &transaction,
-            FISCAL_STORE_SCHEMA_KEY,
-            FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| invariant(error.to_string()))?;
+
+        schema
+            .stamp(FISCAL_STORE_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    verify_fiscal_sql_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_fiscal_sql_invariants(transaction)
 }
 
 pub(crate) fn verify_fiscal_sql_invariants(

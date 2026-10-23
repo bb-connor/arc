@@ -33,132 +33,12 @@ mod threshold_collector;
 
 /// SQLite-backed `ApprovalStore`.
 ///
-/// Schema is created on `open`. Migrations are additive and idempotent
-/// via `CREATE TABLE IF NOT EXISTS`.
 pub struct SqliteApprovalStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// The approval store's single schema version.
-const APPROVAL_STORE_SCHEMA_VERSION: i32 = 1;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table. Distinct from the co-located receipt store's key so the
-/// two track their revisions independently in the one sidecar file.
 const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
-/// Tables that identify a database this standalone approval store may open, all
-/// of them the store's own. `chio_hitl_pending` is the sole approval anchor.
-/// Receipt tables are deliberately excluded: a standalone receipt database must be
-/// refused here rather than adopted and written with HITL tables. The sidecar co-location, where a receipt store creates the shared file
-/// first, adopts a receipt-anchored file through
-/// [`SqliteApprovalStore::open_colocated_with_receipt_store`] instead. A populated
-/// database carrying no approval anchor is refused rather than adopted, so a path
-/// mistargeted at another store's file (a receipt, revocation, budget, or
-/// authority database) never has approval tables written into it. The revocation
-/// store lives in a separate file, and `revoked_capabilities` is deliberately
-/// absent so a standalone revocation database fails closed here too.
-const APPROVAL_STORE_OWN_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
-
-/// Anchor tables accepted when co-locating behind a receipt store that created
-/// the shared sidecar file first. `chio api protect` keeps the receipt and
-/// approval stores in one SQLite file and opens the receipt store first, so on a
-/// fresh file the shared database already carries the receipt store's
-/// `chio_tool_receipts` anchor and no approval table yet. Recognizing that anchor
-/// lets the approval store adopt the receipt-anchored file as its sibling instead
-/// of refusing it. This wider set is used only through
-/// [`SqliteApprovalStore::open_colocated_with_receipt_store`]; the default
-/// [`SqliteApprovalStore::open`] keeps the strict own-anchor set so a standalone
-/// receipt database is never adopted as an approval store outside the sidecar.
-const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] =
-    &["chio_hitl_pending", "chio_tool_receipts"];
-
-impl SqliteApprovalStore {
-    /// Open the store at the given path. Creates the parent directory
-    /// if needed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, ApprovalStoreError> {
-        Self::open_with_anchor_tables(path, APPROVAL_STORE_OWN_ANCHOR_TABLES)
-    }
-
-    /// Open the store co-located behind a receipt store that created the shared
-    /// sidecar file first. `chio api protect` keeps both stores in one SQLite
-    /// file and opens the receipt store first, so the file already carries the
-    /// receipt store's provenance anchor and no approval table yet; this variant
-    /// adopts that receipt-anchored file as its sibling. The default [`open`]
-    /// stays strict so a standalone receipt database is never mistaken for an
-    /// approval store outside the sidecar.
-    ///
-    /// [`open`]: SqliteApprovalStore::open
-    pub fn open_colocated_with_receipt_store(
-        path: impl AsRef<Path>,
-    ) -> Result<Self, ApprovalStoreError> {
-        Self::open_with_anchor_tables(path, APPROVAL_STORE_COLOCATED_ANCHOR_TABLES)
-    }
-
-    fn open_with_anchor_tables(
-        path: impl AsRef<Path>,
-        anchor_tables: &[&str],
-    ) -> Result<Self, ApprovalStoreError> {
-        let path = path.as_ref();
-        // Derive the directory from the resolved filesystem path: a co-located
-        // approval store opens the same `file:` URI as the receipt store (for
-        // example `file:/var/lib/chio/receipts.db?mode=rwc`), whose scheme and
-        // query a raw `parent()` would fold into a bogus directory, leaving the
-        // real one uncreated so SQLite fails to open the database.
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-            fs::create_dir_all(&parent)
-                .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
-        }
-        let manager = SqliteConnectionManager::file(path);
-        let pool = crate::pool::sqlite_pool_builder()
-            .max_size(8)
-            .build(manager)
-            .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
-        let store = Self { pool };
-        store.open_schema(anchor_tables)?;
-        Ok(store)
-    }
-
-    /// Open an in-memory store for tests.
-    pub fn open_in_memory() -> Result<Self, ApprovalStoreError> {
-        let manager = SqliteConnectionManager::memory();
-        let pool = crate::pool::sqlite_pool_builder()
-            .max_size(1)
-            .build(manager)
-            .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
-        let store = Self { pool };
-        store.open_schema(APPROVAL_STORE_OWN_ANCHOR_TABLES)?;
-        Ok(store)
-    }
-
-    fn open_schema(&self, anchor_tables: &[&str]) -> Result<(), ApprovalStoreError> {
-        let conn = self
-            .pool
-            .get()
-            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        let state = crate::check_current_schema(
-            &conn,
-            APPROVAL_STORE_SCHEMA_KEY,
-            APPROVAL_STORE_SCHEMA_VERSION,
-            anchor_tables,
-        )
-        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
-        let provisioned: bool = conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_hitl_pending')",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|e| ApprovalStoreError::Backend(format!("schema probe: {e}")))?;
-        if state == crate::SchemaState::Unstamped && provisioned {
-            return Err(ApprovalStoreError::Backend(
-                "approval storage is provisioned without a schema stamp".into(),
-            ));
-        }
-        conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA foreign_keys = ON;
+pub(crate) const APPROVAL_SCHEMA: &str = r#"
 
             CREATE TABLE IF NOT EXISTS chio_hitl_pending (
                 approval_id TEXT PRIMARY KEY,
@@ -314,15 +194,99 @@ impl SqliteApprovalStore {
                 FOREIGN KEY (proposal_id)
                     REFERENCES chio_threshold_approval_collectors(proposal_id)
             );
-            "#,
-        )
-        .map_err(|e| ApprovalStoreError::Backend(format!("schema: {e}")))?;
-        crate::stamp_schema_version(
-            &conn,
-            APPROVAL_STORE_SCHEMA_KEY,
-            APPROVAL_STORE_SCHEMA_VERSION,
-        )
-        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            "#;
+
+impl SqliteApprovalStore {
+    /// Open the store at the given path. Creates the parent directory
+    /// if needed.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_mode(path, false)
+    }
+
+    pub fn open_colocated_with_receipt_store(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_mode(path, true)
+    }
+
+    fn open_with_mode(path: impl AsRef<Path>, colocated: bool) -> Result<Self, ApprovalStoreError> {
+        let path = path.as_ref();
+        // Derive the directory from the resolved filesystem path: a co-located
+        // approval store opens the same `file:` URI as the receipt store (for
+        // example `file:/var/lib/chio/receipts.db?mode=rwc`), whose scheme and
+        // query a raw `parent()` would fold into a bogus directory, leaving the
+        // real one uncreated so SQLite fails to open the database.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)
+                .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
+        }
+        let manager = SqliteConnectionManager::file(path);
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
+        let store = Self { pool };
+        store.open_schema(colocated)?;
+        Ok(store)
+    }
+
+    /// Open an in-memory store for tests.
+    pub fn open_in_memory() -> Result<Self, ApprovalStoreError> {
+        let manager = SqliteConnectionManager::memory();
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)
+            .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
+        let store = Self { pool };
+        store.open_schema(false)?;
+        Ok(store)
+    }
+
+    fn open_schema(&self, colocated: bool) -> Result<(), ApprovalStoreError> {
+        let mut connection = self
+            .pool
+            .get()
+            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        if colocated {
+            let snapshot = connection
+                .transaction_with_behavior(TransactionBehavior::Deferred)
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            let state = crate::schema_version::inspect_schema(&snapshot, &["receipt", "approval"])
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            if state != crate::SchemaState::Current {
+                return Err(ApprovalStoreError::Backend(
+                    "receipt/approval database is not initialized".into(),
+                ));
+            }
+            crate::receipt_store::validate_receipt_catalog(&snapshot, true)
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            snapshot
+                .commit()
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        } else {
+            let schema = crate::schema_version::SchemaTransaction::begin(
+                &mut connection,
+                &[APPROVAL_STORE_SCHEMA_KEY],
+            )
+            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            if schema.is_fresh() {
+                schema
+                    .connection()
+                    .execute_batch(APPROVAL_SCHEMA)
+                    .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+                schema
+                    .stamp(APPROVAL_STORE_SCHEMA_KEY)
+                    .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            }
+            schema
+                .validate_catalog(APPROVAL_SCHEMA)
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            schema
+                .commit()
+                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+        }
+        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;")
+            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
     }
 }
@@ -1015,15 +979,11 @@ mod tests {
     use chio_kernel::ThresholdApprovalContextResolver;
     use chio_kernel::{ThresholdApprovalCollector, ThresholdApprovalCollectorState};
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn open_colocated_creates_parent_dirs_for_a_file_uri_with_query() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        let base = std::env::temp_dir().join(format!("chio-approval-uri-{nonce}"));
+    fn explicit_pair_creation_supports_a_file_uri_with_query() {
+        let directory = tempfile::tempdir().expect("temporary approval directory");
+        let base = directory.path();
         let db = base.join("nested").join("receipts.db");
         let parent = db.parent().expect("db path has a parent");
         assert!(
@@ -1036,6 +996,7 @@ mod tests {
         // relative directory, leaving the real parent uncreated so SQLite would
         // fail to open the database.
         let uri = format!("file:{}?mode=rwc", db.display());
+        crate::initialize_receipt_approval_database(uri.as_str()).unwrap();
         let store = SqliteApprovalStore::open_colocated_with_receipt_store(uri.as_str())
             .expect("open colocated approval store from a file: URI");
         // The store must be usable once its real parent directory exists.
@@ -1047,8 +1008,6 @@ mod tests {
             parent.exists(),
             "the real parent directory must be created before SQLite opens the URI"
         );
-
-        let _ = fs::remove_dir_all(&base);
     }
 
     fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
@@ -1172,22 +1131,22 @@ mod tests {
     }
 
     #[test]
-    fn standalone_open_refuses_a_receipt_sidecar_that_colocated_open_adopts() {
+    fn standalone_open_refuses_a_declared_receipt_approval_database() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sidecar.sqlite3");
-        crate::SqliteReceiptStore::open(&path).unwrap();
+        crate::initialize_receipt_approval_database(&path).unwrap();
 
         assert!(
             SqliteApprovalStore::open(&path).is_err(),
-            "standalone approval open must refuse a receipt-only sidecar file"
+            "standalone approval open must refuse a declared pair"
         );
 
         let store = SqliteApprovalStore::open_colocated_with_receipt_store(&path)
-            .expect("co-located open must adopt the receipt sidecar file");
+            .expect("co-located open must validate the declared pair");
         store
-            .store_pending(&sample_request("adopt-1", "hash-adopt"))
+            .store_pending(&sample_request("pair-1", "hash-pair"))
             .unwrap();
-        assert!(store.get_pending("adopt-1").unwrap().is_some());
+        assert!(store.get_pending("pair-1").unwrap().is_some());
     }
 
     #[test]
@@ -1213,7 +1172,7 @@ mod tests {
         let path = dir.path().join("approval-stale.sqlite3");
         drop(SqliteApprovalStore::open(&path).unwrap());
         let connection = rusqlite::Connection::open(&path).unwrap();
-        crate::stamp_schema_version(&connection, APPROVAL_STORE_SCHEMA_KEY, 4).unwrap();
+        connection.execute_batch("PRAGMA ignore_check_constraints = ON; UPDATE chio_store_schema_versions SET version = 4 WHERE store_key = 'approval'; PRAGMA ignore_check_constraints = OFF;").unwrap();
         drop(connection);
 
         let error = SqliteApprovalStore::open(&path).err().unwrap();
@@ -1240,7 +1199,7 @@ mod tests {
         let error = SqliteApprovalStore::open(&path).err().unwrap();
         assert_eq!(
             error.to_string(),
-            "storage backend error: approval storage is provisioned without a schema stamp"
+            "storage backend error: schema namespace approval is missing"
         );
     }
 

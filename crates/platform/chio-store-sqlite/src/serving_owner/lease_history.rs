@@ -3,7 +3,7 @@ use rusqlite::Connection;
 
 use super::{read_u64, SqliteServingOwnerError};
 
-const SERVING_LEASE_SCHEMA: &str = r#"
+pub(super) const SERVING_LEASE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_serving_leases (
     store_uuid TEXT NOT NULL,
     owner_epoch INTEGER NOT NULL CHECK (owner_epoch > 0),
@@ -42,10 +42,12 @@ END;
 "#;
 
 pub(super) fn initialize_serving_lease_schema(
-    connection: &Connection,
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(SERVING_LEASE_SCHEMA)?;
-    verify_serving_lease_schema(connection)
+    if schema.is_fresh() {
+        schema.connection().execute_batch(SERVING_LEASE_SCHEMA)?;
+    }
+    verify_serving_lease_schema(schema.connection())
 }
 
 type SchemaCatalogEntry = (String, String, String, Option<String>);
@@ -70,7 +72,9 @@ fn serving_lease_schema_catalog(
     Ok(catalog)
 }
 
-fn verify_serving_lease_schema(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+pub(super) fn verify_serving_lease_schema(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
     let expected = Connection::open_in_memory()?;
     expected.execute_batch(SERVING_LEASE_SCHEMA)?;
     if serving_lease_schema_catalog(connection)? != serving_lease_schema_catalog(&expected)? {

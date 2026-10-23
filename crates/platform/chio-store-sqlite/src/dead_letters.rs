@@ -10,10 +10,6 @@
 //! MUST NOT replay the failed settlement until an operator clears
 //! the row via [`SqliteDeadLetterStore::clear`]. There is no
 //! auto-retry past the documented bound.
-//!
-//! The migration is `CREATE TABLE IF NOT EXISTS` plus
-//! `CREATE INDEX IF NOT EXISTS`, so it can run repeatedly against a
-//! receipt-store database that already holds other tables.
 
 use std::sync::Arc;
 
@@ -27,9 +23,8 @@ use thiserror::Error;
 
 use crate::receipt_store::{receipt_pool_connection, verify_rollback, ReceiptSinkQualification};
 
-/// SQL migration applied by [`SqliteDeadLetterStore::open_with_pool`]
-/// to create the `settle_dead_letters` table.
-pub const SETTLE_DEAD_LETTERS_MIGRATION: &str = r#"
+/// Dead-letter table schema used during receipt database creation.
+pub(crate) const SETTLE_DEAD_LETTERS_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS settle_dead_letters (
     receipt_id TEXT PRIMARY KEY,
     finalized_at INTEGER NOT NULL,
@@ -358,15 +353,14 @@ fn dead_letter_error_from_receipt_store(
 
 impl SqliteDeadLetterStore {
     /// Open a store backed by the same pool as a sibling receipt
-    /// store. Runs the additive migration if the table is absent.
+    /// store. Validates the complete receipt schema.
     pub fn open_with_pool(
         pool: Pool<SqliteConnectionManager>,
     ) -> Result<Self, DeadLetterStoreError> {
-        let connection = pool
+        let mut connection = pool
             .get()
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
-        connection
-            .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
+        crate::receipt_store::validate_receipt_database(&mut connection)
             .map_err(|err| DeadLetterStoreError::Backend(err.to_string()))?;
         Ok(Self {
             pool,
@@ -380,12 +374,10 @@ impl SqliteDeadLetterStore {
     /// [`crate::SqliteReceiptStore`].
     pub fn open_alongside(store: &crate::SqliteReceiptStore) -> Result<Self, DeadLetterStoreError> {
         let writer = store.writer_handle();
-        writer
-            .run_write_anchored_metadata(|connection| {
-                connection
-                    .execute_batch(SETTLE_DEAD_LETTERS_MIGRATION)
-                    .map_err(chio_kernel::ReceiptStoreError::from)
-            })
+        let mut connection = store
+            .connection()
+            .map_err(dead_letter_error_from_receipt_store)?;
+        crate::receipt_store::validate_receipt_database(&mut connection)
             .map_err(dead_letter_error_from_receipt_store)?;
         Ok(Self {
             pool: store.pool.clone(),
@@ -492,10 +484,15 @@ mod tests {
 
     fn pool() -> Pool<SqliteConnectionManager> {
         let manager = SqliteConnectionManager::memory();
-        crate::pool::sqlite_pool_builder()
+        let pool = crate::pool::sqlite_pool_builder()
             .max_size(2)
             .build(manager)
-            .test_expect("test pool builds")
+            .test_expect("test pool builds");
+        crate::receipt_store::initialize_test_receipt_database(
+            &mut pool.get().test_expect("test connection"),
+        )
+        .test_expect("receipt schema creation");
+        pool
     }
 
     fn sample_record(receipt_id: &str, attempts: u32) -> DeadLetterRecord {
@@ -508,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    fn migration_is_idempotent() {
+    fn open_is_idempotent() {
         let pool = pool();
         SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("first open");
         SqliteDeadLetterStore::open_with_pool(pool).test_expect("second open");

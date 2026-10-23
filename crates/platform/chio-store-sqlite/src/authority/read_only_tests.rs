@@ -183,13 +183,12 @@ fn inspection_refuses_storage_outside_schema_v1() -> TestResult {
     let (_directory, path, owner) = provisioned()?;
     drop(owner);
     let raw = Connection::open(&path)?;
+    raw.execute_batch("PRAGMA ignore_check_constraints = ON;")?;
     raw.execute(
         "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = ?2",
-        rusqlite::params![
-            AUTHORITY_STORE_SCHEMA_VERSION + 1,
-            AUTHORITY_STORE_SCHEMA_KEY
-        ],
+        rusqlite::params![2, AUTHORITY_STORE_SCHEMA_KEY],
     )?;
+    raw.execute_batch("PRAGMA ignore_check_constraints = OFF;")?;
     assert!(matches!(
         SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
         Err(AuthorityInspectionError::Store(AuthorityStoreError::Schema(message)))
@@ -200,7 +199,7 @@ fn inspection_refuses_storage_outside_schema_v1() -> TestResult {
         [AUTHORITY_STORE_SCHEMA_KEY],
         |row| row.get(0),
     )?;
-    assert_eq!(version, AUTHORITY_STORE_SCHEMA_VERSION + 1);
+    assert_eq!(version, 2);
     Ok(())
 }
 

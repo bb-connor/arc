@@ -11,7 +11,7 @@ use chio_kernel::{
 };
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use crate::replay_clock::{ReplayClockValidationError, StableReplayClock};
 
@@ -160,9 +160,31 @@ pub struct SqliteGovernedApprovalReplayStore {
     clock: StableReplayClock,
 }
 
-const GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const GOVERNED_APPROVAL_STORE_SCHEMA_KEY: &str = "governed_approval_replay";
-const GOVERNED_APPROVAL_STORE_ANCHOR_TABLES: &[&str] = &["chio_governed_approval_replay_entries"];
+const GOVERNED_APPROVAL_SCHEMA: &str = r#"
+            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_entries (
+                subject_id              TEXT NOT NULL,
+                request_id              TEXT NOT NULL,
+                intent_hash             TEXT NOT NULL,
+                expires_at              INTEGER NOT NULL,
+                dispatch_reservation_id TEXT,
+                PRIMARY KEY (subject_id, request_id, intent_hash)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chio_governed_approval_replay_expiry
+                ON chio_governed_approval_replay_entries(expires_at);
+
+            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_clock (
+                singleton             INTEGER PRIMARY KEY CHECK (singleton = 1),
+                wall_clock_high_water INTEGER NOT NULL,
+                pruned_through        INTEGER NOT NULL DEFAULT -9223372036854775808
+            );
+
+            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_limits (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                capacity  INTEGER NOT NULL CHECK (capacity > 0)
+            );
+            "#;
 
 impl SqliteGovernedApprovalReplayStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteGovernedApprovalReplayStoreError> {
@@ -200,7 +222,7 @@ impl SqliteGovernedApprovalReplayStore {
             capacity: validate_capacity(capacity)?,
             clock,
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         store.validate_retained_row_capacity()?;
         Ok(store)
     }
@@ -230,106 +252,103 @@ impl SqliteGovernedApprovalReplayStore {
             capacity: validate_capacity(capacity)?,
             clock,
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         store.validate_retained_row_capacity()?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), SqliteGovernedApprovalReplayStoreError> {
-        let mut conn = self.pool.get()?;
-        // Do not adopt metadata or normalize journal mode on a sealed source.
-        // The later immediate-transaction check also closes the seal/open race.
-        let snapshot = conn.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    fn initialize_schema(&self) -> Result<(), SqliteGovernedApprovalReplayStoreError> {
+        let mut connection = self.pool.get()?;
+        let snapshot = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        crate::schema_version::inspect_schema(&snapshot, &[GOVERNED_APPROVAL_STORE_SCHEMA_KEY])
+            .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
         if self.load_replay_source_seal_tx(&snapshot)?.is_some() {
             snapshot.commit()?;
             return Ok(());
         }
         snapshot.commit()?;
-        crate::check_current_schema(
-            &conn,
-            GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
-            GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            GOVERNED_APPROVAL_STORE_ANCHOR_TABLES,
+        let schema = crate::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[GOVERNED_APPROVAL_STORE_SCHEMA_KEY],
         )
         .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
-        conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            "#,
-        )?;
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        // A sealed source is read-only. Validate it before any clock advance,
-        // capacity change, or attempt to repair missing objects.
-        if self.load_replay_source_seal_tx(&tx)?.is_some() {
-            tx.commit()?;
+        if !schema.is_fresh()
+            && self
+                .load_replay_source_seal_tx(schema.connection())?
+                .is_some()
+        {
+            schema.commit().map_err(|error| {
+                SqliteGovernedApprovalReplayStoreError::storage(error.to_string())
+            })?;
             return Ok(());
         }
-        tx.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_entries (
-                subject_id              TEXT NOT NULL,
-                request_id              TEXT NOT NULL,
-                intent_hash             TEXT NOT NULL,
-                expires_at              INTEGER NOT NULL,
-                dispatch_reservation_id TEXT,
-                PRIMARY KEY (subject_id, request_id, intent_hash)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_governed_approval_replay_expiry
-                ON chio_governed_approval_replay_entries(expires_at);
-
-            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_clock (
-                singleton             INTEGER PRIMARY KEY CHECK (singleton = 1),
-                wall_clock_high_water INTEGER NOT NULL,
-                pruned_through        INTEGER NOT NULL DEFAULT -9223372036854775808
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_governed_approval_replay_limits (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                capacity  INTEGER NOT NULL CHECK (capacity > 0)
-            );
-            "#,
-        )?;
+        if schema.is_fresh() {
+            schema
+                .connection()
+                .execute_batch(GOVERNED_APPROVAL_SCHEMA)?;
+        }
+        schema
+            .validate_catalog(GOVERNED_APPROVAL_SCHEMA)
+            .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
         let capacity = i64::try_from(self.capacity).map_err(|_| {
             SqliteGovernedApprovalReplayStoreError::storage(
                 "governed approval replay capacity exceeds SQLite integer range",
             )
         })?;
-        tx.execute(
-            "INSERT INTO chio_governed_approval_replay_limits (singleton, capacity) VALUES (1, ?1) ON CONFLICT(singleton) DO NOTHING",
-            params![capacity],
+        if !schema.is_fresh() {
+            let clock: Option<i64> = schema.connection().query_row(
+                "SELECT pruned_through FROM chio_governed_approval_replay_clock WHERE singleton = 1",
+                [], |row| row.get(0),
+            ).optional()?;
+            if clock.is_none() {
+                return Err(SqliteGovernedApprovalReplayStoreError::storage(
+                    "governed approval replay clock is missing",
+                ));
+            }
+            let capacity: Option<i64> = schema
+                .connection()
+                .query_row(
+                    "SELECT capacity FROM chio_governed_approval_replay_limits WHERE singleton = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if capacity.is_none() {
+                return Err(SqliteGovernedApprovalReplayStoreError::storage(
+                    "governed approval replay capacity is missing",
+                ));
+            }
+        }
+        let now = self
+            .clock
+            .expected_wall_now()
+            .map_err(map_replay_clock_error)?;
+        if schema.is_fresh() {
+            schema.connection().execute(
+                "INSERT INTO chio_governed_approval_replay_limits (singleton, capacity) VALUES (1, ?1)",
+                params![capacity],
+            )?;
+            schema.connection().execute(
+                "INSERT INTO chio_governed_approval_replay_clock (singleton, wall_clock_high_water) VALUES (1, ?1)",
+                params![now],
+            )?;
+            schema
+                .stamp(GOVERNED_APPROVAL_STORE_SCHEMA_KEY)
+                .map_err(|error| {
+                    SqliteGovernedApprovalReplayStoreError::storage(error.to_string())
+                })?;
+        } else {
+            schema.connection().execute(
+                "UPDATE chio_governed_approval_replay_clock SET wall_clock_high_water = MAX(wall_clock_high_water, ?1) WHERE singleton = 1",
+                params![now],
+            )?;
+        }
+        schema
+            .commit()
+            .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
-        tx.execute(
-            r#"
-            INSERT INTO chio_governed_approval_replay_clock (
-                singleton,
-                wall_clock_high_water
-            )
-            VALUES (1, ?1)
-            ON CONFLICT(singleton) DO NOTHING
-            "#,
-            params![i64::MIN],
-        )?;
-        tx.execute(
-            r#"
-            UPDATE chio_governed_approval_replay_clock
-            SET wall_clock_high_water = MAX(wall_clock_high_water, ?1)
-            WHERE singleton = 1
-            "#,
-            params![self
-                .clock
-                .expected_wall_now()
-                .map_err(map_replay_clock_error)?],
-        )?;
-        tx.commit()?;
-        crate::stamp_schema_version(
-            &conn,
-            GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
-            GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| SqliteGovernedApprovalReplayStoreError::storage(error.to_string()))?;
         Ok(())
     }
 
@@ -795,6 +814,109 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn canonical_schema_fixture(
+    ) -> Result<SqliteGovernedApprovalReplayStore, Box<dyn std::error::Error>> {
+        let manager = SqliteConnectionManager::memory().with_init(configure_pooled_connection);
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
+        let store = SqliteGovernedApprovalReplayStore {
+            pool,
+            path: None,
+            capacity: 4,
+            clock: StableReplayClock::new(
+                chio_test_support::clock::clock(),
+                MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64,
+            )?,
+        };
+        {
+            let mut connection = store.pool.get()?;
+            let schema = crate::schema_version::SchemaTransaction::begin(
+                &mut connection,
+                &[GOVERNED_APPROVAL_STORE_SCHEMA_KEY],
+            )?;
+            schema
+                .connection()
+                .execute_batch(GOVERNED_APPROVAL_SCHEMA)?;
+            schema.connection().execute(
+                "INSERT INTO chio_governed_approval_replay_limits (singleton, capacity) VALUES (1, 4)",
+                [],
+            )?;
+            schema.connection().execute(
+                "INSERT INTO chio_governed_approval_replay_clock (singleton, wall_clock_high_water) VALUES (1, ?1)",
+                [store.clock.expected_wall_now().map_err(map_replay_clock_error)?],
+            )?;
+            schema.stamp(GOVERNED_APPROVAL_STORE_SCHEMA_KEY)?;
+            schema.commit()?;
+        }
+        Ok(store)
+    }
+
+    #[test]
+    fn schema_reopen_refuses_a_deleted_stamp_without_repair(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let store = canonical_schema_fixture()?;
+        store
+            .pool
+            .get()?
+            .execute("DELETE FROM chio_store_schema_versions", [])?;
+        let result = store.initialize_schema();
+        let stamps: i64 = store.pool.get()?.query_row(
+            "SELECT COUNT(*) FROM chio_store_schema_versions",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(stamps, 0);
+        assert!(
+            matches!(result, Err(SqliteGovernedApprovalReplayStoreError::Storage(message))
+            if message == "schema namespace governed_approval_replay is missing")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn schema_reopen_refuses_a_missing_index_without_repair(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let store = canonical_schema_fixture()?;
+        store
+            .pool
+            .get()?
+            .execute_batch("DROP INDEX idx_chio_governed_approval_replay_expiry;")?;
+        let result = store.initialize_schema();
+        let present: bool = store.pool.get()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_chio_governed_approval_replay_expiry')",
+            [], |row| row.get(0),
+        )?;
+        assert!(!present);
+        assert!(
+            matches!(result, Err(SqliteGovernedApprovalReplayStoreError::Storage(message))
+            if message == "schema catalog differs from its canonical definition")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn schema_reopen_refuses_a_missing_clock_without_repair(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let store = canonical_schema_fixture()?;
+        store
+            .pool
+            .get()?
+            .execute("DELETE FROM chio_governed_approval_replay_clock", [])?;
+        let result = store.initialize_schema();
+        let clocks: i64 = store.pool.get()?.query_row(
+            "SELECT COUNT(*) FROM chio_governed_approval_replay_clock",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(clocks, 0);
+        assert!(
+            matches!(result, Err(SqliteGovernedApprovalReplayStoreError::Storage(message))
+            if message == "governed approval replay clock is missing")
+        );
+        Ok(())
+    }
+
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1070,7 +1192,7 @@ mod tests {
             )
             .unwrap(),
         };
-        advanced.run_migrations().unwrap();
+        advanced.initialize_schema().unwrap();
         advanced.validate_retained_row_capacity().unwrap();
         drop(advanced);
 
@@ -1282,18 +1404,25 @@ mod tests {
         drop(SqliteGovernedApprovalReplayStore::open(&path).unwrap());
         {
             let connection = Connection::open(&path).unwrap();
-            crate::stamp_schema_version(&connection, GOVERNED_APPROVAL_STORE_SCHEMA_KEY, 0)
+            connection
+                .execute_batch(
+                    "PRAGMA ignore_check_constraints = ON;
+                     UPDATE chio_store_schema_versions SET version = 0
+                     WHERE store_key = 'governed_approval_replay';
+                     PRAGMA ignore_check_constraints = OFF;",
+                )
                 .unwrap();
         }
         let error = match SqliteGovernedApprovalReplayStore::open(&path) {
             Ok(_) => panic!("an obsolete replay schema opened"),
             Err(error) => error,
         };
-        assert!(
-            error.to_string().contains(
+        assert_eq!(
+            error,
+            SqliteGovernedApprovalReplayStoreError::Storage(
                 "database schema version 0 is not the current schema version 1; refusing to open"
-            ),
-            "{error}"
+                    .to_owned(),
+            )
         );
         let _ = fs::remove_file(path);
     }

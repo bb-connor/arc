@@ -7,18 +7,8 @@ use std::path::PathBuf;
 
 use r2d2_sqlite::SqliteConnectionManager;
 
-/// Table that identifies a database this receipt store may open. A populated
-/// database without it is refused rather than adopted, so a path mistargeted at
-/// another store's file (an approval, revocation, budget, or authority database)
-/// never has receipt tables written into it.
-///
-/// `chio api protect` co-locates the receipt and approval stores in one SQLite
-/// file and opens the receipt store first, so this store owns the shared file's
-/// provenance anchor. The approval store, opened second, adopts the
-/// receipt-anchored file through its own co-located open; the receipt store never
-/// needs to recognize a neighbor's table to bootstrap the shared file, so a
-/// standalone approval database is refused here.
-const RECEIPT_STORE_ANCHOR_TABLES: &[&str] = &["chio_tool_receipts"];
+const RECEIPT_NAMESPACES: &[&str] = &["receipt"];
+const RECEIPT_APPROVAL_NAMESPACES: &[&str] = &["receipt", "approval"];
 
 struct QualifiedReceiptSink {
     durable_sink_id: Option<String>,
@@ -200,7 +190,7 @@ fn qualify_receipt_sink(
         internal_sink_id,
     )?);
     let file_sink_binding = qualification.durable_file_binding();
-    ensure_receipt_rollback_generation(connection)?;
+    load_receipt_rollback_generation(connection)?;
     let mut scope = Vec::new();
     append_receipt_sink_binding_part(&mut scope, b"chio.receipt-store.rollback-generation.v1");
     append_receipt_sink_binding_part(&mut scope, file_sink_binding.as_bytes());
@@ -252,8 +242,8 @@ fn settlement_projection_schema_is_installed(
     connection: &Connection,
 ) -> Result<bool, ReceiptStoreError> {
     let reference = Connection::open_in_memory()?;
-    reference.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-    reference.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    reference.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
+    reference.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
     Ok(settlement_schema_manifest(connection)? == settlement_schema_manifest(&reference)?)
 }
 
@@ -570,28 +560,21 @@ impl SqliteReceiptStore {
         };
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
-            // Validate provenance before configuring pragmas: a foreign or
-            // future database must be refused before any write touches its
-            // header, so a mistargeted path is never mutated into WAL mode.
-            let schema_state = crate::check_current_schema(
-                &connection,
-                RECEIPT_STORE_SCHEMA_KEY,
-                RECEIPT_STORE_SCHEMA_VERSION,
-                RECEIPT_STORE_ANCHOR_TABLES,
-            )
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-            crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
-            if schema_state != crate::SchemaState::Current {
+            let snapshot =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
+            let (namespaces, state) = receipt_namespaces(&snapshot)?;
+            if state != crate::SchemaState::Current {
                 return Err(ReceiptStoreError::Conflict(
-                    "receipt database carries no receipt schema version; open it with \
-                     SqliteReceiptStore::open"
-                        .to_string(),
+                    "receipt database is not initialized".into(),
                 ));
             }
+            validate_receipt_catalog(&snapshot, namespaces.len() == 2)?;
+            crate::capability_lineage::reject_unsigned_projection_lineage(&snapshot, "main")?;
+            verify_receipt_cost_projection(&snapshot)?;
+            let internal_sink_id = load_receipt_sink_identity(&snapshot)?;
+            load_receipt_rollback_generation(&snapshot)?;
+            snapshot.commit()?;
             configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
-            super::support::ensure_transparency_projection_guards(&connection)?;
-            verify_receipt_cost_projection(&connection)?;
-            let internal_sink_id = load_receipt_sink_identity(&connection)?;
             let QualifiedReceiptSink {
                 durable_sink_id,
                 rollback_anchor,
@@ -635,21 +618,308 @@ impl SqliteReceiptStore {
             });
         }
 
-        // Validate provenance before configuring pragmas: an existing file that
-        // is a foreign database must be refused before any write touches its
-        // header, so a mistargeted path is never mutated into WAL mode.
-        crate::check_current_schema(
-            &connection,
-            RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SCHEMA_VERSION,
-            RECEIPT_STORE_ANCHOR_TABLES,
-        )
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        crate::capability_lineage::reject_unsigned_projection_lineage(&connection, "main")?;
+        let (namespaces, _) = receipt_namespaces(&connection)?;
+        let schema =
+            begin_receipt_creation(&mut connection, namespaces, options.pool.max_page_count)?;
+        if schema.is_fresh() {
+            create_receipt_schema(schema.connection())?;
+            schema
+                .stamp(RECEIPT_STORE_SCHEMA_KEY)
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        }
+        validate_receipt_catalog(schema.connection(), namespaces.len() == 2)?;
+        super::support::validate_claim_receipt_log_entries_in_transaction(schema.connection())?;
+        super::support::validate_checkpoint_transparency_projections(schema.connection())?;
+        crate::capability_lineage::reject_unsigned_projection_lineage(schema.connection(), "main")?;
+        verify_receipt_cost_projection(schema.connection())?;
+        let internal_sink_id = load_receipt_sink_identity(schema.connection())?;
+        load_receipt_rollback_generation(schema.connection())?;
+        schema
+            .commit()
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
-        let schema_migration =
-            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        schema_migration.execute_batch(
+
+        let QualifiedReceiptSink {
+            durable_sink_id,
+            rollback_anchor,
+            receipt_sink_qualification,
+        } = qualify_receipt_sink(path, &connection, &internal_sink_id, rollback_anchor_root)?;
+
+        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
+
+        drop(connection);
+
+        let reader_pool = build_receipt_pool(
+            path,
+            options.pool.reader_pool_max_size,
+            "reader",
+            connection_flags,
+            options.pool.max_page_count,
+            receipt_sink_qualification.clone(),
+        )?;
+        let writer_pool = build_receipt_pool(
+            path,
+            options.pool.writer_pool_max_size,
+            "writer",
+            connection_flags,
+            options.pool.max_page_count,
+            receipt_sink_qualification.clone(),
+        )?;
+
+        Ok(Self {
+            clock: clock.clone(),
+            receipt_commit_actor: ReceiptCommitActor::start(
+                writer_pool,
+                clock.clone(),
+                options.incremental_verification,
+                rollback_anchor.clone(),
+                receipt_sink_qualification.clone(),
+            ),
+            rollback_anchor,
+            pool: reader_pool,
+            settlement_store_binding,
+            durable_sink_id,
+            receipt_sink_qualification,
+            incremental_verification: options.incremental_verification,
+        })
+    }
+
+    pub fn open_with_pool_sizes(
+        path: impl AsRef<Path>,
+        reader_pool_max_size: u32,
+        writer_pool_max_size: u32,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config(
+            path,
+            crate::SqlitePoolConfig {
+                reader_pool_max_size,
+                writer_pool_max_size,
+                max_page_count: None,
+            },
+        )
+    }
+}
+
+fn build_receipt_pool(
+    path: &Path,
+    max_size: u32,
+    pool_name: &str,
+    flags: Option<rusqlite::OpenFlags>,
+    max_page_count: Option<u32>,
+    receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
+) -> Result<Pool<SqliteConnectionManager>, ReceiptStoreError> {
+    if max_size == 0 {
+        return Err(ReceiptStoreError::Pool(format!(
+            "{pool_name} receipt sqlite pool max_size must be greater than zero"
+        )));
+    }
+    let mut manager = SqliteConnectionManager::file(path);
+    if let Some(flags) = flags {
+        manager = manager.with_flags(flags);
+    }
+    let manager = manager.with_init(move |connection| {
+        configure_sqlite_connection(connection, max_page_count).map_err(|error| match error {
+            ReceiptStoreError::Sqlite(error) => error,
+            other => rusqlite::Error::InvalidParameterName(other.to_string()),
+        })?;
+        if let Some(qualification) = receipt_sink_qualification.as_deref() {
+            qualification
+                .validate_connection(connection)
+                .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))?;
+        }
+        Ok(())
+    });
+    crate::pool::sqlite_pool_builder()
+        .max_size(max_size)
+        .build(manager)
+        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+}
+
+fn existing_database_open_flags() -> rusqlite::OpenFlags {
+    rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+}
+
+fn require_existing_receipt_schema(
+    path: &Path,
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    const REQUIRED_TABLES: &[&str] = &[
+        "chio_tool_receipts",
+        "chio_child_receipts",
+        "claim_receipt_log_entries",
+        "kernel_checkpoints",
+        "checkpoint_tree_heads",
+        "checkpoint_predecessor_witnesses",
+        "checkpoint_publication_metadata",
+    ];
+
+    for table in REQUIRED_TABLES {
+        let exists: Option<String> = connection
+            .query_row(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [*table],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if exists.is_none() {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "receipt database {} is not an initialized Chio receipt store: missing table {table}",
+                path.display()
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn receipt_namespaces(
+    connection: &Connection,
+) -> Result<(&'static [&'static str], crate::SchemaState), ReceiptStoreError> {
+    match crate::schema_version::inspect_schema(connection, RECEIPT_NAMESPACES) {
+        Ok(state) => Ok((RECEIPT_NAMESPACES, state)),
+        Err(crate::SchemaVersionError::UnexpectedNamespaces) => {
+            let state =
+                crate::schema_version::inspect_schema(connection, RECEIPT_APPROVAL_NAMESPACES)
+                    .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            Ok((RECEIPT_APPROVAL_NAMESPACES, state))
+        }
+        Err(error) => Err(ReceiptStoreError::Conflict(error.to_string())),
+    }
+}
+
+fn begin_receipt_creation<'a>(
+    connection: &'a mut Connection,
+    namespaces: &[&str],
+    max_page_count: Option<u32>,
+) -> Result<crate::schema_version::SchemaTransaction<'a>, ReceiptStoreError> {
+    if crate::schema_version::inspect_schema(connection, namespaces)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+        == crate::SchemaState::Empty
+    {
+        connection.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
+        let lock =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)?;
+        let fresh = crate::schema_version::inspect_schema(&lock, namespaces)
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+            == crate::SchemaState::Empty;
+        lock.commit()?;
+        if fresh {
+            connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
+            let mode: i64 = connection.pragma_query_value(None, "auto_vacuum", |row| row.get(0))?;
+            if mode != 2 {
+                return Err(ReceiptStoreError::Conflict(
+                    "receipt creation requires incremental auto-vacuum".into(),
+                ));
+            }
+        }
+    }
+    let transaction =
+        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    if crate::schema_version::inspect_schema(&transaction, namespaces)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+        == crate::SchemaState::Empty
+    {
+        if let Some(limit) = max_page_count {
+            transaction.pragma_update(None, "max_page_count", limit)?;
+            let effective: i64 =
+                transaction.query_row("PRAGMA max_page_count", [], |row| row.get(0))?;
+            if effective != i64::from(limit) {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "sqlite max_page_count requested {limit} but effective limit is {effective}"
+                )));
+            }
+        }
+    }
+    crate::schema_version::SchemaTransaction::from_transaction(transaction, namespaces)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+}
+
+pub(crate) fn validate_receipt_database(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let transaction = connection.transaction()?;
+    let (namespaces, state) = receipt_namespaces(&transaction)?;
+    if state == crate::SchemaState::Empty {
+        return Err(ReceiptStoreError::Conflict(
+            crate::SchemaVersionError::CreationNotAllowed.to_string(),
+        ));
+    }
+    validate_receipt_catalog(&transaction, namespaces == RECEIPT_APPROVAL_NAMESPACES)?;
+    transaction.commit()?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn initialize_test_receipt_database(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let schema = crate::schema_version::SchemaTransaction::begin(connection, RECEIPT_NAMESPACES)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    if schema.is_fresh() {
+        create_receipt_schema(schema.connection())?;
+        schema
+            .stamp("receipt")
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    }
+    validate_receipt_catalog(schema.connection(), false)?;
+    schema
+        .commit()
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+}
+
+pub(crate) fn validate_receipt_catalog(
+    connection: &Connection,
+    colocated: bool,
+) -> Result<(), ReceiptStoreError> {
+    let mut reference = Connection::open_in_memory()?;
+    let namespaces = if colocated {
+        RECEIPT_APPROVAL_NAMESPACES
+    } else {
+        RECEIPT_NAMESPACES
+    };
+    let schema = crate::schema_version::SchemaTransaction::begin(&mut reference, namespaces)
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    create_receipt_schema(schema.connection())?;
+    if colocated {
+        schema
+            .connection()
+            .execute_batch(crate::approval_store::APPROVAL_SCHEMA)?;
+    }
+    crate::schema_catalog::validate_against(connection, schema.connection())
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+}
+
+pub fn initialize_receipt_approval_database(
+    path: impl AsRef<Path>,
+) -> Result<(), ReceiptStoreError> {
+    let path = path.as_ref();
+    if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+        fs::create_dir_all(parent)?;
+    }
+    let mut connection = Connection::open(path)?;
+    let schema = begin_receipt_creation(&mut connection, RECEIPT_APPROVAL_NAMESPACES, None)?;
+    if schema.is_fresh() {
+        create_receipt_schema(schema.connection())?;
+        schema
+            .connection()
+            .execute_batch(crate::approval_store::APPROVAL_SCHEMA)?;
+        for namespace in RECEIPT_APPROVAL_NAMESPACES {
+            schema
+                .stamp(namespace)
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        }
+    }
+    validate_receipt_catalog(schema.connection(), true)?;
+    load_receipt_sink_identity(schema.connection())?;
+    load_receipt_rollback_generation(schema.connection())?;
+    schema
+        .commit()
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    configure_sqlite_connection(&mut connection, None)
+}
+
+fn create_receipt_schema(transaction: &rusqlite::Transaction<'_>) -> Result<(), ReceiptStoreError> {
+    transaction.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_tool_receipts (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1382,8 +1652,8 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
-        super::support::ensure_checkpoint_schema(&schema_migration)?;
-        schema_migration.execute_batch(r#"
+    super::support::ensure_checkpoint_schema(transaction)?;
+    transaction.execute_batch(r#"
             CREATE TABLE IF NOT EXISTS capability_lineage (
                 capability_id        TEXT PRIMARY KEY,
                 subject_key          TEXT NOT NULL,
@@ -1479,160 +1749,19 @@ impl SqliteReceiptStore {
 
             "#,
         )?;
-        schema_migration.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
-        schema_migration.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
-        schema_migration.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
-        super::support::install_receipt_cost_indexes(&schema_migration)?;
-        super::support::validate_indexed_security_evidence_schema(&schema_migration)?;
-        super::support::ensure_receipt_retention_watermark_table(&schema_migration)?;
-        super::support::ensure_receipt_retention_tombstones(&schema_migration)?;
-        // Projections derived from the authoritative receipt and checkpoint rows
-        // are rebuilt under the same transaction with the immutability guards
-        // lifted, so another connection never observes an unguarded state.
-        super::support::drop_transparency_projection_guards(&schema_migration)?;
-        super::support::backfill_provenance_lineage_tables(&schema_migration)?;
-        super::support::validate_claim_receipt_log_entries_in_transaction(&schema_migration)?;
-        super::support::backfill_checkpoint_transparency_projections(&schema_migration)?;
-        super::support::ensure_transparency_projection_guards(&schema_migration)?;
-        verify_receipt_cost_projection(&schema_migration)?;
-        let internal_sink_id = ensure_receipt_sink_identity(&schema_migration)?;
-        crate::stamp_schema_version(
-            &schema_migration,
-            RECEIPT_STORE_SCHEMA_KEY,
-            RECEIPT_STORE_SCHEMA_VERSION,
-        )
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
-        schema_migration.commit()?;
-
-        let QualifiedReceiptSink {
-            durable_sink_id,
-            rollback_anchor,
-            receipt_sink_qualification,
-        } = qualify_receipt_sink(path, &connection, &internal_sink_id, rollback_anchor_root)?;
-
-        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
-
-        drop(connection);
-
-        let reader_pool = build_receipt_pool(
-            path,
-            options.pool.reader_pool_max_size,
-            "reader",
-            connection_flags,
-            options.pool.max_page_count,
-            receipt_sink_qualification.clone(),
-        )?;
-        let writer_pool = build_receipt_pool(
-            path,
-            options.pool.writer_pool_max_size,
-            "writer",
-            connection_flags,
-            options.pool.max_page_count,
-            receipt_sink_qualification.clone(),
-        )?;
-
-        Ok(Self {
-            clock: clock.clone(),
-            receipt_commit_actor: ReceiptCommitActor::start(
-                writer_pool,
-                clock.clone(),
-                options.incremental_verification,
-                rollback_anchor.clone(),
-                receipt_sink_qualification.clone(),
-            ),
-            rollback_anchor,
-            pool: reader_pool,
-            settlement_store_binding,
-            durable_sink_id,
-            receipt_sink_qualification,
-            incremental_verification: options.incremental_verification,
-        })
-    }
-
-    pub fn open_with_pool_sizes(
-        path: impl AsRef<Path>,
-        reader_pool_max_size: u32,
-        writer_pool_max_size: u32,
-    ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config(
-            path,
-            crate::SqlitePoolConfig {
-                reader_pool_max_size,
-                writer_pool_max_size,
-                max_page_count: None,
-            },
-        )
-    }
-}
-
-fn build_receipt_pool(
-    path: &Path,
-    max_size: u32,
-    pool_name: &str,
-    flags: Option<rusqlite::OpenFlags>,
-    max_page_count: Option<u32>,
-    receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
-) -> Result<Pool<SqliteConnectionManager>, ReceiptStoreError> {
-    if max_size == 0 {
-        return Err(ReceiptStoreError::Pool(format!(
-            "{pool_name} receipt sqlite pool max_size must be greater than zero"
-        )));
-    }
-    let mut manager = SqliteConnectionManager::file(path);
-    if let Some(flags) = flags {
-        manager = manager.with_flags(flags);
-    }
-    let manager = manager.with_init(move |connection| {
-        configure_sqlite_connection(connection, max_page_count).map_err(|error| match error {
-            ReceiptStoreError::Sqlite(error) => error,
-            other => rusqlite::Error::InvalidParameterName(other.to_string()),
-        })?;
-        if let Some(qualification) = receipt_sink_qualification.as_deref() {
-            qualification
-                .validate_connection(connection)
-                .map_err(|error| rusqlite::Error::InvalidParameterName(error.to_string()))?;
-        }
-        Ok(())
-    });
-    crate::pool::sqlite_pool_builder()
-        .max_size(max_size)
-        .build(manager)
-        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
-}
-
-fn existing_database_open_flags() -> rusqlite::OpenFlags {
-    rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
-}
-
-fn require_existing_receipt_schema(
-    path: &Path,
-    connection: &Connection,
-) -> Result<(), ReceiptStoreError> {
-    const REQUIRED_TABLES: &[&str] = &[
-        "chio_tool_receipts",
-        "chio_child_receipts",
-        "claim_receipt_log_entries",
-        "kernel_checkpoints",
-        "checkpoint_tree_heads",
-        "checkpoint_predecessor_witnesses",
-        "checkpoint_publication_metadata",
-    ];
-
-    for table in REQUIRED_TABLES {
-        let exists: Option<String> = connection
-            .query_row(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1",
-                [*table],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if exists.is_none() {
-            return Err(ReceiptStoreError::NotFound(format!(
-                "receipt database {} is not an initialized Chio receipt store: missing table {table}",
-                path.display()
-            )));
-        }
-    }
-
+    transaction.execute_batch(crate::iou_store::IOU_ENVELOPE_SCHEMA)?;
+    transaction.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
+    transaction.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
+    super::support::install_receipt_cost_indexes(transaction)?;
+    super::support::validate_indexed_security_evidence_schema(transaction)?;
+    super::support::ensure_receipt_retention_watermark_table(transaction)?;
+    super::support::ensure_receipt_retention_tombstones(transaction)?;
+    super::support::drop_transparency_projection_guards(transaction)?;
+    super::support::validate_claim_receipt_log_entries_in_transaction(transaction)?;
+    super::support::validate_checkpoint_transparency_projections(transaction)?;
+    super::support::ensure_transparency_projection_guards(transaction)?;
+    verify_receipt_cost_projection(transaction)?;
+    initialize_receipt_rollback_generation(transaction)?;
+    ensure_receipt_sink_identity(transaction)?;
     Ok(())
 }

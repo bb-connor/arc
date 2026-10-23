@@ -40,6 +40,19 @@ impl NativeDispatchLedgerTestFault {
 }
 
 impl SqliteAdmissionOperationStore {
+    pub fn inject_nonce_capture_preparation_failure_for_test(
+        &self,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        self.connection()?
+            .execute_batch(
+                "CREATE TEMP TRIGGER capture_cutpoint BEFORE INSERT ON main.admission_execution_nonce_transitions
+                 WHEN NEW.kind = 'capture_pending'
+                 AND (SELECT COUNT(*) FROM admission_operations) = 1
+                 BEGIN SELECT RAISE(ABORT, 'injected capture cutpoint'); END;",
+            )
+            .map_err(sqlite_error)
+    }
+
     pub fn inject_native_dispatch_capture_failure_for_test(
         &self,
         fault: NativeDispatchCaptureTestFault,

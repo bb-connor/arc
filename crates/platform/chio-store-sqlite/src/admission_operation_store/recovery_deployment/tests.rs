@@ -1009,9 +1009,11 @@ fn missing_quota_projection_with_retained_history_refuses_save_and_startup() -> 
     drop(store);
     drop(authority);
     match crate::test_authority::open_serving(&database, &lock_root) {
-        Err(crate::SqliteServingOwnerError::Invalid(message)) => assert_eq!(
+        Err(crate::SqliteServingOwnerError::BudgetSchema(
+            chio_kernel::BudgetStoreError::Invariant(message),
+        )) => assert_eq!(
             message,
-            "admission operation invariant failed: recovery history names an absent record"
+            "sqlite foreign key violation in `admission_operation_recovery_events` row 3"
         ),
         Err(other) => return Err(format!("unexpected cold open refusal: {other:?}").into()),
         Ok(_) => return Err("cold open accepted a missing quota projection".into()),

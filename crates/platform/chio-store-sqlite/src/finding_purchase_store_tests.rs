@@ -2247,11 +2247,17 @@ fn finding_purchase_schema_other_than_current_is_refused() {
         ),
     ] {
         let mut connection = Connection::open_in_memory().expect("in-memory database");
-        initialize_finding_purchase_schema(&mut connection).expect("create current schema");
-        crate::stamp_schema_version(&connection, FINDING_PURCHASE_SCHEMA_KEY, version)
+        crate::test_schema::apply(
+            &mut connection,
+            &[FINDING_PURCHASE_SCHEMA_KEY],
+            initialize_finding_purchase_schema,
+            |error| FindingPurchaseStoreError::Invariant(error.to_string()),
+        )
+        .expect("create current schema");
+        crate::test_schema::write_version(&connection, FINDING_PURCHASE_SCHEMA_KEY, version)
             .expect("stage schema version");
         assert!(matches!(
-            initialize_finding_purchase_schema(&mut connection),
+            crate::test_schema::apply(&mut connection, &[FINDING_PURCHASE_SCHEMA_KEY], initialize_finding_purchase_schema, |error| FindingPurchaseStoreError::Invariant(error.to_string())),
             Err(FindingPurchaseStoreError::Invariant(message)) if message == expected
         ));
     }
@@ -2260,12 +2266,18 @@ fn finding_purchase_schema_other_than_current_is_refused() {
 #[test]
 fn current_stamp_over_a_retired_purchase_shape_is_refused() {
     let mut connection = Connection::open_in_memory().expect("in-memory database");
-    initialize_finding_purchase_schema(&mut connection).expect("create current schema");
+    crate::test_schema::apply(
+        &mut connection,
+        &[FINDING_PURCHASE_SCHEMA_KEY],
+        initialize_finding_purchase_schema,
+        |error| FindingPurchaseStoreError::Invariant(error.to_string()),
+    )
+    .expect("create current schema");
     connection
         .execute_batch("DROP INDEX purchase_reservations_listing;")
         .expect("drop index");
     assert!(matches!(
-        initialize_finding_purchase_schema(&mut connection),
+        crate::test_schema::apply(&mut connection, &[FINDING_PURCHASE_SCHEMA_KEY], initialize_finding_purchase_schema, |error| FindingPurchaseStoreError::Invariant(error.to_string())),
         Err(FindingPurchaseStoreError::Invariant(message))
             if message == "finding purchase schema differs from the canonical definition"
     ));

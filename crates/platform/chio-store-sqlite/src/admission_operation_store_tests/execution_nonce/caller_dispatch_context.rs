@@ -417,16 +417,25 @@ fn caller_context_uncommitted_and_orphan_rows_fail_closed() -> TestResult {
             )?;
             connection.execute_batch("PRAGMA foreign_keys = ON;")?;
         }
-        let expected = if orphan {
-            "caller context has no owning admission operation"
-        } else {
-            "caller dispatch context has no committed operation owner"
-        };
         let error = match lifecycle::reopen(fixture) {
             Ok(_) => return Err("startup accepted an unowned caller context".into()),
             Err(error) => error,
         };
-        assert!(error.to_string().contains(expected), "{error}");
+        if orphan {
+            assert!(
+                matches!(error.downcast_ref::<crate::SqliteServingOwnerError>(),
+                Some(crate::SqliteServingOwnerError::BudgetSchema(chio_kernel::BudgetStoreError::Invariant(message)))
+                    if message == "sqlite foreign key violation in `admission_operation_caller_contexts` row 1"),
+                "{error}"
+            );
+        } else {
+            assert!(
+                error
+                    .to_string()
+                    .contains("caller dispatch context has no committed operation owner"),
+                "{error}"
+            );
+        }
     }
     Ok(())
 }

@@ -424,3 +424,62 @@ fn kg2_signed_history_cannot_promote_recovery_root_to_issuer() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn schema_reopen_refuses_deleted_identity_without_repair() -> TestResult {
+    let root = private_root()?;
+    let path = root.path().join("authority.db");
+    drop(SqliteCapabilityAuthority::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute("DELETE FROM authority_state", [])?;
+    let result = SqliteCapabilityAuthority::open(&path);
+    let count: i64 =
+        connection.query_row("SELECT COUNT(*) FROM authority_state", [], |row| row.get(0))?;
+    assert_eq!(count, 0);
+    assert!(
+        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
+        if message == "authority identity is missing")
+    );
+    Ok(())
+}
+
+#[test]
+fn schema_reopen_refuses_deleted_fence_without_repair() -> TestResult {
+    let root = private_root()?;
+    let path = root.path().join("authority.db");
+    drop(SqliteCapabilityAuthority::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute("DELETE FROM authority_cluster_fence", [])?;
+    let result = SqliteCapabilityAuthority::open(&path);
+    let count: i64 =
+        connection.query_row("SELECT COUNT(*) FROM authority_cluster_fence", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(count, 0);
+    assert!(
+        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
+        if message == "authority cluster fence is missing")
+    );
+    Ok(())
+}
+
+#[test]
+fn schema_reopen_refuses_deleted_stamp_without_repair() -> TestResult {
+    let root = private_root()?;
+    let path = root.path().join("authority.db");
+    drop(SqliteCapabilityAuthority::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute("DELETE FROM chio_store_schema_versions", [])?;
+    let result = SqliteCapabilityAuthority::open(&path);
+    let count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_store_schema_versions",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(count, 0);
+    assert!(
+        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
+        if message == "schema namespace authority is missing")
+    );
+    Ok(())
+}

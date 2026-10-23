@@ -56,13 +56,9 @@ fn path_opens_in_memory(path: &Path) -> bool {
     })
 }
 
-/// The revocation store's single schema version.
-pub(crate) const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const REVOCATION_STORE_SCHEMA_KEY: &str = "revocation";
-/// Table that identifies a populated revocation database.
-const REVOCATION_STORE_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
 
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
@@ -121,30 +117,24 @@ impl SqliteRevocationStore {
                 "provisioned sqlite authority store requires joint serving owner at epoch {epoch}"
             )));
         }
-        let state = crate::check_current_schema(
-            &connection,
-            REVOCATION_STORE_SCHEMA_KEY,
-            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-            REVOCATION_STORE_ANCHOR_TABLES,
+        connection.pragma_update(None, "foreign_keys", true)?;
+        let creation = crate::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[REVOCATION_STORE_SCHEMA_KEY],
         )
         .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
-        let provisioned: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'revoked_capabilities')",
-            [],
-            |row| row.get(0),
+        initialize_revocation_schema(&creation, false)?;
+        creation
+            .validate_catalog(&format!(
+                "{REVOCATION_SCHEMA}\n{REVOCATION_STANDALONE_SCHEMA}"
+            ))
+            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+        creation
+            .commit()
+            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
-        if state == crate::SchemaState::Unstamped && provisioned {
-            return Err(RevocationStoreError::Sync(
-                "revocation storage is provisioned without a schema stamp".into(),
-            ));
-        }
-        initialize_revocation_schema(&mut connection, false)?;
-        crate::stamp_schema_version(
-            &connection,
-            REVOCATION_STORE_SCHEMA_KEY,
-            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
         verify_revocation_foreign_keys(&connection)?;
         let clock = crate::store_clock::StoreClock::new(clock);
         if rotate_replication_epoch {
@@ -716,16 +706,7 @@ impl RevocationStore for SqliteRevocationStore {
     }
 }
 
-pub(crate) fn initialize_revocation_schema(
-    connection: &mut Connection,
-    shared_authority_sequence: bool,
-) -> Result<(), RevocationStoreError> {
-    connection.execute_batch(
-        r#"
-        PRAGMA journal_mode = WAL;
-        PRAGMA synchronous = FULL;
-        PRAGMA busy_timeout = 5000;
-        PRAGMA foreign_keys = ON;
+const REVOCATION_SCHEMA: &str = r#"
 
         CREATE TABLE IF NOT EXISTS revoked_capabilities (
             capability_id TEXT PRIMARY KEY,
@@ -756,21 +737,14 @@ pub(crate) fn initialize_revocation_schema(
             stream_id TEXT NOT NULL CHECK (stream_id <> '')
         );
 
-        "#,
-    )?;
-
-    if !shared_authority_sequence {
-        connection.execute_batch(
-            r#"
+        "#;
+const REVOCATION_STANDALONE_SCHEMA: &str = r#"
             CREATE TABLE IF NOT EXISTS revocation_replication_meta (
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                 next_index INTEGER NOT NULL CHECK (next_index >= 0)
             );
-            "#,
-        )?;
-    } else {
-        connection.execute_batch(
-            r#"
+            "#;
+const REVOCATION_AUTHORITY_SCHEMA: &str = r#"
             CREATE TABLE IF NOT EXISTS admission_authority_meta (
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                 head_index INTEGER NOT NULL CHECK (head_index > 0)
@@ -789,181 +763,68 @@ pub(crate) fn initialize_revocation_schema(
                     REFERENCES revoked_capabilities(capability_id)
             );
 
-            CREATE TABLE IF NOT EXISTS chio_authority_migrations (
-                migration_key TEXT PRIMARY KEY CHECK (migration_key <> ''),
-                completed_index INTEGER NOT NULL CHECK (completed_index > 0)
-            );
-            "#,
-        )?;
-    }
+            "#;
 
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute(
-        "INSERT INTO revocation_stream_meta (singleton, stream_id) VALUES (1, ?1) \
-         ON CONFLICT(singleton) DO NOTHING",
-        [uuid::Uuid::now_v7().to_string()],
-    )?;
-    initialize_revocation_delta_log(&transaction)?;
-    if shared_authority_sequence {
-        transaction.execute(
-            r#"
-            INSERT INTO admission_authority_meta (singleton, head_index)
-            VALUES (1, 1)
-            ON CONFLICT(singleton) DO NOTHING
-            "#,
-            [],
-        )?;
-        transaction.execute(
-            r#"
-            INSERT INTO admission_authority_commits (
-                commit_index, kind, capability_id
-            ) VALUES (1, 'genesis', NULL)
-            ON CONFLICT(commit_index) DO NOTHING
-            "#,
-            [],
-        )?;
-        let converted = transaction.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM chio_authority_migrations
-                WHERE migration_key = 'revocation-admission-authority-v1'
-            )
-            "#,
-            [],
-            |row| row.get::<_, bool>(0),
-        )?;
-        if !converted {
-            transaction.execute(
-                "UPDATE revoked_capabilities SET admission_authority_commit_index = NULL",
-                [],
-            )?;
-            transaction.execute(
-                "DELETE FROM admission_authority_commits WHERE kind = 'revocation'",
-                [],
-            )?;
-        }
-        let mut next_index = if converted {
-            transaction.query_row(
-                r#"
-                SELECT MAX(
-                    (SELECT head_index FROM admission_authority_meta
-                     WHERE singleton = 1),
-                    COALESCE((SELECT MAX(commit_index)
-                              FROM admission_authority_commits), 1)
-                )
-                "#,
-                [],
-                |row| row.get::<_, i64>(0),
-            )?
+pub(crate) fn initialize_revocation_schema(
+    creation: &crate::schema_version::SchemaTransaction<'_>,
+    shared_authority_sequence: bool,
+) -> Result<(), RevocationStoreError> {
+    let transaction = creation.connection();
+    if creation.is_fresh() {
+        transaction.execute_batch(REVOCATION_SCHEMA)?;
+        transaction.execute_batch(if shared_authority_sequence {
+            REVOCATION_AUTHORITY_SCHEMA
         } else {
-            1
-        };
-        let capability_ids = {
-            let mut statement = transaction.prepare(
-                r#"
-                SELECT capability_id FROM revoked_capabilities
-                WHERE admission_authority_commit_index IS NULL
-                ORDER BY revoked_at, capability_id
-                "#,
-            )?;
-            let rows = statement
-                .query_map([], |row| row.get::<_, String>(0))?
-                .collect::<Result<Vec<_>, _>>()?;
-            rows
-        };
-        for capability_id in capability_ids {
-            next_index = next_index.checked_add(1).ok_or_else(|| {
-                RevocationStoreError::Sync(
-                    "admission authority commit index overflowed i64".to_string(),
-                )
-            })?;
-            transaction.execute(
-                r#"
-                UPDATE revoked_capabilities
-                SET admission_authority_commit_index = ?2
-                WHERE capability_id = ?1
-                "#,
-                params![&capability_id, next_index],
-            )?;
-            append_admission_revocation_commit(&transaction, next_index, &capability_id)?;
-        }
+            REVOCATION_STANDALONE_SCHEMA
+        })?;
         transaction.execute(
-            "UPDATE admission_authority_meta SET head_index = ?1 WHERE singleton = 1",
-            params![next_index],
+            "INSERT INTO revocation_stream_meta (singleton, stream_id) VALUES (1, ?1)",
+            [uuid::Uuid::now_v7().to_string()],
         )?;
         transaction.execute(
-            r#"
-            INSERT INTO chio_authority_migrations (
-                migration_key, completed_index
-            ) VALUES ('revocation-admission-authority-v1', ?1)
-            ON CONFLICT(migration_key) DO NOTHING
-            "#,
-            params![next_index],
-        )?;
-        let invalid = transaction.query_row(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM revoked_capabilities AS revoked
-                WHERE admission_authority_commit_index IS NULL
-                   OR NOT EXISTS (
-                       SELECT 1 FROM admission_authority_commits AS committed
-                       WHERE committed.commit_index =
-                                 revoked.admission_authority_commit_index
-                         AND committed.kind = 'revocation'
-                         AND committed.capability_id = revoked.capability_id
-                   )
-            )
-            "#,
+            "INSERT INTO revocation_delta_meta (singleton, next_seq) VALUES (1, 0)",
             [],
-            |row| row.get::<_, bool>(0),
         )?;
-        if invalid {
-            return Err(RevocationStoreError::Sync(
-                "admission authority revocation projection is incomplete".to_string(),
-            ));
+        if shared_authority_sequence {
+            transaction.execute(
+                "INSERT INTO admission_authority_meta (singleton, head_index) VALUES (1, 1)",
+                [],
+            )?;
+            transaction.execute("INSERT INTO admission_authority_commits (commit_index, kind, capability_id) VALUES (1, 'genesis', NULL)", [])?;
+        } else {
+            transaction.execute(
+                "INSERT INTO revocation_replication_meta (singleton, next_index) VALUES (1, 0)",
+                [],
+            )?;
         }
+        creation
+            .stamp(REVOCATION_STORE_SCHEMA_KEY)
+            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
+    }
+    verify_revocation_delta_invariants(transaction)?;
+    if shared_authority_sequence {
+        verify_admission_authority_invariants(transaction)?;
     } else {
-        let mut next_index = transaction.query_row(
+        let next: i64 = transaction.query_row(
+            "SELECT next_index FROM revocation_replication_meta WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        let maximum: i64 = transaction.query_row(
             "SELECT COALESCE(MAX(revocation_index), 0) FROM revoked_capabilities",
             [],
-            |row| row.get::<_, i64>(0),
+            |row| row.get(0),
         )?;
-        let capability_ids = {
-            let mut statement = transaction.prepare(
-                r#"
-                SELECT capability_id FROM revoked_capabilities
-                WHERE revocation_index IS NULL
-                ORDER BY revoked_at, capability_id
-                "#,
-            )?;
-            let rows = statement
-                .query_map([], |row| row.get::<_, String>(0))?
-                .collect::<Result<Vec<_>, _>>()?;
-            rows
-        };
-        for capability_id in capability_ids {
-            next_index = next_index.checked_add(1).ok_or_else(|| {
-                RevocationStoreError::Sync("revocation index overflowed i64".to_string())
-            })?;
-            transaction.execute(
-                "UPDATE revoked_capabilities SET revocation_index = ?2 WHERE capability_id = ?1",
-                params![capability_id, next_index],
-            )?;
+        let missing: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE revocation_index IS NULL)",
+            [],
+            |row| row.get(0),
+        )?;
+        if next < maximum || missing {
+            return Err(RevocationStoreError::Sync(
+                "revocation replication index is inconsistent".into(),
+            ));
         }
-        transaction.execute(
-            r#"
-            INSERT INTO revocation_replication_meta (singleton, next_index)
-            VALUES (1, ?1)
-            ON CONFLICT(singleton) DO UPDATE SET
-                next_index = MAX(next_index, excluded.next_index)
-            "#,
-            params![next_index],
-        )?;
-    }
-    transaction.commit()?;
-    verify_revocation_delta_invariants(connection)?;
-    if shared_authority_sequence {
-        verify_admission_authority_invariants(connection)?;
     }
     Ok(())
 }
@@ -1036,29 +897,6 @@ fn append_revocation_delta(
     transaction.execute(
         "UPDATE revocation_delta_meta SET next_seq = ?1 WHERE singleton = 1",
         params![next],
-    )?;
-    Ok(())
-}
-
-/// Create the delta-log metadata row and keep `next_seq` at or above the
-/// highest logged sequence.
-fn initialize_revocation_delta_log(
-    transaction: &Transaction<'_>,
-) -> Result<(), RevocationStoreError> {
-    transaction.execute(
-        "INSERT INTO revocation_delta_meta (singleton, next_seq) VALUES (1, 0) \
-         ON CONFLICT(singleton) DO NOTHING",
-        [],
-    )?;
-    let max_seq = transaction.query_row(
-        "SELECT COALESCE(MAX(seq), 0) FROM revocation_delta_log",
-        [],
-        |row| row.get::<_, i64>(0),
-    )?;
-    transaction.execute(
-        "UPDATE revocation_delta_meta SET next_seq = MAX(next_seq, ?1) \
-         WHERE singleton = 1",
-        params![max_seq],
     )?;
     Ok(())
 }
@@ -1178,7 +1016,7 @@ fn commit_mutation(
 pub(crate) fn verify_admission_authority_invariants(
     connection: &Connection,
 ) -> Result<(), RevocationStoreError> {
-    let (head, commit_count, max_commit, genesis_count, migration_count) = connection.query_row(
+    let (head, commit_count, max_commit, genesis_count) = connection.query_row(
         r#"
             SELECT
                 (SELECT head_index FROM admission_authority_meta
@@ -1188,9 +1026,7 @@ pub(crate) fn verify_admission_authority_invariants(
                  FROM admission_authority_commits),
                 (SELECT COUNT(*) FROM admission_authority_commits
                  WHERE commit_index = 1 AND kind = 'genesis'
-                   AND capability_id IS NULL),
-                (SELECT COUNT(*) FROM chio_authority_migrations
-                 WHERE migration_key = 'revocation-admission-authority-v1')
+                   AND capability_id IS NULL)
             "#,
         [],
         |row| {
@@ -1199,7 +1035,6 @@ pub(crate) fn verify_admission_authority_invariants(
                 row.get::<_, i64>(1)?,
                 row.get::<_, i64>(2)?,
                 row.get::<_, i64>(3)?,
-                row.get::<_, i64>(4)?,
             ))
         },
     )?;
@@ -1224,7 +1059,6 @@ pub(crate) fn verify_admission_authority_invariants(
         || commit_count != head
         || max_commit != head
         || genesis_count != 1
-        || migration_count != 1
         || invalid_projection
     {
         return Err(RevocationStoreError::Sync(
@@ -1404,7 +1238,7 @@ mod tests {
         let path = unique_db_path("chio-rev-stale-schema");
         drop(SqliteRevocationStore::open(&path)?);
         let connection = Connection::open(&path)?;
-        crate::stamp_schema_version(&connection, REVOCATION_STORE_SCHEMA_KEY, 4)?;
+        crate::test_schema::write_version(&connection, REVOCATION_STORE_SCHEMA_KEY, 4)?;
         drop(connection);
 
         let error = SqliteRevocationStore::open(&path)
@@ -1435,7 +1269,7 @@ mod tests {
             .ok_or("unstamped store opened")?;
         assert_eq!(
             error.to_string(),
-            "revocation store synchronization error: revocation storage is provisioned without a schema stamp"
+            "revocation store synchronization error: schema namespace revocation is missing"
         );
         let _ = fs::remove_file(&path);
         Ok(())

@@ -251,7 +251,13 @@ fn receipt_store_refuses_a_schema_version_other_than_current() {
         drop(SqliteReceiptStore::open(&path).test_unwrap());
         {
             let connection = rusqlite::Connection::open(&path).test_unwrap();
-            crate::stamp_schema_version(&connection, "receipt", version).test_unwrap();
+            connection
+                .execute_batch("PRAGMA ignore_check_constraints = ON;")
+                .test_unwrap();
+            connection.execute("UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = 'receipt'", [version]).test_unwrap();
+            connection
+                .execute_batch("PRAGMA ignore_check_constraints = OFF;")
+                .test_unwrap();
         }
         for opened in [
             SqliteReceiptStore::open(&path),
@@ -305,7 +311,7 @@ fn receipt_store_refuses_a_current_stamp_over_a_retired_table_shape(
             .ok_or("a retired receipt table shape must be refused")?;
         assert_eq!(
             error.to_string(),
-            "conflict: receipt cost projection schema differs from the canonical definition"
+            "conflict: schema catalog differs from its canonical definition"
         );
     }
     let connection = rusqlite::Connection::open(&path)?;
@@ -494,7 +500,9 @@ fn current_receipt_schema_rejects_substituted_cost_indexes(
             }
             Err(error) => error,
         };
-        assert!(error.to_string().contains("cost projection schema"));
+        assert!(
+            matches!(error, ReceiptStoreError::Conflict(message) if message == "schema catalog differs from its canonical definition")
+        );
 
         let _ = fs::remove_file(path);
     }
@@ -524,7 +532,9 @@ fn current_receipt_schema_rejects_substituted_immutability_guard(
         }
         Err(error) => error,
     };
-    assert!(error.to_string().contains("cost projection schema"));
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(message) if message == "schema catalog differs from its canonical definition")
+    );
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -902,13 +912,7 @@ fn receipt_pool_sizes_reject_zero_capacity() {
 }
 
 #[test]
-fn open_existing_reinstalls_projection_guards() {
-    // `SqliteReceiptStore::open_existing` runs
-    // `ensure_transparency_projection_guards` against the connection it
-    // opens, which must reinstall every immutability trigger that
-    // protects the transparency projection rows. Drop a representative
-    // subset before reopening and confirm the reopen restores the full
-    // guard set.
+fn open_existing_refuses_missing_projection_guards_without_repair() {
     let path = unique_db_path("chio-receipts-open-existing-guards");
 
     let store = SqliteReceiptStore::open(&path).test_unwrap();
@@ -947,13 +951,28 @@ fn open_existing_reinstalls_projection_guards() {
     }
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path).test_unwrap();
-    for trigger in TRANSPARENCY_PROJECTION_GUARD_TRIGGER_NAMES {
-        assert!(
-            trigger_exists(&reopened, trigger),
-            "trigger {trigger} should be reinstalled by open_existing"
-        );
+    assert!(
+        matches!(SqliteReceiptStore::open_existing(&path), Err(ReceiptStoreError::Conflict(message))
+        if message == "schema catalog differs from its canonical definition")
+    );
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    for trigger in dropped_triggers {
+        let present: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'trigger' AND name = ?1)",
+                [trigger],
+                |row| row.get(0),
+            )
+            .test_unwrap();
+        assert!(!present);
     }
+    let receipts: i64 = connection
+        .query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+            row.get(0)
+        })
+        .test_unwrap();
+    assert_eq!(receipts, 1);
+    drop(connection);
 
     let _ = fs::remove_file(path);
 }

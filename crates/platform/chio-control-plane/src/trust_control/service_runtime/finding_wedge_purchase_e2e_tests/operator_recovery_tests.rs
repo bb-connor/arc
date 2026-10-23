@@ -32,11 +32,12 @@ fn operator_filing_resolver_retains_pre_rotation_authority_policies() -> TestRes
     let bundle_json = bundle.to_canonical_json()?;
     let indexes = finding_operator_bundle_artifact_indexes(&bundle, &original)
         .map_err(std::io::Error::other)?;
-    let store = SqliteFindingOperatorBundleStore::open(
-        deployment
-            .database
-            .with_file_name("operator-historical-filing-policies.db"),
-    )?;
+    let operator_database = deployment
+        .database
+        .with_file_name("operator-historical-filing-policies.db");
+    chio_store_sqlite::initialize_finding_operator_database(&operator_database)
+        .map_err(std::io::Error::other)?;
+    let store = SqliteFindingOperatorBundleStore::open(&operator_database)?;
     store.put_with_artifact_indexes(&deployment.web.finding_id, &bundle_json, &indexes)?;
 
     let mut rotated = original.clone();
@@ -96,6 +97,8 @@ fn production_purchase_executor(
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let bundle_json = bundle.to_canonical_json()?;
+    chio_store_sqlite::initialize_finding_operator_database(&operator_db_path)
+        .map_err(std::io::Error::other)?;
     SqliteFindingOperatorBundleStore::open(&operator_db_path)?
         .put(&deployment.web.finding_id, &bundle_json)?;
     SqliteFindingPayloadStore::open(&operator_db_path)?.put(

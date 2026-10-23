@@ -38,13 +38,8 @@ pub struct SqliteCapabilityAuthority {
     custody: custody::AuthorityCustody,
 }
 
-/// Authority-store schema revision. Any other stamped revision is refused.
-const AUTHORITY_STORE_SCHEMA_VERSION: i32 = 1;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table, distinct from any co-located store's key.
 const AUTHORITY_STORE_SCHEMA_KEY: &str = "authority";
-/// Tables that identify a database as belonging to the authority store.
-const AUTHORITY_STORE_ANCHOR_TABLES: &[&str] = &["authority_state"];
+const AUTHORITY_SCHEMA: &str = include_str!("authority/schema.sql");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityClusterFence {
@@ -87,20 +82,27 @@ impl SqliteCapabilityAuthority {
         let bootstrap = Keypair::generate();
         let bootstrap_time = clock.unix_millis()?;
         let bootstrap_at = bootstrap_time.as_secs();
-        let mut connection = Self::open_connection(&custody)?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let inserted = transaction.execute(
-            r#"
-            INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at)
-            VALUES (1, ?1, ?2, 1, ?3)
-            ON CONFLICT(singleton_id) DO NOTHING
-            "#,
-            params![
-                bootstrap.seed_hex(),
-                bootstrap.public_key().to_hex(),
-                authority_sqlite_integer(bootstrap_at, "rotation time")?
-            ],
-        )?;
+        let mut connection = custody.open_connection()?;
+        let schema = crate::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[AUTHORITY_STORE_SCHEMA_KEY],
+        )
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        if schema.is_fresh() {
+            schema.connection().execute_batch(AUTHORITY_SCHEMA)?;
+            schema.connection().execute(
+                "INSERT INTO authority_cluster_fence (singleton_id, leader_url, election_term, updated_at) VALUES (1, NULL, 0, 0)", [],
+            )?;
+            schema.connection().execute(
+                "INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at) VALUES (1, ?1, ?2, 1, ?3)",
+                params![bootstrap.seed_hex(), bootstrap.public_key().to_hex(), authority_sqlite_integer(bootstrap_at, "rotation time")?],
+            )?;
+        }
+        schema
+            .validate_catalog(AUTHORITY_SCHEMA)
+            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        Self::validate_required_rows(schema.connection())?;
+        let transaction = schema.connection();
         let current_public_key = transaction
             .query_row(
                 r#"
@@ -113,16 +115,16 @@ impl SqliteCapabilityAuthority {
             )
             .map(|seed_hex| Keypair::from_seed_hex(seed_hex.trim()))
             .map_err(AuthorityStoreError::from)??;
-        if inserted != 0 {
+        if schema.is_fresh() {
             persist_trusted_key(
-                &transaction,
+                transaction,
                 &current_public_key.public_key().to_hex(),
                 1,
                 bootstrap_at,
                 &AuthorityKeyLifecycle::Active,
             )?;
         }
-        let status = Self::read_status_from_connection(&transaction)?;
+        let status = Self::read_status_from_connection(transaction)?;
         // A head without persisted issuer history is not evidence of issuer
         // trust. Never repair it by inserting a follower's local key.
         if !status.trusted_public_keys.contains(&status.public_key) {
@@ -131,12 +133,22 @@ impl SqliteCapabilityAuthority {
             ));
         }
         replication::observe_replication_time(
-            &transaction,
+            transaction,
             bootstrap_time,
             replication_clock_policy,
         )?;
-        custody.validate(&transaction)?;
-        transaction.commit()?;
+        custody.validate(transaction)?;
+        if schema.is_fresh() {
+            schema
+                .stamp(AUTHORITY_STORE_SCHEMA_KEY)
+                .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        }
+        schema
+            .commit()
+            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
+        )?;
         Ok(Self {
             clock,
             replication_clock_policy,
@@ -407,95 +419,47 @@ impl SqliteCapabilityAuthority {
         Ok(())
     }
 
-    fn open_connection(
-        custody: &custody::AuthorityCustody,
-    ) -> Result<Connection, AuthorityStoreError> {
-        let connection = custody.open_connection()?;
-        let state = crate::check_current_schema(
-            &connection,
-            AUTHORITY_STORE_SCHEMA_KEY,
-            AUTHORITY_STORE_SCHEMA_VERSION,
-            AUTHORITY_STORE_ANCHOR_TABLES,
-        )
-        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
-        let provisioned: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'authority_state')",
+    fn validate_required_rows(connection: &Connection) -> Result<(), AuthorityStoreError> {
+        let identity: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM authority_state WHERE singleton_id = 1)",
             [],
             |row| row.get(0),
         )?;
-        if state == crate::SchemaState::Unstamped && provisioned {
+        if !identity {
             return Err(AuthorityStoreError::Schema(
-                "authority storage is provisioned without a schema stamp".into(),
+                "authority identity is missing".into(),
             ));
         }
-        connection.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS authority_state (
-                singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
-                seed_hex TEXT NOT NULL,
-                public_key_hex TEXT NOT NULL,
-                generation INTEGER NOT NULL,
-                rotated_at INTEGER NOT NULL,
-                observed_ms INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS authority_trusted_keys (
-                public_key_hex TEXT PRIMARY KEY,
-                generation INTEGER NOT NULL,
-                activated_at INTEGER NOT NULL,
-                lifecycle_json TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS authority_cluster_fence (
-                singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
-                leader_url TEXT,
-                election_term INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                authority_generation INTEGER NOT NULL DEFAULT 0,
-                authority_rotated_at INTEGER NOT NULL DEFAULT 0
-            );
-
-            INSERT INTO authority_cluster_fence (singleton_id, leader_url, election_term, updated_at)
-            VALUES (1, NULL, 0, 0)
-            ON CONFLICT(singleton_id) DO NOTHING;
-
-            CREATE TABLE IF NOT EXISTS authority_budget_anchor_commits (
-                commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
-                previous_chain_digest TEXT NOT NULL,
-                chain_digest TEXT NOT NULL UNIQUE,
-                anchor_set_digest TEXT NOT NULL,
-                leader_url TEXT NOT NULL CHECK (leader_url <> ''),
-                election_term INTEGER NOT NULL CHECK (election_term > 0),
-                committed_at INTEGER NOT NULL CHECK (committed_at >= 0),
-                signer_public_key TEXT NOT NULL CHECK (signer_public_key <> ''),
-                signature TEXT NOT NULL CHECK (signature <> '')
-            );
-
-            CREATE TRIGGER IF NOT EXISTS authority_budget_anchor_commits_immutable
-            BEFORE UPDATE ON authority_budget_anchor_commits
-            BEGIN
-                SELECT RAISE(ABORT, 'budget anchor commitment is immutable');
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS authority_budget_anchor_commits_no_delete
-            BEFORE DELETE ON authority_budget_anchor_commits
-            BEGIN
-                SELECT RAISE(ABORT, 'budget anchor commitment is immutable');
-            END;
-            "#,
+        let fence: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM authority_cluster_fence WHERE singleton_id = 1)",
+            [],
+            |row| row.get(0),
         )?;
-        replication::ensure_schema(&connection)?;
-        crate::stamp_schema_version(
-            &connection,
-            AUTHORITY_STORE_SCHEMA_KEY,
-            AUTHORITY_STORE_SCHEMA_VERSION,
-        )
-        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
-        custody.validate(&connection)?;
+        if !fence {
+            return Err(AuthorityStoreError::Schema(
+                "authority cluster fence is missing".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn open_connection(
+        custody: &custody::AuthorityCustody,
+    ) -> Result<Connection, AuthorityStoreError> {
+        let mut connection = custody.open_connection()?;
+        let snapshot = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        if crate::schema_version::inspect_schema(&snapshot, &[AUTHORITY_STORE_SCHEMA_KEY])
+            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
+            != crate::SchemaState::Current
+        {
+            return Err(AuthorityStoreError::Schema(
+                "authority identity is missing".into(),
+            ));
+        }
+        Self::validate_required_rows(&snapshot)?;
+        custody.validate(&snapshot)?;
+        snapshot.commit()?;
+        connection.execute_batch("PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;")?;
         Ok(connection)
     }
 

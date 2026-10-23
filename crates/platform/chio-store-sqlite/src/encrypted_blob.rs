@@ -363,84 +363,9 @@ pub struct SqliteEncryptedBlobStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Encrypted-blob-store schema version; a database stamped otherwise is refused.
-const ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table, distinct from any co-located store's key.
 const ENCRYPTED_BLOB_STORE_SCHEMA_KEY: &str = "encrypted_blob";
-/// Tables that identify a populated encrypted-blob database as this store's.
-const ENCRYPTED_BLOB_STORE_ANCHOR_TABLES: &[&str] =
-    &["chio_encrypted_blobs", "security_transitions"];
 
-impl SqliteEncryptedBlobStore {
-    /// Open the store at `path`, creating parent directories if needed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, BlobStoreError> {
-        Self::open_with_clock(path, Arc::new(SystemClock))
-    }
-
-    /// Open with the time authority shared by the composing service.
-    pub fn open_with_clock(
-        path: impl AsRef<Path>,
-        clock: Arc<dyn Clock>,
-    ) -> Result<Self, BlobStoreError> {
-        let path = path.as_ref();
-        // Resolve any `file:` URI to its on-disk parent before creating it, so a
-        // URI-configured store creates the real backing directory rather than a
-        // bogus scheme-prefixed one.
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-            fs::create_dir_all(&parent)?;
-        }
-        let manager = SqliteConnectionManager::file(path)
-            .with_flags(
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
-                    | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
-                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-            )
-            .with_init(configure_blob_connection);
-        let pool = crate::pool::sqlite_pool_builder()
-            .max_size(8)
-            .build(manager)?;
-        let store = Self {
-            pool,
-            clock: crate::store_clock::StoreClock::new(clock),
-        };
-        store.run_migrations()?;
-        Ok(store)
-    }
-
-    /// Open an in-memory store for tests.
-    pub fn open_in_memory() -> Result<Self, BlobStoreError> {
-        Self::open_in_memory_with_clock(Arc::new(SystemClock))
-    }
-
-    pub fn open_in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, BlobStoreError> {
-        let manager = SqliteConnectionManager::memory().with_init(configure_blob_connection);
-        let pool = crate::pool::sqlite_pool_builder()
-            .max_size(1)
-            .build(manager)?;
-        let store = Self {
-            pool,
-            clock: crate::store_clock::StoreClock::new(clock),
-        };
-        store.run_migrations()?;
-        Ok(store)
-    }
-
-    fn run_migrations(&self) -> Result<(), BlobStoreError> {
-        let conn = self.pool.get()?;
-        crate::check_current_schema(
-            &conn,
-            ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
-            ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
-            ENCRYPTED_BLOB_STORE_ANCHOR_TABLES,
-        )
-        .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
-        conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
+pub(crate) const ENCRYPTED_BLOB_SCHEMA: &str = r#"
             CREATE TABLE IF NOT EXISTS chio_encrypted_blobs (
                 blob_id TEXT PRIMARY KEY,
                 tenant_id TEXT NOT NULL,
@@ -490,14 +415,106 @@ impl SqliteEncryptedBlobStore {
             BEGIN
                 SELECT RAISE(ABORT, 'encrypted blob reference mutations are append-only');
             END;
-            "#,
+"#;
+
+pub(crate) fn initialize_blob_schema(
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> Result<(), BlobStoreError> {
+    if schema.is_fresh() {
+        schema.connection().execute_batch(ENCRYPTED_BLOB_SCHEMA)?;
+        schema
+            .stamp(ENCRYPTED_BLOB_STORE_SCHEMA_KEY)
+            .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+    }
+    Ok(())
+}
+
+impl SqliteEncryptedBlobStore {
+    /// Open the store at `path`, creating parent directories if needed.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, BlobStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, BlobStoreError> {
+        let path = path.as_ref();
+        // Resolve any `file:` URI to its on-disk parent before creating it, so a
+        // URI-configured store creates the real backing directory rather than a
+        // bogus scheme-prefixed one.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)?;
+        }
+        let manager = SqliteConnectionManager::file(path)
+            .with_flags(
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )
+            .with_init(configure_blob_connection);
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(8)
+            .build(manager)?;
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
+        store.initialize_schema()?;
+        Ok(store)
+    }
+
+    /// Open an in-memory store for tests.
+    pub fn open_in_memory() -> Result<Self, BlobStoreError> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, BlobStoreError> {
+        let manager = SqliteConnectionManager::memory().with_init(configure_blob_connection);
+        let pool = crate::pool::sqlite_pool_builder()
+            .max_size(1)
+            .build(manager)?;
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
+        store.initialize_schema()?;
+        Ok(store)
+    }
+
+    fn initialize_schema(&self) -> Result<(), BlobStoreError> {
+        let mut connection = self.pool.get()?;
+        let security_catalog: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE lower(name) GLOB 'security_*'
+             OR lower(tbl_name) GLOB 'security_*')",
+            [],
+            |row| row.get(0),
         )?;
-        crate::stamp_schema_version(
-            &conn,
-            ENCRYPTED_BLOB_STORE_SCHEMA_KEY,
-            ENCRYPTED_BLOB_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        let security_stamp =
+            crate::schema_version::read_store_schema_version(&connection, "security_state")
+                .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?
+                .is_some();
+        let namespaces = if security_catalog || security_stamp {
+            crate::security_state::SECURITY_BLOB_NAMESPACES
+        } else {
+            &[ENCRYPTED_BLOB_STORE_SCHEMA_KEY]
+        };
+        let schema = crate::schema_version::SchemaTransaction::begin(&mut connection, namespaces)
+            .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        initialize_blob_schema(&schema)?;
+        if security_catalog || security_stamp {
+            crate::security_state::validate_security_blob_catalog(schema.connection())
+                .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        } else {
+            schema
+                .validate_catalog(ENCRYPTED_BLOB_SCHEMA)
+                .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        }
+        schema
+            .commit()
+            .map_err(|error| BlobStoreError::Sqlite(error.to_string()))?;
+        connection.execute_batch("PRAGMA journal_mode = WAL;")?;
         Ok(())
     }
 

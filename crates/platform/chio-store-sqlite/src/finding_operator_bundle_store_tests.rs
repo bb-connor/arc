@@ -8,6 +8,7 @@ fn finding_id() -> String {
 fn canonical_bundle_survives_restart_and_replays_exactly() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("operator.db");
+    crate::initialize_finding_operator_database(&path).unwrap();
     let bundle = br#"{"schema":"chio.finding.operator-bundle.v1"}"#;
     let store = SqliteFindingOperatorBundleStore::open(&path).unwrap();
     assert_eq!(
@@ -26,7 +27,9 @@ fn canonical_bundle_survives_restart_and_replays_exactly() {
 #[test]
 fn every_pooled_connection_has_busy_timeout() {
     let dir = tempfile::tempdir().unwrap();
-    let store = SqliteFindingOperatorBundleStore::open(dir.path().join("operator.db")).unwrap();
+    let path = dir.path().join("operator.db");
+    crate::initialize_finding_operator_database(&path).unwrap();
+    let store = SqliteFindingOperatorBundleStore::open(&path).unwrap();
     let first = store.pool.get().unwrap();
     let second = store.pool.get().unwrap();
 
@@ -357,6 +360,7 @@ fn bundle_lookup_stops_at_the_first_streamed_match() {
 fn public_proof_survives_restart_and_replays_exactly() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("operator.db");
+    crate::initialize_finding_operator_database(&path).unwrap();
     let proof = br#"{"schema":"chio.finding.operator-proof-bundle.v1"}"#;
     let store = SqliteFindingOperatorBundleStore::open(&path).unwrap();
     assert_eq!(
@@ -581,13 +585,6 @@ fn terminal_capacity_claims_are_listed_with_exact_bindings() {
 #[test]
 fn seller_artifact_capacity_bounds_database_and_file_storage() {
     let store = SqliteFindingOperatorBundleStore::open_in_memory().unwrap();
-    {
-        let conn = store.pool.get().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE chio_finding_payloads (finding_id TEXT PRIMARY KEY, ciphertext BLOB NOT NULL)",
-        )
-        .unwrap();
-    }
     let database_bytes = {
         let conn = store.pool.get().unwrap();
         seller_database_bytes(&conn).unwrap()
@@ -657,8 +654,8 @@ fn seller_artifact_capacity_bounds_database_and_file_storage() {
     {
         let conn = store.pool.get().unwrap();
         conn.execute(
-            "INSERT INTO chio_finding_payloads (finding_id, ciphertext) VALUES (?1, ?2)",
-            params![finding_id, vec![0u8; 20]],
+            "INSERT INTO chio_finding_payloads (finding_id, tenant_id, media_type, payload_sha256, nonce, ciphertext, created_at) VALUES (?1, 'seller-1', 'application/octet-stream', ?2, ?3, ?4, 1)",
+            params![finding_id, "9".repeat(64), vec![0u8; 12], vec![0u8; 20]],
         )
         .unwrap();
         conn.execute(
@@ -718,24 +715,29 @@ fn seller_artifact_capacity_bounds_database_and_file_storage() {
 fn bundle_schema_other_than_current_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("operator.db");
+    crate::initialize_finding_operator_database(&path).unwrap();
     drop(SqliteFindingOperatorBundleStore::open(&path).unwrap());
     let conn = rusqlite::Connection::open(&path).unwrap();
-    crate::stamp_schema_version(&conn, SCHEMA_KEY, 0).unwrap();
+    conn.execute_batch("PRAGMA ignore_check_constraints = ON;
+            UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'finding_operator_bundle';
+            PRAGMA ignore_check_constraints = OFF;").unwrap();
     drop(conn);
-    assert_eq!(
-        SqliteFindingOperatorBundleStore::open(&path)
-            .err()
-            .unwrap()
-            .to_string(),
-        "finding operator bundle store is unavailable: database schema version 0 is not the \
-         current schema version 1; refusing to open"
-    );
+    assert!(matches!(
+        SqliteFindingOperatorBundleStore::open(&path),
+        Err(FindingOperatorBundleStoreError::Schema(
+            crate::SchemaVersionError::StaleSchema {
+                found: 0,
+                current: 1
+            }
+        ))
+    ));
 }
 
 #[test]
 fn current_stamp_over_a_retired_bundle_table_shape_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("operator.db");
+    crate::initialize_finding_operator_database(&path).unwrap();
     drop(SqliteFindingOperatorBundleStore::open(&path).unwrap());
     let conn = rusqlite::Connection::open(&path).unwrap();
     conn.execute_batch(
@@ -748,12 +750,10 @@ fn current_stamp_over_a_retired_bundle_table_shape_is_refused() {
     )
     .unwrap();
     drop(conn);
-    assert_eq!(
-        SqliteFindingOperatorBundleStore::open(&path)
-            .err()
-            .unwrap()
-            .to_string(),
-        "finding operator bundle store is unavailable: finding operator bundle schema differs \
-         from the canonical definition"
-    );
+    assert!(matches!(
+        SqliteFindingOperatorBundleStore::open(&path),
+        Err(FindingOperatorBundleStoreError::Schema(
+            crate::SchemaVersionError::CatalogMismatch
+        ))
+    ));
 }

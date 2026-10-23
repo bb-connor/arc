@@ -79,6 +79,7 @@ fn sqlite_injected_payload_clock_denies_exact_replay_without_writes() -> TestRes
     for fault in faults() {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("payload.db");
+        crate::initialize_finding_operator_database(&path).map_err(std::io::Error::other)?;
         let clock = TestClock::new();
         let store = SqliteFindingPayloadStore::open_with_clock(&path, clock.clone())?;
         let tenant = TenantId::new("clock-tenant");
@@ -121,6 +122,7 @@ fn sqlite_injected_payment_clock_denies_replay_and_capture_without_writes() -> T
     for fault in faults() {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("payment.db");
+        crate::initialize_finding_operator_database(&path).map_err(std::io::Error::other)?;
         let clock = TestClock::new();
         let store = SqliteFindingOperatorPaymentAdapter::open_with_clock(&path, clock.clone())?;
         let request = PaymentAuthorizeRequest {
@@ -156,6 +158,7 @@ fn sqlite_injected_bundle_clock_denies_replay_and_capacity_release() -> TestResu
     for fault in faults() {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("bundle.db");
+        crate::initialize_finding_operator_database(&path).map_err(std::io::Error::other)?;
         let clock = TestClock::new();
         let store = SqliteFindingOperatorBundleStore::open_with_clock(&path, clock.clone())?;
         let request = "a".repeat(64);

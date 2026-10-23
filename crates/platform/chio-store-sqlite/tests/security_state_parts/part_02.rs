@@ -1037,9 +1037,7 @@ fn acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness(
             .unwrap_or_else(|error| panic!("restore ingress immutability trigger: {error}"));
         drop(connection);
 
-        let reopened = SqliteSecurityStateStore::open(&path)
-            .unwrap_or_else(|error| panic!("reopen corrupted correlation ingress: {error}"));
-        let error = require_error(reopened.ensure_correlation_ingress_ready());
+        let error = require_error(SqliteSecurityStateStore::open(&path));
         assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
     }
 }

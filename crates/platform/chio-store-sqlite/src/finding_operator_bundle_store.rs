@@ -6,7 +6,6 @@
 //! canonical bundle under the Finding identity with exact-replay semantics.
 
 use chio_security_types::clock::{Clock, SystemClock};
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -23,38 +22,6 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
-fn verify_schema(connection: &rusqlite::Connection) -> Result<(), FindingOperatorBundleStoreError> {
-    let canonical =
-        crate::schema_catalog::matches_canonical_schema(connection, SCHEMA, SCHEMA_TABLES)
-            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-    if canonical {
-        Ok(())
-    } else {
-        Err(FindingOperatorBundleStoreError::Unavailable(
-            "finding operator bundle schema differs from the canonical definition".to_owned(),
-        ))
-    }
-}
-
-const SCHEMA_KEY: &str = "finding_operator_bundle";
-const SCHEMA_VERSION: i32 = 1;
-const SCHEMA_ANCHORS: &[&str] = &[
-    "chio_finding_operator_bundles",
-    "chio_finding_payloads",
-    "chio_finding_operator_payments",
-];
-const SCHEMA_TABLES: &[&str] = &[
-    "chio_finding_operator_bundles",
-    "chio_finding_operator_bundle_artifacts",
-    "chio_finding_operator_artifact_authority_policies",
-    "chio_finding_operator_retained_challenge_policies",
-    "chio_finding_operator_audit_rounds",
-    "chio_finding_operator_terminals",
-    "chio_finding_operator_terminal_capacity",
-    "chio_finding_operator_proofs",
-    "chio_finding_operator_purchase_jobs",
-    "chio_finding_operator_seller_artifact_capacity",
-];
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_operator_bundles (
     finding_id TEXT PRIMARY KEY,
@@ -369,6 +336,8 @@ pub enum FindingOperatorSellerArtifactCapacityOutcome {
 #[derive(Debug, Error)]
 pub enum FindingOperatorBundleStoreError {
     #[error(transparent)]
+    Schema(#[from] crate::SchemaVersionError),
+    #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding operator bundle store is unavailable: {0}")]
     Unavailable(String),
@@ -415,11 +384,9 @@ impl SqliteFindingOperatorBundleStore {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingOperatorBundleStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-            fs::create_dir_all(parent)
-                .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
-        }
-        let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
+        let manager = SqliteConnectionManager::file(path)
+            .with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .with_init(configure_pooled_connection);
         let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)
@@ -428,7 +395,7 @@ impl SqliteFindingOperatorBundleStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        store.validate_schema()?;
         Ok(store)
     }
 
@@ -448,34 +415,25 @@ impl SqliteFindingOperatorBundleStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        {
+            let mut connection = store
+                .pool
+                .get()
+                .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
+            crate::finding_operator_database::initialize_connection(&mut connection)
+                .map_err(FindingOperatorBundleStoreError::Schema)?;
+        }
+        store.validate_schema()?;
         Ok(store)
     }
 
-    fn initialize_schema(&self) -> Result<(), FindingOperatorBundleStoreError> {
-        let unavailable = |error: &dyn std::fmt::Display| {
-            FindingOperatorBundleStoreError::Unavailable(error.to_string())
-        };
-        let mut conn = self.pool.get().map_err(|error| unavailable(&error))?;
-        let state = crate::check_current_schema(&conn, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
-            .map_err(|error| unavailable(&error))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
-        )
-        .map_err(|error| unavailable(&error))?;
-        if state == crate::SchemaState::Current {
-            return verify_schema(&conn);
-        }
-        let transaction = conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|error| unavailable(&error))?;
-        transaction
-            .execute_batch(SCHEMA)
-            .map_err(|error| unavailable(&error))?;
-        crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
-            .map_err(|error| unavailable(&error))?;
-        verify_schema(&transaction)?;
-        transaction.commit().map_err(|error| unavailable(&error))
+    fn validate_schema(&self) -> Result<(), FindingOperatorBundleStoreError> {
+        let mut connection = self
+            .pool
+            .get()
+            .map_err(|error| FindingOperatorBundleStoreError::Unavailable(error.to_string()))?;
+        crate::finding_operator_database::validate_component(&mut connection)
+            .map_err(FindingOperatorBundleStoreError::Schema)
     }
 
     pub fn put(

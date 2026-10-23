@@ -10,7 +10,6 @@
 //! records.
 
 use chio_security_types::clock::{Clock, SystemClock};
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -24,33 +23,11 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
-fn verify_schema(connection: &rusqlite::Connection) -> Result<(), FindingPayloadStoreError> {
-    if crate::schema_catalog::matches_canonical_schema(
-        connection,
-        FINDING_PAYLOAD_SCHEMA,
-        FINDING_PAYLOAD_SCHEMA_TABLES,
-    )? {
-        Ok(())
-    } else {
-        Err(FindingPayloadStoreError::Unavailable(
-            "finding payload schema differs from the canonical definition".to_owned(),
-        ))
-    }
-}
-
 use crate::encrypted_blob::{
     decrypt_blob_with_aad, try_encrypt_blob_with_aad, BlobStoreError, EncryptedBlob, TenantId,
     TenantKey,
 };
 
-const FINDING_PAYLOAD_SCHEMA_KEY: &str = "finding_payload";
-const FINDING_PAYLOAD_SCHEMA_VERSION: i32 = 1;
-const FINDING_PAYLOAD_SCHEMA_ANCHORS: &[&str] = &[
-    "chio_finding_operator_bundles",
-    "chio_finding_payloads",
-    "chio_finding_operator_payments",
-];
-const FINDING_PAYLOAD_SCHEMA_TABLES: &[&str] = &["chio_finding_payloads"];
 pub(crate) const FINDING_PAYLOAD_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_payloads (
     finding_id TEXT PRIMARY KEY,
@@ -86,6 +63,8 @@ pub enum FindingPayloadPutOutcome {
 /// Fail-closed errors returned by sealed Finding payload persistence.
 #[derive(Debug, Error)]
 pub enum FindingPayloadStoreError {
+    #[error(transparent)]
+    Schema(#[from] crate::SchemaVersionError),
     #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("finding payload store is unavailable: {0}")]
@@ -135,7 +114,7 @@ pub struct SqliteFindingPayloadStore {
 }
 
 impl SqliteFindingPayloadStore {
-    /// Open a durable store, creating its parent directory when needed.
+    /// Open an initialized seller database.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FindingPayloadStoreError> {
         Self::open_with_clock(path, Arc::new(SystemClock))
     }
@@ -146,10 +125,9 @@ impl SqliteFindingPayloadStore {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, FindingPayloadStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
-            fs::create_dir_all(parent)?;
-        }
-        let manager = SqliteConnectionManager::file(path).with_init(configure_pooled_connection);
+        let manager = SqliteConnectionManager::file(path)
+            .with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+            .with_init(configure_pooled_connection);
         let pool = crate::pool::sqlite_pool_builder()
             .max_size(8)
             .build(manager)?;
@@ -157,7 +135,7 @@ impl SqliteFindingPayloadStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        store.validate_schema()?;
         Ok(store)
     }
 
@@ -177,36 +155,25 @@ impl SqliteFindingPayloadStore {
             pool,
             clock: crate::store_clock::StoreClock::new(clock),
         };
-        store.initialize_schema()?;
+        {
+            let mut connection = store
+                .pool
+                .get()
+                .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
+            crate::finding_operator_database::initialize_connection(&mut connection)
+                .map_err(FindingPayloadStoreError::Schema)?;
+        }
+        store.validate_schema()?;
         Ok(store)
     }
 
-    fn initialize_schema(&self) -> Result<(), FindingPayloadStoreError> {
-        let mut conn = self.pool.get()?;
-        let state = crate::check_current_schema(
-            &conn,
-            FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SCHEMA_VERSION,
-            FINDING_PAYLOAD_SCHEMA_ANCHORS,
-        )
-        .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
-        )?;
-        if state == crate::SchemaState::Current {
-            return verify_schema(&conn);
-        }
-        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        transaction.execute_batch(FINDING_PAYLOAD_SCHEMA)?;
-        crate::stamp_schema_version(
-            &transaction,
-            FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SCHEMA_VERSION,
-        )
-        .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
-        verify_schema(&transaction)?;
-        transaction.commit()?;
-        Ok(())
+    fn validate_schema(&self) -> Result<(), FindingPayloadStoreError> {
+        let mut connection = self
+            .pool
+            .get()
+            .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
+        crate::finding_operator_database::validate_component(&mut connection)
+            .map_err(FindingPayloadStoreError::Schema)
     }
 
     /// Seal a Finding payload. Exact retries are idempotent while any changed
@@ -417,24 +384,32 @@ mod tests {
     fn payload_schema_other_than_current_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         drop(SqliteFindingPayloadStore::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
-        crate::stamp_schema_version(&conn, FINDING_PAYLOAD_SCHEMA_KEY, 0).unwrap();
+        conn.execute_batch(
+            "PRAGMA ignore_check_constraints = ON;
+            UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'finding_payload';
+            PRAGMA ignore_check_constraints = OFF;",
+        )
+        .unwrap();
         drop(conn);
-        assert_eq!(
-            SqliteFindingPayloadStore::open(&path)
-                .err()
-                .unwrap()
-                .to_string(),
-            "finding payload store is unavailable: database schema version 0 is not the \
-             current schema version 1; refusing to open"
-        );
+        assert!(matches!(
+            SqliteFindingPayloadStore::open(&path),
+            Err(FindingPayloadStoreError::Schema(
+                crate::SchemaVersionError::StaleSchema {
+                    found: 0,
+                    current: 1
+                }
+            ))
+        ));
     }
 
     #[test]
     fn current_stamp_over_a_retired_payload_table_shape_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         drop(SqliteFindingPayloadStore::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
         conn.execute_batch(
@@ -443,14 +418,12 @@ mod tests {
         )
         .unwrap();
         drop(conn);
-        assert_eq!(
-            SqliteFindingPayloadStore::open(&path)
-                .err()
-                .unwrap()
-                .to_string(),
-            "finding payload store is unavailable: finding payload schema differs from the \
-             canonical definition"
-        );
+        assert!(matches!(
+            SqliteFindingPayloadStore::open(&path),
+            Err(FindingPayloadStoreError::Schema(
+                crate::SchemaVersionError::CatalogMismatch
+            ))
+        ));
     }
 
     fn tenant() -> TenantId {
@@ -465,6 +438,7 @@ mod tests {
     fn exact_finding_id_is_tenant_bound_before_and_after_restart() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("tenant-finding.sqlite");
+        crate::initialize_finding_operator_database(&path).unwrap();
         let digest = finding_payload_sha256("text/plain", b"private").unwrap();
         let store = SqliteFindingPayloadStore::open(&path).unwrap();
         store
@@ -499,6 +473,7 @@ mod tests {
     fn sealed_payload_survives_restart_and_exact_replay() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
         let payload = b"diff --git a/a.rs b/a.rs\n";
         let digest = finding_payload_sha256("text/x-diff", payload).unwrap();
         let store = SqliteFindingPayloadStore::open(&path).unwrap();
@@ -545,7 +520,9 @@ mod tests {
     #[test]
     fn every_pooled_connection_has_busy_timeout() {
         let dir = tempfile::tempdir().unwrap();
-        let store = SqliteFindingPayloadStore::open(dir.path().join("operator.db")).unwrap();
+        let path = dir.path().join("operator.db");
+        crate::initialize_finding_operator_database(&path).unwrap();
+        let store = SqliteFindingPayloadStore::open(&path).unwrap();
         let first = store.pool.get().unwrap();
         let second = store.pool.get().unwrap();
 

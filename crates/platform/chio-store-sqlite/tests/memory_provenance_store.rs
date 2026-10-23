@@ -236,6 +236,66 @@ fn chain_persists_across_reopen() {
 }
 
 #[test]
+fn reopen_refuses_a_deleted_schema_stamp_without_repair() -> Result<(), Box<dyn std::error::Error>>
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("provenance.sqlite3");
+    let store = SqliteMemoryProvenanceStore::open(&path)?;
+    let entry = store.append(sample_append("doc-1", "rcpt-1", 100))?;
+    drop(store);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute(
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'memory_provenance'",
+        [],
+    )?;
+    let error = match SqliteMemoryProvenanceStore::open(&path) {
+        Err(error) => error,
+        Ok(_) => panic!("deleted schema stamp was accepted"),
+    };
+    assert_eq!(
+        error.to_string(),
+        "sqlite memory provenance store error: schema namespace memory_provenance is missing"
+    );
+    let stamps: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_store_schema_versions WHERE store_key = 'memory_provenance'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(stamps, 0);
+    let hash: String = connection.query_row(
+        "SELECT hash FROM chio_memory_provenance WHERE entry_id = ?1",
+        [&entry.entry_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(hash, entry.hash);
+    Ok(())
+}
+
+#[test]
+fn reopen_refuses_a_missing_index_without_repair() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("provenance.sqlite3");
+    drop(SqliteMemoryProvenanceStore::open(&path)?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch("DROP INDEX idx_chio_memory_provenance_key;")?;
+    let error = match SqliteMemoryProvenanceStore::open(&path) {
+        Err(error) => error,
+        Ok(_) => panic!("missing schema index was accepted"),
+    };
+    assert_eq!(
+        error.to_string(),
+        "sqlite memory provenance store error: schema catalog differs from its canonical definition"
+    );
+    let present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_chio_memory_provenance_key')",
+        [],
+        |row| row.get(0),
+    )?;
+    assert!(!present);
+    Ok(())
+}
+
+#[test]
 fn get_entry_returns_the_committed_row() {
     let store = SqliteMemoryProvenanceStore::open_in_memory().test_expect("open in-memory store");
     let entry = store

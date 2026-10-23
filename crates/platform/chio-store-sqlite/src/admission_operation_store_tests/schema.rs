@@ -902,13 +902,15 @@ fn admission_schema_other_than_current_is_refused() -> AnchoredTestResult {
     for stamped in [0, 2, 38] {
         let fixture = fixture();
         let mut connection = fixture.store.connection()?;
-        connection.execute(
-            "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = 'admission_operation'",
-            [stamped],
-        )?;
-        let error = initialize_admission_operation_schema(&mut connection)
-            .err()
-            .ok_or("stale admission schema opened")?;
+        crate::test_schema::write_version(&connection, "admission_operation", stamped)?;
+        let error = crate::test_schema::apply(
+            &mut connection,
+            crate::serving_owner::SERVING_NAMESPACES,
+            initialize_admission_operation_schema,
+            |error| invariant(error.to_string()),
+        )
+        .err()
+        .ok_or("stale admission schema opened")?;
         assert_eq!(
             error.to_string(),
             format!(
@@ -927,12 +929,17 @@ fn unstamped_provisioned_admission_store_is_refused() -> AnchoredTestResult {
         "DELETE FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
         [],
     )?;
-    let error = initialize_admission_operation_schema(&mut connection)
-        .err()
-        .ok_or("unstamped admission schema opened")?;
+    let error = crate::test_schema::apply(
+        &mut connection,
+        crate::serving_owner::SERVING_NAMESPACES,
+        initialize_admission_operation_schema,
+        |error| invariant(error.to_string()),
+    )
+    .err()
+    .ok_or("unstamped admission schema opened")?;
     assert_eq!(
         error.to_string(),
-        "admission operation invariant failed: admission storage is provisioned without a schema stamp"
+        "admission operation invariant failed: schema namespace admission_operation is missing"
     );
     Ok(())
 }

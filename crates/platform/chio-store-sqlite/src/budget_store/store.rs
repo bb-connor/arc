@@ -3,6 +3,7 @@ use super::*;
 mod invocations;
 use chio_kernel_core::budget_increment_admits;
 
+#[cfg(test)]
 pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
 pub(super) const LIST_ALL_USAGES_SQL: &str = r#"
@@ -31,8 +32,6 @@ pub(super) const LIST_CAPABILITY_USAGES_SQL: &str = r#"
     WHERE capability_id = ?1
     ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
 "#;
-
-const BUDGET_STORE_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 impl SqliteBudgetStore {
     #[cfg(feature = "admission-test-support")]
@@ -63,7 +62,7 @@ impl SqliteBudgetStore {
         }
 
         let mut connection = Connection::open(path)?;
-        Self::initialize_connection(&mut connection, false)?;
+        Self::initialize_connection(&mut connection)?;
         // Opened by path there is no serving owner and no anchor: each write is
         // one RAII transaction and nothing outside the database records it.
         Ok(Self {
@@ -74,96 +73,64 @@ impl SqliteBudgetStore {
         })
     }
 
-    pub(crate) fn preflight_schema(
-        connection: &Connection,
-        allow_empty: bool,
-    ) -> Result<(), BudgetStoreError> {
+    pub(crate) fn validate_schema(connection: &Connection) -> Result<(), BudgetStoreError> {
         match crate::schema_version::read_store_schema_version(connection, BUDGET_STORE_SCHEMA_KEY)
             .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?
         {
-            Some(found) if found != BUDGET_STORE_SUPPORTED_SCHEMA_VERSION => {
-                Err(BudgetStoreError::StaleSchema {
-                    found,
-                    current: BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-                })
+            Some(found) if found != 1 => {
+                return Err(BudgetStoreError::StaleSchema { found, current: 1 })
             }
-            Some(_) => {
-                verify_budget_catalog(connection)?;
-                crate::schema_version::check_current_schema(
-                    connection,
-                    BUDGET_STORE_SCHEMA_KEY,
-                    BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-                    BUDGET_STORE_ANCHOR_TABLES,
-                )
-                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-                verify_budget_replication_state(connection)
-            }
-            None if allow_empty => require_empty_budget_catalog(connection),
-            None => Err(schema::schema_shape_error()),
+            Some(1) => {}
+            _ => return Err(schema::schema_shape_error()),
         }
+        verify_budget_catalog(connection)?;
+        verify_budget_replication_state(connection)
     }
 
-    pub(crate) fn initialize_connection_offline(
-        connection: &mut Connection,
+    pub(crate) fn initialize_schema(
+        creation: &crate::schema_version::SchemaTransaction<'_>,
     ) -> Result<(), BudgetStoreError> {
-        Self::initialize_connection(connection, true)
+        let transaction = creation.connection();
+        if creation.is_fresh() {
+            transaction.execute_batch(schema::SCHEMA)?;
+            creation
+                .stamp(BUDGET_STORE_SCHEMA_KEY)
+                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        }
+        Self::validate_schema(transaction)?;
+        verify_budget_foreign_keys(transaction)?;
+        Self::verify_supplemental_artifact_selector_index(transaction)?;
+        verify_budget_projection_invariants(transaction)
     }
 
-    fn initialize_connection(
-        connection: &mut Connection,
-        allow_provisioned: bool,
-    ) -> Result<(), BudgetStoreError> {
-        // Bounded bytecode reuse for budget and shared admission lookups.
-        // Rows and authorization decisions are always read in their transaction.
+    fn initialize_connection(connection: &mut Connection) -> Result<(), BudgetStoreError> {
         connection
             .set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
-        if !allow_provisioned {
-            if let Some(epoch) = crate::serving_owner::provisioned_owner_epoch(connection)? {
-                return Err(BudgetStoreError::Fenced {
-                    expected_epoch: 0,
-                    actual_epoch: Some(epoch),
-                });
-            }
+        if let Some(epoch) = crate::serving_owner::provisioned_owner_epoch(connection)? {
+            return Err(BudgetStoreError::Fenced {
+                expected_epoch: 0,
+                actual_epoch: Some(epoch),
+            });
         }
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.pragma_update(None, "foreign_keys", true)?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let schema_state = crate::schema_version::check_current_schema(
-            &transaction,
-            BUDGET_STORE_SCHEMA_KEY,
-            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-            BUDGET_STORE_ANCHOR_TABLES,
-        )
-        .map_err(|error| match error {
-            crate::schema_version::SchemaVersionError::StaleSchema { found, current } => {
-                BudgetStoreError::StaleSchema { found, current }
-            }
-            other => BudgetStoreError::Invariant(other.to_string()),
-        })?;
-        match schema_state {
-            crate::schema_version::SchemaState::Current => {
-                verify_budget_catalog(&transaction)?;
-            }
-            crate::schema_version::SchemaState::Unstamped => {
-                require_empty_budget_catalog(&transaction)?;
-                transaction.execute_batch(schema::SCHEMA)?;
-                crate::stamp_schema_version(
-                    &transaction,
-                    BUDGET_STORE_SCHEMA_KEY,
-                    BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-                )
-                .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-            }
-        }
-        verify_budget_replication_state(&transaction)?;
-        verify_budget_foreign_keys(&transaction)?;
-        Self::verify_supplemental_artifact_selector_index(&transaction)?;
-        verify_budget_projection_invariants(&transaction)?;
-        transaction.commit()?;
+        let creation =
+            crate::schema_version::SchemaTransaction::begin(connection, &[BUDGET_STORE_SCHEMA_KEY])
+                .map_err(|error| match error {
+                    crate::SchemaVersionError::StaleSchema { found, current } => {
+                        BudgetStoreError::StaleSchema { found, current }
+                    }
+                    error => BudgetStoreError::Invariant(error.to_string()),
+                })?;
+        Self::initialize_schema(&creation)?;
+        creation
+            .validate_catalog(schema::SCHEMA)
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+        creation
+            .commit()
+            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
-        Self::rebuild_snapshot_proof_caches(connection)?;
-
-        Ok(())
+        Self::rebuild_snapshot_proof_caches(connection)
     }
 
     pub(crate) fn open_alongside(

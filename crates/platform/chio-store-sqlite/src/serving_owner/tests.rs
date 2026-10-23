@@ -174,7 +174,7 @@ fn a_legacy_global_projection_constraint_is_rejected_rather_than_migrated() {
     // Only the canonical schema is accepted; a non-canonical catalog is refused
     // instead of being adapted in place.
     assert!(matches!(
-        super::global_commit_chain::initialize_global_commit_schema(&connection),
+        super::global_commit_chain::verify_global_commit_schema(&connection),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
     drop(connection);
@@ -464,9 +464,9 @@ fn baseline_verification_rejects_live_projection_tampering() {
         .expect("tamper connection")
         .execute(
             r#"
-            UPDATE chio_authority_migrations
-            SET completed_index = 2
-            WHERE migration_key = 'revocation-admission-authority-v1'
+            UPDATE budget_replication_meta
+            SET next_seq = 1
+            WHERE singleton = 1
             "#,
             [],
         )
@@ -480,23 +480,23 @@ fn baseline_verification_rejects_live_projection_tampering() {
 }
 
 #[test]
-fn initial_provision_refuses_nonempty_legacy_authority_state() {
+fn initial_provision_refuses_nonempty_standalone_authority_state() {
     let (_temp, database, lock_root) = fixture();
-    let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store");
-    assert!(legacy
-        .try_increment("legacy-capability", 0, Some(1))
-        .expect("legacy usage mutation"));
-    drop(legacy);
+    let standalone = SqliteBudgetStore::open(&database).expect("standalone budget store");
+    assert!(standalone
+        .try_increment("standalone-capability", 0, Some(1))
+        .expect("standalone usage mutation"));
+    drop(standalone);
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure database mode");
 
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
-        .expect_err("legacy authority state must be rejected");
+        .expect_err("standalone authority state must be rejected");
     assert!(
         matches!(
             &error,
-            SqliteServingOwnerError::Invalid(message)
-                if message.contains("baseline refuses nonempty safety table")
+            SqliteServingOwnerError::PartialProvision(path)
+                if path == &database.display().to_string()
         ),
         "unexpected error: {error}"
     );
@@ -513,11 +513,12 @@ fn initial_provision_refuses_nonempty_legacy_authority_state() {
         "a refused provision must not leave a lock file behind"
     );
 
-    let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store still opens");
-    assert!(!legacy
-        .try_increment("legacy-capability", 0, Some(1))
-        .expect("legacy usage survives the refusal"));
-    drop(legacy);
+    let standalone =
+        SqliteBudgetStore::open(&database).expect("standalone budget store still opens");
+    assert!(!standalone
+        .try_increment("standalone-capability", 0, Some(1))
+        .expect("standalone usage survives the refusal"));
+    drop(standalone);
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure database mode");
 
@@ -526,8 +527,8 @@ fn initial_provision_refuses_nonempty_legacy_authority_state() {
     assert!(
         matches!(
             &repeated,
-            SqliteServingOwnerError::Invalid(message)
-                if message.contains("baseline refuses nonempty safety table")
+            SqliteServingOwnerError::PartialProvision(path)
+                if path == &database.display().to_string()
         ),
         "unexpected error: {repeated}"
     );
@@ -625,7 +626,7 @@ fn serving_open_rejects_unjournaled_valid_revocation_commit() {
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
         Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("projection coverage is not exact")
+            if message == "revocation store synchronization error: revocation delta log is not a dense complete projection history"
     ));
 }
 
@@ -935,6 +936,9 @@ fn serving_open_rejects_corrupted_lease_history() {
             "#,
         )
         .expect("corrupt lease history");
+    connection
+        .execute_batch(super::lease_history::SERVING_LEASE_SCHEMA)
+        .expect("restore canonical lease guard");
     drop(connection);
 
     assert!(matches!(
@@ -986,8 +990,8 @@ fn serving_open_rejects_forged_historical_revocation_provenance() {
 
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
-        Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("forged revocation provenance")
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)))
+            if message == "budget hold `hold-structured` has forged revocation provenance"
     ));
 }
 
@@ -1046,8 +1050,8 @@ fn serving_open_rejects_forged_historical_budget_authority() {
 
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
-        Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("forged serving authority")
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)))
+            if message == "structured budget hold `hold-structured` has forged serving authority"
     ));
 }
 
@@ -1541,7 +1545,7 @@ fn offline_provision_is_fenced_idempotent_and_refuses_noncurrent_budget() {
     assert_eq!(admission_projection(&database), before);
 
     let connection = Connection::open(&database).expect("schema connection");
-    crate::stamp_schema_version(&connection, "budget", 3).expect("noncurrent budget stamp");
+    crate::test_schema::write_version(&connection, "budget", 3).expect("noncurrent budget stamp");
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
         .expect_err("noncurrent budget schema must be refused");
     assert!(matches!(
@@ -1786,8 +1790,8 @@ fn serving_open_rejects_noncanonical_projection_members() {
 
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
-        Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("non-canonical artifact")
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)))
+            if message == "budget hold `hold-structured` has non-canonical artifact members"
     ));
 
     let (_temp, database, lock_root) = fixture();
@@ -1805,8 +1809,8 @@ fn serving_open_rejects_noncanonical_projection_members() {
     drop(connection);
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
-        Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("non-canonical revocation")
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)))
+            if message == "budget hold `hold-structured` has non-canonical revocation members"
     ));
 }
 
@@ -1840,8 +1844,9 @@ fn serving_open_rejects_invalid_revocation_commit_metadata() {
             &database,
             &lock_root,
             chio_test_support::clock::clock()
-        ),
-        Err(SqliteServingOwnerError::Invalid(_))
+        )
+        ,
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message))) if message == "budget hold `hold-structured` has an incomplete composite projection contract"
     ));
 }
 
@@ -1863,8 +1868,8 @@ fn serving_open_rejects_partial_supplemental_projection() {
     drop(connection);
     assert!(matches!(
         SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()),
-        Err(SqliteServingOwnerError::Invalid(message))
-            if message.contains("incomplete supplemental authority binding")
+        Err(SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)))
+            if message == "budget hold `hold-structured` has an incomplete supplemental authority binding"
     ));
 }
 

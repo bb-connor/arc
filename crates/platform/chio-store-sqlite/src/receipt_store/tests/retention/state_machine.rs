@@ -18,10 +18,9 @@ fn op_strategy() -> impl Strategy<Value = Op> {
     ]
 }
 
-/// Every receipt_id currently in `chio_tool_receipts` union
-/// `chio_child_receipts` on `store` (live or archive database alike).
-fn receipt_id_set(store: &SqliteReceiptStore) -> Result<BTreeSet<String>, ReceiptStoreError> {
-    let connection = store.reader_connection_for_test()?;
+fn receipt_id_set(
+    connection: &rusqlite::Connection,
+) -> Result<BTreeSet<String>, ReceiptStoreError> {
     let mut ids = BTreeSet::new();
     let mut tool_statement = connection.prepare("SELECT receipt_id FROM chio_tool_receipts")?;
     let tool_rows = tool_statement.query_map([], |row| row.get::<_, String>(0))?;
@@ -173,11 +172,15 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
         // archive set empty and everything live, which still satisfies
         // the partition.
         phase("read-live-ids");
-        let live_ids = receipt_id_set(&reopened).map_err(map_err)?;
-        let archive_store = SqliteReceiptStore::open(&archive).map_err(map_err)?;
+        let live_ids = receipt_id_set(&*reopened.reader_connection_for_test().map_err(map_err)?).map_err(map_err)?;
         let reopened_writer = std::sync::Arc::downgrade(&reopened.receipt_commit_actor.worker);
-        let archive_writer = std::sync::Arc::downgrade(&archive_store.receipt_commit_actor.worker);
-        let archived_ids = receipt_id_set(&archive_store).map_err(map_err)?;
+        let archived_ids = if archive.exists() {
+            let archived = rusqlite::Connection::open_with_flags(&archive, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .map_err(|error| map_err(error.into()))?;
+            receipt_id_set(&archived).map_err(map_err)?
+        } else {
+            BTreeSet::new()
+        };
         let overlap: Vec<&String> = live_ids.intersection(&archived_ids).collect();
         prop_assert!(
             overlap.is_empty(),
@@ -190,13 +193,11 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
             "archived and live receipt-id sets must partition the full appended history"
         );
 
-        phase("teardown-archive");
-        drop(archive_store);
         phase("teardown-reopened");
         drop(reopened);
         prop_assert!(
-            reopened_writer.upgrade().is_none() && archive_writer.upgrade().is_none(),
-            "case completion must follow both writer owners' teardown"
+            reopened_writer.upgrade().is_none(),
+            "case completion must follow writer teardown"
         );
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&archive);

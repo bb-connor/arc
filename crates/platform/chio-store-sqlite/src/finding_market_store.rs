@@ -44,9 +44,6 @@ use participation::{paid_through_epoch_tx, require_current_participation_admissi
 mod collateral_registration;
 
 const FINDING_MARKET_SCHEMA_KEY: &str = "finding_market";
-pub(crate) const FINDING_MARKET_SCHEMA_VERSION: i32 = 1;
-const FINDING_MARKET_SCHEMA_ANCHORS: &[&str] =
-    &["findings", "admission_operations", "chio_serving_owner"];
 const FINDING_MARKET_SCHEMA: &str = include_str!("finding_market_store.sql");
 
 /// Publish bodies are capped at 256 KiB (the `MAX_PERSISTED_OPERATION_BYTES`
@@ -2117,32 +2114,20 @@ fn require_verified_live_status_tx(
 }
 
 pub(crate) fn initialize_finding_market_schema(
-    connection: &mut Connection,
-) -> Result<(), FindingMarketStoreError> {
-    let state = crate::check_current_schema(
-        connection,
-        FINDING_MARKET_SCHEMA_KEY,
-        FINDING_MARKET_SCHEMA_VERSION,
-        FINDING_MARKET_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_finding_market_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), FindingMarketStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction
+            .execute_batch(FINDING_MARKET_SCHEMA)
+            .map_err(sqlite_error)?;
+
+        schema
+            .stamp(FINDING_MARKET_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(FINDING_MARKET_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FINDING_MARKET_SCHEMA_KEY,
-        FINDING_MARKET_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    verify_finding_market_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_finding_market_invariants(transaction)
 }
 
 /// Verify the market schema's shape: this database's table, index, and

@@ -243,7 +243,7 @@ fn budget_schema_refuses_stamp_six_without_mutation() {
     let (_directory, path) =
         super::schema_contract::populated_database().expect("create populated budget database");
     let connection = Connection::open(&path).expect("open budget database");
-    crate::stamp_schema_version(&connection, "budget", 6).expect("stamp budget schema");
+    crate::test_schema::write_version(&connection, "budget", 6).expect("stamp budget schema");
     drop(connection);
     super::schema_contract::assert_stale_without_mutation(&path, 6)
         .expect("refuse stamp six without mutation");
@@ -492,7 +492,7 @@ fn budget_schema_refuses_stamp_nine_without_mutation() {
     let (_directory, path) =
         super::schema_contract::populated_database().expect("create populated budget database");
     let connection = Connection::open(&path).expect("open budget database");
-    crate::stamp_schema_version(&connection, "budget", 9).expect("stamp budget schema");
+    crate::test_schema::write_version(&connection, "budget", 9).expect("stamp budget schema");
     drop(connection);
     super::schema_contract::assert_stale_without_mutation(&path, 9)
         .expect("refuse stamp nine without mutation");
@@ -619,7 +619,7 @@ fn assert_sqlite_constraint(error: rusqlite::Error, code: i32, message: &str) {
 fn budget_schema_refuses_stamp_ten_without_mutating_payment_facts() {
     let (_directory, database) = populated_payment_database();
     let connection = Connection::open(&database).expect("open budget database");
-    crate::stamp_schema_version(&connection, "budget", 10).expect("stamp budget schema");
+    crate::test_schema::write_version(&connection, "budget", 10).expect("stamp budget schema");
     drop(connection);
     super::schema_contract::assert_stale_without_mutation(&database, 10)
         .expect("refuse stamp ten without mutation");
@@ -810,11 +810,10 @@ fn provision_refuses_populated_standalone_budget_state() {
 
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
         .expect_err("populated standalone safety state must not acquire an unproven baseline");
+    let canonical_database = fs::canonicalize(&database).expect("canonical database path");
     assert!(
-        error
-            .to_string()
-            .contains("baseline refuses nonempty safety table `budget_mutation_events`"),
-        "unexpected provisioning error: {error}"
+        matches!(error, crate::SqliteServingOwnerError::PartialProvision(path)
+        if path == canonical_database)
     );
     let _ = fs::remove_dir_all(path);
 }

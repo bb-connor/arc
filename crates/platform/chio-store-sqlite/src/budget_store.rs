@@ -65,6 +65,7 @@ pub use snapshot::{
     budget_snapshot_anchor_set_digest, BudgetSnapshotAnchorCommitment,
     BudgetSnapshotAnchorProvenance, BudgetStoreSnapshot, SignedBudgetSnapshotAnchorCommitment,
 };
+#[cfg(test)]
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 #[cfg(test)]
 use store::LIST_CAPABILITY_USAGES_SQL;

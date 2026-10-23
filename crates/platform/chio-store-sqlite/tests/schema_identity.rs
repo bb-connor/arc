@@ -1,4 +1,4 @@
-use chio_store_sqlite::{check_current_schema, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
+use chio_store_sqlite::{inspect_schema, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
 use rusqlite::Connection;
 
 type CatalogRow = (String, String, String, Option<String>);
@@ -13,12 +13,7 @@ fn single_schema_refuses_populated_unstamped_database_with_sqlite_prefix(
              INSERT INTO \"{table}\" (id, value) VALUES (7, 'preserved');"
         ))?;
         let before = catalog(&connection)?;
-        let result = check_current_schema(
-            &connection,
-            "schema_identity",
-            1,
-            &["chio_identity_records"],
-        );
+        let result = inspect_schema(&connection, &["schema_identity"]);
         assert!(
             matches!(
                 &result,
@@ -53,18 +48,9 @@ fn single_schema_refuses_unrecognized_stamped_database_with_sqlite_prefix(
          INSERT INTO sqlitex_user_data (id, value) VALUES (7, 'preserved');"
     ))?;
     let before = catalog(&connection)?;
-    let result = check_current_schema(
-        &connection,
-        "schema_identity",
-        1,
-        &["chio_identity_records"],
-    );
+    let result = inspect_schema(&connection, &["schema_identity"]);
     assert!(
-        matches!(
-            &result,
-            Err(SchemaVersionError::MismatchedStore { expected_anchors })
-                if expected_anchors == &["chio_identity_records".to_string()]
-        ),
+        matches!(&result, Err(SchemaVersionError::MalformedMetadata)),
         "{result:?}"
     );
     let application_id: i32 =

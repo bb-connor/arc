@@ -311,9 +311,26 @@ fn native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt(
     assert_eq!(reopened_receipt.id, signed.id);
     let archive =
         Connection::open(&archive_path).unwrap_or_else(|error| panic!("archive: {error}"));
+    let guards = archive
+        .prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'trigger' AND tbl_name = 'chio_tool_receipts'")
+        .and_then(|mut statement| {
+            statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .unwrap_or_else(|error| panic!("archive guards: {error}"));
+    for (name, _) in &guards {
+        archive
+            .execute_batch(&format!("DROP TRIGGER \"{name}\""))
+            .unwrap_or_else(|error| panic!("remove archive guard: {error}"));
+    }
     archive
         .execute("DELETE FROM chio_tool_receipts", [])
         .unwrap_or_else(|error| panic!("damage archive: {error}"));
+    for (_, sql) in guards {
+        archive
+            .execute_batch(&sql)
+            .unwrap_or_else(|error| panic!("restore archive guard: {error}"));
+    }
     assert!(reopened
         .load_indexed_security_evidence(&request.evidence_id)
         .is_err());

@@ -359,32 +359,18 @@ pub(super) fn admission_error(
 }
 
 pub(crate) fn initialize_channel_release_publisher_schema(
-    connection: &mut Connection,
-) -> Result<(), SqliteServingOwnerError> {
-    let on_disk = crate::check_schema_version(
-        connection,
-        CHANNEL_RELEASE_PUBLISHER_SCHEMA_KEY,
-        CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
-        CHANNEL_RELEASE_PUBLISHER_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-    if on_disk == CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION {
-        return verify_channel_release_publisher_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), SqliteServingOwnerError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction.execute_batch(CHANNEL_RELEASE_PUBLISHER_SCHEMA)?;
+
+        schema
+            .stamp(CHANNEL_RELEASE_PUBLISHER_SCHEMA_KEY)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     }
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(CHANNEL_RELEASE_PUBLISHER_SCHEMA)?;
-    crate::stamp_schema_version(
-        &transaction,
-        CHANNEL_RELEASE_PUBLISHER_SCHEMA_KEY,
-        CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-    verify_channel_release_publisher_invariants(&transaction)?;
-    transaction.commit().map_err(|error| {
-        SqliteServingOwnerError::OutcomeUnknown(format!(
-            "sqlite channel release publisher schema commit outcome is unknown: {error}"
-        ))
-    })
+    verify_channel_release_publisher_invariants(transaction)
 }
 
 pub(crate) fn verify_channel_release_publisher_invariants(

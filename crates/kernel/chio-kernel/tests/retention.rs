@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "retention/archive.rs"]
+mod archive;
+
 /// Retention and archival tests for SqliteReceiptStore.
 ///
 /// These tests cover configurable retention and archived receipt
@@ -11,6 +15,7 @@
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod retention {
+    use super::archive;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -228,9 +233,9 @@ mod retention {
         );
 
         // Archive DB should have 10 receipts.
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        let archive_store = archive::open(&archive_path);
         assert_eq!(
-            archive_store.tool_receipt_count().unwrap(),
+            archive::tool_receipt_count(&archive_store),
             10,
             "archive DB should have 10 receipts"
         );
@@ -318,8 +323,8 @@ mod retention {
         );
         assert_eq!(store.tool_receipt_count().unwrap(), 0);
 
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
-        assert_eq!(archive_store.tool_receipt_count().unwrap(), 3);
+        let archive_store = archive::open(&archive_path);
+        assert_eq!(archive::tool_receipt_count(&archive_store), 3);
 
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);
@@ -476,11 +481,8 @@ mod retention {
         assert_eq!(archived, 10, "should archive all 10 receipts");
 
         // Open archive DB and load the checkpoint.
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
-        let loaded_cp = archive_store
-            .load_checkpoint_by_seq(1)
-            .unwrap()
-            .expect("checkpoint should be in archive");
+        let archive_store = archive::open(&archive_path);
+        let loaded_cp = archive::checkpoint(&archive_store, 1);
         assert_eq!(loaded_cp.body.merkle_root, cp.body.merkle_root);
 
         // Verify the checkpoint signature.
@@ -490,9 +492,7 @@ mod retention {
         );
 
         // Load canonical bytes from archive and verify inclusion proof.
-        let archive_canonical = archive_store
-            .receipts_canonical_bytes_range(seqs[0], seqs[9])
-            .unwrap();
+        let archive_canonical = archive::receipt_bytes(&archive_store, seqs[0], seqs[9]);
         assert_eq!(
             archive_canonical.len(),
             10,
@@ -549,15 +549,15 @@ mod retention {
         assert_eq!(archived, 10, "should archive 10 receipts from batch 1");
 
         // Archive DB should have batch 1's checkpoint row.
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        let archive_store = archive::open(&archive_path);
         assert!(
-            archive_store.load_checkpoint_by_seq(1).unwrap().is_some(),
+            archive::checkpoint_count(&archive_store, 1) == 1,
             "archive DB should have batch 1 checkpoint"
         );
 
         // Archive DB should NOT have batch 2's checkpoint row.
         assert!(
-            archive_store.load_checkpoint_by_seq(2).unwrap().is_none(),
+            archive::checkpoint_count(&archive_store, 2) == 0,
             "archive DB should NOT have batch 2 checkpoint"
         );
 
@@ -604,9 +604,7 @@ mod retention {
             "live DB retains every receipt (nothing archived)"
         );
 
-        // The archive file was never created; opening it yields an empty store.
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
-        assert_eq!(archive_store.tool_receipt_count().unwrap(), 0);
+        assert!(!archive_path.exists());
 
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);
@@ -644,8 +642,8 @@ mod retention {
         );
         assert_eq!(store.child_receipt_count().unwrap(), 0);
 
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
-        assert_eq!(archive_store.child_receipt_count().unwrap(), 1);
+        let archive_store = archive::open(&archive_path);
+        assert_eq!(archive::child_receipt_count(&archive_store), 1);
 
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);
@@ -679,12 +677,15 @@ mod retention {
             .unwrap();
         assert_eq!(archived, 1);
 
-        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
-        let archived_lineage = archive_store
-            .get_lineage("cap-retention-lineage")
-            .unwrap()
-            .expect("archived lineage snapshot");
-        assert_eq!(archived_lineage.subject_key, subject.public_key().to_hex());
+        let archive_store = archive::open(&archive_path);
+        let archived_subject: String = archive_store
+            .query_row(
+                "SELECT subject_key FROM capability_lineage WHERE capability_id = ?1",
+                ["cap-retention-lineage"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(archived_subject, subject.public_key().to_hex());
 
         let live_lineage = store
             .get_lineage("cap-retention-lineage")

@@ -8,17 +8,8 @@ use super::{
     PortError, PortResult,
 };
 
-mod catalog;
-
 const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
-pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const SECURITY_STATE_STORE_ANCHOR_TABLES: &[&str] = &[
-    "security_transitions",
-    "security_flow_contexts",
-    "security_response_effects",
-    "security_scheduler_retries",
-    "chio_tool_receipts",
-];
+pub(crate) const SECURITY_BLOB_NAMESPACES: &[&str] = &["security_state", "encrypted_blob"];
 
 // tenant-read-contract: security_advisory_events; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_attested_finding_batch_items; class=tenant-predicate; principal=security-runtime
@@ -77,45 +68,45 @@ const SECURITY_STATE_STORE_ANCHOR_TABLES: &[&str] = &[
 // Contracts: docs/security/trust-boundary-inventory.json
 pub(super) fn open_schema(connection: &Connection) -> PortResult<()> {
     connection
-        .execute_batch(
-            "PRAGMA synchronous = FULL; \
-         PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;",
-        )
+        .execute_batch("PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;")
         .map_err(sqlite_error)?;
-    let result = (|| {
-        let catalog = catalog::Catalog::canonical()?;
-        catalog.preflight(connection)?;
-        match crate::check_current_schema(
-            connection,
-            SECURITY_STATE_STORE_SCHEMA_KEY,
-            SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
-            SECURITY_STATE_STORE_ANCHOR_TABLES,
-        )
-        .map_err(schema_version_error)?
-        {
-            crate::SchemaState::Current => {}
-            crate::SchemaState::Unstamped => {
-                create_schema(connection)?;
-                crate::stamp_schema_version(
-                    connection,
-                    SECURITY_STATE_STORE_SCHEMA_KEY,
-                    SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
-                )
-                .map_err(schema_version_error)?;
-            }
-        }
-        catalog.validate(connection)?;
-        validate_schema(connection)
-    })();
-    match result {
-        Ok(()) => connection
-            .execute_batch("COMMIT; PRAGMA journal_mode = WAL;")
-            .map_err(sqlite_error),
-        Err(error) => {
-            let _ = connection.execute_batch("ROLLBACK;");
-            Err(error)
-        }
+    let transaction =
+        rusqlite::Transaction::new_unchecked(connection, rusqlite::TransactionBehavior::Immediate)
+            .map_err(sqlite_error)?;
+    let schema = crate::schema_version::SchemaTransaction::from_transaction(
+        transaction,
+        SECURITY_BLOB_NAMESPACES,
+    )
+    .map_err(schema_version_error)?;
+    if schema.is_fresh() {
+        create_security_blob_schema(&schema)?;
     }
+    validate_security_blob_catalog(schema.connection())?;
+    validate_schema(schema.connection())?;
+    schema.commit().map_err(schema_version_error)?;
+    connection
+        .execute_batch("PRAGMA journal_mode = WAL;")
+        .map_err(sqlite_error)
+}
+
+fn create_security_blob_schema(
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> PortResult<()> {
+    create_schema(schema.connection())?;
+    crate::encrypted_blob::initialize_blob_schema(schema).map_err(|_| PortError::unavailable())?;
+    schema
+        .stamp(SECURITY_STATE_STORE_SCHEMA_KEY)
+        .map_err(schema_version_error)
+}
+
+pub(crate) fn validate_security_blob_catalog(connection: &Connection) -> PortResult<()> {
+    let mut model = Connection::open_in_memory().map_err(sqlite_error)?;
+    let schema =
+        crate::schema_version::SchemaTransaction::begin(&mut model, SECURITY_BLOB_NAMESPACES)
+            .map_err(schema_version_error)?;
+    create_security_blob_schema(&schema)?;
+    crate::schema_catalog::validate_against(connection, schema.connection())
+        .map_err(schema_version_error)
 }
 
 fn validate_schema(connection: &Connection) -> PortResult<()> {

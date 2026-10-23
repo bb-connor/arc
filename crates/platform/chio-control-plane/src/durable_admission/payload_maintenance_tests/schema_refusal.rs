@@ -25,10 +25,12 @@ fn durable_runtime_refuses_noncurrent_and_damaged_tool_outcome_catalogs() -> Tes
             if damage {
                 connection.execute_batch("DROP INDEX tool_outcomes_raw_digest_owners")?;
             } else {
+                connection.execute_batch("PRAGMA ignore_check_constraints = ON")?;
                 connection.execute(
                     "UPDATE chio_store_schema_versions SET version = ?1 WHERE store_key = 'tool_outcome'",
                     [version],
                 )?;
+                connection.execute_batch("PRAGMA ignore_check_constraints = OFF")?;
             }
             connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
         }
