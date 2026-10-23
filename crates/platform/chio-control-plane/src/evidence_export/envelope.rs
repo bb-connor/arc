@@ -125,6 +125,10 @@ pub(super) struct ExportCommitment {
 
 pub(super) type PackageEnvelope = SignedExportEnvelope<ExportCommitment>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for ExportCommitment {
+    const SCHEMA_ID: &'static str = ENVELOPE_SCHEMA;
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Payload<'a> {
@@ -169,7 +173,7 @@ pub(super) fn verify_manifest(
 ) -> Result<(), CliError> {
     policy.validate()?;
     policy.require_signer(&envelope.signer_key)?;
-    if envelope.body.schema != ENVELOPE_SCHEMA || !envelope.verify_signature()? {
+    if envelope.body.schema != ENVELOPE_SCHEMA || !envelope.verify_signature(&envelope.signer_key)? {
         return Err(CliError::attest_error(
             "evidence export envelope signature or schema is invalid".to_owned(),
         ));

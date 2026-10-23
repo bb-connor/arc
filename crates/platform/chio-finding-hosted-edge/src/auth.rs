@@ -610,9 +610,14 @@ fn verify_dpop_stateless(
     {
         return Err(HostedEdgeError::AuthenticationFailed);
     }
-    let message =
-        canonical_json_bytes(&proof.body).map_err(|_| HostedEdgeError::AuthenticationFailed)?;
-    if !proof.body.agent_key.verify(&message, &proof.signature) {
+    if chio_core_types::crypto::verify_wrapped(
+        &capability.subject,
+        DPOP_SCHEMA,
+        &proof.body,
+        &proof.signature,
+    )
+    .is_err()
+    {
         return Err(HostedEdgeError::AuthenticationFailed);
     }
     Ok(())

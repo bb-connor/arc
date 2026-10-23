@@ -1,7 +1,9 @@
+use chio_core::crypto::verify_wrapped;
 use chio_core::{canonical_json_bytes, sha256_hex};
 
 use crate::CliError;
 
+use super::schema::CERTIFICATION_SCHEMA;
 use super::types::{
     CertificationRegistryEntry, CertificationRegistryState, SignedCertificationCheck,
 };
@@ -11,10 +13,13 @@ pub(crate) fn verify_signed_certification_check(
     artifact: &SignedCertificationCheck,
 ) -> Result<(), CliError> {
     validate_certification_artifact_body(&artifact.body)?;
-    let body_bytes = canonical_json_bytes(&artifact.body)?;
-    if !artifact
-        .signer_public_key
-        .verify(&body_bytes, &artifact.signature)
+    if verify_wrapped(
+        &artifact.signer_public_key,
+        CERTIFICATION_SCHEMA,
+        &artifact.body,
+        &artifact.signature,
+    )
+    .is_err()
     {
         return Err(CliError::attest_error(
             "certification artifact signature is invalid".to_string(),

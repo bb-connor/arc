@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::{
     body::{prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},
     crypto_floor::ReceiptCryptoFloor,
@@ -16,10 +16,13 @@ use chio_core_types::receipt::{
     metadata::ActorRef,
     metadata::GuardEvidence,
 };
-use chio_core_types::{canonical_json_bytes, sha256_hex};
+use chio_core_types::{canonical_json_bytes, sha256_hex, CanonicalBytes, Error};
 
 use crate::method::HttpMethod;
 use crate::verdict::Verdict;
+
+/// Signing-wrapper schema id of an HTTP receipt.
+pub const CHIO_HTTP_RECEIPT_SCHEMA: &str = "chio.http-receipt.v1";
 
 pub const CHIO_HTTP_STATUS_SCOPE_KEY: &str = "chio_http_status_scope";
 pub const CHIO_DECISION_RECEIPT_ID_KEY: &str = "chio_decision_receipt_id";
@@ -190,7 +193,8 @@ impl HttpReceipt {
     pub fn sign(mut body: HttpReceiptBody, keypair: &Keypair) -> chio_core_types::Result<Self> {
         body.id = compute_http_receipt_id(&body)?;
         body.validate_authority_semantics()?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature =
+            keypair.sign_wrapped(CHIO_HTTP_RECEIPT_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
         Ok(Self {
             id: body.id,
             request_id: body.request_id,
@@ -256,7 +260,11 @@ impl HttpReceipt {
         if compute_http_receipt_id(&body)? != self.id {
             return Ok(false);
         }
-        self.kernel_key.verify_canonical(&body, &self.signature)
+        match verify_wrapped(&self.kernel_key, CHIO_HTTP_RECEIPT_SCHEMA, &body, &self.signature) {
+            Ok(()) => Ok(true),
+            Err(Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     /// Recompute the content-addressed HTTP receipt id.
@@ -360,7 +368,7 @@ impl HttpReceipt {
             return Ok(false);
         }
         if !projected
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(&self.kernel_key, ReceiptCryptoFloor::AllowHybrid)
             .map_err(|error| {
                 chio_core_types::Error::InvalidSignature(format!(
                     "HTTP evidence outer signature verification failed: {error}"
@@ -503,8 +511,12 @@ mod tests {
         receipt.boundary_class = BoundaryClass::DetectOnly;
         receipt.observation_outcome = Some(ObservationOutcome::Observed);
         receipt.trust_level = TrustLevel::Verified;
-        let (signature, _) = kp.sign_canonical(&receipt.body()).test_unwrap();
-        receipt.signature = signature;
+        receipt.signature = kp
+            .sign_wrapped(
+                CHIO_HTTP_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_serializable(&receipt.body()).test_unwrap(),
+            )
+            .test_unwrap();
 
         assert!(!receipt.verify_signature().test_unwrap());
     }
@@ -681,14 +693,14 @@ mod tests {
         let kp = test_keypair();
         let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
         let mut projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
-        projected.algorithm = Some(chio_core_types::crypto::SigningAlgorithm::P256);
+        projected.signature = Signature::from_p256_der(&[0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01]);
         let error = receipt
             .verify_chio_receipt_projection(&projected)
             .test_unwrap_err();
         match error {
             chio_core_types::Error::InvalidSignature(message) => assert_eq!(
                 message,
-                "HTTP evidence outer signature verification failed: receipt algorithm envelope field p256 disagrees with signature ed25519"
+                "HTTP evidence outer signature verification failed: receipt cryptographic verification failed: signature algorithm P256 does not match the pinned key algorithm Ed25519"
             ),
             other => panic!("expected signature refusal, received {other:?}"),
         }
@@ -741,5 +753,41 @@ mod tests {
                 Err(chio_core_types::Error::CanonicalJson(_))
             ));
         }
+    }
+
+    #[test]
+    fn http_receipt_signs_and_verifies_through_the_wrapper() {
+        let kp = test_keypair();
+        let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        assert!(receipt.verify_signature().test_unwrap());
+        verify_wrapped(
+            &kp.public_key(),
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &receipt.body(),
+            &receipt.signature,
+        )
+        .test_unwrap();
+    }
+
+    #[test]
+    fn http_receipt_signature_rejected_under_another_schema_id() {
+        let kp = test_keypair();
+        let mut receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        receipt.signature = kp
+            .sign_wrapped(
+                chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_serializable(&receipt.body()).test_unwrap(),
+            )
+            .test_unwrap();
+        assert!(matches!(
+            verify_wrapped(
+                &kp.public_key(),
+                CHIO_HTTP_RECEIPT_SCHEMA,
+                &receipt.body(),
+                &receipt.signature,
+            ),
+            Err(Error::SignatureRejected)
+        ));
+        assert!(!receipt.verify_signature().test_unwrap());
     }
 }

@@ -29,7 +29,10 @@ pub(super) fn enforcement_anchor_proof(
         .as_object_mut()
         .ok_or("checkpoint statement body is an object")?
         .remove("signature");
-    let (signature, _) = kernel.sign_canonical(&statement)?;
+    let signature = kernel.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&statement)?,
+    )?;
     proof.checkpoint_statement.signature = signature;
     Ok(proof)
 }

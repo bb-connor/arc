@@ -148,7 +148,7 @@ pub(super) fn bundle_contains_verified_receipt_node_id(
     {
         return Ok(false);
     }
-    Ok(validate_artifact_signature(node, &value, trusted_authority_keys).is_ok())
+    Ok(validate_artifact_signature(node, &value, CHIO_RECEIPT_SCHEMA, trusted_authority_keys).is_ok())
 }
 
 pub(super) fn bundle_contains_risk_evidence_kind(
@@ -174,7 +174,7 @@ pub(super) fn bundle_contains_risk_evidence_kind(
     if value.get("schema").and_then(serde_json::Value::as_str) != Some(node.schema.as_str()) {
         return Ok(false);
     }
-    Ok(validate_artifact_signature(node, &value, trusted_authority_keys).is_ok())
+    Ok(validate_artifact_signature(node, &value, &node.schema, trusted_authority_keys).is_ok())
 }
 
 fn risk_evidence_ref_matches_node(node: &TrustMarketEvidenceNode, evidence_ref: &str) -> bool {
@@ -219,7 +219,7 @@ pub(super) fn parse_signed_artifact<T: for<'de> Deserialize<'de>>(
     trusted_authority_keys: &[PublicKey],
 ) -> Result<T, TransactionPassportError> {
     let value = parse_artifact_value(bundle, node, expected_schema)?;
-    validate_artifact_signature(node, &value, trusted_authority_keys)?;
+    validate_artifact_signature(node, &value, expected_schema, trusted_authority_keys)?;
     parse_artifact_from_value(node, value)
 }
 
@@ -274,6 +274,7 @@ fn parse_artifact_from_value<T: for<'de> Deserialize<'de>>(
 fn validate_artifact_signature(
     node: &TrustMarketEvidenceNode,
     value: &serde_json::Value,
+    schema_id: &str,
     trusted_authority_keys: &[PublicKey],
 ) -> Result<(), TransactionPassportError> {
     let signature = value
@@ -301,13 +302,16 @@ fn validate_artifact_signature(
         return Err(invalid_signature(node, "artifact must be an object"));
     };
     object.remove("signature");
-    let verified = trusted_key
-        .verify_canonical(&signed_value, &signature)
-        .map_err(|error| invalid_signature(node, format!("signature check failed: {error}")))?;
-    if verified {
-        Ok(())
-    } else {
-        Err(invalid_signature(node, "signature check failed"))
+    match chio_core_types::crypto::verify_wrapped(trusted_key, schema_id, &signed_value, &signature)
+    {
+        Ok(()) => Ok(()),
+        Err(chio_core_types::Error::SignatureRejected) => {
+            Err(invalid_signature(node, "signature check failed"))
+        }
+        Err(error) => Err(invalid_signature(
+            node,
+            format!("signature check failed: {error}"),
+        )),
     }
 }
 

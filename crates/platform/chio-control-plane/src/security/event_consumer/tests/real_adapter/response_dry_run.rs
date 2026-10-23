@@ -626,8 +626,18 @@ impl chio_core::SigningBackend for DiagnosticSigningFailure {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.inner.public_key()
     }
-    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
-        if self.readiness || message != b"chio.response-simulation.readiness.v1\0" {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> chio_core::error::Result<chio_core::Signature> {
+        let readiness = chio_core::crypto::SigningWrapper::new(
+            crate::security::SIGNER_READINESS_PROBE_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&serde_json::json!({
+                "probe": "response_simulation",
+                "schema": crate::security::SIGNER_READINESS_PROBE_SCHEMA,
+            }))?,
+        )?;
+        if self.readiness || message.as_bytes() != readiness.as_bytes() {
             return Err(chio_core::Error::InvalidSignature(
                 "private-signer-detail".into(),
             ));

@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, path::Path};
 
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 use chio_core_types::receipt::body::ChioReceipt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -570,10 +570,14 @@ fn verify_approval_signature(
     }
     let signature = Signature::from_hex(signature_hex)
         .map_err(|_| signature_invalid("approval signature invalid"))?;
-    let verified = public_key
-        .verify_canonical(&approval_signature_body(approval), &signature)
-        .map_err(|_| signature_invalid("approval signature invalid"))?;
-    if verified {
+    if verify_wrapped(
+        &public_key,
+        ENTERPRISE_APPROVAL_CASE_SCHEMA,
+        &approval_signature_body(approval),
+        &signature,
+    )
+    .is_ok()
+    {
         Ok(())
     } else {
         Err(signature_invalid("approval signature invalid"))

@@ -830,7 +830,10 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
     let mut receipt: Value = receipt_body.clone();
     receipt["signature"] = Value::String(
         receipt_key
-            .sign(&canonical_json_bytes(&receipt_body)?)
+            .sign_wrapped(
+                "chio.receipt.v1",
+                &chio_core_types::CanonicalBytes::from_serializable(&receipt_body)?,
+            )?
             .to_hex(),
     );
     let receipt_bytes = canonical_json_bytes(&receipt)?;
@@ -880,7 +883,10 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
         "chain_root": format!("0x{}", chain_root.to_hex())
     });
     let statement_signature = checkpoint_key
-        .sign(&canonical_json_bytes(&statement_body)?)
+        .sign_wrapped(
+            "chio.checkpoint_statement.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(&statement_body)?,
+        )?
         .to_hex();
     let log_id = format!(
         "local-log-{}",

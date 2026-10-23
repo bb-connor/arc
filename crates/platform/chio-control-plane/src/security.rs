@@ -27,8 +27,8 @@ pub use active_response::{
 };
 #[cfg(unix)]
 pub use active_response_authority::{
-    active_response_authority_request_signing_bytes,
-    active_response_authority_response_signing_bytes, validate_active_response_artifacts_draft,
+    active_response_authority_request_signing_body,
+    active_response_authority_response_signing_body, validate_active_response_artifacts_draft,
     validate_active_response_policy_selection, ActiveResponseAdmissionArtifactsDraftWire,
     ActiveResponseAdmissionArtifactsWire, ActiveResponseAffectedIds, ActiveResponseApprovalTokens,
     ActiveResponseAuthorityHandler, ActiveResponseAuthorityHandlerError,
@@ -40,8 +40,8 @@ pub use active_response_authority::{
     ActiveResponsePolicySelectionWire, ProductionActiveResponseAuthorityClient,
     ProductionActiveResponseAuthorityFileConfig, SignedActiveResponseAuthorityRequest,
     SignedActiveResponseAuthorityResponse, ACTIVE_RESPONSE_AUTHORITY_REJECTION_KIND,
-    ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN, ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN,
-    ACTIVE_RESPONSE_AUTHORITY_SCHEMA, ACTIVE_RESPONSE_AUTHORITY_TRANSIENT_REJECTION_KIND,
+    ACTIVE_RESPONSE_AUTHORITY_PROTOCOL, ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+    ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA, ACTIVE_RESPONSE_AUTHORITY_TRANSIENT_REJECTION_KIND,
     MAX_ACTIVE_RESPONSE_AFFECTED_IDS, MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS,
     MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES, MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
 };
@@ -84,6 +84,23 @@ pub use scheduler_worker::{
 };
 
 use std::sync::Arc;
+
+/// Signing-wrapper schema id of a signer readiness probe.
+pub(crate) const SIGNER_READINESS_PROBE_SCHEMA: &str = "chio.signer-readiness-probe.v1";
+
+/// Proves the signer is live by signing the fixed readiness probe for `probe`.
+pub(crate) fn sign_signer_readiness_probe(
+    signer: &dyn chio_core::SigningBackend,
+    probe: &str,
+) -> chio_core::error::Result<()> {
+    let body = chio_core::CanonicalBytes::from_serializable(&serde_json::json!({
+        "probe": probe,
+        "schema": SIGNER_READINESS_PROBE_SCHEMA,
+    }))?;
+    signer
+        .sign_wrapped(SIGNER_READINESS_PROBE_SCHEMA, &body)
+        .map(|_| ())
+}
 
 use chio_kernel::{
     ChioKernel, PostInvocationPipeline, SecurityInvocationContextAuthority,

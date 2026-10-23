@@ -45,7 +45,7 @@ fn validate_authority_request(
     now_unix_seconds: u64,
 ) -> PortResult<()> {
     let body = &request.body;
-    if body.schema != ACTIVE_RESPONSE_AUTHORITY_SCHEMA {
+    if body.schema != ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA {
         return Err(rejected("schema"));
     }
     if body.deployment_digest != config.deployment_digest {
@@ -62,13 +62,18 @@ fn validate_authority_request(
     if body.client != config.trusted_client {
         return Err(rejected("client"));
     }
-    if request.algorithm != config.trusted_client.algorithm()
-        || request.signature.algorithm() != request.algorithm
-    {
+    if request.signature.algorithm() != config.trusted_client.algorithm() {
         return Err(rejected("algorithm"));
     }
-    let canonical = active_response_authority_request_signing_bytes(body)?;
-    if !config.trusted_client.verify(&canonical, &request.signature) {
+    let canonical = active_response_authority_request_signing_body(body)?;
+    if chio_core::crypto::verify_wrapped_bytes(
+        &config.trusted_client,
+        ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+        &canonical,
+        &request.signature,
+    )
+    .is_err()
+    {
         return Err(rejected("signature"));
     }
     Ok(())

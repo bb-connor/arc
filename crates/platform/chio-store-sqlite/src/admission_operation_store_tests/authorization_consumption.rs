@@ -346,9 +346,11 @@ fn substituted(
         .ok_or("receipt replay digest")? = sha256_hex(&manifest_bytes).into();
     body["projection_json"] = STANDARD.encode(projection_bytes).into();
     body["manifest_json"] = STANDARD.encode(manifest_bytes).into();
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend(canonical_json_bytes(body)?);
-    wire["signature"] = serde_json::to_value(signer().sign(&preimage))?;
+    let signature = signer().sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::CanonicalBytes::from_serializable(body)?,
+    )?;
+    wire["signature"] = serde_json::to_value(signature)?;
     Ok(serde_json::from_value(wire)?)
 }
 

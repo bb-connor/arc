@@ -251,6 +251,9 @@ impl SqliteEnterpriseMigrationStateStore {
     }
 }
 
+/// Signing-wrapper schema id of an enterprise migration transition.
+pub const ENTERPRISE_MIGRATION_TRANSITION_SCHEMA: &str = "chio.enterprise-migration-transition.v1";
+
 /// Sign a typed transition body with its declared signer.
 pub fn sign_enterprise_migration_transition(
     body: EnterpriseMigrationTransitionBody,
@@ -261,8 +264,10 @@ pub fn sign_enterprise_migration_transition(
     if body.signer_public_key != signer.public_key().to_hex() {
         return Err(SqliteEnterpriseMigrationStateStoreError::Cryptography);
     }
-    let (signature, _) = signer
-        .sign_canonical(&body)
+    let signature = chio_core::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            signer.sign_wrapped(ENTERPRISE_MIGRATION_TRANSITION_SCHEMA, &canonical)
+        })
         .map_err(|_| SqliteEnterpriseMigrationStateStoreError::Cryptography)?;
     let transition = EnterpriseMigrationTransition {
         body,
@@ -289,9 +294,14 @@ pub fn enterprise_migration_transition_digest(
     {
         return Err(SqliteEnterpriseMigrationStateStoreError::Cryptography);
     }
-    let canonical_body = canonical_json_bytes(&transition.body)
-        .map_err(|_| SqliteEnterpriseMigrationStateStoreError::Cryptography)?;
-    if !public_key.verify(&canonical_body, &signature) {
+    if chio_core::crypto::verify_wrapped(
+        &public_key,
+        ENTERPRISE_MIGRATION_TRANSITION_SCHEMA,
+        &transition.body,
+        &signature,
+    )
+    .is_err()
+    {
         return Err(SqliteEnterpriseMigrationStateStoreError::Cryptography);
     }
     let canonical = canonical_json_bytes(transition)

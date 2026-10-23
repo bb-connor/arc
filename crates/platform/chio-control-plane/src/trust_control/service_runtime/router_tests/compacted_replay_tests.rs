@@ -13,7 +13,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::Request;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
-use chio_core::{receipt::body::ChioReceipt, SigningAlgorithm};
+use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::tool_outcome::{ToolOutcomeStore, ToolOutcomeStoreError};
 use chio_kernel::{KernelError, ReceiptStoreError, Verdict};
 use rusqlite::{Connection, OpenFlags};
@@ -65,7 +65,13 @@ async fn fault_reply(
             .ok_or_else(|| std::io::Error::other("missing receipt result"))?;
         let mut receipt: ChioReceipt = serde_json::from_value(result.value.clone())?;
         if mode == 2 {
-            receipt.algorithm = Some(SigningAlgorithm::Hybrid);
+            let mut value = serde_json::to_value(&receipt)?;
+            value
+                .as_object_mut()
+                .ok_or_else(|| std::io::Error::other("receipt is not an object"))?
+                .insert("algorithm".to_owned(), serde_json::json!("hybrid"));
+            result.value = value;
+            return Ok::<_, Box<dyn Error>>(envelope);
         } else if mode == 6 {
             let other = chio_core::Keypair::generate();
             let mut foreign_body = receipt.body();

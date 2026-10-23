@@ -539,7 +539,12 @@ fn signed_federation_policy_rejects_unbound_read_boundary() {
         require_proofs: false,
         purpose: None,
     };
-    let (signature, _) = keypair.sign_canonical(&body).test_unwrap();
+    let signature = keypair
+        .sign_wrapped(
+            FEDERATION_POLICY_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&body).test_unwrap(),
+        )
+        .test_unwrap();
     let policy = FederationPolicyDocument { body, signature };
 
     let error = verify_federation_policy(&policy).test_unwrap_err();

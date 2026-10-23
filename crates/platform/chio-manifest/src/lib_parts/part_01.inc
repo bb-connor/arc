@@ -572,7 +572,10 @@ pub fn sign_manifest(
     validate_manifest(manifest)?;
     let signer_key = keypair.public_key();
     ensure_embedded_public_key_matches(manifest, &signer_key)?;
-    let (signature, _bytes) = keypair.sign_canonical(manifest)?;
+    let signature = keypair.sign_wrapped(
+        TOOL_MANIFEST_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(manifest)?,
+    )?;
     Ok(SignedManifest {
         manifest: manifest.clone(),
         signature,
@@ -936,8 +939,12 @@ mod tests {
         let other = Keypair::generate();
         let mut m = sample_manifest();
         m.public_key = other.public_key().to_hex();
-        let (signature, _bytes) = trusted
-            .sign_canonical(&m)
+        let signature = trusted
+            .sign_wrapped(
+                TOOL_MANIFEST_SCHEMA,
+                &chio_core::CanonicalBytes::from_serializable(&m)
+                    .unwrap_or_else(|e| panic!("canonical: {e}")),
+            )
             .unwrap_or_else(|e| panic!("sign: {e}"));
         let signed = SignedManifest {
             manifest: m,
@@ -956,8 +963,12 @@ mod tests {
         let trusted = Keypair::generate();
         let mut m = sample_manifest();
         m.public_key = "not-a-public-key".into();
-        let (signature, _bytes) = trusted
-            .sign_canonical(&m)
+        let signature = trusted
+            .sign_wrapped(
+                TOOL_MANIFEST_SCHEMA,
+                &chio_core::CanonicalBytes::from_serializable(&m)
+                    .unwrap_or_else(|e| panic!("canonical: {e}")),
+            )
             .unwrap_or_else(|e| panic!("sign: {e}"));
         let signed = SignedManifest {
             manifest: m,

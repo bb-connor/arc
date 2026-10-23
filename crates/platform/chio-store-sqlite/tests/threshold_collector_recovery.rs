@@ -9,7 +9,7 @@ use chio_core::capability::governance::{
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequest, ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
-use chio_core::crypto::{sha256_hex, Keypair, SigningAlgorithm};
+use chio_core::crypto::{sha256_hex, Keypair};
 use chio_kernel::approval::{
     ThresholdApprovalProposalCreationContext, ThresholdApprovalProposalCreationParameters,
 };
@@ -346,18 +346,14 @@ fn integer_overflow_rolls_back_vote_and_parent_changes() -> TestResult {
 }
 
 #[test]
-fn creation_retry_compares_canonical_artifacts_not_optional_defaults() -> TestResult {
+fn creation_retry_compares_canonical_artifacts() -> TestResult {
     let fixture = Fixture::new()?;
     let (store, _) = fixture.reopen()?;
     let mut initial = fixture.initial.clone();
     let mut body = initial.proposal.body.clone();
     body.proposal_id = "canonical-proposal".into();
     initial.proposal = ThresholdApprovalProposal::sign(body, &fixture.authority)?;
-    initial.proposal.algorithm = Some(SigningAlgorithm::Ed25519);
     store.create(&initial)?;
-    // The optional default is omitted from canonical JSON and restores as None.
-    store.create(&initial)?;
-    initial.proposal.algorithm = None;
     store.create(&initial)?;
     assert_eq!(store.get("canonical-proposal")?, Some(initial));
     Ok(())

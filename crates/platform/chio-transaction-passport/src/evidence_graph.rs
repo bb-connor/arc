@@ -1146,6 +1146,17 @@ fn trust_root_signer_identity(
     Ok(key_id.to_string())
 }
 
+/// Signing-wrapper schema id of the artifact a signed evidence role carries.
+fn signed_role_wrapper_schema(role: EvidenceNodeRole) -> Option<&'static str> {
+    match role {
+        EvidenceNodeRole::Capability => Some("chio.capability.proof.v1"),
+        EvidenceNodeRole::TrustRoot => Some("chio.trust.root.v1"),
+        EvidenceNodeRole::GuardDecision => Some("chio.guard.decision.v1"),
+        EvidenceNodeRole::Receipt => Some("chio.receipt.v1"),
+        _ => None,
+    }
+}
+
 fn verify_signed_role_artifact(
     graph: &TransactionEvidenceGraph,
     artifacts: &BTreeMap<String, Vec<u8>>,
@@ -1171,11 +1182,12 @@ fn verify_signed_role_artifact(
         minimal_governed_action_binding_error(format!("{label} artifact must be an object"))
     })?;
     object.remove("signature");
-    let verified = public_key
-        .verify_canonical(&artifact, &signature)
-        .map_err(|error| {
-            minimal_governed_action_signature_error(format!("{label} signature invalid: {error}"))
-        })?;
+    let schema_id = signed_role_wrapper_schema(role).ok_or_else(|| {
+        minimal_governed_action_binding_error(format!("{label} role is not a signed artifact"))
+    })?;
+    let verified =
+        chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &artifact, &signature)
+            .is_ok();
     if verified {
         Ok(())
     } else {

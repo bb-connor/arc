@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -734,13 +734,7 @@ fn verify_join_receipt_signature(
             "join receipt signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&join_receipt_signature_body(receipt)?, &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "join receipt signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, SWARM_JOIN_RECEIPT_SCHEMA_ID, &join_receipt_signature_body(receipt)?, &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1163,13 +1157,7 @@ fn verify_runtime_trust_root_signature(
             )
         })?
         .remove("signature");
-    let verified = public_key
-        .verify_canonical(&body, &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "runtime trust root signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, "chio.trust.root.v1", &body, &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1188,13 +1176,7 @@ fn verify_execution_lease_signature(
             "execution lease signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&execution_lease_signature_body(lease), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "execution lease signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_EXECUTION_LEASE_SIGNATURE_SCHEMA, &execution_lease_signature_body(lease), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1224,13 +1206,7 @@ fn verify_task_graph_signature(
         )
     })?;
     object.remove("signature");
-    let verified = public_key
-        .verify_canonical(&body, &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "task graph signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, SWARM_TASK_GRAPH_SCHEMA_ID, &body, &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1320,13 +1296,7 @@ fn verify_route_plan_receipt_signature(
             "route plan receipt signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&route_plan_receipt_signature_body(route_plan), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "route plan receipt signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, SWARM_ROUTE_PLAN_RECEIPT_SIGNATURE_SCHEMA, &route_plan_receipt_signature_body(route_plan), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1345,16 +1315,7 @@ fn verify_policy_activation_receipt_signature(
             "policy activation receipt signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(
-            &policy_activation_receipt_signature_body(receipt),
-            &signature,
-        )
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "policy activation receipt signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, POLICY_ACTIVATION_RECEIPT_SIGNATURE_SCHEMA, &policy_activation_receipt_signature_body(receipt), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1373,13 +1334,7 @@ fn verify_attack_simulation_report_signature(
             "attack simulation report signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&attack_simulation_report_signature_body(report), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "attack simulation report signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_ATTACK_SIMULATION_REPORT_SIGNATURE_SCHEMA, &attack_simulation_report_signature_body(report), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1398,13 +1353,7 @@ fn verify_chaos_run_report_signature(
             "chaos run report signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&chaos_run_report_signature_body(report), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "chaos run report signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_CHAOS_RUN_REPORT_SIGNATURE_SCHEMA, &chaos_run_report_signature_body(report), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1670,13 +1619,7 @@ fn verify_revocation_freshness_signature(
             "revocation freshness signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&revocation_freshness_signature_body(proof), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "revocation freshness signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_REVOCATION_FRESHNESS_PROOF_SIGNATURE_SCHEMA, &revocation_freshness_signature_body(proof), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1752,13 +1695,7 @@ fn verify_sandbox_attestation_signature(
             "sandbox attestation signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&sandbox_attestation_signature_body(sandbox), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "sandbox attestation signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_SANDBOX_ATTESTATION_SIGNATURE_SCHEMA, &sandbox_attestation_signature_body(sandbox), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1960,13 +1897,7 @@ fn verify_tool_server_ack_signature(
             "tool-server acknowledgement signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&tool_server_ack_signature_body(ack), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "tool-server acknowledgement signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_TOOL_SERVER_ACK_SIGNATURE_SCHEMA, &tool_server_ack_signature_body(ack), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -1985,13 +1916,7 @@ fn verify_trusted_time_proof_signature(
             "trusted time proof signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&trusted_time_proof_signature_body(proof), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "trusted time proof signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_TRUSTED_TIME_PROOF_SIGNATURE_SCHEMA, &trusted_time_proof_signature_body(proof), &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -2185,13 +2110,7 @@ fn verify_terminal_receipt_signature(
             "terminal receipt signature invalid: {error}"
         ))
     })?;
-    let verified = public_key
-        .verify_canonical(&terminal_receipt_signature_body(receipt), &signature)
-        .map_err(|error| {
-            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
-                "terminal receipt signature invalid: {error}"
-            ))
-        })?;
+    let verified = verify_wrapped(&public_key, RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA, &terminal_receipt_signature_body(receipt), &signature).is_ok();
     if verified {
         Ok(())
     } else {

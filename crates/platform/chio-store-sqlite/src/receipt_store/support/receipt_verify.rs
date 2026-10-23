@@ -100,7 +100,7 @@ pub(crate) fn ensure_chio_receipt_verified_with_context(
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
     // floor before persistence or export.
     let signature_valid = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
         .map_err(|error| {
             ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
         })?;
@@ -134,7 +134,7 @@ pub(crate) fn ensure_child_receipt_verified_with_context(
     // compatibility floor explicit: accept classical and hybrid receipts, while policy-bearing callers enforce their configured
     // floor before persistence or export.
     let signature_valid = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
         .map_err(|error| {
             ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
         })?;

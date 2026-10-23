@@ -3005,7 +3005,10 @@ async fn wrong_issuer_signature_rejects() -> TestResult {
     forged.finding_id = compute_finding_id(&forged)?;
     forged.signature.clear();
     let interloper = keypair(9);
-    let (signature, _) = interloper.sign_canonical(&forged)?;
+    let signature = interloper.sign_wrapped(
+        chio_core::signed_artifact::CHIO_FINDING_V1_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&forged)?,
+    )?;
     forged.signature = signature.to_hex();
     let (status, body) = send(
         &stack.state,

@@ -664,7 +664,7 @@ impl FindingChallengeCoordinator {
             .map_err(ChallengeCoordinatorError::PenaltyMint)?;
         if !governance
             .fee_schedule
-            .verify_signature()
+            .verify_signature(&governance.fee_schedule.signer_key)
             .map_err(|error| ChallengeCoordinatorError::PenaltyMint(error.to_string()))?
         {
             return Err(ChallengeCoordinatorError::PenaltyMint(
@@ -678,7 +678,7 @@ impl FindingChallengeCoordinator {
             .map_err(ChallengeCoordinatorError::PenaltyMint)?;
         if !governance
             .charter
-            .verify_signature()
+            .verify_signature(&governance.charter.signer_key)
             .map_err(|error| ChallengeCoordinatorError::PenaltyMint(error.to_string()))?
         {
             return Err(ChallengeCoordinatorError::PenaltyMint(
@@ -689,7 +689,7 @@ impl FindingChallengeCoordinator {
             .validate()
             .map_err(ChallengeCoordinatorError::PenaltyMint)?;
         if !case
-            .verify_signature()
+            .verify_signature(&case.signer_key)
             .map_err(|error| ChallengeCoordinatorError::PenaltyMint(error.to_string()))?
         {
             return Err(ChallengeCoordinatorError::PenaltyMint(
@@ -702,7 +702,7 @@ impl FindingChallengeCoordinator {
                 .validate()
                 .map_err(ChallengeCoordinatorError::PenaltyMint)?;
             if !activation
-                .verify_signature()
+                .verify_signature(&activation.signer_key)
                 .map_err(|error| ChallengeCoordinatorError::PenaltyMint(error.to_string()))?
             {
                 return Err(ChallengeCoordinatorError::PenaltyMint(
@@ -716,7 +716,7 @@ impl FindingChallengeCoordinator {
                 .validate()
                 .map_err(ChallengeCoordinatorError::PenaltyMint)?;
             if !prior
-                .verify_signature()
+                .verify_signature(&prior.signer_key)
                 .map_err(|error| ChallengeCoordinatorError::PenaltyMint(error.to_string()))?
             {
                 return Err(ChallengeCoordinatorError::PenaltyMint(

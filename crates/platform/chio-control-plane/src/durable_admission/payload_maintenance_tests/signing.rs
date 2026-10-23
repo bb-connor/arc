@@ -44,8 +44,12 @@ fn compacted_payload_holds_actual_boot_selected_hybrid_receipt_and_cold_replay()
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(response.receipt.kernel_key, backend.public_key()?);
     assert_ne!(response.receipt.kernel_key, kernel.public_key());
-    assert_eq!(response.receipt.algorithm, Some(SigningAlgorithm::Hybrid));
+    assert_eq!(
+        response.receipt.signature.algorithm(),
+        SigningAlgorithm::Hybrid
+    );
     assert!(response.receipt.verify_signature_with_floor(
+        &backend.public_key()?,
         chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowHybrid
     )?);
     let metadata = receipt_operation(&response.receipt)?;

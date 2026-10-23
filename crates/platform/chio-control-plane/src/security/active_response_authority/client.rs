@@ -1,3 +1,4 @@
+use chio_core::crypto::verify_wrapped_bytes;
 use chio_core::{canonical_json_bytes, sha256_hex, PublicKey, SigningBackend};
 use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
 use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
@@ -17,12 +18,13 @@ use super::transport::{
     AbsoluteDeadlineUnixStream,
 };
 use super::{
-    active_response_authority_request_signing_bytes,
-    active_response_authority_response_signing_bytes, ActiveResponseAuthorityOperation,
+    active_response_authority_request_signing_body,
+    active_response_authority_response_signing_body, ActiveResponseAuthorityOperation,
     ActiveResponseAuthorityRequestBody, ActiveResponseAuthorityResult,
     ProductionActiveResponseAuthorityFileConfig, SignedActiveResponseAuthorityRequest,
     SignedActiveResponseAuthorityResponse, ACTIVE_RESPONSE_AUTHORITY_REJECTION_KIND,
-    ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+    ACTIVE_RESPONSE_AUTHORITY_PROTOCOL, ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+    ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
 };
 use crate::security::event_consumer::{
     AttestedFindingAdmissionArtifacts, AttestedFindingResponsePolicyPlanner,
@@ -180,7 +182,7 @@ impl ProductionActiveResponseAuthorityClient {
             return Err(PortError::integrity_failure());
         }
         let body = ActiveResponseAuthorityRequestBody {
-            schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            schema: ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA.to_string(),
             deployment_digest: self.config.deployment_digest,
             store_digest: self.config.store_digest,
             request_id: RequestId::new(crate::security::os_random::hex_256()?)
@@ -189,21 +191,29 @@ impl ProductionActiveResponseAuthorityClient {
             client: expected_client.clone(),
             operation,
         };
-        let canonical = active_response_authority_request_signing_bytes(&body)?;
+        let canonical = active_response_authority_request_signing_body(&body)?;
         let signed = self
             .client_signer
-            .sign_bytes_for_identity(&expected_client, &canonical)
+            .sign_wrapped_for_identity(
+                &expected_client,
+                ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+                &canonical,
+            )
             .map_err(|_| PortError::unavailable())?;
         if signed.public_key != expected_client
             || signed.algorithm != expected_client.algorithm()
-            || signed.signature.algorithm() != signed.algorithm
-            || !expected_client.verify(&canonical, &signed.signature)
+            || verify_wrapped_bytes(
+                &expected_client,
+                ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+                &canonical,
+                &signed.signature,
+            )
+            .is_err()
         {
             return Err(PortError::integrity_failure());
         }
         Ok(SignedActiveResponseAuthorityRequest {
             body,
-            algorithm: signed.algorithm,
             signature: signed.signature,
         })
     }
@@ -221,7 +231,7 @@ impl ProductionActiveResponseAuthorityClient {
         let latest = now_unix_seconds
             .checked_add(self.config.maximum_clock_skew_seconds)
             .ok_or_else(PortError::invalid_data)?;
-        if body.schema != ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+        if body.schema != ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA
             || body.deployment_digest != self.config.deployment_digest
             || body.store_digest != self.config.store_digest
             || body.request_id.as_str() != expected_request_id
@@ -229,13 +239,18 @@ impl ProductionActiveResponseAuthorityClient {
             || body.issued_at_unix_seconds < earliest
             || body.issued_at_unix_seconds > latest
             || &body.authority != trusted
-            || response.algorithm != trusted.algorithm()
-            || response.signature.algorithm() != response.algorithm
         {
             return Err(PortError::integrity_failure());
         }
-        let canonical = active_response_authority_response_signing_bytes(body)?;
-        if !trusted.verify(&canonical, &response.signature) {
+        let canonical = active_response_authority_response_signing_body(body)?;
+        if verify_wrapped_bytes(
+            trusted,
+            ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
+            &canonical,
+            &response.signature,
+        )
+        .is_err()
+        {
             return Err(PortError::integrity_failure());
         }
         Ok(())
@@ -284,7 +299,7 @@ impl AttestedFindingResponsePolicyPlanner for ProductionActiveResponseAuthorityC
                 protocol,
                 deployment_digest,
                 store_digest,
-            } if protocol == ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+            } if protocol == ACTIVE_RESPONSE_AUTHORITY_PROTOCOL
                 && deployment_digest == self.config.deployment_digest
                 && store_digest == self.config.store_digest =>
             {

@@ -37,7 +37,10 @@ fn certification() -> Result<SignedCertificationCheck, Box<dyn std::error::Error
         }
     }))?;
     let signer = Keypair::from_seed(&[74; 32]);
-    let (signature, _) = signer.sign_canonical(&body)?;
+    let signature = signer.sign_wrapped(
+        crate::certify::CERTIFICATION_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&body)?,
+    )?;
     Ok(SignedCertificationCheck {
         body,
         signer_public_key: signer.public_key(),

@@ -222,7 +222,7 @@ impl FindingStatusEpochPublisher {
         signed.body.validate().map_err(|error| error.to_string())?;
         if signed.signer_key != signed.body.operator_key
             || !signed
-                .verify_signature()
+                .verify_signature(&signed.body.operator_key)
                 .map_err(|error| error.to_string())?
         {
             return Err("current finding status epoch signature is invalid".to_owned());

@@ -1,6 +1,6 @@
 //! Structure-aware corpus exercises the same decoder used after peer admission.
 use super::*;
-use chio_core::{Ed25519Backend, Keypair, SigningBackend};
+use chio_core::{canonical_json_bytes, Ed25519Backend, Keypair, SigningBackend};
 
 pub fn response_authority_protocol(data: &[u8]) {
     if let Err(error) = drive(data) {
@@ -23,7 +23,7 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         maximum_replay_entries: 16,
     };
     let body = ActiveResponseAuthorityRequestBody {
-        schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_owned(),
+        schema: ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA.to_owned(),
         deployment_digest: config.deployment_digest,
         store_digest: config.store_digest,
         request_id: RequestId::new("fuzz-authority-request")?,
@@ -31,12 +31,13 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         client: signer.public_key()?,
         operation: ActiveResponseAuthorityOperation::Health,
     };
-    let signature = signer.sign_bytes(&active_response_authority_request_signing_bytes(&body)?)?;
-    let signed = SignedActiveResponseAuthorityRequest {
-        body,
-        algorithm: signer.public_key()?.algorithm(),
-        signature,
-    };
+    let signature = signer
+        .sign_wrapped(
+            ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+            &active_response_authority_request_signing_body(&body)?,
+        )?
+        .signature;
+    let signed = SignedActiveResponseAuthorityRequest { body, signature };
     let valid = canonical_json_bytes(&signed)?;
     let verified = decode_authority_request(&valid, &config, 1000)?;
     assert_eq!(verified.request(), &signed);
@@ -106,9 +107,12 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let wire_now = now & ((1_u64 << 53) - 1);
     let mut timed = signed.clone();
     timed.body.issued_at_unix_seconds = wire_now;
-    timed.signature = signer.sign_bytes(&active_response_authority_request_signing_bytes(
-        &timed.body,
-    )?)?;
+    timed.signature = signer
+        .sign_wrapped(
+            ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+            &active_response_authority_request_signing_body(&timed.body)?,
+        )?
+        .signature;
     let decoded = decode_authority_request(&canonical_json_bytes(&timed)?, &config, wire_now)?;
     assert_eq!(decoded.request(), &timed);
     // Mutate a valid envelope at data-selected byte offsets. This reaches

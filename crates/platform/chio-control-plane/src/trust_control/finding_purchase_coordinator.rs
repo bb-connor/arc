@@ -68,6 +68,31 @@ use super::service_types::{
 };
 
 /// Domain separator for the deterministic reservation identity.
+/// Signing-wrapper schema id of the buyer's signature over the canonical ask
+/// body it purchases against.
+pub(crate) const FINDING_BUYER_ASK_SIGNATURE_SCHEMA: &str = "chio.finding.operator-purchase-job.v1";
+
+/// Buyer signature over the canonical ask body.
+pub(crate) fn sign_buyer_ask(
+    buyer: &Keypair,
+    ask_body: &chio_open_market::bidding::AskResponse,
+) -> chio_core::error::Result<chio_core::crypto::Signature> {
+    buyer.sign_wrapped(
+        FINDING_BUYER_ASK_SIGNATURE_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(ask_body)?,
+    )
+}
+
+/// Whether `signature` is `buyer`'s signature over the canonical ask body.
+pub(crate) fn verify_buyer_ask(
+    buyer: &PublicKey,
+    ask_body: &chio_open_market::bidding::AskResponse,
+    signature: &chio_core::crypto::Signature,
+) -> bool {
+    chio_core::crypto::verify_wrapped(buyer, FINDING_BUYER_ASK_SIGNATURE_SCHEMA, ask_body, signature)
+        .is_ok()
+}
+
 const RESERVATION_DOMAIN: &str = "chio.finding.reservation.v1";
 
 /// Domain separator for the deterministic encumbrance identity.
@@ -680,7 +705,7 @@ impl FindingPurchaseCoordinator {
         &self,
         bid: &SignedBidRequest,
         ask: &SignedAskResponse,
-        buyer_signature_over_ask_digest: &str,
+        buyer_ask_signature: &str,
         admission: &SignedFindingAdmission,
         seller_authorization: &SignedFindingSellerAuthorization,
         maximum_sale_exposure_units: u64,
@@ -690,7 +715,7 @@ impl FindingPurchaseCoordinator {
         self.reserve_inner(
             bid,
             ask,
-            buyer_signature_over_ask_digest,
+            buyer_ask_signature,
             admission,
             seller_authorization,
             maximum_sale_exposure_units,
@@ -711,7 +736,7 @@ impl FindingPurchaseCoordinator {
         &self,
         bid: &SignedBidRequest,
         ask: &SignedAskResponse,
-        buyer_signature_over_ask_digest: &str,
+        buyer_ask_signature: &str,
         admission: &SignedFindingAdmission,
         seller_authorization: &SignedFindingSellerAuthorization,
         maximum_sale_exposure_units: u64,
@@ -722,7 +747,7 @@ impl FindingPurchaseCoordinator {
         self.reserve_inner(
             bid,
             ask,
-            buyer_signature_over_ask_digest,
+            buyer_ask_signature,
             admission,
             seller_authorization,
             maximum_sale_exposure_units,
@@ -740,7 +765,7 @@ impl FindingPurchaseCoordinator {
         &self,
         bid: &SignedBidRequest,
         ask: &SignedAskResponse,
-        buyer_signature_over_ask_digest: &str,
+        buyer_ask_signature: &str,
         admission: &SignedFindingAdmission,
         seller_authorization: &SignedFindingSellerAuthorization,
         maximum_sale_exposure_units: u64,
@@ -749,7 +774,7 @@ impl FindingPurchaseCoordinator {
         public_request: Option<&FindingPublicPurchaseRequestBinding<'_>>,
     ) -> Result<SignedReservationReceipt, PurchaseCoordinatorError> {
         if ask.body.schema != ASK_RESPONSE_SCHEMA
-            || !matches!(ask.verify_signature(), Ok(true))
+            || !matches!(ask.verify_signature(&ask.signer_key), Ok(true))
             || ask.body.token_offer.issuer != ask.signer_key
         {
             return Err(PurchaseCoordinatorError::AskEnvelope);
@@ -774,7 +799,7 @@ impl FindingPurchaseCoordinator {
         bid.body
             .validate()
             .map_err(|_| PurchaseCoordinatorError::BidEnvelope)?;
-        if !matches!(bid.verify_signature(), Ok(true)) {
+        if !matches!(bid.verify_signature(&bid.signer_key), Ok(true)) {
             return Err(PurchaseCoordinatorError::BidEnvelope);
         }
         let bid_body_digest = canonical_json_bytes(&bid.body)
@@ -804,9 +829,9 @@ impl FindingPurchaseCoordinator {
             return Err(PurchaseCoordinatorError::BidBinding);
         }
         let buyer_signature =
-            chio_core::crypto::Signature::from_hex(buyer_signature_over_ask_digest)
+            chio_core::crypto::Signature::from_hex(buyer_ask_signature)
                 .map_err(|_| PurchaseCoordinatorError::BuyerSignature)?;
-        if !payer.verify(ask_digest.as_bytes(), &buyer_signature) {
+        if !verify_buyer_ask(payer, &ask.body, &buyer_signature) {
             return Err(PurchaseCoordinatorError::BuyerSignature);
         }
         // The finding, listing, and backing allocation this reservation

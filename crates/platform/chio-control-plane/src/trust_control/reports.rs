@@ -1010,14 +1010,18 @@ mod reports_tests {
             build_signed_comptroller_surface_report(report, Some(&authority_seed_path), None)
                 .test_expect("build signed comptroller surface");
         assert!(
-            signed.verify_signature().test_expect("verify"),
+            signed
+                .verify_signature(&signed.signer_key)
+                .test_expect("verify"),
             "signature must verify"
         );
         assert_eq!(signed.body.schema, "chio.comptroller.surface-report.v1");
         let reserialized = serde_json::to_vec(&signed).test_expect("serialize envelope");
         let parsed: SignedComptrollerSurfaceReport =
             serde_json::from_slice(&reserialized).test_expect("parse");
-        assert!(parsed.verify_signature().test_expect("verify parsed"));
+        assert!(parsed
+            .verify_signature(&parsed.signer_key)
+            .test_expect("verify parsed"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

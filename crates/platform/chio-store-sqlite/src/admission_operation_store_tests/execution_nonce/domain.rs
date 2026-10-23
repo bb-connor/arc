@@ -3,16 +3,25 @@ use crate::SqliteExecutionNonceStore;
 use chio_kernel::execution_nonce::{verify_execution_nonce, SignedExecutionNonce};
 use chio_kernel::ExecutionNonceStore;
 
+const OPERATION_NONCE_SCHEMA: &str = "chio.operation_execution_nonce.v1";
+
+fn operation_nonce_body(
+    operation: &AdmissionOperationV1,
+    nonce: &SignedExecutionNonce,
+) -> TestResult<chio_core::CanonicalBytes> {
+    Ok(chio_core::CanonicalBytes::from_serializable(&serde_json::json!({
+        "operation_id": operation.binding().operation_id(),
+        "nonce": nonce.nonce,
+    }))?)
+}
+
 pub(super) fn sign_for(
     operation: &AdmissionOperationV1,
     nonce: &mut SignedExecutionNonce,
     key: &Keypair,
 ) -> TestResult {
-    nonce.signature = key.sign(&canonical_json_bytes(&serde_json::json!({
-        "schema": "chio.admission-execution-nonce-signature.v1",
-        "operation_id": operation.binding().operation_id(),
-        "nonce": nonce.nonce,
-    }))?);
+    let body = operation_nonce_body(operation, nonce)?;
+    nonce.signature = key.sign_wrapped(OPERATION_NONCE_SCHEMA, &body)?;
     Ok(())
 }
 
@@ -108,16 +117,22 @@ fn durable_nonce_domain_rejects_admission_after_legacy_consumption() -> TestResu
 fn durable_nonce_domain_requires_exact_operation_signature_context() -> TestResult {
     let fixture = nonce_fixture()?;
     let nonce = signed(&fixture)?;
-    let context = canonical_json_bytes(&serde_json::json!({
-        "schema": "chio.admission-execution-nonce-signature.v1",
-        "operation_id": fixture.operation.binding().operation_id(),
-        "nonce": nonce.nonce,
-    }))?;
-    assert!(fixture.key.public_key().verify(&context, &nonce.signature));
-    assert!(!fixture
-        .key
-        .public_key()
-        .verify(&canonical_json_bytes(&nonce.nonce)?, &nonce.signature));
+    let context = operation_nonce_body(&fixture.operation, &nonce)?;
+    chio_core::crypto::verify_wrapped_bytes(
+        &fixture.key.public_key(),
+        OPERATION_NONCE_SCHEMA,
+        &context,
+        &nonce.signature,
+    )?;
+    assert!(matches!(
+        chio_core::crypto::verify_wrapped(
+            &fixture.key.public_key(),
+            chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
+            &nonce.nonce,
+            &nonce.signature,
+        ),
+        Err(chio_core::Error::SignatureRejected)
+    ));
     for change_namespace in [false, true] {
         let binding = fixture.operation.binding().to_persisted();
         let alternate = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
@@ -183,12 +198,13 @@ fn durable_nonce_domain_rejects_schema_relabeling() -> TestResult {
         let mut nonce = signed(&fixture)?;
         nonce.nonce.schema = schema.into();
         sign_for(&fixture.operation, &mut nonce, &fixture.key)?;
-        let context = canonical_json_bytes(&serde_json::json!({
-            "schema": "chio.admission-execution-nonce-signature.v1",
-            "operation_id": fixture.operation.binding().operation_id(),
-            "nonce": nonce.nonce,
-        }))?;
-        assert!(fixture.key.public_key().verify(&context, &nonce.signature));
+        let context = operation_nonce_body(&fixture.operation, &nonce)?;
+        chio_core::crypto::verify_wrapped_bytes(
+            &fixture.key.public_key(),
+            OPERATION_NONCE_SCHEMA,
+            &context,
+            &nonce.signature,
+        )?;
         let mut wire: serde_json::Value =
             serde_json::from_slice(fixture.reservation.canonical_bytes())?;
         wire["signed_nonce"] = serde_json::to_value(nonce)?;

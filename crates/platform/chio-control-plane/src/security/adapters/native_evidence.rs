@@ -31,7 +31,6 @@ use tokio::sync::Mutex as AsyncMutex;
 
 mod delivery;
 
-const RECEIPT_READINESS_DOMAIN: &[u8] = b"chio.native-security-receipt-readiness.v1\0";
 const ALERT_OUTBOX_SCHEMA_VERSION: u8 = 1;
 const OUTBOX_TABLE: &str = "chio_security_alert_outbox";
 const BACKEND_DELIVERY_TABLE: &str = "chio_security_alert_outbox_backend";
@@ -133,9 +132,11 @@ impl SecurityReceiptSink for NativeSecurityReceiptSink {
         self.store
             .ensure_indexed_security_evidence_ready()
             .map_err(|_| PortError::unavailable())?;
-        self.signer
-            .sign_bytes(RECEIPT_READINESS_DOMAIN)
-            .map_err(|_| PortError::unavailable())?;
+        crate::security::sign_signer_readiness_probe(
+            self.signer.as_ref(),
+            "native_security_receipt",
+        )
+        .map_err(|_| PortError::unavailable())?;
         Ok(())
     }
 
