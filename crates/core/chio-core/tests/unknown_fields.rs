@@ -21,7 +21,7 @@ use chio_core::{
     receipt::lineage::ChildRequestReceipt,
     receipt::lineage::ChildRequestReceiptBody,
     receipt::metadata::GuardEvidence,
-    Keypair, ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBody,
+    Keypair, ToolAnnotations, ToolDefinition,
 };
 
 // ---------------------------------------------------------------------------
@@ -89,11 +89,8 @@ fn make_receipt_body(kp: &Keypair) -> ChioReceiptBody {
     }
 }
 
-fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
-    ToolManifestBody {
-        server_id: "srv-files".to_string(),
-        server_key: kp.public_key(),
-        tools: vec![ToolDefinition {
+fn make_tool_definition() -> ToolDefinition {
+    ToolDefinition {
             name: "file_read".to_string(),
             description: "Read a file".to_string(),
             input_schema: serde_json::json!({
@@ -113,8 +110,6 @@ fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
             },
             latency_hint: Some(chio_core::manifest::LatencyHint::Fast),
             flow: None,
-        }],
-        required_capabilities: vec!["fs_read".to_string()],
     }
 }
 
@@ -204,33 +199,23 @@ fn receipt_refuses_unknown_members() {
 }
 
 #[test]
-fn manifest_refuses_unknown_members_at_every_policy_layer() {
-    let kp = Keypair::generate();
-    let manifest = ToolManifest::sign(make_manifest_body(&kp), &kp).unwrap();
-    let value = serde_json::to_value(&manifest).unwrap();
-
-    let mut envelope = value.clone();
-    envelope["future_billing_account"] = serde_json::json!("acct-xyz");
-    assert_unknown_field_refused::<ToolManifest>(envelope, "future_billing_account");
+fn tool_definition_refuses_unknown_members_at_every_policy_layer() {
+    let value = serde_json::to_value(make_tool_definition()).unwrap();
 
     let mut definition = value.clone();
-    definition["tools"][0]["rate_limit"] = serde_json::json!({"per_minute": 60});
-    assert_unknown_field_refused::<ToolManifest>(definition, "rate_limit");
+    definition["rate_limit"] = serde_json::json!({"per_minute": 60});
+    assert_unknown_field_refused::<ToolDefinition>(definition, "rate_limit");
 
     let mut annotations = value.clone();
-    annotations["tools"][0]["annotations"]["sandboxed"] = serde_json::json!(true);
-    assert_unknown_field_refused::<ToolManifest>(annotations, "sandboxed");
+    annotations["annotations"]["sandboxed"] = serde_json::json!(true);
+    assert_unknown_field_refused::<ToolDefinition>(annotations, "sandboxed");
 
     let mut pricing = value;
-    pricing["tools"][0]["pricing"] = serde_json::json!({
+    pricing["pricing"] = serde_json::json!({
         "pricing_model": "flat",
         "future_cost_basis": "compute"
     });
-    assert_unknown_field_refused::<ToolManifest>(pricing, "future_cost_basis");
-
-    let mut body = serde_json::to_value(manifest.body()).unwrap();
-    body["future_policy"] = serde_json::json!(true);
-    assert_unknown_field_refused::<ToolManifestBody>(body, "future_policy");
+    assert_unknown_field_refused::<ToolDefinition>(pricing, "future_cost_basis");
 }
 
 #[test]

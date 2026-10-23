@@ -188,13 +188,21 @@ fn capability_validation_pass(
 fn bench_signature_verification(c: &mut Criterion) {
     let keypair = Keypair::from_seed(&[0x44; 32]);
     let payload = make_payload();
-    let canonical = canonical_json_bytes(&payload).bench_unwrap("canonicalize signature payload");
-    let signature = keypair.sign(&canonical);
+    let canonical = chio_core::CanonicalBytes::from_serializable(&payload)
+        .bench_unwrap("canonicalize signature payload");
+    let signature = keypair
+        .sign_wrapped("chio.receipt.v1", &canonical)
+        .bench_unwrap("sign signature payload");
     let public_key = keypair.public_key();
 
     c.bench_function("chio_core/signature_verification", |b| {
         b.iter(|| {
-            black_box(public_key.verify(black_box(canonical.as_slice()), black_box(&signature)))
+            black_box(chio_core::crypto::verify_wrapped_bytes(
+                black_box(&public_key),
+                "chio.receipt.v1",
+                black_box(&canonical),
+                black_box(&signature),
+            ))
         })
     });
 }
