@@ -27,7 +27,7 @@ The trait requires concurrent safety and ordered batching; it supplies no queue.
 | `evm/{prepare,finalize,decode,sign,types}` | Solidity ABI calls, receipt/event decoding, proof and identity checks, signing, and prepared values. |
 | `observe` | Escrow/bond snapshots, confirmation/dispute-window assessment, execution receipt projection, and recovery actions. |
 | `hook`, `outcome_store`, `retry` | Observation/outcome schemas, typed failure reasons, leased claims, retry decisions, and dead letters. |
-| `payments` and `payments_approval` | x402 approval binding, EIP-3009 digests/nonces, Circle/paymaster checks, and off-chain receipt validation. |
+| `payments` and `payments_approval` | x402 approval binding and Circle/paymaster checks. |
 | `finding_enforcement/{verify,plan,publish,reconcile,observation_source}` | Pinned authority and collateral verification, impairment intent preparation, remote adapters, and post-dispatch recovery. |
 | `channel` | Asset/funding/open artifacts, signatures, reservations, state, lifecycle projections, replay, terminal outcomes, disputes, close, and release authorization. |
 | `solana`, `ccip`, `automation`, `ops` | Instruction preparation, coordination messages, watchdog evidence, and operator controls/reports. |
@@ -89,12 +89,6 @@ initial backoff, doubling to a 60-second cap. `validate_settlement_claim`
 limits worker ids to 128 UTF-8 bytes, lease durations to one day, and batches
 to 1,024 rows. `SettlementFailureReason` stores a closed code and detail digest.
 Integrity failures remain permanent even when supplied as retryable outcomes.
-
-`prepare_transfer_with_authorization` requires an open validity interval around
-caller-supplied time, approval expiry coverage, and matching chain/payee/amount/
-token contract. It records the canonical chain/contract/sender/nonce tuple only
-after those checks. `InMemoryEip3009NonceStore` bounds retained entries and
-rejects mutex failures; restart-safe replay protection needs a durable store.
 
 Finding dispatch verification uses independently pinned, distinct signing roles,
 retained lifecycle policy, current authority status, fresh finalized collateral,

@@ -18,8 +18,7 @@ idempotent adapter query); recovery-driven resolution of orphaned budget holds; 
 routing consumer that feeds the discarded settlement-observer outcome into the
 existing `classify_attempt` retry envelope and `SqliteDeadLetterStore`; a production
 settlement ledger hook installed whenever a payment adapter is configured; a
-fail-closed `Deny(CurrencyMismatch)` in `BudgetTree` instead of a silent skip; and a
-durable SQLite EIP-3009 nonce store. It is the
+fail-closed `Deny(CurrencyMismatch)` in `BudgetTree` instead of a silent skip. It is the
 money-path specialization of RFC-0003. One `AdmissionOperation` is durable before
 the hold or payment participant and supplies the shared `operation_id`, dispatch
 truth, recovery fence, and retained request tombstone. This RFC owns payment
@@ -35,7 +34,7 @@ or claim that the budget database commits atomically with the receipt database.
 | F68 | Implemented; active only while a settlement observer runtime is installed | Attempt-zero row seeded in the receipt append (`kernel/responses/receipt_persistence.rs`), inline claim and CAS completion (`settlement_routing.rs`), `settle_attempts` and `settle_dead_letters` in `chio-store-sqlite`, `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. |
 | F69 | Open | No production `SettlementHook` exists and no production binary installs the settlement observer runtime. Nothing calls `SettlementOutcomeStore::claim_due`, so a `Retryable` row is never re-run after the inline attempt. |
 | F72 | Implemented | `BudgetDenyReason::CurrencyMismatch` (`chio-metering/src/budget_hierarchy.rs`), tests in `chio-metering/tests/budget_hierarchy.rs`. |
-| F73 | Open, low | `Eip3009NonceStore` has only `InMemoryEip3009NonceStore` (`chio-settle/src/payments.rs`); no production caller reserves EIP-3009 nonces. |
+| F73 | Closed by deletion | The off-chain EIP-3009 lane (`prepare_transfer_with_authorization`, `Eip3009NonceStore`, `InMemoryEip3009NonceStore`) had no production consumer and no longer exists in `chio-settle`. |
 | F74 | Closed by deletion | `BudgetEnforcer` no longer exists in `chio-metering`. |
 
 ## Motivation
@@ -185,13 +184,6 @@ The module doc at `budget_hierarchy.rs:9` claims "the tree renders a fail-closed
 `BudgetDecision`". `BudgetDenyReason`
 (`budget_hierarchy.rs:334-364`) has `{ NodeDisabled, DimensionExceeded, WindowExpired,
 UnknownNode }`, no currency variant.
-
-The only `Eip3009NonceStore` implementation
-(`crates/economy/chio-settle/src/payments.rs:406`) is `InMemoryEip3009NonceStore`
-(`Mutex<HashMap>`); the doc at `payments.rs:366-371` claims a SQLite store "wired by
-default" that does not exist. At `DEFAULT_MAX_EIP3009_NONCE_ENTRIES = 65_536`
-(`payments.rs:284`) the record path returns `SettlementError::InvalidBinding`
-(`payments.rs:426-432`) and `gc_expired` (`payments.rs:437-442`) has no scheduler.
 
 `BudgetEnforcer` (`crates/economy/chio-metering/src/budget.rs:78-89`) holds a plain
 `u64 total_spent` and three `HashMap`s zeroed in `new()` (`budget.rs:91-101`);
@@ -848,37 +840,10 @@ draft currency for the projection.
 
 ### F73: durable SQLite EIP-3009 nonce store
 
-Add `SqliteEip3009NonceStore` in `crates/platform/chio-store-sqlite` implementing the
-existing `chio_settle::Eip3009NonceStore` trait (`payments.rs:317-344`) over:
-
-```sql
-CREATE TABLE IF NOT EXISTS eip3009_nonces (
-    from_address TEXT NOT NULL,
-    nonce_key    TEXT NOT NULL,
-    retain_until INTEGER NOT NULL,
-    PRIMARY KEY (from_address, nonce_key)
-);
-CREATE INDEX IF NOT EXISTS idx_eip3009_nonces_retain_until ON eip3009_nonces(retain_until);
-```
-
-`record_if_fresh` lowercases key components exactly as
-`canonicalize_nonce_key_component` (`payments.rs:357-364`) does. It does NOT prune: the
-trait contract (`payments.rs:311-316`) makes `gc_expired` the sole entry point that
-drops entries so replay decisions stay decoupled from the wall clock, and
-`record_if_fresh` has no `now` argument to prune against. `gc_expired` is a
-`DELETE ... WHERE retain_until < ?`.
-
-Duplicate detection, the hard-cap check, and insertion run in one
-`TransactionBehavior::Immediate` transaction: read the canonical key first and
-return `Replayed` if present; otherwise count retained rows, fail closed when the
-count is at `DEFAULT_MAX_EIP3009_NONCE_ENTRIES` (65,536), and insert only below
-the cap. The configured maximum is persisted and validated as nonzero; concurrent
-writers cannot both pass the last-slot check. An advisory `len()` high-water
-probe may call `gc_expired(now)` before insertion on the verifier's now-bearing
-path, and a periodic scheduler also runs GC, but neither is the capacity safety
-boundary. Pruning stays on explicit GC and never occurs inside insertion. The
-lane's future wiring is gated on this durable store, and the stale
-`payments.rs:366-371` doc is corrected to name it.
+Closed by deletion. The off-chain EIP-3009 preparation lane in `chio-settle` had no
+production consumer and has been removed, so no process-local EIP-3009 nonce store
+remains. On the x402 facilitator path the token contract and the facilitator
+enforce EIP-3009 nonces, and rail truth comes from read-only RPC.
 
 ### F74: BudgetEnforcer durability
 
@@ -898,14 +863,11 @@ has been removed, so no process-local budget counter remains.
   from the defaulted `settlement_state`, forcing a `ReconcileFailed` incident rather
   than a wrong close.
 - `BudgetDenyReason::CurrencyMismatch` (new) is the fail-closed tree outcome.
-- `SettlementError::InvalidBinding` (existing) remains the EIP-3009 replay/capacity
-  return; the durable store preserves those semantics.
 
 ### Crates, dirs, LOC, CI tier
 
-- `crates/platform/chio-store-sqlite`: `payment_journal` + `settle_attempts` +
-  `eip3009_nonces`
-  DDL and methods, `SqliteEip3009NonceStore`, dead-letter/attempt wiring,
+- `crates/platform/chio-store-sqlite`: `payment_journal` + `settle_attempts`
+  DDL and methods, dead-letter/attempt wiring,
   `settlement_reconciliations` writer.
 - `crates/kernel/chio-kernel`: `PaymentJournalRecord`/`PaymentJournalState`, journal
   trait methods, `validation.rs` wiring, claimed-observer routing and lease/CAS
@@ -930,8 +892,8 @@ has been removed, so no process-local budget counter remains.
 - Signed receipt payloads are unchanged. Settlement status stays the advisory
   `FinancialReceiptMetadata::settlement_status` field ADR-0006's no-refund model
   already defines; the journal and reconciliation never rewrite a signed receipt.
-- New non-audit SQLite tables: `payment_journal`, `settle_attempts`, and
-  `eip3009_nonces`, all created idempotently at store open (`CREATE TABLE IF NOT
+- New non-audit SQLite tables: `payment_journal` and `settle_attempts`, both
+  created idempotently at store open (`CREATE TABLE IF NOT
   EXISTS`). `payment_journal.operation_id` binds the RFC-0003 coordinator and is
   the participant idempotency key. The existing `settle_dead_letters`, `iou_envelope`, and
   `settlement_reconciliations` tables are now populated by production code
@@ -948,7 +910,7 @@ has been removed, so no process-local budget counter remains.
 - New tables and enum values are additive; older binaries ignore the tables and
   treat unknown mutation kinds/dispositions as opaque. The unshipped dead-letter
   body is a deliberate pre-release replacement, not a compatibility promise.
-- There are no historical journal, attempt, or nonce rows.
+- There are no historical journal or attempt rows.
 - The bounded `chio.settle.dead-letter.v1` shape is the pre-release dead-letter
   contract. Readers convert the earlier string reason shape into a bounded
   backend failure digest; rows outside those two shapes fail closed.
@@ -956,8 +918,7 @@ has been removed, so no process-local budget counter remains.
   `DurableAdmissionMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled
   (it only adds logging, metrics, and dead-letter rows). The F69 ledger installs
-  whenever a payment adapter is configured. The durable EIP-3009 store becomes the wired
-  default only once the lane is exercised.
+  whenever a payment adapter is configured.
 - Operator-visible behavior changes to document in release notes: newly surfaced
   dead-letter rows and `ReconcileFailed` incidents are "recovery working", not
   "new fault"; an old hold without terminal recovery remains frozen and visible
@@ -997,11 +958,6 @@ has been removed, so no process-local budget counter remains.
 - Loom: model the settlement routing consumer with concurrent `Observed`/`HookFailed`
   and a driver drain, asserting no lost attempt row and no double dead-letter, reusing
   the dead-letter idempotency (`dead_letters.rs` byte-identical replay).
-- Concurrency (F73): with a file-backed database at cap minus one, two distinct
-  concurrent inserts yield exactly one `Fresh` result and one fail-closed capacity
-  error, leaving the retained count at the configured cap. Replaying an existing key
-  at the cap still returns `Replayed` rather than a capacity error and never changes
-  the count.
 - Crash/chaos (load-chaos program):
   `payment_journal_crash_reconciles_every_mode` SIGKILLs after reversible-hold
   authorize, final-prepayment authorize, and capture. Restart proves final
@@ -1047,10 +1003,6 @@ has been removed, so no process-local budget counter remains.
   byte changes.
 - `BudgetTree::evaluate` returns `Deny(CurrencyMismatch)` for a spend-capped node whose
   currency is absent or differs from the draft; no `Allow` with unlimited spend.
-- The EIP-3009 nonce store survives a restart (a previously recorded `(from,
-  nonce)` reads `Replayed`), never exceeds its configured hard cap under
-  concurrent insertion, and reopens capacity only through explicit GC of expired
-  rows.
 
 ## Risks and alternatives
 
@@ -1091,8 +1043,6 @@ has been removed, so no process-local budget counter remains.
    `DurableAdmissionMode::Monetary`. RFC-0003 later releases with cumulative
    `SideEffecting` as the compiled production default after the kill-injection
    soak is green; RFC-0013 does not define a competing default.
-4. The durable EIP-3009 store (F73) lands as independent hardening and becomes the
-   wired default only when the lane is exercised.
-5. The F69 ledger hook installs whenever a payment adapter is configured, turning
+4. The F69 ledger hook installs whenever a payment adapter is configured, turning
    eligible F68 work into reconciliation rows and draining retryable attempts on
    the host maintenance tick.

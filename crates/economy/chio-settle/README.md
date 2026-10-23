@@ -54,9 +54,6 @@ watchdog, and CCIP helpers share the `web3` gate.
   obligations.
 - `RetryPolicy::validate` bounds retry configuration. `classify_attempt`
   preserves typed failure reasons and terminates permanent or exhausted failures.
-- `prepare_transfer_with_authorization` checks time and approval bindings before
-  atomically reserving a domain-scoped nonce through `Eip3009NonceStore`.
-  `InMemoryEip3009NonceStore` supplies process-local replay protection.
 - `channel::ChannelSignatureV1::verify` binds body, signer id, key epoch, and key
   using canonical signed payloads. Verified channel wrappers require the
   corresponding funding, admission, transition, close, or release checks.

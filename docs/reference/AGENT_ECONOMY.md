@@ -24,9 +24,8 @@ Three observations anchor the design:
 The strategy is not to bolt a payment system onto Chio. It is to recognize that Chio is already 80% of a payment authorization system and close the remaining gaps with minimal, backward-compatible extensions.
 
 The current pre-release v1 payment-facing overlay is explicit and bounded:
-Chio can now project governed settlement into x402 requirements, prepare
-EIP-3009 authorization digests, evaluate Circle-managed-custody nanopayments,
-and assess ERC-4337/paymaster compatibility. Those surfaces remain
+Chio can now project governed settlement into x402 requirements, evaluate
+Circle-managed-custody nanopayments, and assess ERC-4337/paymaster compatibility. Those surfaces remain
 interoperability adapters over canonical Chio approval, receipt, and settlement
 truth; they do not become a second ledger.
 

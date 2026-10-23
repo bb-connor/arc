@@ -132,7 +132,6 @@ run jq empty \
   docs/standards/CHIO_CCIP_MESSAGE_EXAMPLE.json \
   docs/standards/CHIO_CCIP_RECONCILIATION_EXAMPLE.json \
   docs/standards/CHIO_X402_REQUIREMENTS_EXAMPLE.json \
-  docs/standards/CHIO_EIP3009_TRANSFER_WITH_AUTHORIZATION_EXAMPLE.json \
   docs/standards/CHIO_CIRCLE_NANOPAYMENT_EXAMPLE.json \
   docs/standards/CHIO_4337_PAYMASTER_COMPAT_EXAMPLE.json \
   docs/standards/CHIO_WEB3_AUTOMATION_QUALIFICATION_MATRIX.json \

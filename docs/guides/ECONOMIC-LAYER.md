@@ -246,7 +246,6 @@ Ed25519-native surface (`crates/economy/chio-settle/src/solana.rs`):
   (`prepare_ccip_settlement_message`, `reconcile_ccip_delivery`).
 - x402 HTTP 402 requirements: `build_x402_payment_requirements` in
   `crates/economy/chio-settle/src/payments.rs`.
-- EIP-3009 meta-transactions: `prepare_transfer_with_authorization`.
 - Circle nanopayments: `evaluate_circle_nanopayment`.
 - ERC-4337 paymaster compatibility: `prepare_paymaster_compatibility`.
 

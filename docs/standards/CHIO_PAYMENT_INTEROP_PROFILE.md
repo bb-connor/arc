@@ -11,12 +11,10 @@ dispatch contract.
 
 ## Shipped Boundary
 
-Chio now ships four bounded payment-interop capabilities:
+Chio now ships three bounded payment-interop capabilities:
 
 - projection of one governed settlement dispatch into an x402 payment-requirement
   object
-- preparation of one EIP-3009 `transferWithAuthorization` digest for
-  explicit gasless token movement review
 - evaluation of one Circle nanopayment candidate only when operator-managed
   custody is explicit
 - evaluation of one ERC-4337/paymaster compatibility record only when gas
@@ -35,7 +33,6 @@ The shipped interop layer requires:
 ## Reference Artifacts
 
 - `docs/standards/CHIO_X402_REQUIREMENTS_EXAMPLE.json`
-- `docs/standards/CHIO_EIP3009_TRANSFER_WITH_AUTHORIZATION_EXAMPLE.json`
 - `docs/standards/CHIO_CIRCLE_NANOPAYMENT_EXAMPLE.json`
 - `docs/standards/CHIO_4337_PAYMASTER_COMPAT_EXAMPLE.json`
 - `docs/standards/CHIO_WEB3_AUTOMATION_QUALIFICATION_MATRIX.json`

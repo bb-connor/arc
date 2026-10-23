@@ -36,7 +36,7 @@ Bounded runtime overlays include:
 - Functions-based Ed25519 fallback audits on EVM
 - automation jobs for anchoring and settlement watchdog flows
 - one CCIP settlement-coordination message family
-- one explicit payment-interop layer for x402, EIP-3009, Circle, and
+- one explicit payment-interop layer for x402, Circle, and
   ERC-4337/paymaster compatibility
 
 Bounded operations overlays include:
@@ -173,7 +173,7 @@ The bounded runtime extensions over the official web3 stack are now:
 - one CCIP message family that coordinates settlement state across chains and
   reconciles delivery back to canonical Chio execution receipts
 - one payment-interop surface that projects governed settlement into x402,
-  EIP-3009, Circle nanopayment, and ERC-4337 compatibility artifacts without
+  Circle nanopayment, and ERC-4337 compatibility artifacts without
   mutating signed Chio truth
 
 ## Non-Goals

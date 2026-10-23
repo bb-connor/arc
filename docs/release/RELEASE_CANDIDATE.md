@@ -264,8 +264,8 @@ kernel/browser/mobile qualification lanes.
 - Chio now also ships one bounded Functions fallback over prepared Chio receipt
   batches, one bounded anchor/settlement automation surface with replay-safe
   job state, one bounded CCIP settlement-coordination message family, and one
-  bounded payment-interop layer for x402, EIP-3009, Circle-managed custody,
-  and ERC-4337/paymaster compatibility, all without turning schedulers,
+  bounded payment-interop layer for x402, Circle-managed custody, and
+  ERC-4337/paymaster compatibility, all without turning schedulers,
   bridges, or facilitators into a replacement truth source
 - Chio now also ships one bounded web3 operations contract over oracle,
   anchoring, and settlement runtime reports, explicit indexer lag/drift or

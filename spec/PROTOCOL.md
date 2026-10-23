@@ -90,7 +90,7 @@ The shipped v1 contract covers:
 - one bounded Functions fallback profile plus request/response examples, one
   automation profile plus anchor/settlement job artifacts, one CCIP message
   profile plus reconciliation artifacts, and one payment-interop profile plus
-  x402, EIP-3009, Circle, and ERC-4337 compatibility artifacts over the
+  x402, Circle, and ERC-4337 compatibility artifacts over the
   official web3 stack
 - one bounded web3 operations profile plus anchor and settlement runtime
   reports, one deployment-promotion policy, and one reviewer-facing external

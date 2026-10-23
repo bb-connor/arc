@@ -18,8 +18,6 @@ fn fixture() -> (Web3SettlementDispatchArtifact, ApprovalBinding) {
         payee_address: dispatch.beneficiary_address.clone(),
         amount_minor_units: u128::from(dispatch.settlement_amount.units),
         token_symbol: dispatch.settlement_amount.currency.clone(),
-        token_contract: None,
-        approval_expires_at: 1_744_000_600,
     };
     (dispatch, binding)
 }
