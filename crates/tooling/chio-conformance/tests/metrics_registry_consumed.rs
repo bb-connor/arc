@@ -906,10 +906,9 @@ fn iroh_transport_bundle(
     Box<dyn Error>,
 > {
     use chio_federation_transport_iroh::identity::{
-        transport_endorsement_preimage, TransportDirectoryBundleBody,
-        TransportDirectoryBundleDocument, TransportDirectoryBundleTrust,
-        TransportDirectoryDocument, TransportDirectoryEntry, TrustedTransportDirectoryIssuer,
-        TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        sign_transport_endorsement, TransportDirectoryBundleBody, TransportDirectoryBundleDocument,
+        TransportDirectoryBundleTrust, TransportDirectoryDocument, TransportDirectoryEntry,
+        TrustedTransportDirectoryIssuer, TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
     };
 
     let passport = Keypair::from_seed(&[1u8; 32]);
@@ -919,10 +918,7 @@ fn iroh_transport_bundle(
         kernel_id: "did:chio:alice".to_string(),
         passport_public_key: passport.public_key(),
         transport_endpoint_id: transport,
-        passport_endorsement: passport.sign(&transport_endorsement_preimage(
-            "did:chio:alice",
-            &transport,
-        )),
+        passport_endorsement: sign_transport_endorsement(&passport, "did:chio:alice", &transport)?,
         revocation_signers: Vec::new(),
         removed: false,
     };

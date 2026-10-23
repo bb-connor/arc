@@ -369,10 +369,11 @@ fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
         .body
         .anomalies
         .push("missing guard".to_string());
-    let body_bytes = chio_core::canonical::CanonicalBytes::from_serializable(&inconsistent_cert.body)
-        .expect("certificate body should serialize");
+    let body_bytes =
+        chio_core::canonical::CanonicalBytes::from_serializable(&inconsistent_cert.body)
+            .expect("certificate body should serialize");
     inconsistent_cert.signature = signer
-        .sign_wrapped(crate::compliance::COMPLIANCE_CERTIFICATE_SCHEMA, &body_bytes)
+        .sign_wrapped(COMPLIANCE_CERTIFICATE_SCHEMA, &body_bytes)
         .expect("certificate body should sign");
     let inconsistent = verify_compliance_certificate(
         &inconsistent_cert,
@@ -431,7 +432,7 @@ fn compliance_verification_signer_mismatch_omits_redundant_body_reason() {
         .expect("certificate body should serialize");
     cert.signer_key = certificate_signer.public_key();
     cert.signature = certificate_signer
-        .sign_wrapped(crate::compliance::COMPLIANCE_CERTIFICATE_SCHEMA, &body_bytes)
+        .sign_wrapped(COMPLIANCE_CERTIFICATE_SCHEMA, &body_bytes)
         .expect("certificate body should sign");
 
     let result = verify_compliance_certificate(&cert, VerificationMode::Lightweight, None, &config);

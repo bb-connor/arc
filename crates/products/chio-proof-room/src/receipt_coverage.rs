@@ -4,14 +4,17 @@ use std::{collections::BTreeSet, path::Path};
 use chio_core_types::{PublicKey, Signature};
 
 use super::{
-    verify_manifest_ref, ProofRoomArtifactRef, ProofRoomReceiptCoverage, CHIO_RECEIPT_SCHEMA,
+    verify_manifest_ref, ProofRoomArtifactRef, ProofRoomReceiptCoverage,
     PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA, REQUIRED_RECEIPT_COVERAGE_CATEGORIES,
     RUNTIME_TERMINAL_RECEIPT_SCHEMA,
 };
 
 const RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA: &str =
     "chio.runtime.terminal-receipt-signature.v1";
-const RECEIPT_PROJECTION_SIGNATURE_SCHEMA: &str = "chio.receipt.v1";
+/// Signing-wrapper schema id, and `schema` member, of a receipt coverage
+/// projection. Distinct from `chio.receipt.v1` so a `ChioReceipt` signature
+/// never verifies as a projection, or the reverse.
+pub const RECEIPT_PROJECTION_SIGNATURE_SCHEMA: &str = "chio.proof-room.receipt-projection.v1";
 
 pub(crate) fn verify(
     bundle_root: &Path,
@@ -139,7 +142,7 @@ fn verify_covered_category(
 
 fn is_receipt_coverage_schema(schema: &str) -> bool {
     schema == PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA
-        || schema == CHIO_RECEIPT_SCHEMA
+        || schema == RECEIPT_PROJECTION_SIGNATURE_SCHEMA
         || schema == RUNTIME_TERMINAL_RECEIPT_SCHEMA
 }
 
@@ -176,14 +179,15 @@ fn verify_receipt_signature(
         format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}")
     })?;
     let (schema_id, signed_body) = receipt_signature_body(category, receipt)?;
-    match chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &signed_body, &signature) {
+    match chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &signed_body, &signature)
+    {
         Ok(()) => return Ok(()),
         Err(chio_core_types::Error::SignatureRejected) => {}
         Err(error) => {
-            return Err(
-                (format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}"))
-                    .into(),
-            )
+            return Err((format!(
+                "proof-room.receipt-coverage.signature-invalid: {category}: {error}"
+            ))
+            .into())
         }
     }
     Err((format!("proof-room.receipt-coverage.signature-invalid: {category}: {receipt_id}")).into())
@@ -218,12 +222,19 @@ fn receipt_signature_body(
         return Ok((RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA, body));
     }
 
+    let schema_id = match receipt.get("schema").and_then(serde_json::Value::as_str) {
+        Some(RECEIPT_PROJECTION_SIGNATURE_SCHEMA) => RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
+        Some(PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA) => PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA,
+        _ => {
+            return Err((format!("proof-room.receipt-coverage.schema-mismatch: {category}")).into())
+        }
+    };
     let mut signed_body = receipt.clone();
     let Some(signed_body_object) = signed_body.as_object_mut() else {
         return Err((format!("proof-room.receipt-coverage.invalid-json: {category}")).into());
     };
     signed_body_object.remove("signature");
-    Ok((RECEIPT_PROJECTION_SIGNATURE_SCHEMA, signed_body))
+    Ok((schema_id, signed_body))
 }
 
 fn verify_excluded_category(
@@ -274,5 +285,93 @@ fn terminal_status_matches_category(category: &str, status: &str) -> bool {
         "runtime_terminal_denial" => status.starts_with("denied_"),
         "runtime_terminal_failure" => status.starts_with("failed_"),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_core_types::crypto::{verify_wrapped, Keypair};
+    use chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA;
+    use chio_core_types::CanonicalBytes;
+
+    const RECEIPT_ID: &str = "receipt-projection-id-separation";
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    fn projection_signed_under(
+        schema_id: &str,
+    ) -> Result<(serde_json::Value, BTreeSet<String>), Box<dyn std::error::Error>> {
+        projection_with_member_signed_under(RECEIPT_PROJECTION_SIGNATURE_SCHEMA, schema_id)
+    }
+
+    fn projection_with_member_signed_under(
+        member: &str,
+        schema_id: &str,
+    ) -> Result<(serde_json::Value, BTreeSet<String>), Box<dyn std::error::Error>> {
+        let keypair = Keypair::from_seed(&[41; 32]);
+        let mut receipt = serde_json::json!({
+            "schema": member,
+            "receipt_id": RECEIPT_ID,
+            "terminal_status": "allowed_executed",
+            "policy_digest": "11".repeat(32),
+            "kernel_key": keypair.public_key().to_hex(),
+        });
+        let signature =
+            keypair.sign_wrapped(schema_id, &CanonicalBytes::from_serializable(&receipt)?)?;
+        receipt["signature"] = serde_json::Value::String(signature.to_hex());
+        Ok((receipt, BTreeSet::from([keypair.public_key().to_hex()])))
+    }
+
+    #[test]
+    fn receipt_projection_verifies_under_its_own_schema_id() -> TestResult {
+        let (receipt, keys) = projection_signed_under(RECEIPT_PROJECTION_SIGNATURE_SCHEMA)?;
+        verify_receipt_signature("allowed", RECEIPT_ID, &receipt, &keys)?;
+        Ok(())
+    }
+
+    #[test]
+    fn chio_receipt_signature_is_rejected_as_receipt_projection() -> TestResult {
+        let (receipt, keys) = projection_signed_under(CHIO_RECEIPT_SCHEMA)?;
+        let Err(error) = verify_receipt_signature("allowed", RECEIPT_ID, &receipt, &keys) else {
+            return Err("a chio.receipt.v1 signature verified as a receipt projection".into());
+        };
+        assert_eq!(
+            error.to_string(),
+            format!("proof-room.receipt-coverage.signature-invalid: allowed: {RECEIPT_ID}")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_projection_with_chio_receipt_member_is_refused() -> TestResult {
+        let (receipt, keys) = projection_with_member_signed_under(
+            CHIO_RECEIPT_SCHEMA,
+            RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
+        )?;
+        let Err(error) = verify_receipt_signature("allowed", RECEIPT_ID, &receipt, &keys) else {
+            return Err("a projection with a chio.receipt.v1 member verified".into());
+        };
+        assert_eq!(
+            error.to_string(),
+            "proof-room.receipt-coverage.schema-mismatch: allowed"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_projection_signature_is_rejected_as_chio_receipt() -> TestResult {
+        let (receipt, _) = projection_signed_under(RECEIPT_PROJECTION_SIGNATURE_SCHEMA)?;
+        let signature = Signature::from_hex(receipt["signature"].as_str().ok_or("signature")?)?;
+        let kernel_key = PublicKey::from_hex(receipt["kernel_key"].as_str().ok_or("kernel_key")?)?;
+        let mut body = receipt;
+        body.as_object_mut()
+            .ok_or("receipt object")?
+            .remove("signature");
+        assert!(matches!(
+            verify_wrapped(&kernel_key, CHIO_RECEIPT_SCHEMA, &body, &signature),
+            Err(chio_core_types::Error::SignatureRejected)
+        ));
+        Ok(())
     }
 }

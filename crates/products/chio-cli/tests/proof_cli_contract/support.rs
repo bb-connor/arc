@@ -36,7 +36,6 @@ pub(crate) const TEST_SIGNATURE_SEED: [u8; 32] = [7; 32];
 pub(crate) const COLLECT_SIGNATURE_SEED: [u8; 32] = [11; 32];
 pub(crate) const PUBLIC_EXPORT_SIGNATURE_SEED: [u8; 32] = [13; 32];
 const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED: [u8; 32] = [9; 32];
-const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM: &str = "ed25519-rfc8785-v1";
 const COLLECT_SIGNATURE_SEED_HEX: &str =
     "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
 const PUBLIC_EXPORT_SIGNATURE_SEED_HEX: &str =
@@ -840,7 +839,7 @@ pub(crate) fn signed_terminal_receipt(
     policy_digest: &str,
 ) -> serde_json::Value {
     sign_terminal_receipt(serde_json::json!({
-        "schema": "chio.receipt.v1",
+        "schema": chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
         "receipt_id": receipt_id,
         "terminal_status": terminal_status,
         "policy_digest": policy_digest
@@ -859,7 +858,7 @@ pub(crate) fn sign_terminal_receipt(mut receipt: serde_json::Value) -> serde_jso
     );
     let signature = keypair
         .sign_wrapped(
-            "chio.receipt.v1",
+            chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
             &chio_core::canonical::CanonicalBytes::from_serializable(&receipt)
                 .test_expect("canonical signing body"),
         )
@@ -975,7 +974,6 @@ fn sign_public_settlement_bundle_value(settlement_bundle: &mut serde_json::Value
         )
         .test_expect("public settlement proof bundle signs");
     settlement_bundle["bundle_signature"] = serde_json::json!({
-        "algorithm": PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM,
         "signer_key": keypair.public_key().to_hex(),
         "signature": signature.to_hex()
     });
@@ -1930,8 +1928,11 @@ pub(crate) fn sign_bundle_signature_with_seed(
     signature["payloadRef"]["sha256"] =
         serde_json::Value::String(hex::encode(Sha256::digest(&manifest_bytes)));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
-    signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload).to_hex());
+    signature["signatures"][0]["sig"] = serde_json::Value::String(
+        keypair
+            .sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload)
+            .to_hex(),
+    );
 }
 
 pub(crate) fn proof_room_trust_roots_for_seed(seed: [u8; 32]) -> serde_json::Value {

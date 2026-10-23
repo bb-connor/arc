@@ -89,8 +89,8 @@ fn sign_frame(frame: &mut Frame, key: &SigningKey) {
         .as_object_mut()
         .expect("frame is json object")
         .remove("tenant_sig");
-    let canonical =
-        chio_core::canonical::CanonicalBytes::from_value(&value).expect("canonical signing payload");
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&value)
+        .expect("canonical signing payload");
     let wrapper = chio_core::crypto::SigningWrapper::new("chio.tee-capture-frame.v1", &canonical)
         .expect("frame signing wrapper");
     let signature = key.sign(wrapper.as_bytes());

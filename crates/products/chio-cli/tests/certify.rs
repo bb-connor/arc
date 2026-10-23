@@ -12,11 +12,10 @@ use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::{
-    aggregate_generic_listing_reports, GenericListingActorKind,
-    GenericListingQuery, GenericListingReport, GenericListingStatus, GenericRegistryPublisherRole,
-    Keypair, PublicKey, Signature, SignedGenericGovernanceCase, SignedGenericGovernanceCharter,
-    SignedGenericListing, SignedGenericTrustActivation, SignedOpenMarketFeeSchedule,
-    SignedOpenMarketPenalty,
+    aggregate_generic_listing_reports, GenericListingActorKind, GenericListingQuery,
+    GenericListingReport, GenericListingStatus, GenericRegistryPublisherRole, Keypair, PublicKey,
+    Signature, SignedGenericGovernanceCase, SignedGenericGovernanceCharter, SignedGenericListing,
+    SignedGenericTrustActivation, SignedOpenMarketFeeSchedule, SignedOpenMarketPenalty,
 };
 use chio_credentials::{
     build_portable_negative_event_artifact, build_portable_reputation_summary_artifact,

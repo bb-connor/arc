@@ -91,7 +91,7 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
         .json()
         .expect("parse issued liability provider");
     assert!(issued
-        .verify_signature()
+        .verify_signature(&issued.signer_key)
         .expect("verify liability provider signature"));
     assert_eq!(issued.body.report.provider_id, "carrier-alpha");
 

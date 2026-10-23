@@ -477,11 +477,13 @@ fn sign_roster(roster: &mut FrostRosterV1) {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("compute roster id: {error}"));
     roster.roster_authority_signature = roster_authority()
-        .sign(
+        .sign_wrapped(
+            CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("canonicalize roster: {error}")),
         )
+        .unwrap_or_else(|error| panic!("sign roster: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -490,11 +492,13 @@ fn sign_roster(roster: &mut FrostRosterV1) {
 
 fn sign_epoch(checkpoint: &mut FrostEpochCheckpointV1) {
     checkpoint.anchor_signature = epoch_authority()
-        .sign(
+        .sign_wrapped(
+            CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("canonicalize epoch checkpoint: {error}")),
         )
+        .unwrap_or_else(|error| panic!("sign epoch checkpoint: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -503,11 +507,13 @@ fn sign_epoch(checkpoint: &mut FrostEpochCheckpointV1) {
 
 fn sign_slot(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) {
     checkpoint.anchor_signature = slot_authority()
-        .sign(
+        .sign_wrapped(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("canonicalize slot checkpoint: {error}")),
         )
+        .unwrap_or_else(|error| panic!("sign slot checkpoint: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()

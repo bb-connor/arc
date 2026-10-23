@@ -180,7 +180,7 @@ fn test_capital_book_report_export_surfaces() {
     let report: SignedCapitalBookReport =
         serde_json::from_str(&response_body).expect("parse signed capital book");
     assert!(report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .expect("verify capital book signature"));
     assert_eq!(report.body.schema, "chio.credit.capital-book.v1");
     assert_eq!(report.body.subject_key, subject_key);
@@ -322,7 +322,7 @@ fn test_capital_book_report_export_surfaces() {
     let cli_report: SignedCapitalBookReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse capital book CLI");
     assert!(cli_report
-        .verify_signature()
+        .verify_signature(&cli_report.signer_key)
         .expect("verify capital book CLI signature"));
     assert_eq!(cli_report.body.summary.funding_sources, 2);
 
@@ -609,7 +609,7 @@ fn test_capital_instruction_issue_surfaces() {
     let instruction: SignedCapitalExecutionInstruction =
         response.json().expect("parse capital instruction");
     assert!(instruction
-        .verify_signature()
+        .verify_signature(&instruction.signer_key)
         .expect("verify capital instruction signature"));
     assert_eq!(
         instruction.body.schema,
@@ -674,7 +674,7 @@ fn test_capital_instruction_issue_surfaces() {
     let cli_instruction: SignedCapitalExecutionInstruction =
         serde_json::from_slice(&cli_output.stdout).expect("parse capital instruction CLI");
     assert!(cli_instruction
-        .verify_signature()
+        .verify_signature(&cli_instruction.signer_key)
         .expect("verify capital instruction CLI signature"));
     assert_eq!(
         cli_instruction.body.action,
@@ -1055,7 +1055,7 @@ fn test_capital_allocation_issue_surfaces() {
     let allocation: SignedCapitalAllocationDecision =
         response.json().expect("parse capital allocation");
     assert!(allocation
-        .verify_signature()
+        .verify_signature(&allocation.signer_key)
         .expect("verify capital allocation signature"));
     assert_eq!(allocation.body.schema, "chio.credit.capital-allocation.v1");
     assert_eq!(allocation.body.subject_key, subject_key);
@@ -1123,7 +1123,7 @@ fn test_capital_allocation_issue_surfaces() {
     let cli_allocation: SignedCapitalAllocationDecision =
         serde_json::from_slice(&cli_output.stdout).expect("parse capital allocation CLI");
     assert!(cli_allocation
-        .verify_signature()
+        .verify_signature(&cli_allocation.signer_key)
         .expect("verify capital allocation CLI signature"));
     assert_eq!(
         cli_allocation.body.outcome,

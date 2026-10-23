@@ -382,7 +382,9 @@ fn test_liability_claim_workflow_surfaces_inner() {
         .expect("issue liability claim");
     assert_eq!(claim_response.status(), reqwest::StatusCode::OK);
     let claim: SignedLiabilityClaimPackage = claim_response.json().expect("parse claim package");
-    assert!(claim.verify_signature().expect("verify claim signature"));
+    assert!(claim
+        .verify_signature(&claim.signer_key)
+        .expect("verify claim signature"));
 
     let claim_response_issue = client
         .post(format!("{base_url}/v1/liability/claim-responses/issue"))
@@ -403,7 +405,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     let provider_response: SignedLiabilityClaimResponse =
         claim_response_issue.json().expect("parse claim response");
     assert!(provider_response
-        .verify_signature()
+        .verify_signature(&provider_response.signer_key)
         .expect("verify claim response signature"));
 
     let dispute_issue = match client
@@ -435,7 +437,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
     assert_eq!(dispute_issue.status(), reqwest::StatusCode::OK);
     let dispute: SignedLiabilityClaimDispute = dispute_issue.json().expect("parse claim dispute");
     assert!(dispute
-        .verify_signature()
+        .verify_signature(&dispute.signer_key)
         .expect("verify dispute signature"));
 
     let roster_policy_path = dir.join("roster-policy.json");

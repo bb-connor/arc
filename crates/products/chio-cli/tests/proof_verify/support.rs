@@ -21,7 +21,6 @@ const TEST_SIGNATURE_SEED: [u8; 32] = [7; 32];
 const COLLECT_SIGNATURE_SEED: [u8; 32] = [11; 32];
 const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str = "application/vnd.chio.proof-room.bundle.v1+json";
 const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED: [u8; 32] = [9; 32];
-const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM: &str = "ed25519-rfc8785-v1";
 const PROOF_ROOM_SHIPPED_BUNDLE_SIGNER_KEYS: &str = concat!(
     "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c,",
     "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
@@ -1218,8 +1217,11 @@ fn refresh_bundle_signature(bundle_dir: &std::path::Path) {
     signature["payloadRef"]["sha256"] =
         serde_json::Value::String(chio_core::sha256_hex(&manifest_bytes));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
-    signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload).to_hex());
+    signature["signatures"][0]["sig"] = serde_json::Value::String(
+        keypair
+            .sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload)
+            .to_hex(),
+    );
     std::fs::write(signature_path, json_bytes(signature)).test_expect("write signature");
 }
 
@@ -1559,7 +1561,6 @@ fn sign_public_settlement_bundle_value(settlement_bundle: &mut serde_json::Value
         )
         .test_expect("sign public settlement proof bundle");
     settlement_bundle["bundle_signature"] = serde_json::json!({
-        "algorithm": PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM,
         "signer_key": keypair.public_key().to_hex(),
         "signature": signature.to_hex()
     });

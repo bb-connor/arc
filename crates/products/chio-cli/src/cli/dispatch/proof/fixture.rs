@@ -54,7 +54,6 @@ const COMMERCE_PROVIDER_TRUST_SIGNATURE_SEED: [u8; 32] = [8; 32];
 const TRUST_MARKET_AUTHORITY_SIGNATURE_SEED: [u8; 32] = [59; 32];
 const ENTERPRISE_RISK_COMPTROLLER_SIGNATURE_SEED: [u8; 32] = [63; 32];
 const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED: [u8; 32] = [9; 32];
-const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM: &str = "ed25519-rfc8785-v1";
 const PUBLIC_SETTLEMENT_ORACLE_SIGNATURE_SEED: [u8; 32] = [15; 32];
 const PUBLIC_SETTLEMENT_ANCHOR_SIGNATURE_SEED: [u8; 32] = [7; 32];
 const PUBLIC_SETTLEMENT_OPERATOR_KEY_HASH: &str =
@@ -718,7 +717,7 @@ fn runtime_join_receipt_signature(
         CliError::cli_other_error("runtime join receipt signature body invalid".to_string())
     })?;
     object.remove("signature");
-    Ok(fixture_wrapped_signature(&keypair, "chio.swarm.join-receipt.v1", &body)
+    Ok(fixture_wrapped_signature(keypair, "chio.swarm.join-receipt.v1", &body)
         .map_err(|error| {
             CliError::cli_other_error(format!("runtime join receipt signing failed: {error}"))
         })?
@@ -2151,7 +2150,7 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
             nodes,
             node_id,
             path,
-            "chio.receipt.v1",
+            chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
             "receipt",
             &sha256_file(&receipt_path)?,
         );
@@ -2175,13 +2174,17 @@ fn write_signed_terminal_receipt(
 ) -> Result<(), CliError> {
     let keypair = Keypair::from_seed(&[29u8; 32]);
     let mut receipt = serde_json::json!({
-        "schema": "chio.receipt.v1",
+        "schema": chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
         "receipt_id": receipt_id,
         "terminal_status": terminal_status,
         "policy_digest": policy_sha256,
         "kernel_key": keypair.public_key().to_hex()
     });
-    let signature = fixture_wrapped_signature(&keypair, "chio.receipt.v1", &receipt).map_err(|error| {
+    let signature = fixture_wrapped_signature(
+        &keypair,
+        chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
+        &receipt,
+    ).map_err(|error| {
         CliError::cli_other_error(format!("proof fixture receipt signing failed: {error}"))
     })?;
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
@@ -2817,7 +2820,6 @@ fn sign_public_settlement_proof_bundle(
         ))
     })?;
     settlement_proof["bundle_signature"] = serde_json::json!({
-        "algorithm": PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM,
         "signer_key": keypair.public_key().to_hex(),
         "signature": signature.to_hex()
     });

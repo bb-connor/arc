@@ -547,7 +547,7 @@ fn proof_serve_hosts_minimal_passport_bundle_root_artifacts_with_ui() {
         artifact_response.starts_with("HTTP/1.1 200"),
         "{artifact_response}"
     );
-    assert!(artifact_response.contains("\"schema\":\"chio.receipt.v1\""));
+    assert!(artifact_response.contains("\"schema\":\"chio.evidence-graph.minimal-receipt.v1\""));
 }
 
 #[test]

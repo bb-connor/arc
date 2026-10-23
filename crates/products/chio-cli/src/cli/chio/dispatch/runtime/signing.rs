@@ -70,9 +70,13 @@ pub(crate) fn cmd_chio_runtime_sign_pheromone_query_report(
         CliError::cli_other_error(format!("Chio pheromone query report validation: {error}"))
     })?;
     let keypair = crate::load_existing_authority_keypair(signing_seed_file)?;
-    let signed = chio_core::receipt::lineage::SignedExportEnvelope::sign(body, &keypair).map_err(
-        |error| CliError::cli_other_error(format!("Chio pheromone query report signing: {error}")),
-    )?;
+    let signed = chio_core::receipt::lineage::SignedExportEnvelope::sign(
+        chio_runtime_core::RuntimePheromoneQueryReport(body),
+        &keypair,
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!("Chio pheromone query report signing: {error}"))
+    })?;
     write_pretty_json(out, &signed, "Chio pheromone query report")
 }
 

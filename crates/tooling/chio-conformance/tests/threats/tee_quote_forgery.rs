@@ -47,7 +47,8 @@ use base64::Engine;
 use chio_core::crypto::Keypair;
 use chio_tee_frame::frame::{Frame, Otel, Provenance, Upstream, UpstreamSystem, Verdict};
 use chio_tee_frame::schema::{
-    signing_payload, validate_signed, verify_tenant_sig, SchemaError, SCHEMA_VERSION,
+    signing_body, validate_signed, verify_tenant_sig, SchemaError, SCHEMA_VERSION,
+    TEE_CAPTURE_FRAME_SCHEMA,
 };
 
 const VALIDATOR_EVIDENCE_FILES: &[(&str, Option<&str>)] = &[
@@ -124,11 +125,14 @@ fn signed_frame() -> (Frame, [u8; 32]) {
     let keypair = Keypair::from_seed(&[0x42u8; 32]);
     let public_key = keypair.public_key_bytes();
     let mut frame = unsigned_frame();
-    let payload = match signing_payload(&frame) {
-        Ok(payload) => payload,
-        Err(err) => panic!("signing_payload: {err}"),
+    let body = match signing_body(&frame) {
+        Ok(body) => body,
+        Err(err) => panic!("signing_body: {err}"),
     };
-    let signature = keypair.sign(&payload);
+    let signature = match keypair.sign_wrapped(TEE_CAPTURE_FRAME_SCHEMA, &body) {
+        Ok(signature) => signature,
+        Err(err) => panic!("sign_wrapped: {err}"),
+    };
     frame.tenant_sig = format!(
         "ed25519:{}",
         base64::engine::general_purpose::STANDARD.encode(signature.to_bytes())

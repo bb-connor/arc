@@ -907,7 +907,6 @@ mod tests {
         let mut body = chio_finding::FindingStatusEpoch {
             schema: chio_finding::FINDING_STATUS_EPOCH_SCHEMA_V1.to_string(),
             status_epoch_id: String::new(),
-            signature_domain: chio_finding::FINDING_STATUS_SIGNATURE_DOMAIN.to_string(),
             status_map_version: FINDING_STATUS_MAP_VERSION.to_string(),
             proof_semantics: FINDING_STATUS_PROOF_SEMANTICS.to_string(),
             feed_id: authorization.feed_id.clone(),

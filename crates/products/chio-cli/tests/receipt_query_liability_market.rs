@@ -199,7 +199,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let quote_request: SignedLiabilityQuoteRequest =
         quote_request_response.json().expect("parse quote request");
     assert!(quote_request
-        .verify_signature()
+        .verify_signature(&quote_request.signer_key)
         .expect("verify quote request signature"));
 
     let quote_response_response = client
@@ -232,7 +232,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let quote_response: SignedLiabilityQuoteResponse =
         serde_json::from_str(&quote_response_body).expect("parse quote response");
     assert!(quote_response
-        .verify_signature()
+        .verify_signature(&quote_response.signer_key)
         .expect("verify quote response signature"));
 
     let placement_response = client
@@ -254,7 +254,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     assert_eq!(placement_response.status(), reqwest::StatusCode::OK);
     let placement: SignedLiabilityPlacement = placement_response.json().expect("parse placement");
     assert!(placement
-        .verify_signature()
+        .verify_signature(&placement.signer_key)
         .expect("verify placement signature"));
 
     let bound_coverage_response = client
@@ -279,7 +279,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
         .json()
         .expect("parse bound coverage");
     assert!(bound_coverage
-        .verify_signature()
+        .verify_signature(&bound_coverage.signer_key)
         .expect("verify bound coverage signature"));
 
     let workflow_response = client
@@ -636,7 +636,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
         .json()
         .expect("parse pricing authority");
     assert!(pricing_authority
-        .verify_signature()
+        .verify_signature(&pricing_authority.signer_key)
         .expect("verify pricing authority signature"));
 
     let quote_response_response = client
@@ -696,7 +696,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
     let auto_bind: SignedLiabilityAutoBindDecision =
         serde_json::from_str(&auto_bind_body).expect("parse auto-bind decision");
     assert!(auto_bind
-        .verify_signature()
+        .verify_signature(&auto_bind.signer_key)
         .expect("verify auto-bind signature"));
     assert_eq!(
         auto_bind.body.disposition,

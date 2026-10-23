@@ -1017,19 +1017,19 @@ fn test_provider_risk_package_export_surfaces() {
     let report: SignedCreditProviderRiskPackage =
         response.json().expect("parse signed provider risk package");
     assert!(report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .expect("verify provider risk package signature"));
     assert_eq!(report.body.schema, "chio.credit.provider-risk-package.v1");
     assert_eq!(report.body.subject_key, subject_key);
     assert!(report
         .body
         .exposure
-        .verify_signature()
+        .verify_signature(&report.body.exposure.signer_key)
         .expect("verify nested exposure signature"));
     assert!(report
         .body
         .scorecard
-        .verify_signature()
+        .verify_signature(&report.body.scorecard.signer_key)
         .expect("verify nested scorecard signature"));
     assert!(report.body.recent_loss_history.summary.returned_loss_events >= 1);
     assert_eq!(
@@ -1087,7 +1087,7 @@ fn test_provider_risk_package_export_surfaces() {
     let cli_report: SignedCreditProviderRiskPackage =
         serde_json::from_slice(&cli_output.stdout).expect("parse provider risk package CLI");
     assert!(cli_report
-        .verify_signature()
+        .verify_signature(&cli_report.signer_key)
         .expect("verify provider risk package CLI signature"));
     assert!(
         cli_report
