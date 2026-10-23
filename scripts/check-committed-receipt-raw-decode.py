@@ -281,24 +281,24 @@ ALLOWED = (
     },
 )
 
-RAW_CALL = re.compile(r"(?<![\w.:])(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
-EXTRACTOR = re.compile(r"(?<![\w:])(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
+RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
+EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
 TYPE_ALIAS = re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
 TRAIT_CALL = re.compile(
-    r"(?<![\w:.])(?:(?:serde\s*::\s*)?(?:de\s*::\s*)?Deserialize"
+    r"(?<![\w:.])(?:::\s*)?(?:[a-z_]\w*\s*::\s*)*(?:Deserialize\b"
     r"|<\s*([\w:]+)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
 )
 GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*(?:for\s*<[^<>]*>|[^,>{])*?\bDeserialize")
 CRATE_ALIAS = re.compile(r"\buse\s+serde_json\s+as\s+(\w+)\s*;")
 FUNCTION_ALIAS = re.compile(r"\bserde_json\s*::\s*(from_(?:str|slice|reader|value))\s+as\s+(\w+)")
 STREAM_CALL = re.compile(
-    r"(?<![\w.])(?:serde_json\s*::\s*)?(?:de\s*::\s*)?Deserializer\s*::\s*from_(?:str|slice|reader)\s*\("
+    r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?(?:de\s*::\s*)?Deserializer\s*::\s*from_(?:str|slice|reader)\s*\("
 )
 INTO_ITER = re.compile(r"^\s*\.\s*into_iter\s*::\s*<")
 FROM_REQUEST = re.compile(r"\bfrom_request(?:_parts)?\s*\(")
-BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*(?:::\s*)?<")
+BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*(?:::\s*)?<")
 IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
 LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
 
@@ -701,6 +701,12 @@ FIXTURES = {
     "body extractor": ("async fn h(request: Request, state: &S) {\n    let Json(r): Json<ChioReceipt> = Json::from_request(request, state).await?;\n}", 1),
     "body extractor turbofish": ("async fn h(request: Request, state: &S) { let r = Json::<ChildRequestReceipt>::from_request(request, state).await; }", 1),
     "body extractor of another type": ("async fn h(request: Request, state: &S) { let Json(r): Json<Other> = Json::from_request(request, state).await?; }", 0),
+    "absolute crate path": ("fn f(raw: &str) -> Result<ChioReceipt,E> { ::serde_json::from_str(raw) }", 1),
+    "absolute turbofish": ("fn f(raw: &[u8]) { let r = ::serde_json::from_slice::<ChildRequestReceipt>(raw); }", 1),
+    "absolute trait path": ("fn f(d: D) -> Result<ChioReceipt, E> { ::serde::Deserialize::deserialize(d) }", 1),
+    "module-qualified type": ("fn f(d: D) { let r = chio_core::receipt::body::ChioReceipt::deserialize(d); }", 1),
+    "absolute stream": ("fn f(raw: &str) { ::serde_json::Deserializer::from_str(raw).into_iter::<ChioReceipt>(); }", 1),
+    "absolute extractor": ("async fn h(::axum::Json(r): ::axum::Json<ChioReceipt>) {}", 1),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
