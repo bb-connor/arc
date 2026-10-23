@@ -36,7 +36,8 @@ fn hash(hex: &str) -> Hash {
 }
 
 fn vector_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/bindings/vectors/security/signed-wire")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../tests/bindings/vectors/security/signed-wire")
 }
 
 fn line(value: &impl serde::Serialize) -> Vec<u8> {
@@ -49,9 +50,7 @@ fn pin() -> KeyLogPin {
     KeyLogPin {
         checkpoint_sequence: 4,
         tree_size: 5,
-        checkpoint_hash: hash(
-            "0x47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef",
-        ),
+        checkpoint_hash: hash("0x47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef"),
         root_hash: hash("0x4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2"),
         signing_epoch: 2,
     }
@@ -129,7 +128,11 @@ fn artifact_signature() -> KeyringArtifactSignature {
     let router = backend(ROUTER_SEED);
     let public_key = router.public_key().test_unwrap();
     let outcome = router
-        .sign_wrapped_for_identity(&public_key, KEY_LOG_CHECKPOINT_SCHEMA, &artifact_canonical())
+        .sign_wrapped_for_identity(
+            &public_key,
+            KEY_LOG_CHECKPOINT_SCHEMA,
+            &artifact_canonical(),
+        )
         .test_unwrap();
     KeyringArtifactSignature::sign_fence(
         &router,
@@ -149,9 +152,7 @@ fn time_anchor_body() -> ArtifactTimeAnchorBody {
         artifact_hash: artifact_hash(&artifact_bytes()).test_unwrap(),
         anchored_at: 1_700_000_000_123,
         anchor: ArtifactTimeAnchorKind::External {
-            commitment: hash(
-                "0x268bdf049e4b7ae47c4c52b10388147af455b0fba9c3b545b2f0c0d1241329cd",
-            ),
+            commitment: hash("0x268bdf049e4b7ae47c4c52b10388147af455b0fba9c3b545b2f0c0d1241329cd"),
         },
     }
 }

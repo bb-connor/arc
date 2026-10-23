@@ -1207,12 +1207,10 @@ impl Ordered {
 
     fn set(&mut self, key: &str, value: serde_json::Value) {
         match self {
-            Ordered::Object(members) => {
-                match members.iter_mut().find(|(name, _)| name == key) {
-                    Some((_, member)) => *member = Ordered::Leaf(value),
-                    None => members.push((key.to_string(), Ordered::Leaf(value))),
-                }
-            }
+            Ordered::Object(members) => match members.iter_mut().find(|(name, _)| name == key) {
+                Some((_, member)) => *member = Ordered::Leaf(value),
+                None => members.push((key.to_string(), Ordered::Leaf(value))),
+            },
             _ => panic!("not an object: {key}"),
         }
     }
@@ -1307,7 +1305,8 @@ fn consumer_signed_manifest() -> chio_manifest::SignedManifest {
         }),
         public_key: server.public_key().to_hex(),
     };
-    sign_manifest(&manifest, &server).unwrap_or_else(|error| panic!("sign consumer manifest: {error}"))
+    sign_manifest(&manifest, &server)
+        .unwrap_or_else(|error| panic!("sign consumer manifest: {error}"))
 }
 
 fn consumer_corpus_text() -> String {
@@ -1332,40 +1331,79 @@ fn consumer_corpus_text() -> String {
                 v.set("authorized", serde_json::json!(true));
             }),
             case("unknown-manifest-field", false, &|v| {
-                v.at("manifest").set("allow_unconfined", serde_json::json!(true));
+                v.at("manifest")
+                    .set("allow_unconfined", serde_json::json!(true));
             }),
             case("second-latency-authority", false, &|v| {
-                v.at("manifest").at("tools").item(0).at("annotations").set("estimated_duration_ms", serde_json::json!(50));
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .set("estimated_duration_ms", serde_json::json!(50));
             }),
             case("null-flow-alias", false, &|v| {
-                v.at("manifest").at("tools").item(0).set("flow", serde_json::Value::Null);
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .set("flow", serde_json::Value::Null);
             }),
             case("null-latency-alias", false, &|v| {
-                v.at("manifest").at("tools").item(0).set("latency_hint", serde_json::Value::Null);
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .set("latency_hint", serde_json::Value::Null);
             }),
             case("missing-annotation", false, &|v| {
-                v.at("manifest").at("tools").item(0).at("annotations").remove("destructive");
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .remove("destructive");
             }),
             case("numeric-boolean", false, &|v| {
-                v.at("manifest").at("tools").item(0).at("annotations").set("destructive", serde_json::json!(0));
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .set("destructive", serde_json::json!(0));
             }),
             case("missing-egress", false, &|v| {
-                v.at("manifest").at("tools").item(0).at("flow").remove("egress");
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("flow")
+                    .remove("egress");
             }),
             case("unknown-flow-field", false, &|v| {
-                v.at("manifest").at("tools").item(0).at("flow").set("allow_declassification", serde_json::json!(true));
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("flow")
+                    .set("allow_declassification", serde_json::json!(true));
             }),
             case("unknown-native-profile", false, &|v| {
-                v.at("manifest").at("required_permissions").set("native_syscall_profile", serde_json::json!("unconfined"));
+                v.at("manifest")
+                    .at("required_permissions")
+                    .set("native_syscall_profile", serde_json::json!("unconfined"));
             }),
             case("old-shape-network-hosts", false, &|v| {
-                v.at("manifest").at("required_permissions").set("network_hosts", serde_json::json!(["api.example.com"]));
+                v.at("manifest")
+                    .at("required_permissions")
+                    .set("network_hosts", serde_json::json!(["api.example.com"]));
             }),
             case("missing-network-port", false, &|v| {
-                v.at("manifest").at("required_permissions").at("network_destinations").item(0).remove("port");
+                v.at("manifest")
+                    .at("required_permissions")
+                    .at("network_destinations")
+                    .item(0)
+                    .remove("port");
             }),
             case("zero-network-port", false, &|v| {
-                v.at("manifest").at("required_permissions").at("network_destinations").item(0).set("port", serde_json::json!(0));
+                v.at("manifest")
+                    .at("required_permissions")
+                    .at("network_destinations")
+                    .item(0)
+                    .set("port", serde_json::json!(0));
             }),
         ],
     };
@@ -1376,7 +1414,8 @@ fn consumer_corpus_text() -> String {
 }
 
 fn consumer_corpus_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tests/bindings/fixtures/manifest-consumers.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../tests/bindings/fixtures/manifest-consumers.json")
 }
 
 #[test]

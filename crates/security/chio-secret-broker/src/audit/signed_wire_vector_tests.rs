@@ -24,7 +24,8 @@ fn backend(seed: u8) -> Ed25519Backend {
 }
 
 fn vector_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/bindings/vectors/security/signed-wire")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../tests/bindings/vectors/security/signed-wire")
 }
 
 fn line(value: &impl Serialize) -> Vec<u8> {
@@ -76,8 +77,10 @@ fn comparison_body(runner: &SignedBrokerAuditRunnerAuthorization) -> BrokerAudit
         .test_unwrap(),
         audit_authorization_sha256: "8".repeat(64),
         runner_authorization_sha256: runner_sha256,
-        reference_source_sha256: broker_audit_reference_source_digest(&runner.body.reference_source)
-            .test_unwrap(),
+        reference_source_sha256: broker_audit_reference_source_digest(
+            &runner.body.reference_source,
+        )
+        .test_unwrap(),
         broker_outbound_projection_commitment_sha256: "b".repeat(64),
         reference_outbound_projection_commitment_sha256: "b".repeat(64),
         projections_equal: true,
