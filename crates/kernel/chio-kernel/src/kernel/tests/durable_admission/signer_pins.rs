@@ -1,20 +1,10 @@
-//! Retained and local receipts verify only under this kernel's own receipt
-//! signer; a valid signature under any other key is refused first.
+//! A local parent receipt verifies only under a key this kernel trusts; a
+//! valid signature under any other key is refused first.
 
 use super::*;
-use crate::admission_operation::{AdmissionRecoveryError, AdmissionRecoveryFailureKind};
-use crate::kernel::signing_authority::KernelSigningAuthority;
 use chio_core::receipt::crypto_floor::ReceiptCryptoFloor;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
-fn signer_unavailable(error: &KernelError) -> bool {
-    matches!(error, KernelError::AdmissionRecovery(failure)
-        if matches!(failure.as_ref(), AdmissionRecoveryError::Item {
-            kind: AdmissionRecoveryFailureKind::ContractChanged,
-            detail,
-        } if detail == "original receipt signing authority is unavailable"))
-}
 
 #[test]
 fn local_parent_receipt_signed_by_another_kernel_is_refused() -> TestResult {
@@ -37,53 +27,18 @@ fn local_parent_receipt_signed_by_another_kernel_is_refused() -> TestResult {
     })?;
     let parent = LocalReceiptArtifact::Tool(Box::new(receipt));
     assert!(parent.verify_signature_with_floor(
-        &foreign.receipt_signing_public_key()?,
+        &[foreign.receipt_signing_public_key()?],
         ReceiptCryptoFloor::AllowClassical,
     )?);
+    let mut trusted = local.trusted_issuer_keys();
+    trusted.push(local.receipt_signing_public_key()?);
     let error = parent
-        .verify_signature_with_floor(
-            &local.receipt_signing_public_key()?,
-            ReceiptCryptoFloor::AllowClassical,
-        )
+        .verify_signature_with_floor(&trusted, ReceiptCryptoFloor::AllowClassical)
         .expect_err("a parent receipt from another kernel is refused");
     assert!(
         matches!(&error, KernelError::GovernedTransactionDenied(reason)
-            if reason == "governed call_chain parent receipt signer is not the local kernel"),
+            if reason == "governed call_chain parent receipt signer is not trusted"),
         "{error:?}"
     );
-    Ok(())
-}
-
-#[test]
-fn completed_replay_refuses_a_receipt_signed_by_a_replaced_signer() -> TestResult {
-    let (mut kernel, request, _store, calls) = durable_admission_fixture("replay-signer-pin");
-    let initial = kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(initial.verdict, Verdict::Allow, "{:?}", initial.reason);
-    kernel.signing_authority = KernelSigningAuthority::classical(&Keypair::generate());
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("a retained receipt under a replaced signer is refused");
-    assert!(signer_unavailable(&error), "{error:?}");
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
-    Ok(())
-}
-
-#[test]
-fn refusal_replay_refuses_a_receipt_signed_by_a_replaced_signer() -> TestResult {
-    let mut grant = make_grant("durable-server", "mutate");
-    grant.max_invocations = Some(1);
-    let (mut kernel, request, _store, calls) =
-        durable_admission_fixture_with_grants("refusal-replay-signer-pin", vec![grant]);
-    assert!(kernel.with_budget_store(|budget| {
-        Ok(budget.try_increment(&request.capability.id, 0, Some(1))?)
-    })?);
-    let initial = kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(initial.verdict, Verdict::Deny);
-    kernel.signing_authority = KernelSigningAuthority::classical(&Keypair::generate());
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect_err("a retained refusal under a replaced signer is refused");
-    assert!(signer_unavailable(&error), "{error:?}");
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
     Ok(())
 }

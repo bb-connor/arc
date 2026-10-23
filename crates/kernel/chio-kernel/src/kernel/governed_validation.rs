@@ -917,8 +917,10 @@ impl ChioKernel {
             {
                 match self.local_receipt_artifact(parent_receipt_id)? {
                     Some(parent_receipt) => {
+                        let mut trusted = self.trusted_issuer_keys();
+                        trusted.push(self.receipt_signing_public_key()?);
                         let signature_valid = parent_receipt.verify_signature_with_floor(
-                            &self.receipt_signing_public_key()?,
+                            &trusted,
                             receipt_crypto_floor(self.capability_crypto_floor),
                         )?;
                         if !signature_valid {

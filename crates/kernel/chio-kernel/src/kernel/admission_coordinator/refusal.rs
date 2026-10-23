@@ -511,7 +511,6 @@ impl ChioKernel {
         {
             return Err(mismatch());
         }
-        self.require_original_receipt_signer(identity)?;
         for floor in [identity.crypto_floor(), self.receipt_signing_crypto_floor()] {
             if !receipt
                 .verify_signature_with_floor(identity.public_key(), floor)

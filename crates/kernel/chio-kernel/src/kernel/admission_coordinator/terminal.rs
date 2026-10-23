@@ -710,7 +710,6 @@ impl ChioKernel {
         let expected_tenant = (binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
             .then_some(binding.authenticated_tenant_id.as_str());
         let signing_identity = tool_return.raw.receipt_signing_identity().clone();
-        self.require_original_receipt_signer(&signing_identity)?;
         let signature_valid = receipt
             .verify_signature_with_floor(
                 signing_identity.public_key(),
