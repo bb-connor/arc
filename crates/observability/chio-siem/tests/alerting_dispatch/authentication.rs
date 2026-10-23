@@ -1,6 +1,7 @@
 //! Alert dispatch pages only denials that verify against an independently
 //! pinned receipt authority; unpinned, forged or flag-mutated receipts never
 //! page.
+use chio_core::crypto::ExemptFormat;
 use super::*;
 use chio_core::receipt::body::chio_receipt_id;
 
@@ -100,7 +101,7 @@ async fn attacker_controlled_public_flags_cannot_enable_unpinned_paging() {
 async fn forged_signature_and_flags_do_not_page() {
     let key = Keypair::generate();
     let mut receipt = signed_deny(&key);
-    receipt.signature = Keypair::generate().sign(b"not a receipt");
+    receipt.signature = Keypair::generate().sign_exempt(ExemptFormat::JwsSigningInput, b"not a receipt");
     assert!(!receipt.verify_signature().unwrap());
     assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), receipt.id);
     assert_no_unpinned_dispatch(event_with_forged_flags(receipt)).await;
@@ -195,7 +196,7 @@ async fn configured_pin_rechecks_every_receipt_component_and_ignores_public_flag
     assert!(untrusted.verify_signature().unwrap());
     assert!(untrusted.action.verify_hash().unwrap());
     let mut bad_signature = valid.clone();
-    bad_signature.signature = attacker.sign(b"different message");
+    bad_signature.signature = attacker.sign_exempt(ExemptFormat::JwsSigningInput, b"different message");
     assert!(!bad_signature.verify_signature().unwrap());
     assert_eq!(
         chio_receipt_id(&bad_signature.body()).unwrap(),
