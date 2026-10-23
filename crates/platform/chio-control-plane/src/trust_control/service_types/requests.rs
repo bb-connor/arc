@@ -956,4 +956,148 @@ mod capability_snapshot_tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn issue_capability_request_refuses_a_repeated_constraint_tag(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request = IssueCapabilityRequest {
+            subject_public_key: "subject".to_string(),
+            scope: ChioScope {
+                grants: vec![chio_core::capability::scope::ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "read".to_string(),
+                    operations: vec![chio_core::capability::scope::Operation::Invoke],
+                    constraints: vec![chio_core::capability::scope::Constraint::PathPrefix(
+                        "/workspace".to_string(),
+                    )],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            ttl_seconds: 60,
+            runtime_attestation: None,
+        };
+        let honest = serde_json::to_vec(&request)?;
+        serde_json::from_slice::<IssueCapabilityRequest>(&honest)?;
+        let padded = String::from_utf8(honest)?.replacen(
+            r#"{"type":"path_prefix","value":"/workspace"}"#,
+            r#"{"type":"domain_exact","type":"path_prefix","value":"/workspace"}"#,
+            1,
+        );
+        let error = serde_json::from_slice::<IssueCapabilityRequest>(padded.as_bytes())
+            .err()
+            .map(|error| error.to_string());
+        let expected = format!(
+            "{}: \"type\"",
+            chio_security_types::strict_serde::DUPLICATE_KEY
+        );
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{error:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn record_snapshot_request_refuses_a_repeated_constraint_key_in_a_nested_token(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use chio_core::capability::attenuation::{Attenuation, DelegationLink, DelegationLinkBody};
+        use chio_core::capability::scope::{Constraint, Operation, ToolGrant};
+
+        let issuer = chio_core::crypto::Keypair::generate();
+        let delegatee = chio_core::crypto::Keypair::generate();
+        let link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "snapshot-parent".to_string(),
+                delegator: issuer.public_key(),
+                delegatee: delegatee.public_key(),
+                attenuations: vec![Attenuation::AddConstraint {
+                    server_id: "srv".to_string(),
+                    tool_name: "read".to_string(),
+                    constraint: Constraint::DomainExact("a.example".to_string()),
+                }],
+                timestamp: 100,
+                scope_hash: None,
+                aggregate_budget: None,
+                cumulative_approval: None,
+            },
+            &issuer,
+        )?;
+        let capability = CapabilityToken::sign(
+            chio_core::capability::token::CapabilityTokenBody {
+                id: "snapshot-token".to_string(),
+                issuer: issuer.public_key(),
+                subject: delegatee.public_key(),
+                scope: ChioScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv".to_string(),
+                        tool_name: "read".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::PathPrefix("/workspace".to_string())],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: vec![link],
+                aggregate_invocation_budget: None,
+            },
+            &issuer,
+        )?;
+        let honest = String::from_utf8(serde_json::to_vec(&RecordCapabilitySnapshotRequest {
+            capability,
+            parent_capability_id: None,
+        })?)?;
+        serde_json::from_slice::<RecordCapabilitySnapshotRequest>(honest.as_bytes())?;
+        for (original, padded, key) in [
+            (
+                r#"{"type":"path_prefix","value":"/workspace"}"#,
+                r#"{"type":"path_prefix","type":"domain_exact","value":"/workspace"}"#,
+                "type",
+            ),
+            (
+                r#"{"type":"path_prefix","value":"/workspace"}"#,
+                r#"{"type":"path_prefix","value":"/other","value":"/workspace"}"#,
+                "value",
+            ),
+            (
+                r#"{"type":"domain_exact","value":"a.example"}"#,
+                r#"{"type":"path_prefix","type":"domain_exact","value":"a.example"}"#,
+                "type",
+            ),
+            (
+                r#"{"type":"domain_exact","value":"a.example"}"#,
+                r#"{"type":"domain_exact","value":"b.example","value":"a.example"}"#,
+                "value",
+            ),
+        ] {
+            assert_eq!(honest.matches(original).count(), 1, "{original}");
+            let wire = honest.replacen(original, padded, 1);
+            let error = serde_json::from_slice::<RecordCapabilitySnapshotRequest>(wire.as_bytes())
+                .err()
+                .map(|error| error.to_string());
+            let expected = format!(
+                "{}: {key:?}",
+                chio_security_types::strict_serde::DUPLICATE_KEY
+            );
+            assert!(
+                error
+                    .as_deref()
+                    .is_some_and(|error| error.starts_with(&expected)),
+                "{padded}: {error:?}"
+            );
+        }
+        Ok(())
+    }
 }

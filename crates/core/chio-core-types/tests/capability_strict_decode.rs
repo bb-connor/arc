@@ -7,6 +7,8 @@ use chio_core_types::capability::scope::{
 };
 use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core_types::Keypair;
+use chio_security_types::strict_serde::DUPLICATE_KEY;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -155,5 +157,124 @@ fn a_delegation_link_body_refuses_an_unknown_member() -> TestResult {
         error.starts_with("unknown field `pad`, expected"),
         "{error}"
     );
+    Ok(())
+}
+
+fn token_with_add_constraint() -> TestResult<String> {
+    let issuer = Keypair::from_seed(&[5; 32]);
+    let delegatee = Keypair::from_seed(&[6; 32]);
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "cap-parent".to_string(),
+            delegator: issuer.public_key(),
+            delegatee: delegatee.public_key(),
+            attenuations: vec![Attenuation::AddConstraint {
+                server_id: "srv".to_string(),
+                tool_name: "read".to_string(),
+                constraint: Constraint::DomainExact("a.example".to_string()),
+            }],
+            timestamp: 1_710_000_000,
+            scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
+        },
+        &issuer,
+    )?;
+    let body = CapabilityTokenBody {
+        id: "cap-duplicate".to_string(),
+        issuer: issuer.public_key(),
+        subject: delegatee.public_key(),
+        scope: ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "srv".to_string(),
+                tool_name: "read".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![Constraint::PathPrefix("/workspace".to_string())],
+                max_invocations: Some(1),
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            resource_grants: vec![],
+            prompt_grants: vec![],
+        },
+        issued_at: 1_710_000_000,
+        expires_at: 1_710_003_600,
+        delegation_chain: vec![link],
+        aggregate_invocation_budget: None,
+    };
+    Ok(serde_json::to_string(&CapabilityToken::sign(
+        body, &issuer,
+    )?)?)
+}
+
+fn replace_once(text: &str, from: &str, to: &str) -> TestResult<String> {
+    if text.matches(from).count() != 1 {
+        return Err(format!("{from} must appear once").into());
+    }
+    Ok(text.replacen(from, to, 1))
+}
+
+#[test]
+fn a_raw_token_refuses_a_repeated_constraint_key_in_a_grant_or_an_attenuation() -> TestResult {
+    let token = token_with_add_constraint()?;
+    assert!(serde_json::from_str::<CapabilityToken>(&token)?.verify_signature()?);
+    let grant = r#"{"type":"path_prefix","value":"/workspace"}"#;
+    let attenuation = r#"{"type":"domain_exact","value":"a.example"}"#;
+    for (padded, key) in [
+        (
+            replace_once(
+                &token,
+                grant,
+                r#"{"type":"domain_exact","type":"path_prefix","value":"/workspace"}"#,
+            )?,
+            "type",
+        ),
+        (
+            replace_once(
+                &token,
+                grant,
+                r#"{"type":"path_prefix","value":"/x","value":"/workspace"}"#,
+            )?,
+            "value",
+        ),
+        (
+            replace_once(
+                &token,
+                attenuation,
+                r#"{"type":"path_prefix","type":"domain_exact","value":"a.example"}"#,
+            )?,
+            "type",
+        ),
+        (
+            replace_once(
+                &token,
+                attenuation,
+                r#"{"type":"domain_exact","value":"b.example","value":"a.example"}"#,
+            )?,
+            "value",
+        ),
+    ] {
+        let expected = format!("{DUPLICATE_KEY}: {key:?}");
+        let direct =
+            <CapabilityToken>::deserialize(&mut serde_json::Deserializer::from_str(&padded))
+                .err()
+                .map(|error| error.to_string());
+        assert!(
+            direct
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{direct:?}"
+        );
+        let decoded = serde_json::from_str::<CapabilityToken>(&padded)
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            decoded
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{decoded:?}"
+        );
+    }
     Ok(())
 }
