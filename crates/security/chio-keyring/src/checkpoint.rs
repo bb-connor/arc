@@ -1,23 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use chio_core_types::{
-    canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningBackend};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::signing::{sign_wrapped_value, verify_wrapped_value};
 use crate::{derive_key_id, KeyId, KeyringError, LogId, Result, WitnessId};
 
 pub const KEY_LOG_CHECKPOINT_SCHEMA: &str = "chio.key-log.checkpoint.v1";
 pub const KEY_ACTIVATION_COMMIT_SCHEMA: &str = "chio.key-log.activation-commit.v1";
-const CHECKPOINT_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.checkpoint-signature.v1\0";
 const CHECKPOINT_HASH_DOMAIN: &[u8] = b"chio.key-log.checkpoint-envelope.v1\0";
 const CHECKPOINT_BODY_HASH_DOMAIN: &[u8] = b"chio.key-log.checkpoint-body.v1\0";
-const WITNESS_STATEMENT_SCHEMA: &str = "chio.key-log.witness-statement.v1";
-const WITNESS_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.witness-signature.v1\0";
+pub const KEY_LOG_WITNESS_STATEMENT_SCHEMA: &str = "chio.key-log.witness-statement.v1";
 const WITNESS_SET_HASH_DOMAIN: &[u8] = b"chio.key-log.witness-set.v1\0";
-const ACTIVATION_COMMIT_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.activation-commit.v1\0";
 pub const MAX_WITNESS_SIGNATURES: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,7 +39,6 @@ impl KeyLogCheckpointBody {
 #[serde(deny_unknown_fields)]
 pub struct WitnessSignature {
     pub witness_id: WitnessId,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -52,7 +47,6 @@ pub struct WitnessSignature {
 pub struct SignedKeyLogCheckpoint {
     pub body: KeyLogCheckpointBody,
     pub operator_key_id: KeyId,
-    pub operator_algorithm: SigningAlgorithm,
     pub operator_signature: Signature,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub witness_signatures: Vec<WitnessSignature>,
@@ -72,7 +66,6 @@ pub struct KeyLogCheckpointExpectation<'a> {
 struct SignedKeyLogCheckpointWire {
     body: KeyLogCheckpointBody,
     operator_key_id: KeyId,
-    operator_algorithm: SigningAlgorithm,
     operator_signature: Signature,
     #[serde(default, deserialize_with = "deserialize_witness_signatures")]
     witness_signatures: Vec<WitnessSignature>,
@@ -96,7 +89,6 @@ impl<'de> Deserialize<'de> for SignedKeyLogCheckpoint {
         Ok(Self {
             body: wire.body,
             operator_key_id: wire.operator_key_id,
-            operator_algorithm: wire.operator_algorithm,
             operator_signature: wire.operator_signature,
             witness_signatures: wire.witness_signatures,
         })
@@ -155,7 +147,6 @@ where
 struct CheckpointCommitment<'a> {
     body: &'a KeyLogCheckpointBody,
     operator_key_id: KeyId,
-    operator_algorithm: SigningAlgorithm,
     operator_signature: &'a Signature,
 }
 
@@ -190,7 +181,6 @@ pub struct KeyActivationCommitBody {
 pub struct SignedKeyActivationCommit {
     pub body: KeyActivationCommitBody,
     pub operator_key_id: KeyId,
-    pub operator_algorithm: SigningAlgorithm,
     pub operator_signature: Signature,
 }
 
@@ -200,18 +190,12 @@ impl SignedKeyLogCheckpoint {
     }
 
     pub fn sign(body: KeyLogCheckpointBody, operator: &dyn SigningBackend) -> Result<Self> {
-        let outcome = operator.sign_bytes_with_identity(&checkpoint_signing_bytes(&body)?)?;
-        let operator_algorithm = outcome.algorithm;
-        let operator_key_id = derive_key_id(operator_algorithm, &outcome.public_key)?;
-        let operator_signature = outcome.signature;
-        if operator_signature.algorithm() != operator_algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(operator, KEY_LOG_CHECKPOINT_SCHEMA, &body)?;
+        let operator_key_id = derive_key_id(outcome.public_key.algorithm(), &outcome.public_key)?;
         Ok(Self {
             body,
             operator_key_id,
-            operator_algorithm,
-            operator_signature,
+            operator_signature: outcome.signature,
             witness_signatures: Vec::new(),
         })
     }
@@ -224,7 +208,6 @@ impl SignedKeyLogCheckpoint {
         let canonical = canonical_json_bytes(&CheckpointCommitment {
             body: &self.body,
             operator_key_id: self.operator_key_id,
-            operator_algorithm: self.operator_algorithm,
             operator_signature: &self.operator_signature,
         })?;
         domain_hash(CHECKPOINT_HASH_DOMAIN, &canonical)
@@ -241,19 +224,15 @@ impl SignedKeyLogCheckpoint {
     }
 
     pub fn verify_operator(&self, operator_key: &PublicKey) -> Result<()> {
-        if operator_key.algorithm() != self.operator_algorithm
-            || self.operator_signature.algorithm() != self.operator_algorithm
-            || derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id
-        {
+        if derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id {
             return Err(KeyringError::AlgorithmMismatch);
         }
-        if !operator_key.verify_strict(
-            &checkpoint_signing_bytes(&self.body)?,
+        verify_wrapped_value(
+            operator_key,
+            KEY_LOG_CHECKPOINT_SCHEMA,
+            &self.body,
             &self.operator_signature,
-        ) {
-            return Err(KeyringError::InvalidSignature);
-        }
-        Ok(())
+        )
     }
 
     pub fn verify_witnesses(
@@ -283,7 +262,7 @@ impl SignedKeyLogCheckpoint {
         {
             return Err(KeyringError::InvalidWitnessActivation);
         }
-        let statement = witness_signing_bytes(self)?;
+        let statement = witness_statement(self)?;
         let mut verified = BTreeSet::new();
         for witness in &self.witness_signatures {
             if !verified.insert(witness.witness_id.clone()) {
@@ -292,12 +271,13 @@ impl SignedKeyLogCheckpoint {
             let key = witness_keys
                 .get(&witness.witness_id)
                 .ok_or(KeyringError::InvalidSignature)?;
-            if key.algorithm() != witness.algorithm
-                || witness.signature.algorithm() != witness.algorithm
-                || !key.verify_strict(&statement, &witness.signature)
-            {
-                return Err(KeyringError::InvalidSignature);
-            }
+            verify_wrapped_value(
+                key,
+                KEY_LOG_WITNESS_STATEMENT_SCHEMA,
+                &statement,
+                &witness.signature,
+            )
+            .map_err(|_| KeyringError::InvalidSignature)?;
         }
         Ok(verified)
     }
@@ -341,31 +321,25 @@ impl SignedKeyActivationCommit {
     }
 
     pub fn sign(body: KeyActivationCommitBody, operator: &dyn SigningBackend) -> Result<Self> {
-        let outcome =
-            operator.sign_bytes_with_identity(&activation_commit_signing_bytes(&body)?)?;
-        let operator_algorithm = outcome.algorithm;
-        let operator_key_id = derive_key_id(operator_algorithm, &outcome.public_key)?;
-        let operator_signature = outcome.signature;
-        if operator_signature.algorithm() != operator_algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(operator, KEY_ACTIVATION_COMMIT_SCHEMA, &body)?;
+        let operator_key_id = derive_key_id(outcome.public_key.algorithm(), &outcome.public_key)?;
         Ok(Self {
             body,
             operator_key_id,
-            operator_algorithm,
-            operator_signature,
+            operator_signature: outcome.signature,
         })
     }
 
     pub fn verify_operator(&self, operator_key: &PublicKey) -> Result<()> {
         if self.body.schema != KEY_ACTIVATION_COMMIT_SCHEMA
-            || operator_key.algorithm() != self.operator_algorithm
-            || self.operator_signature.algorithm() != self.operator_algorithm
             || derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id
-            || !operator_key.verify_strict(
-                &activation_commit_signing_bytes(&self.body)?,
+            || verify_wrapped_value(
+                operator_key,
+                KEY_ACTIVATION_COMMIT_SCHEMA,
+                &self.body,
                 &self.operator_signature,
             )
+            .is_err()
         {
             return Err(KeyringError::InvalidWitnessActivation);
         }
@@ -383,16 +357,14 @@ impl WitnessSignature {
         witness_id: WitnessId,
         witness: &dyn SigningBackend,
     ) -> Result<Self> {
-        let outcome = witness.sign_bytes_with_identity(&witness_signing_bytes(checkpoint)?)?;
-        let algorithm = outcome.algorithm;
-        let signature = outcome.signature;
-        if signature.algorithm() != algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(
+            witness,
+            KEY_LOG_WITNESS_STATEMENT_SCHEMA,
+            &witness_statement(checkpoint)?,
+        )?;
         Ok(Self {
             witness_id,
-            algorithm,
-            signature,
+            signature: outcome.signature,
         })
     }
 
@@ -401,44 +373,21 @@ impl WitnessSignature {
         checkpoint: &SignedKeyLogCheckpoint,
         witness_key: &PublicKey,
     ) -> Result<()> {
-        if witness_key.algorithm() != self.algorithm
-            || self.signature.algorithm() != self.algorithm
-            || !witness_key.verify_strict(&witness_signing_bytes(checkpoint)?, &self.signature)
-        {
-            return Err(KeyringError::InvalidSignature);
-        }
-        Ok(())
+        verify_wrapped_value(
+            witness_key,
+            KEY_LOG_WITNESS_STATEMENT_SCHEMA,
+            &witness_statement(checkpoint)?,
+            &self.signature,
+        )
+        .map_err(|_| KeyringError::InvalidSignature)
     }
 }
 
-fn checkpoint_signing_bytes(body: &KeyLogCheckpointBody) -> Result<Vec<u8>> {
-    domain_canonical_bytes(CHECKPOINT_SIGNATURE_DOMAIN, body)
-}
-
-fn witness_signing_bytes(checkpoint: &SignedKeyLogCheckpoint) -> Result<Vec<u8>> {
-    domain_canonical_bytes(
-        WITNESS_SIGNATURE_DOMAIN,
-        &WitnessStatement {
-            schema: WITNESS_STATEMENT_SCHEMA,
-            checkpoint_hash: checkpoint.checkpoint_hash()?,
-        },
-    )
-}
-
-fn activation_commit_signing_bytes(body: &KeyActivationCommitBody) -> Result<Vec<u8>> {
-    domain_canonical_bytes(ACTIVATION_COMMIT_SIGNATURE_DOMAIN, body)
-}
-
-fn domain_canonical_bytes<T: Serialize>(domain: &[u8], value: &T) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(value)?;
-    let capacity = domain
-        .len()
-        .checked_add(canonical.len())
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(domain);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
+fn witness_statement(checkpoint: &SignedKeyLogCheckpoint) -> Result<WitnessStatement> {
+    Ok(WitnessStatement {
+        schema: KEY_LOG_WITNESS_STATEMENT_SCHEMA,
+        checkpoint_hash: checkpoint.checkpoint_hash()?,
+    })
 }
 
 fn domain_hash(domain: &[u8], bytes: &[u8]) -> Result<Hash> {

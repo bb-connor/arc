@@ -16,13 +16,13 @@ store, and transferred signing-key descriptor.
 use chio_active_response_authority::{AuthorityRuntimeConfig, AUTHORITY_RUNTIME_CONFIG_SCHEMA};
 use chio_core::Keypair;
 use chio_secure_ipc::PeerIdentity;
-use chio_security_types::{ports::{Digest32, ACTIVE_RESPONSE_AUTHORITY_SCHEMA}, ResponseExecutionMode};
+use chio_security_types::{ports::{Digest32, ACTIVE_RESPONSE_AUTHORITY_PROTOCOL}, ResponseExecutionMode};
 
 let service = PeerIdentity { process_id: 100, user_id: 200, group_id: 300 };
 let client = PeerIdentity { process_id: 101, user_id: 201, group_id: 301 };
 let mut config = AuthorityRuntimeConfig {
     schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.into(),
-    protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.into(),
+    protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.into(),
     response_execution_mode: ResponseExecutionMode::DryRun,
     socket_path: "/run/chio/response-authority.sock".into(),
     store_path: "/var/lib/chio/response-authority.db".into(),

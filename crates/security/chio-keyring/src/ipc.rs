@@ -3,11 +3,10 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use chio_core_types::{
-    canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{canonical_json_bytes, Hash, PublicKey, Signature, SigningBackend};
 use serde::{Deserialize, Serialize};
 
+use crate::signing::{sign_wrapped_value, verify_wrapped_value};
 use crate::{
     CheckpointGossip, KeyLogPin, KeyLogPolicy, KeyLogSyncResponse, KeyLogWitnessClient,
     KeyringError, Result, SignedKeyLogCheckpoint, WitnessId, WitnessSignature,
@@ -23,8 +22,6 @@ pub const KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA: &str = "chio.key-log.audit-ipc-reque
 pub const KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA: &str = "chio.key-log.audit-ipc-response.v1";
 pub const KEY_LOG_AUDIT_READINESS_SCHEMA: &str = "chio.key-log.audit-readiness.v1";
 
-const WITNESS_READINESS_DOMAIN: &[u8] = b"chio.key-log.witness-readiness.v1\0";
-const AUDIT_READINESS_DOMAIN: &[u8] = b"chio.key-log.audit-readiness.v1\0";
 const MAX_NONCE_BYTES: usize = 256;
 pub const MAX_KEY_LOG_IPC_FRAME_BYTES: usize = 4_194_304;
 const MAX_GOSSIP_PAGE_ITEMS: usize = 2;
@@ -251,23 +248,16 @@ pub struct WitnessServiceReadinessBody {
 #[serde(deny_unknown_fields)]
 pub struct WitnessServiceReadinessProof {
     pub body: WitnessServiceReadinessBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
 impl WitnessServiceReadinessProof {
     pub fn sign(body: WitnessServiceReadinessBody, backend: &dyn SigningBackend) -> Result<Self> {
         validate_nonce(&body.nonce)?;
-        let outcome = backend.sign_bytes_with_identity(&readiness_signing_bytes(&body)?)?;
-        let algorithm = outcome.algorithm;
-        let signature = outcome.signature;
-        if signature.algorithm() != algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(backend, KEY_LOG_WITNESS_READINESS_SCHEMA, &body)?;
         Ok(Self {
             body,
-            algorithm,
-            signature,
+            signature: outcome.signature,
         })
     }
 
@@ -286,23 +276,18 @@ impl WitnessServiceReadinessProof {
             || self.body.process_id == 0
             || self.body.storage_identity == Hash::zero()
             || self.body.started_at == 0
-            || self.algorithm != expected_public_key.algorithm()
-            || self.signature.algorithm() != self.algorithm
-            || !expected_public_key
-                .verify_strict(&readiness_signing_bytes(&self.body)?, &self.signature)
+            || verify_wrapped_value(
+                expected_public_key,
+                KEY_LOG_WITNESS_READINESS_SCHEMA,
+                &self.body,
+                &self.signature,
+            )
+            .is_err()
         {
             return Err(KeyringError::InvalidSignature);
         }
         Ok(())
     }
-}
-
-fn readiness_signing_bytes(body: &WitnessServiceReadinessBody) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(body)?;
-    let mut bytes = Vec::with_capacity(WITNESS_READINESS_DOMAIN.len() + canonical.len());
-    bytes.extend_from_slice(WITNESS_READINESS_DOMAIN);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
 }
 
 fn validate_nonce(nonce: &str) -> Result<()> {
@@ -486,23 +471,16 @@ impl AuditServiceReadinessBody {
 #[serde(deny_unknown_fields)]
 pub struct AuditServiceReadinessProof {
     pub body: AuditServiceReadinessBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
 impl AuditServiceReadinessProof {
     pub fn sign(body: AuditServiceReadinessBody, backend: &dyn SigningBackend) -> Result<Self> {
         body.validate(&body.monitor_id, body.configuration_binding, &body.nonce)?;
-        let outcome = backend.sign_bytes_with_identity(&audit_readiness_signing_bytes(&body)?)?;
-        let algorithm = outcome.algorithm;
-        let signature = outcome.signature;
-        if signature.algorithm() != algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(backend, KEY_LOG_AUDIT_READINESS_SCHEMA, &body)?;
         Ok(Self {
             body,
-            algorithm,
-            signature,
+            signature: outcome.signature,
         })
     }
 
@@ -518,23 +496,18 @@ impl AuditServiceReadinessProof {
             expected_configuration_binding,
             expected_nonce,
         )?;
-        if self.algorithm != expected_public_key.algorithm()
-            || self.signature.algorithm() != self.algorithm
-            || !expected_public_key
-                .verify_strict(&audit_readiness_signing_bytes(&self.body)?, &self.signature)
+        if verify_wrapped_value(
+            expected_public_key,
+            KEY_LOG_AUDIT_READINESS_SCHEMA,
+            &self.body,
+            &self.signature,
+        )
+        .is_err()
         {
             return Err(KeyringError::InvalidSignature);
         }
         Ok(())
     }
-}
-
-fn audit_readiness_signing_bytes(body: &AuditServiceReadinessBody) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(body)?;
-    let mut bytes = Vec::with_capacity(AUDIT_READINESS_DOMAIN.len() + canonical.len());
-    bytes.extend_from_slice(AUDIT_READINESS_DOMAIN);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

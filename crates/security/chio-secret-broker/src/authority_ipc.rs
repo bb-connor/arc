@@ -8,8 +8,9 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
 use chio_core_types::{
-    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 #[cfg(test)]
 use chio_core_types::{Ed25519Backend, Keypair};
@@ -32,9 +33,8 @@ use crate::service::{
 };
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
 
-pub const AUTHORITY_RPC_SCHEMA: &str = "chio.broker-authority-rpc.v1";
-const AUTHORITY_REQUEST_DOMAIN: &str = "chio.broker-authority-request.v1\0";
-const AUTHORITY_RESPONSE_DOMAIN: &str = "chio.broker-authority-response.v1\0";
+pub const AUTHORITY_REQUEST_SCHEMA: &str = "chio.broker-authority-request.v1";
+pub const AUTHORITY_RESPONSE_SCHEMA: &str = "chio.broker-authority-response.v1";
 const MAX_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +111,6 @@ pub struct AuthorityRequestBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedAuthorityRequest {
     pub body: AuthorityRequestBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -130,7 +129,6 @@ pub struct AuthorityResponseBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedAuthorityResponse {
     pub body: AuthorityResponseBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -218,13 +216,6 @@ pub fn verify_authority_exchange(
         verified_at_unix_seconds,
         maximum_clock_skew_seconds,
     })
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct AuthoritySigningInput<'a, T> {
-    domain: &'static str,
-    body: &'a T,
 }
 
 pub trait BrokerAdmissionAuthority: Send + Sync {
@@ -654,30 +645,31 @@ fn sign_authority_request(
         .public_key()
         .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
     let body = AuthorityRequestBody {
-        schema: AUTHORITY_RPC_SCHEMA.to_string(),
+        schema: AUTHORITY_REQUEST_SCHEMA.to_string(),
         request_id: hex::encode(random),
         issued_at_unix_seconds,
         broker: expected_broker.clone(),
         operation,
     };
-    let input = AuthoritySigningInput {
-        domain: AUTHORITY_REQUEST_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "authority request signing input encoding failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_for_identity(&expected_broker, &canonical)
+        .sign_wrapped_for_identity(&expected_broker, AUTHORITY_REQUEST_SCHEMA, &canonical)
         .map_err(|error| {
             BrokerError::Invariant(format!("authority request signing failed: {error}"))
         })?;
     if signed.public_key != expected_broker
         || signed.algorithm != expected_broker.algorithm()
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &expected_broker,
+            AUTHORITY_REQUEST_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "authority request signer returned a mismatched identity or signature".to_string(),
@@ -685,7 +677,6 @@ fn sign_authority_request(
     }
     Ok(SignedAuthorityRequest {
         body,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -699,30 +690,32 @@ fn verify_authority_request(
     validate_authority_operation(&request.body.operation)?;
     validate_signed_frame_identity(
         &request.body.schema,
+        AUTHORITY_REQUEST_SCHEMA,
         &request.body.request_id,
         request.body.issued_at_unix_seconds,
         &request.body.broker,
-        request.algorithm,
         request.signature.algorithm(),
         trusted_broker,
         now,
         maximum_clock_skew_seconds,
     )?;
-    let input = AuthoritySigningInput {
-        domain: AUTHORITY_REQUEST_DOMAIN,
-        body: &request.body,
-    };
-    if !trusted_broker
-        .verify_canonical(&input, &request.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_broker,
+        AUTHORITY_REQUEST_SCHEMA,
+        &request.body,
+        &request.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "authority request signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "authority request verification failed: {error}"
-            ))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "authority request signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }
@@ -740,31 +733,32 @@ fn sign_authority_response(
         .public_key()
         .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
     let body = AuthorityResponseBody {
-        schema: AUTHORITY_RPC_SCHEMA.to_string(),
+        schema: AUTHORITY_RESPONSE_SCHEMA.to_string(),
         request_id: request_id.to_string(),
         request_digest: request_digest.to_string(),
         issued_at_unix_seconds,
         authority: expected_authority.clone(),
         result,
     };
-    let input = AuthoritySigningInput {
-        domain: AUTHORITY_RESPONSE_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "authority response signing input encoding failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_for_identity(&expected_authority, &canonical)
+        .sign_wrapped_for_identity(&expected_authority, AUTHORITY_RESPONSE_SCHEMA, &canonical)
         .map_err(|error| {
             BrokerError::Invariant(format!("authority response signing failed: {error}"))
         })?;
     if signed.public_key != expected_authority
         || signed.algorithm != expected_authority.algorithm()
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &expected_authority,
+            AUTHORITY_RESPONSE_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "authority response signer returned a mismatched identity or signature".to_string(),
@@ -772,7 +766,6 @@ fn sign_authority_response(
     }
     Ok(SignedAuthorityResponse {
         body,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -821,10 +814,10 @@ fn verify_authority_response(
     validate_digest(&response.body.request_digest, "authority request digest")?;
     validate_signed_frame_identity(
         &response.body.schema,
+        AUTHORITY_RESPONSE_SCHEMA,
         &response.body.request_id,
         response.body.issued_at_unix_seconds,
         &response.body.authority,
-        response.algorithm,
         response.signature.algorithm(),
         trusted_authority,
         now,
@@ -837,21 +830,23 @@ fn verify_authority_response(
             "authority response is bound to a different request".to_string(),
         ));
     }
-    let input = AuthoritySigningInput {
-        domain: AUTHORITY_RESPONSE_DOMAIN,
-        body: &response.body,
-    };
-    if !trusted_authority
-        .verify_canonical(&input, &response.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_authority,
+        AUTHORITY_RESPONSE_SCHEMA,
+        &response.body,
+        &response.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "authority response signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "authority response verification failed: {error}"
-            ))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "authority response signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }
@@ -862,10 +857,10 @@ fn verify_authority_response(
 )]
 fn validate_signed_frame_identity(
     schema: &str,
+    expected_schema: &str,
     request_id: &str,
     issued_at_unix_seconds: u64,
     signer: &PublicKey,
-    algorithm: SigningAlgorithm,
     signature_algorithm: SigningAlgorithm,
     trusted_signer: &PublicKey,
     now: u64,
@@ -878,10 +873,9 @@ fn validate_signed_frame_identity(
         .ok_or_else(|| {
             BrokerError::AuthorizationDenied("authority frame time overflow".to_string())
         })?;
-    if schema != AUTHORITY_RPC_SCHEMA
+    if schema != expected_schema
         || signer != trusted_signer
-        || signer.algorithm() != algorithm
-        || signature_algorithm != algorithm
+        || signature_algorithm != signer.algorithm()
         || now < earliest
         || now > latest
     {

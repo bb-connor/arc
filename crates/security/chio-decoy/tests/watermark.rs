@@ -212,7 +212,10 @@ impl SigningBackend for CountingSigner {
         self.backend.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core_types::SigningMessage<'_>,
+    ) -> chio_core_types::Result<Signature> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.backend.sign_bytes(message)
     }
@@ -906,7 +909,10 @@ fn canonical_payload_signature_and_safe_integer_tampering_are_advisory_not_clear
     assert_eq!(unsafe_report.invalid_candidates, 1);
 
     let mut signature = SignedWatermarkEnvelope::decode_token(&token).test_expect("decode token");
-    signature.signature = Keypair::from_seed(&[99_u8; 32]).sign(b"wrong message");
+    signature.signature = Keypair::from_seed(&[99_u8; 32]).sign_exempt(
+        chio_core_types::ExemptFormat::JwsSigningInput,
+        b"wrong message",
+    );
     let signature = signature
         .encode_token()
         .test_expect("encode signature mutation");

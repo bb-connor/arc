@@ -41,10 +41,8 @@ fn review_rotation_rejects_identity_key_and_universal_proof() {
     event.authorizations.old_key = Some(OldKeyAuthorization::sign(&event.body, &old).test_unwrap());
     event.authorizations.new_key = Some(NewKeyProofOfPossession {
         key_id: event.body.key_id,
-        algorithm: key.algorithm(),
         signature: signature.clone(),
     });
-    assert!(key.verify(&event.body.signing_bytes().test_unwrap(), &signature));
     let common = event.validate_common(
         1,
         Some(&previous.envelope_hash().test_unwrap()),
@@ -72,7 +70,6 @@ fn review_genesis_rejects_universal_bootstrap_authorization() {
     let (key, signature) = identity_key_and_universal_signature();
     event.authorizations.bootstrap = Some(BootstrapAuthorization {
         key_id: derive_key_id(key.algorithm(), &key).test_unwrap(),
-        algorithm: key.algorithm(),
         signature,
     });
     assert!(matches!(
@@ -240,12 +237,15 @@ fn canonical_body_and_complete_envelope_are_stable_and_non_self_referential() {
     let authority = backend(2);
     let event = genesis(&bootstrap, &authority);
 
-    let body_bytes = event.body.signing_bytes().test_unwrap();
+    let body_bytes = event.body.signing_body().test_unwrap().into_vec();
     let envelope_bytes = event.canonical_envelope_bytes().test_unwrap();
     let restored: SignedKeyLogEvent = serde_json::from_slice(&envelope_bytes).test_unwrap();
 
     assert_eq!(restored, event);
-    assert_eq!(restored.body.signing_bytes().test_unwrap(), body_bytes);
+    assert_eq!(
+        restored.body.signing_body().test_unwrap().into_vec(),
+        body_bytes
+    );
     assert_eq!(
         restored.canonical_envelope_bytes().test_unwrap(),
         envelope_bytes
@@ -293,8 +293,8 @@ fn complete_envelope_hash_and_merkle_leaf_cover_every_signature_byte() {
         original_leaf_hash
     );
     assert_eq!(
-        tampered.body.signing_bytes().test_unwrap(),
-        event.body.signing_bytes().test_unwrap()
+        tampered.body.signing_body().test_unwrap(),
+        event.body.signing_body().test_unwrap()
     );
 }
 
@@ -414,7 +414,6 @@ fn identity_point_rotation(genesis: &SignedKeyLogEvent, old: &Ed25519Backend) ->
             OldKeyAuthorization::sign(&body, old).test_unwrap(),
             NewKeyProofOfPossession {
                 key_id: body.key_id,
-                algorithm: SigningAlgorithm::Ed25519,
                 signature: universal,
             },
         ),

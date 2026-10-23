@@ -26,6 +26,7 @@ mod provisioning;
 mod router;
 mod runtime;
 mod service;
+mod signing;
 mod sqlite;
 mod state;
 #[cfg(all(test, unix))]

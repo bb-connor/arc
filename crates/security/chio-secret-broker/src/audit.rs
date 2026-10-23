@@ -1,9 +1,8 @@
 use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 use std::fmt;
 
-use chio_core_types::{
-    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningBackend};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -27,10 +26,6 @@ use crate::{validate_digest, validate_identifier, BrokerError, Result};
 pub const BROKER_AUDIT_COMPARISON_SCHEMA: &str = "chio.broker-audit-comparison.v1";
 pub const BROKER_AUDIT_RUNNER_AUTHORIZATION_SCHEMA: &str =
     "chio.broker-audit-runner-authorization.v1";
-const BROKER_AUDIT_COMPARISON_SIGNATURE_DOMAIN: &str =
-    "chio.broker-audit-comparison-signature.v1\0";
-const BROKER_AUDIT_RUNNER_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] =
-    b"chio.broker-audit-runner-authorization-signature.v1\0";
 const BROKER_AUDIT_RUNNER_AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
     b"chio.broker-audit-runner-authorization-digest.v1\0";
 const BROKER_AUDIT_PROJECTION_DOMAIN: &[u8] = b"chio.broker-audit-wire-projection.v1\0";
@@ -285,7 +280,6 @@ impl BrokerAuditRunnerAuthorizationBody {
 pub struct SignedBrokerAuditRunnerAuthorization {
     pub body: BrokerAuditRunnerAuthorizationBody,
     pub signer: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -295,17 +289,22 @@ impl SignedBrokerAuditRunnerAuthorization {
         signer: &dyn SigningBackend,
     ) -> Result<Self> {
         body.validate()?;
-        let canonical = runner_authorization_signing_bytes(&body)?;
+        let canonical = runner_authorization_signing_body(&body)?;
         let outcome = signer
-            .sign_bytes_with_identity(&canonical)
+            .sign_wrapped(BROKER_AUDIT_RUNNER_AUTHORIZATION_SCHEMA, &canonical)
             .map_err(|error| {
                 BrokerError::AuthorityUnavailable(format!(
                     "broker audit runner authorization signing failed: {error}"
                 ))
             })?;
         if outcome.public_key.algorithm() != outcome.algorithm
-            || outcome.signature.algorithm() != outcome.algorithm
-            || !outcome.public_key.verify(&canonical, &outcome.signature)
+            || verify_wrapped_bytes(
+                &outcome.public_key,
+                BROKER_AUDIT_RUNNER_AUTHORIZATION_SCHEMA,
+                &canonical,
+                &outcome.signature,
+            )
+            .is_err()
         {
             return Err(BrokerError::Invariant(
                 "broker audit runner signer returned invalid identity metadata".to_string(),
@@ -314,7 +313,6 @@ impl SignedBrokerAuditRunnerAuthorization {
         Ok(Self {
             body,
             signer: outcome.public_key,
-            algorithm: outcome.algorithm,
             signature: outcome.signature,
         })
     }
@@ -344,12 +342,13 @@ impl SignedBrokerAuditRunnerAuthorization {
 
     fn verify_signature(&self) -> Result<()> {
         self.body.validate()?;
-        if self.signer.algorithm() != self.algorithm
-            || self.signature.algorithm() != self.algorithm
-            || !self.signer.verify(
-                &runner_authorization_signing_bytes(&self.body)?,
-                &self.signature,
-            )
+        if verify_wrapped_bytes(
+            &self.signer,
+            BROKER_AUDIT_RUNNER_AUTHORIZATION_SCHEMA,
+            &runner_authorization_signing_body(&self.body)?,
+            &self.signature,
+        )
+        .is_err()
         {
             return Err(BrokerError::AuthorizationDenied(
                 "broker audit runner authorization signature is invalid".to_string(),
@@ -607,21 +606,15 @@ fn broker_audit_governed_intent_digest(
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn runner_authorization_signing_bytes(
+fn runner_authorization_signing_body(
     body: &BrokerAuditRunnerAuthorizationBody,
-) -> Result<Vec<u8>> {
+) -> Result<CanonicalBytes> {
     body.validate()?;
-    let canonical = canonical_json_bytes(body).map_err(|error| {
+    CanonicalBytes::from_serializable(body).map_err(|error| {
         BrokerError::Invariant(format!(
             "broker audit runner authorization body encoding failed: {error}"
         ))
-    })?;
-    let mut signing = Vec::with_capacity(
-        BROKER_AUDIT_RUNNER_AUTHORIZATION_SIGNATURE_DOMAIN.len() + canonical.len(),
-    );
-    signing.extend_from_slice(BROKER_AUDIT_RUNNER_AUTHORIZATION_SIGNATURE_DOMAIN);
-    signing.extend_from_slice(&canonical);
-    Ok(signing)
+    })
 }
 
 fn runner_authorization_digest(
@@ -740,7 +733,6 @@ fn reference_request_digest(reference: &BrokerAuditReferenceRequest) -> Result<S
 pub struct SignedBrokerAuditComparison {
     pub body: BrokerAuditComparisonBody,
     pub signer: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -781,35 +773,29 @@ impl SignedBrokerAuditComparison {
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct BrokerAuditComparisonSigningInput<'a> {
-    domain: &'static str,
-    body: &'a BrokerAuditComparisonBody,
-}
-
 pub fn sign_broker_audit_comparison(
     body: BrokerAuditComparisonBody,
     signer: &dyn SigningBackend,
 ) -> Result<SignedBrokerAuditComparison> {
     body.validate()?;
-    let signing = BrokerAuditComparisonSigningInput {
-        domain: BROKER_AUDIT_COMPARISON_SIGNATURE_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&signing).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "broker audit comparison signing input encoding failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_with_identity(&canonical)
+        .sign_wrapped(BROKER_AUDIT_COMPARISON_SCHEMA, &canonical)
         .map_err(|error| {
             BrokerError::Invariant(format!("broker audit comparison signing failed: {error}"))
         })?;
     if signed.public_key.algorithm() != signed.algorithm
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &signed.public_key,
+            BROKER_AUDIT_COMPARISON_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "broker audit comparison signer returned a mismatched identity or signature"
@@ -819,7 +805,6 @@ pub fn sign_broker_audit_comparison(
     Ok(SignedBrokerAuditComparison {
         body,
         signer: signed.public_key,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -834,29 +819,29 @@ pub fn verify_broker_audit_comparison(
         ))
     })?;
     if &comparison.signer != trusted_signer
-        || comparison.signer.algorithm() != comparison.algorithm
-        || comparison.signature.algorithm() != comparison.algorithm
+        || comparison.signer.algorithm() != comparison.signature.algorithm()
     {
         return Err(BrokerError::AuthorizationDenied(
             "broker audit comparison signer or algorithm is invalid".to_string(),
         ));
     }
-    let signing = BrokerAuditComparisonSigningInput {
-        domain: BROKER_AUDIT_COMPARISON_SIGNATURE_DOMAIN,
-        body: &comparison.body,
-    };
-    if !comparison
-        .signer
-        .verify_canonical(&signing, &comparison.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_signer,
+        BROKER_AUDIT_COMPARISON_SCHEMA,
+        &comparison.body,
+        &comparison.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "broker audit comparison signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "broker audit comparison verification failed: {error}"
-            ))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker audit comparison signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }

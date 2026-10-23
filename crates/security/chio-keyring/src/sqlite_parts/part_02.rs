@@ -354,14 +354,13 @@ struct StoredCheckpointRow {
     root_hash: String,
     canonical_body: Option<Vec<u8>>,
     operator_key_id: String,
-    operator_algorithm: String,
     operator_signature: String,
     stage: String,
 }
 
 fn load_checkpoints_from(connection: &Connection) -> Result<Vec<StoredCheckpoint>> {
     let mut statement = connection.prepare(
-        "SELECT checkpoint_sequence, checkpoint_hash, tree_size, root_hash, CASE WHEN length(canonical_body) <= 1048576 THEN canonical_body END, operator_key_id, operator_algorithm, operator_signature, stage FROM key_checkpoints ORDER BY checkpoint_sequence",
+        "SELECT checkpoint_sequence, checkpoint_hash, tree_size, root_hash, CASE WHEN length(canonical_body) <= 1048576 THEN canonical_body END, operator_key_id, operator_signature, stage FROM key_checkpoints ORDER BY checkpoint_sequence",
     )?;
     let rows = statement.query_map([], |row| {
         Ok(StoredCheckpointRow {
@@ -371,9 +370,8 @@ fn load_checkpoints_from(connection: &Connection) -> Result<Vec<StoredCheckpoint
             root_hash: row.get(3)?,
             canonical_body: row.get(4)?,
             operator_key_id: row.get(5)?,
-            operator_algorithm: row.get(6)?,
-            operator_signature: row.get(7)?,
-            stage: row.get(8)?,
+            operator_signature: row.get(6)?,
+            stage: row.get(7)?,
         })
     })?;
     let mut records = Vec::new();
@@ -391,7 +389,6 @@ fn load_checkpoints_from(connection: &Connection) -> Result<Vec<StoredCheckpoint
             root_hash,
             canonical_body,
             operator_key_id,
-            operator_algorithm,
             operator_signature,
             stage,
         } = row;
@@ -403,7 +400,6 @@ fn load_checkpoints_from(connection: &Connection) -> Result<Vec<StoredCheckpoint
         let mut checkpoint = SignedKeyLogCheckpoint {
             body,
             operator_key_id: KeyId::from_hash(Hash::from_hex(&operator_key_id)?),
-            operator_algorithm: parse_algorithm(&operator_algorithm)?,
             operator_signature: Signature::from_hex(&operator_signature)?,
             witness_signatures: load_witnesses_from(connection, &checkpoint_hash_value)?,
         };
@@ -435,25 +431,20 @@ fn load_witnesses_from(
     checkpoint_hash: &Hash,
 ) -> Result<Vec<WitnessSignature>> {
     let mut statement = connection.prepare(
-        "SELECT witness_id, algorithm, signature FROM key_checkpoint_witnesses WHERE checkpoint_hash = ?1 ORDER BY witness_id LIMIT ?2",
+        "SELECT witness_id, signature FROM key_checkpoint_witnesses WHERE checkpoint_hash = ?1 ORDER BY witness_id LIMIT ?2",
     )?;
     let query_limit = crate::MAX_WITNESS_SIGNATURES
         .checked_add(1)
         .and_then(|value| i64::try_from(value).ok())
         .ok_or(KeyringError::NumericRange)?;
     let rows = statement.query_map(params![checkpoint_hash.to_string(), query_limit], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-        ))
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
     })?;
     let mut witnesses = Vec::new();
     for row in rows {
-        let (witness_id, algorithm, signature) = row?;
+        let (witness_id, signature) = row?;
         witnesses.push(WitnessSignature {
             witness_id: WitnessId::new(witness_id)?,
-            algorithm: parse_algorithm(&algorithm)?,
             signature: Signature::from_hex(&signature)?,
         });
     }
@@ -549,25 +540,6 @@ fn canonical_event_leaves(events: &[SignedKeyLogEvent]) -> Result<Vec<Vec<u8>>> 
 fn merkle_root(events: &[SignedKeyLogEvent]) -> Result<Hash> {
     let leaves = canonical_event_leaves(events)?;
     Ok(MerkleTree::from_leaves(&leaves)?.root())
-}
-
-fn algorithm_name(algorithm: SigningAlgorithm) -> &'static str {
-    match algorithm {
-        SigningAlgorithm::Ed25519 => "ed25519",
-        SigningAlgorithm::P256 => "p256",
-        SigningAlgorithm::P384 => "p384",
-        SigningAlgorithm::Hybrid => "hybrid",
-    }
-}
-
-fn parse_algorithm(value: &str) -> Result<SigningAlgorithm> {
-    match value {
-        "ed25519" => Ok(SigningAlgorithm::Ed25519),
-        "p256" => Ok(SigningAlgorithm::P256),
-        "p384" => Ok(SigningAlgorithm::P384),
-        "hybrid" => Ok(SigningAlgorithm::Hybrid),
-        _ => Err(KeyringError::AlgorithmMismatch),
-    }
 }
 
 fn to_i64(value: u64) -> Result<i64> {
