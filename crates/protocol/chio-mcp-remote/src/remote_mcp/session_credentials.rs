@@ -327,8 +327,10 @@ fn persist_record(
     keypair: &Keypair,
     record: &SessionCredential,
 ) -> Result<(), CliError> {
-    let signature =
-        keypair.sign_wrapped(SCHEMA, &chio_core::CanonicalBytes::from_serializable(record)?)?;
+    let signature = keypair.sign_wrapped(
+        SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(record)?,
+    )?;
     open_db(path)?.execute(&format!(
         "INSERT INTO {TABLE} (session_id, token_hash, record_json, signature) VALUES (?1, ?2, ?3, ?4)
          ON CONFLICT(session_id) DO UPDATE SET token_hash=excluded.token_hash,
