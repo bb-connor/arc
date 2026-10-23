@@ -31,7 +31,6 @@ use chio_federation::bilateral::DsseCoSigningRequest;
 use chio_federation::bilateral::DsseCoSigningResponse;
 use chio_federation::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA;
 use chio_federation_transport_iroh::admission::DirectoryGate;
-use chio_federation_transport_iroh::identity::{sign_transport_endorsement, IdentityError};
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleDocument;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleTrust;
@@ -40,6 +39,7 @@ use chio_federation_transport_iroh::identity::TransportDirectoryEntry;
 use chio_federation_transport_iroh::identity::TrustedTransportDirectoryIssuer;
 use chio_federation_transport_iroh::identity::VerifiedDirectory;
 use chio_federation_transport_iroh::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA;
+use chio_federation_transport_iroh::identity::{sign_transport_endorsement, IdentityError};
 use chio_federation_transport_iroh::lanes::bilateral::BilateralCoSignHandler;
 use chio_federation_transport_iroh::lanes::bilateral::IrohBilateralCoSigner;
 use chio_federation_transport_iroh::lanes::bilateral::PinnedPassportKeys;
@@ -82,7 +82,11 @@ impl Peer {
             kernel_id: self.kernel_id.clone(),
             passport_public_key: self.passport.public_key(),
             transport_endpoint_id: self.transport_id,
-            passport_endorsement: sign_transport_endorsement(&self.passport, &self.kernel_id, &self.transport_id)?,
+            passport_endorsement: sign_transport_endorsement(
+                &self.passport,
+                &self.kernel_id,
+                &self.transport_id,
+            )?,
             revocation_signers: Vec::new(),
             removed: false,
         })

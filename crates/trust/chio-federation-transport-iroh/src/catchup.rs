@@ -1276,11 +1276,22 @@ mod tests {
             kernel_id: "did:chio:authority".to_string(),
             passport_public_key: passport.public_key(),
             transport_endpoint_id: transport,
-            passport_endorsement: sign_transport_endorsement(&passport, "did:chio:authority", &transport, ).unwrap(),
+            passport_endorsement: sign_transport_endorsement(
+                &passport,
+                "did:chio:authority",
+                &transport,
+            )
+            .unwrap(),
             revocation_signers: vec![RevocationSignerEntry {
                 signer_id: signer_id.to_string(),
                 oracle_public_key: oracle_public_key.clone(),
-                oracle_endorsement: sign_revocation_signer_endorsement(&passport, "did:chio:authority", signer_id, &oracle_public_key, ).unwrap(),
+                oracle_endorsement: sign_revocation_signer_endorsement(
+                    &passport,
+                    "did:chio:authority",
+                    signer_id,
+                    &oracle_public_key,
+                )
+                .unwrap(),
             }],
             removed: false,
         };
@@ -1305,7 +1316,8 @@ mod tests {
             .sign_wrapped(
                 crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
                 &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,

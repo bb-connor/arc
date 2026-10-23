@@ -210,7 +210,8 @@ mod tests {
             .sign_wrapped(
                 crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
                 &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
