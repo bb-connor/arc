@@ -529,13 +529,16 @@ impl SigningBackend for FailFirstSigningBackend {
         Ok(self.keypair.public_key())
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core_types::SigningMessage<'_>,
+    ) -> chio_core_types::Result<Signature> {
         if self.fail_next.swap(false, Ordering::SeqCst) {
             return Err(CoreError::InvalidSignature(
                 "injected first receipt-signing failure".to_string(),
             ));
         }
-        Ok(self.keypair.sign(message))
+        chio_core_types::Ed25519Backend::new(self.keypair.clone()).sign_bytes(message)
     }
 }
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core_types::{
-    canonical_json_bytes, Hash, MerkleTree, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, Hash, MerkleTree, Signature, SigningBackend,
 };
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 
@@ -52,14 +52,12 @@ CREATE TABLE IF NOT EXISTS key_checkpoints (
     root_hash TEXT NOT NULL,
     canonical_body BLOB NOT NULL CHECK (typeof(canonical_body) = 'blob' AND length(canonical_body) <= 1048576),
     operator_key_id TEXT NOT NULL,
-    operator_algorithm TEXT NOT NULL,
     operator_signature TEXT NOT NULL,
     stage TEXT NOT NULL CHECK (stage IN ('pending', 'witnessed', 'activated'))
 );
 CREATE TABLE IF NOT EXISTS key_checkpoint_witnesses (
     checkpoint_hash TEXT NOT NULL,
     witness_id TEXT NOT NULL,
-    algorithm TEXT NOT NULL,
     signature TEXT NOT NULL,
     PRIMARY KEY (checkpoint_hash, witness_id),
     FOREIGN KEY (checkpoint_hash) REFERENCES key_checkpoints(checkpoint_hash) ON DELETE CASCADE
@@ -378,15 +376,13 @@ impl SqliteKeyLogStore {
 
         let existing = transaction
             .query_row(
-                "SELECT algorithm, signature FROM key_checkpoint_witnesses WHERE checkpoint_hash = ?1 AND witness_id = ?2",
+                "SELECT signature FROM key_checkpoint_witnesses WHERE checkpoint_hash = ?1 AND witness_id = ?2",
                 params![checkpoint_hash.to_string(), witness.witness_id.as_str()],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                |row| row.get::<_, String>(0),
             )
             .optional()?;
-        if let Some((algorithm, signature)) = existing {
-            if algorithm != algorithm_name(witness.algorithm)
-                || signature != witness.signature.to_hex()
-            {
+        if let Some(signature) = existing {
+            if signature != witness.signature.to_hex() {
                 return Err(KeyringError::InvalidSignature);
             }
         } else if stored.stage != CheckpointStage::Activated {
@@ -394,11 +390,10 @@ impl SqliteKeyLogStore {
             // commit and active receipt. A signature that arrives later is
             // verified above but not recorded, so the stored set keeps matching.
             transaction.execute(
-                "INSERT INTO key_checkpoint_witnesses (checkpoint_hash, witness_id, algorithm, signature) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO key_checkpoint_witnesses (checkpoint_hash, witness_id, signature) VALUES (?1, ?2, ?3)",
                 params![
                     checkpoint_hash.to_string(),
                     witness.witness_id.as_str(),
-                    algorithm_name(witness.algorithm),
                     witness.signature.to_hex(),
                 ],
             )?;
@@ -1290,7 +1285,7 @@ fn insert_checkpoint(
     stage: CheckpointStage,
 ) -> Result<()> {
     connection.execute(
-        "INSERT INTO key_checkpoints (checkpoint_sequence, checkpoint_hash, tree_size, root_hash, canonical_body, operator_key_id, operator_algorithm, operator_signature, stage) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO key_checkpoints (checkpoint_sequence, checkpoint_hash, tree_size, root_hash, canonical_body, operator_key_id, operator_signature, stage) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             to_i64(checkpoint.body.checkpoint_sequence)?,
             checkpoint.checkpoint_hash()?.to_string(),
@@ -1298,7 +1293,6 @@ fn insert_checkpoint(
             checkpoint.body.root_hash.to_string(),
             checkpoint.canonical_body_bytes()?,
             checkpoint.operator_key_id.to_string(),
-            algorithm_name(checkpoint.operator_algorithm),
             checkpoint.operator_signature.to_hex(),
             stage.as_str(),
         ],

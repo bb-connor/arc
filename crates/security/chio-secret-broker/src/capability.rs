@@ -1,18 +1,9 @@
-use chio_core_types::{canonical_json_bytes, SigningBackend};
-use serde::Serialize;
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, SigningBackend};
 use sha2::{Digest, Sha256};
 
-use crate::protocol::{BrokerCapabilityBody, SignedBrokerCapability};
+use crate::protocol::{BrokerCapabilityBody, SignedBrokerCapability, BROKER_CAPABILITY_SCHEMA};
 use crate::{BrokerError, Result};
-
-const CAPABILITY_SIGNATURE_DOMAIN: &str = "chio.broker-capability-signature.v1\0";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct CapabilitySigningInput<'a> {
-    domain: &'static str,
-    body: &'a BrokerCapabilityBody,
-}
 
 pub fn issue_capability(
     body: BrokerCapabilityBody,
@@ -20,22 +11,21 @@ pub fn issue_capability(
     production: bool,
 ) -> Result<SignedBrokerCapability> {
     body.validate(production)?;
-    let input = CapabilitySigningInput {
-        domain: CAPABILITY_SIGNATURE_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!("capability signing input encoding failed: {error}"))
     })?;
     let signed = signer
-        .sign_bytes_for_identity(&body.issuer, &canonical)
+        .sign_wrapped_for_identity(&body.issuer, BROKER_CAPABILITY_SCHEMA, &canonical)
         .map_err(|error| BrokerError::Invariant(format!("capability signing failed: {error}")))?;
     if signed.public_key != body.issuer
         || signed.algorithm != body.issuer.algorithm()
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed
-            .public_key
-            .verify_strict(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &body.issuer,
+            BROKER_CAPABILITY_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "capability signing backend returned a mismatched identity or signature".to_string(),
@@ -43,7 +33,6 @@ pub fn issue_capability(
     }
     Ok(SignedBrokerCapability {
         body,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -57,8 +46,7 @@ pub fn verify_capability(
 ) -> Result<()> {
     capability.body.validate(production)?;
     if &capability.body.issuer != trusted_issuer
-        || capability.body.issuer.algorithm() != capability.algorithm
-        || capability.signature.algorithm() != capability.algorithm
+        || capability.signature.algorithm() != capability.body.issuer.algorithm()
         || capability.body.audience != audience
     {
         return Err(BrokerError::AuthorizationDenied(
@@ -72,19 +60,23 @@ pub fn verify_capability(
             "broker capability is outside its validity interval".to_string(),
         ));
     }
-    let input = CapabilitySigningInput {
-        domain: CAPABILITY_SIGNATURE_DOMAIN,
-        body: &capability.body,
-    };
-    let valid = trusted_issuer
-        .verify_canonical_strict(&input, &capability.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!("capability verification failed: {error}"))
-        })?;
-    if !valid {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker capability signature is invalid".to_string(),
-        ));
+    match verify_wrapped(
+        trusted_issuer,
+        BROKER_CAPABILITY_SCHEMA,
+        &capability.body,
+        &capability.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "broker capability signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
+                "capability verification failed: {error}"
+            )));
+        }
     }
     Ok(())
 }
@@ -99,7 +91,7 @@ pub fn capability_digest(capability: &SignedBrokerCapability) -> Result<String> 
 #[cfg(test)]
 mod tests {
     use chio_core_types::{
-        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningBackend, SigningMessage,
         SigningOutcome,
     };
     use chio_test_support::prelude::*;
@@ -107,7 +99,7 @@ mod tests {
     use super::*;
     use crate::protocol::{
         AttemptConsumption, BrokerDestination, BrokerScheme, CredentialRef, ProofBinding,
-        ProofMode, RedirectPolicy, RequestConstraints, BROKER_CAPABILITY_SCHEMA,
+        ProofMode, RedirectPolicy, RequestConstraints,
     };
 
     fn body(signer: &Keypair) -> BrokerCapabilityBody {
@@ -170,16 +162,8 @@ mod tests {
         signature[0] = 1;
         let capability = SignedBrokerCapability {
             body,
-            algorithm: SigningAlgorithm::Ed25519,
             signature: Signature::from_bytes(&signature),
         };
-        let input = CapabilitySigningInput {
-            domain: CAPABILITY_SIGNATURE_DOMAIN,
-            body: &capability.body,
-        };
-        assert!(weak
-            .verify_canonical(&input, &capability.signature)
-            .test_expect("canonical signing input"));
         assert!(matches!(
             verify_capability(&capability, &weak, "broker-service", 20, true),
             Err(BrokerError::InvalidRequest(_))
@@ -230,7 +214,7 @@ mod tests {
             Ok(self.keypair.public_key())
         }
 
-        fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {
+        fn sign_bytes(&self, _message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
             Err(Error::InvalidSignature(
                 "legacy split signing is disabled".to_string(),
             ))
@@ -238,12 +222,12 @@ mod tests {
 
         fn sign_bytes_with_identity(
             &self,
-            message: &[u8],
+            message: SigningMessage<'_>,
         ) -> chio_core_types::Result<SigningOutcome> {
             Ok(SigningOutcome {
                 public_key: self.keypair.public_key(),
                 algorithm: self.keypair.public_key().algorithm(),
-                signature: self.keypair.sign(message),
+                signature: Ed25519Backend::new(self.keypair.clone()).sign_bytes(message)?,
             })
         }
     }
@@ -258,7 +242,7 @@ mod tests {
             Ok(self.selected_before_sign.public_key())
         }
 
-        fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {
+        fn sign_bytes(&self, _message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
             Err(Error::InvalidSignature(
                 "legacy split signing is disabled".to_string(),
             ))
@@ -266,12 +250,13 @@ mod tests {
 
         fn sign_bytes_with_identity(
             &self,
-            message: &[u8],
+            message: SigningMessage<'_>,
         ) -> chio_core_types::Result<SigningOutcome> {
             Ok(SigningOutcome {
                 public_key: self.selected_during_sign.public_key(),
                 algorithm: self.selected_during_sign.public_key().algorithm(),
-                signature: self.selected_during_sign.sign(message),
+                signature: Ed25519Backend::new(self.selected_during_sign.clone())
+                    .sign_bytes(message)?,
             })
         }
     }

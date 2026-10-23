@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use chio_core_types::{canonical_json_bytes, PublicKey, Signature, SigningBackend};
+use chio_core_types::crypto::verify_wrapped;
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningBackend};
 use chio_security_types::ports::{
     Digest32, PortError, PortErrorKind, PortResult, RecordId, TenantId, WatermarkObservationStore,
     WatermarkSequenceStore,
@@ -21,7 +22,6 @@ use thiserror::Error;
 use crate::registry::{PrivateDecoyRegistry, RegistryError, ResolvedDecoy};
 
 const ENVELOPE_SCHEMA: &str = "chio.signed-watermark-envelope.v1";
-const SIGNING_DOMAIN: &[u8] = b"chio.signed-watermark.v1\0";
 const PAYLOAD_DIGEST_DOMAIN: &[u8] = b"chio.watermark-payload-digest.v1\0";
 const TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.watermark-token-digest.v1\0";
 const OBSERVATION_ID_DOMAIN: &[u8] = b"chio.watermark-observation-id.v1\0";
@@ -331,11 +331,14 @@ impl WatermarkIssuer {
             .sequences
             .reserve(&reservation)
             .map_err(map_sequence_error)?;
+        let wrapper_body = CanonicalBytes::from_serializable(&payload)
+            .map_err(|_| WatermarkIssueError::Encoding)?;
         let signature = self
             .dependencies
             .signer
-            .sign_bytes(&signing_message(&canonical))
-            .map_err(|_| WatermarkIssueError::SigningFailed)?;
+            .sign_wrapped(ENVELOPE_SCHEMA, &wrapper_body)
+            .map_err(|_| WatermarkIssueError::SigningFailed)?
+            .signature;
         SignedWatermarkEnvelope {
             schema: ENVELOPE_SCHEMA.to_string(),
             payload,
@@ -603,9 +606,13 @@ impl WatermarkVerifier {
         };
         if trusted.validate().is_err()
             || trusted.status == WatermarkKeyStatus::Rejected
-            || !trusted
-                .public_key
-                .verify(&signing_message(&canonical), &envelope.signature)
+            || verify_wrapped(
+                &trusted.public_key,
+                ENVELOPE_SCHEMA,
+                &envelope.payload,
+                &envelope.signature,
+            )
+            .is_err()
         {
             return CandidateResult::Invalid;
         }
@@ -912,13 +919,6 @@ fn token_observation_id(scan_id: &RecordId, token_digest: Digest32) -> PortResul
         .map(|byte| format!("{byte:02x}"))
         .collect();
     RecordId::new(format!("watermark-observation-{hex}")).map_err(|_| PortError::invalid_data())
-}
-
-fn signing_message(canonical_payload: &[u8]) -> Vec<u8> {
-    let mut message = Vec::with_capacity(SIGNING_DOMAIN.len() + canonical_payload.len());
-    message.extend_from_slice(SIGNING_DOMAIN);
-    message.extend_from_slice(canonical_payload);
-    message
 }
 
 fn digest(domain: &[u8], bytes: &[u8]) -> Digest32 {

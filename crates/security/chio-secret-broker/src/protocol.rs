@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::{PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::{PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
@@ -431,7 +431,6 @@ impl BrokerCapabilityBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedBrokerCapability {
     pub body: BrokerCapabilityBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 

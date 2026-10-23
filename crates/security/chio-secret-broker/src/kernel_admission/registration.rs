@@ -7,7 +7,7 @@ use crate::registration::broker_execute_request_registration_digest;
 use crate::service::broker_request_digest;
 use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 use crate::{validate_identifier, Result};
-use chio_core_types::{PublicKey, Signature, SigningBackend, SigningOutcome};
+use chio_core_types::{PublicKey, Signature, SigningBackend, SigningMessage, SigningOutcome};
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingV1,
 };
@@ -247,11 +247,14 @@ impl SigningBackend for RegistrationSigner {
     fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         Ok(self.key.clone())
     }
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
         self.sign_bytes_with_identity(message)
             .map(|signed| signed.signature)
     }
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> chio_core_types::Result<SigningOutcome> {
+    fn sign_bytes_with_identity(
+        &self,
+        message: SigningMessage<'_>,
+    ) -> chio_core_types::Result<SigningOutcome> {
         self.inner.sign_bytes_for_identity(&self.key, message)
     }
 }
@@ -259,7 +262,7 @@ impl SigningBackend for RegistrationSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chio_core_types::{Ed25519Backend, Keypair};
+    use chio_core_types::{Ed25519Backend, ExemptFormat, Keypair};
 
     #[test]
     fn registered_generation_cannot_sign_with_a_rotated_authority_key() -> Result<()> {
@@ -269,7 +272,10 @@ mod tests {
             key: original.public_key(),
         };
         let signed = pinned
-            .sign_bytes_with_identity(b"original registration")
+            .sign_bytes_with_identity(SigningMessage::exempt(
+                ExemptFormat::JwsSigningInput,
+                b"original registration",
+            ))
             .map_err(|_| rejected())?;
         assert_eq!(signed.public_key, original.public_key());
         let changed = RegistrationSigner {
@@ -277,7 +283,10 @@ mod tests {
             key: original.public_key(),
         };
         assert!(changed
-            .sign_bytes_with_identity(b"original registration")
+            .sign_bytes_with_identity(SigningMessage::exempt(
+                ExemptFormat::JwsSigningInput,
+                b"original registration",
+            ))
             .is_err());
         Ok(())
     }

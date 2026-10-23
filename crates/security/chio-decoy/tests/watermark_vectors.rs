@@ -1,11 +1,15 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
+use chio_core_types::crypto::{verify_wrapped_bytes, SigningWrapper};
 use chio_core_types::{
-    canonical_json_bytes, canonical_json_bytes_from_str, Keypair, PublicKey, Signature,
+    canonical_json_bytes, canonical_json_bytes_from_str, CanonicalBytes, Keypair, PublicKey,
+    Signature,
 };
 use chio_decoy::{SignedWatermarkEnvelope, WatermarkPayload, MAX_IJSON_INTEGER};
 use chio_test_support::prelude::*;
 use serde::Deserialize;
+
+const WATERMARK_ENVELOPE_SCHEMA: &str = "chio.signed-watermark-envelope.v1";
 
 const POSITIVE_VECTORS: &str =
     include_str!("../../../tooling/chio-conformance/vectors/security/watermark/v1.json");
@@ -15,7 +19,6 @@ const REJECTION_VECTORS: &str =
 #[derive(Deserialize)]
 struct WatermarkVectors {
     schema: String,
-    signing_domain: String,
     signing_key_seed_hex: String,
     cases: Vec<WatermarkVector>,
 }
@@ -55,8 +58,6 @@ fn shared_watermark_vector_pins_rust_bytes_and_signature() {
     let vectors: WatermarkVectors =
         serde_json::from_str(POSITIVE_VECTORS).test_expect("valid positive watermark vectors");
     assert_eq!(vectors.schema, "chio.signed-watermark-vectors.v1");
-    assert_eq!(vectors.signing_domain.as_bytes().last(), Some(&0));
-    assert_eq!(vectors.signing_domain, "chio.signed-watermark.v1\0");
     assert_eq!(vectors.cases.len(), 1);
 
     let vector = vectors
@@ -86,21 +87,40 @@ fn shared_watermark_vector_pins_rust_bytes_and_signature() {
         canonical_payload
     );
 
-    let mut signing_message = vectors.signing_domain.as_bytes().to_vec();
-    signing_message.extend_from_slice(&canonical_payload);
-    assert_eq!(hex::encode(&signing_message), vector.signing_message_hex);
+    let wrapper_body =
+        CanonicalBytes::from_serializable(&vector.payload).test_expect("canonical wrapper body");
+    let wrapper = SigningWrapper::new(WATERMARK_ENVELOPE_SCHEMA, &wrapper_body)
+        .test_expect("registered watermark schema id");
+    assert_eq!(hex::encode(wrapper.as_bytes()), vector.signing_message_hex);
     let keypair = Keypair::from_seed_hex(&vectors.signing_key_seed_hex)
         .test_expect("valid fixed Ed25519 seed");
     assert_eq!(keypair.public_key().to_hex(), vector.public_key_hex);
     assert_eq!(
-        keypair.sign(&signing_message).to_hex(),
+        keypair
+            .sign_wrapped(WATERMARK_ENVELOPE_SCHEMA, &wrapper_body)
+            .test_expect("sign watermark wrapper")
+            .to_hex(),
         vector.signature_hex
     );
 
     let public_key = PublicKey::from_hex(&vector.public_key_hex).test_expect("valid public key");
     let signature = Signature::from_hex(&vector.signature_hex).test_expect("valid signature");
-    assert!(public_key.verify(&signing_message, &signature));
-    assert!(!public_key.verify(&canonical_payload, &signature));
+    verify_wrapped_bytes(
+        &public_key,
+        WATERMARK_ENVELOPE_SCHEMA,
+        &wrapper_body,
+        &signature,
+    )
+    .test_expect("watermark wrapper signature verifies");
+    assert!(matches!(
+        verify_wrapped_bytes(
+            &public_key,
+            chio_core_types::CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
+            &wrapper_body,
+            &signature,
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
 
     assert_eq!(vector.envelope.payload, vector.payload);
     assert_eq!(vector.envelope.encoded_payload, vector.encoded_payload);

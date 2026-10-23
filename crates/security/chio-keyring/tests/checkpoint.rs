@@ -1,5 +1,7 @@
 use chio_test_support::prelude::*;
 
+use chio_core_types::crypto::{ExemptFormat, SigningMessage};
+
 use std::collections::BTreeMap;
 
 use chio_core_types::canonical::UntrustedJsonError;
@@ -29,7 +31,6 @@ fn review_checkpoint_rejects_universal_operator_and_witness_signatures() {
     let operator_result = signed.verify_operator(&weak);
     let witness = WitnessSignature {
         witness_id: WitnessId::new("witness.weak").test_unwrap(),
-        algorithm: weak.algorithm(),
         signature,
     };
     let witness_result = witness.verify(&signed, &weak);
@@ -158,7 +159,12 @@ fn witness_signatures_bind_checkpoint_hash_and_require_distinct_known_quorum() {
 
     let mut altered_operator_envelope = checkpoint.clone();
     altered_operator_envelope.operator_signature =
-        operator.sign_bytes(b"other statement").test_unwrap();
+        operator
+            .sign_bytes(SigningMessage::exempt(
+                ExemptFormat::JwsSigningInput,
+                b"other statement",
+            ))
+            .test_unwrap();
     let result = altered_operator_envelope.verify_witness_signatures(&keys);
     assert!(
         matches!(result, Err(KeyringError::InvalidSignature)),

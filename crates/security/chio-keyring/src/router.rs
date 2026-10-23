@@ -1,11 +1,13 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
+use chio_core_types::crypto::{verify_wrapper, SigningMessage, SigningWrapper};
 use chio_core_types::{
-    canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, sha256, CanonicalBytes, Hash, PublicKey, Signature, SigningBackend,
     SigningOutcome,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::signing::verify_wrapped_value;
 use crate::{
     derive_key_id, AnchorId, EventId, IndependentKeyLogServices, KeyId, KeyringError, Result,
     SignedArtifactTimeAnchor, SqliteKeyLogStore,
@@ -13,7 +15,6 @@ use crate::{
 
 pub const KEYRING_ARTIFACT_SIGNATURE_SCHEMA: &str = "chio.keyring.artifact-signature.v1";
 const ARTIFACT_HASH_DOMAIN: &[u8] = b"chio.keyring.artifact-hash.v1\0";
-const ARTIFACT_SIGNATURE_DOMAIN: &[u8] = b"chio.keyring.artifact-signature.v1\0";
 
 pub(crate) fn artifact_hash(artifact: &[u8]) -> Result<Hash> {
     domain_hash(ARTIFACT_HASH_DOMAIN, artifact)
@@ -26,7 +27,6 @@ pub struct KeyringArtifactSignature {
     pub artifact_hash: Hash,
     pub key_id: KeyId,
     pub signing_epoch: u64,
-    pub algorithm: SigningAlgorithm,
     pub artifact_signature: Signature,
     pub fence_signature: Signature,
 }
@@ -35,7 +35,6 @@ pub struct KeyringArtifactSignature {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyringSigningResult {
     pub public_key: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub key_id: KeyId,
     pub signing_epoch: u64,
     pub signature: Signature,
@@ -50,8 +49,18 @@ struct ArtifactSignatureStatement<'a> {
     artifact_hash: Hash,
     key_id: KeyId,
     signing_epoch: u64,
-    algorithm: SigningAlgorithm,
     artifact_signature: &'a Signature,
+}
+
+/// What the router signs: a wrapper message forwarded through the
+/// `SigningBackend` boundary, or a canonical body it wraps itself.
+#[derive(Clone, Copy)]
+enum RouterArtifact<'a> {
+    Forwarded(SigningMessage<'a>),
+    Canonical {
+        schema_id: &'a str,
+        canonical: &'a CanonicalBytes,
+    },
 }
 
 impl KeyringArtifactSignature {
@@ -65,30 +74,34 @@ impl KeyringArtifactSignature {
 
     pub fn verify(&self, public_key: &PublicKey) -> Result<()> {
         if self.schema != KEYRING_ARTIFACT_SIGNATURE_SCHEMA
-            || public_key.algorithm() != self.algorithm
-            || self.artifact_signature.algorithm() != self.algorithm
-            || self.fence_signature.algorithm() != self.algorithm
             || derive_key_id(public_key.algorithm(), public_key)? != self.key_id
-            || !public_key.verify_strict(
-                &artifact_signature_bytes(
-                    self.artifact_hash,
-                    self.key_id,
-                    self.signing_epoch,
-                    self.algorithm,
-                    &self.artifact_signature,
-                )?,
+            || verify_wrapped_value(
+                public_key,
+                KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+                &ArtifactSignatureStatement {
+                    schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+                    artifact_hash: self.artifact_hash,
+                    key_id: self.key_id,
+                    signing_epoch: self.signing_epoch,
+                    artifact_signature: &self.artifact_signature,
+                },
                 &self.fence_signature,
             )
+            .is_err()
         {
             return Err(KeyringError::InvalidSignature);
         }
         Ok(())
     }
 
+    /// Verifies the fence and the artifact signature over `artifact`, which
+    /// must be the 88 signing-wrapper bytes the router signed.
     pub fn verify_artifact_bytes(&self, public_key: &PublicKey, artifact: &[u8]) -> Result<()> {
         self.verify(public_key)?;
+        let wrapper =
+            SigningWrapper::from_bytes(artifact).map_err(|_| KeyringError::InvalidSignature)?;
         if domain_hash(ARTIFACT_HASH_DOMAIN, artifact)? != self.artifact_hash
-            || !public_key.verify_strict(artifact, &self.artifact_signature)
+            || verify_wrapper(public_key, &wrapper, &self.artifact_signature).is_err()
         {
             return Err(KeyringError::InvalidSignature);
         }
@@ -279,39 +292,80 @@ impl KeyringSigningRouter {
         })
     }
 
+    /// Sign the signing wrapper over the canonical `artifact` under
+    /// `schema_id` at `expected_epoch`.
     pub fn sign_canonical<T: Serialize>(
         &self,
         expected_epoch: u64,
+        schema_id: &str,
         artifact: &T,
     ) -> Result<KeyringArtifactSignature> {
-        let canonical = canonical_json_bytes(artifact)?;
-        if canonical.len() > crate::MAX_CANONICAL_RECORD_BYTES {
-            return Err(KeyringError::Canonical(
-                "canonical artifact exceeds 1048576 bytes".to_string(),
-            ));
-        }
-        self.sign_bytes(expected_epoch, &canonical)
+        let canonical = CanonicalBytes::from_serializable(artifact)?;
+        self.sign_bound(
+            Some(expected_epoch),
+            None,
+            RouterArtifact::Canonical {
+                schema_id,
+                canonical: &canonical,
+            },
+        )
+        .map(|result| result.evidence)
     }
 
-    pub fn sign_bytes(
+    /// Sign the signing wrapper over `canonical` under `schema_id` with the
+    /// active selector and return the complete durable result.
+    pub fn sign_wrapped_with_identity(
         &self,
-        expected_epoch: u64,
-        artifact: &[u8],
-    ) -> Result<KeyringArtifactSignature> {
-        self.sign_bytes_bound(Some(expected_epoch), None, artifact)
-            .map(|result| result.evidence)
+        schema_id: &str,
+        canonical: &CanonicalBytes,
+    ) -> Result<KeyringSigningResult> {
+        self.sign_bound(
+            None,
+            None,
+            RouterArtifact::Canonical {
+                schema_id,
+                canonical,
+            },
+        )
     }
 
-    pub fn sign_bytes_with_identity(&self, artifact: &[u8]) -> Result<KeyringSigningResult> {
-        self.sign_bytes_bound(None, None, artifact)
-    }
-
-    pub fn sign_bytes_for_identity(
+    /// [`Self::sign_wrapped_with_identity`] bound to `expected_public_key`.
+    pub fn sign_wrapped_for_identity(
         &self,
         expected_public_key: &PublicKey,
-        artifact: &[u8],
+        schema_id: &str,
+        canonical: &CanonicalBytes,
     ) -> Result<KeyringSigningResult> {
-        self.sign_bytes_bound(None, Some(expected_public_key), artifact)
+        self.sign_bound(
+            None,
+            Some(expected_public_key),
+            RouterArtifact::Canonical {
+                schema_id,
+                canonical,
+            },
+        )
+    }
+
+    /// Sign a wrapper message with the active selector. Exempt-format
+    /// messages are refused: no exempt caller signs through the router.
+    pub fn sign_message_with_identity(
+        &self,
+        message: SigningMessage<'_>,
+    ) -> Result<KeyringSigningResult> {
+        self.sign_bound(None, None, RouterArtifact::Forwarded(message))
+    }
+
+    /// [`Self::sign_message_with_identity`] bound to `expected_public_key`.
+    pub fn sign_message_for_identity(
+        &self,
+        expected_public_key: &PublicKey,
+        message: SigningMessage<'_>,
+    ) -> Result<KeyringSigningResult> {
+        self.sign_bound(
+            None,
+            Some(expected_public_key),
+            RouterArtifact::Forwarded(message),
+        )
     }
 
     /// Resolve the exact durable evidence produced by a prior router-backed
@@ -347,7 +401,6 @@ impl KeyringSigningRouter {
         }
         Ok(KeyringSigningResult {
             public_key: expected_public_key.clone(),
-            algorithm: evidence.algorithm,
             key_id: evidence.key_id,
             signing_epoch: evidence.signing_epoch,
             signature: evidence.artifact_signature.clone(),
@@ -356,30 +409,46 @@ impl KeyringSigningRouter {
         })
     }
 
-    fn sign_bytes_bound(
+    fn sign_bound(
         &self,
         expected_epoch: Option<u64>,
         expected_public_key: Option<&PublicKey>,
-        artifact: &[u8],
+        input: RouterArtifact<'_>,
     ) -> Result<KeyringSigningResult> {
-        if artifact.len() > crate::MAX_CANONICAL_RECORD_BYTES {
-            return Err(KeyringError::Canonical(
-                "artifact exceeds 1048576 bytes".to_string(),
-            ));
-        }
-        let artifact_hash = domain_hash(ARTIFACT_HASH_DOMAIN, artifact)?;
         let router = self.read_state()?;
+        let wrapper = match input {
+            RouterArtifact::Forwarded(message) => {
+                if message.exempt_format().is_some() {
+                    return Err(KeyringError::StateInvariant(
+                        "keyring router signs only signing-wrapper messages",
+                    ));
+                }
+                SigningWrapper::from_bytes(message.as_bytes())?
+            }
+            RouterArtifact::Canonical {
+                schema_id,
+                canonical,
+            } => {
+                if canonical.len() > crate::MAX_CANONICAL_RECORD_BYTES {
+                    return Err(KeyringError::Canonical(
+                        "canonical artifact exceeds 1048576 bytes".to_string(),
+                    ));
+                }
+                SigningWrapper::new(schema_id, canonical)?
+            }
+        };
+        let artifact: &[u8] = wrapper.as_bytes();
+        let artifact_hash = domain_hash(ARTIFACT_HASH_DOMAIN, artifact)?;
         if expected_epoch.is_some_and(|expected| router.signing_epoch != expected) {
             return Err(KeyringError::StateInvariant("stale signing epoch"));
         }
         let public_key = router.active.public_key()?;
-        let algorithm = public_key.algorithm();
         if expected_public_key.is_some_and(|expected| expected != &public_key) {
             return Err(KeyringError::StateInvariant(
                 "active signing identity does not match the requested key",
             ));
         }
-        if derive_key_id(algorithm, &public_key)? != router.active_key_id {
+        if derive_key_id(public_key.algorithm(), &public_key)? != router.active_key_id {
             return Err(KeyringError::StateInvariant(
                 "active backend changed signing identity",
             ));
@@ -396,7 +465,6 @@ impl KeyringSigningRouter {
             let time_anchor = self.artifact_time_anchor_for_existing(&artifact_hash)?;
             return Ok(KeyringSigningResult {
                 public_key,
-                algorithm,
                 key_id: existing.key_id,
                 signing_epoch: existing.signing_epoch,
                 signature: existing.artifact_signature.clone(),
@@ -404,21 +472,32 @@ impl KeyringSigningRouter {
                 time_anchor,
             });
         }
-        let artifact_outcome = router
-            .active
-            .sign_bytes_for_identity(&public_key, artifact)?;
+        let artifact_outcome = match input {
+            RouterArtifact::Forwarded(message) => {
+                router.active.sign_bytes_for_identity(&public_key, message)?
+            }
+            RouterArtifact::Canonical {
+                schema_id,
+                canonical,
+            } => router
+                .active
+                .sign_wrapped_for_identity(&public_key, schema_id, canonical)?,
+        };
         let artifact_signature = artifact_outcome.signature;
-        let fence_outcome = router.active.sign_bytes_for_identity(
+        let statement = CanonicalBytes::from_serializable(&ArtifactSignatureStatement {
+            schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+            artifact_hash,
+            key_id: router.active_key_id,
+            signing_epoch: router.signing_epoch,
+            artifact_signature: &artifact_signature,
+        })?;
+        let fence_outcome = router.active.sign_wrapped_for_identity(
             &public_key,
-            &artifact_signature_bytes(
-                artifact_hash,
-                router.active_key_id,
-                router.signing_epoch,
-                algorithm,
-                &artifact_signature,
-            )?,
+            KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+            &statement,
         )?;
         let fence_signature = fence_outcome.signature;
+        let algorithm = public_key.algorithm();
         if artifact_outcome.algorithm != algorithm
             || fence_outcome.algorithm != algorithm
             || artifact_signature.algorithm() != algorithm
@@ -431,7 +510,6 @@ impl KeyringSigningRouter {
             artifact_hash,
             key_id: router.active_key_id,
             signing_epoch: router.signing_epoch,
-            algorithm,
             artifact_signature,
             fence_signature,
         };
@@ -454,7 +532,6 @@ impl KeyringSigningRouter {
         persisted.verify_artifact_bytes(&public_key, artifact)?;
         Ok(KeyringSigningResult {
             public_key,
-            algorithm,
             key_id: persisted.key_id,
             signing_epoch: persisted.signing_epoch,
             signature: persisted.artifact_signature.clone(),
@@ -632,63 +709,41 @@ impl SigningBackend for KeyringAuthoritySigningBackend {
             .map_err(|error| chio_core_types::Error::InvalidPublicKey(error.to_string()))
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
         self.router
-            .sign_bytes_with_identity(message)
+            .sign_message_with_identity(message)
             .map(|result| result.signature)
             .map_err(|error| chio_core_types::Error::InvalidSignature(error.to_string()))
     }
 
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> chio_core_types::Result<SigningOutcome> {
+    fn sign_bytes_with_identity(
+        &self,
+        message: SigningMessage<'_>,
+    ) -> chio_core_types::Result<SigningOutcome> {
         self.router
-            .sign_bytes_with_identity(message)
-            .map(|result| SigningOutcome {
-                public_key: result.public_key,
-                algorithm: result.algorithm,
-                signature: result.signature,
-            })
+            .sign_message_with_identity(message)
+            .map(signing_outcome)
             .map_err(|error| chio_core_types::Error::InvalidSignature(error.to_string()))
     }
 
     fn sign_bytes_for_identity(
         &self,
         expected_key: &PublicKey,
-        message: &[u8],
+        message: SigningMessage<'_>,
     ) -> chio_core_types::Result<SigningOutcome> {
         self.router
-            .sign_bytes_for_identity(expected_key, message)
-            .map(|result| SigningOutcome {
-                public_key: result.public_key,
-                algorithm: result.algorithm,
-                signature: result.signature,
-            })
+            .sign_message_for_identity(expected_key, message)
+            .map(signing_outcome)
             .map_err(|error| chio_core_types::Error::InvalidSignature(error.to_string()))
     }
 }
 
-fn artifact_signature_bytes(
-    artifact_hash: Hash,
-    key_id: KeyId,
-    signing_epoch: u64,
-    algorithm: SigningAlgorithm,
-    artifact_signature: &Signature,
-) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(&ArtifactSignatureStatement {
-        schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
-        artifact_hash,
-        key_id,
-        signing_epoch,
-        algorithm,
-        artifact_signature,
-    })?;
-    let capacity = ARTIFACT_SIGNATURE_DOMAIN
-        .len()
-        .checked_add(canonical.len())
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(ARTIFACT_SIGNATURE_DOMAIN);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
+fn signing_outcome(result: KeyringSigningResult) -> SigningOutcome {
+    SigningOutcome {
+        algorithm: result.public_key.algorithm(),
+        public_key: result.public_key,
+        signature: result.signature,
+    }
 }
 
 fn domain_hash(domain: &[u8], bytes: &[u8]) -> Result<Hash> {

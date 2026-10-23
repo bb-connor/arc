@@ -1,9 +1,8 @@
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
-use chio_core_types::{
-    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningBackend};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -18,8 +17,6 @@ use crate::{validate_identifier, BrokerError, Result};
 
 pub const BROKER_RECEIPT_SCHEMA: &str = "chio.broker-execution-receipt.v1";
 pub const BROKER_FAILURE_RECEIPT_SCHEMA: &str = "chio.broker-execution-failure-receipt.v1";
-const RECEIPT_DOMAIN: &str = "chio.broker-execution-receipt-signature.v1\0";
-const FAILURE_RECEIPT_DOMAIN: &str = "chio.broker-execution-failure-receipt-signature.v1\0";
 const CREDENTIAL_REFERENCE_DOMAIN: &[u8] = b"chio.broker-credential-reference.v1\0";
 const MAX_SOURCE_RECEIPT_IDS: usize = 64;
 const MAX_DURABLE_COMPLETED_RESPONSE_BYTES: usize = 16 * 1_048_576;
@@ -293,7 +290,6 @@ fn validate_source_receipt_ids(ids: &[String]) -> Result<()> {
 pub struct SignedBrokerReceipt {
     pub body: BrokerReceiptBody,
     pub signer: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -302,22 +298,7 @@ pub struct SignedBrokerReceipt {
 pub struct SignedBrokerFailureReceipt {
     pub body: BrokerFailureReceiptBody,
     pub signer: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ReceiptSigningInput<'a> {
-    domain: &'static str,
-    body: &'a BrokerReceiptBody,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct FailureReceiptSigningInput<'a> {
-    domain: &'static str,
-    body: &'a BrokerFailureReceiptBody,
 }
 
 pub fn sign_execution_receipt(
@@ -325,19 +306,20 @@ pub fn sign_execution_receipt(
     signer: &dyn SigningBackend,
 ) -> Result<SignedBrokerReceipt> {
     body.validate()?;
-    let input = ReceiptSigningInput {
-        domain: RECEIPT_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!("receipt signing input encoding failed: {error}"))
     })?;
     let signed = signer
-        .sign_bytes_with_identity(&canonical)
+        .sign_wrapped(BROKER_RECEIPT_SCHEMA, &canonical)
         .map_err(|error| BrokerError::Invariant(format!("receipt signing failed: {error}")))?;
     if signed.public_key.algorithm() != signed.algorithm
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &signed.public_key,
+            BROKER_RECEIPT_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "receipt signing backend returned a mismatched identity or signature".to_string(),
@@ -346,7 +328,6 @@ pub fn sign_execution_receipt(
     Ok(SignedBrokerReceipt {
         body,
         signer: signed.public_key,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -357,8 +338,7 @@ pub fn verify_execution_receipt(
 ) -> Result<()> {
     if receipt.body.schema != BROKER_RECEIPT_SCHEMA
         || &receipt.signer != trusted_signer
-        || receipt.signer.algorithm() != receipt.algorithm
-        || receipt.signature.algorithm() != receipt.algorithm
+        || receipt.signature.algorithm() != receipt.signer.algorithm()
     {
         return Err(BrokerError::AuthorizationDenied(
             "broker receipt schema, signer, or algorithm is invalid".to_string(),
@@ -367,20 +347,23 @@ pub fn verify_execution_receipt(
     receipt.body.validate().map_err(|error| {
         BrokerError::AuthorizationDenied(format!("broker receipt body is invalid: {error}"))
     })?;
-    let input = ReceiptSigningInput {
-        domain: RECEIPT_DOMAIN,
-        body: &receipt.body,
-    };
-    if !receipt
-        .signer
-        .verify_canonical(&input, &receipt.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!("receipt verification failed: {error}"))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker receipt signature is invalid".to_string(),
-        ));
+    match verify_wrapped(
+        trusted_signer,
+        BROKER_RECEIPT_SCHEMA,
+        &receipt.body,
+        &receipt.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "broker receipt signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
+                "receipt verification failed: {error}"
+            )));
+        }
     }
     Ok(())
 }
@@ -390,23 +373,24 @@ pub fn sign_failure_receipt(
     signer: &dyn SigningBackend,
 ) -> Result<SignedBrokerFailureReceipt> {
     body.validate()?;
-    let input = FailureReceiptSigningInput {
-        domain: FAILURE_RECEIPT_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "failure receipt signing input encoding failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_with_identity(&canonical)
+        .sign_wrapped(BROKER_FAILURE_RECEIPT_SCHEMA, &canonical)
         .map_err(|error| {
             BrokerError::Invariant(format!("failure receipt signing failed: {error}"))
         })?;
     if signed.public_key.algorithm() != signed.algorithm
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &signed.public_key,
+            BROKER_FAILURE_RECEIPT_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "failure receipt signing backend returned a mismatched identity or signature"
@@ -416,7 +400,6 @@ pub fn sign_failure_receipt(
     Ok(SignedBrokerFailureReceipt {
         body,
         signer: signed.public_key,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -427,8 +410,7 @@ pub fn verify_failure_receipt(
 ) -> Result<()> {
     if receipt.body.schema != BROKER_FAILURE_RECEIPT_SCHEMA
         || &receipt.signer != trusted_signer
-        || receipt.signer.algorithm() != receipt.algorithm
-        || receipt.signature.algorithm() != receipt.algorithm
+        || receipt.signature.algorithm() != receipt.signer.algorithm()
     {
         return Err(BrokerError::AuthorizationDenied(
             "broker failure receipt schema, signer, or algorithm is invalid".to_string(),
@@ -437,22 +419,23 @@ pub fn verify_failure_receipt(
     receipt.body.validate().map_err(|error| {
         BrokerError::AuthorizationDenied(format!("broker failure receipt body is invalid: {error}"))
     })?;
-    let input = FailureReceiptSigningInput {
-        domain: FAILURE_RECEIPT_DOMAIN,
-        body: &receipt.body,
-    };
-    if !receipt
-        .signer
-        .verify_canonical(&input, &receipt.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_signer,
+        BROKER_FAILURE_RECEIPT_SCHEMA,
+        &receipt.body,
+        &receipt.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "broker failure receipt signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "failure receipt verification failed: {error}"
-            ))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "broker failure receipt signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }
@@ -1146,7 +1129,8 @@ fn terminal_constraint_or_storage(error: rusqlite::Error) -> BrokerError {
 #[cfg(test)]
 mod tests {
     use chio_core_types::{
-        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningBackend, SigningOutcome,
+        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningBackend, SigningMessage,
+        SigningOutcome,
     };
     use chio_test_support::prelude::*;
 
@@ -1184,7 +1168,7 @@ mod tests {
             Ok(self.keypair.public_key())
         }
 
-        fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {
+        fn sign_bytes(&self, _message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
             Err(Error::InvalidSignature(
                 "legacy split signing is disabled".to_string(),
             ))
@@ -1192,12 +1176,12 @@ mod tests {
 
         fn sign_bytes_with_identity(
             &self,
-            message: &[u8],
+            message: SigningMessage<'_>,
         ) -> chio_core_types::Result<SigningOutcome> {
             Ok(SigningOutcome {
                 public_key: self.keypair.public_key(),
                 algorithm: self.keypair.public_key().algorithm(),
-                signature: self.keypair.sign(message),
+                signature: Ed25519Backend::new(self.keypair.clone()).sign_bytes(message)?,
             })
         }
     }

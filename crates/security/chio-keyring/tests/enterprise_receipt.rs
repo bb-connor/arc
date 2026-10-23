@@ -1,5 +1,7 @@
 use chio_test_support::prelude::*;
 
+use chio_core_types::crypto::{ExemptFormat, SigningMessage};
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -327,7 +329,10 @@ fn review_activated_checkpoint_preserves_committed_witness_set_after_late_signat
     let mut forged = late;
     forged.signature = fixture
         .witness_a
-        .sign_bytes(b"not a witness statement")
+        .sign_bytes(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"not a witness statement",
+        ))
         .test_unwrap();
     assert!(matches!(
         store.store_witness_signature(&hash, &forged),

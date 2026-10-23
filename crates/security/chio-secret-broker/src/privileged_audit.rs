@@ -24,9 +24,8 @@ use std::sync::Arc;
 #[cfg(unix)]
 use std::time::{Duration, Instant};
 
-use chio_core_types::{
-    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningBackend};
 #[cfg(unix)]
 use rand_core::{OsRng, RngCore};
 #[cfg(unix)]
@@ -64,7 +63,6 @@ pub const BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA: &str = "chio.broker-privileged-
 pub const BROKER_PRIVILEGED_AUDIT_EVIDENCE_SCHEMA: &str =
     "chio.broker-privileged-audit-evidence.v1";
 
-const CHALLENGE_SIGNATURE_DOMAIN: &str = "chio.broker-privileged-audit-challenge-signature.v1\0";
 const SESSION_COMMITMENT_DOMAIN: &[u8] = b"chio.broker-privileged-audit-session-commitment.v1\0";
 #[cfg(unix)]
 const MAX_AUDIT_OPEN_FRAME_BYTES: usize = 16 * 1_048_576;
@@ -271,7 +269,6 @@ impl BrokerPrivilegedAuditChallengeBody {
 pub struct SignedBrokerPrivilegedAuditChallenge {
     pub body: BrokerPrivilegedAuditChallengeBody,
     pub signer: PublicKey,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -302,37 +299,31 @@ impl SignedBrokerPrivilegedAuditChallenge {
     }
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ChallengeSigningInput<'a> {
-    domain: &'static str,
-    body: &'a BrokerPrivilegedAuditChallengeBody,
-}
-
 fn sign_challenge(
     body: BrokerPrivilegedAuditChallengeBody,
     signer: &dyn SigningBackend,
 ) -> Result<SignedBrokerPrivilegedAuditChallenge> {
     body.validate()?;
-    let input = ChallengeSigningInput {
-        domain: CHALLENGE_SIGNATURE_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&input).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "privileged audit challenge signing input failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_with_identity(&canonical)
+        .sign_wrapped(BROKER_PRIVILEGED_AUDIT_CHALLENGE_SCHEMA, &canonical)
         .map_err(|error| {
             BrokerError::AuthorityUnavailable(format!(
                 "privileged audit challenge signing failed: {error}"
             ))
         })?;
     if signed.public_key.algorithm() != signed.algorithm
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &signed.public_key,
+            BROKER_PRIVILEGED_AUDIT_CHALLENGE_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "privileged audit challenge signer returned invalid identity metadata".to_string(),
@@ -341,7 +332,6 @@ fn sign_challenge(
     Ok(SignedBrokerPrivilegedAuditChallenge {
         body,
         signer: signed.public_key,
-        algorithm: signed.algorithm,
         signature: signed.signature,
     })
 }
@@ -352,29 +342,29 @@ pub fn verify_broker_privileged_audit_challenge(
 ) -> Result<()> {
     challenge.body.validate()?;
     if &challenge.signer != trusted_broker
-        || challenge.signer.algorithm() != challenge.algorithm
-        || challenge.signature.algorithm() != challenge.algorithm
+        || challenge.signature.algorithm() != challenge.signer.algorithm()
     {
         return Err(BrokerError::AuthorizationDenied(
             "privileged audit challenge signer is invalid".to_string(),
         ));
     }
-    let input = ChallengeSigningInput {
-        domain: CHALLENGE_SIGNATURE_DOMAIN,
-        body: &challenge.body,
-    };
-    if !challenge
-        .signer
-        .verify_canonical(&input, &challenge.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_broker,
+        BROKER_PRIVILEGED_AUDIT_CHALLENGE_SCHEMA,
+        &challenge.body,
+        &challenge.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "privileged audit challenge signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "privileged audit challenge verification failed: {error}"
-            ))
-        })?
-    {
-        return Err(BrokerError::AuthorizationDenied(
-            "privileged audit challenge signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }

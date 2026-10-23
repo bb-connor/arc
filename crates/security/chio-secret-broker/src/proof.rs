@@ -1,4 +1,5 @@
-use chio_core_types::{canonical_json_bytes, Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::crypto::verify_wrapped;
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -8,7 +9,6 @@ use crate::protocol::{
 };
 use crate::{validate_digest, BrokerError, Result};
 
-const PROOF_SIGNATURE_DOMAIN: &str = "chio.broker-request-proof-signature.v1\0";
 const HEADER_DIGEST_DOMAIN: &[u8] = b"chio.broker-caller-headers.v1\0";
 const OPTION_DIGEST_DOMAIN: &[u8] = b"chio.broker-caller-options.v1\0";
 
@@ -33,15 +33,7 @@ pub struct RequestProofBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequestProof {
     pub body: RequestProofBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProofSigningInput<'a> {
-    domain: &'static str,
-    body: &'a RequestProofBody,
 }
 
 pub fn issue_request_proof(
@@ -72,18 +64,10 @@ pub fn issue_request_proof(
         issued_at_unix_seconds,
         authority_key: signer.public_key(),
     };
-    let signing = ProofSigningInput {
-        domain: PROOF_SIGNATURE_DOMAIN,
-        body: &body,
-    };
-    let (signature, _) = signer
-        .sign_canonical(&signing)
+    let signature = CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| signer.sign_wrapped(BROKER_PROOF_SCHEMA, &canonical))
         .map_err(|error| BrokerError::Invariant(format!("proof signing failed: {error}")))?;
-    Ok(RequestProof {
-        body,
-        algorithm: signer.public_key().algorithm(),
-        signature,
-    })
+    Ok(RequestProof { body, signature })
 }
 
 /// A proof is issued inside the capability's half-open `[not_before,
@@ -137,28 +121,29 @@ pub fn verify_request_proof(
         || proof.body.caller_headers_sha256 != caller_header_digest(&request.headers)?
         || proof.body.caller_options_sha256 != caller_option_digest(&request.options)?
         || proof.body.authority_key != capability.body.proof.caller_public_key
-        || proof.algorithm != proof.body.authority_key.algorithm()
-        || proof.signature.algorithm() != proof.algorithm
+        || proof.signature.algorithm() != proof.body.authority_key.algorithm()
     {
         return Err(BrokerError::AuthorizationDenied(
             "request proof does not bind the complete request".to_string(),
         ));
     }
-    let signing = ProofSigningInput {
-        domain: PROOF_SIGNATURE_DOMAIN,
-        body: &proof.body,
-    };
-    let valid = proof
-        .body
-        .authority_key
-        .verify_canonical_strict(&signing, &proof.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!("proof verification failed: {error}"))
-        })?;
-    if !valid {
-        return Err(BrokerError::AuthorizationDenied(
-            "request proof signature is invalid".to_string(),
-        ));
+    match verify_wrapped(
+        &proof.body.authority_key,
+        BROKER_PROOF_SCHEMA,
+        &proof.body,
+        &proof.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "request proof signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
+                "proof verification failed: {error}"
+            )));
+        }
     }
     Ok(())
 }
@@ -304,15 +289,6 @@ mod tests {
         let mut signature = [0_u8; 64];
         signature[0] = 1;
         proof.signature = Signature::from_bytes(&signature);
-        let signing = ProofSigningInput {
-            domain: PROOF_SIGNATURE_DOMAIN,
-            body: &proof.body,
-        };
-        assert!(proof
-            .body
-            .authority_key
-            .verify_canonical(&signing, &proof.signature)
-            .test_expect("canonical signing input"));
         assert!(matches!(
             verify_request_proof(&proof, &capability, &request, 21, 2),
             Err(BrokerError::AuthorizationDenied(_))

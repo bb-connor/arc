@@ -1,15 +1,13 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chio_core_types::{
-    canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{Hash, PublicKey, Signature, SigningBackend};
 use serde::{Deserialize, Serialize};
 
+use crate::signing::{sign_wrapped_value, verify_wrapped_value};
 use crate::{derive_key_id, AnchorId, KeyId, KeyringError, Result};
 
 pub const ARTIFACT_TIME_ANCHOR_SCHEMA: &str = "chio.key-log.artifact-time-anchor.v1";
-const ARTIFACT_TIME_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.artifact-time-anchor.v1\0";
 
 pub use chio_security_types::clock::{Clock, SystemClock};
 
@@ -44,7 +42,6 @@ pub struct ArtifactTimeAnchorBody {
 pub struct SignedArtifactTimeAnchor {
     pub body: ArtifactTimeAnchorBody,
     pub anchor_key_id: KeyId,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -54,17 +51,11 @@ impl SignedArtifactTimeAnchor {
     }
 
     pub fn sign(body: ArtifactTimeAnchorBody, signer: &dyn SigningBackend) -> Result<Self> {
-        let outcome = signer.sign_bytes_with_identity(&artifact_time_signing_bytes(&body)?)?;
-        let anchor_key_id = derive_key_id(outcome.algorithm, &outcome.public_key)?;
-        if outcome.public_key.algorithm() != outcome.algorithm
-            || outcome.signature.algorithm() != outcome.algorithm
-        {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_value(signer, ARTIFACT_TIME_ANCHOR_SCHEMA, &body)?;
+        let anchor_key_id = derive_key_id(outcome.public_key.algorithm(), &outcome.public_key)?;
         Ok(Self {
             body,
             anchor_key_id,
-            algorithm: outcome.algorithm,
             signature: outcome.signature,
         })
     }
@@ -110,13 +101,14 @@ impl ArtifactTimeVerifier {
             .trust_roots
             .get(&signed.body.anchor_id)
             .ok_or(KeyringError::InvalidArtifactTimeEvidence)?;
-        if key.algorithm() != signed.algorithm
-            || signed.signature.algorithm() != signed.algorithm
-            || derive_key_id(key.algorithm(), key)? != signed.anchor_key_id
-            || !key.verify_strict(
-                &artifact_time_signing_bytes(&signed.body)?,
+        if derive_key_id(key.algorithm(), key)? != signed.anchor_key_id
+            || verify_wrapped_value(
+                key,
+                ARTIFACT_TIME_ANCHOR_SCHEMA,
+                &signed.body,
                 &signed.signature,
             )
+            .is_err()
         {
             return Err(KeyringError::InvalidArtifactTimeEvidence);
         }
@@ -161,16 +153,4 @@ impl ArtifactTimeEvidence {
     pub(crate) fn policy_binding(&self) -> Hash {
         self.policy_binding
     }
-}
-
-fn artifact_time_signing_bytes(body: &ArtifactTimeAnchorBody) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(body)?;
-    let capacity = ARTIFACT_TIME_SIGNATURE_DOMAIN
-        .len()
-        .checked_add(canonical.len())
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(ARTIFACT_TIME_SIGNATURE_DOMAIN);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
 }

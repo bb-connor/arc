@@ -1,6 +1,5 @@
-use chio_core_types::{
-    canonical_json_bytes, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes};
+use chio_core_types::{canonical_json_bytes, CanonicalBytes, PublicKey, Signature, SigningBackend};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -16,8 +15,6 @@ pub const RELEASE_ATTEMPT_ACKNOWLEDGEMENT_SCHEMA: &str =
     "chio.broker-release-attempt-acknowledgement.v1";
 pub const PREPARE_DISPATCH_ACKNOWLEDGEMENT_SCHEMA: &str =
     "chio.broker-prepare-dispatch-acknowledgement.v1";
-const REGISTER_ATTEMPT_AUTHORIZATION_DOMAIN: &str =
-    "chio.broker-register-attempt-authorization.v1\0";
 const REGISTER_ATTEMPT_DIGEST_DOMAIN: &[u8] = b"chio.broker-register-attempt.v1\0";
 const BROKER_EXECUTE_REQUEST_DIGEST_DOMAIN: &[u8] =
     b"chio.broker-execute-request-registration.v1\0";
@@ -53,7 +50,6 @@ pub struct RegisterAttemptAuthorizationBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedRegisterAttemptAuthorization {
     pub body: RegisterAttemptAuthorizationBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -91,13 +87,6 @@ pub struct PrepareDispatchAcknowledgement {
     pub attempt_id: String,
     pub prepared_dispatch_id: String,
     pub prepared_at_unix_seconds: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RegisterAttemptSigningInput<'a> {
-    domain: &'static str,
-    body: &'a RegisterAttemptAuthorizationBody,
 }
 
 pub fn attempt_registration_digest(registration: &AttemptRegistration) -> Result<String> {
@@ -181,17 +170,17 @@ pub fn sign_register_attempt_authorization(
         issued_at_unix_seconds,
         authority: expected_authority.clone(),
     };
-    let signing = RegisterAttemptSigningInput {
-        domain: REGISTER_ATTEMPT_AUTHORIZATION_DOMAIN,
-        body: &body,
-    };
-    let canonical = canonical_json_bytes(&signing).map_err(|error| {
+    let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "register-attempt authorization signing input encoding failed: {error}"
         ))
     })?;
     let signed = signer
-        .sign_bytes_for_identity(&expected_authority, &canonical)
+        .sign_wrapped_for_identity(
+            &expected_authority,
+            REGISTER_ATTEMPT_AUTHORIZATION_SCHEMA,
+            &canonical,
+        )
         .map_err(|error| {
             BrokerError::Invariant(format!(
                 "register-attempt authorization signing failed: {error}"
@@ -199,8 +188,13 @@ pub fn sign_register_attempt_authorization(
         })?;
     if signed.public_key != expected_authority
         || signed.algorithm != expected_authority.algorithm()
-        || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || verify_wrapped_bytes(
+            &expected_authority,
+            REGISTER_ATTEMPT_AUTHORIZATION_SCHEMA,
+            &canonical,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(BrokerError::Invariant(
             "register-attempt signing backend returned a mismatched identity or signature"
@@ -208,7 +202,6 @@ pub fn sign_register_attempt_authorization(
         ));
     }
     Ok(SignedRegisterAttemptAuthorization {
-        algorithm: signed.algorithm,
         body,
         signature: signed.signature,
     })
@@ -232,8 +225,7 @@ pub fn verify_register_attempt_authorization(
         || authorization.body.action != expected_action
         || authorization.body.tenant_scope != tenant_scope
         || &authorization.body.authority != trusted_authority
-        || authorization.algorithm != trusted_authority.algorithm()
-        || authorization.signature.algorithm() != authorization.algorithm
+        || authorization.signature.algorithm() != trusted_authority.algorithm()
         || authorization.body.registration_digest != attempt_registration_digest(registration)?
     {
         return Err(BrokerError::AuthorizationDenied(
@@ -258,21 +250,23 @@ pub fn verify_register_attempt_authorization(
             "register-attempt authorization is stale or from the future".to_string(),
         ));
     }
-    let signing = RegisterAttemptSigningInput {
-        domain: REGISTER_ATTEMPT_AUTHORIZATION_DOMAIN,
-        body: &authorization.body,
-    };
-    let verified = trusted_authority
-        .verify_canonical(&signing, &authorization.signature)
-        .map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
+    match verify_wrapped(
+        trusted_authority,
+        REGISTER_ATTEMPT_AUTHORIZATION_SCHEMA,
+        &authorization.body,
+        &authorization.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BrokerError::AuthorizationDenied(
+                "register-attempt authorization signature is invalid".to_string(),
+            ));
+        }
+        Err(error) => {
+            return Err(BrokerError::AuthorizationDenied(format!(
                 "register-attempt authorization verification failed: {error}"
-            ))
-        })?;
-    if !verified {
-        return Err(BrokerError::AuthorizationDenied(
-            "register-attempt authorization signature is invalid".to_string(),
-        ));
+            )));
+        }
     }
     Ok(())
 }
