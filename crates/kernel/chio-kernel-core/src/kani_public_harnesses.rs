@@ -1828,3 +1828,15 @@ pub fn public_delivery_contract_allow_implies_digest_match() {
     let retry = delivery_denies_settlement(committed, observed_str, delivered_value);
     assert!(retry == denies);
 }
+
+#[kani::proof]
+pub fn verify_signing_wrapper_layout() {
+    let schema_digest: [u8; 32] = kani::any();
+    let body_digest: [u8; 32] = kani::any();
+    let wrapper = chio_core_types::crypto::assemble_wrapper(schema_digest, body_digest);
+    assert_eq!(&wrapper[..24], chio_core_types::crypto::SIGNING_WRAPPER_PREFIX);
+    assert_eq!(wrapper[23], 0);
+    assert_eq!(&wrapper[24..56], &schema_digest);
+    assert_eq!(&wrapper[56..88], &body_digest);
+    kani::cover!(true, "verify_signing_wrapper_layout");
+}

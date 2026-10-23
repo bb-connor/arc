@@ -194,6 +194,14 @@ lane = "pr"
 [[harness]]
 crate = "chio-kernel-core"
 features = ["kani"]
+harness = "verify_signing_wrapper_layout"
+default_unwind = 2
+timeout_secs = 600
+lane = "pr"
+
+[[harness]]
+crate = "chio-kernel-core"
+features = ["kani"]
 harness = "verify_budget_checked_add_no_overflow"
 default_unwind = 8
 timeout_secs = 1800
