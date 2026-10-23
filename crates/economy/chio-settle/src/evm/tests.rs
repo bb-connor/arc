@@ -247,12 +247,6 @@ fn align_config_to_anchor_proof(config: &mut SettlementChainConfig, proof: &Anch
     config.chain_id = chain_anchor.chain_id.clone();
     config.root_registry_contract = chain_anchor.contract_address.clone();
     config.operator_address = chain_anchor.operator_address.clone();
-    if !config.kernel_authority.trusts(&proof.receipt.kernel_key) {
-        config
-            .kernel_authority
-            .trusted_keys
-            .push(proof.receipt.kernel_key.clone());
-    }
 }
 
 fn sample_anchor_content_binding() -> SettlementAnchorContentBinding {
