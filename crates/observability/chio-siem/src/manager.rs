@@ -114,6 +114,13 @@ pub struct ExporterManager {
     acked: std::collections::BTreeMap<String, u64>,
 }
 
+/// Decode one retained receipt row, refusing duplicate keys at every depth.
+fn decode_receipt_row(
+    raw_json: &str,
+) -> Result<chio_core::receipt::body::ChioReceipt, chio_core::canonical::UntrustedJsonError> {
+    chio_core::canonical::UntrustedJsonText::new(raw_json).decode_signed()
+}
+
 impl ExporterManager {
     /// Create a new ExporterManager with the given configuration.
     ///
@@ -290,7 +297,7 @@ impl ExporterManager {
         let mut max_seq = self.cursor;
 
         for (seq, raw_json) in &rows {
-            match serde_json::from_str::<chio_core::receipt::body::ChioReceipt>(raw_json) {
+            match decode_receipt_row(raw_json) {
                 Ok(receipt) => {
                     events.push(SiemEvent::from_receipt_with_trusted_kernel_keys(
                         receipt,

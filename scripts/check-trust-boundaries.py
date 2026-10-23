@@ -48,6 +48,10 @@ RETIRED_DIRECT_HELPERS = {
         "read_json_file", "read_json_file_bounded", "from_wire"),
     "crates/sdk/chio-binding-helpers/src/receipt.rs": (
         "parse_receipt_json", "parse_receipt_json", "new"),
+    "crates/observability/chio-siem/src/manager.rs": (
+        "decode_receipt_row", "decode_receipt_row", "new"),
+    "crates/tooling/chio-trace-validate/src/decode.rs": (
+        "decode_observations", "decode_observations", "from_wire"),
 }
 
 

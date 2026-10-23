@@ -11,6 +11,7 @@ use super::report_validation::{
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 
+use super::json_ingress::SignedJson;
 use super::reports::{
     build_comptroller_surface_report, build_economic_completion_flow_report, build_operator_report,
     build_signed_behavioral_feed,
@@ -118,7 +119,7 @@ pub(crate) async fn handle_list_tool_receipts(
 pub(crate) async fn handle_append_tool_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(receipt): Json<ChioReceipt>,
+    SignedJson(receipt): SignedJson<ChioReceipt>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
@@ -427,7 +428,7 @@ struct AuthenticatedEvidenceExportResponse {
 pub(crate) async fn handle_evidence_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(request): Json<evidence_export::RemoteEvidenceImportRequest>,
+    SignedJson(request): SignedJson<evidence_export::RemoteEvidenceImportRequest>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
@@ -993,7 +994,7 @@ pub(crate) async fn handle_agent_receipts(
 pub(crate) async fn handle_append_child_receipt(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(receipt): Json<ChildRequestReceipt>,
+    SignedJson(receipt): SignedJson<ChildRequestReceipt>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;

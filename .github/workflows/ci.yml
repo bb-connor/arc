@@ -325,6 +325,7 @@ jobs:
           run_gate python3 scripts/check-escape-hatches.py
           run_gate python3 scripts/tests/check-escape-hatches.test.py
           run_gate python3 scripts/check-trust-boundaries.py
+          run_gate python3 scripts/check-committed-receipt-raw-decode.py
           run_gate python3 scripts/check-receipt-query-http.py
           run_gate python3 scripts/tests/check-receipt-query-http.test.py
           run_gate python3 scripts/tests/check-trust-boundaries.test.py
