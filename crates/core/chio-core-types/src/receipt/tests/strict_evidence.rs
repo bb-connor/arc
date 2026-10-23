@@ -32,11 +32,15 @@ fn child_receipt_rejects_identity_key_forgery() -> crate::error::Result<()> {
 
 #[test]
 fn export_envelope_rejects_identity_key_forgery() -> crate::error::Result<()> {
-    let mut envelope = SignedExportEnvelope::sign(
-        serde_json::json!({"schema": "test.export.v1", "count": 3}),
-        &Keypair::generate(),
-    )?;
+    #[derive(Clone, serde::Serialize)]
+    struct ForgedExport {
+        count: u32,
+    }
+    impl crate::receipt::lineage::SignedExportPayload for ForgedExport {
+        const SCHEMA_ID: &'static str = crate::CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA;
+    }
+    let mut envelope = SignedExportEnvelope::sign(ForgedExport { count: 3 }, &Keypair::generate())?;
     (envelope.signer_key, envelope.signature) = identity_forgery()?;
-    assert!(!envelope.verify_signature()?);
+    assert!(!envelope.verify_signature(&envelope.signer_key)?);
     Ok(())
 }

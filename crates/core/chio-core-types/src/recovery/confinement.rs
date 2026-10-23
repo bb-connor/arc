@@ -1,15 +1,16 @@
 //! Return authorities cannot substitute disclosure signatures for endorsement.
 use super::authority::{invalid, signed_authority};
-use crate::crypto::Ed25519Backend;
-use crate::{
-    canonical_json_bytes, Keypair, PublicKey, Result, Signature, SigningAlgorithm, SigningBackend,
-};
+use crate::{canonical_json_bytes, Keypair, PublicKey, Result, Signature, SigningBackend};
 use alloc::vec::Vec;
 use chio_security_types::confinement::*;
 use serde::{Deserialize, Serialize};
 
-pub const CONFINED_DISCLOSURE_SIGNATURE_DOMAIN: &str = "chio:confined-disclosure:v1";
-pub const CONFINED_ENDORSEMENT_SIGNATURE_DOMAIN: &str = "chio:confined-endorsement:v1";
+/// Signing-wrapper schema id of a confined disclosure.
+pub const CHIO_RECOVERY_CONFINED_DISCLOSURE_SCHEMA: &str =
+    "chio.recovery.signed-confined-disclosure.v1";
+/// Signing-wrapper schema id of a confined endorsement.
+pub const CHIO_RECOVERY_CONFINED_ENDORSEMENT_SCHEMA: &str =
+    "chio.recovery.signed-confined-endorsement.v1";
 /// Hash the complete signed confined capability under its own domain.
 /// This identity cannot be substituted for a capability body digest.
 ///
@@ -63,13 +64,13 @@ pub fn parse_cage_digest(
 signed_authority!(
     SignedConfinedDisclosureV1,
     ConfinedReturnEvidenceV1,
-    CONFINED_DISCLOSURE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_CONFINED_DISCLOSURE_SCHEMA,
     |b: &ConfinedReturnEvidenceV1| b.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedConfinedEndorsementV1,
     ConfinedReturnEvidenceV1,
-    CONFINED_ENDORSEMENT_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_CONFINED_ENDORSEMENT_SCHEMA,
     |b: &ConfinedReturnEvidenceV1| b.validate().map_err(|_| invalid())
 );
 

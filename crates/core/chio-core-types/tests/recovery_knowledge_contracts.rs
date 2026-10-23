@@ -1,4 +1,4 @@
-use chio_core_types::{canonical_json_bytes, recovery::*, PublicKey};
+use chio_core_types::{canonical_json_bytes, recovery::*};
 use chio_security_types::{knowledge::*, recovery::*};
 #[path = "../../../../fixtures/recovery-knowledge-profile.rs"]
 mod profile;
@@ -98,14 +98,15 @@ fn signatures_content_and_role_domains_cannot_substitute() -> TestResult {
             .map(|proof| proof.verify_signature().unwrap_or(false))
             .is_ok_and(|valid| !valid)
     );
-    assert!(proof
-        .signing_bytes()?
-        .starts_with(b"chio:artifact-certificate:v1\0"));
-    let mut wrong = b"chio:scoped-endorsement:v1\0".to_vec();
-    wrong.extend(canonical_json_bytes(proof.body())?);
-    assert!(!proof.authority_key().verify(&wrong, proof.signature()));
-    let key: PublicKey = proof.authority_key().clone();
-    assert_eq!(key.algorithm(), proof.algorithm());
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            proof.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_SCOPED_ENDORSEMENT_SCHEMA,
+            proof.body(),
+            proof.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     Ok(())
 }
 #[test]

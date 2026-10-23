@@ -1,6 +1,6 @@
 use chio_core_types::{
-    canonical_json_bytes, Ed25519Backend, Keypair, SignedSecurityEvent, SigningAlgorithm,
-    SECURITY_EVENT_SIGNATURE_DOMAIN,
+    CanonicalBytes, Ed25519Backend, Keypair, Signature, SignedSecurityEvent,
+    CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
 };
 use chio_security_types::ports::{
     EventId, LineageId, OpaqueReceiptRef, ProducerId, ProducerTrustClass, RecordId, SessionId,
@@ -10,6 +10,15 @@ use chio_security_types::{
     SecurityEventBody, SecurityEventBodyInput, SecurityEventKind, SecuritySeverity, SecuritySubject,
 };
 use serde_json::{json, Value};
+
+fn sign_body_as(key: &Keypair, schema_id: &str, body: &SecurityEventBody) -> Signature {
+    key.sign_wrapped(
+        schema_id,
+        &CanonicalBytes::from_serializable(body)
+            .unwrap_or_else(|error| panic!("canonical security event body: {error}")),
+    )
+    .unwrap_or_else(|error| panic!("sign security event body: {error}"))
+}
 
 fn record_id(value: &str) -> RecordId {
     RecordId::new(value).unwrap_or_else(|error| panic!("record id {value}: {error}"))
@@ -108,24 +117,16 @@ fn replace_at_pointer(value: &mut Value, pointer: &str, replacement: Value) {
 }
 
 #[test]
-fn trusted_producer_round_trip_uses_the_security_event_domain() {
+fn trusted_producer_round_trip_uses_the_security_event_schema() {
     let key = Keypair::from_seed(&[7; 32]);
     let signed = signed_event(&key);
 
     assert!(verifies_as_trusted(&signed, &key));
     assert_eq!(signed.body(), &body());
     assert_eq!(signed.producer_key(), &key.public_key());
-    assert_eq!(signed.algorithm(), SigningAlgorithm::Ed25519);
-    assert_eq!(SECURITY_EVENT_SIGNATURE_DOMAIN, "chio:security-event:v1");
-
-    let signing_bytes = signed
-        .signing_bytes()
-        .unwrap_or_else(|error| panic!("security event signing bytes: {error}"));
-    assert!(signing_bytes.starts_with(SECURITY_EVENT_SIGNATURE_DOMAIN.as_bytes()));
     assert_eq!(
-        signing_bytes[SECURITY_EVENT_SIGNATURE_DOMAIN.len()],
-        0,
-        "the domain and canonical body must be separated by a NUL byte"
+        signed.signature(),
+        &sign_body_as(&key, CHIO_SIGNED_SECURITY_EVENT_SCHEMA, signed.body())
     );
 
     let encoded =
@@ -165,19 +166,18 @@ fn trusted_producer_binding_rejects_wrong_identity_key_id_and_key() {
 }
 
 #[test]
-fn wrong_domain_signature_is_rejected() {
+fn signature_under_another_schema_id_is_rejected() {
     let key = Keypair::from_seed(&[7; 32]);
     let signed = signed_event(&key);
-    let mut wrong_domain_bytes = b"chio:security-event:v0\0".to_vec();
-    wrong_domain_bytes.extend_from_slice(
-        &canonical_json_bytes(signed.body())
-            .unwrap_or_else(|error| panic!("canonical security event body: {error}")),
-    );
 
     let mut value =
         serde_json::to_value(&signed).unwrap_or_else(|error| panic!("serialize event: {error}"));
-    value["signature"] = serde_json::to_value(key.sign(&wrong_domain_bytes))
-        .unwrap_or_else(|error| panic!("serialize wrong-domain signature: {error}"));
+    value["signature"] = serde_json::to_value(sign_body_as(
+        &key,
+        chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+        signed.body(),
+    ))
+    .unwrap_or_else(|error| panic!("serialize wrong-schema signature: {error}"));
     let candidate: SignedSecurityEvent = serde_json::from_value(value)
         .unwrap_or_else(|error| panic!("decode wrong-domain event: {error}"));
 
@@ -190,11 +190,8 @@ fn every_body_field_and_envelope_cryptographic_field_is_bound() {
     let other_key = Keypair::from_seed(&[8; 32]);
     let signed = signed_event(&key);
     let alternate = alternate_body();
-    let alternate_signature = other_key.sign(
-        &signed
-            .signing_bytes()
-            .unwrap_or_else(|error| panic!("security event signing bytes: {error}")),
-    );
+    let alternate_signature =
+        sign_body_as(&other_key, CHIO_SIGNED_SECURITY_EVENT_SCHEMA, signed.body());
 
     let mutations = [
         ("/body/event_id", json!(alternate.event_id)),
@@ -224,7 +221,6 @@ fn every_body_field_and_envelope_cryptographic_field_is_bound() {
         ("/body/policy_version", json!(alternate.policy_version)),
         ("/producer_key", json!(other_key.public_key())),
         ("/signature", json!(alternate_signature)),
-        ("/algorithm", json!(SigningAlgorithm::P256)),
     ];
 
     for (pointer, replacement) in mutations {
@@ -250,6 +246,11 @@ fn strict_wire_decode_rejects_unknown_or_unsigned_envelopes() {
     unknown_envelope["unknown"] = json!(true);
     assert!(serde_json::from_value::<SignedSecurityEvent>(unknown_envelope).is_err());
 
+    let mut algorithm_member =
+        serde_json::to_value(&signed).unwrap_or_else(|error| panic!("serialize event: {error}"));
+    algorithm_member["algorithm"] = json!("ed25519");
+    assert!(serde_json::from_value::<SignedSecurityEvent>(algorithm_member).is_err());
+
     let mut unknown_body =
         serde_json::to_value(&signed).unwrap_or_else(|error| panic!("serialize event: {error}"));
     unknown_body["body"]["unknown"] = json!(true);
@@ -265,10 +266,10 @@ fn strict_wire_decode_rejects_unknown_or_unsigned_envelopes() {
 
     let mut forged =
         serde_json::to_value(&signed).unwrap_or_else(|error| panic!("serialize event: {error}"));
-    forged["signature"] = json!(Keypair::from_seed(&[9; 32]).sign(
-        &signed
-            .signing_bytes()
-            .unwrap_or_else(|error| panic!("security event signing bytes: {error}"))
+    forged["signature"] = json!(sign_body_as(
+        &Keypair::from_seed(&[9; 32]),
+        CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
+        signed.body(),
     ));
     let decoded_forgery: SignedSecurityEvent = serde_json::from_value(forged)
         .unwrap_or_else(|error| panic!("decode signed-shaped forgery: {error}"));

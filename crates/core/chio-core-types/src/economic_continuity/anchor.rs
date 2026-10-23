@@ -11,9 +11,7 @@ pub const CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA: &str =
 
 const VIEW_HEADS_ROOT_DOMAIN: &str = "chio.economy.anchor-view.heads-root.v1";
 const VIEW_REPLAYS_ROOT_DOMAIN: &str = "chio.economy.anchor-view.replays-root.v1";
-const VIEW_SIGNING_DOMAIN: &str = "CHIO-ECONOMIC-STATE-ANCHOR-VIEW-V1";
 const DISPATCH_COMMIT_ID_DOMAIN: &str = "chio.economy.effect-dispatch-commit.id.v1";
-const DISPATCH_COMMIT_SIGNING_DOMAIN: &str = "CHIO-ECONOMIC-EFFECT-DISPATCH-COMMIT-V1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EconomicStateAnchorError {
@@ -252,7 +250,11 @@ impl EconomicStateAnchorViewV1 {
         self.validate_body(false)?;
         self.heads_root = view_heads_root(&self.heads)?;
         self.request_replays_root = view_replays_root(&self.request_replays)?;
-        self.anchor_signature = keypair.sign(&self.signing_bytes()?).to_hex();
+        self.anchor_signature = sign_wrapped_hex(
+            keypair,
+            CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+            &self.signing_preimage(),
+        )?;
         self.validate()
     }
 
@@ -285,20 +287,16 @@ impl EconomicStateAnchorViewV1 {
         if self.signer_key_epoch != pins.signer_key_epoch {
             return Err(EconomicStateAnchorError::PinMismatch("signer_key_epoch"));
         }
-        let signature = Signature::from_hex(&self.anchor_signature)
-            .map_err(|_| EconomicStateAnchorError::InvalidSignature)?;
-        if pins
-            .signer_public_key
-            .verify(&self.signing_bytes()?, &signature)
-        {
+        if verify_wrapped_hex(
+            &pins.signer_public_key,
+            CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+            &self.signing_preimage(),
+            &self.anchor_signature,
+        ) {
             Ok(())
         } else {
             Err(EconomicStateAnchorError::InvalidSignature)
         }
-    }
-
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, EconomicStateAnchorError> {
-        prefixed_canonical(VIEW_SIGNING_DOMAIN, &self.signing_preimage()).map_err(Into::into)
     }
 
     pub fn head(&self, key: &EconomicResourceKeyV1) -> Option<&EconomicResourceHeadV1> {
@@ -1051,7 +1049,11 @@ impl EconomicEffectDispatchCommitV1 {
             anchor_signature: String::new(),
         };
         commit.commit_id = commit.recompute_commit_id()?;
-        commit.anchor_signature = keypair.sign(&commit.signing_bytes()?).to_hex();
+        commit.anchor_signature = sign_wrapped_hex(
+            keypair,
+            CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA,
+            &commit.signing_preimage(),
+        )?;
         commit.validate()?;
         Ok(commit)
     }
@@ -1098,12 +1100,12 @@ impl EconomicEffectDispatchCommitV1 {
         {
             return Err(EconomicStateAnchorError::PinMismatch("dispatch_commit"));
         }
-        let signature = Signature::from_hex(&self.anchor_signature)
-            .map_err(|_| EconomicStateAnchorError::InvalidSignature)?;
-        if pins
-            .signer_public_key
-            .verify(&self.signing_bytes()?, &signature)
-        {
+        if verify_wrapped_hex(
+            &pins.signer_public_key,
+            CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA,
+            &self.signing_preimage(),
+            &self.anchor_signature,
+        ) {
             Ok(())
         } else {
             Err(EconomicStateAnchorError::InvalidSignature)
@@ -1112,11 +1114,6 @@ impl EconomicEffectDispatchCommitV1 {
 
     fn recompute_commit_id(&self) -> Result<String, EconomicStateAnchorError> {
         domain_digest(DISPATCH_COMMIT_ID_DOMAIN, &self.id_preimage()).map_err(Into::into)
-    }
-
-    fn signing_bytes(&self) -> Result<Vec<u8>, EconomicStateAnchorError> {
-        prefixed_canonical(DISPATCH_COMMIT_SIGNING_DOMAIN, &self.signing_preimage())
-            .map_err(Into::into)
     }
 
     fn id_preimage(&self) -> EconomicEffectDispatchCommitIdPreimage<'_> {

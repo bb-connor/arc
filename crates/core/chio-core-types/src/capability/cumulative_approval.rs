@@ -4,15 +4,14 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
 use crate::crypto::{
-    is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey, Signature, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-    sign_bytes_for_embedded_key,
+    sign_wrapped_for_embedded_key,
 };
 
 use super::attenuation::{
@@ -25,7 +24,6 @@ pub const CUMULATIVE_APPROVAL_ROOT_SCHEMA: &str = "chio.cumulative-approval-root
 pub const MAX_CUMULATIVE_APPROVAL_BINDINGS_PER_MARKER: usize = 64;
 
 const ROOT_COMMITMENT_DOMAIN: &[u8] = b"chio.cumulative-approval-root-commitment.v1\0";
-const ROOT_SIGNATURE_DOMAIN: &[u8] = b"chio.cumulative-approval-root.v1\0";
 const ROOT_BINDING_DIGEST_DOMAIN: &[u8] = b"chio.cumulative-approval-root-binding-digest.v1\0";
 const ROOT_GRANT_HASH_DOMAIN: &[u8] = b"chio.cumulative-approval-root-grant.v1\0";
 const FAMILY_KEY_DOMAIN: &[u8] = b"chio.cumulative-approval-family-key.v1\0";
@@ -52,8 +50,6 @@ pub struct CumulativeApprovalRootBindingBody {
 #[serde(deny_unknown_fields)]
 pub struct CumulativeApprovalRootBinding {
     pub body: CumulativeApprovalRootBindingBody,
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -121,12 +117,11 @@ impl CumulativeApprovalRootBinding {
             "cumulative approval root binding",
             "root_issuer",
         )?;
-        let signature = keypair.sign(&domain_message(ROOT_SIGNATURE_DOMAIN, &body)?);
-        Ok(Self {
-            body,
-            algorithm: None,
-            signature,
-        })
+        let signature = keypair.sign_wrapped(
+            CUMULATIVE_APPROVAL_ROOT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
+        Ok(Self { body, signature })
     }
 
     pub fn sign_with_backend(
@@ -139,18 +134,14 @@ impl CumulativeApprovalRootBinding {
             "cumulative approval root binding",
             "root_issuer",
         )?;
-        let signature = sign_bytes_for_embedded_key(
+        let signature = sign_wrapped_for_embedded_key(
             &body.root_issuer,
             backend,
-            &domain_message(ROOT_SIGNATURE_DOMAIN, &body)?,
+            CUMULATIVE_APPROVAL_ROOT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
         )?
         .signature;
-        let algorithm = body.root_issuer.algorithm();
-        Ok(Self {
-            body,
-            algorithm: Some(algorithm),
-            signature,
-        })
+        Ok(Self { body, signature })
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
@@ -160,16 +151,10 @@ impl CumulativeApprovalRootBinding {
                 self.body.schema
             )));
         }
-        if self
-            .algorithm
-            .is_some_and(|algorithm| algorithm != self.signature.algorithm())
-        {
-            return Err(violation(
-                "cumulative approval root signature algorithm does not match its envelope",
-            ));
-        }
-        Ok(self.body.root_issuer.verify(
-            &domain_message(ROOT_SIGNATURE_DOMAIN, &self.body)?,
+        wrapped_verdict(verify_wrapped(
+            &self.body.root_issuer,
+            CUMULATIVE_APPROVAL_ROOT_SCHEMA,
+            &self.body,
             &self.signature,
         ))
     }

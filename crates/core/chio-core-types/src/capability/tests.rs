@@ -1719,10 +1719,6 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(
-        token.algorithm,
-        Some(crate::crypto::SigningAlgorithm::Ed25519)
-    );
     assert!(token.verify_signature().unwrap());
 }
 
@@ -1731,7 +1727,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
 fn capability_token_p256_round_trip() {
     // A capability token signed with P-256 verifies when reconstructed
     // through the exact same API path the kernel uses
-    // (`verify_signature` -> `PublicKey::verify_canonical`).
+    // (`verify_signature` -> `verify_wrapped`).
     let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
@@ -1745,13 +1741,12 @@ fn capability_token_p256_round_trip() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
     assert!(token.verify_signature().unwrap());
 
     // Round-trip through JSON (the wire format the kernel receives).
     let wire = serde_json::to_string(&token).unwrap();
     assert!(wire.contains("\"p256:"));
-    assert!(wire.contains("\"algorithm\":\"p256\""));
+    assert!(!wire.contains("\"algorithm\""));
     let restored: CapabilityToken = serde_json::from_str(&wire).unwrap();
     assert!(restored.verify_signature().unwrap());
 }
@@ -1772,7 +1767,6 @@ fn capability_token_p384_round_trip() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
     assert!(token.verify_signature().unwrap());
 }
 
@@ -1813,7 +1807,6 @@ fn governed_approval_token_p256_verifies() {
         decision: GovernedApprovalDecision::Approved,
     };
     let token = GovernedApprovalToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
     assert!(token.verify_signature().unwrap());
 }
 

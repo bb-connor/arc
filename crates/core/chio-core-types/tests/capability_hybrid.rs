@@ -139,21 +139,11 @@ fn hybrid_token_under_pq_required_verifies() {
 }
 
 #[test]
-fn algorithm_envelope_field_mismatch_rejects_fail_closed() {
-    // Forge: produce a hybrid signature, then claim Ed25519 in the
-    // envelope field. The validator MUST reject before invoking the
-    // cryptographic step. Threat model row `pq_signature_downgrade`.
-    let mut cap = hybrid_token();
-    cap.algorithm = Some(SigningAlgorithm::Ed25519);
-    let err = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowHybrid)
-        .expect_err("envelope mismatch must reject");
-    match err {
-        CapabilityFloorVerifyError::AlgorithmMismatch { declared, actual } => {
-            assert_eq!(declared, SigningAlgorithm::Ed25519);
-            assert_eq!(actual, SigningAlgorithm::Hybrid);
-        }
-        other => panic!("expected AlgorithmMismatch, got {other:?}"),
+fn algorithm_member_fails_decoding() {
+    for algorithm in ["ed25519", "hybrid"] {
+        let mut value = serde_json::to_value(hybrid_token()).unwrap();
+        value["algorithm"] = serde_json::json!(algorithm);
+        assert!(serde_json::from_value::<CapabilityToken>(value).is_err());
     }
 }
 
@@ -163,7 +153,9 @@ fn algorithm_envelope_field_absent_is_accepted() {
     // entirely (Ed25519 default). The validator MUST accept the absence
     // and dispatch on signature material.
     let cap = classical_token();
-    assert!(cap.algorithm.is_none());
+    assert!(!serde_json::to_string(&cap)
+        .unwrap()
+        .contains("\"algorithm\""));
     let ok = cap
         .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
         .unwrap();

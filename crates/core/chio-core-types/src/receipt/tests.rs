@@ -244,7 +244,7 @@ fn receipt_floor_rejects_ed25519_under_pq_required() {
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
 
     let err = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)
         .expect_err("ed25519 receipt must reject under pq_required");
 
     assert!(err.to_string().contains("crypto_floor=pq_required"));
@@ -257,7 +257,7 @@ fn receipt_floor_accepts_ed25519_under_allow_classical() {
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
 
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .unwrap());
 }
 
@@ -278,7 +278,7 @@ fn receipt_floor_accepts_hybrid_under_pq_required() {
 
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Hybrid);
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)
         .unwrap());
 }
 
@@ -296,7 +296,7 @@ fn receipt_floor_rejects_hybrid_under_allow_classical() {
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     let err = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .expect_err("hybrid receipt must reject under allow_classical");
 
     assert!(err.to_string().contains("crypto_floor=allow_classical"));
@@ -357,14 +357,22 @@ fn receipt_signature_binds_typed_id_and_body_wrapper() {
 
     assert_eq!(signing_body.id, receipt.id);
     assert_eq!(chio_receipt_id(&body).unwrap(), receipt.id);
-    assert!(receipt
-        .kernel_key
-        .verify_canonical(&signing_body, &receipt.signature)
-        .unwrap());
-    assert!(!receipt
-        .kernel_key
-        .verify_canonical(&body, &receipt.signature)
-        .unwrap());
+    crate::crypto::verify_wrapped(
+        &receipt.kernel_key,
+        super::body::CHIO_RECEIPT_SCHEMA,
+        &signing_body,
+        &receipt.signature,
+    )
+    .unwrap();
+    assert!(matches!(
+        crate::crypto::verify_wrapped(
+            &receipt.kernel_key,
+            super::body::CHIO_RECEIPT_SCHEMA,
+            &body,
+            &receipt.signature,
+        ),
+        Err(crate::Error::SignatureRejected)
+    ));
 }
 
 #[test]
@@ -524,6 +532,10 @@ fn signed_export_envelope_roundtrip() {
         exported_at: u64,
     }
 
+    impl super::lineage::SignedExportPayload for ExampleExport {
+        const SCHEMA_ID: &'static str = crate::CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA;
+    }
+
     let kp = Keypair::generate();
     let export = ExampleExport {
         schema: "chio.example-export.v1".to_string(),
@@ -531,7 +543,7 @@ fn signed_export_envelope_roundtrip() {
     };
     let envelope = SignedExportEnvelope::sign(export.clone(), &kp).unwrap();
     assert_eq!(envelope.body, export);
-    assert!(envelope.verify_signature().unwrap());
+    assert!(envelope.verify_signature(&kp.public_key()).unwrap());
 }
 
 #[test]
@@ -1375,16 +1387,12 @@ fn ed25519_receipt_is_byte_identical_without_algorithm_field() {
 }
 
 #[test]
-fn ed25519_receipt_without_algorithm_field_verifies() {
-    // Generate an Ed25519 receipt, then assert that parsing its JSON (which
-    // has no `algorithm` key) produces a receipt whose `algorithm` is
-    // `None` and whose signature still verifies.
+fn receipt_wire_carries_no_algorithm_member() {
     let kp = Keypair::generate();
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
     let wire = serde_json::to_string(&receipt).unwrap();
     assert!(!wire.contains("\"algorithm\""));
     let restored: ChioReceipt = serde_json::from_str(&wire).unwrap();
-    assert!(restored.algorithm.is_none());
     assert!(restored.verify_signature().unwrap());
 }
 
@@ -1396,7 +1404,7 @@ fn receipt_signs_and_verifies_under_p256_backend() {
     let mut body = make_receipt_body(&Keypair::generate());
     body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
+    assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::P256);
     assert!(receipt.verify_signature().unwrap());
     // And through the wire.
     let wire = serde_json::to_string(&receipt).unwrap();

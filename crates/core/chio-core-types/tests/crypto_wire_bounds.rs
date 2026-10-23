@@ -1,5 +1,6 @@
 //! Untrusted crypto wire input must not control parser depth or decode allocation.
 
+use chio_core_types::crypto::ExemptFormat;
 use chio_core_types::crypto::{
     HYBRID_ED25519_MLDSA65, HYBRID_P256_MLDSA65, HYBRID_P384_MLDSA65, ML_DSA_65_PUBLIC_KEY_LEN,
     ML_DSA_65_SIGNATURE_LEN,
@@ -216,7 +217,7 @@ fn oversized_hex_rejects_before_decoding_invalid_digits() {
 fn valid_ed25519_and_hybrid_transport_encodings_round_trip() -> TestResult {
     let signer = Keypair::from_seed(&[7; 32]);
     let key = signer.public_key();
-    let signature = signer.sign(b"wire contract");
+    let signature = signer.sign_exempt(ExemptFormat::JwsSigningInput, b"wire contract");
     assert_eq!(PublicKey::from_hex(&key.to_hex())?, key);
     assert_eq!(Signature::from_hex(&signature.to_hex())?, signature);
     assert_eq!(PublicKey::from_hex(&key.to_hex().to_uppercase())?, key);
@@ -418,7 +419,7 @@ fn hash_serde_borrows_input_and_preserves_prefixed_wire_format() -> TestResult {
 fn serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy() -> TestResult {
     let signer = Keypair::from_seed(&[7; 32]);
     let key = signer.public_key();
-    let signature = signer.sign(b"borrowed wire");
+    let signature = signer.sign_exempt(ExemptFormat::JwsSigningInput, b"borrowed wire");
     assert_eq!(
         PublicKey::deserialize(BorrowedStringOnly(&key.to_hex()))?,
         key
@@ -549,13 +550,28 @@ fn hybrid_backend_signatures_verify_after_wire_and_json_round_trip() -> TestResu
 fn assert_signed_round_trip(backend: &dyn chio_core_types::SigningBackend) -> TestResult {
     let message = b"bounded crypto wire verification";
     let key = backend.public_key()?;
-    let signature = backend.sign_bytes(message)?;
+    let signature = backend.sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+        ExemptFormat::JwsSigningInput,
+        message,
+    ))?;
     let key_wire = key.to_hex();
     let signature_wire = signature.to_hex();
     let decoded_key = PublicKey::from_hex(&key_wire)?;
     let decoded_signature = Signature::from_hex(&signature_wire)?;
-    assert!(decoded_key.verify_strict(message, &decoded_signature));
-    assert!(!decoded_key.verify_strict(b"changed message", &decoded_signature));
+    assert!(chio_core_types::crypto::verify_exempt(
+        &decoded_key,
+        ExemptFormat::JwsSigningInput,
+        message,
+        &decoded_signature
+    )
+    .is_ok());
+    assert!(chio_core_types::crypto::verify_exempt(
+        &decoded_key,
+        ExemptFormat::JwsSigningInput,
+        b"changed message",
+        &decoded_signature
+    )
+    .is_err());
     let key_json = serde_json::to_string(&key)?;
     let signature_json = serde_json::to_string(&signature)?;
     assert_eq!(serde_json::from_str::<PublicKey>(&key_json)?, key);

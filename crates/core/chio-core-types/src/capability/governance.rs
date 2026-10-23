@@ -4,10 +4,9 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
 use crate::crypto::{
-    is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey, Signature, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::hashing::Hash;
@@ -15,13 +14,20 @@ use crate::schema_binding::ensure_schema_matches;
 use crate::session::SessionAnchorReference;
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-    sign_bytes_for_embedded_key,
+    sign_wrapped_for_embedded_key,
 };
 
 use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence};
 use super::scope::MonetaryAmount;
 
 const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.v1\0";
+
+/// Signing-wrapper schema id of a governed approval token.
+pub const GOVERNED_APPROVAL_TOKEN_SCHEMA: &str = "chio.governed-approval-token.v1";
+
+/// Signing-wrapper schema id of a governed upstream call-chain proof.
+pub const GOVERNED_UPSTREAM_CALL_CHAIN_PROOF_SCHEMA: &str =
+    "chio.governed-upstream-call-chain-proof.v1";
 pub const THRESHOLD_APPROVAL_PROPOSAL_SCHEMA: &str = "chio.threshold-approval-proposal.v1";
 
 const THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN: &[u8] = b"chio.threshold-approval-proposal.v1\0";
@@ -266,7 +272,10 @@ impl GovernedUpstreamCallChainProof {
 
     pub fn sign(body: GovernedUpstreamCallChainProofBody, keypair: &Keypair) -> Result<Self> {
         ensure_keypair_matches_embedded_key(&body.signer, keypair, "call-chain proof", "signer")?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            GOVERNED_UPSTREAM_CALL_CHAIN_PROOF_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             signer: body.signer,
             subject: body.subject,
@@ -283,7 +292,12 @@ impl GovernedUpstreamCallChainProof {
 
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
-        self.signer.verify_canonical(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.signer,
+            GOVERNED_UPSTREAM_CALL_CHAIN_PROOF_SCHEMA,
+            &body,
+            &self.signature,
+        ))
     }
 
     /// Verify the signature AND enforce the validity window in one pass.
@@ -447,7 +461,10 @@ impl CallChainContinuationToken {
             "call-chain continuation token",
         )?;
         ensure_keypair_matches_embedded_key(&body.signer, keypair, "continuation token", "signer")?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             schema: body.schema,
             token_id: body.token_id,
@@ -479,7 +496,12 @@ impl CallChainContinuationToken {
             "call-chain continuation token",
         )?;
         let body = self.body();
-        self.signer.verify_canonical(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.signer,
+            CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+            &body,
+            &self.signature,
+        ))
     }
 
     /// Verify the signature AND enforce the validity window in one pass.
@@ -1314,6 +1336,7 @@ pub struct GovernedApprovalTokenBody {
 
 /// Signed approval artifact bound to one governed intent and one request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GovernedApprovalToken {
     pub id: String,
     pub approver: PublicKey,
@@ -1325,12 +1348,6 @@ pub struct GovernedApprovalToken {
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
-    /// Signing algorithm. Absent means Ed25519 (the default).
-    ///
-    /// Informational: verification dispatches off the algorithm encoded in
-    /// [`GovernedApprovalToken::signature`] and [`GovernedApprovalToken::approver`].
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -1358,7 +1375,10 @@ impl GovernedApprovalToken {
             "governed approval token",
             "approver",
         )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            GOVERNED_APPROVAL_TOKEN_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             approver: body.approver,
@@ -1369,7 +1389,6 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
-            algorithm: None,
             signature,
         })
     }
@@ -1387,8 +1406,12 @@ impl GovernedApprovalToken {
             "governed approval token",
             "approver",
         )?;
-        let outcome =
-            sign_bytes_for_embedded_key(&body.approver, backend, &canonical_json_bytes(&body)?)?;
+        let outcome = sign_wrapped_for_embedded_key(
+            &body.approver,
+            backend,
+            GOVERNED_APPROVAL_TOKEN_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             approver: body.approver,
@@ -1399,14 +1422,18 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
-            algorithm: Some(outcome.algorithm),
             signature: outcome.signature,
         })
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
-        self.approver.verify_canonical(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.approver,
+            GOVERNED_APPROVAL_TOKEN_SCHEMA,
+            &body,
+            &self.signature,
+        ))
     }
 
     pub fn artifact_digest(&self) -> Result<String> {
@@ -1581,8 +1608,6 @@ impl ThresholdApprovalProposalBody {
 pub struct ThresholdApprovalProposal {
     #[serde(flatten)]
     pub body: ThresholdApprovalProposalBody,
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -1601,8 +1626,6 @@ struct ThresholdApprovalProposalWire {
     proposal_created_at: u64,
     proposal_deadline: u64,
     policy_authority: PublicKey,
-    #[serde(default)]
-    algorithm: Option<SigningAlgorithm>,
     signature: Signature,
 }
 
@@ -1627,7 +1650,6 @@ impl<'de> Deserialize<'de> for ThresholdApprovalProposal {
                 proposal_deadline: wire.proposal_deadline,
                 policy_authority: wire.policy_authority,
             },
-            algorithm: wire.algorithm,
             signature: wire.signature,
         })
     }
@@ -1656,12 +1678,11 @@ impl ThresholdApprovalProposal {
             "threshold approval proposal",
             "policy_authority",
         )?;
-        let (signature, _) = keypair.sign_canonical(&body)?;
-        Ok(Self {
-            body,
-            algorithm: None,
-            signature,
-        })
+        let signature = keypair.sign_wrapped(
+            THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
+        Ok(Self { body, signature })
     }
 
     pub fn sign_with_backend(
@@ -1675,23 +1696,26 @@ impl ThresholdApprovalProposal {
             "threshold approval proposal",
             "policy_authority",
         )?;
-        let outcome = sign_bytes_for_embedded_key(
+        let outcome = sign_wrapped_for_embedded_key(
             &body.policy_authority,
             backend,
-            &canonical_json_bytes(&body)?,
+            THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
         )?;
         Ok(Self {
             body,
-            algorithm: Some(outcome.algorithm),
             signature: outcome.signature,
         })
     }
 
     pub fn verify_signature(&self) -> Result<bool> {
         self.body.validate()?;
-        self.body
-            .policy_authority
-            .verify_canonical(&self.body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.body.policy_authority,
+            THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+            &self.body,
+            &self.signature,
+        ))
     }
 
     pub fn validate_at(&self, now: u64) -> Result<()> {

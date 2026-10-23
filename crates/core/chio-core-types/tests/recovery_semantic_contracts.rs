@@ -152,10 +152,15 @@ fn ingress_bounds_and_private_diagnostics() -> Result {
         .find(|case| case["schema"] == "signed-scoped-endorsement.schema.json")
         .ok_or("endorsement")?;
     let signed: SignedScopedEndorsementV1 = serde_json::from_value(value["value"].clone())?;
-    let mut wrong = RECOVERY_GRANT_SIGNATURE_DOMAIN.as_bytes().to_vec();
-    wrong.push(0);
-    wrong.extend(chio_core_types::canonical_json_bytes(signed.body())?);
     assert!(signed.verify_signature()?);
-    assert!(!signed.authority_key().verify(&wrong, signed.signature()));
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            signed.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_GRANT_SCHEMA,
+            signed.body(),
+            signed.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     Ok(())
 }

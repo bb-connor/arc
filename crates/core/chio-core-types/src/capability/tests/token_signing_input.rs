@@ -45,7 +45,10 @@ fn plain_body_signature_is_refused() -> Result<()> {
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
     };
-    let (signature, _bytes) = kp.sign_canonical(&body)?;
+    let signature = kp.sign_wrapped(
+        CHIO_CAPABILITY_SCHEMA,
+        &crate::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let token = CapabilityToken {
         schema: CHIO_CAPABILITY_SCHEMA.to_string(),
         id: body.id,
@@ -55,7 +58,6 @@ fn plain_body_signature_is_refused() -> Result<()> {
         issued_at: body.issued_at,
         expires_at: body.expires_at,
         delegation_chain: body.delegation_chain,
-        algorithm: None,
         caveats: Vec::new(),
         scope_attenuations: None,
         attenuation_proof: None,

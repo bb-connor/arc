@@ -330,13 +330,20 @@ fn econsim_qualification_matrix_is_registered_and_unknown_versions_fail_closed()
     )))
     .expect("econsim qualification fixture parses");
     assert_eq!(body["schema"], schema);
+    #[derive(Clone, serde::Serialize)]
+    #[serde(transparent)]
+    struct QualificationMatrix(serde_json::Value);
+    impl chio_core_types::receipt::lineage::SignedExportPayload for QualificationMatrix {
+        const SCHEMA_ID: &'static str = "chio.econsim.qualification-matrix.v1";
+    }
+    let key = chio_core_types::Keypair::from_seed(&[91; 32]);
     let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(
-        body,
-        &chio_core_types::Keypair::from_seed(&[91; 32]),
+        QualificationMatrix(body),
+        &key,
     )
     .expect("econsim qualification fixture signs");
     assert!(signed
-        .verify_signature()
+        .verify_signature(&key.public_key())
         .expect("econsim signature verifies"));
 }
 
@@ -1283,8 +1290,13 @@ fn request_lineage_record() -> RequestLineageRecord {
     )
 }
 
-fn sign_body<T: serde::Serialize>(body: &T, keypair: &Keypair) -> Signature {
-    keypair.sign_canonical(body).expect("body signs").0
+fn sign_body<T: serde::Serialize>(schema_id: &str, body: &T, keypair: &Keypair) -> Signature {
+    keypair
+        .sign_wrapped(
+            schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(body).expect("body canonicalizes"),
+        )
+        .expect("body signs")
 }
 
 fn session_anchor_from_body(body: SessionAnchorBody, signature: Signature) -> SessionAnchor {
@@ -1377,19 +1389,31 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
 
     let mut anchor_body = session_anchor_body(&keypair);
     anchor_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let anchor_signature = sign_body(&anchor_body, &keypair);
+    let anchor_signature = sign_body(
+        chio_core_types::session::CHIO_SESSION_ANCHOR_SCHEMA,
+        &anchor_body,
+        &keypair,
+    );
     let anchor = session_anchor_from_body(anchor_body, anchor_signature);
     assert!(anchor.verify_signature().is_err());
 
     let mut lineage_body = receipt_lineage_body(&keypair);
     lineage_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let lineage_signature = sign_body(&lineage_body, &keypair);
+    let lineage_signature = sign_body(
+        chio_core_types::receipt::lineage::CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+        &lineage_body,
+        &keypair,
+    );
     let lineage = receipt_lineage_from_body(lineage_body, lineage_signature);
     assert!(lineage.verify_signature().is_err());
 
     let mut continuation_body = continuation_body(&keypair);
     continuation_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let continuation_signature = sign_body(&continuation_body, &keypair);
+    let continuation_signature = sign_body(
+        chio_core_types::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+        &continuation_body,
+        &keypair,
+    );
     let continuation = continuation_from_body(continuation_body, continuation_signature);
     assert!(continuation.verify_signature().is_err());
 }

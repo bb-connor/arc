@@ -1,19 +1,20 @@
 //! Signed recovery authority: grants, coverage attestations and provider finality.
-use alloc::vec::Vec;
 use chio_security_types::recovery::{
     AuthorityCoverageAttestationV1, RecoveryGrantBindingV1, SafeInteger, VersionV1,
 };
 use chio_security_types::DeclassificationGrantBody;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::Ed25519Backend;
-use crate::{
-    canonical_json_bytes, Error, Keypair, PublicKey, Result, Signature, SigningAlgorithm,
-    SigningBackend,
-};
+use crate::{Error, Keypair, PublicKey, Result, Signature, SigningBackend};
 
-pub const RECOVERY_GRANT_SIGNATURE_DOMAIN: &str = "chio:recovery-grant:v1";
-pub const RECOVERY_COVERAGE_SIGNATURE_DOMAIN: &str = "chio:recovery-authority-coverage:v1";
+/// Signing-wrapper schema id of a recovery grant.
+pub const CHIO_RECOVERY_GRANT_SCHEMA: &str = "chio.recovery.grant.v1";
+/// Signing-wrapper schema id of an authority coverage attestation.
+pub const CHIO_RECOVERY_AUTHORITY_COVERAGE_SCHEMA: &str =
+    "chio.recovery.signed-authority-coverage.v1";
+/// Signing-wrapper schema id of a recovery provider finality statement.
+pub const CHIO_RECOVERY_PROVIDER_FINALITY_SCHEMA: &str =
+    "chio.recovery.signed-provider-finality.v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RecoveryGrantSchema {
@@ -50,64 +51,42 @@ pub(super) fn invalid() -> Error {
 }
 
 macro_rules! signed_authority {
-    ($name:ident, $body:ty, $domain:ident, $validate:expr) => {
+    ($name:ident, $body:ty, $schema:ident, $validate:expr) => {
         #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
         #[serde(deny_unknown_fields)]
         pub struct $name {
             body: $body,
             authority_key: PublicKey,
-            algorithm: SigningAlgorithm,
             signature: Signature,
         }
         impl $name {
             pub fn sign(body: $body, key: &Keypair) -> Result<Self> {
-                Self::sign_with_backend(body, &Ed25519Backend::new(key.clone()))
+                Self::sign_with_backend(body, &$crate::crypto::Ed25519Backend::new(key.clone()))
             }
             pub fn sign_with_backend(body: $body, backend: &dyn SigningBackend) -> Result<Self> {
                 ($validate)(&body)?;
-                let signed = backend.sign_bytes_with_identity(&Self::body_signing_bytes(&body)?)?;
-                if signed.public_key.algorithm() != signed.algorithm
-                    || signed.signature.algorithm() != signed.algorithm
-                {
-                    return Err(invalid());
-                }
+                let signed = backend
+                    .sign_wrapped($schema, &$crate::CanonicalBytes::from_serializable(&body)?)?;
                 Ok(Self {
                     body,
                     authority_key: signed.public_key,
-                    algorithm: signed.algorithm,
                     signature: signed.signature,
                 })
             }
-            fn body_signing_bytes(body: &$body) -> Result<Vec<u8>> {
-                let canonical = canonical_json_bytes(body)?;
-                let mut bytes = Vec::with_capacity($domain.len() + 1 + canonical.len());
-                bytes.extend_from_slice($domain.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(&canonical);
-                Ok(bytes)
-            }
-            pub fn signing_bytes(&self) -> Result<Vec<u8>> {
-                Self::body_signing_bytes(&self.body)
-            }
             pub fn verify_signature(&self) -> Result<bool> {
                 ($validate)(&self.body)?;
-                if self.authority_key.algorithm() != self.algorithm
-                    || self.signature.algorithm() != self.algorithm
-                {
-                    return Ok(false);
-                }
-                Ok(self
-                    .authority_key
-                    .verify(&self.signing_bytes()?, &self.signature))
+                $crate::crypto::wrapped_verdict($crate::crypto::verify_wrapped(
+                    &self.authority_key,
+                    $schema,
+                    &self.body,
+                    &self.signature,
+                ))
             }
             pub const fn body(&self) -> &$body {
                 &self.body
             }
             pub const fn authority_key(&self) -> &PublicKey {
                 &self.authority_key
-            }
-            pub const fn algorithm(&self) -> SigningAlgorithm {
-                self.algorithm
             }
             pub const fn signature(&self) -> &Signature {
                 &self.signature
@@ -124,13 +103,13 @@ pub(super) use signed_authority;
 signed_authority!(
     SignedRecoveryGrant,
     RecoveryGrantBody,
-    RECOVERY_GRANT_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_GRANT_SCHEMA,
     RecoveryGrantBody::validate
 );
 signed_authority!(
     SignedAuthorityCoverageAttestationV1,
     AuthorityCoverageAttestationV1,
-    RECOVERY_COVERAGE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_AUTHORITY_COVERAGE_SCHEMA,
     |body: &AuthorityCoverageAttestationV1| {
         if body.issued_at_unix_ms >= body.expires_at_unix_ms
             || body.expires_at_unix_ms.get() - body.issued_at_unix_ms.get() > 900_000
@@ -146,11 +125,10 @@ impl core::fmt::Debug for RecoveryGrantBody {
     }
 }
 
-pub const RECOVERY_PROVIDER_SIGNATURE_DOMAIN: &str = "chio:recovery-provider-finality:v1";
 signed_authority!(
     SignedRecoveryProviderFinalityV1,
     chio_security_types::recovery::RecoveryProviderFinalityV1,
-    RECOVERY_PROVIDER_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_PROVIDER_FINALITY_SCHEMA,
     |body: &chio_security_types::recovery::RecoveryProviderFinalityV1| {
         if body.observed_at_unix_ms >= body.expires_at_unix_ms
             || body.expires_at_unix_ms.get() - body.observed_at_unix_ms.get() > 60_000

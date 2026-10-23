@@ -161,13 +161,15 @@ fn operator_signatures_bind_every_base_target_proposal_and_fence() -> TestResult
     assert!(!decoded.verify_signature()?);
     let setup = SignedRecoverySetupProbeV1::sign(probe()?, &key)?;
     assert!(setup.verify_signature()?);
-    assert_ne!(signed.signing_bytes()?, setup.signing_bytes()?);
-    assert!(signed
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-policy-deployment-change:v1\0"));
-    assert!(setup
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-setup-probe:v1\0"));
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            setup.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_POLICY_DEPLOYMENT_CHANGE_SCHEMA,
+            setup.body(),
+            setup.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     Ok(())
 }
 
@@ -186,9 +188,15 @@ fn setup_report_requires_a_distinct_reopened_writer_and_bounded_probe_lifetime()
     };
     let signed = SignedRecoverySetupReportV1::sign(report.clone(), &key)?;
     assert!(signed.verify_signature()?);
-    assert!(signed
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-setup-report:v1\0"));
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            signed.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_SETUP_PROBE_SCHEMA,
+            signed.body(),
+            signed.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     let same_writer = RecoverySetupReportV1 {
         current_serving_fence: report.previous_serving_fence,
         ..report
