@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """Fail on any production verify call that trusts a key the verified artifact carries itself.
 
-A self-key verify passes a field of the artifact under verification (signer_key, kernel_key,
-issuer, authority_key, ...) as the verifying key. Every such site outside tests must appear in
-ALLOWLIST, keyed by (file, enclosing fn), with its class and call count:
+Two kinds of site are tracked outside tests, each keyed by (file, enclosing fn) with its class
+and call count:
 
+  SELF_KEY_SITES        a verify call whose key argument is a field of the artifact under
+                        verification (signer_key, kernel_key, issuer, authority_key, ...)
+  EMBEDDED_KEY_CALLERS  a call to a chio-core-types verify_integrity_embedded_key* method
+
+Classes:
+
+  PINNED                         the carried key is compared with a trusted key first
+  GUARDED                        a trusted key or membership check on the carried key gates use
   INTEGRITY-ONLY                 no authorization decision depends on the result
   NEEDS-TRUST-CONTEXT:<row id>   an authorization path whose trusted key arrives in <row id>
 
-The observed multiset must equal ALLOWLIST: a new site fails, a removed site fails until its
-entry is deleted, so the list only shrinks.
+Each observed multiset must equal its list: a new site fails, a removed site fails until its
+entry is deleted, so the lists only shrink.
 
 Usage: check-self-key-verify.py [--root DIR] [--print]
 """
@@ -20,10 +27,11 @@ import re
 import sys
 from pathlib import Path
 
-CLASSES = re.compile(r"^(INTEGRITY-ONLY|NEEDS-TRUST-CONTEXT:SELF-KEY-PIN-[A-Z0-9-]+)$")
+CLASSES = re.compile(r"^(PINNED|GUARDED|INTEGRITY-ONLY|NEEDS-TRUST-CONTEXT:SELF-KEY-PIN-[A-Z0-9-]+)$")
 
 # (file, enclosing fn): (class, count)
-ALLOWLIST: dict[tuple[str, str], tuple[str, int]] = {}
+SELF_KEY_SITES: dict[tuple[str, str], tuple[str, int]] = {}
+EMBEDDED_KEY_CALLERS: dict[tuple[str, str], tuple[str, int]] = {}
 
 CARRIED = r"(?:signer_key|kernel_key|issuer|authority_key|signer|producer_key|root_issuer|approver|delegator|public_key|policy_authority)"
 CALL = re.compile(
@@ -31,6 +39,7 @@ CALL = re.compile(
     + CARRIED
     + r")\b"
 )
+EMBEDDED = re.compile(r"\bverify_integrity_embedded_key\w*\s*\(")
 TEST_PATH = re.compile(r"(^|/)(tests|benches|examples|fixtures)/|(^|/)tests\.rs$|_tests?\.rs$|_tests/|test_support")
 CFG_TEST = re.compile(r"#\[cfg\((?:test|any\([^)]*\btest\b[^)]*\))\)\]")
 
@@ -79,7 +88,8 @@ def strip_test_items(text):
 
 def scan(root):
     gated = gated_module_files(root)
-    observed = collections.Counter()
+    self_key = collections.Counter()
+    embedded = collections.Counter()
     for path in sorted(root.joinpath("crates").rglob("*.rs")):
         rel = path.relative_to(root).as_posix()
         if TEST_PATH.search(rel) or path.resolve() in gated:
@@ -87,13 +97,18 @@ def scan(root):
         text = strip_test_items(path.read_text(encoding="utf-8", errors="replace"))
         text = re.sub(r"//[^\n]*", lambda m: " " * len(m.group(0)), text)
         fns = [(m.start(), m.group(1)) for m in re.finditer(r"\bfn\s+(\w+)", text)]
-        for m in CALL.finditer(text):
-            enclosing = "<module>"
-            for pos, name in fns:
-                if pos < m.start():
-                    enclosing = name
-            observed[(rel, enclosing)] += 1
-    return observed
+        for pattern, observed in ((CALL, self_key), (EMBEDDED, embedded)):
+            for m in pattern.finditer(text):
+                if text[: m.start()].rstrip().endswith("fn"):
+                    continue
+                enclosing = "<module>"
+                for pos, name in fns:
+                    if pos < m.start():
+                        enclosing = name
+                if observed is embedded and enclosing.startswith("verify_integrity_embedded_key"):
+                    continue
+                observed[(rel, enclosing)] += 1
+    return self_key, embedded
 
 
 def main():
@@ -102,25 +117,36 @@ def main():
     parser.add_argument("--print", action="store_true")
     args = parser.parse_args()
     root = Path(args.root).resolve()
-    observed = scan(root)
+    self_key, embedded = scan(root)
+    tracked = (
+        ("SELF_KEY_SITES", "self-key verify", self_key, SELF_KEY_SITES),
+        ("EMBEDDED_KEY_CALLERS", "embedded-key verify", embedded, EMBEDDED_KEY_CALLERS),
+    )
     if args.print:
-        for (rel, fn), count in sorted(observed.items()):
-            print(f'    ("{rel}", "{fn}"): ("UNCLASSIFIED", {count}),')
+        for list_name, _, observed, _ in tracked:
+            print(f"{list_name} = {{")
+            for (rel, fn), count in sorted(observed.items()):
+                print(f'    ("{rel}", "{fn}"): ("UNCLASSIFIED", {count}),')
+            print("}")
         return 0
     errors = []
-    for key, (cls, _) in sorted(ALLOWLIST.items()):
-        if not CLASSES.match(cls):
-            errors.append(f"{key}: invalid class {cls}")
-    for key in sorted(set(observed) | set(ALLOWLIST)):
-        allowed = ALLOWLIST.get(key, (None, 0))[1]
-        if observed[key] != allowed:
-            errors.append(f"{key}: observed {observed[key]} self-key verify call(s), allowed {allowed}")
+    for list_name, label, observed, allowlist in tracked:
+        for key, (cls, _) in sorted(allowlist.items()):
+            if not CLASSES.match(cls):
+                errors.append(f"{list_name} {key}: invalid class {cls}")
+        for key in sorted(set(observed) | set(allowlist)):
+            allowed = allowlist.get(key, (None, 0))[1]
+            if observed[key] != allowed:
+                errors.append(f"{list_name} {key}: observed {observed[key]} {label} call(s), allowed {allowed}")
     if errors:
         print("check-self-key-verify: FAIL", file=sys.stderr)
         for error in errors:
             print(f"  {error}", file=sys.stderr)
         return 1
-    print(f"check-self-key-verify: ok ({sum(observed.values())} classified self-key sites)")
+    print(
+        f"check-self-key-verify: ok ({sum(self_key.values())} self-key sites, "
+        f"{sum(embedded.values())} embedded-key callers)"
+    )
     return 0
 
 
