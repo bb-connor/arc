@@ -359,7 +359,7 @@ pub fn validate_risk_report_signature(
         .remove("signature");
     if chio_core_types::crypto::verify_wrapped(
         &public_key,
-        RISK_COMPTROLLER_REPORT_SCHEMA_ID,
+        chio_core_types::signed_artifact::CHIO_RISK_COMPTROLLER_REPORT_V1_SCHEMA,
         &signed_value,
         &signature,
     )

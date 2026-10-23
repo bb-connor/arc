@@ -1159,7 +1159,7 @@ fn transparency_anchor_state(
     let Ok(typed_body_bytes) = canonical_json_bytes(&checkpoint_body) else {
         return invalid("parsed checkpoint statement body is not canonicalizable");
     };
-    if typed_body_bytes != body_bytes {
+    if typed_body_bytes.as_slice() != body_bytes.as_bytes() {
         return invalid("checkpoint statement body uses noncanonical field encodings");
     }
     if checkpoint_body.kernel_key != kernel_key {
