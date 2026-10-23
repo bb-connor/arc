@@ -51,7 +51,7 @@ fn classical_certificate_round_trip_under_allow_classical() {
     let cert =
         issue_session_compliance_certificate(body, KernelCryptoFloor::AllowClassical, &backend)
             .unwrap();
-    assert_eq!(cert.algorithm, SigningAlgorithm::Ed25519);
+    assert_eq!(cert.signer_key.algorithm(), SigningAlgorithm::Ed25519);
     assert_eq!(cert.signature.algorithm(), SigningAlgorithm::Ed25519);
     verify_session_compliance_certificate(&cert, KernelCryptoFloor::AllowClassical).unwrap();
 }
@@ -62,7 +62,7 @@ fn hybrid_certificate_round_trip_under_allow_hybrid() {
     let body = body_with_floor(KernelCryptoFloor::AllowHybrid);
     let cert = issue_session_compliance_certificate(body, KernelCryptoFloor::AllowHybrid, &backend)
         .unwrap();
-    assert_eq!(cert.algorithm, SigningAlgorithm::Hybrid);
+    assert_eq!(cert.signer_key.algorithm(), SigningAlgorithm::Hybrid);
     assert_eq!(cert.signature.algorithm(), SigningAlgorithm::Hybrid);
     verify_session_compliance_certificate(&cert, KernelCryptoFloor::AllowHybrid).unwrap();
 }
@@ -125,26 +125,6 @@ fn hybrid_certificate_under_allow_classical_rejects_at_verification() {
         err,
         ComplianceCertificateError::RejectedByCryptoFloor {
             floor: "allow_classical",
-            actual: "hybrid",
-        }
-    ));
-}
-
-#[test]
-fn tampered_algorithm_field_rejects_before_signature_verification() {
-    let backend = hybrid_backend();
-    let body = body_with_floor(KernelCryptoFloor::AllowHybrid);
-    let mut cert =
-        issue_session_compliance_certificate(body, KernelCryptoFloor::AllowHybrid, &backend)
-            .unwrap();
-    cert.algorithm = SigningAlgorithm::Ed25519;
-
-    let err = verify_session_compliance_certificate(&cert, KernelCryptoFloor::AllowHybrid)
-        .expect_err("declared algorithm must match signature material");
-    assert!(matches!(
-        err,
-        ComplianceCertificateError::AlgorithmMismatch {
-            declared: "ed25519",
             actual: "hybrid",
         }
     ));

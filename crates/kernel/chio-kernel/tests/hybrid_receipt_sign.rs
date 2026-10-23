@@ -50,6 +50,21 @@ fn bind_signing_nonce(body: &mut ChioReceiptBody) {
     body.metadata = Some(serde_json::Value::Object(metadata));
 }
 
+fn verifies_receipt_wrapper(
+    key: &chio_core::crypto::PublicKey,
+    canonical_body: &[u8],
+    signature: &chio_core::crypto::Signature,
+) -> bool {
+    let body: serde_json::Value = serde_json::from_slice(canonical_body).unwrap();
+    chio_core::crypto::verify_wrapped(
+        key,
+        chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+        &body,
+        signature,
+    )
+    .is_ok()
+}
+
 /// Canonical JSON bytes of the authoritative `ChioReceiptSigningBody`
 /// wrapper. Both classical and hybrid receipt-signing paths sign these
 /// bytes, not the bare `ChioReceiptBody` bytes. The signer binds the
@@ -211,14 +226,12 @@ fn classical_receipt_byte_identical_under_allow_classical() {
     // bare body bytes.
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
     assert!(
-        receipt
-            .kernel_key
-            .verify(&wrapper_bytes, &receipt.signature),
+        verifies_receipt_wrapper(&receipt.kernel_key, &wrapper_bytes, &receipt.signature),
         "signature must verify against the ChioReceiptSigningBody wrapper bytes"
     );
-    assert!(receipt.verify_integrity_embedded_key().unwrap());
+    assert!(receipt.verify_signature().unwrap());
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .unwrap());
 }
 
@@ -244,15 +257,13 @@ fn hybrid_receipt_round_trip_signs_and_verifies() {
     // The signature verifies against the authoritative
     // `ChioReceiptSigningBody` wrapper bytes, not the bare body bytes.
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
+    assert!(verifies_receipt_wrapper(&receipt.kernel_key, &wrapper_bytes, &receipt.signature));
+    assert!(receipt.verify_signature().unwrap());
     assert!(receipt
-        .kernel_key
-        .verify(&wrapper_bytes, &receipt.signature));
-    assert!(receipt.verify_integrity_embedded_key().unwrap());
-    assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)
         .unwrap());
     let err = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .expect_err("hybrid receipt must reject under allow_classical");
     assert!(err.to_string().contains("crypto_floor=allow_classical"));
 }

@@ -57,6 +57,21 @@ fn canonical_signing_wrapper_bytes(body: &ChioReceiptBody) -> Vec<u8> {
     canonical_json_bytes(&signing_body).unwrap()
 }
 
+fn verifies_receipt_wrapper(
+    key: &chio_core::crypto::PublicKey,
+    canonical_body: &[u8],
+    signature: &chio_core::crypto::Signature,
+) -> bool {
+    let body: serde_json::Value = serde_json::from_slice(canonical_body).unwrap();
+    chio_core::crypto::verify_wrapped(
+        key,
+        chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+        &body,
+        signature,
+    )
+    .is_ok()
+}
+
 fn fixture_classical_seed() -> [u8; 32] {
     let raw = b"chio-canonical-bytes-class-seed!";
     let mut out = [0u8; 32];
@@ -149,9 +164,7 @@ fn shared_canonical_bytes_match_classical_signing_path() {
     // Verify the produced signature against the exact shared wrapper
     // bytes the backend signed.
     assert!(
-        receipt
-            .kernel_key
-            .verify(canonical.as_bytes(), &receipt.signature),
+        verifies_receipt_wrapper(&receipt.kernel_key, canonical.as_bytes(), &receipt.signature),
         "signature MUST verify against the exact ChioReceiptSigningBody bytes"
     );
 }
@@ -175,9 +188,7 @@ fn hybrid_signing_consumes_shared_canonical_bytes_and_verifies() {
     // Verify against the EXACT shared bytes the backend signed. This
     // is the byte chain downstream consumers preserve.
     assert!(
-        receipt
-            .kernel_key
-            .verify(canonical.as_bytes(), &receipt.signature),
+        verifies_receipt_wrapper(&receipt.kernel_key, canonical.as_bytes(), &receipt.signature),
         "hybrid signature MUST verify against shared CanonicalBytes"
     );
 }
@@ -344,15 +355,11 @@ fn hybrid_canonical_and_classical_paths_sign_identical_bytes_under_ed25519() {
     // verify against the hybrid path's shared canonical bytes (and
     // vice versa).
     assert!(
-        classical_receipt
-            .kernel_key
-            .verify(canonical.as_bytes(), &classical_receipt.signature),
+        verifies_receipt_wrapper(&classical_receipt.kernel_key, canonical.as_bytes(), &classical_receipt.signature),
         "classical signature MUST verify against the hybrid path's shared canonical bytes"
     );
     assert!(
-        hybrid_receipt
-            .kernel_key
-            .verify(&expected_wrapper_bytes, &hybrid_receipt.signature),
+        verifies_receipt_wrapper(&hybrid_receipt.kernel_key, &expected_wrapper_bytes, &hybrid_receipt.signature),
         "hybrid path signature MUST verify against independently computed wrapper bytes"
     );
 }

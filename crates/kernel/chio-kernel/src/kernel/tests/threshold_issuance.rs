@@ -349,7 +349,7 @@ fn installed_hybrid_backend_signs_cumulative_proposal() -> TestResult {
     let mut fixture = Fixture::new()?;
     let backend = fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let proposal = fixture.pending()?;
-    assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Hybrid));
+    assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Hybrid);
     assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Hybrid);
     Ok(())
@@ -369,7 +369,7 @@ fn pq_required_proposal_uses_the_boot_verified_authority() -> TestResult {
         .push(backend.public_key()?);
     fixture.request.capability = CapabilityToken::sign_with_backend(capability, backend.as_ref())?;
     let proposal = fixture.pending()?;
-    assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Hybrid));
+    assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Hybrid);
     assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     Ok(())
 }
@@ -533,7 +533,7 @@ fn hybrid_proposal_dispatches_and_replays_once() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let proposal = fixture.pending()?;
-    assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Hybrid));
+    assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Hybrid);
     fixture.approve(proposal)?;
     fixture.dispatch_and_retry_once()
 }
