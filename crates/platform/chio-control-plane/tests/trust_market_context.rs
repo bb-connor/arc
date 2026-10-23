@@ -76,7 +76,9 @@ fn signed_market_artifact_bytes(mut value: Value) -> Vec<u8> {
     object.remove("signature");
     let signature = keypair
         .sign_wrapped(
-            value["schema"].as_str().test_expect("market artifact schema"),
+            value["schema"]
+                .as_str()
+                .test_expect("market artifact schema"),
             &chio_core::CanonicalBytes::from_serializable(&value)
                 .test_expect("market artifact canonicalizes"),
         )

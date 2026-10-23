@@ -107,7 +107,9 @@ fn signed_value_with_key(mut value: Value, keypair: &Keypair) -> Value {
         .remove("signature");
     let signature = keypair
         .sign_wrapped(
-            value["schema"].as_str().test_expect("signed artifact schema"),
+            value["schema"]
+                .as_str()
+                .test_expect("signed artifact schema"),
             &chio_core::CanonicalBytes::from_serializable(&value)
                 .test_expect("artifact canonicalizes"),
         )

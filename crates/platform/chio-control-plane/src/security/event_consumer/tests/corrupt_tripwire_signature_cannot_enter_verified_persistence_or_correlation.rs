@@ -17,11 +17,13 @@ fn corrupt_tripwire_signature_cannot_enter_verified_persistence_or_correlation()
     let signed: SignedSecurityEvent = serde_json::from_slice(corrupted.source_evidence.as_bytes())
         .unwrap_or_else(|error| panic!("decode signed event: {error}"));
     let wrong_key = Keypair::from_seed(&[75_u8; 32]);
-    let wrong_signature = wrong_key.sign(
-        &signed
-            .signing_bytes()
-            .unwrap_or_else(|error| panic!("security event signing bytes: {error}")),
-    );
+    let wrong_signature = wrong_key
+        .sign_wrapped(
+            chio_core_types::CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
+            &chio_core_types::canonical::CanonicalBytes::from_serializable(signed.body())
+                .unwrap_or_else(|error| panic!("security event signing body: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("sign security event: {error}"));
     let mut envelope = serde_json::to_value(&signed)
         .unwrap_or_else(|error| panic!("encode signed event: {error}"));
     envelope["signature"] = serde_json::to_value(wrong_signature)

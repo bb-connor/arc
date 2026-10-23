@@ -306,7 +306,7 @@ mod tests {
     use chio_core::Keypair;
     use chio_test_support::prelude::*;
 
-    use super::super::schema::CRITERIA_PROFILE_ALL_PASS_V1;
+    use super::super::schema::{CERTIFICATION_SCHEMA, CRITERIA_PROFILE_ALL_PASS_V1};
     use super::super::types::CertificationVerdict;
     use super::{build_certification_body, evaluate_all_pass_profile, sign_artifact};
 

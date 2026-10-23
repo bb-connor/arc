@@ -2245,7 +2245,9 @@ fn handshake_at(
         &web.finding,
     )?;
     let ask_digest = digest_of(&ask.body)?;
-    let buyer_signature_hex = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(buyer, &ask.body)?.to_hex();
+    let buyer_signature_hex =
+        crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(buyer, &ask.body)?
+            .to_hex();
     let reservation_id = derive_reservation_id(&ask_digest, &buyer.public_key().to_hex());
     Ok(Handshake {
         bid,
@@ -4267,7 +4269,11 @@ async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> Tes
     let exchange = handshake(&deployment.web, &witness, &buyer, BUYER_PAYOUT, TOKEN_ID)?;
 
     // A signature by a key that is not the token subject never reserves.
-    let interloper = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(&keypair(9), &exchange.ask.body)?.to_hex();
+    let interloper = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+        &keypair(9),
+        &exchange.ask.body,
+    )?
+    .to_hex();
     let rejected = coordinator.reserve(
         &exchange.bid,
         &exchange.ask,
@@ -5089,7 +5095,11 @@ async fn wedge_purchase_reserve_refuses_a_self_minted_ask() -> TestResult {
     let forged: SignedAskResponse = SignedExportEnvelope::sign(forged_body, &interloper)?;
     let forged_bid = SignedBidRequest::sign(fixture.exchange.bid.body.clone(), &interloper)?;
     let forged_digest = digest_of(&forged.body)?;
-    let forged_signature = interloper.sign(forged_digest.as_bytes()).to_hex();
+    let forged_signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+        &interloper,
+        &forged.body,
+    )?
+    .to_hex();
 
     assert!(matches!(
         fixture.coordinator.reserve(
@@ -5168,7 +5178,11 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
         mutate(grant);
         body.token_offer = CapabilityToken::sign(token.body(), &operator)?;
         let signed: SignedAskResponse = SignedExportEnvelope::sign(body, &operator)?;
-        let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(&buyer, &signed.body)?.to_hex();
+        let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+            &buyer,
+            &signed.body,
+        )?
+        .to_hex();
         Ok((signed, signature))
     };
 
@@ -5242,7 +5256,10 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
             let mut body = fixture.exchange.ask.body.clone();
             body.token_offer = token;
             let ask: SignedAskResponse = SignedExportEnvelope::sign(body, &operator)?;
-            let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(&buyer, &ask.body)?.to_hex();
+            let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+                &buyer, &ask.body,
+            )?
+            .to_hex();
             Ok((ask, signature))
         };
     let mut resource_token = fixture.exchange.ask.body.token_offer.clone();

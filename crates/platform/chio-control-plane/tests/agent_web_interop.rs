@@ -267,12 +267,13 @@ fn resign_agent_web_envelope(bundle: &mut AgentWebInteropBundle, envelope_path: 
     let canonical = chio_core::CanonicalBytes::from_serializable(&payload)
         .test_expect("agent web envelope canonicalizes");
     let signature = keypair
-        .sign_wrapped(chio_core::signed_artifact::CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA, &canonical)
+        .sign_wrapped(
+            chio_core::signed_artifact::CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA,
+            &canonical,
+        )
         .test_expect("agent web envelope signs");
-    envelope["signature"] = Value::String(format!(
-        "sig-ed25519:{public_key}:{}",
-        signature.to_hex()
-    ));
+    envelope["signature"] =
+        Value::String(format!("sig-ed25519:{public_key}:{}", signature.to_hex()));
     replace_agent_web_artifact(
         bundle,
         envelope_path,

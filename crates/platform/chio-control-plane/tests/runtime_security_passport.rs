@@ -688,8 +688,9 @@ fn sign_revocation_freshness(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("revocation proof signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("revocation proof signs"),
         )
         .test_expect("revocation proof signs")
         .to_hex()
@@ -763,8 +764,9 @@ fn sign_execution_lease(value: &Value, keypair: &Keypair) -> String {
     }
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("execution lease signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("execution lease signs"),
         )
         .test_expect("execution lease signs")
         .to_hex()
@@ -790,7 +792,7 @@ fn sign_runtime_route_plan(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
+            body["schema"].as_str().test_expect("signature body schema"),
             &chio_core::CanonicalBytes::from_serializable(&body).test_expect("route plan signs"),
         )
         .test_expect("route plan signs")
@@ -811,8 +813,9 @@ fn sign_policy_activation_receipt(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("policy activation receipt signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("policy activation receipt signs"),
         )
         .test_expect("policy activation receipt signs")
         .to_hex()
@@ -834,8 +837,9 @@ fn sign_attack_simulation_report(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("attack simulation report signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("attack simulation report signs"),
         )
         .test_expect("attack simulation report signs")
         .to_hex()
@@ -856,8 +860,9 @@ fn sign_chaos_run_report(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("chaos run report signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("chaos run report signs"),
         )
         .test_expect("chaos run report signs")
         .to_hex()
@@ -878,8 +883,9 @@ fn sign_sandbox_attestation(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("sandbox attestation signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("sandbox attestation signs"),
         )
         .test_expect("sandbox attestation signs")
         .to_hex()
@@ -899,8 +905,9 @@ fn sign_tool_server_ack(value: &Value, keypair: &Keypair) -> String {
     });
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("tool-server acknowledgement signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("tool-server acknowledgement signs"),
         )
         .test_expect("tool-server acknowledgement signs")
         .to_hex()
@@ -928,8 +935,9 @@ fn sign_runtime_terminal_receipt(value: &Value, keypair: &Keypair) -> String {
     }
     keypair
         .sign_wrapped(
-            body[\"schema\"].as_str().test_expect(\"signature body schema\"),
-            &chio_core::CanonicalBytes::from_serializable(&body).test_expect("terminal receipt signs"),
+            body["schema"].as_str().test_expect("signature body schema"),
+            &chio_core::CanonicalBytes::from_serializable(&body)
+                .test_expect("terminal receipt signs"),
         )
         .test_expect("terminal receipt signs")
         .to_hex()

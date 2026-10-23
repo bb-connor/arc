@@ -121,7 +121,7 @@ pub fn verify_job_capability(
         return Err("worker_capability_signer_mismatch");
     }
     if !capability
-        .verify_signature()
+        .verify_signature(expected_signer)
         .map_err(|_| "worker_capability_signature_invalid")?
     {
         return Err("worker_capability_signature_invalid");
@@ -752,7 +752,7 @@ pub fn verify_attested_result(
         return Err("worker_signer_mismatch");
     }
     if !envelope
-        .verify_signature()
+        .verify_signature(expected_signer)
         .map_err(|_| "worker_signature_invalid")?
     {
         return Err("worker_signature_invalid");
@@ -1218,4 +1218,12 @@ mod tests {
             }
         }
     }
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingWorkerCapabilityBody {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_CAPABILITY_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingWorkerAttestedResult {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_ATTESTED_RESULT_SCHEMA;
 }

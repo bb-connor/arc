@@ -287,8 +287,9 @@ impl RuntimeAttestationVerifierAdapter for EnterpriseVerifierAdapter {
         if !signed_evidence
             .verify_signature(&signed_evidence.signer_key)
             .map_err(|error| {
-            EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
-        })? {
+                EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
+            })?
+        {
             return Err(EnterpriseVerifierVerificationError::InvalidSignature);
         }
         let signer_key_hex = signed_evidence.signer_key.to_hex();

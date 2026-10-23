@@ -75,7 +75,7 @@ async fn behavioral_report_after_seed_loss_leaves_following_issuance_refused() -
     );
     let feed: SignedBehavioralFeed = serde_json::from_slice(&body)?;
     assert_eq!(feed.signer_key, signer.public_key());
-    assert!(feed.verify_signature()?);
+    assert!(feed.verify_signature(&signer.public_key())?);
     let (status, body) = issue(&state).await?;
     assert_eq!(
         status,

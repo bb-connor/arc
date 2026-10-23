@@ -10,6 +10,7 @@ mod verify;
 
 #[cfg(test)]
 pub(crate) use registry::revocation_capacity;
+#[cfg(test)]
 pub(crate) use schema::CERTIFICATION_SCHEMA;
 
 pub use commands::{

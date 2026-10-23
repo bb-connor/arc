@@ -89,8 +89,13 @@ pub(crate) fn verify_buyer_ask(
     ask_body: &chio_open_market::bidding::AskResponse,
     signature: &chio_core::crypto::Signature,
 ) -> bool {
-    chio_core::crypto::verify_wrapped(buyer, FINDING_BUYER_ASK_SIGNATURE_SCHEMA, ask_body, signature)
-        .is_ok()
+    chio_core::crypto::verify_wrapped(
+        buyer,
+        FINDING_BUYER_ASK_SIGNATURE_SCHEMA,
+        ask_body,
+        signature,
+    )
+    .is_ok()
 }
 
 const RESERVATION_DOMAIN: &str = "chio.finding.reservation.v1";
@@ -828,9 +833,8 @@ impl FindingPurchaseCoordinator {
         if bid.signer_key != *payer {
             return Err(PurchaseCoordinatorError::BidBinding);
         }
-        let buyer_signature =
-            chio_core::crypto::Signature::from_hex(buyer_ask_signature)
-                .map_err(|_| PurchaseCoordinatorError::BuyerSignature)?;
+        let buyer_signature = chio_core::crypto::Signature::from_hex(buyer_ask_signature)
+            .map_err(|_| PurchaseCoordinatorError::BuyerSignature)?;
         if !verify_buyer_ask(payer, &ask.body, &buyer_signature) {
             return Err(PurchaseCoordinatorError::BuyerSignature);
         }

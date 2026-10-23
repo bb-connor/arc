@@ -42,8 +42,8 @@ use chio_core::receipt::metadata::{
 };
 use chio_core::web3::anchors::AnchorInclusionProof;
 use chio_finding::{
-    audit_epoch_precommitment_sha256, audit_seed_witness_signing_bytes, compute_admission_id,
-    compute_allocation_id, compute_audit_epoch_id, compute_challenge_id, compute_enforcement_id,
+    audit_epoch_precommitment_sha256, compute_admission_id, compute_allocation_id,
+    compute_audit_epoch_id, compute_challenge_id, compute_enforcement_id,
     compute_failed_delivery_id, compute_finding_id, compute_profile_id, compute_snapshot_id,
     compute_terms_id, derive_audit_seed_commitment, derive_purchase_key, sign_finding,
     signed_envelope_sha256, Finding, FindingAdmission, FindingAffectedDelivery, FindingAuditEpoch,
@@ -2610,14 +2610,15 @@ fn audit_round_over(eligible: Vec<EligibleListing>) -> Result<FindingAuditRound,
         seed_witnessed_at,
         eligible_snapshot_at,
         seed_witness: randomness_witness.public_key(),
-        seed_witness_signature: randomness_witness.sign(&audit_seed_witness_signing_bytes(
+        seed_witness_signature: chio_finding::sign_audit_seed_witness(
+            &randomness_witness,
             &audit_authority.public_key(),
             1,
             &eligible_snapshot_digest,
             &seed_commitment,
             eligible_snapshot_at,
             seed_witnessed_at,
-        )),
+        )?,
         eligible_snapshot_digest,
         eligible_listing_count: u64::try_from(eligible.len())?,
         fee_schedule_envelope_sha256: signed_envelope_sha256(&published_fee_schedule()?)?,

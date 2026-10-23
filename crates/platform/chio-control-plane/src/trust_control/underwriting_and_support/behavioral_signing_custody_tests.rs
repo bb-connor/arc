@@ -177,6 +177,6 @@ fn behavioral_report_keeps_local_node_signer_after_replication_moves_head() -> T
         },
     )?;
     assert_eq!(feed.signer_key, follower_key);
-    assert!(feed.verify_signature()?);
+    assert!(feed.verify_signature(&follower_key)?);
     Ok(())
 }
