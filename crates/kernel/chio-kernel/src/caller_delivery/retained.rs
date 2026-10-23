@@ -1,5 +1,6 @@
 //! Independent original-admission authentication for native output recovery.
 use super::*;
+use chio_core::canonical::canonical_json_bytes;
 use crate::admission_operation::{
     AdmissionCallerDispatchContextV1, AdmissionExecutionNonceReservationV1, AdmissionOperationV1,
     NativeCallerReleaseCustodyV1, RetainedToolAdmissionRequestV1,

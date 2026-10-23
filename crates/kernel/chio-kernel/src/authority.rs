@@ -1,4 +1,3 @@
-use chio_core::crypto::SigningMessage;
 use chio_core::capability::{
     caveat::{CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA},
     runtime_attestation::RuntimeAttestationEvidence,
@@ -1204,7 +1203,7 @@ pub(crate) mod tests {
             ))
         }
 
-        fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core::error::Result<chio_core::Signature> {
+        fn sign_bytes(&self, message: chio_core::crypto::SigningMessage<'_>) -> chio_core::error::Result<chio_core::Signature> {
             self.0.sign_bytes(message)
         }
     }

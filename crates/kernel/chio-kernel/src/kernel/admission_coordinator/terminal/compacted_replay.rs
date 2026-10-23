@@ -153,7 +153,7 @@ impl ChioKernel {
             self.receipt_signing_crypto_floor(),
         ] {
             if !receipt
-                .verify_signature_with_floor(floor)
+                .verify_signature_with_floor(&request.capability.issuer, floor)
                 .map_err(KernelError::ReceiptVerificationFailed)?
             {
                 return Err(KernelError::ReceiptVerificationFailed(

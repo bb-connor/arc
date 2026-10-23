@@ -489,7 +489,10 @@ impl EvidenceRecoveryResources {
         };
         if receipt.kernel_key != *self.signing_identity.public_key()
             || !receipt
-                .verify_signature_with_floor(self.signing_identity.crypto_floor())
+                .verify_signature_with_floor(
+                    self.signing_identity.public_key(),
+                    self.signing_identity.crypto_floor(),
+                )
                 .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
         {
             return Err(KernelError::ReceiptSigningFailed(

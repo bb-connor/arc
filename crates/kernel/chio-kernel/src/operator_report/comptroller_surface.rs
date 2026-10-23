@@ -210,3 +210,7 @@ mod tests {
         assert!(err.contains("overflow"), "unexpected error: {err}");
     }
 }
+
+impl chio_core::receipt::lineage::SignedExportPayload for ComptrollerSurfaceReport {
+    const SCHEMA_ID: &'static str = COMPTROLLER_SURFACE_REPORT_SCHEMA;
+}
