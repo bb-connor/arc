@@ -2,6 +2,7 @@
 
 use chio_core::root_authority::Sha256Digest;
 
+use super::claims::is_scope_token;
 use super::client_auth::ClientCredentials;
 use super::error::RootExchangeError;
 
@@ -26,15 +27,17 @@ pub enum RequestedTokenType {
 /// Upper bound on a token request body.
 pub const MAX_TOKEN_REQUEST_BYTES: usize = 32 * 1024;
 
-const PARAMETERS: [&str; 9] = [
+const PARAMETERS: [&str; 11] = [
     "grant_type",
     "assertion",
     "subject_token",
     "subject_token_type",
     "requested_token_type",
+    "scope",
     "client_id",
     "client_assertion_type",
     "client_assertion",
+    "client_secret",
     "resource",
 ];
 
@@ -46,6 +49,7 @@ pub struct IdJagGrant {
     client_assertion_type: Option<String>,
     client_assertion: Option<String>,
     requested_token_type: RequestedTokenType,
+    requested_scope: Option<Vec<String>>,
     resource: Option<String>,
     request_digest: Sha256Digest,
 }
@@ -57,29 +61,65 @@ struct RequestDigestInput<'a> {
     grant_type: &'a str,
     id_jag: &'a str,
     requested_token_type: RequestedTokenType,
+    scope: Option<&'a [String]>,
     client_id: Option<&'a str>,
     resource: Option<&'a str>,
 }
 
+/// The values of an RFC 6749 section 3.3 `scope`: scope tokens separated by
+/// single spaces.
+fn scope_tokens(scope: &str) -> Result<Vec<String>, RootExchangeError> {
+    scope
+        .split(' ')
+        .map(|token| {
+            if is_scope_token(token) {
+                Ok(token.to_owned())
+            } else {
+                Err(RootExchangeError::RequestedScopeMalformed)
+            }
+        })
+        .collect()
+}
+
+/// Whether an `Authorization` header value uses the HTTP Basic scheme, the
+/// carrier of `client_secret_basic` (RFC 6749 section 2.3.1).
+fn is_http_basic(authorization: &[u8]) -> bool {
+    authorization
+        .split(|byte| *byte == b' ')
+        .next()
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case(b"Basic"))
+}
+
 impl IdJagGrant {
-    /// Parse an `application/x-www-form-urlencoded` token request.
+    /// Parse an `application/x-www-form-urlencoded` token request together
+    /// with the request's `Authorization` header, if any.
     ///
     /// Per RFC 6749 section 3.2, unrecognized parameters are ignored, and per
     /// section 3.1 a parameter sent without a value is treated as omitted. A
-    /// repeated recognized parameter, a recognized value that is not valid
-    /// UTF-8, or an unsupported grant, subject token type or requested token
-    /// type refuses.
-    pub fn parse(body: &[u8]) -> Result<Self, RootExchangeError> {
+    /// recognized parameter that appears twice refuses, even when one
+    /// occurrence is empty. A recognized value that is not valid UTF-8, a
+    /// `scope` outside the section 3.3 syntax, a `client_secret` or HTTP Basic
+    /// credentials next to a `client_assertion` (section 2.3: one
+    /// authentication method per request), or an unsupported grant, subject
+    /// token type or requested token type refuses.
+    pub fn parse(body: &[u8], authorization: Option<&[u8]>) -> Result<Self, RootExchangeError> {
         if body.len() > MAX_TOKEN_REQUEST_BYTES {
             return Err(RootExchangeError::MalformedRequest(
                 "body exceeds the size bound",
             ));
         }
-        let mut values: [Option<String>; 9] = Default::default();
+        let mut seen = [false; PARAMETERS.len()];
+        let mut values: [Option<String>; PARAMETERS.len()] = Default::default();
         for (name, value) in url::form_urlencoded::parse(body) {
             let Some(index) = PARAMETERS.iter().position(|known| *known == name) else {
                 continue;
             };
+            let (Some(was_seen), Some(slot)) = (seen.get_mut(index), values.get_mut(index)) else {
+                continue;
+            };
+            if std::mem::replace(was_seen, true) {
+                return Err(RootExchangeError::MalformedRequest("repeated parameter"));
+            }
             if value.is_empty() {
                 continue;
             }
@@ -88,15 +128,16 @@ impl IdJagGrant {
                     "parameter is not valid UTF-8",
                 ));
             }
-            let Some(slot) = values.get_mut(index) else {
-                continue;
-            };
-            if slot.replace(value.into_owned()).is_some() {
-                return Err(RootExchangeError::MalformedRequest("repeated parameter"));
-            }
+            *slot = Some(value.into_owned());
         }
-        let [grant_type, assertion, subject_token, subject_token_type, requested_token_type, client_id, client_assertion_type, client_assertion, resource] =
+        let [grant_type, assertion, subject_token, subject_token_type, requested_token_type, scope, client_id, client_assertion_type, client_assertion, client_secret, resource] =
             values;
+        if client_assertion.is_some()
+            && (client_secret.is_some() || authorization.is_some_and(is_http_basic))
+        {
+            return Err(RootExchangeError::ClientAuthenticationAmbiguous);
+        }
+        let requested_scope = scope.as_deref().map(scope_tokens).transpose()?;
         let mut requested = RequestedTokenType::AccessToken;
         let id_jag = match grant_type.as_deref() {
             Some(GRANT_TYPE_JWT_BEARER) => {
@@ -134,6 +175,7 @@ impl IdJagGrant {
             grant_type: grant_type.as_deref().unwrap_or_default(),
             id_jag: &id_jag,
             requested_token_type: requested,
+            scope: requested_scope.as_deref(),
             client_id: client_id.as_deref(),
             resource: resource.as_deref(),
         };
@@ -146,6 +188,7 @@ impl IdJagGrant {
             client_assertion_type,
             client_assertion,
             requested_token_type: requested,
+            requested_scope,
             resource,
             request_digest,
         })
@@ -155,6 +198,12 @@ impl IdJagGrant {
     #[must_use]
     pub fn id_jag(&self) -> &str {
         &self.id_jag
+    }
+
+    /// The requested `scope` values, absent when the request sent none.
+    #[must_use]
+    pub fn requested_scope(&self) -> Option<&[String]> {
+        self.requested_scope.as_deref()
     }
 
     /// The RFC 8707 `resource` parameter, when present.
@@ -169,8 +218,9 @@ impl IdJagGrant {
     }
 
     /// `SHA-256("chio.root-exchange-request.v1\0" || canonical_json(request))`
-    /// over the grant type, the ID-JAG, the requested token type and the
-    /// client id. Client authentication is not part of it.
+    /// over the grant type, the ID-JAG, the requested token type, the
+    /// requested scope, the client id and the resource. Client
+    /// authentication is not part of it.
     #[must_use]
     pub fn request_digest(&self) -> &Sha256Digest {
         &self.request_digest
