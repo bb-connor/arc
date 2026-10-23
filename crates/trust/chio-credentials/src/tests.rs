@@ -166,7 +166,10 @@ fn rewrite_portable_compact(
     let signing_input = format!("{header_b64}.{payload_b64}");
     let signature_b64 = URL_SAFE_NO_PAD.encode(
         issuer
-            .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes())
+            .sign_exempt(
+                chio_core::crypto::ExemptFormat::JwsSigningInput,
+                signing_input.as_bytes(),
+            )
             .to_bytes(),
     );
     let compact_jwt = format!("{signing_input}.{signature_b64}");
@@ -259,7 +262,8 @@ fn passport_artifacts_with_canonical_schema_verify() {
     let policy_signature = signer
         .sign_wrapped(
             PASSPORT_VERIFIER_POLICY_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&policy_body).expect("canonical verifier policy"),
+            &chio_core::canonical::CanonicalBytes::from_serializable(&policy_body)
+                .expect("canonical verifier policy"),
         )
         .expect("sign verifier policy");
     let signed_policy = SignedPassportVerifierPolicy {
@@ -292,7 +296,8 @@ fn passport_artifacts_with_canonical_schema_verify() {
     let response_signature = holder
         .sign_wrapped(
             PASSPORT_PRESENTATION_RESPONSE_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned).test_ok("canonical response"),
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned)
+                .test_ok("canonical response"),
         )
         .test_ok("sign response");
     response.proof.proof_value = response_signature.to_hex();

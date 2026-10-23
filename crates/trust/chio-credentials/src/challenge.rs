@@ -218,7 +218,7 @@ pub fn verify_reputation_credential(
 
     let signature = Signature::from_hex(&credential.proof.proof_value)?;
     let signed = chio_core::crypto::verify_wrapped(
-        &issuer.public_key(),
+        issuer.public_key(),
         REPUTATION_CREDENTIAL_SCHEMA,
         &credential.unsigned,
         &signature,

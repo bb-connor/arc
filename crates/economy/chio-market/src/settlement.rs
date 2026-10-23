@@ -725,18 +725,26 @@ pub struct LiabilityClaimWorkflowReport {
     pub claims: Vec<LiabilityClaimWorkflowRow>,
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimPayoutInstructionArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for LiabilityClaimPayoutInstructionArtifact
+{
     const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimPayoutReceiptArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for LiabilityClaimPayoutReceiptArtifact
+{
     const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimSettlementInstructionArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for LiabilityClaimSettlementInstructionArtifact
+{
     const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimSettlementReceiptArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for LiabilityClaimSettlementReceiptArtifact
+{
     const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA;
 }

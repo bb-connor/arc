@@ -353,7 +353,7 @@ pub fn inspect_financial_credential_signature(
     let issuer = DidChio::from_str(&credential.issuer)?;
     let signature = Signature::from_hex(&credential.proof.proof_value)?;
     if chio_core::crypto::verify_wrapped(
-        &issuer.public_key(),
+        issuer.public_key(),
         credential.family().schema(),
         &credential.signing_body(),
         &signature,

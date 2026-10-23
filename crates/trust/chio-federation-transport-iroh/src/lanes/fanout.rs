@@ -128,7 +128,6 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use bytes::Bytes;
-use chio_core_types::canonical_json_bytes;
 use chio_core_types::PublicKey;
 use chio_federation::pheromone_gossip::verify_pheromone_gossip_frame;
 use chio_federation::pheromone_gossip::PheromoneDepositGossip;

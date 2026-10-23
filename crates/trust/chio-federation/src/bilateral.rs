@@ -212,12 +212,12 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
             ));
         }
         if chio_core_types::crypto::verify_exempt(
-        &self.tool_host_public_key,
-        chio_core_types::crypto::ExemptFormat::DssePae,
-        &request.pae_bytes,
-        &request.org_b_signature,
-    )
-    .is_err()
+            &self.tool_host_public_key,
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &request.pae_bytes,
+            &request.org_b_signature,
+        )
+        .is_err()
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
