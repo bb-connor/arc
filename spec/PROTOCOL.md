@@ -324,17 +324,28 @@ Rules:
   `DSSEv1 `, and every wrapper opens with `chio.signing-wrapper.v1`. The
   message spaces are therefore disjoint. A key that signs JWS signing inputs
   is still required to differ from every wrapper-signing key.
-- Algorithm binding: every pinned key admits exactly one signature algorithm,
-  derived from its self-describing encoding (section 4.4). A signature whose
-  prefix does not match the pinned key's algorithm rejects before any
-  cryptographic check. A verifier holding a pinned hybrid key rejects a bare
+- Algorithm binding: every verification key admits exactly one signature
+  algorithm, derived from its self-describing encoding (section 4.4). A
+  signature whose prefix does not match the key's algorithm rejects before
+  any cryptographic check. A verifier holding a hybrid key rejects a bare
   classical signature.
 - Algorithm selection: a verifier derives the signature algorithm only from
-  the pinned, typed key it verifies against. It never reads the algorithm
-  from any member of the artifact being verified, signed or unsigned, and no
-  member of an artifact changes which verifier runs. Signed artifacts carry
-  no `algorithm` member. An artifact that carries one fails strict decoding
-  before any verifier is chosen.
+  the typed key it verifies against. It never reads the algorithm from an
+  `algorithm` member or any other member that names a scheme, and no such
+  member changes which verifier runs. Signed artifacts carry no `algorithm`
+  member. An artifact that carries one fails strict decoding before any
+  verifier is chosen.
+- Key binding: a verification under a key the artifact itself carries
+  (a `signer_key`, `kernel_key`, `issuer` or similar member) establishes
+  integrity only. Before acting on the result, the verifier MUST bind that
+  key to a trusted key: equality with a key pinned in its configuration, or
+  membership in a trusted set it holds. Every production call site of such a
+  verification is classified as PINNED (verified only under a trusted key),
+  GUARDED (the carried key is compared with a trusted key before use),
+  INTEGRITY-ONLY (no authorization decision depends on the result) or
+  NEEDS-TRUST-CONTEXT (an authorization path whose trusted key is not yet
+  wired), and `scripts/check-self-key-verify.py` refuses an unclassified
+  site. Kernel call sites are PINNED or GUARDED.
 - Strict decoding: a signed artifact rejects an unknown member, even when
   the signature over the body that carries it verifies. A tagged union
   rejects an unknown member in every variant, including variants that carry
