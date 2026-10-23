@@ -310,6 +310,47 @@ fn bid_rejects_unbound_token_issuer() {
 }
 
 #[test]
+fn bid_rejects_a_valid_bid_signed_by_another_key() {
+    let registry_keypair = Keypair::generate();
+    let operator_keypair = Keypair::generate();
+    let issuer_keypair = operator_keypair.clone();
+    let agent_keypair = Keypair::generate();
+    let other_keypair = Keypair::generate();
+    let listing = listing_entry(
+        &registry_keypair,
+        &operator_keypair,
+        GenericListingStatus::Active,
+        100,
+        110,
+        600,
+    );
+    let request = signed_bid_request(&other_keypair, "agent-alpha", 200, 300, 120);
+    assert!(
+        matches!(
+            request.verify_signature(&other_keypair.public_key()),
+            Ok(true)
+        ),
+        "the bid is validly self-signed"
+    );
+
+    let error = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &issuer_keypair,
+            agent_subject: agent_keypair.public_key(),
+            token_id: "token-1".to_string(),
+            now: 120,
+            grant_constraints: Vec::new(),
+            dpop_required: None,
+        },
+    )
+    .test_expect_err("bid signed by another key rejected");
+
+    assert_eq!(error, BiddingError::BidSignerNotAgentSubject);
+}
+
+#[test]
 fn bid_rejects_scope_widening_outside_listing_server() {
     let registry_keypair = Keypair::generate();
     let operator_keypair = Keypair::generate();
