@@ -1,11 +1,11 @@
 //! One affine owner from the effect boundary through terminal commitment,
 //! buffered evidence, or the original durable saga's custody.
 
+use super::publication_sync::PublicationGuard;
 use super::*;
 use crate::kernel::admission_coordinator::{DurableToolReturn, DurableToolReturnContext};
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::kernel::responses::{PrepareToolOutputCostContext, PreparedResponse};
-use std::sync::MutexGuard;
 
 pub(super) mod evidence;
 mod post_effect;
@@ -166,7 +166,7 @@ struct ReceiptDelivery<'a> {
     parts: Box<ObligationParts<'a>>,
     prepared: PreparedResponse,
     committed: ReceiptCommit,
-    transition: MutexGuard<'a, ()>,
+    transition: PublicationGuard<'a>,
     returned: bool,
     deferred_error: Option<KernelError>,
 }
@@ -302,7 +302,7 @@ impl<'a> PostEffectObligation<'a> {
             sha256: chio_core::crypto::sha256_hex(&canonical),
             key: receipt.kernel_key.clone(),
         };
-        let transition = match kernel.lock_runtime_trace_transition() {
+        let transition = match kernel.lock_receipt_publication(false) {
             Ok(transition) => transition,
             Err(error) => {
                 return Err(Box::new(Undischarged {

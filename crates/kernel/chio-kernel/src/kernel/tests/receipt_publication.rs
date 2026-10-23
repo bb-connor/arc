@@ -1,5 +1,12 @@
 use super::*;
 
+#[path = "receipt_publication/concurrency.rs"]
+mod concurrency;
+#[path = "receipt_publication/durable.rs"]
+mod durable;
+#[path = "receipt_publication/ordering.rs"]
+mod ordering;
+
 #[derive(Clone, Copy)]
 enum AppendMode {
     Acknowledged,
@@ -165,11 +172,11 @@ fn producer_append_panic_preserves_unknown_identity_and_recovery_locks() {
     }));
     assert_eq!(journal.lock().unwrap().committed.len(), 1);
     assert!(
-        kernel.receipt_store_write_lock.try_lock().is_ok(),
+        kernel.publication_sync.receipts.try_write().is_ok(),
         "producer poisoned receipt write lock"
     );
     assert!(
-        kernel.runtime_trace_transition_lock.try_lock().is_ok(),
+        kernel.publication_sync.fence.try_write().is_ok(),
         "producer poisoned trace transition lock"
     );
     let error = result

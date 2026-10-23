@@ -245,7 +245,7 @@ impl ChioKernel {
         );
         let thread_admission = current_scoped_receipt_federation_admission();
         let thread_admission = thread_admission.as_ref();
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.lock_receipt_publication(false)?;
         if receipt.is_allowed() {
             self.check_revocation(&request.capability)?;
         }
@@ -327,7 +327,7 @@ impl ChioKernel {
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.lock_receipt_publication(false)?;
         let committed = self.record_chio_receipt_during_trace_transition(
             receipt,
             &trace_transition,
@@ -345,7 +345,7 @@ impl ChioKernel {
         &self,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.lock_receipt_publication(false)?;
         let committed = self.record_chio_receipt_during_trace_transition(
             receipt,
             &trace_transition,
@@ -365,7 +365,7 @@ impl ChioKernel {
         &self,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
-        let trace_transition = self.lock_runtime_trace_transition()?;
+        let trace_transition = self.lock_receipt_publication(true)?;
         let committed = self.record_chio_receipt_during_trace_transition(
             receipt,
             &trace_transition,
@@ -379,7 +379,7 @@ impl ChioKernel {
     fn record_chio_receipt_during_trace_transition(
         &self,
         receipt: &ChioReceipt,
-        trace_transition: &std::sync::MutexGuard<'_, ()>,
+        trace_transition: &crate::kernel::publication_sync::PublicationGuard<'_>,
         settlement_eligible: bool,
         suppress_exact_durable_replay: bool,
     ) -> Result<ReceiptCommit, ReceiptAppendFailure> {
@@ -401,7 +401,7 @@ impl ChioKernel {
     pub(in crate::kernel) fn append_terminal_receipt_during_trace_transition(
         &self,
         receipt: &ChioReceipt,
-        _trace_transition: &std::sync::MutexGuard<'_, ()>,
+        _trace_transition: &crate::kernel::publication_sync::PublicationGuard<'_>,
         settlement_eligible: bool,
         suppress_exact_durable_replay: bool,
     ) -> Result<ReceiptCommit, ReceiptAppendFailure> {
@@ -413,10 +413,6 @@ impl ChioKernel {
         } else {
             None
         };
-        let _receipt_store_write = self
-            .receipt_store_write_lock
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
         let mut projected = true;
         if let Some(store) = self.receipt_store.as_ref() {
             if suppress_exact_durable_replay && settlement_visible_at_ms.is_none() {
@@ -438,7 +434,7 @@ impl ChioKernel {
                 }
             }
             if projected {
-                // Catch inside both publication locks. Once the append is
+                // Catch inside the publication fence and receipt barrier. Once the append is
                 // entered, a panic cannot establish that nothing committed.
                 let appended = catch_unwind(AssertUnwindSafe(|| match settlement_visible_at_ms {
                     Some(next_visible_at_ms) => store
@@ -480,13 +476,20 @@ impl ChioKernel {
         &self,
         receipt: &ChioReceipt,
         mut committed: ReceiptCommit,
-        _trace_transition: &std::sync::MutexGuard<'_, ()>,
+        _trace_transition: &crate::kernel::publication_sync::PublicationGuard<'_>,
     ) -> ReceiptCommit {
+        let _projection = match self.publication_sync.projection() {
+            Ok(guard) => guard,
+            Err(error) => {
+                committed.trace_source_sequence = Err(error);
+                return committed;
+            }
+        };
         if committed.projected && self.receipt_store.is_some() {
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        // Allocate under the transition lock to preserve receipt/revocation
-        // ordering. Failure here is carried by an acknowledged commit.
+        // Allocate under the projection guard inside the publication fence.
+        // Failure here is carried by an acknowledged commit.
         committed.trace_source_sequence =
             if committed.projected && self.runtime_trace_observer.is_some() {
                 self.allocate_runtime_trace_source_sequence().map(Some)
@@ -630,10 +633,7 @@ impl ChioKernel {
             .as_ref()
             .map(|_| self.trusted_now_millis().map(|value| value.get()))
             .transpose()?;
-        let _receipt_store_write = self
-            .receipt_store_write_lock
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        let _receipt_store_write = self.publication_sync.receipts(true)?;
         self.with_receipt_store(|store| match store.load_chio_receipt(&receipt.id)? {
             Some(existing) => {
                 if receipts_match(&existing, receipt)? {

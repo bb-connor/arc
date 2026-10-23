@@ -57,13 +57,14 @@ fn poisoned_runtime_trace_lock_does_not_disable_revocation_or_admission() {
     let poison_transition_lock = || {
         let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _guard = kernel
-                .runtime_trace_transition_lock
-                .lock()
+                .publication_sync
+                .fence
+                .write()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             panic!("inject runtime trace transition panic");
         }));
         assert!(panic.is_err());
-        assert!(kernel.runtime_trace_transition_lock.is_poisoned());
+        assert!(kernel.publication_sync.fence.is_poisoned());
     };
 
     poison_transition_lock();
@@ -71,7 +72,7 @@ fn poisoned_runtime_trace_lock_does_not_disable_revocation_or_admission() {
     kernel
         .record_chio_receipt(&receipt)
         .expect("receipt persistence should recover a poisoned ordering lock");
-    assert!(!kernel.runtime_trace_transition_lock.is_poisoned());
+    assert!(!kernel.publication_sync.fence.is_poisoned());
     assert!(kernel
         .receipt_log()
         .iter()
@@ -81,13 +82,13 @@ fn poisoned_runtime_trace_lock_does_not_disable_revocation_or_admission() {
     kernel
         .check_tool_call_revocation_admission(&request)
         .expect("admission should recover a poisoned ordering lock");
-    assert!(!kernel.runtime_trace_transition_lock.is_poisoned());
+    assert!(!kernel.publication_sync.fence.is_poisoned());
 
     poison_transition_lock();
     kernel
         .revoke_capability(&capability.id)
         .expect("revocation should recover a poisoned ordering lock");
-    assert!(!kernel.runtime_trace_transition_lock.is_poisoned());
+    assert!(!kernel.publication_sync.fence.is_poisoned());
     assert!(matches!(
         kernel.check_tool_call_revocation_admission(&request),
         Err(KernelError::CapabilityRevoked(id)) if id == capability.id

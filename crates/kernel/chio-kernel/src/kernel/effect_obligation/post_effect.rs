@@ -91,14 +91,9 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
         };
         let write = obligation
             .kernel
-            .receipt_store_write_lock
-            .lock()
-            .map_err(|_| {
-                failure(
-                    "child_receipt_flush",
-                    KernelError::Internal("receipt store write lock poisoned".into()),
-                )
-            })?;
+            .publication_sync
+            .receipts(false)
+            .map_err(|error| failure("child_receipt_flush", error))?;
         if let Some(store) = obligation.kernel.receipt_store.as_ref() {
             // Once entered, the writer can still commit after a timeout or
             // callback panic. Preserve this exact child at the vector front.
@@ -127,13 +122,14 @@ fn flush_children(obligation: &mut PostEffectObligation<'_>) -> Result<(), PostE
                 KernelError::Internal("acknowledged child lost its signed evidence".into()),
             ));
         };
-        drop(write);
         let mut log = obligation
             .kernel
             .child_receipt_log
             .lock()
             .unwrap_or_else(|error| error.into_inner());
         log.append(receipt);
+        drop(log);
+        drop(write);
     }
     Ok(())
 }

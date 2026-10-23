@@ -135,17 +135,12 @@ impl ChioKernel {
         f(self.revocation_store.as_ref())
     }
 
-    pub(crate) fn lock_runtime_trace_transition(
+    pub(in crate::kernel) fn lock_receipt_publication(
         &self,
-    ) -> Result<std::sync::MutexGuard<'_, ()>, KernelError> {
-        Ok(match self.runtime_trace_transition_lock.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                warn!("runtime trace transition lock was poisoned; recovering trace ordering");
-                self.runtime_trace_transition_lock.clear_poison();
-                poisoned.into_inner()
-            }
-        })
+        replay: bool,
+    ) -> Result<super::publication_sync::PublicationGuard<'_>, KernelError> {
+        self.publication_sync
+            .publication(self.receipt_store.is_some(), replay)
     }
 
     pub(crate) fn allocate_runtime_trace_source_sequence(&self) -> Result<u64, KernelError> {
@@ -314,7 +309,7 @@ impl ChioKernel {
             post_effect_evidence: Mutex::new(None),
             post_effect_host_budget: super::effect_obligation::evidence::PostEffectEvidenceBudget::process_default(),
             receipt_store: None,
-            receipt_store_write_lock: Arc::new(Mutex::new(())),
+            publication_sync: Arc::new(super::publication_sync::PublicationSync::default()),
             retention_maintenance: None,
             payment_adapter: None,
             finding_purchase_verifier: None,
@@ -341,7 +336,6 @@ impl ChioKernel {
                 DEFAULT_RUNTIME_ADMISSION_READINESS_TIMEOUT_MS,
             ),
             runtime_trace_observer: None,
-            runtime_trace_transition_lock: Arc::new(Mutex::new(())),
             runtime_trace_sequence: Arc::new(AtomicU64::new(0)),
             attestation_trust_policy: None,
             capability_crypto_floor: KernelCryptoFloor::AllowClassical,

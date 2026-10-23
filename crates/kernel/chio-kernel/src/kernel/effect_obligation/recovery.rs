@@ -223,8 +223,7 @@ pub(super) struct EvidenceRecoveryResources {
     pub store: Option<Arc<dyn ReceiptStore>>,
     pub log: Arc<Mutex<ReceiptLog>>,
     pub child_log: Arc<Mutex<ChildReceiptLog>>,
-    pub write_lock: Arc<Mutex<()>>,
-    pub trace_lock: Arc<Mutex<()>>,
+    pub publication_sync: Arc<crate::kernel::publication_sync::PublicationSync>,
     pub trace_sequence: Arc<AtomicU64>,
     pub trace_observer: Option<Arc<dyn RuntimeTraceObserver>>,
     pub append_budget: Duration,
@@ -419,14 +418,8 @@ fn recover(queue: Arc<EvidenceQueue>, resources: Arc<EvidenceRecoveryResources>)
 
 impl EvidenceRecoveryResources {
     fn flush(&self, record: &mut BufferedRecord) -> Result<(), KernelError> {
-        let trace = self
-            .trace_lock
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt trace transition lock poisoned".into()))?;
-        let writes = self
-            .write_lock
-            .lock()
-            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".into()))?;
+        let trace = self.publication_sync.fence(self.store.is_none(), false)?;
+        let writes = self.publication_sync.receipts(true)?;
         let result =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.flush_locked(record)))
                 .map_err(|_| {
@@ -667,6 +660,7 @@ impl EvidenceRecoveryResources {
     }
 
     fn project(&self, receipt: &ChioReceipt) -> Result<Option<u64>, KernelError> {
+        let _projection = self.publication_sync.projection()?;
         let mut log = self.log.lock().unwrap_or_else(|error| error.into_inner());
         if let Some(existing) = log.iter().find(|existing| existing.id == receipt.id) {
             let expected = chio_core::canonical::canonical_json_bytes(receipt)
