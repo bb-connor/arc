@@ -197,13 +197,16 @@ The security boundary that matters is constant across these surfaces:
 
 ### 4.1 Canonical JSON
 
-Signed Chio artifacts use canonical JSON serialization before signing. Classical
-artifacts remain Ed25519 by default. Post-quantum hybrid artifacts use the
-`hybrid:<classical>:<pq>:<alg_set>` string prefix, where `pq` is ML-DSA-65
-bytes encoded as lowercase hex and `alg_set` is one of
-`ed25519+mldsa65`, `p256+mldsa65`, or `p384+mldsa65`. Verifiers dispatch from
-the self-describing signature prefix and reject malformed or mismatched hybrid
-halves fail-closed.
+Signed Chio artifacts serialize their signing body as RFC 8785 canonical JSON.
+The signature covers the 88-byte signing wrapper over that canonical body and
+the artifact's registered schema id (section 4.5), not the canonical body
+itself. Classical artifacts remain Ed25519 by default. Post-quantum hybrid
+artifacts use the `hybrid:<classical>:<pq>:<alg_set>` string prefix, where
+`pq` is ML-DSA-65 bytes encoded as lowercase hex and `alg_set` is one of
+`ed25519+mldsa65`, `p256+mldsa65`, or `p384+mldsa65`. A verifier takes the
+signature algorithm from the pinned key it verifies against and rejects a
+signature whose prefix differs, or malformed or mismatched hybrid halves,
+fail-closed.
 
 This includes capability tokens, receipts, manifests, checkpoints, verifier
 policies, passport presentations, and certification artifacts.
@@ -279,6 +282,250 @@ Broader public identity profiles may also name `did:web`, `did:key`, and
 those methods do not replace `did:chio` as Chio's canonical provenance anchor in
 this release.
 
+### 4.5 Signing Wrapper
+
+Every Chio signature over bytes Chio defines signs an 88-byte signing wrapper
+instead of the body. This covers capabilities, delegation links, Chio DPoP
+proofs, receipts, root policies, identity-provider key snapshots,
+checkpoints, export commitments, readiness probes, challenges and every other
+artifact in the Signed-Artifact Registry (section 5).
+
+```text
+wrapper = "chio.signing-wrapper.v1" || 0x00          (24 bytes)
+       || SHA-256(utf8(schema_id))                     (32 bytes)
+       || SHA-256(canonical_body)                      (32 bytes)
+```
+
+Rules:
+
+- `schema_id` is the signed artifact's registered schema id, never the id of
+  a payload or body schema. Each signed artifact has exactly one id, and a
+  request and its response are two artifacts with two ids. Where an artifact
+  carries a `schema` member, it equals the wrapper id. A verifier takes
+  `schema_id` from its verification context, meaning the artifact type it
+  expects at that call site. It never reads `schema_id` from a member of the
+  artifact being verified. A signature over one artifact type therefore never
+  verifies as another.
+- `canonical_body` is the RFC 8785 canonical JSON of the artifact's signing
+  body. For receipts it is the canonical
+  `ChioReceiptSigningBody { id, body, bbs_signature? }`, so BBS signature
+  material stays covered by the authoritative signature through this hash.
+- The schema id is the only signature domain separation. No signing input
+  carries a domain prefix of its own. A body that is signed together with its
+  signer's key is the object `{"body": <body>, "signer": <key>}`. A signature
+  that would cover a digest of a Chio object covers the wrapper over that
+  object's canonical body instead. Domain strings inside hash and commitment
+  inputs (digests, identifiers, commitments) are not signature prefixes and
+  are unaffected.
+- Domain separation: no Chio key signs any message other than wrapper bytes,
+  except keys that sign one of the exempt formats below. A JWS signing input
+  is base64url text plus `.` and never contains `0x00`; byte 23 of every
+  wrapper is `0x00`. A DSSE pre-authentication encoding opens with
+  `DSSEv1 `, and every wrapper opens with `chio.signing-wrapper.v1`. The
+  message spaces are therefore disjoint. A key that signs JWS signing inputs
+  is still required to differ from every wrapper-signing key.
+- Algorithm binding: every pinned key admits exactly one signature algorithm,
+  derived from its self-describing encoding (section 4.4). A signature whose
+  prefix does not match the pinned key's algorithm rejects before any
+  cryptographic check. A verifier holding a pinned hybrid key rejects a bare
+  classical signature.
+- Algorithm selection: a verifier derives the signature algorithm only from
+  the pinned, typed key it verifies against. It never reads the algorithm
+  from any member of the artifact being verified, signed or unsigned, and no
+  member of an artifact changes which verifier runs. Signed artifacts carry
+  no `algorithm` member. An artifact that carries one fails strict decoding
+  before any verifier is chosen.
+- Strict decoding: a signed artifact rejects an unknown member, even when
+  the signature over the body that carries it verifies. A tagged union
+  rejects an unknown member in every variant, including variants that carry
+  only the discriminator: a document such as `{"kind": "<variant>", "pad": 0}`
+  rejects. A closed discriminator is a string member of a closed object, and
+  a union whose variants carry different members decodes as closed
+  per-variant objects or through a lossless round trip in which the decoded
+  value re-encodes to exactly the input value. Duplicate member names reject.
+  Members whose value is caller data by definition (an opening's `payload`,
+  `parameters_inline`, `result_inline`, `metadata`) are opaque values; the
+  rule covers every Chio-defined object around them.
+- Ed25519 signs the 88 wrapper bytes.
+- ML-DSA-65 signs the 88 wrapper bytes with an empty FIPS 204 context string.
+- P-256 signs with ECDSA over SHA-256 of the wrapper. P-384 signs with ECDSA
+  over SHA-384 of the wrapper.
+- Hybrid signatures sign the same 88 bytes with both halves.
+- Both inner hashes are SHA-256, which caps the collision resistance of every
+  signature at 128 bits, including P-384 and ML-DSA-65. Changing either hash
+  or the layout requires a new prefix string and a change to this section.
+- Signature encodings are unchanged: bare 128-hex Ed25519, `p256:<DER hex>`,
+  `p384:<DER hex>` and the hybrid form of section 4.4.
+- Exempt formats, a closed list: JWS signing inputs (RFC 7515, including
+  local authorization server access tokens, other JWTs, OpenID4VP request
+  and response objects and SD-JWT) and DSSE pre-authentication encoding. An
+  external standard fixes their signing bytes, so they do not use the
+  wrapper. Every other signature does.
+- Remote and rotating signers carry the typed message across their boundary.
+  A remote signer accepts only an 88-byte message that opens with the
+  wrapper prefix and refuses every other request, including any exempt
+  format, before a signing call.
+- Implementations expose one signing helper and one verification helper for
+  the wrapper. No path signs a canonical body directly. Generic signing
+  helpers in the SDKs and bindings take the schema id as an argument and
+  reject an unregistered id; no helper signs raw caller text.
+- The key-log event authorizations (bootstrap, old key, new key proof of
+  possession, recovery) all sign `chio.key-log.event.v1`. Each is checked
+  against a distinct expected key, and each states the same thing: the key
+  approves this exact event body.
+
+Every signing preimage is 88 bytes, so no remote signer's message-size limit
+constrains any artifact.
+
+Wrapper schema ids, one per signed artifact type:
+
+| Signed artifact | Wrapper `schema_id` |
+|---|---|
+| `CapabilityToken` | `chio.capability.v1` |
+| `DelegationLink` | `chio.delegation-link.v1` |
+| `GovernedUpstreamCallChainProof` | `chio.governed-upstream-call-chain-proof.v1` |
+| `CallChainContinuationToken` | `chio.call_chain_continuation.v1` |
+| `GovernedApprovalToken` | `chio.governed-approval-token.v1` |
+| `ThresholdApprovalProposal` | `chio.threshold-approval-proposal.v1` |
+| `SignedDeclassificationGrant` | `chio.declassification-grant.v1` |
+| `ChioReceipt` | `chio.receipt.v1` |
+| `ChildRequestReceipt` | `chio.child-request-receipt.v1` |
+| `ReceiptLineageStatement` | `chio.receipt_lineage_statement.v1` |
+| `SignedExportEnvelope<T>` | the schema id of the payload type `T` |
+| `SignedRecoveryGrant`, `SignedAuthorityCoverageAttestationV1`, `SignedRecoveryProviderFinalityV1` | `chio.recovery.grant.v1`, `chio.recovery.signed-authority-coverage.v1`, `chio.recovery.signed-provider-finality.v1` |
+| `SignedRecoveryExplanationReportV1`, `SignedRecoveryExplanationViewV1` | `chio.recovery.signed-explanation-report.v1`, `chio.recovery.signed-explanation-view.v1` |
+| `SignedRecoverySetupProbeV1`, `SignedRecoverySetupReportV1` | `chio.recovery-setup-probe.v1`, `chio.recovery-setup-report.v1` |
+| `SignedConfinedDisclosureV1`, `SignedConfinedEndorsementV1` | `chio.recovery.signed-confined-disclosure.v1`, `chio.recovery.signed-confined-endorsement.v1` |
+| `SignedArtifactCertificateV1`, `SignedArtifactArchiveManifestV1` | `chio.recovery.signed-artifact-certificate.v1`, `chio.recovery.signed-archive-manifest.v1` |
+| `SignedPolicyDeploymentChangeV1` | `chio.recovery.signed-policy-deployment-change.v1` |
+| Semantic package, deployment, audience, scoped endorsement, annotation, transformation and prerequisite | `chio.recovery.signed-semantic-package.v1`, `chio.recovery.signed-semantic-deployment.v1`, `chio.recovery.signed-semantic-audience.v1`, `chio.recovery.signed-scoped-endorsement.v1`, `chio.recovery.signed-semantic-annotation.v1`, `chio.recovery.signed-semantic-transformation.v1`, `chio.recovery.signed-semantic-prerequisite.v1` |
+| `SignedSecurityEvent` | `chio.signed-security-event.v1` |
+| `SessionAnchor` | `chio.session_anchor.v1` |
+| `AnchorBatch` | `chio.anchor_batch.v1` |
+| `SignedClearingEnvelopeV1<T>` | the clearing schema id of the payload type `T` |
+| `SignedAssignmentAgreementV1` | `chio.factor.assignment-agreement.v1` |
+| `IouEnvelope` | `chio.credit.iou-envelope.v1` |
+| `SignedCreditFacilityBindV1` | `chio.credit.facility-bind.v1` |
+| `SignedReceivableIou` | `chio.credit.receivable-iou-envelope.v1` |
+| `Finding` | `chio.finding.v1` |
+| Channel signatures, one id per body kind | `chio.channel.open-intent.v1`, `chio.channel.funding-acknowledgement.v1`, `chio.channel.open.v1`, `chio.channel.funding-evidence.v1`, `chio.channel.reservation.v1`, `chio.channel.state.v1`, `chio.channel.close.v1`, `chio.channel.dispute.v1`, `chio.channel.release-authorization.v1` |
+| `OracleConversionEvidence` | `chio.oracle-conversion-evidence.v1` |
+| `SignedAdmissionTerminalProjectionV1` | `chio.signed-admission-terminal-projection.v1` |
+| `SignedAuthorityTransition` | `chio.authority-lifecycle.v1` |
+| `SignedAuthoritySnapshot` | `chio.authority-snapshot.v1` |
+| `SessionComplianceCertificate` | `chio.session-compliance-certificate.v1` |
+| `DpopProof` | `chio.dpop_proof.v1` |
+| `SignedExecutionNonce` | `chio.execution_nonce.v1` |
+| `ActiveResponseSubmissionProof` | `chio.active-response-submission.v1` |
+| `ActiveResponseArtifactAuthorityAttestation` | `chio.active-response-artifact-authority-attestation.v1` |
+| `SignedContainerLaunchRecord` | `chio.process.container-launch.v1` |
+| Swarm delegation-witness hop signature | `chio.swarm.delegation-witness-hop-signature.v1` |
+| `SwarmTaskGraph` | `chio.swarm.task-graph.v1` |
+| `SwarmContinuationToken` | `chio.swarm.continuation-token.v1` |
+| `SwarmJoinReceipt` | `chio.swarm.join-receipt.v1` |
+| `SwarmRoutePlanReceipt` | `chio.swarm.route-plan-receipt.v1` |
+| `SwarmRevocationEpoch` | `chio.swarm.revocation-epoch.v1` |
+| `SwarmTerminalGraphReceipt` | `chio.swarm.terminal-graph-receipt.v1` |
+| `SignedCertificationCheck` | `chio.certify.check.v1` |
+| `FederationPolicyDocument` | `chio.federation-policy.v1` |
+| `SignedActiveResponseAuthorityRequest` | `chio.active-response-policy-authority-request.v1` |
+| `SignedActiveResponseAuthorityResponse` | `chio.active-response-policy-authority-response.v1` |
+| `SignedManifest` | `chio.manifest.v1` |
+| `HttpReceipt` | `chio.http-receipt.v1` |
+| `SignedBudgetSnapshotAnchorCommitment` | `chio.budget-snapshot-anchor-commitment.v1` |
+| `EnterpriseMigrationTransition` | `chio.enterprise-migration-transition.v1` |
+| `TransactionPassport` | `chio.transaction-passport.v1` |
+| `Signed<Subdivision>`, `Signed<WorkOffer>`, `Signed<Selection>`, `Signed<DispatchPermit>` | `chio.work-subdivision.v1`, `chio.work-offer.v1`, `chio.work-selection.v1`, `chio.work-dispatch-permit.v1` |
+| `WorkflowReceipt` and its vendor co-signature | `chio.workflow-receipt.v1` |
+| `FederatedDelegationPolicyDocument` | `chio.federated-delegation-policy.v1` |
+| Proof-room trust roots and guard report | `chio.proof.first-run.trust-roots.v1`, `chio.proof.first-run.guard-report.v1` |
+| `SignedMcpCageLaunchPolicy` | `chio.mcp.cage-launch-policy.v1` |
+| `SignedProfile` (swarm profile) | `chio.process.swarm-profile.v1` |
+| `AgUiReceipt` | `chio.ag-ui-receipt.v1` |
+| Operator approval `SignedRecord` | `chio.mcp.operator-approval.v1` |
+| Session credential row | `chio.mcp.session-credential.v1` |
+| Session credential call row | `chio.mcp.session-credential-call.v1` |
+| `SignedProvenance` | `chio.provenance-stamp.v1` |
+| `SignedWatermarkEnvelope` | `chio.signed-watermark-envelope.v1` |
+| `SignedKeyLogCheckpoint` | `chio.key-log.checkpoint.v1` |
+| `SignedKeyActivationCommit` | `chio.key-log.activation-commit.v1` |
+| Key-log witness signature | `chio.key-log.witness-statement.v1` |
+| `SignedKeyEnterpriseReceipt` | `chio.key-log.enterprise-receipt.v1` |
+| `SignedKeyLogEvent` authorizations | `chio.key-log.event.v1` |
+| `WitnessServiceReadinessProof` | `chio.key-log.witness-readiness.v1` |
+| `AuditServiceReadinessProof` | `chio.key-log.audit-readiness.v1` |
+| `KeyringArtifactSignature` fence statement | `chio.keyring.artifact-signature.v1` |
+| `SignedArtifactTimeAnchor` | `chio.key-log.artifact-time-anchor.v1` |
+| `SignedBrokerAuditRunnerAuthorization` | `chio.broker-audit-runner-authorization.v1` |
+| `SignedBrokerAuditComparison` | `chio.broker-audit-comparison.v1` |
+| `SignedAuthorityRequest` (broker authority RPC) | `chio.broker-authority-request.v1` |
+| `SignedAuthorityResponse` (broker authority RPC) | `chio.broker-authority-response.v1` |
+| `SignedBrokerCapability` | `chio.broker-capability.v1` |
+| `SignedBrokerPrivilegedAuditChallenge` | `chio.broker-privileged-audit-challenge.v1` |
+| `RequestProof` | `chio.broker-request-proof.v1` |
+| `SignedAdminMutationReceipt` | `chio.broker-admin-mutation-receipt.v1` |
+| `SignedAdminControlReceipt` | `chio.broker-admin-control-receipt.v1` |
+| `SignedBrokerReceipt` | `chio.broker-execution-receipt.v1` |
+| `SignedBrokerFailureReceipt` | `chio.broker-execution-failure-receipt.v1` |
+| `SignedRegisterAttemptAuthorization` | `chio.broker-register-attempt-authorization.v1` |
+| `SignedObservation` | `chio.trace-observation.v1` |
+| `ReputationCredential` | `chio.reputation-credential.v1` |
+| `SignedCrossIssuerMigration` | `chio.cross-issuer-migration.v1` |
+| `SignedPublicIssuerDiscovery` | `chio.public-issuer-discovery.v1` |
+| `SignedPublicVerifierDiscovery` | `chio.public-verifier-discovery.v1` |
+| `SignedPublicDiscoveryTransparency` | `chio.public-discovery-transparency.v1` |
+| `FinancialCredentialEnvelope` | the `chio.fincred.*.v1` id of the credential family |
+| `FinancialPassportPresentationResponse` | `chio.financial-agent-passport-presentation-response.v1` |
+| `PassportPresentationResponse` | `chio.agent-passport-presentation-response.v1` |
+| `SignedPassportVerifierPolicy` | `chio.passport-verifier-policy.v1` |
+| `PasskeyCapability` | `chio.passkey-capability.v1` |
+| `DisclosureCryptoContextReport` | `chio.disclosure.crypto-context-report.v1` |
+| `DkgPackage` transport signature | `chio.frost.dkg-package.v1` |
+| `RelayAlertAssuranceArchivePackageManifest` | `chio.pheromone.relay-alert-assurance-archive-package-manifest.v1` |
+| `RelayAlertAssuranceExportManifest` | `chio.pheromone.relay-alert-assurance-export-manifest.v1` |
+| `PeerDirectoryBundleDocument` | `chio.pheromone.peer-directory-bundle.v1` |
+| `PheromoneRelayHttpRequest` | `chio.pheromone.relay-http-request.v1` |
+| `PheromoneDeposit` | `chio.pheromone-deposit.v1` |
+| `TeeBlessAuditEntry` | `chio.tee-bless-audit.v1` |
+| tool-server ack | `chio.runtime.tool-server-ack-signature.v1` |
+| public settlement proof bundle | `chio.web3-settlement-proof-bundle.v1` |
+| checkpoint statement | `chio.checkpoint_statement.v1` |
+| payment lifecycle | `chio.commerce.payment-lifecycle.v1` |
+| provider-trust artifacts | `chio.commerce.provider-passport.v1`, `chio.commerce.reputation-snapshot.v1`, `chio.commerce.federation-trust-bundle.v1` |
+| enterprise approval case | `chio.enterprise.approval-case.v1` |
+| risk comptroller report | `chio.risk.comptroller-report.v1` |
+| trust-market artifacts | the registered schema id of each trust-market artifact |
+| agent-web envelope | `chio.agent-web-proof-envelope.v1` |
+| Root policy | `chio.root-policy.v1` |
+| Identity-provider key snapshot | `chio.idp-key-snapshot.v1` |
+| Settlement closure | `chio.settlement-closure.v1` |
+| Caller revocation request | `chio.revocation-request.v1` |
+| Evidence export commitment (`SignedExportEnvelope` payload) | `chio.evidence_export_commitment.v1` |
+| Aggregate budget root binding | `chio.aggregate-budget-root.v1` |
+| Cumulative approval root binding | `chio.cumulative-approval-root.v1` |
+| Economic state batch | `chio.economy.state-batch.v1` |
+| Economic state anchor view | `chio.economy.anchor-view.v1` |
+| Effect dispatch commit | `chio.economy.effect-dispatch-commit.v1` |
+| Operation execution nonce | `chio.operation_execution_nonce.v1` |
+| Caller dispatch authorization | `chio.caller-dispatch-authorization.v1` |
+| Caller delivery report | `chio.caller-delivery-report.v1` |
+| Stop operator configuration | `chio.stop-operator-config.v1` |
+| Stop operator configuration approval | `chio.stop-operator-config-approval.v1` |
+| Channel terminal outcome commitment | `chio.channel.terminal-outcome-commitment.v1` |
+| Signer readiness probe | `chio.signer-readiness-probe.v1` |
+| Finding-pool store identity proof | `chio.finding-pool.store-identity-proof.v1` |
+| ACP compliance certificate | `chio.compliance.certificate.v1` |
+| Federation kernel handshake | `chio.federation-kernel-handshake.v1` |
+| Operator purchase job (buyer ask signature) | `chio.finding.operator-purchase-job.v1` |
+| WASM guard module | `chio.wasm-module.v1` |
+| TEE capture frame | `chio.tee-capture-frame.v1` |
+| Passport revocation epoch root | `chio.trust.passport-revocation-root.v1` |
+
+A signed artifact type with no registered schema id cannot be signed or
+verified. Every id in this table is listed in `spec/schemas/registry.json` and
+`KNOWN_SIGNED_ARTIFACT_SCHEMAS` before an implementation emits it, and the
+verification helper refuses any id outside that list.
+
 ## 5. Capability Contract
 
 The shipped capability token is `CapabilityToken` from
@@ -302,16 +549,15 @@ The v1 signed body is:
 | `expires_at` | Unix timestamp seconds |
 | `delegation_chain` | Ordered chain of delegation links |
 | `aggregate_invocation_budget` | Optional capability-wide or delegation-family invocation ceiling |
-| `algorithm` | Optional envelope hint: `ed25519`, `p256`, `p384`, or `hybrid` |
 
 Capability public-key fields and signatures use the same self-describing
-encoding defined in section 4. Hybrid capability tokens set
-`algorithm: "hybrid"` and encode `issuer`, `subject`, delegation-link keys,
-and signatures as `hybrid:<classical>:<mldsa65-hex>:<alg_set>`. Verifiers
-MUST dispatch from the signature prefix, confirm any present `algorithm` hint
-matches that prefix, and reject mismatches fail-closed. The algorithm enum
-MUST NOT contain concrete algorithm-set strings such as `ed25519+mldsa65`;
-those strings live only inside the hybrid wire value.
+encoding defined in section 4. Hybrid capability tokens encode `issuer`,
+`subject`, delegation-link keys, and signatures as
+`hybrid:<classical>:<mldsa65-hex>:<alg_set>`. The token carries no
+`algorithm` member: a verifier takes the algorithm from the issuer key and
+rejects a signature whose prefix differs, fail-closed, and a token that
+carries an `algorithm` member fails decoding. The signature covers the
+signing wrapper under `chio.capability.v1` (section 4.5).
 
 ### Capability Negotiation
 
@@ -1247,8 +1493,7 @@ The current pre-release v1 receipt envelope is `ChioReceipt` from
 | `bbs_projection_version` | Optional BBS projection selector. Present only when `bbs_signature` is present, included in the receipt id, and fixed to `chio.bbs-projection.receipt.v1` for v1 receipt BBS material |
 | `kernel_key` | Verifying public key; bare 64-hex Ed25519, `p256:<130-hex>` SEC1 P-256, or `p384:<194-hex>` SEC1 P-384 |
 | `bbs_signature` | Optional BBS signature material for selective disclosure. When present, it is covered by the authoritative receipt signature |
-| `algorithm` | Optional envelope hint (`ed25519`, `p256`, or `p384`); verification dispatches off the signature prefix, not this field |
-| `signature` | Algorithm-aware hex signature over canonical JSON of `ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }`. The schema regex is `^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$`: bare 128-hex for Ed25519, `p256:<DER hex>` for P-256, or `p384:<DER hex>` for P-384 |
+| `signature` | Algorithm-aware hex signature over the signing wrapper under `chio.receipt.v1` of the canonical JSON of `ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }`. The schema regex is `^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+)$`: bare 128-hex for Ed25519, `p256:<DER hex>` for P-256, or `p384:<DER hex>` for P-384 |
 
 `chio_internal` identifies a Chio-owned operation such as a cage decision or
 kernel session report. It is not an external tool-execution claim and grants no
@@ -1299,13 +1544,13 @@ receipt id is:
 id = H(canonical_jcs(ChioReceiptIdInput))
 ```
 
-The signature input is the typed wrapper:
+The canonical signing body is the typed structure:
 
 ```text
 ChioReceiptSigningBody { id, body: ChioReceiptIdInput }
 ```
 
-When BBS receipt material is present, the signature wrapper also carries
+When BBS receipt material is present, the signing body also carries
 `bbs_signature`:
 
 ```text
@@ -1334,19 +1579,16 @@ metadata. Every signed `chio.receipt.v1` carries this key, and the inline and
 asynchronous kernel signing funnels emit byte-identical receipts because both
 apply this same binding through one signing primitive.
 
-The producer canonicalizes that wrapper via RFC 8785 JCS and signs the
-resulting bytes with the kernel's identity key. Three signing
-algorithms are supported in v1, and verifiers dispatch off the
-`signature` field prefix rather than the optional `algorithm` envelope
-hint:
+The producer canonicalizes that signing body via RFC 8785 JCS and signs the
+signing wrapper over it under `chio.receipt.v1` (section 4.5) with the
+kernel's identity key. Three signing algorithms are supported in v1, and the
+verifier takes the algorithm from the pinned kernel key:
 
 - **Ed25519** (default): bare lowercase 128-hex (exactly 64 raw bytes);
   the `kernel_key` is bare lowercase 64-hex (32 raw bytes).
-- **P-256 (ECDSA / SECP256R1)**: `p256:<DER hex>` over the same canonical
-  bytes; the `kernel_key` is `p256:<130-hex>` (uncompressed SEC1 point,
+- **P-256 (ECDSA / SECP256R1)**: `p256:<DER hex>` over the same wrapper; the `kernel_key` is `p256:<130-hex>` (uncompressed SEC1 point,
   65 bytes, leading byte `0x04`).
-- **P-384 (ECDSA / SECP384R1)**: `p384:<DER hex>` over the same canonical
-  bytes; the `kernel_key` is `p384:<194-hex>` (uncompressed SEC1 point,
+- **P-384 (ECDSA / SECP384R1)**: `p384:<DER hex>` over the same wrapper; the `kernel_key` is `p384:<194-hex>` (uncompressed SEC1 point,
   97 bytes, leading byte `0x04`).
 
 The wire pattern is fixed by
@@ -1360,18 +1602,16 @@ kernel_key -> ^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194})$
 The Ed25519 signature length is exactly 128 hex characters; the P-256
 and P-384 hex bodies hold variable-length DER-encoded ECDSA signatures
 (roughly 70-72 bytes for P-256 and 104-110 bytes for P-384) and are
-validated by length-aware decoders downstream of the schema regex. The
-optional `algorithm` envelope hint MAY be `ed25519`, `p256`, or `p384`;
-when present it MUST agree with the signature prefix and verifiers
-reject mismatches fail-closed. Hybrid post-quantum signatures use the
+validated by length-aware decoders downstream of the schema regex. A
+receipt carries no `algorithm` member; a signature whose prefix differs from
+the pinned key's algorithm rejects fail-closed. Hybrid post-quantum signatures use the
 self-describing prefix shape defined in section 4 and are not part of
 this `chio.receipt.v1` algorithm enumeration.
 
 Ad hoc byte concatenation is not a valid signing input. Verifiers
-reconstruct the typed wrapper, re-canonicalize it via JCS, dispatch off
-the signature prefix to select the correct verification algorithm, and
-only then verify the signature against the embedded `kernel_key` (which
-itself must agree with the same algorithm prefix).
+reconstruct the typed signing body, re-canonicalize it via JCS, rebuild the
+signing wrapper under `chio.receipt.v1`, take the algorithm from the pinned
+kernel key, and only then verify the signature.
 
 Replay and deduplication state keys exclusively on `id`. A tampered id cannot
 influence replay acceptance because verifiers recompute the id from canonical
@@ -1441,10 +1681,10 @@ authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,
 #### Operation-owned execution nonce profile
 
 `chio.operation_execution_nonce.v1` is a distinct operation-owned profile. It uses the
-existing signed-nonce transport shape, but signs the canonical JSON of an object
-with exactly these members:
+existing signed-nonce transport shape, but signs the signing wrapper under
+`chio.operation_execution_nonce.v1` over the canonical JSON of an object with
+exactly these members:
 
-- `schema`: the literal `chio.admission-execution-nonce-signature.v1`.
 - `operation_id`: the authenticated admission operation ID string.
 - `nonce`: the complete nonce body, including its `chio.operation_execution_nonce.v1`
   schema label and every optional member present in that body.
@@ -2517,8 +2757,7 @@ after governance authorization.
 #### 6.4.7.22 `chio.finding.status-epoch.v1`
 
 The status-feed operator's signed sparse-map root. Its strict body binds the
-content-addressed `status_epoch_id`, signature domain
-`chio.finding.status.v1`, map version `sparse_map_v1`, proof semantics
+content-addressed `status_epoch_id`, map version `sparse_map_v1`, proof semantics
 `siblings_leaf_to_root_v1`, feed id, fixed numeric key-domain nonce
 `3318287169837494`, monotonic `map_epoch`, operator identity, Ed25519 key and
 key epoch, root hash, depth 256, SHA-256, the four hash-domain labels, the

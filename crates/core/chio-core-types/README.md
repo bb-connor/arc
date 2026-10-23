@@ -43,7 +43,10 @@ WASM builds enable `getrandom/js` through a target-specific dependency.
 - `CanonicalBytes<CanonicalJsonWitness>` exposes immutable serializer-produced
   bytes for signing and hashing.
 - `validate_attenuation` requires the child's scope to be a subset of its parent.
-- `Keypair::sign_canonical` returns the exact bytes used for its signature.
+- `Keypair::sign_wrapped` signs the signing wrapper over canonical bytes under a
+  registered schema id and refuses an unregistered id.
+- `verify_wrapped` takes the algorithm from the pinned key only and returns an
+  error on any refusal.
 
 ## Status
 
