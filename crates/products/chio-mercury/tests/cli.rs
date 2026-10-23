@@ -21,7 +21,7 @@ use chio_store_sqlite::SqliteReceiptStore;
 
 #[path = "cli/evidence_fixture.rs"]
 mod evidence_fixture;
-use evidence_fixture::{export_fixture_package, mercury_receipt_with_ts};
+use evidence_fixture::{export_fixture_package, kernel_trust_file, mercury_receipt_with_ts};
 
 #[path = "cli/signed_reader.rs"]
 mod signed_reader;
@@ -33,23 +33,6 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
         .expect("system time before unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
-}
-
-/// A `chio.verifier-trust.v1` file pinning `key` as the only kernel key.
-fn kernel_trust_file(dir: &Path, key: &chio_core::crypto::PublicKey) -> PathBuf {
-    let path = dir.join("verifier-trust.json");
-    let trust = serde_json::json!({
-        "schema": "chio.verifier-trust.v1",
-        "kernel_keys": [key.to_hex()],
-        "exchange_keys": [],
-        "root_policy_keys": [],
-    });
-    fs::write(
-        &path,
-        serde_json::to_vec(&trust).expect("encode trust file"),
-    )
-    .expect("write trust file");
-    path
 }
 
 fn workspace_root() -> PathBuf {
