@@ -1715,10 +1715,10 @@ rust_symbols = [
   "ChioKernel::configured_runtime_participant_binding",
   "ChioKernel::run_runtime_admission_hook",
 ]
-normalized_sha256 = "f55a98a69e81d1491e5634853d45c996704b2077e5055688b081fb79aad0a279"
+normalized_sha256 = "b29d848d6bae17fca49833640c17948cf5b6c688f2864629d563875dd5dd56b4"
 symbol_sha256 = [
   { symbol = "ChioKernel::configured_runtime_participant_binding", sha256 = "4834308b5071d000ed1194b7d78f5eded2e435b58c59e2b437494249f8c01e9e" },
-  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "d2bf64363d9114f09bc51437439bd072b720b41e6916f7570594e5efefe2d9dc" },
+  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "8daa25fbc5174e6dc7ab183e317d7f23f039a7c360343d5c4334876671effafa" },
 ]
 
 [[mirror]]
