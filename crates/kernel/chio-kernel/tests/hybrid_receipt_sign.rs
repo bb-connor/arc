@@ -257,7 +257,11 @@ fn hybrid_receipt_round_trip_signs_and_verifies() {
     // The signature verifies against the authoritative
     // `ChioReceiptSigningBody` wrapper bytes, not the bare body bytes.
     let wrapper_bytes = canonical_signing_wrapper_bytes(&body);
-    assert!(verifies_receipt_wrapper(&receipt.kernel_key, &wrapper_bytes, &receipt.signature));
+    assert!(verifies_receipt_wrapper(
+        &receipt.kernel_key,
+        &wrapper_bytes,
+        &receipt.signature
+    ));
     assert!(receipt.verify_signature().unwrap());
     assert!(receipt
         .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)

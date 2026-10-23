@@ -745,20 +745,32 @@ pub(crate) enum LocalReceiptArtifact {
 }
 
 impl LocalReceiptArtifact {
+    /// `local_kernel` is this kernel's receipt signing key; a parent signed
+    /// under any other key is refused before its signature is checked.
     fn verify_signature_with_floor(
         &self,
+        local_kernel: &chio_core::PublicKey,
         floor: chio_core::receipt::crypto_floor::ReceiptCryptoFloor,
     ) -> Result<bool, KernelError> {
+        let signer = match self {
+            Self::Tool(receipt) => &receipt.kernel_key,
+            Self::Child(receipt) => &receipt.kernel_key,
+        };
+        if signer != local_kernel {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain parent receipt signer is not the local kernel".to_string(),
+            ));
+        }
         match self {
             Self::Tool(receipt) => receipt
-                .verify_signature_with_floor(&receipt.kernel_key, floor)
+                .verify_signature_with_floor(local_kernel, floor)
                 .map_err(|error| {
                     KernelError::GovernedTransactionDenied(format!(
                         "governed call_chain parent receipt failed signature verification: {error}"
                     ))
                 }),
             Self::Child(receipt) => receipt
-                .verify_signature_with_floor(&receipt.kernel_key, floor)
+                .verify_signature_with_floor(local_kernel, floor)
                 .map_err(|error| {
                     KernelError::GovernedTransactionDenied(format!(
                         "governed call_chain parent receipt failed signature verification: {error}"

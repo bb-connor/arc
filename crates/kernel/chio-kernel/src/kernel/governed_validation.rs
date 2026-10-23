@@ -918,6 +918,7 @@ impl ChioKernel {
                 match self.local_receipt_artifact(parent_receipt_id)? {
                     Some(parent_receipt) => {
                         let signature_valid = parent_receipt.verify_signature_with_floor(
+                            &self.receipt_signing_public_key()?,
                             receipt_crypto_floor(self.capability_crypto_floor),
                         )?;
                         if !signature_valid {
@@ -1100,8 +1101,15 @@ impl ChioKernel {
         })?;
 
         let signed_bond = &bond_row.bond;
+        let trusted = self.trusted_issuer_keys();
+        let Some(credit_authority) = trusted.iter().find(|key| **key == signed_bond.signer_key)
+        else {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "delegation bond `{bond_id}` signer is not the trusted credit authority"
+            )));
+        };
         let signature_valid = signed_bond
-            .verify_signature(&signed_bond.signer_key)
+            .verify_signature(credit_authority)
             .map_err(|error| {
                 KernelError::GovernedTransactionDenied(format!(
                     "delegation bond `{bond_id}` failed signature verification: {error}"
