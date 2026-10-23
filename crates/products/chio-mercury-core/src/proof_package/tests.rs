@@ -1307,7 +1307,8 @@ fn trusted_proof_verification_rejects_untrusted_checkpoint_signer() {
 fn trusted_proof_verification_rejects_invalid_checkpoint_when_profile_flag_is_false() {
     let mut package = full_trusted_sample_package();
     package.publication_profile.checkpoint_signatures_required = false;
-    package.chio_bundle.checkpoints[0].signature = Keypair::generate().sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"invalid");
+    package.chio_bundle.checkpoints[0].signature = Keypair::generate()
+        .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"invalid");
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);
 
     let error = package

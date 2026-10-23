@@ -133,7 +133,12 @@ impl AgUiReceipt {
             payload_hash: self.payload_hash.clone(),
             kernel_key: self.kernel_key.clone(),
         };
-        match verify_wrapped(&self.kernel_key, AG_UI_RECEIPT_SCHEMA, &body, &self.signature) {
+        match verify_wrapped(
+            &self.kernel_key,
+            AG_UI_RECEIPT_SCHEMA,
+            &body,
+            &self.signature,
+        ) {
             Ok(()) => Ok(true),
             Err(chio_core::Error::SignatureRejected) => Ok(false),
             Err(error) => Err(error),

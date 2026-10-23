@@ -158,7 +158,9 @@ mod tests {
         let stamp = sample_stamp();
         let envelope = sign_provenance(&stamp, &backend).unwrap();
         assert_eq!(envelope.stamp, stamp);
-        assert!(!serde_json::to_string(&envelope).unwrap().contains("\"algorithm\""));
+        assert!(!serde_json::to_string(&envelope)
+            .unwrap()
+            .contains("\"algorithm\""));
         let pk = verify_signed_provenance(&envelope).unwrap();
         assert_eq!(pk, &backend.public_key().unwrap());
     }

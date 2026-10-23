@@ -691,7 +691,8 @@ config:
             "version": "1.0.0",
         }))
         .unwrap();
-        let expected = chio_core::crypto::SigningWrapper::new(WASM_MODULE_SCHEMA, &canonical).unwrap();
+        let expected =
+            chio_core::crypto::SigningWrapper::new(WASM_MODULE_SCHEMA, &canonical).unwrap();
         assert_eq!(msg.as_slice(), expected.as_bytes());
         assert_ne!(
             msg,
