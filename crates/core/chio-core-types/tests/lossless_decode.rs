@@ -4,6 +4,7 @@
 
 use chio_core_types::capability::scope::{Constraint, FindingSettlementSelector};
 use chio_core_types::economic_continuity::EconomicActionAuthorizationV1;
+use chio_core_types::root_authority::ClaimValue;
 use chio_security_types::strict_serde::{DROPPED_INPUT, DUPLICATE_KEY};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -108,4 +109,56 @@ fn a_constraint_refuses_a_repeated_content_or_nested_key() {
         r#"[{"type":"governed_intent_required"},{"type":"path_prefix","type":"domain_exact","value":"/a"}]"#,
         "type"
     );
+}
+
+#[test]
+fn a_claim_value_refuses_a_repeated_commitment_field() {
+    let commit = format!("sha256:{}", "a9".repeat(32));
+    let other = format!("sha256:{}", "b9".repeat(32));
+    let cases = [
+        (
+            format!(r#"{{"commit":"{commit}","commit":"{other}","salt_ref":"anchor.sub"}}"#),
+            r#"duplicate object key: "commit" at line 1 column 92"#,
+        ),
+        (
+            format!(
+                r#"{{"commit":"{commit}","salt_ref":"anchor.sub","salt_ref":"anchor.tenant"}}"#
+            ),
+            r#"duplicate object key: "salt_ref" at line 1 column 118"#,
+        ),
+    ];
+    let observed: Vec<_> = cases
+        .iter()
+        .map(|(text, _)| {
+            let direct = ClaimValue::deserialize(&mut serde_json::Deserializer::from_str(text))
+                .err()
+                .map(|error| error.to_string());
+            let decoded = serde_json::from_str::<ClaimValue>(text)
+                .err()
+                .map(|error| error.to_string());
+            (direct, decoded)
+        })
+        .collect();
+    let expected: Vec<_> = cases
+        .iter()
+        .map(|(_, message)| (Some(message.to_string()), Some(message.to_string())))
+        .collect();
+    assert_eq!(observed, expected);
+}
+
+#[test]
+fn a_claim_value_refuses_an_unknown_commitment_member() {
+    let text = format!(
+        r#"{{"commit":"sha256:{}","salt_ref":"anchor.sub","pad":1}}"#,
+        "a9".repeat(32)
+    );
+    let expected = "data did not match any variant of untagged enum LosslessTarget";
+    let direct = ClaimValue::deserialize(&mut serde_json::Deserializer::from_str(&text))
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(direct.as_deref(), Some(expected));
+    let decoded = serde_json::from_str::<ClaimValue>(&text)
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(decoded.as_deref(), Some(expected));
 }
