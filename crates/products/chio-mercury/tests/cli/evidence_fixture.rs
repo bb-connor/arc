@@ -67,3 +67,20 @@ pub(super) fn export_fixture_package(receipt_db_path: &Path, output_dir: &Path) 
     )
     .expect("export evidence fixture package");
 }
+
+/// A `chio.verifier-trust.v1` file pinning `key` as the only kernel key.
+pub(super) fn kernel_trust_file(dir: &Path, key: &chio_core::crypto::PublicKey) -> PathBuf {
+    let path = dir.join("verifier-trust.json");
+    let trust = serde_json::json!({
+        "schema": "chio.verifier-trust.v1",
+        "kernel_keys": [key.to_hex()],
+        "exchange_keys": [],
+        "root_policy_keys": [],
+    });
+    fs::write(
+        &path,
+        serde_json::to_vec(&trust).expect("encode trust file"),
+    )
+    .expect("write trust file");
+    path
+}
