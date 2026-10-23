@@ -370,3 +370,93 @@ func TestCapabilityWithoutV1SchemaIsRefused(t *testing.T) {
 		t.Fatalf("expected signing body refusal without schema")
 	}
 }
+
+func paddedReceipt(t *testing.T, receipt map[string]any, pointer string) map[string]any {
+	t.Helper()
+	switch pointer {
+	case "/actor_chain/0":
+		receipt["actor_chain"] = []any{map[string]any{"actor_id": "agent-1", "pad": float64(0)}}
+		return receipt
+	case "/bbs_signature":
+		receipt["bbs_signature"] = map[string]any{"pad": float64(0)}
+		return receipt
+	}
+	var target any = receipt
+	for _, part := range strings.Split(pointer, "/")[1:] {
+		switch node := target.(type) {
+		case map[string]any:
+			target = node[part]
+		case []any:
+			target = node[0]
+		}
+	}
+	object, ok := target.(map[string]any)
+	if !ok {
+		t.Fatalf("pointer %q does not name an object", pointer)
+	}
+	object["pad"] = float64(0)
+	return receipt
+}
+
+func assertReceiptMemberRefused(t *testing.T, receipt map[string]any, member string) {
+	t.Helper()
+	kernelKey, _ := receipt["kernel_key"].(string)
+	_, err := invariants.VerifyReceiptWithTrustedSigners(receipt, []string{kernelKey})
+	invariantErr, ok := err.(*invariants.InvariantError)
+	if !ok {
+		t.Fatalf("%s: expected InvariantError, got %v", member, err)
+	}
+	if invariantErr.Code != "receipt" || invariantErr.Message != "unknown receipt member: "+member {
+		t.Fatalf("%s: unexpected refusal %#v", member, invariantErr)
+	}
+}
+
+func TestEveryReceiptRecordRefusesAnUnknownMember(t *testing.T) {
+	var vectors receiptVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "receipt", "v1.json"), &vectors)
+	byID := map[string]map[string]any{}
+	for _, testCase := range vectors.Cases {
+		byID[testCase.ID] = testCase.Receipt
+	}
+	for _, padding := range []struct{ caseID, pointer string }{
+		{"allow_receipt", ""},
+		{"allow_receipt", "/action"},
+		{"allow_receipt", "/decision"},
+		{"deny_receipt", "/decision"},
+		{"allow_receipt", "/evidence/0"},
+		{"allow_receipt", "/actor_chain/0"},
+		{"allow_receipt", "/bbs_signature"},
+	} {
+		source, ok := byID[padding.caseID]
+		if !ok {
+			t.Fatalf("%s vector not found", padding.caseID)
+		}
+		receipt := paddedReceipt(t, cloneMap(t, source), padding.pointer)
+		assertReceiptMemberRefused(t, receipt, padding.pointer+"/pad")
+	}
+	allow := cloneMap(t, byID["allow_receipt"])
+	allow["schema"] = "chio.receipt.v1"
+	assertReceiptMemberRefused(t, allow, "/schema")
+}
+
+func TestProtocolPrimitivesUnknownFieldReceiptIsRefused(t *testing.T) {
+	var corpus struct {
+		Cases []struct {
+			Name     string         `json:"name"`
+			Valid    bool           `json:"valid"`
+			Instance map[string]any `json:"instance"`
+		} `json:"cases"`
+	}
+	loadVectorFile(t, "../../../../tests/bindings/fixtures/protocol-primitives-v1.json", &corpus)
+	for _, testCase := range corpus.Cases {
+		if testCase.Name != "receipt-unknown-field" {
+			continue
+		}
+		if testCase.Valid {
+			t.Fatalf("receipt-unknown-field must be an invalid case")
+		}
+		assertReceiptMemberRefused(t, testCase.Instance, "/unsigned_extension")
+		return
+	}
+	t.Fatalf("receipt-unknown-field case not found")
+}
