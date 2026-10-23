@@ -42,14 +42,14 @@ One row per tool receipt with five columns, each `verified`, `observed`,
 
 | Column | `verified` when |
 |---|---|
-| `identity_root` | the receipt's root authority verifies against pinned exchange and root policy keys |
-| `delegation_chain` | every hop of the presented chain verifies and no exported revocation covers it |
+| `identity_root` | never: this verifier reads no root authority and reports `unverifiable` |
+| `delegation_chain` | never: this verifier reads no presented chain and reports `unverifiable` |
 | `decision` | the receipt signature verifies under a pinned kernel key and the receipt is a mediated decision that carries its decision; trace observations and advisory evaluations report `observed` |
-| `content` | the receipt's commitments open from data the verifier holds |
+| `content` | never: this verifier reads no content openings and reports `unverifiable` |
 | `settlement` | not supported by this verifier; requiring it exits 50 |
 
-Receipts without root authority report `identity_root`, `delegation_chain` and
-`content` as `unverifiable`.
+A trust file that requires `identity_root`, `delegation_chain` or `content`
+therefore exits 10.
 
 ## Exit codes
 
