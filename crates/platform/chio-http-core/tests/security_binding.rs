@@ -112,7 +112,7 @@ fn bound_projection_denies(session: Option<&str>, policy: HttpAuthorityPolicy) {
     );
     assert!(prepared.capability_id.is_none());
     let receipt = authority.sign_decision_receipt(&prepared).test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     assert!(receipt.capability_id.is_none());
 }
 
@@ -152,7 +152,7 @@ fn security_binding_projection_preserves_unbound_capability() {
         result.receipt.capability_id.as_deref(),
         Some(token.id.as_str())
     );
-    assert!(result.receipt.verify_signature().test_unwrap());
+    assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[test]
@@ -172,5 +172,5 @@ fn security_binding_projection_preserves_dpop_refusal() {
         .test_unwrap();
     assert!(matches!(&result.verdict, Verdict::Deny { reason, .. }
         if reason.contains("proof-required capabilities require kernel-mediated dispatch")));
-    assert!(result.receipt.verify_signature().test_unwrap());
+    assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
 }

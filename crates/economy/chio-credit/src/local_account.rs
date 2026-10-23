@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(envelope.body.currency, "USD");
         assert_eq!(envelope.body.receipt_id, receipt.id);
         assert_eq!(envelope.body.tenant_id.as_deref(), Some("tenant-a"));
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

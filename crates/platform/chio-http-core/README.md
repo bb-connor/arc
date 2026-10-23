@@ -31,7 +31,7 @@ let result = authority.evaluate(HttpAuthorityInput {
     policy: HttpAuthorityPolicy::SessionAllow,
 })?;
 assert!(result.verdict.is_allowed());
-assert!(result.receipt.verify_signature()?);
+assert!(result.receipt.verify_integrity_embedded_key()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -50,7 +50,7 @@ extensions. `evaluate` prepares and signs a decision receipt. Invalid
 presented capabilities deny even otherwise session-allowed requests.
 
 `ChioHttpRequest::content_hash` canonically binds method, route pattern,
-actual path, query, and supplied body hash. `HttpReceipt::verify_signature`
+actual path, query, and supplied body hash. `HttpReceipt::verify_integrity_embedded_key`
 checks authority semantics, recomputed receipt ID, and the embedded kernel
 signature; consumers independently pin that kernel key.
 

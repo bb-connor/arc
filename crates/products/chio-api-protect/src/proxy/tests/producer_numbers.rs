@@ -43,6 +43,9 @@ async fn sdk_producer_numbers_reach_evaluation_and_a_signed_receipt() {
             .test_unwrap();
         let evaluation: EvaluateResponse = serde_json::from_slice(&bytes).test_unwrap();
         assert!(evaluation.verdict.is_denied());
-        assert!(evaluation.receipt.verify_signature().test_unwrap());
+        assert!(evaluation
+            .receipt
+            .verify_integrity_embedded_key()
+            .test_unwrap());
     }
 }

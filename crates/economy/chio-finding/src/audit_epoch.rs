@@ -186,12 +186,15 @@ impl FindingAuditEpoch {
         if self.seed_witnessed_at > self.committed_at {
             return Err(FindingError::InvalidField("committed_at"));
         }
-        self.verify_seed_witness()?;
+        self.verify_integrity_embedded_key()?;
         self.verify_audit_epoch_id()
     }
 
     /// Verify the independently pinned seed witness embedded in this body.
-    pub fn verify_seed_witness(&self) -> Result<(), FindingError> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<(), FindingError> {
         let body = audit_seed_witness_body(
             &self.audit_authority,
             self.epoch_index,

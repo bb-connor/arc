@@ -240,7 +240,9 @@ impl<T: Serialize + sealed::Body> Signed<T> {
             signature,
         })
     }
-    pub fn verify(&self) -> Result<()> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<()> {
         if verify_wrapped_bytes(
             &self.signer,
             T::DOMAIN,
@@ -302,7 +304,7 @@ pub fn verify_dispatch_permit(
     now: u64,
     accepted_issuers: &[PublicKey],
 ) -> Result<Admission> {
-    permit.verify()?;
+    permit.verify_integrity_embedded_key()?;
     if !accepted_issuers.contains(&permit.signer) {
         return Err(Error::Authority);
     }
@@ -313,8 +315,8 @@ pub fn verify_dispatch_permit(
         return invalid("permit issuance time");
     }
     let selection = &body.selection;
-    selection.verify()?;
-    selection.body.offer.verify()?;
+    selection.verify_integrity_embedded_key()?;
+    selection.body.offer.verify_integrity_embedded_key()?;
     let offer = &selection.body.offer.body;
     hash(&body.allocation_hash)?;
     if offer.allocation_hash != body.allocation_hash {

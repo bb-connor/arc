@@ -87,7 +87,9 @@ where
         })
     }
 
-    pub fn verify_signature(&self) -> Result<bool, ClearingError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, ClearingError> {
         match verify_wrapped(&self.signer_key, T::SCHEMA_ID, &self.body, &self.signature) {
             Ok(()) => Ok(true),
             Err(chio_core_types::Error::SignatureRejected) => Ok(false),

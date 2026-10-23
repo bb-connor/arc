@@ -104,7 +104,7 @@ fn package_rejects_tampered_embedded_http_receipt() {
         .to_chio_receipt_with_keypair(&package_keypair())
         .test_unwrap();
     http.response_status = 503;
-    assert!(!http.verify_signature().test_unwrap());
+    assert!(!http.verify_integrity_embedded_key().test_unwrap());
     let receipt = resign_embedded_http(projected.body(), http);
     let expected = format!(
         "HTTP receipt projection verification failed: {}",
@@ -139,7 +139,7 @@ fn package_rejects_forged_embedded_http_signature_with_valid_id() {
         .test_unwrap();
     http.signature = http_receipt(Verdict::deny("outside capability scope", "scope")).signature;
     assert!(http.receipt_id_valid().test_unwrap());
-    assert!(!http.verify_signature().test_unwrap());
+    assert!(!http.verify_integrity_embedded_key().test_unwrap());
     let receipt = resign_embedded_http(projected.body(), http);
     let expected = format!(
         "HTTP receipt projection verification failed: {}",
@@ -251,7 +251,7 @@ fn package_rejects_distinct_trusted_http_and_outer_signers() {
     let mut body = http_receipt(Verdict::Allow).body();
     body.kernel_key = foreign.public_key();
     let http = HttpReceipt::sign(body, &foreign).test_unwrap();
-    assert!(http.verify_signature().test_unwrap());
+    assert!(http.verify_integrity_embedded_key().test_unwrap());
     let mut body = http
         .to_chio_receipt_with_keypair(&foreign)
         .test_unwrap()

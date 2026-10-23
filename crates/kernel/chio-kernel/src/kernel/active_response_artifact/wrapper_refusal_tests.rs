@@ -25,7 +25,7 @@ fn authority_attestation_refuses_unwrapped_and_foreign_id_signatures() {
         &Ed25519Backend::new(authority.clone()),
     )
     .unwrap();
-    assert!(attestation.verify_signature().unwrap());
+    assert!(attestation.verify_integrity_embedded_key().unwrap());
     for (label, signature) in
         crate::wrapper_refusals::refused_signatures(&authority, &attestation.body)
     {
@@ -33,6 +33,10 @@ fn authority_attestation_refuses_unwrapped_and_foreign_id_signatures() {
             signature,
             ..attestation.clone()
         };
-        assert_eq!(refused.verify_signature(), Ok(false), "{label}");
+        assert_eq!(
+            refused.verify_integrity_embedded_key(),
+            Ok(false),
+            "{label}"
+        );
     }
 }

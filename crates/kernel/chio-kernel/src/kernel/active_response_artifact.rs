@@ -171,7 +171,9 @@ impl ActiveResponseArtifactAuthorityAttestation {
         })
     }
 
-    pub fn verify_signature(
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(
         &self,
     ) -> Result<bool, ActiveResponseArtifactAuthorityAttestationError> {
         self.body.validate()?;
@@ -391,7 +393,7 @@ impl ChioKernel {
             ));
         }
         if !attestation
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| denied(&error.to_string()))?
         {
             return Err(denied(

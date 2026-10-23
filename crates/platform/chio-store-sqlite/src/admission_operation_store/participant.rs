@@ -9,7 +9,7 @@ impl SqliteAdmissionOperationStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(), AdmissionOperationStoreError> {
-        let verified = envelope.verify()?;
+        let verified = envelope.verify_integrity_embedded_key()?;
         let cache = crate::economic_state_cache::SqliteEconomicStateCache::open_alongside(
             self.connection.clone(),
             self.serving_owner.clone(),

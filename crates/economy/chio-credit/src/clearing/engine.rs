@@ -199,7 +199,7 @@ fn verified_body<T>(
 where
     T: ClearingPayload + Clone,
 {
-    if &envelope.signer_key != expected_key || !envelope.verify_signature()? {
+    if &envelope.signer_key != expected_key || !envelope.verify_integrity_embedded_key()? {
         return Err(ClearingError::AuthorityVerification);
     }
     Ok(envelope.body.clone())
@@ -258,7 +258,7 @@ fn validate_participant_snapshot(
         return Err(ClearingError::AuthorityVerification);
     }
     if !snapshot
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|_| ClearingError::AuthorityVerification)?
     {
         return Err(ClearingError::AuthorityVerification);
@@ -340,7 +340,7 @@ fn validate_participant_acknowledgements(
             body.expires_at_unix_ms,
         )?;
         if !acknowledgement
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ClearingError::AuthorityVerification)?
         {
             return Err(ClearingError::AuthorityVerification);
@@ -362,7 +362,7 @@ fn validate_input_manifest(
         return Err(ClearingError::AuthorityVerification);
     }
     if !manifest
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|_| ClearingError::AuthorityVerification)?
     {
         return Err(ClearingError::AuthorityVerification);

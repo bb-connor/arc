@@ -213,7 +213,7 @@ proptest! {
             prop_assert_eq!(&envelope.body.receipt_id, &receipt.id);
             prop_assert_eq!(envelope.body.receipt_timestamp, scenario.timestamp);
             prop_assert_eq!(envelope.body.tenant_id.clone(), scenario.tenant_id.clone());
-            prop_assert!(envelope.verify_signature().unwrap());
+            prop_assert!(envelope.verify_integrity_embedded_key().unwrap());
 
             // Re-evaluation is idempotent: same envelope, same id.
             let again = account.evaluate(&receipt).unwrap().unwrap();

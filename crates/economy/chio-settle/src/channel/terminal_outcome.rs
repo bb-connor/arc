@@ -120,7 +120,9 @@ impl SignedChannelTerminalOutcomeCommitmentV1 {
         })
     }
 
-    pub fn verify_signature(&self) -> Result<(), ChannelError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<(), ChannelError> {
         if verify_wrapped_bytes(
             &self.kernel_key,
             CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA,
@@ -170,7 +172,7 @@ pub fn verify_channel_terminal_outcome_commitment(
     receipt: &ChioReceipt,
 ) -> Result<VerifiedChannelTerminalOutcomeCommitmentV1, ChannelError> {
     artifact.body.validate()?;
-    artifact.verify_signature()?;
+    artifact.verify_integrity_embedded_key()?;
     let reservation = reservation.artifact();
     if &artifact.kernel_key != trusted_kernel_key
         || &receipt.kernel_key != trusted_kernel_key

@@ -1727,7 +1727,7 @@ fn channel_terminal_projection_rebases_immutable_evidence_over_a_later_checkpoin
         &capabilities(),
         &kernel,
     )?;
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     assert_eq!(
         verified
             .channel_terminal()
@@ -1784,7 +1784,7 @@ fn signed_channel_terminal_preserves_typed_anchor_contract() -> TestResult<()> {
         &capabilities(),
         &Keypair::from_seed(&[36; 32]),
     )?;
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     assert!(verified.requires_anchored_economic_commit());
     let channel = verified
         .channel_terminal()
@@ -1893,7 +1893,7 @@ fn resigned_terminal_envelope_rejects_substituted_obligation_record() -> TestRes
     )?)?;
     let substituted: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        substituted.verify(),
+        substituted.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())

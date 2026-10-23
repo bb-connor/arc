@@ -229,7 +229,7 @@ pub(super) fn verify_reconciliation(
         || body.disposition_authority_id != trust.obligation_authority_id
         || body.disposition_authority_key_epoch != trust.obligation_key_epoch
         || body.observed_at_unix_ms > trust.trusted_time_unix_ms
-        || !signed_reconciliation.verify_signature()?
+        || !signed_reconciliation.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }
@@ -241,7 +241,7 @@ pub(super) fn verify_reconciliation(
     let intent_digest = signed_intent.body.digest()?;
     let signed_intent_digest = signed_intent.digest()?;
     if signed_intent.signer_key != trust.clearing_authority_key
-        || !signed_intent.verify_signature()?
+        || !signed_intent.verify_integrity_embedded_key()?
         || body.round_id != record.round_id
         || body.round_core_digest != record.round_core_digest
         || record.output_manifest_digest.as_deref() != Some(body.output_manifest_digest.as_str())

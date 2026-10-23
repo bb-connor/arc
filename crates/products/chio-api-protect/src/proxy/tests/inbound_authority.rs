@@ -93,7 +93,7 @@ fn inbound_authority_unknown_routes_refuse_even_a_valid_capability() {
                 matches!(result.verdict, Verdict::Deny { .. }),
                 "{method:?} {path}"
             );
-            assert!(result.receipt.verify_signature().test_unwrap());
+            assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
         }
     }
 }
@@ -576,7 +576,7 @@ async fn security_binding_projection_refuses_without_upstream_effects() {
         let receipt = log.receipts.last().test_unwrap();
         assert!(receipt.verdict.is_denied());
         assert!(receipt.capability_id.is_none());
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     let allowed = app
@@ -599,6 +599,6 @@ async fn security_binding_projection_refuses_without_upstream_effects() {
         receipt.capability_id.as_deref(),
         Some("ordinary-upstream-capability")
     );
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     server.abort();
 }

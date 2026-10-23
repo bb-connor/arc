@@ -497,7 +497,7 @@ pub fn verify_clearing_zero_dispatch_proof(
         || body.issued_at_unix_ms < current_round_head.trusted_clock_high_water
         || body.issued_at_unix_ms > proof_trust.trusted_time_unix_ms
         || proof_trust.trusted_time_unix_ms >= body.expires_at_unix_ms
-        || !signed_proof.verify_signature()?
+        || !signed_proof.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }
@@ -623,7 +623,7 @@ pub fn verify_clearing_round_abort(
         || body.authorized_at_unix_ms < zero_dispatch.verified_at_unix_ms
         || body.authorized_at_unix_ms < current_round_head.trusted_clock_high_water
         || body.authorized_at_unix_ms > trust.trusted_time_unix_ms
-        || !signed_abort.verify_signature()?
+        || !signed_abort.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }
@@ -801,7 +801,7 @@ fn verify_abort_burn(
                 || body.clearing_authority_key_epoch != trust.clearing_authority_key_epoch
                 || finalization.signer_key != trust.clearing_authority_key
                 || body.finalized_at_unix_ms > trust.trusted_time_unix_ms
-                || !finalization.verify_signature()?
+                || !finalization.verify_integrity_embedded_key()?
             {
                 return Err(ClearingError::AuthorityVerification);
             }

@@ -228,7 +228,10 @@ impl WorkflowReceipt {
     }
 
     /// Verify the receipt signature.
-    pub fn verify(&self) -> Result<bool, chio_core::Error> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, chio_core::Error> {
         if self.schema != WORKFLOW_RECEIPT_SCHEMA {
             return Ok(false);
         }
@@ -365,7 +368,7 @@ mod tests {
         };
 
         let receipt = WorkflowReceipt::sign(body, &kp).unwrap();
-        assert!(receipt.verify().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         assert!(receipt.is_complete());
         assert_eq!(receipt.successful_steps(), 2);
     }
@@ -392,7 +395,7 @@ mod tests {
 
         let mut receipt = WorkflowReceipt::sign(body, &kp).unwrap();
         receipt.duration_ms = 999; // tamper
-        assert!(!receipt.verify().unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]
@@ -417,7 +420,7 @@ mod tests {
 
         let receipt = WorkflowReceipt::sign(body, &kp).unwrap();
 
-        assert!(!receipt.verify().unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]
@@ -503,9 +506,9 @@ mod tests {
         };
 
         let mut receipt = WorkflowReceipt::sign(body, &kp).unwrap();
-        assert!(receipt.verify().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         receipt.steps[0].parent_receipt_sha256 = Some("c".repeat(64));
-        assert!(!receipt.verify().unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

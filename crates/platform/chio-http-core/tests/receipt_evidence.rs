@@ -56,11 +56,11 @@ fn explicit_null_metadata_preserves_http_body_roundtrip() -> Result<(), Box<dyn 
 fn explicit_null_metadata_preserves_http_signature_roundtrip(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let receipt = HttpReceipt::sign(body(Some(Value::Null)), &keypair())?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let encoded = serde_json::to_vec(&receipt)?;
     let decoded: HttpReceipt = serde_json::from_slice(&encoded)?;
     assert_eq!(decoded.metadata, Some(Value::Null));
-    assert!(decoded.verify_signature()?);
+    assert!(decoded.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -70,7 +70,7 @@ fn absent_metadata_preserves_http_signature_roundtrip() -> Result<(), Box<dyn st
     let encoded = serde_json::to_vec(&receipt)?;
     let decoded: HttpReceipt = serde_json::from_slice(&encoded)?;
     assert_eq!(decoded.metadata, None);
-    assert!(decoded.verify_signature()?);
+    assert!(decoded.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -80,7 +80,7 @@ fn adding_null_metadata_invalidates_http_signature() -> Result<(), Box<dyn std::
     let mut value = serde_json::to_value(&receipt)?;
     value["metadata"] = Value::Null;
     let decoded: HttpReceipt = serde_json::from_value(value)?;
-    assert!(matches!(decoded.verify_signature(), Ok(false)));
+    assert!(matches!(decoded.verify_integrity_embedded_key(), Ok(false)));
     Ok(())
 }
 
@@ -90,6 +90,6 @@ fn removing_null_metadata_invalidates_http_signature() -> Result<(), Box<dyn std
     let mut value = serde_json::to_value(&receipt)?;
     value.as_object_mut().test_unwrap().remove("metadata");
     let decoded: HttpReceipt = serde_json::from_value(value)?;
-    assert!(matches!(decoded.verify_signature(), Ok(false)));
+    assert!(matches!(decoded.verify_integrity_embedded_key(), Ok(false)));
     Ok(())
 }

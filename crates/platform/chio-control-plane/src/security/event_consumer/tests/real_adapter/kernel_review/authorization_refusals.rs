@@ -79,7 +79,7 @@ fn signed_request(
         &Ed25519Backend::new(fixture.submission_authority.clone()),
     )
     .test_unwrap();
-    assert!(attestation.verify_signature().test_unwrap());
+    assert!(attestation.verify_integrity_embedded_key().test_unwrap());
     let authorization = ActiveResponseAuthorizationRequest::new(
         capability,
         plan.authorization_body(),

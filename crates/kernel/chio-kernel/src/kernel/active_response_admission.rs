@@ -123,7 +123,11 @@ impl ActiveResponseSubmissionProof {
         })
     }
 
-    pub fn verify_signature(&self) -> Result<bool, ActiveResponseSubmissionProofError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(
+        &self,
+    ) -> Result<bool, ActiveResponseSubmissionProofError> {
         self.body.validate()?;
         Ok(verify_wrapped_bytes(
             &self.body.submitter,
@@ -263,7 +267,7 @@ impl ActiveResponseAuthorizationRequest {
             ));
         }
         if !submission_proof
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| denied(&error.to_string()))?
         {
             return Err(denied(
@@ -716,7 +720,7 @@ fn validate_active_response_submission(
         ));
     }
     if !proof
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| denied(&error.to_string()))?
     {
         return Err(denied(

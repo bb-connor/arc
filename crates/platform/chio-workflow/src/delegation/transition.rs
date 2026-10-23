@@ -96,7 +96,7 @@ pub fn subdivide(
     counts: SubdivisionCounts,
     now: u64,
 ) -> Result<SubdivisionOutcome> {
-    request.verify()?;
+    request.verify_integrity_embedded_key()?;
     let child = &request.body.child;
     child.validate()?;
     if request.body.parent_allocation_hash != parent_allocation_hash {
@@ -159,9 +159,9 @@ pub fn select(
     now: u64,
     qualified: &[PublicKey],
 ) -> Result<SelectionOutcome> {
-    request.verify()?;
+    request.verify_integrity_embedded_key()?;
     let selection = &request.body;
-    selection.offer.verify()?;
+    selection.offer.verify_integrity_embedded_key()?;
     identifier(&selection.request_id)?;
     hash(&selection.capability_hash)?;
     let offer = &selection.offer.body;
@@ -268,7 +268,7 @@ pub fn verify_historical_permit(
     binding: &DispatchBinding,
     issuer: &PublicKey,
 ) -> Result<()> {
-    permit.verify()?;
+    permit.verify_integrity_embedded_key()?;
     if permit.signer != *issuer
         || permit.body.allocation_hash != allocation_hash
         || permit.body.slot != row.slot

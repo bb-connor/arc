@@ -438,7 +438,10 @@ impl PeerHandshakeEnvelope {
     /// confirm the envelope targets them and fits within the freshness
     /// window: [`KernelTrustExchange::accept_envelope`] is the convenient
     /// one-shot version that enforces all of that.
-    pub fn verify_signature(&self) -> Result<(), PeerHandshakeError> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<(), PeerHandshakeError> {
         if self.challenge.schema != FEDERATION_HANDSHAKE_SCHEMA {
             return Err(PeerHandshakeError::UnsupportedSchema(
                 self.challenge.schema.clone(),
@@ -771,7 +774,7 @@ impl KernelTrustExchange {
         now: u64,
         quorum_policy: &QuorumPolicy,
     ) -> Result<FederationPeer, PeerHandshakeError> {
-        envelope.verify_signature()?;
+        envelope.verify_integrity_embedded_key()?;
 
         if envelope.challenge.remote_kernel_id != self.local_kernel_id {
             return Err(PeerHandshakeError::AddressMismatch {

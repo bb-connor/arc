@@ -105,7 +105,10 @@ pub struct IouEnvelope {
 impl IouEnvelope {
     /// Verify the IOU envelope signature against the embedded issuer
     /// key. Returns `Ok(true)` when the signature is valid.
-    pub fn verify_signature(&self) -> Result<bool, CreditEvaluatorError> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, CreditEvaluatorError> {
         match verify_wrapped(
             &self.body.issuer_key,
             IOU_ENVELOPE_SCHEMA,

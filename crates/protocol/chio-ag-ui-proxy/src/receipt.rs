@@ -116,7 +116,10 @@ impl AgUiReceipt {
     }
 
     /// Verify the embedded signature only. This is not an authorization check.
-    pub fn verify_embedded_signature(&self) -> Result<bool, chio_core::Error> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, chio_core::Error> {
         let body = AgUiReceiptBody {
             id: self.id.clone(),
             timestamp: self.timestamp,
@@ -150,7 +153,7 @@ impl AgUiReceipt {
         &self,
         trusted_kernel_keys: &[PublicKey],
     ) -> Result<AgUiReceiptVerification, chio_core::Error> {
-        let signature_valid = self.verify_embedded_signature()?;
+        let signature_valid = self.verify_integrity_embedded_key()?;
         let signer_trusted = trusted_kernel_keys
             .iter()
             .any(|key| key.to_hex() == self.kernel_key.to_hex());
@@ -204,7 +207,7 @@ mod tests {
         };
 
         let receipt = AgUiReceipt::sign(body, &kp).unwrap();
-        assert!(receipt.verify_embedded_signature().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         let trusted = receipt
             .verify_with_trusted_kernel_keys(&[kp.public_key()])
             .unwrap();
@@ -242,7 +245,7 @@ mod tests {
 
         let mut receipt = AgUiReceipt::sign(body, &kp).unwrap();
         receipt.allowed = true; // tamper
-        assert!(!receipt.verify_embedded_signature().unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

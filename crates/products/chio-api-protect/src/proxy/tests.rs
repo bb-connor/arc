@@ -845,7 +845,9 @@ async fn proxy_handler_denies_without_capability_and_records_receipt() {
         http_status_scope(log.receipts[0].metadata.as_ref()),
         Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
     );
-    assert!(log.receipts[0].verify_signature().test_unwrap());
+    assert!(log.receipts[0]
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1087,7 +1089,10 @@ async fn sidecar_evaluate_returns_200_with_deny_verdict() {
         .await
         .test_unwrap();
     let evaluation: EvaluateResponse = serde_json::from_slice(&bytes).test_unwrap();
-    assert!(evaluation.receipt.verify_signature().test_unwrap());
+    assert!(evaluation
+        .receipt
+        .verify_integrity_embedded_key()
+        .test_unwrap());
     assert!(evaluation.verdict.is_denied());
     assert!(evaluation.receipt.is_denied());
     assert_eq!(
@@ -1886,7 +1891,7 @@ async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
         stored.metadata.as_ref().test_unwrap()["steps"][0]["pod_name"],
         "demo-pod"
     );
-    assert!(stored.verify_signature().test_unwrap());
+    assert!(stored.verify_integrity_embedded_key().test_unwrap());
     // The returned id must be the content-addressed signed id (64-char
     // SHA-256 hex), not the pre-sign UUID. This guarantees clients can
     // look up the submitted job receipt in the receipt log.
@@ -2221,7 +2226,9 @@ async fn proxy_handler_persists_receipts_when_receipt_db_configured() {
     );
     let log = reloaded.receipt_log.lock().await;
     assert_eq!(log.receipts.len(), 1);
-    assert!(log.receipts[0].verify_signature().test_unwrap());
+    assert!(log.receipts[0]
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 
     let _ = std::fs::remove_file(receipt_db);
 }

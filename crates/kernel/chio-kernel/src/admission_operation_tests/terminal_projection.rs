@@ -1025,13 +1025,13 @@ fn denied_after_delivery_projection_round_trips_through_the_signed_envelope() {
         )
         .expect("the test envelope must be re-signed");
     assert_eq!(
-        mismatched_replay.verify(),
+        mismatched_replay.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
         "the terminal replay must identify the projected receipt"
     );
 
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .expect("denied terminal envelope must import");
     assert_eq!(verified.source_operation(), &operation);
     assert_eq!(
@@ -1095,7 +1095,7 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
     )
     .expect("verified projection must produce a signed envelope");
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .expect("untampered terminal envelope must verify");
     assert_eq!(verified.source_operation(), &operation);
     assert_eq!(
@@ -1112,7 +1112,7 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
             serde_json::from_value(refused).expect("refused wire value must decode structurally");
         assert!(
             matches!(
-                refused.verify(),
+                refused.verify_integrity_embedded_key(),
                 Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
             ),
             "{label}"
@@ -1124,7 +1124,7 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
     let tampered: SignedAdmissionTerminalProjectionV1 =
         serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
     assert!(matches!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
 }
@@ -1148,7 +1148,7 @@ fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
         &full_projection_capabilities(),
         &kernel,
     )?;
-    envelope.verify()?;
+    envelope.verify_integrity_embedded_key()?;
 
     let mut encoded = serde_json::to_value(envelope)?;
     let record = encoded["body"]["records"]
@@ -1203,7 +1203,7 @@ fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
     )?)?;
     let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())
@@ -1255,7 +1255,7 @@ fn signed_terminal_projection_rejects_channel_attachment_substitution(
     )?)?;
     let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())
@@ -1306,7 +1306,7 @@ fn signed_terminal_projection_envelope_rejects_signer_substitution() {
     let tampered: SignedAdmissionTerminalProjectionV1 =
         serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
     assert!(matches!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
 }
@@ -1924,7 +1924,7 @@ fn unknown_terminal_envelope_requires_receipt_and_closed_body_shape(
         &full_projection_capabilities(),
         &kernel,
     )?;
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     assert_eq!(
         verified.terminal_operation().attachments(),
         operation.attachments()
@@ -1967,7 +1967,7 @@ fn unknown_terminal_envelope_requires_receipt_and_closed_body_shape(
         )?)?;
         let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
         assert_eq!(
-            tampered.verify(),
+            tampered.verify_integrity_embedded_key(),
             Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
         );
     }

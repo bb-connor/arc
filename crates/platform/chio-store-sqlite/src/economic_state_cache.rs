@@ -437,7 +437,7 @@ pub fn admission_terminal_projection_effect_result(
     envelope: &SignedAdmissionTerminalProjectionV1,
 ) -> Result<EconomicEffectTerminalV1, EconomicStateCacheError> {
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .map_err(|_| EconomicStateCacheError::Conflict)?;
     let descriptor = admission_terminal_projection_descriptor(envelope, &verified)?;
     terminal_projection_effect_result(&descriptor, &verified)
@@ -1012,7 +1012,7 @@ impl SqliteEconomicStateCache {
     ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
         validate_trusted_time(trusted_now_unix_ms)?;
         let verified = envelope
-            .verify()
+            .verify_integrity_embedded_key()
             .map_err(|_| EconomicStateCacheError::Conflict)?;
         let descriptor = admission_terminal_projection_descriptor(envelope, &verified)?;
         let context = verified.context();
@@ -1108,7 +1108,7 @@ impl SqliteEconomicStateCache {
         {
             let envelope = descriptor.decode::<SignedAdmissionTerminalProjectionV1>()?;
             let verified = envelope
-                .verify()
+                .verify_integrity_embedded_key()
                 .map_err(|_| EconomicStateCacheError::Conflict)?;
             let terminal_slot =
                 qualify_terminal_projection_advance(advance, &descriptor, &verified)?;
@@ -1465,7 +1465,7 @@ pub(crate) fn load_anchored_terminal_projection_in_transaction(
         .ok_or(EconomicStateCacheError::Conflict)?;
     let envelope = descriptor.decode::<SignedAdmissionTerminalProjectionV1>()?;
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .map_err(|_| EconomicStateCacheError::Conflict)?;
     let context = verified.context();
     let source = verified.source_operation();

@@ -311,7 +311,7 @@ pub fn verify_clearing_participant_acceptances(
             || trust.trusted_time_unix_ms >= body.expires_at_unix_ms
             || body.expires_at_unix_ms > request.participant_snapshot.body.expires_at_unix_ms
             || trust.trusted_time_unix_ms >= acknowledgement.body.expires_at_unix_ms
-            || !acceptance.verify_signature()?
+            || !acceptance.verify_integrity_embedded_key()?
         {
             return Err(ClearingError::AuthorityVerification);
         }
@@ -499,7 +499,7 @@ fn verify_clearing_round_finalization_envelope(
         || body.finalized_at_unix_ms < current_round_head.trusted_clock_high_water
         || body.finalized_at_unix_ms > trust.trusted_time_unix_ms
         || trust.trusted_time_unix_ms >= acceptances.valid_until_unix_ms
-        || !signed.verify_signature()?
+        || !signed.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }

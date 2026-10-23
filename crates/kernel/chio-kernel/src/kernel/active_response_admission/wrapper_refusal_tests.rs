@@ -20,12 +20,16 @@ fn submission_proof_refuses_unwrapped_and_foreign_id_signatures() {
         &Ed25519Backend::new(submitter.clone()),
     )
     .unwrap();
-    assert!(proof.verify_signature().unwrap());
+    assert!(proof.verify_integrity_embedded_key().unwrap());
     for (label, signature) in crate::wrapper_refusals::refused_signatures(&submitter, &proof.body) {
         let refused = ActiveResponseSubmissionProof {
             signature,
             ..proof.clone()
         };
-        assert_eq!(refused.verify_signature(), Ok(false), "{label}");
+        assert_eq!(
+            refused.verify_integrity_embedded_key(),
+            Ok(false),
+            "{label}"
+        );
     }
 }

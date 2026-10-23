@@ -1116,7 +1116,7 @@ impl SqliteAdmissionOperationStore {
         &self,
         envelope: &SignedAdmissionTerminalProjectionV1,
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
-        let verified = envelope.verify()?;
+        let verified = envelope.verify_integrity_embedded_key()?;
         let context = verified.context();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;

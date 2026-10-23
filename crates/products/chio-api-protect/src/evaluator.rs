@@ -938,7 +938,7 @@ mod tests {
             )
             .test_unwrap();
         assert!(result.verdict.is_allowed());
-        assert!(result.receipt.verify_signature().test_unwrap());
+        assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
@@ -971,7 +971,7 @@ mod tests {
         let result = evaluator.evaluate_chio_request(request, None).test_unwrap();
 
         assert!(result.verdict.is_denied());
-        assert!(result.receipt.verify_signature().test_unwrap());
+        assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
         assert!(result.receipt.evidence[0]
             .details
             .as_deref()
@@ -1340,7 +1340,7 @@ mod tests {
             .test_unwrap();
         assert!(result.verdict.is_denied());
         assert_eq!(result.receipt.response_status, 403);
-        assert!(result.receipt.verify_signature().test_unwrap());
+        assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
@@ -1459,7 +1459,7 @@ mod tests {
                 .and_then(|value| value.as_str()),
             Some(decision.id.as_str())
         );
-        assert!(final_receipt.verify_signature().test_unwrap());
+        assert!(final_receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -1532,7 +1532,7 @@ mod tests {
             )
             .test_unwrap();
         assert!(result.verdict.is_allowed());
-        assert!(result.receipt.verify_signature().test_unwrap());
+        assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]

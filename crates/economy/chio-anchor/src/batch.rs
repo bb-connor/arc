@@ -74,7 +74,9 @@ impl AnchorBatch {
         Ok(Self { body, signature })
     }
 
-    pub fn verify_signature(&self) -> Result<bool, AnchorError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, AnchorError> {
         validate_anchor_batch_body(&self.body)?;
         match verify_wrapped(
             &self.body.signer_key,
@@ -158,7 +160,7 @@ pub fn build_anchor_batch_body(
 
 /// Verify the batch root, inclusion proofs, witness binding, and signature.
 pub fn verify_anchor_batch(batch: &AnchorBatch) -> Result<(), AnchorError> {
-    if !batch.verify_signature()? {
+    if !batch.verify_integrity_embedded_key()? {
         return Err(AnchorError::Verification(
             "anchor batch signature verification failed".to_string(),
         ));

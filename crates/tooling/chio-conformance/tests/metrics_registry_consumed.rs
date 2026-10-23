@@ -758,7 +758,7 @@ fn anchor_emits_chio_anchor_round_latency_seconds() -> Result<(), Box<dyn Error>
         &keypair,
     )?;
 
-    assert!(batch.verify_signature()?);
+    assert!(batch.verify_integrity_embedded_key()?);
     let after = chio_anchor::anchor_round_count(chio_anchor::ANCHOR_OUTCOME_SUCCESS);
     assert!(
         after > before,

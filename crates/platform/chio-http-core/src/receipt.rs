@@ -254,7 +254,10 @@ impl HttpReceipt {
     }
 
     /// Verify the receipt signature against the embedded kernel key.
-    pub fn verify_signature(&self) -> chio_core_types::Result<bool> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> chio_core_types::Result<bool> {
         let body = self.body();
         if body.validate_authority_semantics().is_err() {
             return Ok(false);
@@ -356,7 +359,7 @@ impl HttpReceipt {
         &self,
         keypair: &Keypair,
     ) -> chio_core_types::Result<ChioReceipt> {
-        if !self.verify_signature()? || keypair.public_key() != self.kernel_key {
+        if !self.verify_integrity_embedded_key()? || keypair.public_key() != self.kernel_key {
             return Err(chio_core_types::Error::InvalidSignature(
                 "HTTP evidence projection requires an authentic receipt and its matching signer"
                     .into(),
@@ -371,7 +374,7 @@ impl HttpReceipt {
         &self,
         projected: &ChioReceipt,
     ) -> chio_core_types::Result<bool> {
-        if self.kernel_key != projected.kernel_key || !self.verify_signature()? {
+        if self.kernel_key != projected.kernel_key || !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         if !projected
@@ -478,7 +481,7 @@ mod tests {
         let kp = test_keypair();
         let body = sample_body(&kp);
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert!(receipt.is_allowed());
         assert!(!receipt.is_denied());
     }
@@ -491,7 +494,7 @@ mod tests {
         body.response_status = 403;
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         assert!(receipt.is_denied());
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -525,7 +528,7 @@ mod tests {
             )
             .test_unwrap();
 
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -549,7 +552,7 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         let json = serde_json::to_string(&receipt).test_unwrap();
         let back: HttpReceipt = serde_json::from_str(&json).test_unwrap();
-        assert!(back.verify_signature().test_unwrap());
+        assert!(back.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -569,7 +572,7 @@ mod tests {
             },
         ];
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(receipt.evidence.len(), 2);
         assert_eq!(receipt.evidence[0].guard_name, "PolicyGuard");
         assert!(receipt.evidence[0].verdict);
@@ -584,7 +587,7 @@ mod tests {
             "tags": ["production", "v2"]
         }));
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         let meta = receipt.metadata.as_ref().test_unwrap();
         assert_eq!(meta["trace_id"], "abc123");
     }
@@ -595,7 +598,7 @@ mod tests {
         let mut body = sample_body(&kp);
         body.capability_id = Some("cap-xyz-789".to_string());
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
         let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert_eq!(chio_receipt.capability_id, "cap-xyz-789");
@@ -630,7 +633,7 @@ mod tests {
         let mut receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         // Tamper with the response status
         receipt.response_status = 500;
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -644,7 +647,7 @@ mod tests {
             http_status_scope(receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
         );
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -656,7 +659,7 @@ mod tests {
         let mut receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         receipt.metadata = Some(http_status_metadata_final(Some("decision-001")));
 
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -742,7 +745,7 @@ mod tests {
             reason: "reported by operator".into(),
         };
         let observation = HttpReceipt::sign(body.clone(), &kp).test_unwrap();
-        assert!(observation.verify_signature().test_unwrap());
+        assert!(observation.verify_integrity_embedded_key().test_unwrap());
         assert!(!observation.is_authorized());
         let projection = observation.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert_eq!(projection.receipt_kind, ReceiptKind::AdvisoryEvaluation);
@@ -767,7 +770,7 @@ mod tests {
     fn http_receipt_signs_and_verifies_through_the_wrapper() {
         let kp = test_keypair();
         let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         verify_wrapped(
             &kp.public_key(),
             CHIO_HTTP_RECEIPT_SCHEMA,
@@ -796,6 +799,6 @@ mod tests {
             ),
             Err(Error::SignatureRejected)
         ));
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 }

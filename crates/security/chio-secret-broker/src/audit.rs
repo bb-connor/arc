@@ -318,7 +318,7 @@ impl SignedBrokerAuditRunnerAuthorization {
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>> {
-        self.verify_signature()?;
+        self.verify_integrity_embedded_key()?;
         canonical_json_bytes(self).map_err(|error| {
             BrokerError::Invariant(format!(
                 "broker audit runner authorization encoding failed: {error}"
@@ -336,11 +336,13 @@ impl SignedBrokerAuditRunnerAuthorization {
             chio_core_types::canonical::UntrustedJsonText::from_wire(bytes, MAX_WIRE_BYTES)
                 .and_then(|text| text.decode_canonical())
                 .map_err(BrokerError::UntrustedInput)?;
-        authorization.verify_signature()?;
+        authorization.verify_integrity_embedded_key()?;
         Ok(authorization)
     }
 
-    fn verify_signature(&self) -> Result<()> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    fn verify_integrity_embedded_key(&self) -> Result<()> {
         self.body.validate()?;
         if verify_wrapped_bytes(
             &self.signer,
@@ -441,7 +443,7 @@ pub fn verify_broker_audit_runner_authorization(
     trust: BrokerAuditRunnerTrust<'_>,
     now_unix_seconds: u64,
 ) -> Result<VerifiedBrokerAuditRunnerAuthorization> {
-    authorization.verify_signature()?;
+    authorization.verify_integrity_embedded_key()?;
     reference.validate()?;
     for (value, label) in [
         (trust.deployment_id, "trusted audit deployment identifier"),
@@ -620,7 +622,7 @@ fn runner_authorization_signing_body(
 fn runner_authorization_digest(
     authorization: &SignedBrokerAuditRunnerAuthorization,
 ) -> Result<String> {
-    authorization.verify_signature()?;
+    authorization.verify_integrity_embedded_key()?;
     let canonical = canonical_json_bytes(authorization).map_err(|error| {
         BrokerError::Invariant(format!(
             "broker audit runner authorization digest encoding failed: {error}"
@@ -738,7 +740,7 @@ pub struct SignedBrokerAuditComparison {
 
 impl SignedBrokerAuditComparison {
     pub fn canonical_bytes(&self) -> Result<Vec<u8>> {
-        self.verify_signature()?;
+        self.verify_integrity_embedded_key()?;
         let canonical = canonical_json_bytes(self).map_err(|error| {
             BrokerError::Invariant(format!(
                 "broker audit comparison canonical encoding failed: {error}"
@@ -764,11 +766,13 @@ impl SignedBrokerAuditComparison {
         )
         .and_then(|text| text.decode_canonical())
         .map_err(BrokerError::UntrustedInput)?;
-        comparison.verify_signature()?;
+        comparison.verify_integrity_embedded_key()?;
         Ok(comparison)
     }
 
-    fn verify_signature(&self) -> Result<()> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    fn verify_integrity_embedded_key(&self) -> Result<()> {
         verify_broker_audit_comparison(self, &self.signer)
     }
 }
@@ -1071,7 +1075,9 @@ pub fn verify_broker_audit_evidence(
     }
 
     let runner_body = &bundle.runner_authorization.body;
-    bundle.runner_authorization.verify_signature()?;
+    bundle
+        .runner_authorization
+        .verify_integrity_embedded_key()?;
     if &bundle.runner_authorization.signer != expected.trust.trusted_runner
         || runner_body.audit_id != expected.audit_id
         || runner_body.deployment_id != expected.trust.deployment_id

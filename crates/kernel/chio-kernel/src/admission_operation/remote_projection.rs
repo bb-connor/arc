@@ -290,11 +290,15 @@ impl SignedAdmissionTerminalProjectionV1 {
         };
         let signature = sign_projection(signer, &body)?;
         let envelope = Self { body, signature };
-        envelope.verify()?;
+        envelope.verify_integrity_embedded_key()?;
         Ok(envelope)
     }
 
-    pub fn verify(&self) -> Result<VerifiedAdmissionTerminalProjectionV1, AdmissionOperationError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(
+        &self,
+    ) -> Result<VerifiedAdmissionTerminalProjectionV1, AdmissionOperationError> {
         let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
         if self.body.schema != SIGNED_TERMINAL_PROJECTION_SCHEMA
             || verify_wrapped_bytes(

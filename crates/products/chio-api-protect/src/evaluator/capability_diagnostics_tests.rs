@@ -90,7 +90,7 @@ fn check_result(
     signer: &Keypair,
 ) -> TestResult {
     assert_eq!(result.receipt.kernel_key, signer.public_key());
-    assert!(result.receipt.verify_signature()?);
+    assert!(result.receipt.verify_integrity_embedded_key()?);
     let projection = serde_json::to_string(&(result.verdict.clone(), result.receipt.clone()))?;
     if let Some(capability) = capability {
         assert!(result.execution_nonce.is_none());

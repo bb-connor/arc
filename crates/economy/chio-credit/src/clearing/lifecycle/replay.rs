@@ -844,7 +844,7 @@ fn verify_satisfaction_replay(
     if replay.signed_satisfaction.signer_key != trust.obligation_authority_key
         || body.disposition_authority_id != trust.obligation_authority_id
         || body.disposition_authority_key_epoch != trust.obligation_key_epoch
-        || !replay.signed_satisfaction.verify_signature()?
+        || !replay.signed_satisfaction.verify_integrity_embedded_key()?
         || body.satisfied_at_unix_ms < source_round_head.trusted_clock_high_water
         || body.round_id != record.round_id
         || body.round_core_digest != record.round_core_digest
@@ -905,7 +905,9 @@ fn verify_zero_intent_reconciliation_replay(
     if replay.signed_reconciliation.signer_key != trust.obligation_authority_key
         || body.disposition_authority_id != trust.obligation_authority_id
         || body.disposition_authority_key_epoch != trust.obligation_key_epoch
-        || !replay.signed_reconciliation.verify_signature()?
+        || !replay
+            .signed_reconciliation
+            .verify_integrity_embedded_key()?
         || body.reconciled_at_unix_ms < source_round_head.trusted_clock_high_water
         || record.state != ClearingRoundLifecycleStateV1::Finalized
         || !record.intent_progress.is_empty()
