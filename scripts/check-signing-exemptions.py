@@ -50,16 +50,65 @@ DEFINITION_FILES = {
 
 NAMES = ("exempt", "sign_exempt", "verify_exempt")
 TEST_PATH = re.compile(r"(^|/)(tests|benches|examples|fixtures)/|(^|/)tests\.rs$|_tests?\.rs$|_tests/|test_support")
-CFG_TEST = re.compile(r"#\[cfg\((?:test|any\([^)]*\btest\b[^)]*\))\)\]")
+CFG_ATTR = re.compile(r"#\[cfg\(")
+
+
+def cfg_close(text, open_index):
+    """Index just past the parenthesis that closes text[open_index]."""
+    depth, i = 0, open_index
+    while i < len(text):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return i
+
+
+def requires_test(predicate):
+    """True when a cfg predicate only holds in test builds: test, all(.., test, ..) or any(test, ..)."""
+    predicate = predicate.strip()
+    if predicate == "test":
+        return True
+    m = re.match(r"^(all|any)\((.*)\)$", predicate, re.S)
+    if not m:
+        return False
+    depth, parts, start = 0, [], 0
+    body = m.group(2)
+    for i, c in enumerate(body):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "," and depth == 0:
+            parts.append(body[start:i])
+            start = i + 1
+    parts.append(body[start:])
+    if m.group(1) == "all":
+        return any(requires_test(p) for p in parts)
+    return any(p.strip() == "test" for p in parts)
+
+
+def test_cfg_attrs(text):
+    """(start, end) of every #[cfg(..)] attribute whose predicate requires test."""
+    for m in CFG_ATTR.finditer(text):
+        close = cfg_close(text, m.end() - 1)
+        if requires_test(text[m.end() : close - 1]) and text.startswith("]", close):
+            yield m.start(), close + 1
 
 
 def gated_module_files(root):
     gated = set()
     for path in root.joinpath("crates").rglob("*.rs"):
         text = path.read_text(encoding="utf-8", errors="replace")
-        for m in re.finditer(r"#\[cfg\(test\)\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;", text):
+        for start, end in test_cfg_attrs(text):
+            m = re.match(r"\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;", text[end:])
+            if not m:
+                continue
             name = m.group(1)
-            before = text[: m.start()]
+            before = text[:start]
             explicit = re.search(r"#\[path\s*=\s*\"([^\"]+)\"\]\s*$", before.rstrip())
             base = path.parent if path.stem in ("mod", "lib", "main") else path.parent / path.stem
             for cand in ([path.parent / explicit.group(1)] if explicit else []) + [
@@ -75,10 +124,10 @@ def gated_module_files(root):
 
 
 def strip_test_items(text):
-    """Blank out every item that a #[cfg(test)] attribute gates, preserving line numbers."""
+    """Blank out every item a test-only cfg attribute gates, preserving line numbers."""
     out = list(text)
-    for m in CFG_TEST.finditer(text):
-        i = m.end()
+    for start, end in test_cfg_attrs(text):
+        i = end
         depth = 0
         started = False
         while i < len(text):
@@ -95,7 +144,7 @@ def strip_test_items(text):
                 i += 1
                 break
             i += 1
-        for j in range(m.start(), min(i, len(out))):
+        for j in range(start, min(i, len(out))):
             if out[j] != "\n":
                 out[j] = " "
     return "".join(out)

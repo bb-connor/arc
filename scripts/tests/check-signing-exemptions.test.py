@@ -105,6 +105,17 @@ def test_unresolvable_format_fails():
     assert unresolved
 
 
+def test_calls_under_compound_test_cfg_are_not_production():
+    inline = CLEAN + "\n#[cfg(all(test, not(loom)))]\nmod refusals {\n    fn r() { k.sign_exempt(ExemptFormat::JwsSigningInput, b); }\n}\n"
+    assert result({FILE: inline})
+    lib = "crates/demo/chio-demo/src/lib.rs"
+    gated = "#[cfg(all(test, not(loom)))]\npub(crate) mod refusals;\n"
+    module = "crates/demo/chio-demo/src/refusals.rs"
+    assert result({FILE: CLEAN, lib: gated, module: "fn r() { k.sign_exempt(ExemptFormat::JwsSigningInput, b); }\n"})
+    ungated = "#[cfg(all(unix, not(loom)))]\npub(crate) mod refusals;\n"
+    assert not result({FILE: CLEAN, lib: ungated, module: "fn r() { k.sign_exempt(ExemptFormat::JwsSigningInput, b); }\n"})
+
+
 def test_kat_signer_without_gate_fails():
     root = tree({"crates/core/chio-core-types/src/pq.rs": "    pub fn sign_bytes_with_seed(&self) {}\n"})
     assert gate.check_gates(root)
