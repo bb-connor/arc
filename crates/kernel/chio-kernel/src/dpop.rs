@@ -35,7 +35,7 @@ use std::time::Duration;
 #[cfg(test)]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core::canonical::CanonicalBytes;
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{verify_wrapped, Keypair, PublicKey, Signature, SigningBackend};
 use chio_kernel_core::{dpop_freshness_valid, nonce_admits};

@@ -259,3 +259,7 @@ pub fn behavioral_anomaly_score(
         generated_at: now,
     }
 }
+
+impl chio_core::receipt::lineage::SignedExportPayload for BehavioralFeedReport {
+    const SCHEMA_ID: &'static str = super::constants::BEHAVIORAL_FEED_SCHEMA;
+}
