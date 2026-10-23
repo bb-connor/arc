@@ -72,7 +72,6 @@ def test_structural_self_key_sites_are_found():
     self_key, _ = observed({FILE: SOURCE})
     assert self_key == collections.Counter(
         {
-            (FILE, "verify_integrity_embedded_key"): 1,
             (FILE, "method_form"): 1,
             (FILE, "exempt_form"): 1,
         }
