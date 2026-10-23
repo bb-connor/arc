@@ -768,21 +768,16 @@ Implemented on 2026-03-23: `chio-kernel` now ships this payment bridge module
 with the adapter trait, rail-side settlement enum, and canonical
 receipt-side settlement mapping helper.
 
-Also implemented on 2026-03-23: `chio-kernel` now ships a concrete
-`X402PaymentAdapter` reference bridge. It performs a thin prepaid HTTP
-authorization hop before execution, records receipt-linked payment references
-on successful calls, and denies truthfully when authorization fails. The
-built-in adapter does not synthesize capture, release, or refund
-acknowledgements. Without a configured endpoint, those operations remain
-pending with a reconciliation reason. Deployments can install authoritative
-HTTP acknowledgement paths with `with_capture_path`, `with_release_path`, and
-`with_refund_path`; each response must provide a transaction identifier and
-settlement status.
-
-Extended on 2026-03-26: the x402 authorize payload now carries governed
-transaction context when present, including the intent id/hash, target
-server/tool, purpose, and optional approval-token id. This binds prepaid rail
-authorization to the same governed request the kernel validates locally.
+`X402PaymentAdapter` is an x402 v2 facilitator client for the `exact` scheme
+on EVM. Before the tool runs it checks the presented `PaymentPayload` against
+the issued requirements and the configured rail (allowlisted testnet, asset,
+currency, `payTo`, amount), refuses an EIP-3009 `validBefore` later than the
+capability or approval expiry, then calls the facilitator's `/verify` and
+`/settle`. Every authorization is a final prepayment: there is no hold to
+release and no remote refund. Recovery reads rail truth over read-only RPC
+(`authorizationState` plus the `AuthorizationUsed` and `AuthorizationCanceled`
+logs) and holds no keys. Until the transport presents x402 payloads to the
+kernel, the adapter refuses every charge before contacting the facilitator.
 
 Extended on 2026-03-26: `chio-kernel` now also ships `AcpPaymentAdapter`, a
 seller-scoped shared-payment-token reference bridge. Governed intents can now
@@ -808,7 +803,7 @@ cost when the configured payment rail is not prepaid.
 | Adapter | Rail | Settlement | Notes |
 |---------|------|-----------|-------|
 | `AcpPaymentAdapter` | ACP-Commerce / Shared Payment Token | Authorize plus configured HTTP settlement | Seller-scoped commerce approvals with explicit `max_amount` bounds. Missing acknowledgement paths remain pending for reconciliation. |
-| `X402PaymentAdapter` | x402 HTTP payment protocol | Authorize plus configured HTTP settlement | Settlement paths are explicit; the adapter never fabricates capture, release, or refund evidence. |
+| `X402PaymentAdapter` | x402 v2 facilitator, `exact` scheme | Final prepayment through `/verify` then `/settle` | Testnet allowlist only. Recovery reads the token contract over read-only RPC; no keys, no broadcast. |
 | `StablecoinPaymentAdapter` | USDC/USDT on EVM chains | Async (block confirmation) | On-chain transfer or hold model. Receipts may carry `pending` settlement state until confirmations land. |
 
 #### 3.6.3 Integration Point

@@ -19018,13 +19018,17 @@
       "validate_delegation_admission::shared-reader::crates/kernel/chio-kernel/src/kernel/mod.rs::scope_from_capability_snapshot"
     ],
     "crates/kernel/chio-kernel/src/payment.rs": [
-      "authorize#1::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
-      "authorize#2::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
+      "authorize::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
       "execute_terminal_operation::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
       "get_json::shared-reader::crates/kernel/chio-kernel/src/payment.rs::read_payment_json",
       "post_json::shared-reader::crates/kernel/chio-kernel/src/payment.rs::read_payment_json",
       "read_payment_json::original-json-reader::UntrustedJsonText",
       "settlement_state#2::shared-reader::crates/kernel/chio-kernel/src/payment.rs::get_json"
+    ],
+    "crates/kernel/chio-kernel/src/payment/x402.rs": [
+      "call::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
+      "settle::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
+      "verify::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json"
     ],
     "crates/kernel/chio-kernel/src/provider_verdict.rs": [
       "build_tool_call_request::original-json-reader::UntrustedJsonText",
