@@ -405,3 +405,55 @@ fn regenerate_protocol_primitives_receipt_cases() {
     let committed = fs::read_to_string(&path).unwrap();
     fs::write(&path, receipt_fixture::render(&committed)).unwrap();
 }
+
+/// Signature members in the schema-shape cases after the receipt cases are
+/// placeholders. Under every registered wrapper id and every Ed25519 key the
+/// instance names, a verifier refuses each one.
+#[test]
+fn placeholder_case_signatures_are_refused() {
+    use chio_core_types::signed_artifact::KNOWN_SIGNED_ARTIFACT_SCHEMAS;
+    use chio_core_types::{verify_wrapped, PublicKey, Signature};
+
+    fn keys(value: &Value, found: &mut Vec<PublicKey>) {
+        match value {
+            Value::String(text) if text.len() == 64 => {
+                if let Ok(key) = PublicKey::from_hex(text) {
+                    found.push(key);
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|item| keys(item, found)),
+            Value::Object(members) => members.values().for_each(|item| keys(item, found)),
+            _ => {}
+        }
+    }
+
+    let corpus: Value = serde_json::from_str(&fs::read_to_string(corpus_path()).unwrap()).unwrap();
+    let mut refused = 0;
+    for case in corpus["cases"].as_array().unwrap() {
+        if case["schema_file"] == "receipt/record.schema.json" {
+            continue;
+        }
+        let Some(mut signed) = case["instance"].as_object().cloned() else {
+            continue;
+        };
+        let Some(Value::String(signature)) = signed.remove("signature") else {
+            continue;
+        };
+        let Ok(signature) = Signature::from_hex(&signature) else {
+            continue;
+        };
+        let mut candidates = Vec::new();
+        keys(&Value::Object(signed.clone()), &mut candidates);
+        for key in &candidates {
+            for schema_id in KNOWN_SIGNED_ARTIFACT_SCHEMAS {
+                assert!(
+                    verify_wrapped(key, schema_id, &signed, &signature).is_err(),
+                    "{} placeholder signature verifies under {schema_id}",
+                    case["name"]
+                );
+            }
+        }
+        refused += 1;
+    }
+    assert!(refused > 0);
+}

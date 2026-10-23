@@ -145,9 +145,24 @@ fn generated_bindings_accept_exactly_the_pinned_schema_only_rejections() {
 /// member holding its signer key, and the wrapper id that signs it.
 const PLACEHOLDER_SIGNED_EXAMPLES: &[(&str, &str, &str, &str)] = &[
     ("root-policy", "", "policy_key", "chio.root-policy.v1"),
-    ("idp-key-snapshot", "", "exchange_key", "chio.idp-key-snapshot.v1"),
-    ("revocation-request", "", "revoker_key", "chio.revocation-request.v1"),
-    ("settlement-closure", "", "kernel_key", "chio.settlement-closure.v1"),
+    (
+        "idp-key-snapshot",
+        "",
+        "exchange_key",
+        "chio.idp-key-snapshot.v1",
+    ),
+    (
+        "revocation-request",
+        "",
+        "revoker_key",
+        "chio.revocation-request.v1",
+    ),
+    (
+        "settlement-closure",
+        "",
+        "kernel_key",
+        "chio.settlement-closure.v1",
+    ),
     ("presentation", "/leaf", "issuer", "chio.capability.v1"),
 ];
 

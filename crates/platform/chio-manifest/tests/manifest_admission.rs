@@ -1098,7 +1098,7 @@ fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
             assert_eq!(source, encoded);
             assert_eq!(
                 chio_core::sha256_hex(&encoded),
-                "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed"
+                "b3387974261d22131bee3b2d2113e761db60bf610921e96955a76b349ac60bc2"
             );
         }
     }
