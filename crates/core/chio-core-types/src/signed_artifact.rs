@@ -2175,6 +2175,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         "chio.behavioral-feed.v1",
         Some(("behavioral_feed", "signing-wrapper-v1")),
     ),
+    (
+        "chio.cluster.peer-signature.v1",
+        Some(("cluster_peer_signature", "signing-wrapper-v1")),
+    ),
 ];
 
 #[allow(
