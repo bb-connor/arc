@@ -3,10 +3,13 @@
 //! The presented token's SHA-256 is compared in constant time with the
 //! configured token's; the token itself is never held. The principal and
 //! tenant are the ones the single `operator_static_bearer` rule names, and
-//! the issuer is `urn:chio:operator`. The root's own expiry is its
-//! assertion expiry, and the replay key is `(operator_static_bearer,
-//! urn:chio:operator, token_digest ":" expires_at)`, so exactly one live
-//! root exists per token and a fresh root follows expiry.
+//! the issuer is `urn:chio:operator`. Roots live in fixed windows of the
+//! rule's `capability_ttl_secs`: a root expires at the end of the window it
+//! is minted in, capped by the policy's `valid_until`, and that expiry is
+//! its assertion expiry. The replay key is `(operator_static_bearer,
+//! urn:chio:operator, token_digest ":" expires_at)`, the same for every
+//! presentation within a window, so exactly one root exists per token and
+//! window and a fresh root follows expiry.
 
 use chio_core::capability::anchor::AnchorKind;
 use chio_core::root_authority::{Sha256Digest, OPERATOR_ISSUER};
@@ -63,8 +66,10 @@ pub fn verify(
         .tenant_value
         .as_ref()
         .ok_or(RootExchangeError::ClaimMissing("tenant"))?;
-    let expires_at = now
-        .saturating_add(rule.capability_ttl())
+    let ttl = rule.capability_ttl();
+    let expires_at = (now / ttl)
+        .saturating_add(1)
+        .saturating_mul(ttl)
         .min(exchange.policy.policy().valid_until);
     if expires_at <= now {
         return Err(RootExchangeError::RootLifetimeEmpty);

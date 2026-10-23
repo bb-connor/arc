@@ -24,7 +24,7 @@ use super::super::claims::{
 };
 use super::super::error::RootExchangeError;
 use super::super::evidence::AnchorEvidence;
-use super::super::exchange::{MatchInput, RootExchange};
+use super::super::exchange::{check_record, MatchInput, RootExchange};
 use super::super::provider::ProviderRecord;
 use super::super::replay::{ReplayKey, ReplayNamespace};
 
@@ -98,23 +98,32 @@ impl TokenIntrospector for HttpTokenIntrospector {
     }
 }
 
-/// The one usable provider record the `oauth_introspection` rules
-/// reference. Two distinct records refuse: an opaque token names no issuer
-/// to choose between them.
+/// The one provider record the `oauth_introspection` rules reference,
+/// pinned before any token or credential is sent to it: every referencing
+/// rule must find it registered under its own id, enabled, of the
+/// `oauth_introspection` kind and with the identity digest the rule pins.
+/// Two distinct records refuse: an opaque token names no issuer to choose
+/// between them.
 fn introspection_record(exchange: &RootExchange) -> Result<&ProviderRecord, RootExchangeError> {
     let mut chosen: Option<&ProviderRecord> = None;
     for rule in &exchange.policy.policy().rules {
         if rule.match_.anchor_kind != KIND {
             continue;
         }
-        let Some(record) = rule
-            .match_
-            .provider_record_id
-            .as_ref()
-            .and_then(|id| exchange.providers.get(id.as_str()))
-        else {
-            continue;
+        let Some(record_id) = rule.match_.provider_record_id.as_ref() else {
+            return Err(RootExchangeError::KindNotExchanged(KIND));
         };
+        let record = exchange
+            .providers
+            .get(record_id.as_str())
+            .ok_or_else(|| RootExchangeError::ProviderRecordMissing(record_id.to_string()))?;
+        if &record.identity().provider_id != record_id {
+            return Err(RootExchangeError::ProviderRecordInvalid {
+                record: record_id.to_string(),
+                reason: "registered under another provider_id".to_owned(),
+            });
+        }
+        check_record(rule, record, KIND)?;
         match chosen {
             Some(seen) if seen.identity().provider_id != record.identity().provider_id => {
                 return Err(RootExchangeError::IntrospectionRecordAmbiguous);
@@ -135,11 +144,6 @@ pub async fn verify(
     let record = introspection_record(exchange)?;
     let identity = record.identity();
     let provider_id = identity.provider_id.as_str();
-    if !record.enabled() {
-        return Err(RootExchangeError::ProviderRecordDisabled(
-            provider_id.to_owned(),
-        ));
-    }
     let endpoint = identity.introspection_url.as_ref().ok_or_else(|| {
         RootExchangeError::ProviderRecordInvalid {
             record: provider_id.to_owned(),
@@ -192,6 +196,9 @@ pub async fn verify(
     let iat = seconds(&response, "iat")?.unwrap_or(now);
     if iat > now.saturating_add(skew) {
         return Err(RootExchangeError::AssertionIssuedInFuture);
+    }
+    if exp <= iat {
+        return Err(RootExchangeError::ClaimInvalid("exp"));
     }
     let (principal, tenant) = mapped_identity(&response, identity)?;
     let token_digest = Sha256Digest::from_hash(sha256(token.as_bytes()));

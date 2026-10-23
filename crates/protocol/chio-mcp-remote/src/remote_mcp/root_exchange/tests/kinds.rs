@@ -395,6 +395,7 @@ async fn every_kind_reaches_the_same_prepare() {
                     scope: Some(&["mcp:read".to_owned()]),
                     resource: Some(RESOURCE),
                     client_id: Some(CLIENT_ID),
+                    root_scope: None,
                     request_digest: Sha256Digest::from_hash(sha256(b"re-exchange")),
                 },
                 SubjectRoot {
@@ -999,6 +1000,16 @@ fn reexchange(
     resource: Option<&str>,
     client_id: Option<&str>,
 ) -> Result<AnchorEvidence, RootExchangeError> {
+    reexchange_to(token, scope, resource, client_id, None)
+}
+
+fn reexchange_to(
+    token: &str,
+    scope: Option<&[String]>,
+    resource: Option<&str>,
+    client_id: Option<&str>,
+    root_scope: Option<&ChioScope>,
+) -> Result<AnchorEvidence, RootExchangeError> {
     let key = local_keypair().public_key();
     let subject_scope = ceiling();
     let headers = no_headers();
@@ -1009,6 +1020,7 @@ fn reexchange(
             scope,
             resource,
             client_id,
+            root_scope,
             request_digest: Sha256Digest::from_hash(sha256(b"re-exchange")),
         },
         SubjectRoot {
@@ -1186,4 +1198,97 @@ fn operator_request_refusals() {
         .unwrap_err();
     assert_eq!(error, RootExchangeError::ScopeExceedsCeiling);
     refusal_code(&error, OAuthErrorCode::InvalidScope);
+}
+
+#[test]
+fn local_reexchange_takes_the_requested_root_scope() {
+    let exchange = every_kind();
+    let token = local_token(&local_claims());
+    let narrowed_scope = ChioScope {
+        grants: vec![grant("get")],
+        ..ChioScope::default()
+    };
+    let narrowed = reexchange_to(
+        &token,
+        Some(&["mcp:read".to_owned()]),
+        None,
+        None,
+        Some(&narrowed_scope),
+    )
+    .unwrap();
+    let prepared = exchange
+        .prepare(narrowed, None, None, NOW, &entropy())
+        .unwrap();
+    assert_eq!(tools(&prepared), ["get"]);
+    consistent(&exchange, &prepared);
+
+    let wider = ChioScope {
+        grants: vec![grant("get"), grant("delete")],
+        ..ChioScope::default()
+    };
+    let error = reexchange_to(&token, None, None, None, Some(&wider)).unwrap_err();
+    assert_eq!(error, RootExchangeError::ReExchangeWidens);
+    refusal_code(&error, OAuthErrorCode::InvalidScope);
+}
+
+#[test]
+fn static_bearer_replay_key_is_stable_within_a_window() {
+    let exchange = every_kind();
+    let configured = StaticBearerToken::new(STATIC_TOKEN);
+    let at = |now: u64| {
+        operator_static_bearer::verify(&exchange, &configured, STATIC_TOKEN, now).unwrap()
+    };
+    let first = at(NOW);
+    let later = at(NOW + 299);
+    let next = at(NOW + 300);
+    assert_eq!(first.token_exp(), NOW + 300);
+    assert_eq!(later.token_exp(), NOW + 300);
+    assert_eq!(first.replay_key(), later.replay_key());
+    assert_eq!(next.token_exp(), NOW + 600);
+    assert_ne!(first.replay_key(), next.replay_key());
+}
+
+#[tokio::test]
+async fn introspection_record_is_pinned_before_the_request() {
+    let pinned = introspection_record("acme-introspect");
+    let moved = record(
+        "acme-introspect",
+        INTROSPECTION_ISSUER,
+        ("sub", "iss"),
+        |value| {
+            value["kind"] = json!("oauth_introspection");
+            value.as_object_mut().unwrap().remove("jwks_url");
+            value["introspection_url"] = json!("https://elsewhere.example/introspect");
+        },
+    );
+    let exchange = build(
+        vec![provider_rule(
+            "introspected-agents",
+            "oauth_introspection",
+            &pinned,
+        )],
+        &[moved],
+    )
+    .unwrap();
+    let introspector = StubIntrospector::answering(introspection_response());
+    let error = oauth_introspection::verify(&exchange, "opaque-token", NOW, &introspector)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error,
+        RootExchangeError::ProviderIdentityMismatch("acme-introspect".to_owned())
+    );
+    refusal_code(&error, OAuthErrorCode::ServerError);
+    assert_eq!(introspector.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn introspection_issued_after_expiry_refuses() {
+    let introspector = StubIntrospector::answering(edit(introspection_response(), |response| {
+        response.insert("exp".into(), json!(NOW + 10));
+        response.insert("iat".into(), json!(NOW + 20));
+    }));
+    let error = introspection_refusal(&introspector).await;
+    assert_eq!(error, RootExchangeError::ClaimInvalid("exp"));
+    refusal_code(&error, OAuthErrorCode::InvalidGrant);
 }
