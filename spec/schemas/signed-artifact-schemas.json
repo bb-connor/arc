@@ -1,0 +1,1136 @@
+{
+  "schema": "chio.signed-artifact-schemas.v1",
+  "artifacts": [
+    {
+      "schema": "chio.active-response-artifact-authority-attestation.v1",
+      "artifactKind": "active_response_artifact_authority_attestation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/active-response-artifact-authority-attestation.schema.json",
+      "title": "Chio active response artifact authority attestation signed body"
+    },
+    {
+      "schema": "chio.active-response-policy-authority-request.v1",
+      "artifactKind": "active_response_policy_authority_request",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/active-response-policy-authority-request.schema.json",
+      "title": "Chio active response policy authority request signed body"
+    },
+    {
+      "schema": "chio.active-response-policy-authority-response.v1",
+      "artifactKind": "active_response_policy_authority_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/active-response-policy-authority-response.schema.json",
+      "title": "Chio active response policy authority response signed body"
+    },
+    {
+      "schema": "chio.active-response-submission.v1",
+      "artifactKind": "active_response_submission",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/active-response-submission.schema.json",
+      "title": "Chio active response submission signed body"
+    },
+    {
+      "schema": "chio.ag-ui-receipt.v1",
+      "artifactKind": "ag_ui_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/ag-ui-receipt.schema.json",
+      "title": "Chio ag ui receipt signed body"
+    },
+    {
+      "schema": "chio.agent-passport-presentation-response.v1",
+      "artifactKind": "agent_passport_presentation_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/agent-passport-presentation-response.schema.json",
+      "title": "Chio agent passport presentation response signed body"
+    },
+    {
+      "schema": "chio.authority-lifecycle.v1",
+      "artifactKind": "authority_lifecycle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/authority-lifecycle.schema.json",
+      "title": "Chio authority lifecycle signed body"
+    },
+    {
+      "schema": "chio.authority-snapshot.v1",
+      "artifactKind": "authority_snapshot",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/authority-snapshot.schema.json",
+      "title": "Chio authority snapshot signed body"
+    },
+    {
+      "schema": "chio.autonomous-comparison-report.v1",
+      "artifactKind": "autonomous_comparison_report",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-comparison-report.schema.json",
+      "title": "Chio autonomous comparison report signed body"
+    },
+    {
+      "schema": "chio.autonomous-drift-report.v1",
+      "artifactKind": "autonomous_drift_report",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-drift-report.schema.json",
+      "title": "Chio autonomous drift report signed body"
+    },
+    {
+      "schema": "chio.autonomous-execution-decision.v1",
+      "artifactKind": "autonomous_execution_decision",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-execution-decision.schema.json",
+      "title": "Chio autonomous execution decision signed body"
+    },
+    {
+      "schema": "chio.autonomous-pricing-authority-envelope.v1",
+      "artifactKind": "autonomous_pricing_authority_envelope",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-pricing-authority-envelope.schema.json",
+      "title": "Chio autonomous pricing authority envelope signed body"
+    },
+    {
+      "schema": "chio.autonomous-pricing-decision.v1",
+      "artifactKind": "autonomous_pricing_decision",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-pricing-decision.schema.json",
+      "title": "Chio autonomous pricing decision signed body"
+    },
+    {
+      "schema": "chio.autonomous-pricing-input.v1",
+      "artifactKind": "autonomous_pricing_input",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-pricing-input.schema.json",
+      "title": "Chio autonomous pricing input signed body"
+    },
+    {
+      "schema": "chio.autonomous-rollback-plan.v1",
+      "artifactKind": "autonomous_rollback_plan",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/autonomous-rollback-plan.schema.json",
+      "title": "Chio autonomous rollback plan signed body"
+    },
+    {
+      "schema": "chio.budget-snapshot-anchor-commitment.v1",
+      "artifactKind": "budget_snapshot_anchor_commitment",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/budget-snapshot-anchor-commitment.schema.json",
+      "title": "Chio budget snapshot anchor commitment signed body"
+    },
+    {
+      "schema": "chio.call_chain_continuation.v1",
+      "artifactKind": "call_chain_continuation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/call-chain-continuation.schema.json",
+      "title": "Chio call chain continuation signed body"
+    },
+    {
+      "schema": "chio.capital-pool-optimization.v1",
+      "artifactKind": "capital_pool_optimization",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/capital-pool-optimization.schema.json",
+      "title": "Chio capital pool optimization signed body"
+    },
+    {
+      "schema": "chio.capital-pool-simulation-report.v1",
+      "artifactKind": "capital_pool_simulation_report",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/economy/capital-pool-simulation-report.schema.json",
+      "title": "Chio capital pool simulation report signed body"
+    },
+    {
+      "schema": "chio.certify.check.v1",
+      "artifactKind": "certify_check",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/certify/check.schema.json",
+      "title": "Chio certify check signed body"
+    },
+    {
+      "schema": "chio.checkpoint_statement.v1",
+      "artifactKind": "checkpoint_statement",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/checkpoint-statement.schema.json",
+      "title": "Chio checkpoint statement signed body"
+    },
+    {
+      "schema": "chio.child-request-receipt.v1",
+      "artifactKind": "child_request_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/child-request-receipt.schema.json",
+      "title": "Chio child request receipt signed body"
+    },
+    {
+      "schema": "chio.compliance.certificate.v1",
+      "artifactKind": "compliance_certificate",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/compliance/certificate.schema.json",
+      "title": "Chio compliance certificate signed body"
+    },
+    {
+      "schema": "chio.credit.bond.v1",
+      "artifactKind": "credit_bond",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/bond.schema.json",
+      "title": "Chio credit bond signed body"
+    },
+    {
+      "schema": "chio.credit.capital-allocation.v1",
+      "artifactKind": "credit_capital_allocation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/capital-allocation.schema.json",
+      "title": "Chio credit capital allocation signed body"
+    },
+    {
+      "schema": "chio.credit.capital-authority-step-proof.v1",
+      "artifactKind": "credit_capital_authority_step_proof",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/capital-authority-step-proof.schema.json",
+      "title": "Chio credit capital authority step proof signed body"
+    },
+    {
+      "schema": "chio.credit.capital-book.v1",
+      "artifactKind": "credit_capital_book",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/capital-book.schema.json",
+      "title": "Chio credit capital book signed body"
+    },
+    {
+      "schema": "chio.credit.capital-instruction.v1",
+      "artifactKind": "credit_capital_instruction",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/capital-instruction.schema.json",
+      "title": "Chio credit capital instruction signed body"
+    },
+    {
+      "schema": "chio.credit.exposure-ledger.v1",
+      "artifactKind": "credit_exposure_ledger",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/exposure-ledger.schema.json",
+      "title": "Chio credit exposure ledger signed body"
+    },
+    {
+      "schema": "chio.credit.facility.v1",
+      "artifactKind": "credit_facility",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/facility.schema.json",
+      "title": "Chio credit facility signed body"
+    },
+    {
+      "schema": "chio.credit.iou-envelope.v1",
+      "artifactKind": "credit_iou_envelope",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/iou-envelope.schema.json",
+      "title": "Chio credit iou envelope signed body"
+    },
+    {
+      "schema": "chio.credit.loss-lifecycle.v1",
+      "artifactKind": "credit_loss_lifecycle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/loss-lifecycle.schema.json",
+      "title": "Chio credit loss lifecycle signed body"
+    },
+    {
+      "schema": "chio.credit.provider-risk-package.v1",
+      "artifactKind": "credit_provider_risk_package",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/provider-risk-package.schema.json",
+      "title": "Chio credit provider risk package signed body"
+    },
+    {
+      "schema": "chio.credit.scorecard.v1",
+      "artifactKind": "credit_scorecard",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/credit/scorecard.schema.json",
+      "title": "Chio credit scorecard signed body"
+    },
+    {
+      "schema": "chio.cross-issuer-migration.v1",
+      "artifactKind": "cross_issuer_migration",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/cross-issuer-migration.schema.json",
+      "title": "Chio cross issuer migration signed body"
+    },
+    {
+      "schema": "chio.delegation-link.v1",
+      "artifactKind": "delegation_link",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/delegation-link.schema.json",
+      "title": "Chio delegation link signed body"
+    },
+    {
+      "schema": "chio.enterprise-migration-transition.v1",
+      "artifactKind": "enterprise_migration_transition",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/enterprise-migration-transition.schema.json",
+      "title": "Chio enterprise migration transition signed body"
+    },
+    {
+      "schema": "chio.evidence_export_commitment.v1",
+      "artifactKind": "evidence_export_commitment",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/evidence-export-commitment.schema.json",
+      "title": "Chio evidence export commitment signed body"
+    },
+    {
+      "schema": "chio.execution_nonce.v1",
+      "artifactKind": "execution_nonce",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/execution-nonce-body.schema.json",
+      "title": "Chio execution nonce signed body",
+      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/kernel/execution_nonce.schema.json"
+    },
+    {
+      "schema": "chio.federated-delegation-policy.v1",
+      "artifactKind": "federated_delegation_policy",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federated-delegation-policy.schema.json",
+      "title": "Chio federated delegation policy signed body"
+    },
+    {
+      "schema": "chio.federation-activation-exchange.v1",
+      "artifactKind": "federation_activation_exchange",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-activation-exchange.schema.json",
+      "title": "Chio federation activation exchange signed body"
+    },
+    {
+      "schema": "chio.federation-kernel-handshake.v1",
+      "artifactKind": "federation_kernel_handshake",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-kernel-handshake.schema.json",
+      "title": "Chio federation kernel handshake signed body"
+    },
+    {
+      "schema": "chio.federation-open-admission-policy.v1",
+      "artifactKind": "federation_open_admission_policy",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-open-admission-policy.schema.json",
+      "title": "Chio federation open admission policy signed body"
+    },
+    {
+      "schema": "chio.federation-policy.v1",
+      "artifactKind": "federation_policy",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-policy.schema.json",
+      "title": "Chio federation policy signed body"
+    },
+    {
+      "schema": "chio.federation-qualification-matrix.v1",
+      "artifactKind": "federation_qualification_matrix",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-qualification-matrix.schema.json",
+      "title": "Chio federation qualification matrix signed body"
+    },
+    {
+      "schema": "chio.federation-quorum-report.v1",
+      "artifactKind": "federation_quorum_report",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-quorum-report.schema.json",
+      "title": "Chio federation quorum report signed body"
+    },
+    {
+      "schema": "chio.federation-reputation-clearing.v1",
+      "artifactKind": "federation_reputation_clearing",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-reputation-clearing.schema.json",
+      "title": "Chio federation reputation clearing signed body"
+    },
+    {
+      "schema": "chio.federation.transport.iroh.peer-directory-bundle.v1",
+      "artifactKind": "federation_transport_iroh_peer_directory_bundle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/federation/transport-iroh-peer-directory-bundle.schema.json",
+      "title": "Chio federation transport iroh peer directory bundle signed body"
+    },
+    {
+      "schema": "chio.financial-agent-passport-presentation-response.v1",
+      "artifactKind": "financial_agent_passport_presentation_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-response.schema.json",
+      "title": "Chio financial agent passport presentation response signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer-entry-activation-decision.v1",
+      "artifactKind": "financial_cross_issuer_entry_activation_decision",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-entry-activation-decision.schema.json",
+      "title": "Chio financial cross issuer entry activation decision signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer-migration.v1",
+      "artifactKind": "financial_cross_issuer_migration",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-migration.schema.json",
+      "title": "Chio financial cross issuer migration signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer-trust-pack.v1",
+      "artifactKind": "financial_cross_issuer_trust_pack",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-trust-pack.schema.json",
+      "title": "Chio financial cross issuer trust pack signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1",
+      "artifactKind": "financial_cross_issuer_lifecycle_checkpoint_pin",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint-pin.schema.json",
+      "title": "Chio financial cross issuer lifecycle checkpoint pin signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer.lifecycle-checkpoint.v1",
+      "artifactKind": "financial_cross_issuer_lifecycle_checkpoint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint.schema.json",
+      "title": "Chio financial cross issuer lifecycle checkpoint signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer.lifecycle-generation-pin.v1",
+      "artifactKind": "financial_cross_issuer_lifecycle_generation_pin",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-generation-pin.schema.json",
+      "title": "Chio financial cross issuer lifecycle generation pin signed body"
+    },
+    {
+      "schema": "chio.financial.cross-issuer.lifecycle-result.v1",
+      "artifactKind": "financial_cross_issuer_lifecycle_result",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-result.schema.json",
+      "title": "Chio financial cross issuer lifecycle result signed body"
+    },
+    {
+      "schema": "chio.finding-pool.store-identity-proof.v1",
+      "artifactKind": "finding_pool_store_identity_proof",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/store-identity-proof.schema.json",
+      "title": "Chio finding pool store identity proof signed body"
+    },
+    {
+      "schema": "chio.finding.anchor-checkpoint-publication.v1",
+      "artifactKind": "finding_anchor_checkpoint_publication",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/anchor-checkpoint-publication.schema.json",
+      "title": "Chio finding anchor checkpoint publication signed body"
+    },
+    {
+      "schema": "chio.finding.audit-seed-witness.v1",
+      "artifactKind": "finding_audit_seed_witness",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/audit-seed-witness.schema.json",
+      "title": "Chio finding audit seed witness signed body"
+    },
+    {
+      "schema": "chio.finding.bond-store-snapshot.v1",
+      "artifactKind": "finding_bond_store_snapshot",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/bond-store-snapshot.schema.json",
+      "title": "Chio finding bond store snapshot signed body"
+    },
+    {
+      "schema": "chio.finding.current-listing-assertion.v1",
+      "artifactKind": "finding_current_listing_assertion",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/current-listing-assertion.schema.json",
+      "title": "Chio finding current listing assertion signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-api-key-lifecycle.v1",
+      "artifactKind": "finding_hosted_api_key_lifecycle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-api-key-lifecycle.schema.json",
+      "title": "Chio finding hosted api key lifecycle signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-canary-observation.v1",
+      "artifactKind": "finding_hosted_canary_observation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-canary-observation.schema.json",
+      "title": "Chio finding hosted canary observation signed body"
+    },
+    {
+      "schema": "chio.finding.operator-purchase-job.v1",
+      "artifactKind": "finding_operator_purchase_job",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/operator-purchase-job.schema.json",
+      "title": "Chio finding operator purchase job signed body"
+    },
+    {
+      "schema": "chio.finding.pool-debit-authorization.v1",
+      "artifactKind": "finding_pool_debit_authorization",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/pool-debit-authorization.schema.json",
+      "title": "Chio finding pool debit authorization signed body"
+    },
+    {
+      "schema": "chio.finding.status-intent-submission.v1",
+      "artifactKind": "finding_status_intent_submission",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/status-intent-submission.schema.json",
+      "title": "Chio finding status intent submission signed body"
+    },
+    {
+      "schema": "chio.finding.voluntary-retraction-receipt.v1",
+      "artifactKind": "finding_voluntary_retraction_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/voluntary-retraction-receipt.schema.json",
+      "title": "Chio finding voluntary retraction receipt signed body"
+    },
+    {
+      "schema": "chio.frost.dkg-package.v1",
+      "artifactKind": "frost_dkg_package",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/frost/dkg-package.schema.json",
+      "title": "Chio frost dkg package signed body"
+    },
+    {
+      "schema": "chio.governed-approval-token.v1",
+      "artifactKind": "governed_approval_token",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json",
+      "title": "Chio governed approval token signed body",
+      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/capability/governed-approval-token.schema.json"
+    },
+    {
+      "schema": "chio.governed-upstream-call-chain-proof.v1",
+      "artifactKind": "governed_upstream_call_chain_proof",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/governed-upstream-call-chain-proof.schema.json",
+      "title": "Chio governed upstream call chain proof signed body"
+    },
+    {
+      "schema": "chio.http-receipt.v1",
+      "artifactKind": "http_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/http-receipt.schema.json",
+      "title": "Chio http receipt signed body"
+    },
+    {
+      "schema": "chio.iroh.revocation-signer-endorsement.v1",
+      "artifactKind": "iroh_revocation_signer_endorsement",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/iroh/revocation-signer-endorsement.schema.json",
+      "title": "Chio iroh revocation signer endorsement signed body"
+    },
+    {
+      "schema": "chio.iroh.transport-endorsement.v1",
+      "artifactKind": "iroh_transport_endorsement",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/iroh/transport-endorsement.schema.json",
+      "title": "Chio iroh transport endorsement signed body"
+    },
+    {
+      "schema": "chio.key-binding-certificate.v1",
+      "artifactKind": "key_binding_certificate",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/key-binding-certificate.schema.json",
+      "title": "Chio key binding certificate signed body"
+    },
+    {
+      "schema": "chio.key-log.witness-statement.v1",
+      "artifactKind": "key_log_witness_statement",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/witness-statement.schema.json",
+      "title": "Chio key log witness statement signed body"
+    },
+    {
+      "schema": "chio.lineage.frontier-signature.v1",
+      "artifactKind": "lineage_frontier_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/lineage/frontier-signature.schema.json",
+      "title": "Chio lineage frontier signature signed body"
+    },
+    {
+      "schema": "chio.market.auto-bind.v1",
+      "artifactKind": "market_auto_bind",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/auto-bind.schema.json",
+      "title": "Chio market auto bind signed body"
+    },
+    {
+      "schema": "chio.market.bound-coverage.v1",
+      "artifactKind": "market_bound_coverage",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/bound-coverage.schema.json",
+      "title": "Chio market bound coverage signed body"
+    },
+    {
+      "schema": "chio.market.claim-adjudication.v1",
+      "artifactKind": "market_claim_adjudication",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-adjudication.schema.json",
+      "title": "Chio market claim adjudication signed body"
+    },
+    {
+      "schema": "chio.market.claim-dispute.v1",
+      "artifactKind": "market_claim_dispute",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-dispute.schema.json",
+      "title": "Chio market claim dispute signed body"
+    },
+    {
+      "schema": "chio.market.claim-package.v1",
+      "artifactKind": "market_claim_package",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-package.schema.json",
+      "title": "Chio market claim package signed body"
+    },
+    {
+      "schema": "chio.market.claim-payout-instruction.v1",
+      "artifactKind": "market_claim_payout_instruction",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-payout-instruction.schema.json",
+      "title": "Chio market claim payout instruction signed body"
+    },
+    {
+      "schema": "chio.market.claim-payout-receipt.v1",
+      "artifactKind": "market_claim_payout_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-payout-receipt.schema.json",
+      "title": "Chio market claim payout receipt signed body"
+    },
+    {
+      "schema": "chio.market.claim-response.v1",
+      "artifactKind": "market_claim_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-response.schema.json",
+      "title": "Chio market claim response signed body"
+    },
+    {
+      "schema": "chio.market.claim-settlement-instruction.v1",
+      "artifactKind": "market_claim_settlement_instruction",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-settlement-instruction.schema.json",
+      "title": "Chio market claim settlement instruction signed body"
+    },
+    {
+      "schema": "chio.market.claim-settlement-receipt.v1",
+      "artifactKind": "market_claim_settlement_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/claim-settlement-receipt.schema.json",
+      "title": "Chio market claim settlement receipt signed body"
+    },
+    {
+      "schema": "chio.market.placement.v1",
+      "artifactKind": "market_placement",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/placement.schema.json",
+      "title": "Chio market placement signed body"
+    },
+    {
+      "schema": "chio.market.pricing-authority.v1",
+      "artifactKind": "market_pricing_authority",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/pricing-authority.schema.json",
+      "title": "Chio market pricing authority signed body"
+    },
+    {
+      "schema": "chio.market.provider.v1",
+      "artifactKind": "market_provider",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/provider.schema.json",
+      "title": "Chio market provider signed body"
+    },
+    {
+      "schema": "chio.market.quote-request.v1",
+      "artifactKind": "market_quote_request",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/quote-request.schema.json",
+      "title": "Chio market quote request signed body"
+    },
+    {
+      "schema": "chio.market.quote-response.v1",
+      "artifactKind": "market_quote_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/market/quote-response.schema.json",
+      "title": "Chio market quote response signed body"
+    },
+    {
+      "schema": "chio.marketplace.accepted-bid.v1",
+      "artifactKind": "marketplace_accepted_bid",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/marketplace/accepted-bid.schema.json",
+      "title": "Chio marketplace accepted bid signed body"
+    },
+    {
+      "schema": "chio.marketplace.ask-response.v1",
+      "artifactKind": "marketplace_ask_response",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/marketplace/ask-response.schema.json",
+      "title": "Chio marketplace ask response signed body"
+    },
+    {
+      "schema": "chio.marketplace.bid-request.v1",
+      "artifactKind": "marketplace_bid_request",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/marketplace/bid-request.schema.json",
+      "title": "Chio marketplace bid request signed body"
+    },
+    {
+      "schema": "chio.marketplace.listing-pricing-hint.v1",
+      "artifactKind": "marketplace_listing_pricing_hint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/marketplace/listing-pricing-hint.schema.json",
+      "title": "Chio marketplace listing pricing hint signed body"
+    },
+    {
+      "schema": "chio.marketplace.reservation-receipt.v1",
+      "artifactKind": "marketplace_reservation_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/marketplace/reservation-receipt.schema.json",
+      "title": "Chio marketplace reservation receipt signed body"
+    },
+    {
+      "schema": "chio.mcp.operator-approval.v1",
+      "artifactKind": "mcp_operator_approval",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/mcp/operator-approval.schema.json",
+      "title": "Chio mcp operator approval signed body"
+    },
+    {
+      "schema": "chio.mcp.session-credential-call.v1",
+      "artifactKind": "mcp_session_credential_call",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/mcp/session-credential-call.schema.json",
+      "title": "Chio mcp session credential call signed body"
+    },
+    {
+      "schema": "chio.mcp.session-credential.v1",
+      "artifactKind": "mcp_session_credential",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/mcp/session-credential.schema.json",
+      "title": "Chio mcp session credential signed body"
+    },
+    {
+      "schema": "chio.operation_execution_nonce.v1",
+      "artifactKind": "operation_execution_nonce",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/operation-execution-nonce-body.schema.json",
+      "title": "Chio operation execution nonce signed body",
+      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/kernel/execution_nonce.schema.json"
+    },
+    {
+      "schema": "chio.parametric.contest.v1",
+      "artifactKind": "parametric_contest",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/parametric/contest.schema.json",
+      "title": "Chio parametric contest signed body"
+    },
+    {
+      "schema": "chio.parametric.evidence-source-checkpoint.v1",
+      "artifactKind": "parametric_evidence_source_checkpoint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/parametric/evidence-source-checkpoint.schema.json",
+      "title": "Chio parametric evidence source checkpoint signed body"
+    },
+    {
+      "schema": "chio.parametric.payout-intent.v1",
+      "artifactKind": "parametric_payout_intent",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/parametric/payout-intent.schema.json",
+      "title": "Chio parametric payout intent signed body"
+    },
+    {
+      "schema": "chio.passkey-capability.v1",
+      "artifactKind": "passkey_capability",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/passkey-capability.schema.json",
+      "title": "Chio passkey capability signed body"
+    },
+    {
+      "schema": "chio.passport-verifier-policy.v1",
+      "artifactKind": "passport_verifier_policy",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/passport-verifier-policy.schema.json",
+      "title": "Chio passport verifier policy signed body"
+    },
+    {
+      "schema": "chio.policy.activation-receipt-signature.v1",
+      "artifactKind": "policy_activation_receipt_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/policy/activation-receipt-signature.schema.json",
+      "title": "Chio policy activation receipt signature signed body"
+    },
+    {
+      "schema": "chio.portable-agent-passport.v1",
+      "artifactKind": "portable_agent_passport",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/portable-agent-passport.schema.json",
+      "title": "Chio portable agent passport signed body"
+    },
+    {
+      "schema": "chio.portable-negative-event.v1",
+      "artifactKind": "portable_negative_event",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/portable-negative-event.schema.json",
+      "title": "Chio portable negative event signed body"
+    },
+    {
+      "schema": "chio.portable-reputation-summary.v1",
+      "artifactKind": "portable_reputation_summary",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/portable-reputation-summary.schema.json",
+      "title": "Chio portable reputation summary signed body"
+    },
+    {
+      "schema": "chio.process.container-launch.v1",
+      "artifactKind": "container_launch",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/process/container-launch.schema.json",
+      "title": "Chio process container launch signed body"
+    },
+    {
+      "schema": "chio.process.swarm-profile.v1",
+      "artifactKind": "process_swarm_profile",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/process/swarm-profile.schema.json",
+      "title": "Chio process swarm profile signed body"
+    },
+    {
+      "schema": "chio.provenance-stamp.v1",
+      "artifactKind": "provenance_stamp",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/provenance/provenance-stamp.schema.json",
+      "title": "Chio provenance stamp signed body"
+    },
+    {
+      "schema": "chio.public-discovery-transparency.v1",
+      "artifactKind": "public_discovery_transparency",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/public-discovery-transparency.schema.json",
+      "title": "Chio public discovery transparency signed body"
+    },
+    {
+      "schema": "chio.public-issuer-discovery.v1",
+      "artifactKind": "public_issuer_discovery",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/public-issuer-discovery.schema.json",
+      "title": "Chio public issuer discovery signed body"
+    },
+    {
+      "schema": "chio.public-verifier-discovery.v1",
+      "artifactKind": "public_verifier_discovery",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/public-verifier-discovery.schema.json",
+      "title": "Chio public verifier discovery signed body"
+    },
+    {
+      "schema": "chio.registry.governance-case.v1",
+      "artifactKind": "registry_governance_case",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/governance-case.schema.json",
+      "title": "Chio registry governance case signed body"
+    },
+    {
+      "schema": "chio.registry.governance-charter.v1",
+      "artifactKind": "registry_governance_charter",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/governance-charter.schema.json",
+      "title": "Chio registry governance charter signed body"
+    },
+    {
+      "schema": "chio.registry.listing.v1",
+      "artifactKind": "registry_listing",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/listing.schema.json",
+      "title": "Chio registry listing signed body"
+    },
+    {
+      "schema": "chio.registry.market-fee-schedule.v1",
+      "artifactKind": "registry_market_fee_schedule",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/market-fee-schedule.schema.json",
+      "title": "Chio registry market fee schedule signed body"
+    },
+    {
+      "schema": "chio.registry.namespace.v1",
+      "artifactKind": "registry_namespace",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/namespace.schema.json",
+      "title": "Chio registry namespace signed body"
+    },
+    {
+      "schema": "chio.registry.trust-activation.v1",
+      "artifactKind": "registry_trust_activation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/registry/trust-activation.schema.json",
+      "title": "Chio registry trust activation signed body"
+    },
+    {
+      "schema": "chio.regulatory.receipt-export.v1",
+      "artifactKind": "regulatory_receipt_export",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/regulatory/receipt-export.schema.json",
+      "title": "Chio regulatory receipt export signed body"
+    },
+    {
+      "schema": "chio.release-qualification-manifest.v1",
+      "artifactKind": "release_qualification_manifest",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/release/release-qualification-manifest.schema.json",
+      "title": "Chio release qualification manifest signed body"
+    },
+    {
+      "schema": "chio.replay.bless-checkpoint.v1",
+      "artifactKind": "replay_bless_checkpoint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/replay/bless-checkpoint.schema.json",
+      "title": "Chio replay bless checkpoint signed body"
+    },
+    {
+      "schema": "chio.reputation-credential.v1",
+      "artifactKind": "reputation_credential",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/reputation-credential.schema.json",
+      "title": "Chio reputation credential signed body"
+    },
+    {
+      "schema": "chio.request_lineage_record.v1",
+      "artifactKind": "request_lineage_record",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/request-lineage-record.schema.json",
+      "title": "Chio request lineage record signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation-evidence.v1",
+      "artifactKind": "runtime_attestation_evidence",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/evidence.schema.json",
+      "title": "Chio runtime attestation evidence signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation.appraisal-report.v1",
+      "artifactKind": "runtime_attestation_appraisal_report",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/appraisal-report.schema.json",
+      "title": "Chio runtime attestation appraisal report signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation.appraisal-result.v1",
+      "artifactKind": "runtime_attestation_appraisal_result",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/appraisal-result.schema.json",
+      "title": "Chio runtime attestation appraisal result signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation.reference-values.v1",
+      "artifactKind": "runtime_attestation_reference_values",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/reference-values.schema.json",
+      "title": "Chio runtime attestation reference values signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation.trust-bundle.v1",
+      "artifactKind": "runtime_attestation_trust_bundle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/trust-bundle.schema.json",
+      "title": "Chio runtime attestation trust bundle signed body"
+    },
+    {
+      "schema": "chio.runtime-attestation.verifier-descriptor.v1",
+      "artifactKind": "runtime_attestation_verifier_descriptor",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime-attestation/verifier-descriptor.schema.json",
+      "title": "Chio runtime attestation verifier descriptor signed body"
+    },
+    {
+      "schema": "chio.runtime.attack-simulation-report-signature.v1",
+      "artifactKind": "runtime_attack_simulation_report_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/attack-simulation-report-signature.schema.json",
+      "title": "Chio runtime attack simulation report signature signed body"
+    },
+    {
+      "schema": "chio.runtime.chaos-run-report-signature.v1",
+      "artifactKind": "runtime_chaos_run_report_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/chaos-run-report-signature.schema.json",
+      "title": "Chio runtime chaos run report signature signed body"
+    },
+    {
+      "schema": "chio.runtime.execution-lease-signature.v1",
+      "artifactKind": "runtime_execution_lease_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/execution-lease-signature.schema.json",
+      "title": "Chio runtime execution lease signature signed body"
+    },
+    {
+      "schema": "chio.runtime.revocation-freshness-proof-signature.v1",
+      "artifactKind": "runtime_revocation_freshness_proof_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/revocation-freshness-proof-signature.schema.json",
+      "title": "Chio runtime revocation freshness proof signature signed body"
+    },
+    {
+      "schema": "chio.runtime.sandbox-attestation-signature.v1",
+      "artifactKind": "runtime_sandbox_attestation_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/sandbox-attestation-signature.schema.json",
+      "title": "Chio runtime sandbox attestation signature signed body"
+    },
+    {
+      "schema": "chio.runtime.terminal-receipt-signature.v1",
+      "artifactKind": "runtime_terminal_receipt_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/terminal-receipt-signature.schema.json",
+      "title": "Chio runtime terminal receipt signature signed body"
+    },
+    {
+      "schema": "chio.runtime.tool-server-ack-signature.v1",
+      "artifactKind": "runtime_tool_server_ack_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/tool-server-ack-signature.schema.json",
+      "title": "Chio runtime tool server ack signature signed body"
+    },
+    {
+      "schema": "chio.runtime.trusted-time-proof-signature.v1",
+      "artifactKind": "runtime_trusted_time_proof_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/trusted-time-proof-signature.schema.json",
+      "title": "Chio runtime trusted time proof signature signed body"
+    },
+    {
+      "schema": "chio.session-compliance-certificate.v1",
+      "artifactKind": "session_compliance_certificate",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/session-compliance-certificate.schema.json",
+      "title": "Chio session compliance certificate signed body"
+    },
+    {
+      "schema": "chio.session_anchor.v1",
+      "artifactKind": "session_anchor",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/session-anchor.schema.json",
+      "title": "Chio session anchor signed body"
+    },
+    {
+      "schema": "chio.signed-admission-terminal-projection.v1",
+      "artifactKind": "signed_admission_terminal_projection",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/signed-admission-terminal-projection.schema.json",
+      "title": "Chio signed admission terminal projection signed body"
+    },
+    {
+      "schema": "chio.signed-watermark-envelope.v1",
+      "artifactKind": "signed_watermark_envelope",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/signed-watermark-envelope.schema.json",
+      "title": "Chio signed watermark envelope signed body"
+    },
+    {
+      "schema": "chio.signer-readiness-probe.v1",
+      "artifactKind": "signer_readiness_probe",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/signer-readiness-probe.schema.json",
+      "title": "Chio signer readiness probe signed body"
+    },
+    {
+      "schema": "chio.stop-operator-config-approval.v1",
+      "artifactKind": "stop_operator_config_approval",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/stop-operator-config-approval.schema.json",
+      "title": "Chio stop operator config approval signed body"
+    },
+    {
+      "schema": "chio.stop-operator-config.v1",
+      "artifactKind": "stop_operator_config",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/stop-operator-config.schema.json",
+      "title": "Chio stop operator config signed body"
+    },
+    {
+      "schema": "chio.swarm.delegation-witness-hop-signature.v1",
+      "artifactKind": "swarm_delegation_witness_hop_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/swarm/delegation-witness-hop-signature.schema.json",
+      "title": "Chio swarm delegation witness hop signature signed body"
+    },
+    {
+      "schema": "chio.swarm.route-plan-receipt-signature.v1",
+      "artifactKind": "swarm_route_plan_receipt_signature",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/swarm/route-plan-receipt-signature.schema.json",
+      "title": "Chio swarm route plan receipt signature signed body"
+    },
+    {
+      "schema": "chio.tee-bless-audit.v1",
+      "artifactKind": "tee_bless_audit",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/tee-bless-audit.schema.json",
+      "title": "Chio tee bless audit signed body"
+    },
+    {
+      "schema": "chio.tee-capture-frame.v1",
+      "artifactKind": "tee_capture_frame",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/tee-capture-frame.schema.json",
+      "title": "Chio tee capture frame signed body"
+    },
+    {
+      "schema": "chio.trace-observation.v1",
+      "artifactKind": "trace_observation",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/provenance/trace-observation.schema.json",
+      "title": "Chio trace observation signed body"
+    },
+    {
+      "schema": "chio.trust.passport-revocation-root.v1",
+      "artifactKind": "trust_passport_revocation_root",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust/passport-revocation-root.schema.json",
+      "title": "Chio trust passport revocation root signed body"
+    },
+    {
+      "schema": "chio.underwriting.decision.v1",
+      "artifactKind": "underwriting_decision",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/underwriting/decision.schema.json",
+      "title": "Chio underwriting decision signed body"
+    },
+    {
+      "schema": "chio.underwriting.policy-input.v1",
+      "artifactKind": "underwriting_policy_input",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/underwriting/policy-input.schema.json",
+      "title": "Chio underwriting policy input signed body"
+    },
+    {
+      "schema": "chio.wasm-module.v1",
+      "artifactKind": "wasm_module",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/runtime/wasm-module.schema.json",
+      "title": "Chio wasm module signed body"
+    },
+    {
+      "schema": "chio.work-dispatch-permit.v1",
+      "artifactKind": "work_dispatch_permit",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/work/work-dispatch-permit.schema.json",
+      "title": "Chio work dispatch permit signed body"
+    },
+    {
+      "schema": "chio.work-offer.v1",
+      "artifactKind": "work_offer",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/work/work-offer.schema.json",
+      "title": "Chio work offer signed body"
+    },
+    {
+      "schema": "chio.work-selection.v1",
+      "artifactKind": "work_selection",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/work/work-selection.schema.json",
+      "title": "Chio work selection signed body"
+    },
+    {
+      "schema": "chio.work-subdivision.v1",
+      "artifactKind": "work_subdivision",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/work/work-subdivision.schema.json",
+      "title": "Chio work subdivision signed body"
+    },
+    {
+      "schema": "chio.workflow-receipt.v1",
+      "artifactKind": "workflow_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/workflow/workflow-receipt.schema.json",
+      "title": "Chio workflow receipt signed body"
+    }
+  ],
+  "secretShapedMembers": {}
+}

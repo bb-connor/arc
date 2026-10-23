@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema", "requestId", "requestDigest", "issuedAtUnixSeconds", "authority", "result"],
   "properties": {
-    "schema": { "const": "chio.broker-authority-rpc.v1" },
+    "schema": { "const": "chio.broker-authority-response.v1" },
     "requestId": { "$ref": "#/$defs/authorityRpcResponseIdentifier" },
     "requestDigest": { "$ref": "#/$defs/digest" },
     "issuedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
