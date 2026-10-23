@@ -110,15 +110,25 @@ pub fn sign_admin_mutation_receipt(
     })
 }
 
-pub fn verify_admin_mutation_receipt(receipt: &SignedAdminMutationReceipt) -> Result<()> {
+/// Accepts only a receipt signed by `trusted_signer`; the signer is compared
+/// before the signature is checked.
+pub fn verify_admin_mutation_receipt(
+    receipt: &SignedAdminMutationReceipt,
+    trusted_signer: &PublicKey,
+) -> Result<()> {
     receipt.body.validate()?;
-    if receipt.signature.algorithm() != receipt.signer.algorithm() {
+    if &receipt.signer != trusted_signer {
+        return Err(BrokerError::AuthorizationDenied(
+            "admin mutation receipt signer is not trusted".to_string(),
+        ));
+    }
+    if receipt.signature.algorithm() != trusted_signer.algorithm() {
         return Err(BrokerError::AuthorizationDenied(
             "admin mutation receipt signer or algorithm is invalid".to_string(),
         ));
     }
     match verify_wrapped(
-        &receipt.signer,
+        trusted_signer,
         ADMIN_MUTATION_RECEIPT_SCHEMA,
         &receipt.body,
         &receipt.signature,
@@ -138,8 +148,8 @@ pub fn verify_admin_mutation_receipt(receipt: &SignedAdminMutationReceipt) -> Re
     Ok(())
 }
 
+/// Digest of a receipt's canonical bytes; callers verify the receipt first.
 pub fn admin_mutation_receipt_digest(receipt: &SignedAdminMutationReceipt) -> Result<String> {
-    verify_admin_mutation_receipt(receipt)?;
     let canonical = canonical_json_bytes(receipt).map_err(|error| {
         BrokerError::Invariant(format!("admin mutation receipt digest failed: {error}"))
     })?;
@@ -219,15 +229,25 @@ pub fn sign_admin_control_receipt(
     })
 }
 
-pub fn verify_admin_control_receipt(receipt: &SignedAdminControlReceipt) -> Result<()> {
+/// Accepts only a receipt signed by `trusted_signer`; the signer is compared
+/// before the signature is checked.
+pub fn verify_admin_control_receipt(
+    receipt: &SignedAdminControlReceipt,
+    trusted_signer: &PublicKey,
+) -> Result<()> {
     receipt.body.validate()?;
-    if receipt.signature.algorithm() != receipt.signer.algorithm() {
+    if &receipt.signer != trusted_signer {
+        return Err(BrokerError::AuthorizationDenied(
+            "admin control receipt signer is not trusted".to_string(),
+        ));
+    }
+    if receipt.signature.algorithm() != trusted_signer.algorithm() {
         return Err(BrokerError::AuthorizationDenied(
             "admin control receipt signer or algorithm is invalid".to_string(),
         ));
     }
     match verify_wrapped(
-        &receipt.signer,
+        trusted_signer,
         ADMIN_CONTROL_RECEIPT_SCHEMA,
         &receipt.body,
         &receipt.signature,
@@ -247,8 +267,8 @@ pub fn verify_admin_control_receipt(receipt: &SignedAdminControlReceipt) -> Resu
     Ok(())
 }
 
+/// Digest of a receipt's canonical bytes; callers verify the receipt first.
 fn admin_control_receipt_digest(receipt: &SignedAdminControlReceipt) -> Result<String> {
-    verify_admin_control_receipt(receipt)?;
     let canonical = canonical_json_bytes(receipt).map_err(|error| {
         BrokerError::Invariant(format!("admin control receipt digest failed: {error}"))
     })?;
@@ -827,7 +847,13 @@ impl GovernedAdminAuthorizer {
                 "admin operation binding changed before completion".to_string(),
             ));
         }
-        if load_admin_control_completion(&transaction, &operation.operation_id)?.is_some() {
+        if load_admin_control_completion(
+            &transaction,
+            &operation.operation_id,
+            &self.trusted_mutation_receipt_signer,
+        )?
+        .is_some()
+        {
             return Err(BrokerError::Conflict(
                 "admin operation cannot be both a remote control and mutation".to_string(),
             ));
@@ -875,7 +901,11 @@ impl GovernedAdminAuthorizer {
     ) -> Result<Option<CompletedAdminControl>> {
         validate_digest(operation_id, "admin control operation id")?;
         let connection = self.connection()?;
-        load_admin_control_completion(&connection, operation_id)
+        load_admin_control_completion(
+            &connection,
+            operation_id,
+            &self.trusted_mutation_receipt_signer,
+        )
     }
 
     /// Append a signed terminal receipt and the exact validated response for
@@ -887,7 +917,7 @@ impl GovernedAdminAuthorizer {
         receipt: &SignedAdminControlReceipt,
         response: &[u8],
     ) -> Result<CompletedAdminControl> {
-        verify_admin_control_receipt(receipt)?;
+        verify_admin_control_receipt(receipt, &self.trusted_mutation_receipt_signer)?;
         if response.is_empty() || response.len() > crate::protocol::MAX_WIRE_BYTES {
             return Err(BrokerError::InvalidRequest(
                 "admin control response is empty or oversized".to_string(),
@@ -936,9 +966,11 @@ impl GovernedAdminAuthorizer {
                 "admin operation cannot be both a mutation and remote control".to_string(),
             ));
         }
-        if let Some(existing) =
-            load_admin_control_completion(&transaction, &operation.operation_id)?
-        {
+        if let Some(existing) = load_admin_control_completion(
+            &transaction,
+            &operation.operation_id,
+            &self.trusted_mutation_receipt_signer,
+        )? {
             if existing.receipt.body.operation != receipt.body.operation
                 || existing.receipt.body.tenant_scope != receipt.body.tenant_scope
                 || existing.receipt.body.response_digest != receipt.body.response_digest
@@ -1278,21 +1310,8 @@ fn decode_admin_mutation_receipt(
         )
         .and_then(|text| text.decode_canonical())
         .map_err(BrokerError::UntrustedInput)?;
-    verify_trusted_admin_mutation_receipt(&receipt, trusted_mutation_receipt_signer)?;
+    verify_admin_mutation_receipt(&receipt, trusted_mutation_receipt_signer)?;
     Ok(receipt)
-}
-
-fn verify_trusted_admin_mutation_receipt(
-    receipt: &SignedAdminMutationReceipt,
-    trusted_mutation_receipt_signer: &PublicKey,
-) -> Result<()> {
-    verify_admin_mutation_receipt(receipt)?;
-    if &receipt.signer != trusted_mutation_receipt_signer {
-        return Err(BrokerError::AuthorizationDenied(
-            "admin mutation receipt signer is not trusted".to_string(),
-        ));
-    }
-    Ok(())
 }
 
 fn validate_admin_operation_completion(
@@ -1300,7 +1319,7 @@ fn validate_admin_operation_completion(
     receipt: &SignedAdminMutationReceipt,
     trusted_mutation_receipt_signer: &PublicKey,
 ) -> Result<()> {
-    verify_trusted_admin_mutation_receipt(receipt, trusted_mutation_receipt_signer)?;
+    verify_admin_mutation_receipt(receipt, trusted_mutation_receipt_signer)?;
     if receipt.body.operation_id != operation.operation_id
         || receipt.body.request_id != operation.request_id
         || receipt.body.intent_digest != operation.intent_digest
@@ -1316,6 +1335,7 @@ fn validate_admin_operation_completion(
 fn load_admin_control_completion(
     connection: &Connection,
     operation_id: &str,
+    trusted_signer: &PublicKey,
 ) -> Result<Option<CompletedAdminControl>> {
     let row: Option<(Vec<u8>, Vec<u8>)> = connection
         .query_row(
@@ -1344,7 +1364,7 @@ fn load_admin_control_completion(
         )
         .and_then(|text| text.decode_canonical())
         .map_err(BrokerError::UntrustedInput)?;
-    verify_admin_control_receipt(&receipt)?;
+    verify_admin_control_receipt(&receipt, trusted_signer)?;
     if receipt.body.operation_id != operation_id
         || receipt.body.response_digest != hex::encode(Sha256::digest(&response))
     {
