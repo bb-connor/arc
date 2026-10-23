@@ -966,21 +966,16 @@ impl ChioKernel {
             let validated_session_anchor_id = if let Some(parent_session_anchor) =
                 continuation_token.parent_session_anchor.as_ref()
             {
-                let authoritative_parent_anchor = if let Some(parent_context) = parent_context {
-                    Some(self.with_session(&parent_context.session_id, |session| {
-                        session.validate_context(parent_context)?;
-                        Ok(session.session_anchor().reference())
-                    })?)
-                } else {
-                    local_parent_receipt
-                        .as_ref()
-                        .and_then(LocalReceiptArtifact::session_anchor_reference)
-                };
-                let Some(authoritative_parent_anchor) = authoritative_parent_anchor else {
+                let Some(parent_context) = parent_context else {
                     return Err(KernelError::GovernedTransactionDenied(
                         "governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage".to_string(),
                     ));
                 };
+                let authoritative_parent_anchor =
+                    self.with_session(&parent_context.session_id, |session| {
+                        session.validate_context(parent_context)?;
+                        Ok(session.session_anchor().reference())
+                    })?;
                 if authoritative_parent_anchor != *parent_session_anchor {
                     return Err(KernelError::GovernedTransactionDenied(
                         "governed call_chain continuation token session anchor does not match the authoritative parent lineage".to_string(),

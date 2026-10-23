@@ -562,11 +562,12 @@ impl ChioKernel {
                     .unwrap_or_else(|| "runtime admission denied".to_string());
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
                 let (runtime_metadata, runtime_release_confirmed) = self
-                    .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                    .release_runtime_admission_reservations_for_hook_denial(
                         durable_admission
                             .as_ref()
                             .map(DurableToolAdmission::operation),
                         runtime_metadata,
+                        runtime_admission.hook_release_metadata.as_ref(),
                     );
                 if !runtime_release_confirmed && durable_admission.is_some() {
                     return Err(KernelError::DurableAdmission(

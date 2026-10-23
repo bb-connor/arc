@@ -765,3 +765,25 @@ fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_thro
 
     assert!(governed.economic_authorization.is_none());
 }
+
+/// The later object replaces a top-level non-object value and overrides
+/// nested fields of an object value, so a caller block merged after a
+/// kernel block would win. Refusing reserved caller keys before any merge is
+/// the only barrier.
+#[test]
+fn later_metadata_overrides_earlier_kernel_blocks() {
+    let kernel_blocks = Some(serde_json::json!({
+        "delivery_contract": {"schema": "chio.delivery-contract.v1", "result": "matched"},
+        "stream": 1
+    }));
+    let caller_blocks = Some(serde_json::json!({
+        "delivery_contract": {"result": "mismatched"},
+        "stream": {"forged": true}
+    }));
+    let merged = merge_metadata_objects(kernel_blocks, caller_blocks).expect("merged metadata");
+    assert_eq!(
+        merged["delivery_contract"],
+        serde_json::json!({"schema": "chio.delivery-contract.v1", "result": "mismatched"})
+    );
+    assert_eq!(merged["stream"], serde_json::json!({"forged": true}));
+}

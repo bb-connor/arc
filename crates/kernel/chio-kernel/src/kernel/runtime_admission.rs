@@ -47,6 +47,9 @@ pub struct RuntimeAdmissionDecision {
     pub reason: Option<String>,
     pub metadata: Option<serde_json::Value>,
     pub(crate) verified_treaty_material: Option<VerifiedFederationTreatyMaterial>,
+    /// The hook's own metadata when the kernel refused it and recorded its
+    /// own block instead. Only reservation release reads it; receipts never do.
+    pub(crate) hook_release_metadata: Option<serde_json::Value>,
 }
 
 impl RuntimeAdmissionDecision {
@@ -62,6 +65,7 @@ impl RuntimeAdmissionDecision {
             reason: None,
             metadata,
             verified_treaty_material: None,
+            hook_release_metadata: None,
         }
     }
 
@@ -75,6 +79,7 @@ impl RuntimeAdmissionDecision {
             reason: None,
             metadata,
             verified_treaty_material: Some(verified_treaty_material),
+            hook_release_metadata: None,
         }
     }
 
@@ -85,11 +90,17 @@ impl RuntimeAdmissionDecision {
             reason: Some(reason.into()),
             metadata,
             verified_treaty_material: None,
+            hook_release_metadata: None,
         }
     }
 }
 
 /// Optional pre-dispatch admission hook for product-specific runtime gates.
+///
+/// Decision metadata may name only `chio_runtime` among the kernel-reserved
+/// receipt-metadata keys; any other reserved key turns the decision into a
+/// runtime-admission denial. Output must not echo context metadata, which can
+/// carry kernel-written blocks.
 pub trait RuntimeAdmissionHook: Send + Sync {
     fn name(&self) -> &str;
 

@@ -775,9 +775,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "64a496aa13b2eae99d0835cc300dee4673709887256fbfab5d504960edc4c0c4"
+normalized_sha256 = "1dd5e8c911f7c68f3b3efc59a39d06a45058b540efe90c597bb7599b80bf1062"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "b55fed742f4838f16aaecb8fbea643aa70c3daa7761a381852a6ac010352b755" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "f1d1f3cd63d897d0bbf5ced128fe5f5b2c2fe8976cfdb0d2c5ab96e296ba2253" },
 ]
 
 [[mirror]]
@@ -1115,9 +1115,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "64a496aa13b2eae99d0835cc300dee4673709887256fbfab5d504960edc4c0c4"
+normalized_sha256 = "1dd5e8c911f7c68f3b3efc59a39d06a45058b540efe90c597bb7599b80bf1062"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "b55fed742f4838f16aaecb8fbea643aa70c3daa7761a381852a6ac010352b755" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "f1d1f3cd63d897d0bbf5ced128fe5f5b2c2fe8976cfdb0d2c5ab96e296ba2253" },
 ]
 
 [[mirror]]
@@ -1715,10 +1715,10 @@ rust_symbols = [
   "ChioKernel::configured_runtime_participant_binding",
   "ChioKernel::run_runtime_admission_hook",
 ]
-normalized_sha256 = "1130db3a8caed722b8a550248017a5ef4906a4afc89fa347002af8729522f29a"
+normalized_sha256 = "b29d848d6bae17fca49833640c17948cf5b6c688f2864629d563875dd5dd56b4"
 symbol_sha256 = [
   { symbol = "ChioKernel::configured_runtime_participant_binding", sha256 = "4834308b5071d000ed1194b7d78f5eded2e435b58c59e2b437494249f8c01e9e" },
-  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "e8fa5107418bcf459f40351e946d289c256adc51e0255f71630d5f464b55cded" },
+  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "8daa25fbc5174e6dc7ab183e317d7f23f039a7c360343d5c4334876671effafa" },
 ]
 
 [[mirror]]

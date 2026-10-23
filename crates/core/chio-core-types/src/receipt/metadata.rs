@@ -210,6 +210,48 @@ pub struct GuardEvidence {
 // signature. These consts are the `chio-core-types` reader-side source of
 // truth; the human-readable table lives in `spec/PROTOCOL.md` 6.4.
 
+/// Every top-level receipt-metadata key that only a Chio signer writes: the
+/// kernel, the receipt signing path, or the HTTP receipt projection. The
+/// kernel refuses caller metadata naming any of them before any effect, and a
+/// runtime-admission hook may name only `chio_runtime`.
+pub const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
+    "admission_operation",
+    "attribution",
+    "chio_manifest_security_v1",
+    "protocol_admission",
+    BUDGET_AUTHORITY_METADATA_KEY,
+    "budget_denial_authority",
+    FINANCIAL_METADATA_KEY,
+    GOVERNED_TRANSACTION_METADATA_KEY,
+    "caller_delivery",
+    "protocol_refusal",
+    "chio_runtime",
+    "receipt_context",
+    "governed_transaction_diagnostics",
+    "model_metadata",
+    CHANNEL_METADATA_KEY,
+    DELIVERY_CONTRACT_METADATA_KEY,
+    FINDING_DELIVERY_METADATA_KEY,
+    FINDING_RECOVERY_METADATA_KEY,
+    "finding_purchase_replay_snapshot",
+    "finding_recovery_replay_snapshot",
+    "findingDenial",
+    "stream",
+    "threshold_approval",
+    "memory_provenance",
+    "post_invocation",
+    "execution_nonce",
+    "chio_kernel",
+    "runtime_admission",
+    "active_response_terminal_evidence",
+    "chio_http_receipt_v1",
+    super::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
+    super::signing::CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
+    "finding_pool_mutation",
+    "session_report",
+    "prior_metadata",
+];
+
 /// Financial attribution and settlement metadata block key.
 pub const FINANCIAL_METADATA_KEY: &str = "financial";
 

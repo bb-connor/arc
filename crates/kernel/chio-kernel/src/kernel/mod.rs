@@ -158,23 +158,31 @@ const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
 const FINANCIAL_METADATA_KEY: &str = "financial";
 const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
 const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
-const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
-    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
-    "attribution",
-    MANIFEST_SECURITY_METADATA_KEY,
-    PROTOCOL_ADMISSION_METADATA_KEY,
-    BUDGET_AUTHORITY_METADATA_KEY,
-    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
-    FINANCIAL_METADATA_KEY,
-    GOVERNED_TRANSACTION_METADATA_KEY,
-    CALLER_DELIVERY_METADATA_KEY,
-    PROTOCOL_REFUSAL_METADATA_KEY,
-    RUNTIME_ADMISSION_METADATA_KEY,
-    "receipt_context",
-];
+use chio_core::receipt::metadata::RESERVED_RECEIPT_METADATA_KEYS;
+
+/// Refusal reason for runtime-admission hook metadata that is present but not
+/// a JSON object; such metadata would displace every later kernel block.
+const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
+    "runtime admission hook metadata must be a JSON object";
+
+/// Hook output may name only `chio_runtime` among the reserved keys. The kernel
+/// writes `runtime_admission` itself, only on its own error paths and never
+/// from hook output, so a hook can never supply it.
+fn is_hook_forbidden_metadata_key(key: &str) -> bool {
+    key != RUNTIME_ADMISSION_METADATA_KEY && RESERVED_RECEIPT_METADATA_KEYS.contains(&key)
+}
+
+/// The first reserved key a runtime-admission hook may not write, if its
+/// metadata names one.
+fn reserved_hook_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key) && is_hook_forbidden_metadata_key(key))
+}
 
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
@@ -775,14 +783,6 @@ impl LocalReceiptArtifact {
         })?;
         Ok(sha256_hex(&canonical))
     }
-
-    fn session_anchor_reference(&self) -> Option<chio_core::session::SessionAnchorReference> {
-        let metadata = match self {
-            Self::Tool(receipt) => receipt.metadata.as_ref(),
-            Self::Child(receipt) => receipt.metadata.as_ref(),
-        };
-        extract_session_anchor_reference_from_metadata(metadata)
-    }
 }
 
 /// Bridge a sync caller to the async tool-server dispatch path.
@@ -845,41 +845,6 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
         KernelError::SyncBridgeIncompatibleWithCurrentThreadRuntime
     ) && tokio::runtime::Handle::try_current()
         .is_ok_and(|handle| handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread)
-}
-
-fn extract_session_anchor_reference_from_metadata(
-    metadata: Option<&serde_json::Value>,
-) -> Option<chio_core::session::SessionAnchorReference> {
-    let metadata = metadata?;
-    let candidates = [
-        metadata
-            .get("governed_transaction")
-            .and_then(|value| value.get("call_chain")),
-        metadata.get("lineageReferences"),
-    ];
-
-    for candidate in candidates.into_iter().flatten() {
-        let Some(session_anchor_id) = candidate
-            .get("sessionAnchorId")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        let Some(session_anchor_hash) = candidate
-            .get("sessionAnchorHash")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        return Some(chio_core::session::SessionAnchorReference::new(
-            session_anchor_id,
-            session_anchor_hash,
-        ));
-    }
-
-    None
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
