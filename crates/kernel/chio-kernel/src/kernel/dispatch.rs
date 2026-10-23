@@ -1525,7 +1525,21 @@ impl ChioKernel {
         operation: Option<&crate::admission_operation::AdmissionOperationV1>,
         metadata: Option<serde_json::Value>,
     ) -> (Option<serde_json::Value>, bool) {
-        match self.release_runtime_admission_reservations(operation, metadata.as_ref()) {
+        self.release_runtime_admission_reservations_for_hook_denial(operation, metadata, None)
+    }
+
+    /// Release with the hook's own metadata when the kernel replaced it in
+    /// the denial, so the hook can still identify what it reserved.
+    pub(crate) fn release_runtime_admission_reservations_for_hook_denial(
+        &self,
+        operation: Option<&crate::admission_operation::AdmissionOperationV1>,
+        metadata: Option<serde_json::Value>,
+        hook_release_metadata: Option<&serde_json::Value>,
+    ) -> (Option<serde_json::Value>, bool) {
+        match self.release_runtime_admission_reservations(
+            operation,
+            hook_release_metadata.or(metadata.as_ref()),
+        ) {
             Ok(()) => (metadata, true),
             Err(error) => {
                 warn!(

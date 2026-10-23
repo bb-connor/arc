@@ -200,7 +200,8 @@ fn hook_deny_forging_the_kernel_runtime_admission_record_is_refused() {
 const NON_OBJECT_REFUSAL: &str = "runtime admission hook metadata must be a JSON object";
 
 /// A legacy hook whose `Ok` decision carries metadata that is not a JSON
-/// object.
+/// object. Its release receives that same value, so it can still find what
+/// it reserved.
 struct NonObjectMetadataHook {
     metadata: serde_json::Value,
     allow: bool,
@@ -243,17 +244,30 @@ impl RuntimeAdmissionHook for NonObjectMetadataHook {
     }
 }
 
-fn assert_non_object_hook_metadata_refused(metadata: serde_json::Value, allow: bool) {
-    let (mut kernel, request, _context, invocations) = fixture();
-    let hook = StdArc::new(NonObjectMetadataHook {
+fn non_object_hook(metadata: &serde_json::Value, allow: bool) -> StdArc<NonObjectMetadataHook> {
+    StdArc::new(NonObjectMetadataHook {
         metadata: metadata.clone(),
         allow,
         released: Mutex::new(Vec::new()),
-    });
+    })
+}
+
+fn assert_non_object_hook_metadata_refused(metadata: serde_json::Value, allow: bool) {
+    let (mut kernel, request, _context, invocations) = fixture();
+    let hook = non_object_hook(&metadata, allow);
     kernel.set_runtime_admission_hook(hook.clone());
     let response = kernel
         .evaluate_tool_call_blocking(&request)
         .expect("runtime admission denial");
+    assert_non_object_refusal(response, &hook, &invocations, &metadata);
+}
+
+fn assert_non_object_refusal(
+    response: ToolCallResponse,
+    hook: &NonObjectMetadataHook,
+    invocations: &AtomicU64,
+    metadata: &serde_json::Value,
+) {
     assert_eq!(response.verdict, Verdict::Deny, "{metadata}");
     assert_eq!(
         response.reason.as_deref(),
@@ -277,8 +291,7 @@ fn assert_non_object_hook_metadata_refused(metadata: serde_json::Value, allow: b
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clone();
-    assert_eq!(released.len(), 1, "{metadata}");
-    assert!(released[0].is_object(), "{metadata}");
+    assert_eq!(released, vec![metadata.clone()], "{metadata}");
 }
 
 #[test]
@@ -309,4 +322,20 @@ fn legacy_hook_deny_with_array_metadata_is_refused() {
 #[test]
 fn legacy_hook_deny_with_scalar_metadata_is_refused() {
     assert_non_object_hook_metadata_refused(serde_json::json!(7), false);
+}
+
+#[test]
+fn legacy_hook_scalar_metadata_is_released_as_returned_on_the_nested_path() {
+    let (mut kernel, request, context, invocations) = fixture();
+    let metadata = serde_json::json!("lease-7");
+    let hook = non_object_hook(&metadata, true);
+    kernel.set_runtime_admission_hook(hook.clone());
+    let response = kernel
+        .evaluate_tool_call_operation_with_nested_flow_client(
+            &context,
+            &operation_without_metadata(&request),
+            &mut NoopNestedFlowClient,
+        )
+        .expect("runtime admission denial");
+    assert_non_object_refusal(response, &hook, &invocations, &metadata);
 }
