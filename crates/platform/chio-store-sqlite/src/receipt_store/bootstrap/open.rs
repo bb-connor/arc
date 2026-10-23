@@ -564,8 +564,8 @@ impl SqliteReceiptStore {
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)?;
             let (namespaces, state) = receipt_namespaces(&snapshot)?;
             if state != crate::SchemaState::Current {
-                return Err(ReceiptStoreError::Conflict(
-                    "receipt database is not initialized".into(),
+                return Err(ReceiptStoreError::Schema(
+                    chio_security_types::schema::SchemaRefusal::CreationNotAllowed,
                 ));
             }
             validate_receipt_catalog(&snapshot, namespaces.len() == 2)?;
@@ -625,7 +625,7 @@ impl SqliteReceiptStore {
             create_receipt_schema(schema.connection())?;
             schema
                 .stamp(RECEIPT_STORE_SCHEMA_KEY)
-                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+                .map_err(ReceiptStoreError::from)?;
         }
         validate_receipt_catalog(schema.connection(), namespaces.len() == 2)?;
         super::support::validate_claim_receipt_log_entries_in_transaction(schema.connection())?;
@@ -634,9 +634,7 @@ impl SqliteReceiptStore {
         verify_receipt_cost_projection(schema.connection())?;
         let internal_sink_id = load_receipt_sink_identity(schema.connection())?;
         load_receipt_rollback_generation(schema.connection())?;
-        schema
-            .commit()
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        schema.commit().map_err(ReceiptStoreError::from)?;
         configure_sqlite_connection(&mut connection, options.pool.max_page_count)?;
 
         let QualifiedReceiptSink {
@@ -780,10 +778,10 @@ fn receipt_namespaces(
         Err(crate::SchemaVersionError::UnexpectedNamespaces) => {
             let state =
                 crate::schema_version::inspect_schema(connection, RECEIPT_APPROVAL_NAMESPACES)
-                    .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+                    .map_err(ReceiptStoreError::from)?;
             Ok((RECEIPT_APPROVAL_NAMESPACES, state))
         }
-        Err(error) => Err(ReceiptStoreError::Conflict(error.to_string())),
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -793,14 +791,14 @@ fn begin_receipt_creation<'a>(
     max_page_count: Option<u32>,
 ) -> Result<crate::schema_version::SchemaTransaction<'a>, ReceiptStoreError> {
     if crate::schema_version::inspect_schema(connection, namespaces)
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+        .map_err(ReceiptStoreError::from)?
         == crate::SchemaState::Empty
     {
         connection.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
         let lock =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)?;
         let fresh = crate::schema_version::inspect_schema(&lock, namespaces)
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+            .map_err(ReceiptStoreError::from)?
             == crate::SchemaState::Empty;
         lock.commit()?;
         if fresh {
@@ -816,7 +814,7 @@ fn begin_receipt_creation<'a>(
     let transaction =
         connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     if crate::schema_version::inspect_schema(&transaction, namespaces)
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
+        .map_err(ReceiptStoreError::from)?
         == crate::SchemaState::Empty
     {
         if let Some(limit) = max_page_count {
@@ -831,7 +829,7 @@ fn begin_receipt_creation<'a>(
         }
     }
     crate::schema_version::SchemaTransaction::from_transaction(transaction, namespaces)
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn validate_receipt_database(
@@ -840,9 +838,7 @@ pub(crate) fn validate_receipt_database(
     let transaction = connection.transaction()?;
     let (namespaces, state) = receipt_namespaces(&transaction)?;
     if state == crate::SchemaState::Empty {
-        return Err(ReceiptStoreError::Conflict(
-            crate::SchemaVersionError::CreationNotAllowed.to_string(),
-        ));
+        return Err(crate::SchemaVersionError::CreationNotAllowed.into());
     }
     validate_receipt_catalog(&transaction, namespaces == RECEIPT_APPROVAL_NAMESPACES)?;
     transaction.commit()?;
@@ -854,17 +850,13 @@ pub(crate) fn initialize_test_receipt_database(
     connection: &mut Connection,
 ) -> Result<(), ReceiptStoreError> {
     let schema = crate::schema_version::SchemaTransaction::begin(connection, RECEIPT_NAMESPACES)
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        .map_err(ReceiptStoreError::from)?;
     if schema.is_fresh() {
         create_receipt_schema(schema.connection())?;
-        schema
-            .stamp("receipt")
-            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        schema.stamp("receipt").map_err(ReceiptStoreError::from)?;
     }
     validate_receipt_catalog(schema.connection(), false)?;
-    schema
-        .commit()
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+    schema.commit().map_err(ReceiptStoreError::from)
 }
 
 pub(crate) fn validate_receipt_catalog(
@@ -878,7 +870,7 @@ pub(crate) fn validate_receipt_catalog(
         RECEIPT_NAMESPACES
     };
     let schema = crate::schema_version::SchemaTransaction::begin(&mut reference, namespaces)
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        .map_err(ReceiptStoreError::from)?;
     create_receipt_schema(schema.connection())?;
     if colocated {
         schema
@@ -886,7 +878,7 @@ pub(crate) fn validate_receipt_catalog(
             .execute_batch(crate::approval_store::APPROVAL_SCHEMA)?;
     }
     crate::schema_catalog::validate_against(connection, schema.connection())
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))
+        .map_err(ReceiptStoreError::from)
 }
 
 pub fn initialize_receipt_approval_database(
@@ -904,17 +896,13 @@ pub fn initialize_receipt_approval_database(
             .connection()
             .execute_batch(crate::approval_store::APPROVAL_SCHEMA)?;
         for namespace in RECEIPT_APPROVAL_NAMESPACES {
-            schema
-                .stamp(namespace)
-                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            schema.stamp(namespace).map_err(ReceiptStoreError::from)?;
         }
     }
     validate_receipt_catalog(schema.connection(), true)?;
     load_receipt_sink_identity(schema.connection())?;
     load_receipt_rollback_generation(schema.connection())?;
-    schema
-        .commit()
-        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+    schema.commit().map_err(ReceiptStoreError::from)?;
     configure_sqlite_connection(&mut connection, None)
 }
 

@@ -1,5 +1,6 @@
 use super::*;
 use crate::receipt_store::support;
+use chio_security_types::schema::SchemaRefusal;
 
 const ARCHIVE_SCHEMA: &str = r#"
         CREATE TABLE IF NOT EXISTS archive.chio_tool_receipts (
@@ -133,15 +134,11 @@ pub(in crate::receipt_store) fn create_archive_schema(
     if application_id == 0 && empty {
         create_fresh_archive(&transaction)?;
     } else {
-        if application_id == 0 {
-            return Err(ReceiptStoreError::Conflict(
-                "retention archive is not an empty new database".into(),
-            ));
-        }
         if application_id != crate::CHIO_SQLITE_APPLICATION_ID {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "retention archive application_id {application_id:#x} is not a Chio store"
-            )));
+            return Err(ReceiptStoreError::Schema(SchemaRefusal::ForeignDatabase {
+                found: application_id,
+                expected: crate::CHIO_SQLITE_APPLICATION_ID,
+            }));
         }
         validate_metadata(&transaction)?;
     }
@@ -183,14 +180,12 @@ fn validate_metadata(connection: &rusqlite::Connection) -> Result<(), ReceiptSto
         [], |row| row.get(0),
     ).optional()?;
     if sql.is_none() {
-        return Err(ReceiptStoreError::Conflict(
-            "retention archive carries tables but no receipt schema version".into(),
-        ));
+        return Err(ReceiptStoreError::Schema(SchemaRefusal::MissingSchema {
+            store_key: RECEIPT_STORE_SCHEMA_KEY.to_owned(),
+        }));
     }
     if sql.as_deref() != Some(crate::schema_version::METADATA_SCHEMA) {
-        return Err(ReceiptStoreError::Conflict(
-            "retention archive schema is not canonical".into(),
-        ));
+        return Err(ReceiptStoreError::Schema(SchemaRefusal::MalformedMetadata));
     }
     let version: Option<i32> = connection
         .query_row(
@@ -200,12 +195,15 @@ fn validate_metadata(connection: &rusqlite::Connection) -> Result<(), ReceiptSto
         )
         .optional()?;
     let version = version.ok_or_else(|| {
-        ReceiptStoreError::Conflict("retention archive carries no receipt schema version".into())
+        ReceiptStoreError::Schema(SchemaRefusal::MissingSchema {
+            store_key: RECEIPT_STORE_SCHEMA_KEY.to_owned(),
+        })
     })?;
     if version != RECEIPT_STORE_SCHEMA_VERSION {
-        return Err(ReceiptStoreError::Conflict(format!(
-            "retention archive schema version {version} is not the current receipt schema version {RECEIPT_STORE_SCHEMA_VERSION}"
-        )));
+        return Err(ReceiptStoreError::Schema(SchemaRefusal::StaleSchema {
+            found: version,
+            current: RECEIPT_STORE_SCHEMA_VERSION,
+        }));
     }
     let count: i64 = connection.query_row(
         "SELECT COUNT(*) FROM archive.chio_store_schema_versions",
@@ -213,8 +211,8 @@ fn validate_metadata(connection: &rusqlite::Connection) -> Result<(), ReceiptSto
         |row| row.get(0),
     )?;
     if count != 1 {
-        return Err(ReceiptStoreError::Conflict(
-            "retention archive schema namespaces are not canonical".into(),
+        return Err(ReceiptStoreError::Schema(
+            SchemaRefusal::UnexpectedNamespaces,
         ));
     }
     Ok(())
@@ -226,9 +224,8 @@ fn validate_catalog(connection: &rusqlite::Connection) -> Result<(), ReceiptStor
     let transaction =
         rusqlite::Transaction::new_unchecked(&canonical, rusqlite::TransactionBehavior::Immediate)?;
     create_fresh_archive(&transaction)?;
-    crate::schema_catalog::validate_archive_against(connection, &transaction).map_err(|_| {
-        ReceiptStoreError::Conflict("retention archive schema is not canonical".into())
-    })
+    crate::schema_catalog::validate_archive_against(connection, &transaction)
+        .map_err(ReceiptStoreError::from)
 }
 
 fn validate_sink_identity(connection: &rusqlite::Connection) -> Result<(), ReceiptStoreError> {

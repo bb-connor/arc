@@ -59,3 +59,45 @@ pub(crate) fn read_store_schema_version(
         )
         .optional()?)
 }
+
+impl From<SchemaVersionError> for chio_kernel::ReceiptStoreError {
+    fn from(error: SchemaVersionError) -> Self {
+        use chio_security_types::schema::SchemaRefusal;
+        let refusal = match error {
+            SchemaVersionError::Io(error) => return Self::Io(error),
+            SchemaVersionError::Sqlite(error) => return Self::Sqlite(error),
+            SchemaVersionError::InvalidCreationPlan => SchemaRefusal::InvalidCreationPlan,
+            SchemaVersionError::MissingSchema { store_key } => {
+                SchemaRefusal::MissingSchema { store_key }
+            }
+            SchemaVersionError::CreationNotAllowed => SchemaRefusal::CreationNotAllowed,
+            SchemaVersionError::MalformedMetadata => SchemaRefusal::MalformedMetadata,
+            SchemaVersionError::UnexpectedNamespaces => SchemaRefusal::UnexpectedNamespaces,
+            SchemaVersionError::CatalogMismatch => SchemaRefusal::CatalogMismatch,
+            SchemaVersionError::ForeignDatabase { found, expected } => {
+                SchemaRefusal::ForeignDatabase { found, expected }
+            }
+            SchemaVersionError::StaleSchema { found, current } => {
+                SchemaRefusal::StaleSchema { found, current }
+            }
+        };
+        Self::Schema(refusal)
+    }
+}
+
+impl From<SchemaVersionError> for chio_kernel::ApprovalStoreError {
+    fn from(error: SchemaVersionError) -> Self {
+        receipt_schema_error_to_approval(error.into())
+    }
+}
+
+pub(crate) fn receipt_schema_error_to_approval(
+    error: chio_kernel::ReceiptStoreError,
+) -> chio_kernel::ApprovalStoreError {
+    match error {
+        chio_kernel::ReceiptStoreError::Schema(error) => {
+            chio_kernel::ApprovalStoreError::Schema(error)
+        }
+        other => chio_kernel::ApprovalStoreError::Backend(other.to_string()),
+    }
+}

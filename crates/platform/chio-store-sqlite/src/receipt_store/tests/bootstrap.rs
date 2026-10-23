@@ -237,16 +237,7 @@ fn sqlite_receipt_store_stamps_application_id_and_current_schema_version() {
 
 #[test]
 fn receipt_store_refuses_a_schema_version_other_than_current() {
-    for (version, expected) in [
-        (
-            0,
-            "database schema version 0 is not the current schema version 1; refusing to open",
-        ),
-        (
-            7,
-            "database schema version 7 is not the current schema version 1; refusing to open",
-        ),
-    ] {
+    for version in [0, 7] {
         let path = unique_db_path("chio-receipts-schema-refused");
         drop(SqliteReceiptStore::open(&path).test_unwrap());
         {
@@ -264,7 +255,7 @@ fn receipt_store_refuses_a_schema_version_other_than_current() {
             SqliteReceiptStore::open_existing(&path),
         ] {
             assert!(
-                matches!(&opened, Err(ReceiptStoreError::Conflict(message)) if message == expected),
+                matches!(&opened, Err(ReceiptStoreError::Schema(chio_security_types::schema::SchemaRefusal::StaleSchema { found, current: 1 })) if *found == version),
                 "version {version} must be refused, got {:?}",
                 opened.err()
             );
@@ -309,10 +300,10 @@ fn receipt_store_refuses_a_current_stamp_over_a_retired_table_shape(
         let error = opened
             .err()
             .ok_or("a retired receipt table shape must be refused")?;
-        assert_eq!(
-            error.to_string(),
-            "conflict: schema catalog differs from its canonical definition"
-        );
+        assert!(matches!(
+            error,
+            ReceiptStoreError::Schema(chio_security_types::schema::SchemaRefusal::CatalogMismatch)
+        ));
     }
     let connection = rusqlite::Connection::open(&path)?;
     let attempted_cost_columns: i64 = connection.query_row(
@@ -500,9 +491,10 @@ fn current_receipt_schema_rejects_substituted_cost_indexes(
             }
             Err(error) => error,
         };
-        assert!(
-            matches!(error, ReceiptStoreError::Conflict(message) if message == "schema catalog differs from its canonical definition")
-        );
+        assert!(matches!(
+            error,
+            ReceiptStoreError::Schema(chio_security_types::schema::SchemaRefusal::CatalogMismatch)
+        ));
 
         let _ = fs::remove_file(path);
     }
@@ -532,9 +524,10 @@ fn current_receipt_schema_rejects_substituted_immutability_guard(
         }
         Err(error) => error,
     };
-    assert!(
-        matches!(error, ReceiptStoreError::Conflict(message) if message == "schema catalog differs from its canonical definition")
-    );
+    assert!(matches!(
+        error,
+        ReceiptStoreError::Schema(chio_security_types::schema::SchemaRefusal::CatalogMismatch)
+    ));
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -563,7 +556,9 @@ fn open_refuses_foreign_database_without_switching_it_to_wal() {
     // Opening it as a receipt store must fail closed as foreign.
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
 
@@ -596,7 +591,9 @@ fn open_refuses_an_unstamped_db_with_a_lookalike_receipt_table() {
 
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
 
@@ -624,7 +621,9 @@ fn open_refuses_an_unstamped_db_carrying_a_receipt_payload_column() {
 
     let error = SqliteReceiptStore::open(&path).test_unwrap_err();
     assert!(
-        error.to_string().contains("not a Chio store"),
+        matches!(&error, ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase { found: 0, expected }
+        ) if *expected == crate::CHIO_SQLITE_APPLICATION_ID),
         "unexpected error: {error}"
     );
     let reopened = rusqlite::Connection::open(&path).test_unwrap();
@@ -951,10 +950,12 @@ fn open_existing_refuses_missing_projection_guards_without_repair() {
     }
     drop(store);
 
-    assert!(
-        matches!(SqliteReceiptStore::open_existing(&path), Err(ReceiptStoreError::Conflict(message))
-        if message == "schema catalog differs from its canonical definition")
-    );
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let connection = rusqlite::Connection::open(&path).test_unwrap();
     for trigger in dropped_triggers {
         let present: bool = connection

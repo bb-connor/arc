@@ -663,8 +663,9 @@ fn store_admitting_unsigned_projection_lineage_is_refused_at_open(
         assert!(
             matches!(
                 &opened,
-                Err(ReceiptStoreError::Conflict(message))
-                    if message == "schema catalog differs from its canonical definition"
+                Err(ReceiptStoreError::Schema(
+                    chio_security_types::schema::SchemaRefusal::CatalogMismatch
+                ))
             ),
             "{opened:?}"
         );

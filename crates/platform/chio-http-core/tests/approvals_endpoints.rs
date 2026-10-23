@@ -510,3 +510,23 @@ fn threshold_handlers_are_unavailable_without_a_trusted_collector() {
         Err(ApprovalHandlerError::Internal(_))
     ));
 }
+
+#[test]
+fn approval_schema_refusal_has_a_fixed_internal_error_body() {
+    let error = ApprovalHandlerError::from(chio_kernel::ApprovalStoreError::Schema(
+        chio_security_types::schema::SchemaRefusal::MissingSchema {
+            store_key: "private-store-namespace".to_owned(),
+        },
+    ));
+    assert_eq!(error.status(), 500);
+    assert_eq!(
+        error.body(),
+        serde_json::json!({
+            "error": "internal_error",
+            "message": "urn:chio:error:kernel:internal-error"
+        })
+    );
+}
+
+#[path = "approvals_endpoints/schema_refusal.rs"]
+mod schema_refusal;

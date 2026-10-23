@@ -71,9 +71,12 @@ fn open_existing_does_not_install_missing_settlement_schema(
     })?;
     drop(store);
 
-    assert!(matches!(SqliteReceiptStore::open_existing(&path),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let connection =
         Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let attempts_table: Option<String> = connection
@@ -101,9 +104,12 @@ fn open_existing_does_not_reinstall_missing_settlement_guard(
     })?;
     drop(store);
 
-    assert!(matches!(SqliteReceiptStore::open_existing(&path),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let connection =
         Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let guard: Option<String> = connection
@@ -135,9 +141,12 @@ fn open_existing_rejects_same_named_noop_settlement_guard() -> Result<(), Box<dy
     })?;
     drop(store);
 
-    assert!(matches!(SqliteReceiptStore::open_existing(&path),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -162,9 +171,12 @@ fn open_existing_rejects_unconstrained_settlement_table() -> Result<(), Box<dyn 
     })?;
     drop(store);
 
-    assert!(matches!(SqliteReceiptStore::open_existing(&path),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -184,9 +196,12 @@ fn open_existing_rejects_extra_settlement_trigger() -> Result<(), Box<dyn std::e
     })?;
     drop(store);
 
-    assert!(matches!(SqliteReceiptStore::open_existing(&path),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     let _ = fs::remove_file(path);
     Ok(())
 }

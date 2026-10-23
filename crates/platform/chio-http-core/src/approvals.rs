@@ -111,6 +111,11 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
+            ApprovalStoreError::Schema(_) => Self::Internal(
+                chio_errors::_generated::error_codes::KERNEL_INTERNAL_ERROR
+                    .urn
+                    .into(),
+            ),
             ApprovalStoreError::Clock(error) => Self::Internal(error.code().into()),
             ApprovalStoreError::UntrustedInput(error) => Self::Internal(error.code().into()),
         }
@@ -120,6 +125,11 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
 impl From<KernelError> for ApprovalHandlerError {
     fn from(e: KernelError) -> Self {
         match e {
+            KernelError::Internal(_) => Self::Internal(
+                chio_errors::_generated::error_codes::KERNEL_INTERNAL_ERROR
+                    .urn
+                    .into(),
+            ),
             KernelError::ApprovalRejected(m) => {
                 if m.contains("replay") {
                     Self::ReplayDetected(m)

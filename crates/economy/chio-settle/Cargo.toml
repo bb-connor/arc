@@ -36,6 +36,7 @@ web3 = [
     "dep:zeroize",
 ]
 [dependencies]
+chio-security-types = { workspace = true }
 secrecy = { workspace = true }
 chio-core = { workspace = true, optional = true }
 chio-finding = { workspace = true, optional = true }

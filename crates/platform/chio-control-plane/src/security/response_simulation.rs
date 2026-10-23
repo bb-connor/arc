@@ -67,6 +67,7 @@ fn receipt_store_error(error: chio_kernel::ReceiptStoreError) -> PortError {
         ReceiptStoreError::Clock(error) => (PortErrorKind::Unavailable, error.code()),
         ReceiptStoreError::UntrustedInput(error) => (PortErrorKind::IntegrityFailure, error.code()),
         ReceiptStoreError::Conflict(_)
+        | ReceiptStoreError::Schema(_)
         | ReceiptStoreError::Canonical(_)
         | ReceiptStoreError::CryptoDecode(_)
         | ReceiptStoreError::Json(_)
@@ -115,7 +116,7 @@ fn record_simulation_failure(operation: &'static str, error: &PortError) {
                 ReceiptStoreError::Clock(_) => "authority_clock",
                 ReceiptStoreError::Sqlite(_) => "sqlite",
                 ReceiptStoreError::Io(_) => "io",
-                ReceiptStoreError::Conflict(_) => "conflict",
+                ReceiptStoreError::Conflict(_) | ReceiptStoreError::Schema(_) => "conflict",
                 ReceiptStoreError::Fenced => "fenced",
                 ReceiptStoreError::OutcomeUnknown(_) => "outcome_unknown",
                 ReceiptStoreError::Unsupported(_) => "unsupported",
@@ -424,6 +425,22 @@ pub(super) fn production_response_effects(
 #[cfg(test)]
 mod diagnostic_classification_tests {
     use super::*;
+
+    #[test]
+    fn schema_refusal_retains_integrity_class_and_source() {
+        let error = receipt_store_error(chio_kernel::ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch,
+        ));
+        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+        assert_eq!(error.code().as_str(), RECEIPT_VERIFICATION_FAILED);
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>()),
+            Some(chio_kernel::ReceiptStoreError::Schema(
+                chio_security_types::schema::SchemaRefusal::CatalogMismatch
+            ))
+        ));
+    }
 
     #[test]
     fn simulation_diagnostic_fenced_store_retains_refusal_without_claiming_corruption() {

@@ -33,6 +33,7 @@ mod response_domains;
 pub mod response_execution;
 pub mod response_simulation;
 pub mod response_state;
+pub mod schema;
 pub mod semantic;
 pub mod strict_serde;
 

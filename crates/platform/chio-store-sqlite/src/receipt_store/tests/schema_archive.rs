@@ -1,5 +1,6 @@
 use crate::receipt_store::evidence_retention;
 use chio_kernel::ReceiptStoreError;
+use chio_security_types::schema::SchemaRefusal;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -15,9 +16,10 @@ fn archive_schema_rejects_substituted_security_identity_guards(
          CREATE TRIGGER archive.chio_security_evidence_index_reject_update
          BEFORE UPDATE ON chio_security_evidence_index BEGIN SELECT 1; END;",
     )?;
-    assert!(matches!(create_archive_schema(&mut connection),
-        Err(chio_kernel::ReceiptStoreError::Conflict(message))
-            if message == "retention archive schema is not canonical"));
+    assert!(matches!(
+        create_archive_schema(&mut connection),
+        Err(ReceiptStoreError::Schema(SchemaRefusal::CatalogMismatch))
+    ));
     Ok(())
 }
 
@@ -62,9 +64,12 @@ fn archive_schema_is_stamped_with_the_current_version() -> Result<(), Box<dyn st
     assert_eq!(replayed_sink_id, first_sink_id);
     connection.execute_batch("DETACH DATABASE archive")?;
 
-    assert!(matches!(crate::SqliteReceiptStore::open_existing(&archive),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        crate::SqliteReceiptStore::open_existing(&archive),
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
 
     let archived = rusqlite::Connection::open(&archive)?;
     let application_id: i32 = archived.query_row("PRAGMA application_id", [], |row| row.get(0))?;
@@ -89,17 +94,13 @@ fn archive_schema_refuses_an_archive_without_the_current_version(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::evidence_retention::create_archive_schema;
 
-    for (version, expected) in [
-        (
-            Some(0),
-            "retention archive schema version 0 is not the current receipt schema version 1",
-        ),
-        (
-            Some(7),
-            "retention archive schema version 7 is not the current receipt schema version 1",
-        ),
-        (None, "retention archive carries no receipt schema version"),
-    ] {
+    for version in [Some(0), Some(7), None] {
+        let expected = match version {
+            Some(found) => SchemaRefusal::StaleSchema { found, current: 1 },
+            None => SchemaRefusal::MissingSchema {
+                store_key: "receipt".to_owned(),
+            },
+        };
         let archive = unique_archive_path();
         let mut creator = rusqlite::Connection::open_in_memory()?;
         creator.execute(
@@ -127,7 +128,7 @@ fn archive_schema_refuses_an_archive_without_the_current_version(
             .err()
             .ok_or("a non-current archive must be refused")?;
         assert!(
-            matches!(&error, chio_kernel::ReceiptStoreError::Conflict(message) if message == expected),
+            matches!(&error, ReceiptStoreError::Schema(refusal) if refusal == &expected),
             "unexpected error: {error}"
         );
         connection.execute_batch("DETACH DATABASE archive")?;
@@ -154,8 +155,8 @@ fn archive_schema_refuses_an_archive_without_the_current_version(
     assert!(
         matches!(
             &error,
-            chio_kernel::ReceiptStoreError::Conflict(message)
-                if message == "retention archive carries tables but no receipt schema version"
+            ReceiptStoreError::Schema(SchemaRefusal::MissingSchema { store_key })
+                if store_key == "receipt"
         ),
         "unexpected error: {error}"
     );
@@ -203,8 +204,10 @@ fn current_archive_schema_rejects_substituted_cost_indexes(
         let Err(error) = create_archive_schema(&mut connection) else {
             return Err("archive cost projection schema unexpectedly passed".into());
         };
-        assert!(matches!(error, ReceiptStoreError::Conflict(message)
-            if message == "retention archive schema is not canonical"));
+        assert!(matches!(
+            error,
+            ReceiptStoreError::Schema(SchemaRefusal::CatalogMismatch)
+        ));
 
         drop(connection);
         let _ = std::fs::remove_file(archive);
@@ -227,8 +230,7 @@ fn archive_admitting_unsigned_projection_lineage_is_refused(
          );",
     )?;
     assert!(matches!(create_archive_schema(&mut connection),
-        Err(chio_kernel::ReceiptStoreError::Conflict(message))
-            if message == "retention archive is not an empty new database"));
+        Err(ReceiptStoreError::Schema(SchemaRefusal::ForeignDatabase { found: 0, expected })) if expected == crate::CHIO_SQLITE_APPLICATION_ID));
     Ok(())
 }
 
@@ -246,8 +248,7 @@ fn archive_empty_creation_refuses_a_view_only_catalog() -> Result<(), Box<dyn st
         connection.query_row("PRAGMA archive.schema_version", [], |row| row.get(0))?;
     assert!(
         matches!(evidence_retention::create_archive_schema(&mut connection),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "retention archive is not an empty new database")
+        Err(ReceiptStoreError::Schema(SchemaRefusal::ForeignDatabase { found: 0, expected })) if expected == crate::CHIO_SQLITE_APPLICATION_ID)
     );
     assert_eq!(
         connection.query_row("PRAGMA archive.schema_version", [], |row| row
@@ -277,11 +278,10 @@ fn archive_missing_table_is_not_recreated() -> Result<(), Box<dyn std::error::Er
     let mut connection = memory_archive()?;
     evidence_retention::create_archive_schema(&mut connection)?;
     connection.execute_batch("DROP TABLE archive.chio_child_receipts")?;
-    assert!(
-        matches!(evidence_retention::create_archive_schema(&mut connection),
-        Err(ReceiptStoreError::Conflict(message))
-            if message == "retention archive schema is not canonical")
-    );
+    assert!(matches!(
+        evidence_retention::create_archive_schema(&mut connection),
+        Err(ReceiptStoreError::Schema(SchemaRefusal::CatalogMismatch))
+    ));
     assert_eq!(
         connection.query_row(
             "SELECT COUNT(*) FROM archive.sqlite_schema WHERE name = 'chio_child_receipts'",
@@ -311,5 +311,45 @@ fn archive_missing_sink_identity_is_not_reseeded() -> Result<(), Box<dyn std::er
         )?,
         0
     );
+    Ok(())
+}
+
+#[test]
+fn archive_schema_refusals_preserve_the_damaged_catalog() -> Result<(), Box<dyn std::error::Error>>
+{
+    for (damage, expected) in [
+        (
+            "PRAGMA archive.application_id = 7",
+            SchemaRefusal::ForeignDatabase {
+                found: 7,
+                expected: crate::CHIO_SQLITE_APPLICATION_ID,
+            },
+        ),
+        (
+            "ALTER TABLE archive.chio_store_schema_versions ADD COLUMN extra TEXT",
+            SchemaRefusal::MalformedMetadata,
+        ),
+        (
+            "INSERT INTO archive.chio_store_schema_versions(store_key, version) VALUES('extra', 1)",
+            SchemaRefusal::UnexpectedNamespaces,
+        ),
+    ] {
+        let mut connection = memory_archive()?;
+        evidence_retention::create_archive_schema(&mut connection)?;
+        connection.execute_batch(damage)?;
+        let changes = connection.total_changes();
+        let schema_version: i64 =
+            connection.query_row("PRAGMA archive.schema_version", [], |row| row.get(0))?;
+        let error = evidence_retention::create_archive_schema(&mut connection)
+            .err()
+            .ok_or("damaged archive accepted")?;
+        assert!(matches!(error, ReceiptStoreError::Schema(refusal) if refusal == expected));
+        assert_eq!(connection.total_changes(), changes);
+        assert_eq!(
+            connection.query_row("PRAGMA archive.schema_version", [], |row| row
+                .get::<_, i64>(0))?,
+            schema_version
+        );
+    }
     Ok(())
 }

@@ -334,6 +334,8 @@ pub struct AuthorizationReceiptConsumption {
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
     #[error(transparent)]
+    Schema(#[from] chio_security_types::schema::SchemaRefusal),
+    #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error(transparent)]
     UntrustedInput(std::sync::Arc<chio_core::canonical::UntrustedJsonError>),

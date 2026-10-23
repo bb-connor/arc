@@ -252,14 +252,12 @@ impl SqliteApprovalStore {
                 .transaction_with_behavior(TransactionBehavior::Deferred)
                 .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
             let state = crate::schema_version::inspect_schema(&snapshot, &["receipt", "approval"])
-                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+                .map_err(ApprovalStoreError::from)?;
             if state != crate::SchemaState::Current {
-                return Err(ApprovalStoreError::Backend(
-                    "receipt/approval database is not initialized".into(),
-                ));
+                return Err(crate::SchemaVersionError::CreationNotAllowed.into());
             }
             crate::receipt_store::validate_receipt_catalog(&snapshot, true)
-                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+                .map_err(crate::schema_version::receipt_schema_error_to_approval)?;
             snapshot
                 .commit()
                 .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
@@ -268,7 +266,7 @@ impl SqliteApprovalStore {
                 &mut connection,
                 &[APPROVAL_STORE_SCHEMA_KEY],
             )
-            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+            .map_err(ApprovalStoreError::from)?;
             if schema.is_fresh() {
                 schema
                     .connection()
@@ -276,14 +274,12 @@ impl SqliteApprovalStore {
                     .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
                 schema
                     .stamp(APPROVAL_STORE_SCHEMA_KEY)
-                    .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+                    .map_err(ApprovalStoreError::from)?;
             }
             schema
                 .validate_catalog(APPROVAL_SCHEMA)
-                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
-            schema
-                .commit()
-                .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
+                .map_err(ApprovalStoreError::from)?;
+            schema.commit().map_err(ApprovalStoreError::from)?;
         }
         connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;")
             .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
@@ -1176,10 +1172,13 @@ mod tests {
         drop(connection);
 
         let error = SqliteApprovalStore::open(&path).err().unwrap();
-        assert_eq!(
-            error.to_string(),
-            "storage backend error: database schema version 4 is not the current schema version 1; refusing to open"
-        );
+        assert!(matches!(
+            error,
+            ApprovalStoreError::Schema(chio_security_types::schema::SchemaRefusal::StaleSchema {
+                found: 4,
+                current: 1
+            })
+        ));
     }
 
     #[test]
@@ -1197,9 +1196,8 @@ mod tests {
         drop(connection);
 
         let error = SqliteApprovalStore::open(&path).err().unwrap();
-        assert_eq!(
-            error.to_string(),
-            "storage backend error: schema namespace approval is missing"
+        assert!(
+            matches!(error, ApprovalStoreError::Schema(chio_security_types::schema::SchemaRefusal::MissingSchema { store_key }) if store_key == "approval")
         );
     }
 

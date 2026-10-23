@@ -483,6 +483,7 @@ impl ActiveResponseFindingAuthority for NativeActiveResponseFindingAuthority {
 fn map_append_error(error: ReceiptStoreError) -> PortError {
     match error {
         ReceiptStoreError::Conflict(_)
+        | ReceiptStoreError::Schema(_)
         | ReceiptStoreError::Canonical(_)
         | ReceiptStoreError::CryptoDecode(_)
         | ReceiptStoreError::Json(_) => PortError::integrity_failure(),
@@ -493,6 +494,7 @@ fn map_append_error(error: ReceiptStoreError) -> PortError {
 fn map_finding_store_error(error: ReceiptStoreError) -> ActiveResponseFindingAuthorityError {
     match error {
         ReceiptStoreError::Conflict(_)
+        | ReceiptStoreError::Schema(_)
         | ReceiptStoreError::Canonical(_)
         | ReceiptStoreError::CryptoDecode(_)
         | ReceiptStoreError::Json(_) => {
@@ -1292,6 +1294,21 @@ fn backend_alert(alert: &SecurityAlert) -> PortResult<Alert> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn schema_refusal_retains_native_evidence_integrity_class() {
+        let schema_error = || {
+            ReceiptStoreError::Schema(chio_security_types::schema::SchemaRefusal::CatalogMismatch)
+        };
+        assert_eq!(
+            map_append_error(schema_error()).kind(),
+            chio_security_types::ports::PortErrorKind::IntegrityFailure,
+        );
+        assert!(matches!(
+            map_finding_store_error(schema_error()),
+            ActiveResponseFindingAuthorityError::Integrity(_),
+        ));
+    }
+
     use super::scheduler_health_body;
     use super::*;
     use chio_quarantine::build_response_plan;

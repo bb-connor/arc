@@ -1,4 +1,5 @@
 use chio_kernel::{ApprovalStoreError, ReceiptStoreError};
+use chio_security_types::schema::SchemaRefusal;
 use chio_store_sqlite::{SqliteApprovalStore, SqliteReceiptStore};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -17,8 +18,9 @@ fn receipt_reopen_refuses_missing_stamp_without_repair() -> TestResult {
         |row| row.get(0),
     )?;
     assert_eq!(count, 0);
-    assert!(matches!(result, Err(ReceiptStoreError::Conflict(message))
-        if message == "schema namespace receipt is missing"));
+    assert!(
+        matches!(result, Err(ReceiptStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == "receipt")
+    );
     Ok(())
 }
 
@@ -32,8 +34,12 @@ fn receipt_reopen_refuses_missing_index_without_repair() -> TestResult {
     let result = SqliteReceiptStore::open(&path);
     let present: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_chio_tool_receipts_timestamp')", [], |row| row.get(0))?;
     assert!(!present);
-    assert!(matches!(result, Err(ReceiptStoreError::Conflict(message))
-        if message == "schema catalog differs from its canonical definition"));
+    assert!(matches!(
+        result,
+        Err(ReceiptStoreError::Schema(
+            chio_security_types::schema::SchemaRefusal::CatalogMismatch
+        ))
+    ));
     Ok(())
 }
 
@@ -51,8 +57,9 @@ fn approval_reopen_refuses_missing_stamp_without_repair() -> TestResult {
         |row| row.get(0),
     )?;
     assert_eq!(count, 0);
-    assert!(matches!(result, Err(ApprovalStoreError::Backend(message))
-        if message == "schema namespace approval is missing"));
+    assert!(
+        matches!(result, Err(ApprovalStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == "approval")
+    );
     Ok(())
 }
 
@@ -90,23 +97,23 @@ fn partial_pair_is_refused_without_restamping() -> TestResult {
             [namespace],
         )?;
         assert!(
-            matches!(chio_store_sqlite::initialize_receipt_approval_database(&path), Err(ReceiptStoreError::Conflict(message))
-            if message == format!("schema namespace {namespace} is missing"))
+            matches!(chio_store_sqlite::initialize_receipt_approval_database(&path), Err(ReceiptStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == namespace)
         );
         let receipt_error = if namespace == "approval" {
-            "schema catalog differs from its canonical definition"
+            SchemaRefusal::CatalogMismatch
         } else {
-            "schema namespace receipt is missing"
+            SchemaRefusal::MissingSchema {
+                store_key: "receipt".into(),
+            }
         };
         let receipt_result = SqliteReceiptStore::open(&path).map(drop);
         assert!(
-            matches!(&receipt_result, Err(ReceiptStoreError::Conflict(message))
-                if message == receipt_error),
+            matches!(&receipt_result, Err(ReceiptStoreError::Schema(error))
+                if error == &receipt_error),
             "{receipt_result:?}"
         );
         assert!(
-            matches!(SqliteApprovalStore::open_colocated_with_receipt_store(&path), Err(ApprovalStoreError::Backend(message))
-            if message == format!("schema namespace {namespace} is missing"))
+            matches!(SqliteApprovalStore::open_colocated_with_receipt_store(&path), Err(ApprovalStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == namespace)
         );
         let count: i64 = connection.query_row(
             "SELECT COUNT(*) FROM chio_store_schema_versions",
@@ -124,12 +131,10 @@ fn receipt_only_database_is_not_adopted_as_an_approval_pair() -> TestResult {
     let path = root.path().join("receipts.db");
     drop(SqliteReceiptStore::open(&path)?);
     assert!(
-        matches!(SqliteApprovalStore::open_colocated_with_receipt_store(&path), Err(ApprovalStoreError::Backend(message))
-        if message == "schema namespace approval is missing")
+        matches!(SqliteApprovalStore::open_colocated_with_receipt_store(&path), Err(ApprovalStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == "approval")
     );
     assert!(
-        matches!(chio_store_sqlite::initialize_receipt_approval_database(&path), Err(ReceiptStoreError::Conflict(message))
-        if message == "schema namespace approval is missing")
+        matches!(chio_store_sqlite::initialize_receipt_approval_database(&path), Err(ReceiptStoreError::Schema(SchemaRefusal::MissingSchema { store_key })) if store_key == "approval")
     );
     let connection = rusqlite::Connection::open(&path)?;
     let present: bool = connection.query_row(

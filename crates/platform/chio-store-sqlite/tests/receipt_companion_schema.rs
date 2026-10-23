@@ -1,4 +1,5 @@
 use chio_credit::IouEnvelopeStoreError;
+use chio_security_types::schema::SchemaRefusal;
 use chio_settle::SettlementRouteError;
 use chio_store_sqlite::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStore};
 use chio_store_sqlite::{SqliteIouEnvelopeStore, SqliteSettlementOutcomeStore};
@@ -17,10 +18,7 @@ fn companion_openers_refuse_empty_catalog_without_creating_tables() -> TestResul
             pool.get()?
                 .query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
         assert_eq!(count, 0, "{component} created a partial schema");
-        assert_eq!(
-            result,
-            Err("conflict: schema creation is not allowed for this namespace".to_owned())
-        );
+        assert_eq!(result, Err(SchemaRefusal::CreationNotAllowed));
     }
     Ok(())
 }
@@ -28,24 +26,24 @@ fn companion_openers_refuse_empty_catalog_without_creating_tables() -> TestResul
 fn open_component(
     component: &str,
     pool: &r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>,
-) -> Result<(), String> {
+) -> Result<(), SchemaRefusal> {
     match component {
         "iou" => SqliteIouEnvelopeStore::open_with_pool(pool.clone())
             .map(drop)
             .map_err(|error| match error {
-                IouEnvelopeStoreError::Backend(message) => message,
+                IouEnvelopeStoreError::Schema(error) => error,
                 other => panic!("unexpected IOU refusal: {other:?}"),
             }),
         "dead_letter" => SqliteDeadLetterStore::open_with_pool(pool.clone())
             .map(drop)
             .map_err(|error| match error {
-                DeadLetterStoreError::Backend(message) => message,
+                DeadLetterStoreError::Schema(error) => error,
                 other => panic!("unexpected dead-letter refusal: {other:?}"),
             }),
         "settlement" => SqliteSettlementOutcomeStore::open_with_pool(pool.clone())
             .map(drop)
             .map_err(|error| match error {
-                SettlementRouteError::Backend { detail } => detail,
+                SettlementRouteError::Schema(error) => error,
                 other => panic!("unexpected settlement refusal: {other:?}"),
             }),
         _ => unreachable!(),
@@ -87,7 +85,7 @@ fn companion_openers_accept_complete_schema_and_refuse_missing_objects() -> Test
             drop(connection);
             assert_eq!(
                 open_component(component, &pool),
-                Err("conflict: schema catalog differs from its canonical definition".to_owned())
+                Err(SchemaRefusal::CatalogMismatch)
             );
             assert_eq!(catalog(&*pool.get()?)?, before);
         }
@@ -108,17 +106,20 @@ fn alongside_openers_refuse_missing_companion_index() -> TestResult {
         "SELECT name FROM sqlite_schema WHERE type = 'index' AND name LIKE '%iou%' AND sql IS NOT NULL ORDER BY name LIMIT 1",
         [], |row| row.get(0))?;
     connection.execute_batch(&format!("DROP INDEX \"{}\"", index.replace('"', "\"\"")))?;
-    assert!(matches!(SqliteIouEnvelopeStore::open_alongside(&receipts),
-        Err(IouEnvelopeStoreError::Backend(message))
-        if message == "conflict: schema catalog differs from its canonical definition"));
-    assert!(matches!(SqliteDeadLetterStore::open_alongside(&receipts),
-        Err(DeadLetterStoreError::Backend(message))
-        if message == "receipt writer conflict: schema catalog differs from its canonical definition"));
-    assert!(
-        matches!(SqliteSettlementOutcomeStore::open_alongside(&receipts),
-        Err(SettlementRouteError::Backend { detail })
-        if detail == "receipt writer conflict: schema catalog differs from its canonical definition")
-    );
+    assert!(matches!(
+        SqliteIouEnvelopeStore::open_alongside(&receipts),
+        Err(IouEnvelopeStoreError::Schema(
+            SchemaRefusal::CatalogMismatch
+        ))
+    ));
+    assert!(matches!(
+        SqliteDeadLetterStore::open_alongside(&receipts),
+        Err(DeadLetterStoreError::Schema(SchemaRefusal::CatalogMismatch))
+    ));
+    assert!(matches!(
+        SqliteSettlementOutcomeStore::open_alongside(&receipts),
+        Err(SettlementRouteError::Schema(SchemaRefusal::CatalogMismatch))
+    ));
     let count: i64 = connection.query_row(
         "SELECT COUNT(*) FROM sqlite_schema WHERE name = ?1",
         [&index],
