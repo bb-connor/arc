@@ -141,6 +141,10 @@ pub struct ChannelOpenIntentBodyV1 {
     pub participant_snapshot_digest: String,
 }
 
+impl super::signed::ChannelSignedBody for ChannelOpenIntentBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_OPEN_INTENT_SCHEMA;
+}
+
 impl ChannelOpenIntentBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_OPEN_INTENT_SCHEMA {
@@ -424,6 +428,10 @@ pub struct ChannelFundingAcknowledgementBodyV1 {
     pub expires_at_unix_ms: u64,
 }
 
+impl super::signed::ChannelSignedBody for ChannelFundingAcknowledgementBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_FUNDING_ACKNOWLEDGEMENT_SCHEMA;
+}
+
 impl ChannelFundingAcknowledgementBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_FUNDING_ACKNOWLEDGEMENT_SCHEMA {
@@ -499,6 +507,10 @@ pub struct ChannelOpenBodyV1 {
     pub funding_acknowledgement_digest: String,
     pub initial_state_digest: String,
     pub opened_at_unix_ms: u64,
+}
+
+impl super::signed::ChannelSignedBody for ChannelOpenBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_OPEN_SCHEMA;
 }
 
 impl ChannelOpenBodyV1 {

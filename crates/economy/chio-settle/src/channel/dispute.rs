@@ -116,6 +116,10 @@ pub struct ChannelDisputeBodyV1 {
     pub submitted_at_unix_ms: u64,
 }
 
+impl super::signed::ChannelSignedBody for ChannelDisputeBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_DISPUTE_SCHEMA;
+}
+
 impl ChannelDisputeBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_DISPUTE_SCHEMA {

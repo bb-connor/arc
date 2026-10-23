@@ -8,8 +8,8 @@
 //! unnoticed.
 
 use chio_finding::{
-    audit_epoch_precommitment_sha256, sign_audit_seed_witness, compute_audit_epoch_id,
-    compute_audit_report_id, compute_challenge_id, derive_audit_seed_commitment, derive_outcome_id,
+    audit_epoch_precommitment_sha256, compute_audit_epoch_id, compute_audit_report_id,
+    compute_challenge_id, derive_audit_seed_commitment, derive_outcome_id, sign_audit_seed_witness,
     signed_envelope_sha256, FindingAuditEpoch, FindingAuditReport, FindingAuditRoundAuthorization,
     FindingAuthorityKeyPolicy, FindingAuthorityStatus, FindingChallenge,
     FindingChallengeAuthorization, FindingChallengeAuthorizationKind, FindingChallengeEvidence,
@@ -305,7 +305,8 @@ fn epoch_for(eligible: &[EligibleListing], rate_bps: u64, budget_units: u64) -> 
             &seed_commitment,
             eligible_snapshot_at,
             seed_witnessed_at,
-        ).test_expect("seed witness signs"),
+        )
+        .test_expect("seed witness signs"),
         eligible_snapshot_digest,
         eligible_listing_count: eligible.len() as u64,
         fee_schedule_envelope_sha256: sha256_hex(b"fee-schedule-envelope"),
@@ -1701,7 +1702,8 @@ fn a_seed_commitment_witnessed_before_eligibility_rejects() {
         &epoch.seed_commitment,
         epoch.eligible_snapshot_at,
         epoch.seed_witnessed_at,
-    ).test_expect("seed witness signs");
+    )
+    .test_expect("seed witness signs");
     epoch.audit_epoch_id = String::new();
     epoch.audit_epoch_id = compute_audit_epoch_id(&epoch).test_expect("epoch id");
     assert_eq!(

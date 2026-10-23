@@ -55,6 +55,7 @@ pub enum CreditEvaluatorError {
 /// the receipt's content/policy hashes so a downstream auditor can
 /// confirm the IOU references the same bytes the kernel signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct IouEnvelopeBody {
     /// Schema tag (`chio.credit.iou-envelope.v1`).
     pub schema: String,
@@ -92,9 +93,9 @@ pub struct IouEnvelopeBody {
 /// after a finalized receipt is observed, and persisted by the
 /// store binding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct IouEnvelope {
     /// Body that was signed.
-    #[serde(flatten)]
     pub body: IouEnvelopeBody,
     /// Signature over the signing wrapper of the canonical `body` under
     /// `chio.credit.iou-envelope.v1`.

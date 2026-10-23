@@ -47,7 +47,6 @@ use chio_finding::{
     SignedFindingAuthorityStatus, SignedFindingMarketTerms, FINDING_AUTHORITY_STATUS_SCHEMA_V1,
     FINDING_BOND_BACKING_SCHEMA_V1, FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1,
     FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1, FINDING_SCHEMA_V1, FINDING_STATUS_EPOCH_SCHEMA_V1,
-    FINDING_STATUS_SIGNATURE_DOMAIN,
 };
 use chio_finding_verifier::{
     sign_finding_verifier_report, validate_supported_finding_verifier_profile,
@@ -898,7 +897,6 @@ fn portable_live_status_proof_for_feed(
     let mut epoch = FindingStatusEpoch {
         schema: FINDING_STATUS_EPOCH_SCHEMA_V1.to_string(),
         status_epoch_id: String::new(),
-        signature_domain: FINDING_STATUS_SIGNATURE_DOMAIN.to_string(),
         status_map_version: FINDING_STATUS_MAP_VERSION.to_string(),
         proof_semantics: FINDING_STATUS_PROOF_SEMANTICS.to_string(),
         feed_id: feed_id.to_string(),

@@ -48,6 +48,10 @@ pub struct ChannelCloseBodyV1 {
     pub lifecycle_fence: u64,
 }
 
+impl super::signed::ChannelSignedBody for ChannelCloseBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_CLOSE_SCHEMA;
+}
+
 impl ChannelCloseBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_CLOSE_SCHEMA {

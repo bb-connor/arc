@@ -10,7 +10,6 @@
 
 use chio_core_types::crypto::sha256_hex;
 use chio_core_types::merkle::MerkleTree;
-use chio_core_types::SigningAlgorithm;
 use chio_finding::{
     compute_admission_id, compute_allocation_id, compute_authorization_id, compute_finding_id,
     compute_terms_id, sign_finding, signed_envelope_sha256, Finding, FindingAdmission,
@@ -780,7 +779,6 @@ fn finding_pheromone_context(passport: &Keypair, kernel: &Keypair) -> PheromoneV
         verifier_id: "did:chio:finding-cost-verifier".to_string(),
         verifier_key_id: "finding-cost-key-1".to_string(),
         public_key: verifier.public_key(),
-        signature_algorithm: SigningAlgorithm::Ed25519,
         valid_from_unix_ms: FINDING_PHEROMONE_NOW_MS - 100_000,
         valid_until_unix_ms: FINDING_PHEROMONE_NOW_MS + 100_000,
         allowed_treaties: vec![FINDING_PHEROMONE_TREATY.to_string()],

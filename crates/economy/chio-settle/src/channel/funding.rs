@@ -281,6 +281,10 @@ pub struct ChannelFundingEvidenceBodyV1 {
     pub evidence_expires_at_unix_ms: u64,
 }
 
+impl super::signed::ChannelSignedBody for ChannelFundingEvidenceBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_FUNDING_EVIDENCE_SCHEMA;
+}
+
 impl ChannelFundingEvidenceBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_FUNDING_EVIDENCE_SCHEMA {

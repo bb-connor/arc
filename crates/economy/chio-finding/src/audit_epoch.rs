@@ -14,8 +14,8 @@
 //! where [`derive_audit_seed_commitment`] re-derives this commitment from
 //! it. Two artifacts, never one mutable one.
 
-use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use serde::{Deserialize, Serialize};

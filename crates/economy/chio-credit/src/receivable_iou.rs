@@ -1,7 +1,8 @@
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{
-    sha256_hex, sign_wrapped, verify_wrapped, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    sha256_hex, sign_wrapped, verify_wrapped, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use chio_core_types::receipt::body::ChioReceipt;
 use chio_core_types::receipt::crypto_floor::ReceiptCryptoFloor;
@@ -577,10 +578,7 @@ pub fn verify_receivable_iou<S: CreditAdmissionStore>(
     if signed.body.issuer_id != context.issuer_trust.issuer_id
         || signed.body.issuer_key_epoch != context.issuer_trust.issuer_key_epoch
         || &signed.signer_key != pinned
-        || !context
-            .issuer_trust
-            .crypto_floor
-            .allows(pinned.algorithm())
+        || !context.issuer_trust.crypto_floor.allows(pinned.algorithm())
         || verify_wrapped(
             pinned,
             CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,

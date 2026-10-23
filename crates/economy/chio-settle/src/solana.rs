@@ -312,7 +312,14 @@ mod tests {
                     expires_at: 1_774_828_800,
                     nonce: "nonce".to_string(),
                 };
-                chio_core::canonical::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| keypair.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)).test_unwrap()
+                chio_core::canonical::CanonicalBytes::from_serializable(&certificate)
+                    .and_then(|canonical| {
+                        keypair.sign_wrapped(
+                            chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+                            &canonical,
+                        )
+                    })
+                    .test_unwrap()
             },
         };
         (

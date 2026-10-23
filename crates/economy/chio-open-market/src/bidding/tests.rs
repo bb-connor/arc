@@ -266,7 +266,9 @@ fn bid_happy_path_mints_scoped_capability_token() {
             .units,
         1_000
     );
-    assert!(ask.verify_signature(&ask.signer_key).test_expect("verify ask"));
+    assert!(ask
+        .verify_signature(&ask.signer_key)
+        .test_expect("verify ask"));
     assert!(ask
         .body
         .token_offer

@@ -72,7 +72,10 @@ impl ChannelTerminalOutcomeCommitmentBodyV1 {
     /// `chio.channel.terminal-outcome-commitment.v1`.
     pub fn sign(&self, kernel_keypair: &Keypair) -> Result<Signature, ChannelError> {
         kernel_keypair
-            .sign_wrapped(CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA, &self.signing_body()?)
+            .sign_wrapped(
+                CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA,
+                &self.signing_body()?,
+            )
             .map_err(|error| ChannelError::Canonicalization(error.to_string()))
     }
 }
