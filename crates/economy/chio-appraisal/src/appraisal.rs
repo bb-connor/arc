@@ -584,7 +584,11 @@ pub fn evaluate_imported_runtime_attestation_appraisal(
     if !request.local_policy.is_explicit() {
         reason_codes.push(RuntimeAttestationImportReasonCode::NoLocalPolicy);
     }
-    if !request.signed_result.verify_signature(&request.signed_result.signer_key).unwrap_or(false) {
+    if !request
+        .signed_result
+        .verify_signature(&request.signed_result.signer_key)
+        .unwrap_or(false)
+    {
         reason_codes.push(RuntimeAttestationImportReasonCode::InvalidSignature);
     }
     if result.schema != RUNTIME_ATTESTATION_APPRAISAL_RESULT_SCHEMA
@@ -622,12 +626,11 @@ pub fn evaluate_imported_runtime_attestation_appraisal(
     {
         reason_codes.push(RuntimeAttestationImportReasonCode::UntrustedIssuer);
     }
-    if !request.local_policy.trusted_signer_keys.is_empty()
-        && !request
-            .local_policy
-            .trusted_signer_keys
-            .iter()
-            .any(|trusted| trusted == &signer_key_hex)
+    if !request
+        .local_policy
+        .trusted_signer_keys
+        .iter()
+        .any(|trusted| trusted == &signer_key_hex)
     {
         reason_codes.push(RuntimeAttestationImportReasonCode::UntrustedSigner);
     }
