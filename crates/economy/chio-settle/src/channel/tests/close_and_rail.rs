@@ -18,6 +18,9 @@ fn public_rail_amount_conversion_rejects_invalid_policy_currency_and_ijson_overf
         oracle: crate::SettlementOracleConfig::default(),
         evidence_substrate: crate::SettlementEvidenceConfig::default(),
         policy: crate::SettlementPolicyConfig::default(),
+        kernel_authority: crate::SettlementKernelAuthority {
+            trusted_keys: vec![chio_core::crypto::Keypair::from_seed(&[7u8; 32]).public_key()],
+        },
     };
     let scaled = crate::scale_chio_amount_to_token_minor_units(
         &MonetaryAmount {

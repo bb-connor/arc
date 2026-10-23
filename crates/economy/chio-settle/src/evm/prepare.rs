@@ -1139,6 +1139,11 @@ pub async fn prepare_dual_sign_release(
             "dispatch is not configured for the dual-signature path".to_string(),
         ));
     }
+    if !config.kernel_authority.trusts(&receipt.kernel_key) {
+        return Err(SettlementError::Verification(
+            "receipt kernel_key is not a trusted settlement kernel key".to_string(),
+        ));
+    }
     let verified = receipt
         .verify_signature()
         .map_err(|error| SettlementError::Verification(error.to_string()))?;

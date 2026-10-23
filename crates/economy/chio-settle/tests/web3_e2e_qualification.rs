@@ -749,7 +749,9 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config()?;
+    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
+        trusted_keys: vec![operator_keypair.public_key()],
+    })?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,
