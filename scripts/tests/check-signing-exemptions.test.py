@@ -112,10 +112,10 @@ def test_kat_signer_without_gate_fails():
     assert not gate.check_gates(root)
 
 
-def test_production_feature_enable_fails():
-    root = tree({"crates/x/chio-x/Cargo.toml": '[dependencies]\nchio-core-types = { workspace = true, features = ["wrapper-capture"] }\n'})
+def test_production_pq_kat_enable_fails():
+    root = tree({"crates/x/chio-x/Cargo.toml": '[dependencies]\nchio-core-types = { workspace = true, features = ["pq-kat"] }\n'})
     assert gate.check_gates(root)
-    root = tree({"crates/x/chio-x/Cargo.toml": '[dev-dependencies]\nchio-core-types = { workspace = true, features = ["wrapper-capture"] }\n'})
+    root = tree({"crates/x/chio-x/Cargo.toml": '[dev-dependencies]\nchio-core-types = { workspace = true, features = ["pq-kat"] }\n'})
     assert not gate.check_gates(root)
 
 

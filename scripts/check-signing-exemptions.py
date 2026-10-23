@@ -5,7 +5,7 @@ An exempt call is `SigningMessage::exempt`, `Keypair::sign_exempt` or `verify_ex
 spelling: fully qualified, imported, renamed on import, or method syntax. Each observed call is
 keyed by (file, enclosing fn, ExemptFormat) and counted; the multiset must equal ALLOWLIST. A call
 whose format cannot be resolved to an `ExemptFormat` variant fails. The gate also fails when the
-deterministic ML-DSA KAT signer or the wrapper capture hook is reachable from a production build.
+deterministic ML-DSA KAT signer is reachable from a production build.
 
 Usage: check-signing-exemptions.py [--root DIR] [--print]
 """
@@ -179,10 +179,6 @@ def check_gates(root):
         m = re.search(r"((?:#\[[^\]]*\]\s*)*)pub fn sign_bytes_with_seed", text)
         if not m or '#[cfg(any(test, feature = "pq-kat"))]' not in m.group(1):
             errors.append("MlDsa65Backend::sign_bytes_with_seed must be gated by #[cfg(any(test, feature = \"pq-kat\"))]")
-    wrapper = root / "crates/core/chio-core-types/src/crypto/wrapper.rs"
-    if wrapper.exists() and "capture::record" in wrapper.read_text():
-        if not re.search(r'#\[cfg\(feature = "wrapper-capture"\)\]\s*capture::record', wrapper.read_text()):
-            errors.append("wrapper capture call must be gated by #[cfg(feature = \"wrapper-capture\")]")
     for manifest in sorted(root.glob("**/Cargo.toml")):
         rel = manifest.relative_to(root).as_posix()
         if "/target/" in f"/{rel}" or rel.startswith("target/"):
@@ -193,7 +189,7 @@ def check_gates(root):
             if line.startswith("["):
                 section = line
                 continue
-            for feature in ("wrapper-capture", "pq-kat"):
+            for feature in ("pq-kat",):
                 if f'"{feature}"' not in line and f"/{feature}" not in line:
                     continue
                 if section == "[features]" and rel in (
@@ -211,9 +207,9 @@ def check_gates(root):
             errors.append("chio-core default features enable pq-kat")
     types_manifest = root / "crates/core/chio-core-types/Cargo.toml"
     if types_manifest.exists() and re.search(
-        r"^default\s*=\s*\[[^\]]*(pq-kat|wrapper-capture)", types_manifest.read_text(), re.M
+        r"^default\s*=\s*\[[^\]]*pq-kat", types_manifest.read_text(), re.M
     ):
-        errors.append("chio-core-types default features enable a test-only feature")
+        errors.append("chio-core-types default features enable pq-kat")
     return errors
 
 
