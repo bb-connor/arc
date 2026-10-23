@@ -1,4 +1,4 @@
-a5276556c2bb30969c2f33dbf37b5b2ad0bc4885dd7d8e9a9ed1afb12fbd9cf2  spec/schemas/MANIFEST.sha256
+664301f499ed64e984dcdde17882ac9805c89e3dcd044d7cf3259b07b9652572  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -388,7 +388,7 @@ d6bf9ce5dc28556b94a47c3312b78eb7c7a0b4a5feb1eed4ba2b558532b95c36  spec/schemas/c
 5a7d11b9b6a2b67b5ec296fa6589be675084704824fa4b3c833363c67a398f0d  spec/schemas/chio-web3/v1/public-settlement-verifier-report.schema.json
 f7da455a2c05895a3dc6b4bbed6697c43c220627345083e7a1ed559af55f28c9  spec/schemas/chio-web3/v1/settlement-dispatch.schema.json
 ece53a8486e23d82170276b35ef1925da3b1df42ddcd47975ae4d73ad139dd7f  spec/schemas/chio-web3/v1/settlement-execution-receipt.schema.json
-6e16b07a0bd3200673167da8be8e98c86cde193df5c49af7b4610b0e9c5a4505  spec/schemas/chio-web3/v1/settlement-proof-bundle.schema.json
+669914939e8951beb80324dfa8ee91a1f51a2ae93bf4ca0368684eff2b32cbfc  spec/schemas/chio-web3/v1/settlement-proof-bundle.schema.json
 fc79138b5ce64df2233a6b7fcdda9bff8fb482999b24d0cd1d368efb4762b3bb  spec/schemas/chio-wire/v1/agent/active-response-governed-intent.schema.json
 a52aa001c16dfe0527ba8c716925f04b29955e4a5757f3a6f837a15175f0a1f7  spec/schemas/chio-wire/v1/agent/governed-transaction-intent.schema.json
 79919a3cf6f16b03fa5c44eb00e6a79d7fe3b70b8223cace0dd520ea71179b18  spec/schemas/chio-wire/v1/agent/heartbeat.schema.json
@@ -634,4 +634,4 @@ e870e486f90b3a4a163f060b656538523bf731570dbb64eb0212d65486da8b2d  spec/schemas/c
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 aee326a25691ea8dde9219a97a1acc5a4521acb24e44ed2a5b0c7126fb06de09  spec/schemas/fiscal-defs.v1.schema.json
 216ca7d9c174f728a1931f84791858702bb365cb5f5acba24c5e936bc923955e  spec/schemas/policy/analysis-report.schema.json
-3ff526773558cca771382c3507b77c2255b8d5032afecdab15be7f5318b58c40  spec/schemas/registry.json
+44b780018ef4210d741d093bdf2b79916808f946886478b58e330a752b280942  spec/schemas/registry.json

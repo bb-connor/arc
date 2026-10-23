@@ -3148,31 +3148,21 @@
       "schema": "chio.recovery-setup-probe.v1",
       "artifactKind": "recovery_setup_probe",
       "introducedBy": "recovery-product",
-      "schemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-probe.schema.json"
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-probe.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-probe.schema.json"
     },
     {
       "schema": "chio.recovery-setup-report.v1",
       "artifactKind": "recovery_setup_report",
       "introducedBy": "recovery-product",
-      "schemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-report.schema.json"
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-report.schema.json",
+      "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-report.schema.json"
     },
     {
       "schema": "chio.recovery.signed-policy-deployment-change.v1",
       "artifactKind": "recovery_policy_deployment_change",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-policy-deployment-change.schema.json"
-    },
-    {
-      "schema": "chio.signed-recovery-setup-probe.v1",
-      "artifactKind": "signed_recovery_setup_probe",
-      "introducedBy": "recovery-product",
-      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-probe.schema.json"
-    },
-    {
-      "schema": "chio.signed-recovery-setup-report.v1",
-      "artifactKind": "signed_recovery_setup_report",
-      "introducedBy": "recovery-product",
-      "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-recovery-setup-report.schema.json"
     },
     {
       "schema": "chio.decision-report-view.v1",

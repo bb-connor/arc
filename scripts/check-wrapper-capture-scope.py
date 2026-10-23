@@ -31,8 +31,6 @@ NAMING_FILES = HOOK_FILES | {
     CORE_MANIFEST,
     "scripts/capture-wrapper-bodies.sh",
     "scripts/check-wrapper-capture-scope.py",
-    "scripts/check-signing-exemptions.py",
-    "scripts/tests/check-signing-exemptions.test.py",
     "scripts/tests/check-wrapper-capture-scope.test.py",
 }
 
