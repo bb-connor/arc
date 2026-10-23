@@ -22,6 +22,21 @@ pub(crate) fn build_proof_package(
     .map_err(|error| CliError::Other(error.to_string()))
 }
 
+pub(crate) fn trusted_kernel_key_set(
+    trust: &chio_core::root_authority::VerifierTrust,
+) -> BTreeSet<String> {
+    trust
+        .kernel_keys
+        .iter()
+        .map(chio_core::crypto::PublicKey::to_hex)
+        .collect()
+}
+
+/// The single kernel key a pipeline run generated and signed every receipt with.
+pub(crate) fn run_kernel_key_set(kernel_public_key: &str) -> BTreeSet<String> {
+    BTreeSet::from([kernel_public_key.to_string()])
+}
+
 pub(crate) fn build_inquiry_package(
     proof_package: MercuryProofPackage,
     audience: &str,
@@ -83,6 +98,7 @@ pub(crate) fn pilot_capability_with_id(
 pub(crate) fn pilot_receipt(
     step: &MercuryPilotStep,
     capability_id: &str,
+    bundle_refs: &[MercuryBundleReference],
     kernel_keypair: &Keypair,
 ) -> Result<ChioReceipt, CliError> {
     let action = ToolCallAction::from_parameters(serde_json::json!({
@@ -92,11 +108,12 @@ pub(crate) fn pilot_receipt(
         "stage": serde_json::to_value(step.metadata.chronology.stage)?,
         "toolName": step.tool_name,
     }))?;
-    let metadata = step
-        .metadata
+    let mut mercury_metadata = step.metadata.clone();
+    mercury_metadata.bundle_refs = bundle_refs.to_vec();
+    let metadata = mercury_metadata
         .into_receipt_metadata_value()
         .map_err(|error| CliError::Other(error.to_string()))?;
-    let content_hash = sha256_hex(&canonical_json_bytes(&step.metadata)?);
+    let content_hash = sha256_hex(&canonical_json_bytes(&mercury_metadata)?);
     ChioReceipt::sign(
         ChioReceiptBody {
             id: step.receipt_id.clone(),
@@ -130,7 +147,13 @@ pub(crate) fn populate_mercury_receipt_store(
     receipt_db: &Path,
     capability_id: &str,
     steps: &[MercuryPilotStep],
+    bundle_manifests: &[MercuryBundleManifest],
 ) -> Result<Keypair, CliError> {
+    let bundle_refs = bundle_manifests
+        .iter()
+        .map(MercuryBundleReference::from_manifest)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| CliError::Other(error.to_string()))?;
     let store = SqliteReceiptStore::open(receipt_db)?;
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -143,7 +166,7 @@ pub(crate) fn populate_mercury_receipt_store(
     let mut start_seq = None;
     let mut end_seq = None;
     for step in steps {
-        let receipt = pilot_receipt(step, capability_id, &kernel_keypair)?;
+        let receipt = pilot_receipt(step, capability_id, &bundle_refs, &kernel_keypair)?;
         let seq = store.append_chio_receipt_returning_seq(&receipt)?;
         if start_seq.is_none() {
             start_seq = Some(seq);

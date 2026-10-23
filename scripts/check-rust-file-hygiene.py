@@ -168,7 +168,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-mercury/tests/cli.rs": allow(
         "2026-12-31",
         "existing oversized Mercury CLI integration suite; capped to current size until split",
-        max_lines=3_124,
+        max_lines=2_993,
     ),
     "crates/products/chio-cli/tests/trust_cluster.rs": allow(
         "2026-12-31",
