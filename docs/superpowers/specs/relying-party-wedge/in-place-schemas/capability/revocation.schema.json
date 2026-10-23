@@ -55,8 +55,8 @@
       "then": {
         "properties": {
           "target": {
-            "pattern": "^[0-9a-f]{64}$",
-            "description": "HMAC-SHA256 tag as 64 lowercase hex characters."
+            "pattern": "^(st|tt)1\\.[0-9a-f]{64}\\.[0-9a-f]{64}$",
+            "description": "Keyed index tag in its string form, `<prefix>1.<hex key_id>.<hex value>`: `st` for `anchor_subject`, `tt` for `tenant_tag`."
           }
         }
       }
