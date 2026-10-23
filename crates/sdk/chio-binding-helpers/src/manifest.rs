@@ -1,3 +1,4 @@
+use chio_core::canonical::UntrustedJsonText;
 use chio_core::PublicKey;
 use chio_manifest::SignedManifest;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,13 @@ pub struct ManifestVerification {
     pub embedded_public_key_matches_signer: bool,
 }
 
+/// Decodes a signed manifest after the signed-input reader refuses a duplicate
+/// object key or a non-canonical number token, so shape errors keep their
+/// serde position.
 pub fn parse_signed_manifest_json(input: &str) -> Result<SignedManifest> {
+    UntrustedJsonText::from_wire(input.as_bytes(), crate::MAX_JSON_INPUT_BYTES)
+        .and_then(|text| text.decode_signed::<serde::de::IgnoredAny>())
+        .map_err(|error| chio_core::Error::UntrustedInput(error.into()))?;
     Ok(serde_json::from_str(input)?)
 }
 

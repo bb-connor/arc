@@ -40,7 +40,7 @@ DECODER_KINDS = {
 
 # The reviewed debt cohort survives scoped caller repairs and direct-site
 # migrations. Removing or promoting it requires an explicit source-gate review.
-RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "049948d58a6c6c1ee334f7dd0886724dc786227068ee1df88b5be862318b2922"
+RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "b5710dda407ef636c0376de9401749f59dc3430af1bd9f21b9aa3bd6f0bf8e25"
 # Each retired helper names the inner reader that owns its single signed
 # decode and that reader's constructor. A distinct reader is private to the helper.
 RETIRED_DIRECT_HELPERS = {

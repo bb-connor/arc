@@ -27,7 +27,10 @@ use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
 };
-use chio_kernel_browser::wasm::{evaluate, mint_signing_seed_hex, sign_receipt, verify_capability};
+use chio_kernel_browser::wasm::{
+    evaluate, mint_signing_seed_hex, sign_receipt, verify_capability,
+    verify_capability_with_context,
+};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_test::console_log;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -201,4 +204,118 @@ fn web_crypto_rng_fills_buffers_larger_than_one_quota() {
     for tail in [&buffer[65_536..131_072], &buffer[131_072..]] {
         assert!(tail.iter().any(|byte| *byte != 0), "chunk left zero-filled");
     }
+}
+
+const REPEATED_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+
+fn repeat_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member},{member}"), 1)
+}
+
+fn assert_signed_input_refused(
+    result: Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>,
+    label: &str,
+) {
+    let error: serde_json::Value = from_value(result.unwrap_err()).unwrap();
+    assert_eq!(error["code"], "invalid_json_input");
+    assert_eq!(error["message"], format!("{label}: {REPEATED_KEY}"));
+}
+
+#[wasm_bindgen_test]
+fn entry_points_refuse_a_repeated_key_in_the_original_json() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let token_id = r#""id":"cap-wasm-1""#;
+
+    let request = serde_json::json!({
+        "request": {
+            "request_id": "req-wasm-dup",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+        },
+        "capability": capability,
+        "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "clock_override_unix_secs": ISSUED_AT + 1,
+    })
+    .to_string();
+    evaluate(&request).expect("evaluate without a repeated key");
+    assert_signed_input_refused(
+        evaluate(&repeat_member(&request, token_id)),
+        "evaluate request",
+    );
+
+    let token = serde_json::to_string(&capability).unwrap();
+    assert_signed_input_refused(
+        verify_capability(
+            &repeat_member(&token, token_id),
+            &issuer.public_key().to_hex(),
+        ),
+        "verify_capability token",
+    );
+    let context = serde_json::json!({
+        "token": capability,
+        "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "clock_override_unix_secs": ISSUED_AT + 1,
+    })
+    .to_string();
+    verify_capability_with_context(&context).expect("verify without a repeated key");
+    assert_signed_input_refused(
+        verify_capability_with_context(&repeat_member(&context, token_id)),
+        "verify_capability request",
+    );
+}
+
+fn exponent_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member}e0"), 1)
+}
+
+#[wasm_bindgen_test]
+fn signed_entry_points_refuse_a_non_canonical_number() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let clock = format!(r#""clock_override_unix_secs":{}"#, ISSUED_AT + 1);
+
+    let request = serde_json::json!({
+        "request": {
+            "request_id": "req-wasm-number",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+        },
+        "capability": capability,
+        "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "clock_override_unix_secs": ISSUED_AT + 1,
+    })
+    .to_string();
+    evaluate(&request).expect("evaluate with canonical numbers");
+    assert_signed_input_refused(
+        evaluate(&exponent_member(&request, &clock)),
+        "evaluate request",
+    );
+
+    let token = serde_json::to_string(&capability).unwrap();
+    assert_signed_input_refused(
+        verify_capability(
+            &exponent_member(&token, &format!(r#""issued_at":{ISSUED_AT}"#)),
+            &issuer.public_key().to_hex(),
+        ),
+        "verify_capability token",
+    );
+    let context = serde_json::json!({
+        "token": capability,
+        "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "clock_override_unix_secs": ISSUED_AT + 1,
+    })
+    .to_string();
+    assert_signed_input_refused(
+        verify_capability_with_context(&exponent_member(&context, &clock)),
+        "verify_capability request",
+    );
 }

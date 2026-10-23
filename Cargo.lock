@@ -5404,6 +5404,8 @@ name = "chio-test-support"
 version = "0.1.0"
 dependencies = [
  "chio-security-types",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
@@ -5608,6 +5610,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-spec-validate",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

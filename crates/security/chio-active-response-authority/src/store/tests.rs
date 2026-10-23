@@ -212,3 +212,36 @@ fn cleanup_guard_never_removes_a_replacement_inode() {
     assert!(path.exists());
     assert!(displaced.exists());
 }
+
+#[test]
+fn stored_records_refuse_a_repeated_key_before_typed_decoding() {
+    let connection = Connection::open_in_memory().test_expect("in-memory authority database");
+    connection
+        .execute_batch(AUTHORITY_STORE_SCHEMA_SQL)
+        .test_expect("authority schema");
+    let key = "a".repeat(64);
+    for table in ["policies", "artifacts"] {
+        connection
+            .execute(
+                &format!("INSERT INTO {table} (lookup_key, payload) VALUES (?1, ?2)"),
+                params![&key, br#"{"kind":"policy"}"#],
+            )
+            .test_expect("insert canonical record");
+        let records = load_logical_records(&connection, table).test_expect("load canonical record");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].payload, serde_json::json!({"kind": "policy"}));
+
+        connection
+            .execute(
+                &format!("UPDATE {table} SET payload = ?1"),
+                params![br#"{"kind":"policy","kind":"policy"}"#],
+            )
+            .test_expect("repeat a record key");
+        assert!(matches!(
+            load_logical_records(&connection, table),
+            Err(AuthorityError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::NonCanonical
+            ))
+        ));
+    }
+}
