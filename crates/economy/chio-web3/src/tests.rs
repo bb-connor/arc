@@ -139,7 +139,14 @@ fn signed_identity_binding_with_window(
         expires_at,
         nonce: nonce.to_string(),
     };
-    let Ok(signature) = chio_core_types::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| signer.sign_wrapped(crate::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)) else {
+    let Ok(signature) =
+        chio_core_types::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| {
+            signer.sign_wrapped(
+                crate::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+                &canonical,
+            )
+        })
+    else {
         panic!("sample identity binding signs");
     };
     SignedWeb3IdentityBinding {
@@ -373,7 +380,11 @@ fn sample_anchor_inclusion_proof_for_receipt(receipt: ChioReceipt) -> AnchorIncl
         .unwrap(),
     };
     let body = checkpoint_statement_body(&statement);
-    let signature = chio_core_types::CanonicalBytes::from_serializable(&body).and_then(|canonical| operator.sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)).unwrap();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            operator.sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)
+        })
+        .unwrap();
     statement.signature = signature;
 
     AnchorInclusionProof {
@@ -691,7 +702,14 @@ pub(super) fn sample_public_settlement_proof_bundle() -> PublicSettlementProofBu
 pub(super) fn sign_sample_public_settlement_bundle(bundle: &mut PublicSettlementProofBundle) {
     bundle.bundle_signature = None;
     let keypair = settlement_bundle_keypair();
-    let Ok(signature) = chio_core_types::CanonicalBytes::from_serializable(bundle).and_then(|canonical| keypair.sign_wrapped(crate::settlement_proof::CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA, &canonical)) else {
+    let Ok(signature) =
+        chio_core_types::CanonicalBytes::from_serializable(bundle).and_then(|canonical| {
+            keypair.sign_wrapped(
+                crate::settlement_proof::CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA,
+                &canonical,
+            )
+        })
+    else {
         panic!("sample public settlement bundle signs")
     };
     bundle.bundle_signature = Some(PublicSettlementBundleSignature {

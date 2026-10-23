@@ -498,7 +498,9 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
         chio_core::receipt::kinds::ReceiptKind::TraceObservation
     );
     assert!(receipt.decision.is_none());
-    assert!(receipt.verify_integrity_embedded_key().expect("observation signature"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("observation signature"));
     let metadata = receipt
         .metadata
         .as_ref()

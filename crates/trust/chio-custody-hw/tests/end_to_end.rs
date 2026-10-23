@@ -87,7 +87,14 @@ mod kernel_shim {
             let message = signing_body(cap)?;
             let signature = Signature::from_hex(&cap.signature)
                 .map_err(|err| CustodyError::AssertionRejected(format!("hex decode: {err}")))?;
-            if chio_core_types::crypto::verify_wrapped_bytes(&self.issuer_public_key, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err() {
+            if chio_core_types::crypto::verify_wrapped_bytes(
+                &self.issuer_public_key,
+                chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+                &message,
+                &signature,
+            )
+            .is_err()
+            {
                 return Err(CustodyError::AssertionRejected("bad signature".into()));
             }
             Ok(())

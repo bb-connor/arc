@@ -275,8 +275,11 @@ pub fn sign_peer_directory_bundle(
         expires_at_unix_ms: input.expires_at_unix_ms,
     };
     let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| input
-        .keypair.sign_wrapped(PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            input
+                .keypair
+                .sign_wrapped(PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA, &canonical)
+        })
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     Ok(PeerDirectoryBundleDocument {
         schema: PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA.to_string(),

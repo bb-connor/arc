@@ -840,6 +840,8 @@ impl chio_core_types::receipt::lineage::SignedExportPayload for Web3SettlementDi
     const SCHEMA_ID: &'static str = CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for Web3SettlementExecutionReceiptArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for Web3SettlementExecutionReceiptArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA;
 }

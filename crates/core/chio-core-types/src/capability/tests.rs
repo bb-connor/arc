@@ -2172,7 +2172,10 @@ fn bac573_capability_token_verify_with_floor_at_folds_time_and_floor() {
     let (_kp, token) = bac573_capability_token(1000, 2000);
     // In-window + allowed floor verifies.
     assert!(matches!(
-        token.verify_integrity_embedded_key_with_floor_at(CapabilityCryptoFloor::AllowClassical, 1500),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            1500
+        ),
         Ok(true)
     ));
     // In-window but floor rejects classical: floor error, not a time error.
@@ -2182,14 +2185,20 @@ fn bac573_capability_token_verify_with_floor_at_folds_time_and_floor() {
     ));
     // Floor + signature pass but expired: surfaced as Crypto(CapabilityExpired).
     assert!(matches!(
-        token.verify_integrity_embedded_key_with_floor_at(CapabilityCryptoFloor::AllowClassical, 2000),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            2000
+        ),
         Err(CapabilityFloorVerifyError::Crypto(
             Error::CapabilityExpired { expires_at: 2000 }
         ))
     ));
     // Not yet valid: surfaced as Crypto(CapabilityNotYetValid).
     assert!(matches!(
-        token.verify_integrity_embedded_key_with_floor_at(CapabilityCryptoFloor::AllowClassical, 999),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            999
+        ),
         Err(CapabilityFloorVerifyError::Crypto(
             Error::CapabilityNotYetValid { not_before: 1000 }
         ))
@@ -2204,7 +2213,10 @@ fn bac573_capability_token_verify_with_floor_at_bad_signature_fails_first() {
     // Expired AND broken signature: floor ok, signature fails -> Ok(false),
     // never the time error.
     assert!(matches!(
-        token.verify_integrity_embedded_key_with_floor_at(CapabilityCryptoFloor::AllowClassical, 9999),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            9999
+        ),
         Ok(false)
     ));
 }

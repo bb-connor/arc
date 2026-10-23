@@ -276,7 +276,9 @@ impl DispatchAllowFixture {
     }
 
     pub fn receipt_verify_once(&self) -> bool {
-        self.signed_receipt.verify_integrity_embedded_key().unwrap_or(false)
+        self.signed_receipt
+            .verify_integrity_embedded_key()
+            .unwrap_or(false)
     }
 
     pub fn signed_receipt_with_id(&self, id: String) -> ChioReceipt {

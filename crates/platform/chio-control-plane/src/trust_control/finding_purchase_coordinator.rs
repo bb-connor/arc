@@ -784,7 +784,10 @@ impl FindingPurchaseCoordinator {
         {
             return Err(PurchaseCoordinatorError::AskEnvelope);
         }
-        if !matches!(ask.body.token_offer.verify_integrity_embedded_key(), Ok(true)) {
+        if !matches!(
+            ask.body.token_offer.verify_integrity_embedded_key(),
+            Ok(true)
+        ) {
             return Err(PurchaseCoordinatorError::TokenOffer);
         }
         if ask.body.token_offer.issued_at > ask.body.issued_at

@@ -572,7 +572,10 @@ async fn full_flow_revocation_cascade() {
         "expected delegation chain revocation, got: {reason}"
     );
     assert!(resp_revoked.receipt.is_denied());
-    assert!(resp_revoked.receipt.verify_integrity_embedded_key().unwrap());
+    assert!(resp_revoked
+        .receipt
+        .verify_integrity_embedded_key()
+        .unwrap());
 }
 
 // Test: Receipt chain integrity

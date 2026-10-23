@@ -151,7 +151,9 @@ fn operator_signatures_bind_every_base_target_proposal_and_fence() -> TestResult
         let decoded: SignedPolicyDeploymentChangeV1 =
             decode_contract(&canonical_json_bytes(&body)?)?;
         assert!(
-            !decoded.verify_integrity_embedded_key().is_ok_and(|valid| valid),
+            !decoded
+                .verify_integrity_embedded_key()
+                .is_ok_and(|valid| valid),
             "{field}"
         );
     }

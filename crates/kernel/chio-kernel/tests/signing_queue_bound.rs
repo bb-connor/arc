@@ -107,7 +107,9 @@ async fn sign_accepts_content_at_the_byte_budget() {
         .sign(body, content)
         .await
         .expect("content at the budget should sign");
-    assert!(receipt.verify_integrity_embedded_key().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -142,7 +144,9 @@ async fn sign_refuses_oversized_content_fail_closed() {
         .sign(body, small)
         .await
         .expect("normal request still signs after an oversized rejection");
-    assert!(receipt.verify_integrity_embedded_key().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -200,7 +204,9 @@ async fn default_budget_admits_large_async_receipts_above_one_mib() {
         .sign(body, content)
         .await
         .expect("a 2 MiB async receipt must sign under the configured-stream-max budget");
-    assert!(receipt.verify_integrity_embedded_key().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -230,7 +236,9 @@ async fn zero_per_request_cap_admits_large_receipts_unlimited() {
     let receipt = handle.sign(body, content).await.expect(
         "a 0 (unlimited) per-request cap must admit a 64 KiB receipt, not reject as 1-over",
     );
-    assert!(receipt.verify_integrity_embedded_key().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -298,7 +306,9 @@ async fn aggregate_byte_budget_backpressures_even_with_channel_room() {
         .sign(body, content)
         .await
         .expect("a request within the aggregate budget signs");
-    assert!(receipt.verify_integrity_embedded_key().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
     handle.shutdown().await;
 }
 

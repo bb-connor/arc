@@ -78,10 +78,16 @@ pub fn verify_capability_signature(
     if capability.signature.is_empty() {
         return Err(CustodyError::AssertionRejected("empty signature".into()));
     }
-    let signature = Signature::from_hex(&capability.signature)
-        .map_err(|err| CustodyError::AssertionRejected(format!("signature hex decode failed: {err}")))?;
-    verify_wrapped_bytes(issuer, PASSKEY_CAPABILITY_SCHEMA, &signing_body(capability)?, &signature)
-        .map_err(|err| CustodyError::AssertionRejected(format!("signature rejected: {err}")))
+    let signature = Signature::from_hex(&capability.signature).map_err(|err| {
+        CustodyError::AssertionRejected(format!("signature hex decode failed: {err}"))
+    })?;
+    verify_wrapped_bytes(
+        issuer,
+        PASSKEY_CAPABILITY_SCHEMA,
+        &signing_body(capability)?,
+        &signature,
+    )
+    .map_err(|err| CustodyError::AssertionRejected(format!("signature rejected: {err}")))
 }
 
 #[cfg(test)]

@@ -18,13 +18,19 @@ fn typed(schema: &str, bytes: &[u8]) -> bool {
         "artifact-recipient.schema.json" => read!(ArtifactRecipientV1),
         "artifact-certificate.schema.json" => read!(ArtifactCertificateV1),
         "signed-artifact-certificate.schema.json" => {
-            decode_contract::<SignedArtifactCertificateV1>(bytes)
-                .is_ok_and(|proof| proof.verify_integrity_embedded_key().is_ok_and(|valid| valid))
+            decode_contract::<SignedArtifactCertificateV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
         }
         "artifact-archive-manifest.schema.json" => read!(ArtifactArchiveManifestV1),
         "signed-artifact-archive-manifest.schema.json" => {
-            decode_contract::<SignedArtifactArchiveManifestV1>(bytes)
-                .is_ok_and(|proof| proof.verify_integrity_embedded_key().is_ok_and(|valid| valid))
+            decode_contract::<SignedArtifactArchiveManifestV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
         }
         "model-context.schema.json" => read!(ModelContextV1),
         "labeled-checkpoint.schema.json" => read!(LabeledCheckpointV1),

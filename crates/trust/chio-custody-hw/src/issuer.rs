@@ -549,7 +549,13 @@ mod tests {
             Err(e) => panic!("issued signature must decode: {e}"),
         };
         assert!(
-            chio_core_types::crypto::verify_wrapped_bytes(&public, crate::mint::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
+            chio_core_types::crypto::verify_wrapped_bytes(
+                &public,
+                crate::mint::PASSKEY_CAPABILITY_SCHEMA,
+                &message,
+                &signature
+            )
+            .is_ok(),
             "issued capability must verify under the signer public key"
         );
     }

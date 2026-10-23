@@ -1834,7 +1834,10 @@ pub fn verify_signing_wrapper_layout() {
     let schema_digest: [u8; 32] = kani::any();
     let body_digest: [u8; 32] = kani::any();
     let wrapper = chio_core_types::crypto::assemble_wrapper(schema_digest, body_digest);
-    assert_eq!(&wrapper[..24], chio_core_types::crypto::SIGNING_WRAPPER_PREFIX);
+    assert_eq!(
+        &wrapper[..24],
+        chio_core_types::crypto::SIGNING_WRAPPER_PREFIX
+    );
     assert_eq!(wrapper[23], 0);
     assert_eq!(&wrapper[24..56], &schema_digest);
     assert_eq!(&wrapper[56..88], &body_digest);

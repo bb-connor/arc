@@ -66,7 +66,8 @@ pub fn verify_destructive_authorization(
 ) -> Result<(), GovernanceAuthorizationError> {
     receipt.body.validate()?;
     validate_sha256_hex(expected_step_sha256, "expected_step_sha256")?;
-    if !receipt.verify_signature(&receipt.signer_key)
+    if !receipt
+        .verify_signature(&receipt.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);
@@ -110,7 +111,8 @@ pub fn verify_step_governance_boundary(
             receipt.body.receipt_id.clone(),
         ));
     }
-    if !receipt.verify_signature(&receipt.signer_key)
+    if !receipt
+        .verify_signature(&receipt.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);

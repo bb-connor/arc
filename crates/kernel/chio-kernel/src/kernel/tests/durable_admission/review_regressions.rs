@@ -654,7 +654,10 @@ fn durable_terminal_receipt_uses_the_admitted_tenant() {
         response.receipt.tenant_id.as_deref(),
         Some("tenant-durable")
     );
-    assert!(response.receipt.verify_integrity_embedded_key().expect("signed receipt"));
+    assert!(response
+        .receipt
+        .verify_integrity_embedded_key()
+        .expect("signed receipt"));
     assert_eq!(
         store
             .operation()

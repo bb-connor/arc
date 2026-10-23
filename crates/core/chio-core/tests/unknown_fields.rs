@@ -91,25 +91,25 @@ fn make_receipt_body(kp: &Keypair) -> ChioReceiptBody {
 
 fn make_tool_definition() -> ToolDefinition {
     ToolDefinition {
-            name: "file_read".to_string(),
-            description: "Read a file".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string" }
-                },
-                "required": ["path"]
-            }),
-            output_schema: None,
-            pricing: None,
-            annotations: ToolAnnotations {
-                read_only: true,
-                destructive: false,
-                idempotent: true,
-                requires_approval: false,
+        name: "file_read".to_string(),
+        description: "Read a file".to_string(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" }
             },
-            latency_hint: Some(chio_core::manifest::LatencyHint::Fast),
-            flow: None,
+            "required": ["path"]
+        }),
+        output_schema: None,
+        pricing: None,
+        annotations: ToolAnnotations {
+            read_only: true,
+            destructive: false,
+            idempotent: true,
+            requires_approval: false,
+        },
+        latency_hint: Some(chio_core::manifest::LatencyHint::Fast),
+        flow: None,
     }
 }
 

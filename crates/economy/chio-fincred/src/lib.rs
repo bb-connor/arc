@@ -414,7 +414,9 @@ impl chio_core_types::receipt::lineage::SignedExportPayload for FinancialSourceC
     const SCHEMA_ID: &'static str = FINANCIAL_SOURCE_CHECKPOINT_SCHEMA_V1;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for FinancialSourceCompletenessAttestationBodyV1 {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FinancialSourceCompletenessAttestationBodyV1
+{
     const SCHEMA_ID: &'static str = FINANCIAL_SOURCE_COMPLETENESS_ATTESTATION_SCHEMA_V1;
 }
 

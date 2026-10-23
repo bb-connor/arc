@@ -343,7 +343,8 @@ impl GenericGovernanceCaseIssueRequest {
         }
         self.charter.body.validate()?;
         if let Some(activation) = self.activation.as_ref() {
-            if !activation.verify_signature(&activation.signer_key)
+            if !activation
+                .verify_signature(&activation.signer_key)
                 .map_err(|error| error.to_string())?
             {
                 return Err("trust activation signature is invalid".to_string());

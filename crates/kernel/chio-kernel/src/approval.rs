@@ -242,11 +242,14 @@ impl ApprovalToken {
             )));
         }
 
-        let ok = self.governed_token.verify_integrity_embedded_key().map_err(|e| {
-            KernelError::ApprovalRejected(format!(
-                "approval token signature verification failed: {e}"
-            ))
-        })?;
+        let ok = self
+            .governed_token
+            .verify_integrity_embedded_key()
+            .map_err(|e| {
+                KernelError::ApprovalRejected(format!(
+                    "approval token signature verification failed: {e}"
+                ))
+            })?;
         if !ok {
             return Err(KernelError::ApprovalRejected(
                 "approval token signature did not verify".into(),

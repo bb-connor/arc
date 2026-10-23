@@ -505,8 +505,8 @@ fn tampered_step_parent_hash_fails_closed() {
 #[test]
 fn bad_vendor_signature_fails_closed() {
     let mut package = fresh_proof_package().unwrap();
-    package.workflow_receipt.vendor_signatures[0].signature =
-        Keypair::from_seed(&[99; 32]).sign_exempt(
+    package.workflow_receipt.vendor_signatures[0].signature = Keypair::from_seed(&[99; 32])
+        .sign_exempt(
             chio_core_types::crypto::ExemptFormat::JwsSigningInput,
             b"not the workflow body",
         );

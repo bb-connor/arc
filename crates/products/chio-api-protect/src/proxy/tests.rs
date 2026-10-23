@@ -1276,7 +1276,10 @@ async fn sidecar_mint_returns_canonical_capability_tokens() {
     assert_eq!(mint.capability.scope.grants.len(), 2);
     assert_eq!(mint.capability.scope.grants[0].server_id, "*");
     assert_eq!(mint.capability.scope.grants[0].tool_name, "search");
-    assert!(mint.capability.verify_integrity_embedded_key().test_unwrap());
+    assert!(mint
+        .capability
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 }
 
 #[tokio::test]

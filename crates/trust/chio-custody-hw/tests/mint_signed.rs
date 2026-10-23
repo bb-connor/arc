@@ -137,7 +137,13 @@ fn signature_verifies_against_backend_public_key() {
         Err(e) => panic!("signed capability signature must decode: {e}"),
     };
     assert!(
-        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
+        chio_core_types::crypto::verify_wrapped_bytes(
+            &public,
+            chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+            &message,
+            &signature
+        )
+        .is_ok(),
         "issuer signature must verify against backend public key"
     );
 }
@@ -169,7 +175,13 @@ fn tampering_with_audience_breaks_signature() {
         Err(e) => panic!("hex must decode: {e}"),
     };
     assert!(
-        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err(),
+        chio_core_types::crypto::verify_wrapped_bytes(
+            &public,
+            chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+            &message,
+            &signature
+        )
+        .is_err(),
         "tampering with audience MUST invalidate the signature"
     );
 }
@@ -201,7 +213,13 @@ fn tampering_with_scope_set_breaks_signature() {
         Err(e) => panic!("hex must decode: {e}"),
     };
     assert!(
-        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err(),
+        chio_core_types::crypto::verify_wrapped_bytes(
+            &public,
+            chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+            &message,
+            &signature
+        )
+        .is_err(),
         "tampering with scope set MUST invalidate the signature"
     );
 }
@@ -250,7 +268,13 @@ mod hybrid {
             Err(e) => panic!("hybrid signature hex must decode: {e}"),
         };
         assert!(
-            chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
+            chio_core_types::crypto::verify_wrapped_bytes(
+                &public,
+                chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+                &message,
+                &signature
+            )
+            .is_ok(),
             "hybrid signature must verify against hybrid public key"
         );
     }

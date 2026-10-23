@@ -6,8 +6,8 @@ use chio_binding_helpers::{
     sha256_hex_utf8, sign_wrapped_json_ed25519, signed_manifest_body_canonical_json,
     verify_capability, verify_receipt, verify_receipt_json,
     verify_receipt_json_with_trusted_signer_hex, verify_receipt_with_trusted_signers,
-    verify_signed_manifest, verify_wrapped_json,
-    CapabilityVerification, ErrorCode, ManifestVerification, ReceiptVerification,
+    verify_signed_manifest, verify_wrapped_json, CapabilityVerification, ErrorCode,
+    ManifestVerification, ReceiptVerification,
 };
 use chio_core::{
     capability::{
@@ -760,9 +760,9 @@ fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLev
     let signature = keypair
         .sign_wrapped(
             chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&ChioReceiptSigningBody::from(
-                &body,
-            ))
+            &chio_core::canonical::CanonicalBytes::from_serializable(
+                &ChioReceiptSigningBody::from(&body),
+            )
             .test_unwrap("canonical trust level receipt body"),
         )
         .test_unwrap("sign trust level receipt body");
@@ -1233,8 +1233,8 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         );
 
         if expected_verify {
-            let signed = sign_wrapped_json_ed25519(schema_id, input, seed_hex)
-                .test_unwrap("sign json case");
+            let signed =
+                sign_wrapped_json_ed25519(schema_id, input, seed_hex).test_unwrap("sign json case");
             assert_eq!(
                 signed.canonical_json, canonical_json,
                 "json sign {}",
@@ -1253,7 +1253,12 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         }
 
         let actual = verify_wrapped_json(schema_id, input, public_key_hex, signature_hex);
-        assert_eq!(actual.is_ok(), expected_verify, "json verify {}", case["id"]);
+        assert_eq!(
+            actual.is_ok(),
+            expected_verify,
+            "json verify {}",
+            case["id"]
+        );
         if !expected_verify {
             assert!(
                 matches!(

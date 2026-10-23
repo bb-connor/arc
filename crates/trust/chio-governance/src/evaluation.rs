@@ -14,7 +14,7 @@ pub fn evaluate_generic_governance_case(
 
     if !request
         .listing
-            .verify_signature(&request.listing.signer_key)
+        .verify_signature(&request.listing.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Ok(governance_failure(
@@ -26,7 +26,7 @@ pub fn evaluate_generic_governance_case(
     }
     if !request
         .charter
-            .verify_signature(&request.charter.signer_key)
+        .verify_signature(&request.charter.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Ok(governance_failure(
@@ -46,7 +46,7 @@ pub fn evaluate_generic_governance_case(
     }
     if !request
         .case
-            .verify_signature(&request.case.signer_key)
+        .verify_signature(&request.case.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Ok(governance_failure(
@@ -65,7 +65,8 @@ pub fn evaluate_generic_governance_case(
         ));
     }
     if let Some(activation) = request.activation.as_ref() {
-        if !activation.verify_signature(&activation.signer_key)
+        if !activation
+            .verify_signature(&activation.signer_key)
             .map_err(|error| error.to_string())?
         {
             return Ok(governance_failure(
@@ -85,7 +86,8 @@ pub fn evaluate_generic_governance_case(
         }
     }
     if let Some(prior_case) = request.prior_case.as_ref() {
-        if !prior_case.verify_signature(&prior_case.signer_key)
+        if !prior_case
+            .verify_signature(&prior_case.signer_key)
             .map_err(|error| error.to_string())?
         {
             return Ok(governance_failure(

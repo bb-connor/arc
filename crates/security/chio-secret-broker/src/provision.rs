@@ -1102,11 +1102,14 @@ fn verify_governed_admin_authorization_inner(
                 "governed admin approval lifetime exceeds policy".to_string(),
             ));
         }
-        if !approval.verify_integrity_embedded_key_at(now).map_err(|error| {
-            BrokerError::AuthorizationDenied(format!(
-                "governed admin approval verification failed: {error}"
-            ))
-        })? {
+        if !approval
+            .verify_integrity_embedded_key_at(now)
+            .map_err(|error| {
+                BrokerError::AuthorizationDenied(format!(
+                    "governed admin approval verification failed: {error}"
+                ))
+            })?
+        {
             return Err(BrokerError::AuthorizationDenied(
                 "governed admin approval signature is invalid".to_string(),
             ));

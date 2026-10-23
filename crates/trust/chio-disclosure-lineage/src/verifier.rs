@@ -144,7 +144,11 @@ pub fn sign_lineage_subgraph(
     let material = chio_core_types::CanonicalBytes::from_serializable(
         &lineage_subgraph_digest_material(lineage),
     )
-    .map_err(|error| invalid(format!("lineage signing body canonicalization failed: {error}")))?;
+    .map_err(|error| {
+        invalid(format!(
+            "lineage signing body canonicalization failed: {error}"
+        ))
+    })?;
     let signature = signer
         .sign_wrapped(LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1, &material)
         .map_err(|error| invalid(format!("lineage subgraph signature failed: {error}")))?;

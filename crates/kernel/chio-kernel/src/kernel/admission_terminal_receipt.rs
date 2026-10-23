@@ -928,11 +928,15 @@ fn validate_terminal_receipt_payload(
             "signed terminal receipt does not carry the exact operation projection".to_string(),
         ));
     }
-    if !payload.receipt.verify_integrity_embedded_key().map_err(|error| {
-        KernelError::ReceiptSigningFailed(format!(
-            "terminal receipt outbox signature verification failed: {error}"
-        ))
-    })? {
+    if !payload
+        .receipt
+        .verify_integrity_embedded_key()
+        .map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "terminal receipt outbox signature verification failed: {error}"
+            ))
+        })?
+    {
         return Err(KernelError::ReceiptSigningFailed(
             "terminal receipt outbox contains an invalid signature".to_string(),
         ));

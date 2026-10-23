@@ -1078,7 +1078,10 @@ fn evaluate_artifact_assertion(
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::ReceiptSignatureValid => {
-            let actual = fixture.valid_receipt()?.verify_integrity_embedded_key().unwrap_or(false);
+            let actual = fixture
+                .valid_receipt()?
+                .verify_integrity_embedded_key()
+                .unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::ReceiptTamperRejected => {

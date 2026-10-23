@@ -35,12 +35,24 @@ fn accepts(kind: &str, bytes: &[u8]) -> bool {
         "command" => typed::<RecoveryCommandV1>(bytes),
         "support_issue_input" => typed::<RecoverySupportIssueInputV1>(bytes),
         "provider_body" => typed::<RecoveryProviderFinalityV1>(bytes),
-        "grant" => decode_contract::<SignedRecoveryGrant>(bytes)
-            .is_ok_and(|grant| grant.verify_integrity_embedded_key().is_ok_and(|valid| valid)),
-        "coverage" => decode_contract::<SignedAuthorityCoverageAttestationV1>(bytes)
-            .is_ok_and(|proof| proof.verify_integrity_embedded_key().is_ok_and(|valid| valid)),
+        "grant" => decode_contract::<SignedRecoveryGrant>(bytes).is_ok_and(|grant| {
+            grant
+                .verify_integrity_embedded_key()
+                .is_ok_and(|valid| valid)
+        }),
+        "coverage" => {
+            decode_contract::<SignedAuthorityCoverageAttestationV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
+        }
         "provider_finality" => decode_contract::<SignedRecoveryProviderFinalityV1>(bytes)
-            .is_ok_and(|proof| proof.verify_integrity_embedded_key().is_ok_and(|valid| valid)),
+            .is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            }),
         _ => typed::<Value>(bytes),
     }
 }

@@ -143,8 +143,12 @@ pub fn sign_relay_alert_assurance_export_bundle(
         ],
     };
     let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| input
-        .signing_key.sign_wrapped(PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            input.signing_key.sign_wrapped(
+                PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA,
+                &canonical,
+            )
+        })
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     let manifest = RelayAlertAssuranceExportManifest {
         schema: PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA.to_string(),
@@ -442,7 +446,14 @@ pub(crate) fn validate_trusted_exporters(
             "trusted exporter key is outside its validity window".to_string(),
         ));
     }
-    if chio_core_types::crypto::verify_wrapped(&exporter.public_key, PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA, &manifest.body, &manifest.signature).is_err() {
+    if chio_core_types::crypto::verify_wrapped(
+        &exporter.public_key,
+        PHEROMONE_RELAY_ALERT_ASSURANCE_EXPORT_MANIFEST_SCHEMA,
+        &manifest.body,
+        &manifest.signature,
+    )
+    .is_err()
+    {
         return Err(PheromoneRelayError::SignatureInvalid);
     }
     Ok(())

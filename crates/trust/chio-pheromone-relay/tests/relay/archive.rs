@@ -352,7 +352,10 @@ fn relay_alert_assurance_archive_package_binds_source_reports_and_members() {
     let signature = packager
         .sign_wrapped(
             chio_pheromone_relay::PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
-            &chio_core_types::CanonicalBytes::from_serializable(&mismatched_bundle_package.manifest.body).unwrap(),
+            &chio_core_types::CanonicalBytes::from_serializable(
+                &mismatched_bundle_package.manifest.body,
+            )
+            .unwrap(),
         )
         .unwrap();
     mismatched_bundle_package.manifest.signature = signature;
@@ -376,7 +379,8 @@ fn relay_alert_assurance_archive_package_binds_source_reports_and_members() {
     let signature = packager
         .sign_wrapped(
             chio_pheromone_relay::PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
-            &chio_core_types::CanonicalBytes::from_serializable(&outside_package.manifest.body).unwrap(),
+            &chio_core_types::CanonicalBytes::from_serializable(&outside_package.manifest.body)
+                .unwrap(),
         )
         .unwrap();
     outside_package.manifest.signature = signature;

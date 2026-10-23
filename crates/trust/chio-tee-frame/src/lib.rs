@@ -19,8 +19,7 @@ pub use frame::{
 };
 pub use schema::{
     signing_body, signing_payload, validate, validate_signed, verify_tenant_sig, SchemaError,
-    SCHEMA_ID, TEE_CAPTURE_FRAME_SCHEMA,
-    SCHEMA_VERSION,
+    SCHEMA_ID, SCHEMA_VERSION, TEE_CAPTURE_FRAME_SCHEMA,
 };
 
 /// Frame schema version label. The on-the-wire field [`SCHEMA_VERSION`] is

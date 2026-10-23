@@ -248,7 +248,10 @@ async fn final_f11_repair_plain_seed_first_issue_uses_owner_startup_provisioning
             .test_unwrap()
             .public_key()
     );
-    assert!(issued.capability.verify_integrity_embedded_key().test_unwrap());
+    assert!(issued
+        .capability
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 }
 
 #[tokio::test]
@@ -403,7 +406,10 @@ async fn assert_relays_preserve_admission(force_snapshot: bool) {
         issued.capability.issuer,
         custodian.status().test_unwrap().public_key
     );
-    assert!(issued.capability.verify_integrity_embedded_key().test_unwrap());
+    assert!(issued
+        .capability
+        .verify_integrity_embedded_key()
+        .test_unwrap());
     // F now confirms the same elected source's admitted state.
     sync_peer(&state, &leader.url).test_unwrap();
     assert_eq!(

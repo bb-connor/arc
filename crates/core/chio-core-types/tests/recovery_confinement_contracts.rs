@@ -134,7 +134,8 @@ fn disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail()
         let mut changed = contract.clone();
         changed["body"][field] = serde_json::to_value([171u8; 32])?;
         assert!(
-            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?.verify_integrity_embedded_key()?,
+            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?
+                .verify_integrity_embedded_key()?,
             "{field}"
         );
     }
@@ -142,7 +143,8 @@ fn disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail()
         let mut changed = contract.clone();
         changed["body"]["parent"][field] = "substitute".into();
         assert!(
-            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?.verify_integrity_embedded_key()?,
+            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?
+                .verify_integrity_embedded_key()?,
             "parent {field}"
         );
     }

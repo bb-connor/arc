@@ -460,7 +460,13 @@ mod tests {
             }
         ));
         assert!(matches!(
-            parse(&["xtask", "gen", "signed-fixtures", "--check", "--require-complete"]),
+            parse(&[
+                "xtask",
+                "gen",
+                "signed-fixtures",
+                "--check",
+                "--require-complete"
+            ]),
             Command::Gen {
                 command: GenCommand::SignedFixtures {
                     check: true,

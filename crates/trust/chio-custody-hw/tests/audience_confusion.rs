@@ -87,7 +87,13 @@ fn audience_bit_flip_invalidates_signature_pinned() {
         Ok(s) => s,
         Err(e) => panic!("hex must decode: {e}"),
     };
-    assert!(chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err());
+    assert!(chio_core_types::crypto::verify_wrapped_bytes(
+        &public,
+        chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+        &message,
+        &signature
+    )
+    .is_err());
 }
 
 proptest! {

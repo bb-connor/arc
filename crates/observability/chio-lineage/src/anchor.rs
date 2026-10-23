@@ -596,7 +596,10 @@ mod tests {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
         let signature = keypair
-            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .sign_wrapped(
+                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+                &frontier_signature_body(&g).unwrap(),
+            )
             .unwrap();
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
@@ -611,7 +614,10 @@ mod tests {
         let keypair = Keypair::from_seed(&[7_u8; 32]);
         let wrong_keypair = Keypair::from_seed(&[8_u8; 32]);
         let signature = keypair
-            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .sign_wrapped(
+                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+                &frontier_signature_body(&g).unwrap(),
+            )
             .unwrap();
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
@@ -626,7 +632,10 @@ mod tests {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
         let signature = keypair
-            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .sign_wrapped(
+                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+                &frontier_signature_body(&g).unwrap(),
+            )
             .unwrap();
         let signature_hex = signature.to_hex();
         let mut pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature_hex)

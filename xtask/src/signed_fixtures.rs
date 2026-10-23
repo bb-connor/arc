@@ -63,32 +63,58 @@ const fn cargo_env(
     Invocation::Cargo { args, env }
 }
 
-const BINDING_VECTOR_CHECK: Invocation =
-    cargo(&["test", "-p", "chio-binding-helpers", "--test", "vector_fixtures"]);
+const BINDING_VECTOR_CHECK: Invocation = cargo(&[
+    "test",
+    "-p",
+    "chio-binding-helpers",
+    "--test",
+    "vector_fixtures",
+]);
 
 /// Generators in run order. Bindings first, freeze-vectors last.
 pub(crate) const STEPS: &[Step] = &[
     Step {
         name: "bindings receipt vectors",
         regenerate: cargo(&[
-            "test", "-p", "chio-binding-helpers", "--test", "vector_fixtures", "--",
-            "--ignored", "--exact", "refresh_receipt_vector_fixture",
+            "test",
+            "-p",
+            "chio-binding-helpers",
+            "--test",
+            "vector_fixtures",
+            "--",
+            "--ignored",
+            "--exact",
+            "refresh_receipt_vector_fixture",
         ]),
         check: BINDING_VECTOR_CHECK,
     },
     Step {
         name: "bindings manifest vectors",
         regenerate: cargo(&[
-            "test", "-p", "chio-binding-helpers", "--test", "vector_fixtures", "--",
-            "--ignored", "--exact", "regenerate_manifest_vector_fixture",
+            "test",
+            "-p",
+            "chio-binding-helpers",
+            "--test",
+            "vector_fixtures",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate_manifest_vector_fixture",
         ]),
         check: BINDING_VECTOR_CHECK,
     },
     Step {
         name: "bindings capability vectors",
         regenerate: cargo(&[
-            "test", "-p", "chio-binding-helpers", "--test", "vector_fixtures", "--",
-            "--ignored", "--exact", "rebless_capability_vector_signatures",
+            "test",
+            "-p",
+            "chio-binding-helpers",
+            "--test",
+            "vector_fixtures",
+            "--",
+            "--ignored",
+            "--exact",
+            "rebless_capability_vector_signatures",
         ]),
         check: BINDING_VECTOR_CHECK,
     },
@@ -97,15 +123,25 @@ pub(crate) const STEPS: &[Step] = &[
         regenerate: Invocation::Program {
             program: "uv",
             args: &[
-                "run", "--with-requirements", "scripts/gen-signing-wrapper-vectors.requirements.txt",
-                "python3", "-I", "scripts/gen-signing-wrapper-vectors.py", "write",
+                "run",
+                "--with-requirements",
+                "scripts/gen-signing-wrapper-vectors.requirements.txt",
+                "python3",
+                "-I",
+                "scripts/gen-signing-wrapper-vectors.py",
+                "write",
             ],
         },
         check: Invocation::Program {
             program: "uv",
             args: &[
-                "run", "--with-requirements", "scripts/gen-signing-wrapper-vectors.requirements.txt",
-                "python3", "-I", "scripts/gen-signing-wrapper-vectors.py", "check",
+                "run",
+                "--with-requirements",
+                "scripts/gen-signing-wrapper-vectors.requirements.txt",
+                "python3",
+                "-I",
+                "scripts/gen-signing-wrapper-vectors.py",
+                "check",
             ],
         },
     },
@@ -127,27 +163,62 @@ pub(crate) const STEPS: &[Step] = &[
     Step {
         name: "recovery knowledge contract vectors",
         regenerate: cargo(&[
-            "test", "-p", "chio-core-types", "--test", "recovery_knowledge_contracts", "--",
-            "--ignored", "--exact", "write_shared_vectors",
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_knowledge_contracts",
+            "--",
+            "--ignored",
+            "--exact",
+            "write_shared_vectors",
         ]),
-        check: cargo(&["test", "-p", "chio-core-types", "--test", "recovery_knowledge_contracts"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_knowledge_contracts",
+        ]),
     },
     Step {
         name: "recovery product contract vectors",
         regenerate: cargo_env(
-            &["test", "-p", "chio-core-types", "--test", "recovery_product_contracts"],
+            &[
+                "test",
+                "-p",
+                "chio-core-types",
+                "--test",
+                "recovery_product_contracts",
+            ],
             &[("CHIO_REGENERATE_RECOVERY_PRODUCT_VECTORS", "1")],
         ),
-        check: cargo(&["test", "-p", "chio-core-types", "--test", "recovery_product_contracts"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_product_contracts",
+        ]),
     },
     Step {
         name: "frost sealed round-two vectors",
         regenerate: cargo(&[
-            "test", "-p", "chio-federation-authority", "--lib", "--",
-            "--ignored", "--exact", "frost_ceremony::sealing::tests::regenerate_sealed_vectors",
+            "test",
+            "-p",
+            "chio-federation-authority",
+            "--lib",
+            "--",
+            "--ignored",
+            "--exact",
+            "frost_ceremony::sealing::tests::regenerate_sealed_vectors",
         ]),
         check: cargo(&[
-            "test", "-p", "chio-federation-authority", "--lib", "frost_ceremony::sealing::tests",
+            "test",
+            "-p",
+            "chio-federation-authority",
+            "--lib",
+            "frost_ceremony::sealing::tests",
         ]),
     },
     Step {
@@ -166,67 +237,157 @@ pub(crate) const STEPS: &[Step] = &[
     Step {
         name: "receipt trace fixtures",
         regenerate: cargo_env(
-            &["test", "-p", "chio-trace-validate", "--test", "checked_fixtures"],
+            &[
+                "test",
+                "-p",
+                "chio-trace-validate",
+                "--test",
+                "checked_fixtures",
+            ],
             &[("CHIO_UPDATE_TRACE_FIXTURES", "1")],
         ),
-        check: cargo(&["test", "-p", "chio-trace-validate", "--test", "checked_fixtures"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-trace-validate",
+            "--test",
+            "checked_fixtures",
+        ]),
     },
     Step {
         name: "proof-room fixtures",
         regenerate: cargo(&[
-            "run", "-p", "chio-cli", "--bin", "chio", "--", "proof", "fixture", "regenerate",
+            "run",
+            "-p",
+            "chio-cli",
+            "--bin",
+            "chio",
+            "--",
+            "proof",
+            "fixture",
+            "regenerate",
         ]),
         check: cargo(&[
-            "run", "-p", "chio-cli", "--bin", "chio", "--", "proof", "fixture", "regenerate",
+            "run",
+            "-p",
+            "chio-cli",
+            "--bin",
+            "chio",
+            "--",
+            "proof",
+            "fixture",
+            "regenerate",
             "--check",
         ]),
     },
     Step {
         name: "finding golden fixture",
         regenerate: cargo(&[
-            "test", "-p", "chio-finding", "--test", "finding", "--",
-            "--ignored", "--exact", "regenerate_golden_fixture",
+            "test",
+            "-p",
+            "chio-finding",
+            "--test",
+            "finding",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate_golden_fixture",
         ]),
         check: cargo(&["test", "-p", "chio-finding", "--test", "finding"]),
     },
     Step {
         name: "finding market golden fixtures",
         regenerate: cargo(&[
-            "test", "-p", "chio-finding", "--test", "market_schemas", "--",
-            "--ignored", "--exact", "regenerate_market_golden_fixtures",
+            "test",
+            "-p",
+            "chio-finding",
+            "--test",
+            "market_schemas",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate_market_golden_fixtures",
         ]),
         check: cargo(&["test", "-p", "chio-finding", "--test", "market_schemas"]),
     },
     Step {
         name: "cognition-market proof-room golden",
         regenerate: cargo(&[
-            "test", "-p", "chio-transaction-passport", "--test", "cognition_market", "--",
-            "--ignored", "--exact", "regenerate_cognition_market_golden",
+            "test",
+            "-p",
+            "chio-transaction-passport",
+            "--test",
+            "cognition_market",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate_cognition_market_golden",
         ]),
-        check: cargo(&["test", "-p", "chio-transaction-passport", "--test", "cognition_market"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-transaction-passport",
+            "--test",
+            "cognition_market",
+        ]),
     },
     Step {
         name: "adversarial suite manifest",
         regenerate: cargo(&[
-            "test", "-p", "chio-adversarial-suite", "--test", "manifest_emit", "--",
-            "--ignored", "--exact", "regenerate",
+            "test",
+            "-p",
+            "chio-adversarial-suite",
+            "--test",
+            "manifest_emit",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate",
         ]),
-        check: cargo(&["test", "-p", "chio-adversarial-suite", "--test", "manifest_emit"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-adversarial-suite",
+            "--test",
+            "manifest_emit",
+        ]),
     },
     Step {
         name: "attestation v318 migration fixture",
         regenerate: cargo(&[
-            "test", "-p", "chio-attest-verify", "--features", "pq", "--test", "v318_migration",
-            "--", "--ignored", "--exact", "regenerate_fixture",
+            "test",
+            "-p",
+            "chio-attest-verify",
+            "--features",
+            "pq",
+            "--test",
+            "v318_migration",
+            "--",
+            "--ignored",
+            "--exact",
+            "regenerate_fixture",
         ]),
         check: cargo(&[
-            "test", "-p", "chio-attest-verify", "--features", "pq", "--test", "v318_migration",
+            "test",
+            "-p",
+            "chio-attest-verify",
+            "--features",
+            "pq",
+            "--test",
+            "v318_migration",
         ]),
     },
     Step {
         name: "replay fixtures",
         regenerate: cargo(&[
-            "test", "-p", "chio-cli", "--test", "replay", "--", "--ignored", "--exact",
+            "test",
+            "-p",
+            "chio-cli",
+            "--test",
+            "replay",
+            "--",
+            "--ignored",
+            "--exact",
             "bless_fixtures",
         ]),
         check: cargo(&["test", "-p", "chio-cli", "--test", "replay"]),
@@ -236,15 +397,22 @@ pub(crate) const STEPS: &[Step] = &[
         regenerate: Invocation::Program {
             program: "python3",
             args: &[
-                "spec/ietf/tools/render_vectors.py", "--vectors", "tests/bindings/vectors", "--out",
+                "spec/ietf/tools/render_vectors.py",
+                "--vectors",
+                "tests/bindings/vectors",
+                "--out",
                 "spec/ietf/generated",
             ],
         },
         check: Invocation::Program {
             program: "python3",
             args: &[
-                "spec/ietf/tools/render_vectors.py", "--vectors", "tests/bindings/vectors", "--out",
-                "spec/ietf/generated", "--check",
+                "spec/ietf/tools/render_vectors.py",
+                "--vectors",
+                "tests/bindings/vectors",
+                "--out",
+                "spec/ietf/generated",
+                "--check",
             ],
         },
     },
@@ -348,7 +516,9 @@ fn check_pass(root: &Path) -> Result<(), XtaskError> {
 }
 
 fn step_error(name: &str, mode: &str, error: XtaskError) -> XtaskError {
-    XtaskError::Process(format!("signed-fixtures {mode} step `{name}` failed: {error}"))
+    XtaskError::Process(format!(
+        "signed-fixtures {mode} step `{name}` failed: {error}"
+    ))
 }
 
 fn invoke(root: &Path, invocation: Invocation, check: bool) -> Result<(), XtaskError> {
@@ -419,8 +589,8 @@ fn tree_state(root: &Path) -> Result<Vec<u8>, XtaskError> {
         }
         let path = root.join(String::from_utf8_lossy(&entry[3..]).as_ref());
         if path.is_file() {
-            let bytes =
-                std::fs::read(&path).map_err(|error| XtaskError::Io(path.display().to_string(), error))?;
+            let bytes = std::fs::read(&path)
+                .map_err(|error| XtaskError::Io(path.display().to_string(), error))?;
             state.extend_from_slice(&bytes);
         }
     }
@@ -460,9 +630,7 @@ mod tests {
     #[test]
     fn require_complete_names_every_unowned_set() {
         let message = unowned_error().to_string();
-        assert!(message.starts_with(
-            "usage: signed fixture sets without an owning generator: "
-        ));
+        assert!(message.starts_with("usage: signed fixture sets without an owning generator: "));
         for set in UNOWNED_SETS {
             assert!(message.contains(set), "{set}");
         }

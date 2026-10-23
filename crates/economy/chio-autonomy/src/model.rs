@@ -558,11 +558,15 @@ impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousDriftR
     const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_DRIFT_REPORT_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousExecutionDecisionArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for AutonomousExecutionDecisionArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_EXECUTION_DECISION_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousPricingAuthorityEnvelopeArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for AutonomousPricingAuthorityEnvelopeArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_PRICING_AUTHORITY_ENVELOPE_SCHEMA;
 }
 

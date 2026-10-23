@@ -971,7 +971,9 @@ pub fn authenticate_outcome_delivery_nonacceptance(
     })
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeDeliveryAcknowledgementBodyV1 {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for OutcomeDeliveryAcknowledgementBodyV1
+{
     const SCHEMA_ID: &'static str = OUTCOME_DELIVERY_ACKNOWLEDGEMENT_SCHEMA;
 }
 

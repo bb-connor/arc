@@ -368,7 +368,9 @@ fn signed_capability_refuses_a_padded_local_selector() {
     let token = CapabilityToken::sign(body, &issuer).expect("token signs");
     let mut value = serde_json::to_value(&token).expect("token serializes");
     let decoded: CapabilityToken = serde_json::from_value(value.clone()).expect("token decodes");
-    assert!(decoded.verify_integrity_embedded_key().expect("signature checks"));
+    assert!(decoded
+        .verify_integrity_embedded_key()
+        .expect("signature checks"));
     value["scope"]["grants"][0]["constraints"][0]["value"]["settlement"]["pad"] = json!(0);
     let refused =
         serde_json::from_value::<CapabilityToken>(value).map_err(|error| error.to_string());

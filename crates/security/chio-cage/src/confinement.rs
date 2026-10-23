@@ -53,7 +53,9 @@ fn bound_launch_is_fully_enforced(
     trusted_kernel_key: &PublicKey,
     trusted_launch_signer: &PublicKey,
 ) -> bool {
-    if &receipt.kernel_key != trusted_kernel_key || !receipt.verify_integrity_embedded_key().unwrap_or(false) {
+    if &receipt.kernel_key != trusted_kernel_key
+        || !receipt.verify_integrity_embedded_key().unwrap_or(false)
+    {
         return false;
     }
     let Some(reference) = receipt

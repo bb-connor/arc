@@ -44,7 +44,8 @@ pub(crate) fn validate_revocation_checkpoint(
         ));
     }
     revoked_key_fingerprints(&checkpoint.body.revoked_key_fingerprints)?;
-    if !checkpoint.verify_signature(&checkpoint.signer_key)
+    if !checkpoint
+        .verify_signature(&checkpoint.signer_key)
         .map_err(|error| ChioPackageError::TrustBundle(error.to_string()))?
     {
         return Err(ChioPackageError::TrustBundle(

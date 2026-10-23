@@ -62,7 +62,8 @@ pub fn verify_capability_lease(
     expected_scope_digest: Option<String>,
 ) -> Result<(), GovernanceAuthorizationError> {
     lease.body.validate()?;
-    if !lease.verify_signature(&lease.signer_key)
+    if !lease
+        .verify_signature(&lease.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);

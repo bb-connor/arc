@@ -567,7 +567,11 @@ fn assert_terminal_executor_original_predicates(
         operation.dispatch_state(),
         AdmissionDispatchState::EffectCompleted
     );
-    setup_check!("genuine signature", receipt.verify_integrity_embedded_key()?, true);
+    setup_check!(
+        "genuine signature",
+        receipt.verify_integrity_embedded_key()?,
+        true
+    );
     setup_check!(
         "identity vs operation authority",
         identity.authority_id().to_owned(),

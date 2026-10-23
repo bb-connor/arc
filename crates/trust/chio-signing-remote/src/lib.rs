@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
-use chio_core::error::Result;
 use chio_core::crypto::verify_wrapper;
+use chio_core::error::Result;
 use chio_core::{
     canonical_json_bytes, sha256, Error, PublicKey, Signature, SigningAlgorithm, SigningBackend,
     SigningMessage, SigningWrapper,
@@ -489,10 +489,12 @@ fn verified_signature(
 
 fn hex_encode(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut out, byte| {
-        let _ = write!(out, "{byte:02x}");
-        out
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut out, byte| {
+            let _ = write!(out, "{byte:02x}");
+            out
+        })
 }
 
 fn binding_digest<T: Serialize>(value: &T) -> Result<String> {

@@ -151,8 +151,11 @@ pub fn sign_relay_http_request<T: Serialize + ?Sized>(
         sent_at_unix_ms: input.sent_at_unix_ms,
     };
     let signature = chio_core_types::CanonicalBytes::from_serializable(&signing_body)
-        .and_then(|canonical| input
-        .keypair.sign_wrapped(PHEROMONE_RELAY_HTTP_REQUEST_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            input
+                .keypair
+                .sign_wrapped(PHEROMONE_RELAY_HTTP_REQUEST_SCHEMA, &canonical)
+        })
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     Ok(PheromoneRelayHttpRequest {
         schema: signing_body.schema,

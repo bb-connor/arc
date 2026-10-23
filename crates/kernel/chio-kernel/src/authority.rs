@@ -1191,7 +1191,10 @@ pub(crate) mod tests {
 
         assert_eq!(capability.issuer, public_key);
         assert_eq!(capability.issued_at, 1_700_000_000);
-        assert!(matches!(capability.verify_integrity_embedded_key(), Ok(true)));
+        assert!(matches!(
+            capability.verify_integrity_embedded_key(),
+            Ok(true)
+        ));
     }
 
     /// A rotating backend whose current selector cannot be read.

@@ -2229,7 +2229,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.finding-status-operator-authorization.v1",
-        Some(("finding_status_operator_authorization", "signing-wrapper-v1")),
+        Some((
+            "finding_status_operator_authorization",
+            "signing-wrapper-v1",
+        )),
     ),
     (
         "chio.finding.worker-capability.v1",

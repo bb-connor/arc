@@ -19,7 +19,11 @@ fn vectors() -> Value {
 fn canonical(text: &str) -> CanonicalBytes {
     let value: Value = serde_json::from_str(text).expect("canonical body parses");
     let canonical = CanonicalBytes::from_value(&value).expect("canonical body canonicalizes");
-    assert_eq!(canonical.as_bytes(), text.as_bytes(), "vector body is canonical");
+    assert_eq!(
+        canonical.as_bytes(),
+        text.as_bytes(),
+        "vector body is canonical"
+    );
     canonical
 }
 
@@ -70,7 +74,10 @@ fn every_known_id_has_a_wrapper_case() {
         .copied()
         .filter(|id| !covered.contains(id))
         .collect();
-    assert!(missing.is_empty(), "known ids without a wrapper case: {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "known ids without a wrapper case: {missing:?}"
+    );
 }
 
 fn verifiable(algorithm: &str) -> bool {
@@ -135,7 +142,12 @@ fn rust_signer_reproduces_every_ed25519_positive() {
             .sign_wrapped(case["signed_schema_id"].as_str().unwrap(), &body)
             .unwrap();
         assert_eq!(signature.algorithm(), SigningAlgorithm::Ed25519);
-        assert_eq!(signature.to_hex(), case["signature"].as_str().unwrap(), "{}", case["id"]);
+        assert_eq!(
+            signature.to_hex(),
+            case["signature"].as_str().unwrap(),
+            "{}",
+            case["id"]
+        );
         reproduced += 1;
     }
     assert!(reproduced > 0);

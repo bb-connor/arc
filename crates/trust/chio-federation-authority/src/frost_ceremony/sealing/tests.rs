@@ -303,8 +303,8 @@ fn every_metadata_field_and_ciphertext_is_authenticated() -> TestResult {
             FrostSealingError::Signature,
         );
         changed.transport_signature = n.signing[0]
-        .sign_wrapped(FROST_ROUND2_SCHEMA, &changed.signing_body()?)?
-        .to_hex();
+            .sign_wrapped(FROST_ROUND2_SCHEMA, &changed.signing_body()?)?
+            .to_hex();
         expect_error(
             changed.open(&n.configs[1], &n.sealing[1]),
             FrostSealingError::Authentication,

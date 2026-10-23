@@ -215,7 +215,10 @@ pub fn verify_finding_recovery_context(
         &context.original_capability_json,
         "original_capability_json",
     )?;
-    if !matches!(original_capability.verify_integrity_embedded_key(), Ok(true)) {
+    if !matches!(
+        original_capability.verify_integrity_embedded_key(),
+        Ok(true)
+    ) {
         return Err(RecoveryVerificationError::CapabilitySignature);
     }
     if original_capability.id != inputs.marker.original_capability_id {

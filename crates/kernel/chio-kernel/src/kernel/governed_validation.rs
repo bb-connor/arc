@@ -792,11 +792,14 @@ impl ChioKernel {
                 "governed call_chain continuation token is malformed: {error}"
             ))
         })? {
-            let signature_valid = continuation_token.verify_integrity_embedded_key().map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
+            let signature_valid =
+                continuation_token
+                    .verify_integrity_embedded_key()
+                    .map_err(|error| {
+                        KernelError::GovernedTransactionDenied(format!(
                     "governed call_chain continuation token failed signature verification: {error}"
                 ))
-            })?;
+                    })?;
             if !signature_valid {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed call_chain continuation token failed signature verification"
@@ -1010,11 +1013,13 @@ impl ChioKernel {
             return Ok(None);
         };
 
-        let signature_valid = upstream_proof.verify_integrity_embedded_key().map_err(|error| {
-            KernelError::GovernedTransactionDenied(format!(
-                "governed call_chain upstream proof failed signature verification: {error}"
-            ))
-        })?;
+        let signature_valid = upstream_proof
+            .verify_integrity_embedded_key()
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain upstream proof failed signature verification: {error}"
+                ))
+            })?;
         if !signature_valid {
             return Err(KernelError::GovernedTransactionDenied(
                 "governed call_chain upstream proof failed signature verification".to_string(),

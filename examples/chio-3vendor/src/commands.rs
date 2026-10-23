@@ -136,7 +136,7 @@ fn execute_command(command: Command) -> Result<(), ChioPackageError> {
                 chio_pheromone_runtime::RuntimeTransitPolicyDocument(body),
                 &runtime_issuer_key,
             )
-                .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
             write_json(out, &signed)?;
         }
         Command::WriteOutDir { dir } => {
@@ -526,12 +526,11 @@ fn write_pheromone_fixtures(
     };
     let mut policy_document = transit_policy_document(&policy, &validation_context)?;
     seal_runtime_policy_document_hashes(&mut policy_document, &runtime_issuer_key)?;
-    let signed_policy_document =
-        SignedExportEnvelope::sign(
-            chio_pheromone_runtime::RuntimeTransitPolicyDocument(policy_document.clone()),
-            &runtime_issuer_key,
-        )
-            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    let signed_policy_document = SignedExportEnvelope::sign(
+        chio_pheromone_runtime::RuntimeTransitPolicyDocument(policy_document.clone()),
+        &runtime_issuer_key,
+    )
+    .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     let (loaded_policy, receiver_config) = runtime_policy_from_json(
         &serde_json::to_string(&signed_policy_document)
             .map_err(|error| ChioPackageError::Json(error.to_string()))?,
@@ -774,7 +773,8 @@ fn observation_cost_verifier_root(
     };
     let issuer_signature = CanonicalBytes::from_serializable(&body)
         .and_then(|canonical| {
-            runtime_issuer_key.sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
+            runtime_issuer_key
+                .sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
         })
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     Ok(PheromoneObservationCostVerifierRoot {

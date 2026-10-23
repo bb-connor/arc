@@ -331,7 +331,9 @@ mod algorithm_member {
         let token = capability(&Keypair::from_seed(&[11; 32]));
         assert!(token.verify_integrity_embedded_key().unwrap());
         for algorithm in ["ed25519", "p256"] {
-            assert!(serde_json::from_value::<CapabilityToken>(with_member(&token, algorithm)).is_err());
+            assert!(
+                serde_json::from_value::<CapabilityToken>(with_member(&token, algorithm)).is_err()
+            );
         }
     }
 
@@ -341,7 +343,9 @@ mod algorithm_member {
         let receipt = ChioReceipt::sign(receipt_body(&key, None), &key).unwrap();
         assert!(receipt.verify_integrity_embedded_key().unwrap());
         for algorithm in ["ed25519", "p256"] {
-            assert!(serde_json::from_value::<ChioReceipt>(with_member(&receipt, algorithm)).is_err());
+            assert!(
+                serde_json::from_value::<ChioReceipt>(with_member(&receipt, algorithm)).is_err()
+            );
         }
     }
 
@@ -369,14 +373,16 @@ mod algorithm_member {
         let key = Keypair::from_seed(&[11; 32]);
         let mut receipt = ChioReceipt::sign(receipt_body(&key, None), &key).unwrap();
         let id = receipt.id.clone();
-        receipt.signature = Keypair::from_seed(&[13; 32]).sign_exempt(ExemptFormat::JwsSigningInput, b"other");
+        receipt.signature =
+            Keypair::from_seed(&[13; 32]).sign_exempt(ExemptFormat::JwsSigningInput, b"other");
         assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), id);
     }
 
     #[test]
     fn receipt_id_follows_nested_signature_change() {
         let key = Keypair::from_seed(&[11; 32]);
-        let nested = |signature: &str| Some(serde_json::json!({"child_receipt_signature": signature}));
+        let nested =
+            |signature: &str| Some(serde_json::json!({"child_receipt_signature": signature}));
         let first = ChioReceipt::sign(receipt_body(&key, nested("aa")), &key).unwrap();
         let second = ChioReceipt::sign(receipt_body(&key, nested("bb")), &key).unwrap();
         assert_ne!(first.id, second.id);
