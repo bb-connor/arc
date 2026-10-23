@@ -354,7 +354,7 @@ fn ap23_stdio_host_binds_pending_intent_before_collecting_votes() -> TestResult 
     else {
         return Err("pending response missing".into());
     };
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     assert_ne!(proposal.body.governed_intent_hash, original_hash);
     assert_eq!(proposal.body.governed_intent_hash, expected.binding_hash()?);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
@@ -431,7 +431,7 @@ fn pending_approval_transports_the_signed_proposal_without_dispatch() -> TestRes
     assert_eq!(wire["result"]["status"], "pending_approval");
     let proposal: ThresholdApprovalProposal =
         serde_json::from_value(wire["result"]["proposal"].clone())?;
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     assert_eq!(proposal.body.request_id, "pending-request");
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
     let KernelMessage::ToolCallResponse {
@@ -443,7 +443,7 @@ fn pending_approval_transports_the_signed_proposal_without_dispatch() -> TestRes
         return Err("tool response missing".into());
     };
     assert!(execution_nonce.is_none());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         receipt.kernel_key,
         fixture.kernel.receipt_signing_public_key().unwrap()
@@ -498,7 +498,7 @@ fn pending_approval_round_trip_resumes_the_original_request_once() -> TestResult
         };
         assert_eq!(id, "pending-request");
         assert_eq!(value, serde_json::json!({"text": "original parameters"}));
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
     }
     let session = fixture

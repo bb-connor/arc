@@ -51,7 +51,7 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
     assert_eq!(pending.output["status"], "pending_approval");
     let proposal: ThresholdApprovalProposal =
         serde_json::from_value(pending.output["proposal"].clone())?;
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     assert_eq!(proposal.body.policy_authority, fixture.signer.public_key());
     assert_eq!(proposal.body.request_id, request.request_id);
     assert_eq!(proposal.body.threshold, 2);

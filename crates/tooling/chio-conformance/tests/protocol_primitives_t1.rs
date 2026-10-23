@@ -64,7 +64,7 @@ fn capability_unknown_schema_rejected() {
 
     let mut bad = token;
     bad.schema = "chio.capability.v999".to_string();
-    assert!(bad.verify_signature().is_err());
+    assert!(bad.verify_integrity_embedded_key().is_err());
 }
 
 #[test]

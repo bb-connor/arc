@@ -545,7 +545,7 @@ async fn security_binding_projection_refuses_without_upstream_effects() {
         issuer,
     )
     .test_unwrap();
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
     assert_eq!(token.security_binding().test_unwrap(), Some(binding));
     token.validate_time(now).test_unwrap();
     let bound = serde_json::to_string(&token).test_unwrap();

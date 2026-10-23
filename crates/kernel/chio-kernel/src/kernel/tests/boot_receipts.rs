@@ -99,7 +99,7 @@ fn classical_inline_and_channel_receipts_remain_identical() -> TestResult {
         kernel.sign_receipt_via_channel(original_signing_body(&inline)?, CONTENT.to_vec()),
     )?;
     assert!(canonical_json_bytes(&inline)? == canonical_json_bytes(&channel)?);
-    assert!(inline.verify_signature()?);
+    assert!(inline.verify_integrity_embedded_key()?);
     runtime.block_on(kernel.shutdown());
     Ok(())
 }
@@ -528,7 +528,7 @@ fn capability_only_floor_setter_does_not_reconfigure_receipt_authority() -> Test
     kernel.set_capability_crypto_floor(KernelCryptoFloor::PqRequired);
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
     assert!(receipt.kernel_key == previous_key);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         kernel.signing_authority.floor,
         KernelCryptoFloor::AllowClassical

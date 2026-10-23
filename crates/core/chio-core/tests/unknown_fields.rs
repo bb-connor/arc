@@ -157,7 +157,7 @@ fn token_round_trips() {
     assert_eq!(token.issued_at, restored.issued_at);
     assert_eq!(token.expires_at, restored.expires_at);
     assert_eq!(token.signature.to_hex(), restored.signature.to_hex());
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]

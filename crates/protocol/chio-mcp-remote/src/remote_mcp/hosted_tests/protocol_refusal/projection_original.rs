@@ -73,7 +73,7 @@ async fn capture(logical_id: &str) -> TestResult<CapturedCall> {
     let receipt: ChioReceipt =
         serde_json::from_value(terminal["result"]["_meta"]["chioEvidence"]["receipt"].clone())?;
     assert_eq!(receipt.kernel_key, fixture.trusted_key);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         receipt.content_hash,
         sha256_hex(&canonical_json_bytes(
@@ -176,7 +176,7 @@ async fn rejects_forged_projection(invalid_signed_evidence: bool) -> TestResult 
         let mut receipt: ChioReceipt =
             serde_json::from_value(forged["result"]["_meta"]["chioEvidence"]["receipt"].clone())?;
         receipt.tool_name = "unsigned-replacement-tool".into();
-        assert!(!receipt.verify_signature()?);
+        assert!(!receipt.verify_integrity_embedded_key()?);
         forged["result"]["_meta"]["chioEvidence"]["receipt"] = serde_json::to_value(receipt)?;
     } else {
         assert_eq!(
@@ -320,7 +320,7 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
         .find(|capability| capability.id == receipt.capability_id)
         .ok_or("actual issued capability")?
         .clone();
-    assert!(capability.verify_signature()?);
+    assert!(capability.verify_integrity_embedded_key()?);
     let request = chio_kernel::ToolCallRequest {
         request_id: base.binding().request_id().as_str().into(),
         capability,

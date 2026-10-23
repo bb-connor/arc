@@ -94,7 +94,7 @@ impl ApprovalRedemption {
                 "token is not the current retained Approved decision for this call",
             ));
         }
-        if !token.verify_signature().map_err(denied)? {
+        if !token.verify_integrity_embedded_key().map_err(denied)? {
             return Err(denied("approval signature is invalid"));
         }
         let policy = load_policy(&self.policy_path).map_err(denied)?;

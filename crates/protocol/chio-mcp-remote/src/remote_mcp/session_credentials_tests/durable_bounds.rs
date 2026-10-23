@@ -53,7 +53,7 @@ fn signed_extension(keypair: &Keypair, completed: &Value, field: &str, value: Va
         serde_json::from_value(completed["result"]["_meta"]["chioEvidence"]["receipt"].clone())
             .unwrap();
     assert_eq!(signed.kernel_key, keypair.public_key());
-    assert!(signed.verify_signature().unwrap());
+    assert!(signed.verify_integrity_embedded_key().unwrap());
     let mut output = completed["result"]["_meta"]["chioEvidence"]["output"].clone();
     assert!(output["content"].is_array() && output["isError"].is_boolean());
     output[field] = value;

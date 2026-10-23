@@ -118,7 +118,7 @@ fn threat_kernel_impersonation_tampered_kernel_key_field_fails_verification() {
     };
 
     // Sanity: the genuine receipt verifies.
-    let genuine_ok = match tampered.verify_signature() {
+    let genuine_ok = match tampered.verify_integrity_embedded_key() {
         Ok(ok) => ok,
         Err(err) => panic!("attacker self-signed receipt verify failed: {err}"),
     };
@@ -132,7 +132,7 @@ fn threat_kernel_impersonation_tampered_kernel_key_field_fails_verification() {
     // key, but the on-the-wire kernel_key claims K_kernel.
     tampered.kernel_key = kernel_kp.public_key();
 
-    let result = match tampered.verify_signature() {
+    let result = match tampered.verify_integrity_embedded_key() {
         Ok(ok) => ok,
         Err(err) => panic!("verify_signature unexpectedly raised: {err}"),
     };
@@ -159,7 +159,7 @@ fn threat_kernel_impersonation_genuine_receipt_round_trips() {
         Ok(r) => r,
         Err(err) => panic!("legitimate sign_receipt_relaying_trusted_body failed: {err:?}"),
     };
-    let ok = match receipt.verify_signature() {
+    let ok = match receipt.verify_integrity_embedded_key() {
         Ok(ok) => ok,
         Err(err) => panic!("legitimate receipt verify_signature: {err}"),
     };

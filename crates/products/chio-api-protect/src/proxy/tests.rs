@@ -1276,7 +1276,7 @@ async fn sidecar_mint_returns_canonical_capability_tokens() {
     assert_eq!(mint.capability.scope.grants.len(), 2);
     assert_eq!(mint.capability.scope.grants[0].server_id, "*");
     assert_eq!(mint.capability.scope.grants[0].tool_name, "search");
-    assert!(mint.capability.verify_signature().test_unwrap());
+    assert!(mint.capability.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[tokio::test]
@@ -2345,7 +2345,7 @@ async fn sidecar_capabilities_alias_accepts_sdk_body_shape() {
         .test_unwrap();
     let token: CapabilityToken = serde_json::from_slice(&bytes).test_unwrap();
     assert!(!token.id.is_empty());
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[tokio::test]
@@ -2369,7 +2369,7 @@ async fn sidecar_capabilities_alias_accepts_canonical_body_shape() {
         .await
         .test_unwrap();
     let token: CapabilityToken = serde_json::from_slice(&bytes).test_unwrap();
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[tokio::test]
@@ -2859,7 +2859,7 @@ async fn sidecar_verify_receipt_round_trips_a_signed_chio_receipt() {
         .await
         .test_unwrap();
     let (_body, receipt) = parse_advisory_evaluation_body(&receipt_bytes);
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     assert_eq!(receipt.capability_id, token.id);
     // The sidecar advisory path emits advisory receipts (no decision)
     // so v1 authority gates cannot mistake the result for a kernel-
@@ -3033,7 +3033,7 @@ async fn sidecar_verify_receipt_rejects_untrusted_signer() {
         &attacker,
     )
     .test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
 
     let verify_body = serde_json::to_value(&receipt).test_unwrap();
     let verify_response = build_app(Arc::clone(&state))
@@ -3158,7 +3158,7 @@ async fn sidecar_verify_receipt_rejects_action_parameter_hash_mismatch() {
         &state.signer_keypair,
     )
     .test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
 
     let verify_body = serde_json::to_value(&receipt).test_unwrap();
     let verify_response = build_app(Arc::clone(&state))
@@ -3313,7 +3313,7 @@ async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
         .and_then(|m| m.get("advisory_check_outcome"))
         .and_then(|v| v.as_str());
     assert_eq!(alias_outcome, Some("capability_revoked"));
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
 
     let log = state.tool_receipt_log.lock().await;
     assert_eq!(log.receipts.len(), 1);

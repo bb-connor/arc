@@ -129,7 +129,7 @@ pub(super) fn verified_receipt(
     )
     .ok()?;
     if receipt.kernel_key != keypair.public_key()
-        || !matches!(receipt.verify_signature(), Ok(true))
+        || !matches!(receipt.verify_integrity_embedded_key(), Ok(true))
         || receipt.decision != Some(chio_core::receipt::decision::Decision::Allow)
         || receipt.tool_server != call.server_id
         || receipt.tool_name != call.tool_name

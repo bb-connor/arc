@@ -124,7 +124,7 @@ impl Fixture {
             receipt.policy_hash,
             chio_core::sha256_hex(b"test-runtime-policy")
         );
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert!(receipt.action.verify_hash()?);
         Ok(())
     }
@@ -154,7 +154,7 @@ impl Fixture {
                 chio_core::canonical_json_bytes(receipt)?,
                 chio_core::canonical_json_bytes(&recorded)?
             );
-            assert!(recorded.verify_signature()?);
+            assert!(recorded.verify_integrity_embedded_key()?);
         }
         Ok(())
     }

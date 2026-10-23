@@ -244,7 +244,7 @@ fn native_sink_signs_appends_idempotently_and_verifies_the_exact_stored_receipt(
     let signed: ChioReceipt = serde_json::from_str(&raw_json)
         .unwrap_or_else(|error| panic!("decode signed receipt: {error}"));
     assert!(signed
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("verify signed receipt: {error}")));
     assert_eq!(signed.tenant_id.as_deref(), Some("tenant-native"));
     assert_eq!(
@@ -612,7 +612,7 @@ fn detector_health_evidence_is_signed_persisted_and_append_failure_propagates() 
     let receipt: ChioReceipt = serde_json::from_str(&raw_json)
         .unwrap_or_else(|error| panic!("decode detector health receipt: {error}"));
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("verify detector health receipt: {error}")));
     assert_eq!(receipt.kernel_key, signer.public_key());
     let body: ActiveDefenseReceiptBody = serde_json::from_value(
@@ -746,7 +746,7 @@ fn attested_correlation_writer_publishes_only_read_back_authoritative_evidence()
         .unwrap_or_else(|error| panic!("load indexed finding: {error}"))
         .unwrap_or_else(|| panic!("indexed finding is missing"));
     assert!(persisted
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("verify finding signature: {error}")));
 }
 

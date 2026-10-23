@@ -506,7 +506,7 @@ impl Consumer {
             }
         };
         let receipt: ChioReceipt = serde_json::from_value(metadata["chio"]["receipt"].clone())?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         Ok(Observed {
             receipt,
             decision: metadata["chio"]["decision"]

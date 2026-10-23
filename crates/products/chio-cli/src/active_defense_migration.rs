@@ -1037,7 +1037,7 @@ fn verify_backfill_receipts(
                 receipt.id, registered.registered_key_id
             )));
         }
-        let signature_valid = receipt.verify_signature().map_err(|error| {
+        let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
             ShadowMigrationError::Invalid(format!(
                 "receipt {} signature verification failed: {error}",
                 receipt.id

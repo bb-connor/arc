@@ -74,7 +74,7 @@ fn transient_deadline_clock_failure_preserves_the_original_task_for_retry() -> T
     );
     let receipt: ChioReceipt =
         serde_json::from_value(completed["result"]["task"]["metadata"]["chio"]["receipt"].clone())?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.kernel_key, fixture.signer.public_key());
     assert_eq!(
         receipt.decision,

@@ -337,22 +337,22 @@ fn threshold_proposal_mutations_and_exact_quorum_fail_closed() -> TestResult {
             "proposal_deadline" => {
                 let mut changed = proposal.clone();
                 changed.body.proposal_deadline = 201;
-                assert!(!changed.verify_signature()?);
+                assert!(!changed.verify_integrity_embedded_key()?);
             }
             "eligible_set_digest" => {
                 let mut changed = proposal.clone();
                 changed.body.eligible_set_digest = sha256_hex(b"changed-set");
-                assert!(!changed.verify_signature()?);
+                assert!(!changed.verify_integrity_embedded_key()?);
             }
             "governed_intent_hash" => {
                 let mut changed = proposal.clone();
                 changed.body.governed_intent_hash = sha256_hex(b"changed-intent");
-                assert!(!changed.verify_signature()?);
+                assert!(!changed.verify_integrity_embedded_key()?);
             }
             "authorizing_capability_digest" => {
                 let mut changed = proposal.clone();
                 changed.body.authorizing_capability_digest = sha256_hex(b"changed-capability");
-                assert!(!changed.verify_signature()?);
+                assert!(!changed.verify_integrity_embedded_key()?);
             }
             other => return Err(std::io::Error::other(format!("unknown mutation {other}")).into()),
         }

@@ -278,7 +278,7 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
         body.content_hash = sha256_hex(&canonical_json_bytes(&value)?);
         body.id.clear();
         let signed = ChioReceipt::sign(body, &signer)?;
-        assert!(signed.verify_signature()?);
+        assert!(signed.verify_integrity_embedded_key()?);
         let path = root.join(format!("substitution-{index}.json"));
         std::fs::write(&path, canonical_json_bytes(&signed)?)?;
         let denied = verify(&path, runtime)?;

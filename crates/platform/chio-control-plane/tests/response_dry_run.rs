@@ -83,7 +83,7 @@ fn response_dry_run_verification_refuses_tampering_wrong_trust_and_configuration
             _ => unreachable!(),
         }
         let rebound = ChioReceipt::sign_with_backend(body, &backend)?;
-        assert!(rebound.verify_signature()?);
+        assert!(rebound.verify_integrity_embedded_key()?);
         let error =
             verify_response_simulation_receipt(&rebound, &id, &signer, report.configuration_digest)
                 .err()

@@ -104,7 +104,7 @@ fn mcp_serve_http_adapted_server_call_binds_its_verified_cage_launch() {
         .public_key();
 
     assert_eq!(tool.kernel_key, kernel, "tool receipt signer");
-    assert!(tool.verify_signature().expect("verify tool receipt"));
+    assert!(tool.verify_integrity_embedded_key().expect("verify tool receipt"));
     let launch_bytes = chio_core::canonical_json_bytes(&launch).expect("canonical launch receipt");
     assert_eq!(
         reference["receipt_sha256"],

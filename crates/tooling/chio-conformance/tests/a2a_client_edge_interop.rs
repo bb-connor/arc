@@ -216,7 +216,7 @@ async fn a2a_client_reads_signed_blocking_result_without_redispatching_retired_w
             .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(receipt.kernel_key, host.kernel_key);
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("{error:?}")));
     assert_eq!(receipt.decision, Some(Decision::Allow));
     assert_eq!(receipt.action.parameters, json!({"target": "payments-api"}));
@@ -275,7 +275,7 @@ async fn a2a_client_receives_signed_kernel_denial_without_tool_dispatch() {
             .unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(receipt.kernel_key, host.kernel_key);
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("{error:?}")));
     assert!(matches!(receipt.decision, Some(Decision::Deny { .. })));
     assert_eq!(host.calls.load(Ordering::SeqCst), 0);

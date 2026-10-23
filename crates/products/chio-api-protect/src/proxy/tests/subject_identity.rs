@@ -49,7 +49,7 @@ async fn subject_identity_all_mint_shapes_preserve_caller_public_key() {
             &mint_body(&agent.public_key().to_hex(), structured),
         )
         .await;
-        assert!(token.verify_signature().test_unwrap());
+        assert!(token.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(
             token.subject,
             agent.public_key(),

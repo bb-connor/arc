@@ -128,7 +128,7 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
         body.content_hash = sha256_hex(&canonical_json_bytes(&parameters)?);
         body.id.clear();
         let signed = ChioReceipt::sign(body, &signer)?;
-        assert!(signed.verify_signature()?);
+        assert!(signed.verify_integrity_embedded_key()?);
         let path = root.join(format!("substitution-{index}.json"));
         std::fs::write(&path, canonical_json_bytes(&signed)?)?;
         let rejected = verify(&path, runtime)?;

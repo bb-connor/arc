@@ -190,7 +190,7 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
             body.content_hash = sha256_hex(&canonical_json_bytes(&parameters)?);
             body.id.clear();
             let signed = ChioReceipt::sign(body, &signer)?;
-            assert!(signed.verify_signature()?);
+            assert!(signed.verify_integrity_embedded_key()?);
             let path = folder.join(format!("substitution-{index}.json"));
             std::fs::write(&path, canonical_json_bytes(&signed)?)?;
             let rejected = verify(&path, runtime, &folder, &key)?;

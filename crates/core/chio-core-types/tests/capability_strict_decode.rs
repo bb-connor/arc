@@ -218,7 +218,7 @@ fn replace_once(text: &str, from: &str, to: &str) -> TestResult<String> {
 #[test]
 fn a_raw_token_refuses_a_repeated_constraint_key_in_a_grant_or_an_attenuation() -> TestResult {
     let token = token_with_add_constraint()?;
-    assert!(serde_json::from_str::<CapabilityToken>(&token)?.verify_signature()?);
+    assert!(serde_json::from_str::<CapabilityToken>(&token)?.verify_integrity_embedded_key()?);
     let grant = r#"{"type":"path_prefix","value":"/workspace"}"#;
     let attenuation = r#"{"type":"domain_exact","value":"a.example"}"#;
     for (padded, key) in [

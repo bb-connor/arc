@@ -736,7 +736,7 @@ pub(crate) fn explain_receipt_value(
     fanout_limit: usize,
 ) -> Result<serde_json::Value, CliError> {
     let receipt: chio_core::receipt::body::ChioReceipt = crate::input::project(value)?;
-    let signature_ok = receipt.verify_signature()?;
+    let signature_ok = receipt.verify_integrity_embedded_key()?;
     let receipt_id_ok = chio_core::receipt::body::chio_receipt_id(&receipt.body())? == receipt.id;
     let parameter_hash_ok = receipt.action.verify_hash()?;
     let decision = explain_decision_label(receipt.decision.as_ref());

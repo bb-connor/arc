@@ -91,10 +91,10 @@ fn pad(value: &Value, path: &str, record: &str) -> TestResult<Value> {
 #[test]
 fn the_signed_receipts_decode_and_verify() -> TestResult {
     let receipt: ChioReceipt = serde_json::from_value(signed_receipt(Decision::Allow)?)?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let child: ChildRequestReceipt =
         serde_json::from_value(signed_child_receipt(OperationTerminalState::Completed)?)?;
-    assert!(child.verify_signature()?);
+    assert!(child.verify_integrity_embedded_key()?);
     Ok(())
 }
 
