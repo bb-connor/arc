@@ -534,7 +534,9 @@ fn durable_payload_maintenance_budget_failures_remain_visible_after_join() -> Te
         config.page_limits.max_sql_steps = sql_steps;
         config.page_limits.max_payload_bytes = bytes;
         runtime.start_terminal_payload_maintenance(config)?;
-        let health = wait_for_health(&runtime, |health| health.failures > 0)?;
+        let health = wait_for_health(&runtime, |health| {
+            health.failures > 0 && health.lifecycle == TerminalPayloadMaintenanceLifecycle::Degraded
+        })?;
         assert_eq!(
             health.lifecycle,
             TerminalPayloadMaintenanceLifecycle::Degraded
