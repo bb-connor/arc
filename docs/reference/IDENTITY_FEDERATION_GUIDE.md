@@ -137,7 +137,7 @@ chio mcp serve-http \
 
 chio trust serve \
   --listen 127.0.0.1:8940 \
-  --service-token <service-token> \
+  --access-config ./trust-access.toml \
   --enterprise-providers-file ./enterprise-providers.json
 ```
 
@@ -147,7 +147,7 @@ that depend on explicit operator identity:
 ```bash
 chio trust serve \
   --listen 127.0.0.1:8940 \
-  --service-token <service-token> \
+  --access-config ./trust-access.toml \
   --enterprise-providers-file ./enterprise-providers.json \
   --passport-statuses-file ./passport-statuses.json \
   --certification-registry-file ./certifications.json \
@@ -256,7 +256,7 @@ surface for validated `scim` provider-admin records:
 ```bash
 chio trust serve \
   --listen 127.0.0.1:8940 \
-  --service-token <service-token> \
+  --access-config ./trust-access.toml \
   --enterprise-providers-file ./enterprise-providers.json \
   --scim-lifecycle-file ./scim-lifecycle.json \
   --receipt-db ./receipts.sqlite3 \

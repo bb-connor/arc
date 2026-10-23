@@ -3,6 +3,7 @@ mod cluster_and_reports_tests {
     use super::super::report_rendering::*;
     use super::super::report_validation::*;
     use super::super::*;
+    use crate::trust_control::route_authorization::{require_peer_grant, RouteGrant};
     use axum::body::to_bytes;
     use serde_json::{json, Value};
     use std::collections::HashMap;
@@ -55,8 +56,11 @@ mod cluster_and_reports_tests {
         let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
             Arc::new(chio_security_types::clock::SystemClock);
         let mut config = base_config();
-        config.advertise_url = Some(advertise_url.to_string());
-        config.peer_urls = peer_urls.iter().map(|value| value.to_string()).collect();
+        crate::trust_control::caller_credentials::tests::set_test_peers(
+            &mut config,
+            advertise_url,
+            peer_urls,
+        );
         config.receipt_db_path = receipt_db_path;
         config.revocation_db_path = revocation_db_path;
         config.budget_db_path = budget_db_path;
@@ -126,6 +130,35 @@ mod cluster_and_reports_tests {
             update_peer_state(&state, peer, |peer| peer.force_snapshot = false);
         }
         state
+    }
+
+    /// Serve `public` and `internal` test routes behind the route table, each
+    /// on its own listener rules, merged onto one test socket.
+    fn with_route_table(
+        state: &TrustServiceState,
+        public: axum::Router<TrustServiceState>,
+        internal: axum::Router<TrustServiceState>,
+    ) -> axum::Router {
+        use crate::trust_control::route_authorization::{
+            authorize_route, Listener, RouteAuthorizer,
+        };
+        let authorizer = |listener| {
+            Arc::new(RouteAuthorizer::new(
+                listener,
+                Arc::clone(&state.config.access),
+                Arc::clone(&state.finding_challenge_clock),
+            ))
+        };
+        public
+            .route_layer(axum::middleware::from_fn_with_state(
+                authorizer(Listener::Public),
+                authorize_route,
+            ))
+            .merge(internal.route_layer(axum::middleware::from_fn_with_state(
+                authorizer(Listener::Internal),
+                authorize_route,
+            )))
+            .with_state(state.clone())
     }
 
     fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
@@ -1379,9 +1412,6 @@ mod cluster_and_reports_tests {
 
     #[test]
     fn auth_helpers_and_metered_billing_validation_cover_error_paths() {
-        let Ok(clock_now) = unix_timestamp_now() else {
-            return;
-        };
         let mut headers = HeaderMap::new();
         let auth_error = bearer_token_from_headers(&headers).test_unwrap_err();
         assert_eq!(auth_error.status(), StatusCode::UNAUTHORIZED);
@@ -1401,65 +1431,43 @@ mod cluster_and_reports_tests {
             bearer_token_from_headers(&headers).test_unwrap(),
             "issue-token"
         );
-        assert!(validate_service_auth(&headers, "issue-token").is_ok());
-        assert_eq!(
-            validate_service_auth(&headers, "")
-                .test_unwrap_err()
-                .status(),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-
         let mut config = base_config();
-        // The admin bearer header carries "issue-token"; align the configured
-        // service token so the admin principal resolves and the downstream
-        // tenant-token-equals-service-token collision check exercises a real
-        // conflict rather than failing the bearer match first.
-        config.service_token = "issue-token".to_string();
-        config
-            .tenant_read_tokens
-            .insert("tenant-a".to_string(), "tenant-read-token".to_string());
-        let admin_principal = resolve_control_read_principal(&headers, &config).test_unwrap();
+        config.access = crate::trust_control::caller_credentials::tests::test_access_with_cluster(
+            "issue-token",
+            &[("tenant-a", "tenant-read-token")],
+            None,
+            &[],
+        );
+        validate_caller(&headers, &config, Scope::ReceiptsRead).test_unwrap();
+        let admin_principal =
+            resolve_control_read_principal(&headers, &config, Scope::ReceiptsRead).test_unwrap();
         assert_eq!(admin_principal, ResolvedControlReadPrincipal::AdminService);
-        config
-            .tenant_read_tokens
-            .insert("tenant-collision".to_string(), "issue-token".to_string());
-        assert_eq!(
-            resolve_control_read_principal(&headers, &config)
-                .test_unwrap_err()
-                .status(),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-        config.tenant_read_tokens.remove("tenant-collision");
-
-        config.authority_workload_token = Some("authority-workload".to_string());
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_static("Bearer authority-workload"),
-        );
-        assert!(validate_authority_workload_auth(&headers, &config).is_ok());
-        assert!(validate_service_auth(&headers, &config.service_token).is_err());
-        assert_eq!(
-            resolve_control_read_principal(&headers, &config)
-                .test_unwrap_err()
-                .status(),
-            StatusCode::UNAUTHORIZED
-        );
 
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_static("Bearer tenant-read-token"),
         );
-        let tenant_principal = resolve_control_read_principal(&headers, &config).test_unwrap();
+        let tenant_principal =
+            resolve_control_read_principal(&headers, &config, Scope::ReceiptsRead).test_unwrap();
         assert_eq!(
             tenant_principal,
             ResolvedControlReadPrincipal::TenantRead {
                 tenant_id: "tenant-a".to_string()
             }
         );
-        assert!(validate_service_auth(&headers, "issue-token").is_err());
-        assert!(tenant_principal
-            .authorize_evidence_export_query(EvidenceExportQuery::admin_all())
-            .is_err());
+        assert_eq!(
+            validate_caller(&headers, &config, Scope::AuthorityAdmin)
+                .test_unwrap_err()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            tenant_principal
+                .authorize_evidence_export_query(EvidenceExportQuery::admin_all())
+                .test_unwrap_err()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
         let tenant_export = tenant_principal
             .authorize_evidence_export_query(EvidenceExportQuery::default())
             .test_unwrap();
@@ -1472,9 +1480,10 @@ mod cluster_and_reports_tests {
         );
         headers.insert(
             AUTHORIZATION,
-            HeaderValue::from_static("Bearer issue-token"),
+            HeaderValue::from_static("Bearer other-token"),
         );
-        let invalid_auth = validate_service_auth(&headers, "other-token").test_unwrap_err();
+        let invalid_auth =
+            validate_caller(&headers, &config, Scope::ReceiptsRead).test_unwrap_err();
         assert_eq!(invalid_auth.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(
             invalid_auth
@@ -1483,136 +1492,6 @@ mod cluster_and_reports_tests {
                 .and_then(|value| value.to_str().ok()),
             Some("Bearer")
         );
-
-        let cluster_state =
-            state_with_cluster("https://node-a", &["https://node-b"], None, None, None);
-        let issued_at = clock_now as i64;
-        let signature = cluster_peer_auth_signature(
-            &cluster_state.config.service_token,
-            "https://node-b",
-            INTERNAL_CLUSTER_STATUS_PATH,
-            issued_at,
-            None,
-        )
-        .test_unwrap();
-        headers.clear();
-        headers.insert(
-            CLUSTER_NODE_ID_HEADER,
-            HeaderValue::from_static("https://node-b"),
-        );
-        headers.insert(
-            CLUSTER_AUTH_ISSUED_AT_HEADER,
-            HeaderValue::from_str(&issued_at.to_string()).test_unwrap(),
-        );
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_str(&signature).test_unwrap(),
-        );
-        let peer = validate_cluster_peer_auth(
-            &headers,
-            &cluster_state.config,
-            INTERNAL_CLUSTER_STATUS_PATH,
-        )
-        .test_unwrap();
-        assert_eq!(peer.node_id, "https://node-b");
-
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_static("deadbeef"),
-        );
-        let invalid_peer = validate_cluster_peer_auth(
-            &headers,
-            &cluster_state.config,
-            INTERNAL_CLUSTER_STATUS_PATH,
-        )
-        .test_unwrap_err();
-        assert_eq!(invalid_peer.status(), StatusCode::UNAUTHORIZED);
-        clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
-            "https://node-b",
-            INTERNAL_CLUSTER_STATUS_PATH,
-        ));
-
-        let expired_issued_at = issued_at - CLUSTER_AUTH_MAX_SKEW_SECS - 1;
-        let expired_signature = cluster_peer_auth_signature(
-            &cluster_state.config.service_token,
-            "https://node-b",
-            INTERNAL_CLUSTER_STATUS_PATH,
-            expired_issued_at,
-            None,
-        )
-        .test_unwrap();
-        headers.insert(
-            CLUSTER_AUTH_ISSUED_AT_HEADER,
-            HeaderValue::from_str(&expired_issued_at.to_string()).test_unwrap(),
-        );
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_str(&expired_signature).test_unwrap(),
-        );
-        let expired_peer = validate_cluster_peer_auth(
-            &headers,
-            &cluster_state.config,
-            INTERNAL_CLUSTER_STATUS_PATH,
-        )
-        .test_unwrap_err();
-        assert_eq!(expired_peer.status(), StatusCode::UNAUTHORIZED);
-        clear_cluster_peer_auth_failures("https://node-b");
-
-        for attempt in 0..CLUSTER_AUTH_FAILURE_BURST {
-            let invalid_issued_at = issued_at + attempt as i64;
-            headers.insert(
-                CLUSTER_AUTH_ISSUED_AT_HEADER,
-                HeaderValue::from_str(&invalid_issued_at.to_string()).test_unwrap(),
-            );
-            headers.insert(
-                CLUSTER_AUTH_SIGNATURE_HEADER,
-                HeaderValue::from_str(&format!("deadbeef-{attempt}")).test_unwrap(),
-            );
-            let response = validate_cluster_peer_auth(
-                &headers,
-                &cluster_state.config,
-                INTERNAL_CLUSTER_STATUS_PATH,
-            )
-            .test_unwrap_err();
-            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-        }
-        let limited_issued_at = issued_at + CLUSTER_AUTH_FAILURE_BURST as i64;
-        headers.insert(
-            CLUSTER_AUTH_ISSUED_AT_HEADER,
-            HeaderValue::from_str(&limited_issued_at.to_string()).test_unwrap(),
-        );
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_static("deadbeef-final"),
-        );
-        let limited_peer = validate_cluster_peer_auth(
-            &headers,
-            &cluster_state.config,
-            INTERNAL_CLUSTER_STATUS_PATH,
-        )
-        .test_unwrap_err();
-        assert_eq!(limited_peer.status(), StatusCode::TOO_MANY_REQUESTS);
-        headers.insert(
-            CLUSTER_AUTH_ISSUED_AT_HEADER,
-            HeaderValue::from_str(&issued_at.to_string()).test_unwrap(),
-        );
-        headers.insert(
-            CLUSTER_AUTH_SIGNATURE_HEADER,
-            HeaderValue::from_str(&signature).test_unwrap(),
-        );
-        let peer_after_spoofed_failures = validate_cluster_peer_auth(
-            &headers,
-            &cluster_state.config,
-            INTERNAL_CLUSTER_STATUS_PATH,
-        )
-        .test_unwrap();
-        assert_eq!(peer_after_spoofed_failures.node_id, "https://node-b");
-        clear_cluster_peer_auth_failures(&cluster_peer_auth_unverified_failure_key(
-            "https://node-b",
-            INTERNAL_CLUSTER_STATUS_PATH,
-        ));
-        clear_cluster_peer_auth_failures("https://node-b");
-
         let mut request = MeteredBillingReconciliationUpdateRequest {
             receipt_id: "receipt-1".to_string(),
             adapter_kind: "usage-adapter".to_string(),
@@ -1659,31 +1538,12 @@ mod cluster_and_reports_tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
 
-        let mut blank_tenant_id = base_config();
-        blank_tenant_id
-            .tenant_read_tokens
-            .insert(" ".to_string(), "tenant-read-token".to_string());
-        assert_eq!(
-            resolve_control_read_principal(&headers, &blank_tenant_id)
-                .test_unwrap_err()
-                .status(),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-
-        let mut blank_tenant_token = base_config();
-        blank_tenant_token
-            .tenant_read_tokens
-            .insert("tenant-a".to_string(), "   ".to_string());
-        assert_eq!(
-            resolve_control_read_principal(&headers, &blank_tenant_token)
-                .test_unwrap_err()
-                .status(),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
-
         let mut zero_cluster_interval = base_config();
-        zero_cluster_interval.advertise_url = Some("http://127.0.0.1:3200".to_string());
-        zero_cluster_interval.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+        crate::trust_control::caller_credentials::tests::set_test_peers(
+            &mut zero_cluster_interval,
+            "http://127.0.0.1:3200",
+            &["http://127.0.0.1:3300"],
+        );
         zero_cluster_interval.cluster_sync_interval = Duration::ZERO;
         let error = build_cluster_state(
             &zero_cluster_interval,
@@ -1702,7 +1562,6 @@ mod cluster_and_reports_tests {
         config.authority_keyring_config_path = Some(PathBuf::from("keyring.yml"));
         config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
         config.authority_keyring_receipt_anchor_root = Some(PathBuf::from("/anchors/keyring"));
-        config.authority_workload_token = Some("authority-workload".to_string());
         config.authority_seed_path = None;
 
         config.validate().test_unwrap();
@@ -1712,10 +1571,9 @@ mod cluster_and_reports_tests {
                 .is_none()
         );
         let mut headers = HeaderMap::new();
-        let admin = format!("Bearer {}", config.service_token);
-        headers.insert(AUTHORIZATION, HeaderValue::from_str(&admin).test_unwrap());
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
         assert_eq!(
-            resolve_control_read_principal(&headers, &config).test_unwrap(),
+            resolve_control_read_principal(&headers, &config, Scope::ReceiptsRead).test_unwrap(),
             ResolvedControlReadPrincipal::AdminService
         );
     }

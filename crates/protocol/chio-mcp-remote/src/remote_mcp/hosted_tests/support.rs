@@ -626,6 +626,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         admin_token: None,
         approval: None,
         control_url: None,
+        control_internal_url: None,
         control_token: None,
         remote_authority_workload_token: None,
         control_authority_public_key: None,

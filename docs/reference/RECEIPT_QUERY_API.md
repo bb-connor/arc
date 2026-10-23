@@ -11,8 +11,9 @@ semantics, freshness rules, typed errors and limits.
 
 ## Operator recovery
 
-`POST /v1/receipts/query/snapshot/recovery` requires the service `Bearer` token.
-Authentication runs before the body is read; tenant read tokens cannot invoke it.
+`POST /v1/receipts/query/snapshot/recovery` requires a `Bearer` credential with
+`receipts:admin` and deployment tenant authority. Authentication runs before the
+body is read; tenant credentials cannot invoke it.
 Send strict JSON of at most 256 bytes with `Content-Type: application/json`:
 
 ```json
@@ -159,7 +160,7 @@ When `nextCursor` is `null` or absent in the response, all matching receipts hav
 
 ```
 GET /v1/receipts/query?outcome=deny&since=1700000000&limit=2
-Authorization: Bearer my-service-token
+Authorization: Bearer my-control-token
 ```
 
 ```json
@@ -240,8 +241,8 @@ GET /v1/receipts/tools?receiptId=receipt-001
 
 The list form accepts `capabilityId`, `toolServer`, `toolName`, `decision` and
 `limit` (1 through 200, default 50) and returns one page without a cursor. The
-`receiptId` form loads exactly one receipt and requires the admin service
-token; a tenant read token gets `403`. Both forms return:
+`receiptId` form loads exactly one receipt and requires a credential with
+deployment tenant authority; a tenant credential gets `403`. Both forms return:
 
 ```json
 {
@@ -396,7 +397,7 @@ Every other error keeps the `{"error": string}` body without a `code`:
 |--------|-------|
 | `400` | Cost bound without `costCurrency`, a currency other than three uppercase ASCII letters, or `minCost > maxCost`. |
 | `401` | Missing or invalid bearer token. Authentication runs before admission, so an unauthenticated request never takes a permit. |
-| `403` | Point read by `receiptId` with a tenant read token. |
+| `403` | Point read by `receiptId` with a tenant credential. |
 | `409` | The service was started without `--receipt-db`. |
 | `500` | Any other store error, including an `outcome` value other than `allow`, `deny`, `cancelled` or `incomplete`. |
 

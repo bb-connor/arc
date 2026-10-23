@@ -13,8 +13,12 @@ fn build_cluster_state_seeds_persisted_authority_fence_term() {
         .test_unwrap();
 
     let mut config = base_config();
-    config.advertise_url = Some("https://node-a".to_string());
-    config.peer_urls = vec!["https://node-b".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut config,
+        "token",
+        "https://node-a",
+        &["https://node-b"],
+    );
     config.authority_db_path = Some(authority_db_path.clone());
 
     let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
@@ -40,8 +44,12 @@ fn build_cluster_state_discards_persisted_authority_fence_for_unknown_leader() {
         .test_unwrap();
 
     let mut config = base_config();
-    config.advertise_url = Some("https://node-a".to_string());
-    config.peer_urls = vec!["https://node-b".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut config,
+        "token",
+        "https://node-a",
+        &["https://node-b"],
+    );
     config.authority_db_path = Some(authority_db_path.clone());
 
     let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
@@ -71,8 +79,12 @@ fn build_cluster_state_discards_persisted_authority_fence_after_rotation() {
     authority.rotate().test_unwrap();
 
     let mut config = base_config();
-    config.advertise_url = Some("https://node-a".to_string());
-    config.peer_urls = vec!["https://node-b".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut config,
+        "token",
+        "https://node-a",
+        &["https://node-b"],
+    );
     config.authority_db_path = Some(authority_db_path.clone());
 
     let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())

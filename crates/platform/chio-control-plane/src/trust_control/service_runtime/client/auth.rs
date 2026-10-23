@@ -1,69 +1,54 @@
-use super::super::super::report_validation::cluster_peer_auth_signature;
+use super::super::super::caller_credentials::{
+    PeerRequestTarget, CLUSTER_AUTH_BODY_SHA256_HEADER, CLUSTER_AUTH_NONCE_HEADER,
+};
 use super::super::*;
 
 impl TrustControlClient {
+    /// A GET to a peer's internal listener, signed with this node's key for
+    /// that peer. `request_path` is the path and raw query exactly as sent.
     pub(super) fn build_internal_get_request(
         &self,
         client: &Agent,
         url: &str,
-        endpoint: &str,
+        request_path: &str,
         term: Option<u64>,
     ) -> Result<ureq::Request, CliError> {
-        let clock_now = unix_timestamp_now()?;
-        let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
-            return Ok(client
-                .get(url)
-                .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
-        };
-        let issued_at = i64::try_from(clock_now).map_err(|_| {
+        let cluster_peer_auth = self.cluster_peer_auth.as_ref().ok_or_else(|| {
+            CliError::cli_other_error(
+                "internal trust-control routes require a cluster peer client".to_owned(),
+            )
+        })?;
+        let (path, query) = request_path.split_once('?').unwrap_or((request_path, ""));
+        let issued_at = i64::try_from(unix_timestamp_now()?).map_err(|_| {
             CliError::cli_other_error("clock exceeds signed timestamp field".to_owned())
         })?;
-        let signature = cluster_peer_auth_signature(
-            &self.token,
-            cluster_peer_auth.node_id.as_ref(),
-            endpoint,
-            issued_at,
-            term,
-        )?;
+        let mut nonce = [0_u8; 32];
+        rand_core::RngCore::try_fill_bytes(&mut rand_core::OsRng, &mut nonce).map_err(|error| {
+            CliError::cli_other_error(format!("cluster peer nonce generation failed: {error}"))
+        })?;
+        let target = PeerRequestTarget {
+            method: "GET",
+            path,
+            query,
+            body: b"",
+        };
+        let (node_id, signed) = cluster_peer_auth
+            .access
+            .sign_peer_request(
+                &cluster_peer_auth.recipient,
+                &target,
+                &nonce,
+                issued_at,
+                term,
+            )
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         let mut request = client
             .get(url)
-            .set(CLUSTER_NODE_ID_HEADER, cluster_peer_auth.node_id.as_ref())
+            .set(CLUSTER_NODE_ID_HEADER, &node_id)
             .set(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
-            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signature);
-        if let Some(term) = term {
-            request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
-        }
-        Ok(request)
-    }
-
-    pub(super) fn build_internal_post_request(
-        &self,
-        client: &Agent,
-        url: &str,
-        endpoint: &str,
-        term: Option<u64>,
-    ) -> Result<ureq::Request, CliError> {
-        let clock_now = unix_timestamp_now()?;
-        let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
-            return Ok(client
-                .post(url)
-                .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
-        };
-        let issued_at = i64::try_from(clock_now).map_err(|_| {
-            CliError::cli_other_error("clock exceeds signed timestamp field".to_owned())
-        })?;
-        let signature = cluster_peer_auth_signature(
-            &self.token,
-            cluster_peer_auth.node_id.as_ref(),
-            endpoint,
-            issued_at,
-            term,
-        )?;
-        let mut request = client
-            .post(url)
-            .set(CLUSTER_NODE_ID_HEADER, cluster_peer_auth.node_id.as_ref())
-            .set(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
-            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signature);
+            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signed.signature)
+            .set(CLUSTER_AUTH_NONCE_HEADER, &signed.nonce)
+            .set(CLUSTER_AUTH_BODY_SHA256_HEADER, &signed.body_sha256);
         if let Some(term) = term {
             request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
         }

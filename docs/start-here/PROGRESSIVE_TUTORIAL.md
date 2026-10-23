@@ -223,7 +223,7 @@ chio trust federated-delegation-policy-create \
 
 chio \
   --control-url https://trust.example.com \
-  --control-token <service-token> \
+  --control-token <control-token> \
   trust federated-issue \
   --presentation-response response.json \
   --challenge challenge.json \

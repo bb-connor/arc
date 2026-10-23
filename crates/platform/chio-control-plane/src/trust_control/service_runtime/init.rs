@@ -6,6 +6,7 @@ use chio_http_serve::{
     apply_server_hygiene, run_until_drained, MaxConnListener, ServeHygieneConfig,
     ShutdownController,
 };
+use std::future::IntoFuture;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -73,6 +74,8 @@ async fn serve_async_inner(
         payload_maintenance_config,
     )?;
     let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
+    let internal_listen = config.access.config().internal_listen;
+    let internal_transport = crate::server_transport::prepare(&config.transport, internal_listen)?;
     // Co-located startup stores may need the space held by abandoned snapshots.
     // Reclaim one bounded window before any of those stores opens or writes.
     if let Some(receipt_path) = config.receipt_db_path.as_deref() {
@@ -170,6 +173,8 @@ async fn serve_async_inner(
     )?;
     let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
+    let internal_listener = internal_transport.bind(internal_listen).await?;
+    let internal_addr = internal_listener.local_addr()?;
     let budget_store = config
         .budget_db_path
         .as_deref()
@@ -316,11 +321,23 @@ async fn serve_async_inner(
         request_timeout: None,
         ..ServeHygieneConfig::default()
     };
+    let internal_router =
+        apply_server_hygiene(router::build_internal_router(state.clone()), &hygiene);
     let router = apply_server_hygiene(router::build_router(state), &hygiene);
 
     info!(listen_addr = %local_addr, "serving Chio trust control service");
     tracing::info!(%local_addr, "Chio trust control service listening");
 
+    info!(listen_addr = %internal_addr, "serving Chio trust control internal listener");
+    let internal_listener = MaxConnListener::new(
+        internal_listener,
+        hygiene.max_connections.unwrap_or(usize::MAX),
+    );
+    let internal_server = tokio::spawn(
+        axum::serve(internal_listener, internal_router)
+            .with_graceful_shutdown(controller.signalled())
+            .into_future(),
+    );
     let listener = MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
     let server = axum::serve(listener, router).with_graceful_shutdown(controller.signalled());
 
@@ -344,6 +361,15 @@ async fn serve_async_inner(
     // a still-running call at the deadline never loses a receipt. Anchoring the join
     // at the stop signal keeps the whole teardown inside one drain budget, which the
     // platform stop grace is already sized to cover.
+    let internal_budget = shutdown_at.get().map_or(hygiene.drain_timeout, |observed| {
+        cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
+    });
+    match tokio::time::timeout(internal_budget, internal_server).await {
+        Ok(Ok(Ok(()))) => {}
+        Ok(Ok(Err(error))) => warn!(%error, "trust-control internal listener failed"),
+        Ok(Err(error)) => warn!(%error, "trust-control internal listener task failed"),
+        Err(_) => warn!("trust-control internal listener did not drain within the budget"),
+    }
     if let Some(task) = cluster_sync_task {
         let join_budget = shutdown_at.get().map_or(hygiene.drain_timeout, |observed| {
             cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
@@ -533,9 +559,7 @@ mod windows_authority_tests {
         let config = TrustServiceConfig {
             transport: Default::default(),
             listen: SocketAddr::from(([127, 0, 0, 1], 0)),
-            service_token: "service-token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
+            access: crate::trust_control::caller_credentials::tests::test_access("service-token"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
@@ -560,7 +584,6 @@ mod windows_authority_tests {
             advertise_url: None,
             allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 300,
-            peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,

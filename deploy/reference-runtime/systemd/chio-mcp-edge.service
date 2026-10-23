@@ -57,6 +57,7 @@ ExecStart=/usr/local/bin/chio security supervise \
   --stop-grace 30 \
   -- /usr/local/bin/chio \
   --control-url http://127.0.0.1:8940 \
+  --control-internal-url http://127.0.0.1:8941 \
   --control-authority-public-key ${CHIO_CONTROL_AUTHORITY_PUBLIC_KEY} \
   mcp serve-http \
   --policy /etc/chio/mcp-edge/policy.yaml \

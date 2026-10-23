@@ -212,6 +212,9 @@ def main() -> None:
         raise SystemExit("the demo edge must not run as root")
 
     control_url = os.environ.get("CHIO_CONTROL_URL", "http://chio-trust-demo:8940")
+    control_internal_url = os.environ.get(
+        "CHIO_CONTROL_INTERNAL_URL", "http://chio-trust-demo:8941"
+    )
     server_id = os.environ.get("CHIO_DEMO_SERVER_ID", "wrapped-http-mock")
     server_name = os.environ.get("CHIO_DEMO_SERVER_NAME", "Wrapped HTTP Mock")
     server_version = os.environ.get("CHIO_DEMO_SERVER_VERSION", "1")
@@ -227,6 +230,8 @@ def main() -> None:
         EXECUTABLE,
         "--control-url",
         control_url,
+        "--control-internal-url",
+        control_internal_url,
         "--control-authority-public-key",
         authority_key,
         "mcp",

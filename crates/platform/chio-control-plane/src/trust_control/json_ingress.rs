@@ -1,18 +1,15 @@
 //! Validate original JSON bytes before Axum can discard keys or numeric spelling.
 //!
 //! The route table is checked against actual request extractors and router bindings
-//! by check-trust-boundaries.py. Service authorization runs before body reads;
-//! signature, protocol-specific authentication and semantic validation remain
-//! the owning handler's responsibility. Binary and Form routes stay with their
+//! by check-trust-boundaries.py. Caller and peer authorization run before body
+//! reads in the route table middleware, and the wallet credential entitlement
+//! here; signature, protocol-specific authentication and semantic validation
+//! remain the owning handler's responsibility. Binary and Form routes stay with their
 //! existing format-specific readers.
 use super::config_and_public::load_passport_issuance_registry_for_admin;
 use super::frost::*;
 use super::ingress_lanes::IngressLane;
-use super::receipt_handlers::resolve_admin_report_read_context;
-use super::report_validation::{
-    bearer_token_from_headers, resolve_control_read_principal, validate_authority_issue_auth,
-    validate_cluster_peer_auth, validate_service_auth,
-};
+use super::report_validation::bearer_token_from_headers;
 use super::*;
 use axum::body::Body;
 use axum::extract::{MatchedPath, NestedPath, Request};
@@ -61,37 +58,6 @@ async fn read_body(body: Body, bound: usize) -> Result<Vec<u8>, InputError> {
 enum Mode {
     Signed,
     Document,
-}
-
-enum Authentication {
-    Service,
-    AuthorityIssue,
-    ControlRead,
-    ClusterPeer,
-    AdminReport(&'static str),
-    WalletCredential,
-    Handler,
-}
-
-fn authentication(path: &str) -> Authentication {
-    match path {
-        ISSUE_CAPABILITY_PATH => Authentication::AuthorityIssue,
-        EVIDENCE_EXPORT_PATH | FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH => Authentication::ControlRead,
-        INTERNAL_CLUSTER_PARTITION_PATH => Authentication::ClusterPeer,
-        UNDERWRITING_SIMULATION_PATH => {
-            Authentication::AdminReport("underwriting simulation report")
-        }
-        CREDIT_BONDED_EXECUTION_SIMULATION_PATH => {
-            Authentication::AdminReport("credit bonded execution simulation report")
-        }
-        PASSPORT_ISSUANCE_CREDENTIAL_PATH => Authentication::WalletCredential,
-        // Public and token-exchange contracts keep their own protocol-specific
-        // authentication. The separate FROST router installs only validate.
-        PASSPORT_ISSUANCE_TOKEN_PATH
-        | PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH
-        | FINDINGS_SEARCH_PATH => Authentication::Handler,
-        _ => Authentication::Service,
-    }
 }
 
 fn contract(method: &str, path: &str) -> Option<(Mode, usize)> {
@@ -273,6 +239,7 @@ fn request_contract(request: &Request) -> Result<Option<(Mode, usize, &str)>, Re
     Ok(Some((mode, bound, path)))
 }
 
+/// Check a wallet credential upload's entitlement before its body is read.
 pub(super) async fn authenticate(
     State(state): State<TrustServiceState>,
     request: Request,
@@ -283,38 +250,18 @@ pub(super) async fn authenticate(
         Ok(None) => return next.run(request).await,
         Err(response) => return response,
     };
-    let authorized = match authentication(path) {
-        Authentication::Service => {
-            validate_service_auth(request.headers(), &state.config.service_token)
+    if path == PASSPORT_ISSUANCE_CREDENTIAL_PATH {
+        if let Err(response) = authenticate_wallet_credential(
+            request.headers(),
+            state.config,
+            Arc::clone(&state.finding_challenge_clock),
+            &state.wallet_entitlement_lane,
+        )
+        .await
+        {
+            return response;
         }
-        Authentication::AuthorityIssue => {
-            validate_authority_issue_auth(request.headers(), &state, path).map(|_| ())
-        }
-        Authentication::ControlRead => {
-            resolve_control_read_principal(request.headers(), &state.config).map(|_| ())
-        }
-        Authentication::ClusterPeer => {
-            validate_cluster_peer_auth(request.headers(), &state.config, path).map(|_| ())
-        }
-        Authentication::AdminReport(surface) => {
-            resolve_admin_report_read_context(request.headers(), &state.config, surface).map(|_| ())
-        }
-        Authentication::WalletCredential => {
-            authenticate_wallet_credential(
-                request.headers(),
-                state.config,
-                Arc::clone(&state.finding_challenge_clock),
-                &state.wallet_entitlement_lane,
-            )
-            .await
-        }
-        Authentication::Handler => Ok(()),
-    };
-    if let Err(response) = authorized {
-        return response;
     }
-    // Retain handler rechecks: a long upload cannot turn this allocation guard
-    // into stale authentication or a stale cluster authority lease.
     next.run(request).await
 }
 

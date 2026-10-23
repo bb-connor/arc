@@ -9,14 +9,14 @@ use chio_store_sqlite::fiscal_store::FiscalStoreError;
 use crate::fiscal_state_recovery::FiscalStartupRecoveryAction;
 use crate::trust_control::report_rendering::forward_post_to_leader;
 use crate::trust_control::report_validation::{
-    resolve_control_read_principal, validate_service_auth, ResolvedControlReadPrincipal,
+    resolve_control_read_principal, validate_caller, ResolvedControlReadPrincipal,
 };
 
 pub(crate) async fn handle_fiscal_runtime_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalRead) {
         return response;
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
@@ -42,7 +42,7 @@ pub(crate) async fn handle_fiscal_proposal_preview(
     headers: HeaderMap,
     Json(proposal): Json<SignedFiscalProposal>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
@@ -64,10 +64,10 @@ pub(crate) async fn handle_fiscal_proposal_persist(
     headers: HeaderMap,
     Json(proposal): Json<SignedFiscalProposal>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FISCAL_PROPOSALS_PATH, &proposal).await {
+    match forward_post_to_leader(&state, &headers, FISCAL_PROPOSALS_PATH, &proposal).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -91,10 +91,10 @@ pub(crate) async fn handle_fiscal_proposal_admit(
     headers: HeaderMap,
     Json(proposal): Json<SignedFiscalProposal>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FISCAL_PROPOSAL_ADMIT_PATH, &proposal).await {
+    match forward_post_to_leader(&state, &headers, FISCAL_PROPOSAL_ADMIT_PATH, &proposal).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -126,10 +126,10 @@ pub(crate) async fn handle_fiscal_approval_persist(
     headers: HeaderMap,
     Json(request): Json<FiscalApprovalPersistRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FISCAL_APPROVALS_PATH, &request).await {
+    match forward_post_to_leader(&state, &headers, FISCAL_APPROVALS_PATH, &request).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -162,10 +162,10 @@ pub(crate) async fn handle_fiscal_activation_commit(
     headers: HeaderMap,
     Json(request): Json<FiscalActivationCommitRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FISCAL_ACTIVATIONS_PATH, &request).await {
+    match forward_post_to_leader(&state, &headers, FISCAL_ACTIVATIONS_PATH, &request).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -202,7 +202,7 @@ pub(crate) async fn handle_fiscal_resolve(
     headers: HeaderMap,
     Json(request): Json<FiscalResolveRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
@@ -251,7 +251,7 @@ pub(crate) async fn handle_fiscal_marketplace_price(
     headers: HeaderMap,
     Json(request): Json<FiscalMarketplacePriceRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FiscalWrite) {
         return response;
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {
@@ -275,10 +275,11 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
     headers: HeaderMap,
     Json(request): Json<FiscalMarketplaceCreditLimitRequest>,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::ReportsRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     if matches!(
         &principal,
         ResolvedControlReadPrincipal::TenantRead { tenant_id }
@@ -286,7 +287,7 @@ pub(crate) async fn handle_fiscal_marketplace_credit_limit(
     ) {
         return plain_http_error(
             StatusCode::FORBIDDEN,
-            "tenant read token cannot request another tenant's credit limit",
+            "tenant credential cannot request another tenant's credit limit",
         );
     }
     let Some(runtime) = state.fiscal_runtime.as_ref() else {

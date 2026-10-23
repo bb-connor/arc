@@ -1,31 +1,17 @@
 use super::*;
 
-fn signed_peer_headers(state: &TrustServiceState) -> HeaderMap {
-    let issued_at = unix_timestamp_now()
-        .unwrap_or_else(|error| panic!("trusted fixture clock: {error}"))
-        as i64;
-    let signature = cluster_peer_auth_signature(
-        &state.config.service_token,
-        "https://node-b",
-        INTERNAL_REVOCATIONS_DELTA_PATH,
-        issued_at,
-        None,
-    )
-    .test_unwrap();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        CLUSTER_NODE_ID_HEADER,
-        HeaderValue::from_static("https://node-b"),
-    );
-    headers.insert(
-        CLUSTER_AUTH_ISSUED_AT_HEADER,
-        HeaderValue::from_str(&issued_at.to_string()).test_unwrap(),
-    );
-    headers.insert(
-        CLUSTER_AUTH_SIGNATURE_HEADER,
-        HeaderValue::from_str(&signature).test_unwrap(),
-    );
-    headers
+/// The grant the route table attaches to a verified request from node B.
+fn peer_grant() -> Option<axum::Extension<RouteGrant>> {
+    Some(axum::Extension(RouteGrant::Peer(
+        crate::trust_control::caller_credentials::AuthenticatedPeer {
+            node_id: "https://node-b".to_string(),
+            issued_at: 0,
+            term: None,
+            scopes: [crate::trust_control::caller_credentials::Scope::ClusterReplicate]
+                .into_iter()
+                .collect(),
+        },
+    )))
 }
 
 async fn body_text(response: Response) -> String {
@@ -58,7 +44,7 @@ async fn revocation_delta_endpoint_serves_only_the_v1_sequence_cursor() {
             .test_unwrap();
     }
     let stream_id = store.revocation_stream_id().test_unwrap();
-    let headers = signed_peer_headers(&state);
+    let grant = peer_grant();
     let query = |cursor_version: u8, stream_id: &str| RevocationDeltaQuery {
         cursor_version,
         stream_id: stream_id.to_string(),
@@ -69,7 +55,7 @@ async fn revocation_delta_endpoint_serves_only_the_v1_sequence_cursor() {
     let sequence = handle_internal_revocations_delta(
         State(state.clone()),
         Query(query(REVOCATION_CURSOR_VERSION, &stream_id)),
-        headers.clone(),
+        grant.clone(),
     )
     .await;
     assert_eq!(sequence.status(), StatusCode::OK);
@@ -88,7 +74,7 @@ async fn revocation_delta_endpoint_serves_only_the_v1_sequence_cursor() {
             REVOCATION_CURSOR_VERSION,
             "01991bb4-e2f7-7e21-b75d-a59be8fbc442",
         )),
-        headers.clone(),
+        grant.clone(),
     )
     .await;
     assert_eq!(wrong_stream.status(), StatusCode::CONFLICT);
@@ -97,7 +83,7 @@ async fn revocation_delta_endpoint_serves_only_the_v1_sequence_cursor() {
         let refused = handle_internal_revocations_delta(
             State(state.clone()),
             Query(query(version, &stream_id)),
-            headers.clone(),
+            grant.clone(),
         )
         .await;
         assert_eq!(refused.status(), StatusCode::BAD_REQUEST);
@@ -243,12 +229,9 @@ fn streamless_peer_is_a_transient_revocation_pull_error_that_applies_nothing() {
         capability_id: "cap-1".to_string(),
     };
     update_peer_revocation_cursor(&state, "https://node-a", cursor.clone());
-    let client = service_runtime::client::build_cluster_peer_client(
-        "https://node-a",
-        &state.config.service_token,
-        "https://node-b",
-    )
-    .test_unwrap();
+    let client =
+        service_runtime::client::build_cluster_peer_client(&state.config.access, "https://node-a")
+            .test_unwrap();
 
     let outcome = sync_peer_revocations(
         &state,

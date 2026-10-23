@@ -105,9 +105,17 @@ impl RemoteSessionFactory {
                     )
                 })?;
                 let control_token = require_control_token(config.control_token.as_deref())?;
+                let control_internal_url =
+                    config.control_internal_url.as_deref().ok_or_else(|| {
+                        CliError::cli_other_error(
+                            "hosted MCP durable admission against --control-url requires --control-internal-url"
+                                .to_string(),
+                        )
+                    })?;
                 Some(DurableAdmissionRuntime::open_remote(
                     identity_path,
                     control_url,
+                    control_internal_url,
                     control_token,
                 )?)
             }

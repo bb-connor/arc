@@ -249,7 +249,7 @@ pub(super) fn sync_authority_serving_evidence(
     {
         // Internal export remains available while this public admission is
         // unresolved, so replicas can seed the leader's signed prefix quorum.
-        let admitted = client.authority_status()?;
+        let admitted = client.peer_authority_status()?;
         let peer_after = client.cluster_status()?;
         observe_peer_authority_identity(state, peer_url, &peer_after);
         if !source_is_stable_leader(peer_before, &peer_after, peer_url)

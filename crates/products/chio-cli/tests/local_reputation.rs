@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -85,8 +88,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--advertise-url",
             &format!("http://{listen}"),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &trust_access::write_access_config(service_token, &[]),
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])

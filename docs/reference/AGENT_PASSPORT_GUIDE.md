@@ -138,7 +138,7 @@ Remote trust-control flow:
 chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
-  --service-token issuer-admin-token \
+  --access-config trust-access.toml \
   --passport-issuance-offers-file passport-issuance-offers.json \
   --passport-statuses-file passport-statuses.json
 ```
@@ -255,7 +255,7 @@ registry file:
 chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
-  --service-token verifier-token \
+  --access-config trust-access.toml \
   --passport-statuses-file passport-statuses.json
 ```
 
@@ -454,7 +454,7 @@ without pretending it became first-party local history.
 ```text
 chio \
   --control-url https://trust.example.com \
-  --control-token <service-token> \
+  --control-token <control-token> \
   evidence import \
   --input upstream-evidence-package
 
@@ -470,7 +470,7 @@ chio trust federated-delegation-policy-create \
 
 chio \
   --control-url https://trust.example.com \
-  --control-token <service-token> \
+  --control-token <control-token> \
   trust federated-issue \
   --presentation-response response.json \
   --challenge challenge.json \
@@ -650,7 +650,7 @@ The public holder transport is intentionally narrow:
 chio trust serve \
   --listen 127.0.0.1:8090 \
   --advertise-url https://trust.example.com \
-  --service-token verifier-token \
+  --access-config trust-access.toml \
   --passport-statuses-file passport-statuses.json \
   --verifier-policies-file verifier-policies.json \
   --verifier-challenge-db verifier-challenges.sqlite3

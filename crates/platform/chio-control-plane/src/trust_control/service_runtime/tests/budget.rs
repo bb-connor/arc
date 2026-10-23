@@ -215,7 +215,7 @@ fn remote_budget_store_binds_authorize_response_identity_and_event(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            recovery_fence: None,
+            recovery: None,
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let request = BudgetAuthorizeHoldRequest {
@@ -419,7 +419,7 @@ fn remote_budget_store_rejects_incomplete_event_projection_without_poisoning_cac
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     };
     store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
     let request = BudgetAuthorizeHoldRequest {
@@ -503,7 +503,7 @@ fn remote_budget_store_rejects_impossible_authorize_projection_without_poisoning
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            recovery_fence: None,
+            recovery: None,
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let result = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -715,7 +715,7 @@ fn remote_budget_store_rejects_legacy_identity_substitution_without_poisoning_ca
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            recovery_fence: None,
+            recovery: None,
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let result = match operation {
@@ -843,7 +843,7 @@ fn remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     };
     assert_eq!(store.list_usages(10, Some("cap-budget"))?.len(), 2);
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
@@ -933,7 +933,7 @@ fn remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     };
     assert_eq!(store.get_usage("cap-budget", 0)?, Some(baseline));
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
@@ -982,7 +982,7 @@ fn remote_budget_get_reloads_costs_seeded_by_a_partial_response(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     };
     // try_increment carries only the invocation count, so the entry it seeds defaults
     // both monetary totals to zero at the same sequence the list will report.
@@ -1036,7 +1036,7 @@ fn remote_budget_get_rejects_substituted_capability_without_partial_cache_update
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     };
     let result = store.get_usage("cap-budget", 2);
     assert!(result.as_ref().is_err_and(|error| error

@@ -93,10 +93,11 @@ async fn export_requires_an_authenticated_snapshot_instead_of_scanning_the_store
     )?);
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
     assert_eq!(body["code"], "receipt_query_snapshot_unavailable");
@@ -168,10 +169,11 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
     let receipts = body["bundle"]["toolReceipts"]
@@ -211,10 +213,11 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert_eq!(body["code"], "receipt_query_work_budget_exhausted");
@@ -265,14 +268,14 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-b".into(), "tenant-b-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[
+            ("tenant-a", "tenant-secret"),
+            ("tenant-b", "tenant-b-secret"),
+        ],
+    );
     let (status, body) = export(state.clone()).await?;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert_eq!(body["code"], "receipt_query_export_refused");
@@ -331,10 +334,11 @@ async fn captured_attribution_tamper_invalidates_before_export_refusal() -> Test
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
     assert_eq!(body["code"], "receipt_query_snapshot_invalid");
@@ -392,14 +396,14 @@ async fn signed_lineage_router(
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-b".into(), "tenant-b-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[
+            ("tenant-a", "tenant-secret"),
+            ("tenant-b", "tenant-b-secret"),
+        ],
+    );
     Ok((directory, path, snapshots, state))
 }
 

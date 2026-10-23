@@ -35,12 +35,15 @@ The onboarding imports the BOUNDED_OPERATIONAL_PROFILE from
 ```bash
 chio trust serve \
   --listen 127.0.0.1:8710 \
-  --service-token "$CHIO_TRUST_SERVICE_TOKEN" \
+  --access-config /etc/chio/healthcare-pilot/trust-access.toml \
   --receipt-db /var/lib/chio/healthcare-pilot/receipts.sqlite \
   --revocation-db /var/lib/chio/healthcare-pilot/revocations.sqlite \
   --authority-db /var/lib/chio/healthcare-pilot/authority.sqlite \
   --budget-db /var/lib/chio/healthcare-pilot/budgets.sqlite
 ```
+
+The access configuration declares the trust-control credentials; see
+[Trust-Control Access Configuration](../reference/TRUST_CONTROL_ACCESS.md).
 
 `chio mcp serve-http` starts after trust-control readiness:
 

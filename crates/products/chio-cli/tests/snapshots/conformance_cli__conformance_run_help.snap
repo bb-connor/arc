@@ -34,6 +34,8 @@ Options:
           Optional SQLite database path for durable admission, trust authority, and remote MCP session state
       --control-url <CONTROL_URL>
           Optional shared trust-control service base URL
+      --control-internal-url <CONTROL_INTERNAL_URL>
+          Trust-control internal listener base URL, which a kernel host with durable admission reaches the admission authority through [env: CHIO_CONTROL_INTERNAL_URL=]
       --control-token <CONTROL_TOKEN>
           Bearer token used to authenticate to the shared trust-control service. Prefer `CHIO_CONTROL_TOKEN` env over the argv form so the bearer does not leak via `ps` / `/proc/<pid>/cmdline` [env: CHIO_CONTROL_TOKEN]
       --control-authority-public-key <CONTROL_AUTHORITY_PUBLIC_KEY>

@@ -22,6 +22,7 @@ fn terminal_payload_maintenance_environment_starts_actual_owner_or_reports_missi
             None,
             None,
             None,
+            None,
         )?
         .ok_or("missing fixture runtime")?;
         if scenario == "configured" {
@@ -122,6 +123,7 @@ fn terminal_payload_maintenance_environment_refuses_before_opening_authority(
             None,
             None,
             remote,
+            remote.map(|_| "https://operator.example.test:8941"),
             Some("test-control-token"),
         );
         let error = match result {

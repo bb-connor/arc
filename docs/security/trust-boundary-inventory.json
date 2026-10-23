@@ -19591,6 +19591,9 @@
       "handle_structured_budget_release::request-json::StructuredBudgetReleaseRequest",
       "handle_structured_budget_reverse::request-json::StructuredBudgetFencedReverseRequest"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs": [
+      "from_toml_str::format-toml::from_str"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/certification_handlers.rs": [
       "handle_consume_certification_marketplace::request-json::CertificationConsumptionRequest",
       "handle_consume_certification_marketplace::shared-reader::crates/platform/chio-control-plane/src/certify/network.rs::consume_public_certification_across_network",
@@ -19848,7 +19851,6 @@
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs": [
       "read_capped_json::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
       "request_internal_get_json::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
-      "request_internal_post_json::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
       "request_json_capped::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
       "request_json_without_service_auth::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json"
     ],

@@ -37,6 +37,12 @@ of the hosted edge, `demo-admin-token` for the edge's admin routes,
 edge's calls to the trust service's authority. Override them with
 `CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`, `CHIO_SERVICE_TOKEN`, and
 `CHIO_WORKLOAD_TOKEN`; the edge refuses to start when any two share a value.
+The `chio-trust-demo` entrypoint writes a trust-control access configuration
+holding only the SHA-256 digests of `CHIO_SERVICE_TOKEN` (a credential with
+every caller scope) and the workload token, passed to the container as
+`CHIO_AUTHORITY_WORKLOAD_TOKEN` (a credential with `authority:read` and
+`capabilities:issue`), and starts `chio trust serve --access-config` with it.
+See [Trust-Control Access Configuration](../../docs/reference/TRUST_CONTROL_ACCESS.md).
 
 These defaults are public strings, so every port is published on 127.0.0.1
 only. Set your own tokens before changing that binding. The `chio-trust-demo`
