@@ -10,6 +10,7 @@ independent chain observations. Runtime adapters consume these types.
 Sign and verify an identity-to-settlement-address binding locally:
 
 ```rust
+use chio_web3::canonical::CanonicalBytes;
 use chio_web3::crypto::Keypair;
 use chio_web3::identity::{
     verify_web3_identity_binding, SignedWeb3IdentityBinding,
@@ -28,7 +29,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         settlement_address: "0x1111111111111111111111111111111111111111".into(),
         issued_at: 1_000, expires_at: 2_000, nonce: "binding-1".into(),
     };
-    let (signature, _) = signer.sign_canonical(&certificate)?;
+    let signature = signer.sign_wrapped(
+        CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+        &CanonicalBytes::from_serializable(&certificate)?,
+    )?;
     let binding = SignedWeb3IdentityBinding { certificate, signature };
     verify_web3_identity_binding(&binding)?;
     Ok(())

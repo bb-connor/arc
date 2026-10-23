@@ -209,9 +209,9 @@ fn authenticate_bid_and_reservation(
     let accepted = standing.accepted_bid;
     if bid.body.schema != BID_REQUEST_SCHEMA
         || bid.body.validate().is_err()
-        || !matches!(bid.verify_signature(), Ok(true))
+        || !matches!(bid.verify_signature(&bid.signer_key), Ok(true))
         || accepted.body.schema != ACCEPTED_BID_SCHEMA
-        || !matches!(accepted.verify_signature(), Ok(true))
+        || !matches!(accepted.verify_signature(&accepted.signer_key), Ok(true))
     {
         return Err(FindingChallengeInadmissible::StandingSettlementNotEstablished);
     }

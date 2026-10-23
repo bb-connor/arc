@@ -532,3 +532,7 @@ pub fn verify_signed_challenge_outcome(
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_evaluator_authority, "challenge_outcome")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingChallengeOutcome {
+    const SCHEMA_ID: &'static str = FINDING_CHALLENGE_OUTCOME_SCHEMA_V1;
+}

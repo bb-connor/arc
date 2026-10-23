@@ -60,6 +60,10 @@ pub struct FederationQualificationMatrix {
 
 pub type SignedFederationQualificationMatrix = SignedExportEnvelope<FederationQualificationMatrix>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for FederationQualificationMatrix {
+    const SCHEMA_ID: &'static str = CHIO_FEDERATION_QUALIFICATION_MATRIX_SCHEMA;
+}
+
 pub fn validate_federation_qualification_matrix(
     matrix: &FederationQualificationMatrix,
 ) -> Result<(), FederationContractError> {

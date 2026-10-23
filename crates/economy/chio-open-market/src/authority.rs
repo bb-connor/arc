@@ -20,7 +20,7 @@ pub(crate) fn verify_signed_activation(
 ) -> Result<(), String> {
     activation.body.validate()?;
     if !activation
-        .verify_signature()
+        .verify_signature(&activation.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err("trust activation signature is invalid".to_string());
@@ -33,7 +33,7 @@ pub(crate) fn verify_signed_charter(
 ) -> Result<(), String> {
     charter.body.validate()?;
     if !charter
-        .verify_signature()
+        .verify_signature(&charter.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err("governance charter signature is invalid".to_string());
@@ -43,7 +43,7 @@ pub(crate) fn verify_signed_charter(
 
 pub(crate) fn verify_signed_case(case: &SignedGenericGovernanceCase) -> Result<(), String> {
     case.body.validate()?;
-    if !case.verify_signature().map_err(|error| error.to_string())? {
+    if !case.verify_signature(&case.signer_key).map_err(|error| error.to_string())? {
         return Err("governance case signature is invalid".to_string());
     }
     Ok(())
@@ -54,7 +54,7 @@ pub(crate) fn verify_signed_fee_schedule(
 ) -> Result<(), String> {
     schedule.body.validate()?;
     if !schedule
-        .verify_signature()
+        .verify_signature(&schedule.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err("fee schedule signature is invalid".to_string());
@@ -65,7 +65,7 @@ pub(crate) fn verify_signed_fee_schedule(
 pub(crate) fn verify_signed_penalty(penalty: &SignedOpenMarketPenalty) -> Result<(), String> {
     penalty.body.validate()?;
     if !penalty
-        .verify_signature()
+        .verify_signature(&penalty.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err("penalty signature is invalid".to_string());

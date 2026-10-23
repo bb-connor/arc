@@ -14,7 +14,6 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use chio_core::canonical::canonical_json_bytes;
 use chio_core::merkle::leaf_hash;
 use chio_core::Keypair;
 use chio_kernel::checkpoint::{
@@ -50,7 +49,12 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
     let fabricated_root = checkpoint_chain_root(&[leaf_hash(b"fabricated-history")]).unwrap();
     let mut rewritten = second.clone();
     rewritten.body.chain_root = Some(fabricated_root);
-    rewritten.signature = kp.sign(&canonical_json_bytes(&rewritten.body).unwrap());
+    rewritten.signature = kp
+        .sign_wrapped(
+            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&rewritten.body).unwrap(),
+        )
+        .unwrap();
 
     let mut forged = honest.clone();
     forged.to_checkpoint_sha256 = checkpoint_body_sha256(&rewritten.body).unwrap();

@@ -375,7 +375,7 @@ pub fn evaluate_generic_trust_activation(
     };
 
     if !activation
-        .verify_signature()
+        .verify_signature(&activation.signer_key)
         .map_err(|error| error.to_string())?
     {
         evaluation.findings.push(GenericTrustActivationFinding {
@@ -572,4 +572,8 @@ pub fn evaluate_generic_trust_activation(
 
     evaluation.admitted = true;
     Ok(evaluation)
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for GenericTrustActivationArtifact {
+    const SCHEMA_ID: &'static str = GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA;
 }

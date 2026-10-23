@@ -584,7 +584,7 @@ pub fn evaluate_imported_runtime_attestation_appraisal(
     if !request.local_policy.is_explicit() {
         reason_codes.push(RuntimeAttestationImportReasonCode::NoLocalPolicy);
     }
-    if !request.signed_result.verify_signature().unwrap_or(false) {
+    if !request.signed_result.verify_signature(&request.signed_result.signer_key).unwrap_or(false) {
         reason_codes.push(RuntimeAttestationImportReasonCode::InvalidSignature);
     }
     if result.schema != RUNTIME_ATTESTATION_APPRAISAL_RESULT_SCHEMA

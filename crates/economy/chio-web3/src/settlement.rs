@@ -219,7 +219,7 @@ pub fn validate_web3_settlement_dispatch(
     }
     let signature_valid = dispatch
         .capital_instruction
-        .verify_signature()
+        .verify_signature(&dispatch.capital_instruction.signer_key)
         .map_err(|error| {
             Web3ContractError::settlement_signature_invalid(format!(
                 "capital instruction signature verification failed: {error}"
@@ -290,7 +290,7 @@ pub fn validate_web3_settlement_dispatch(
             ))
         })?;
     if let Some(bond) = dispatch.bond.as_ref() {
-        let signature_valid = bond.verify_signature().map_err(|error| {
+        let signature_valid = bond.verify_signature(&bond.signer_key).map_err(|error| {
             Web3ContractError::settlement_signature_invalid(format!(
                 "credit bond signature verification failed: {error}"
             ))
@@ -834,4 +834,12 @@ fn validate_transfer_completion_flow_binding(
         ));
     }
     Ok(())
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for Web3SettlementDispatchArtifact {
+    const SCHEMA_ID: &'static str = CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for Web3SettlementExecutionReceiptArtifact {
+    const SCHEMA_ID: &'static str = CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA;
 }

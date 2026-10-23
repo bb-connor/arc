@@ -32,7 +32,7 @@ pub fn signed_envelope_sha256<T: Serialize>(
 /// fail-closed: pinned key must be a non-weak Ed25519 key, the embedded
 /// signer must equal the pinned key, and the signature must verify
 /// STRICTLY over the canonical body.
-pub fn verify_pinned_envelope<T: Serialize>(
+pub fn verify_pinned_envelope<T: chio_core_types::receipt::lineage::SignedExportPayload>(
     envelope: &SignedExportEnvelope<T>,
     pinned_authority: &PublicKey,
     label: &'static str,
@@ -41,9 +41,14 @@ pub fn verify_pinned_envelope<T: Serialize>(
     if envelope.signer_key != *pinned_authority {
         return Err(FindingError::AuthorityMismatch(label));
     }
-    match pinned_authority.verify_canonical_strict(&envelope.body, &envelope.signature) {
-        Ok(true) => Ok(()),
-        _ => Err(FindingError::EnvelopeSignatureInvalid(label)),
+    match chio_core_types::crypto::verify_wrapped(
+        pinned_authority,
+        T::SCHEMA_ID,
+        &envelope.body,
+        &envelope.signature,
+    ) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(FindingError::EnvelopeSignatureInvalid(label)),
     }
 }
 

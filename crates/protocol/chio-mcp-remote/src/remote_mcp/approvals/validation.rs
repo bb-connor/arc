@@ -89,8 +89,7 @@ pub(super) fn decision(
         ));
     }
     if !token
-        .approver
-        .verify_canonical_strict(&token.body(), &token.signature)
+        .verify_signature()
         .map_err(|error| {
             warn!(error = %error, "operator approval signature could not be verified");
             failure(StatusCode::BAD_REQUEST, "approval signature is invalid")

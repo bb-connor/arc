@@ -53,6 +53,10 @@ impl GovernanceReceiptArtifact {
 
 pub type SignedGovernanceReceipt = SignedExportEnvelope<GovernanceReceiptArtifact>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for GovernanceReceiptArtifact {
+    const SCHEMA_ID: &'static str = GOVERNANCE_RECEIPT_SCHEMA_V1;
+}
+
 pub fn verify_destructive_authorization(
     receipt: &SignedGovernanceReceipt,
     expected_lease_id: &str,
@@ -62,8 +66,7 @@ pub fn verify_destructive_authorization(
 ) -> Result<(), GovernanceAuthorizationError> {
     receipt.body.validate()?;
     validate_sha256_hex(expected_step_sha256, "expected_step_sha256")?;
-    if !receipt
-        .verify_signature()
+    if !receipt.verify_signature(&receipt.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);
@@ -107,8 +110,7 @@ pub fn verify_step_governance_boundary(
             receipt.body.receipt_id.clone(),
         ));
     }
-    if !receipt
-        .verify_signature()
+    if !receipt.verify_signature(&receipt.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);

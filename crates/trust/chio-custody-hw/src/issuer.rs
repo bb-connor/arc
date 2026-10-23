@@ -540,16 +540,16 @@ mod tests {
             Ok(r) => r,
             Err(e) => panic!("signed mint must succeed: {e}"),
         };
-        let message = match crate::mint::signing_message(&resp.capability) {
+        let message = match crate::mint::signing_body(&resp.capability) {
             Ok(m) => m,
-            Err(e) => panic!("signing_message must encode: {e}"),
+            Err(e) => panic!("signing_body must encode: {e}"),
         };
         let signature = match Signature::from_hex(&resp.capability.signature) {
             Ok(s) => s,
             Err(e) => panic!("issued signature must decode: {e}"),
         };
         assert!(
-            public.verify(&message, &signature),
+            chio_core_types::crypto::verify_wrapped_bytes(&public, crate::mint::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
             "issued capability must verify under the signer public key"
         );
     }

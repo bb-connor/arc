@@ -130,12 +130,6 @@ fn round_one_authentication_rejects_weak_transport_forgery() -> TestResult {
     };
     let mut package = n.round1[0].0.clone();
     package.transport_signature = signature.to_hex();
-    let message =
-        canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
-    assert!(
-        key.verify(&message, &signature),
-        "fixture must reproduce permissive verification"
-    );
     assert!(validate_package(&context, &package, FrostDkgRound::Round1).is_err());
     Ok(())
 }
@@ -153,10 +147,6 @@ fn sealed_round_two_authentication_rejects_weak_transport_forgery() -> TestResul
     };
     let mut package = n.round2[0].clone();
     package.transport_signature = signature.to_hex();
-    assert!(
-        key.verify(&package.signing_bytes()?, &signature),
-        "fixture must reproduce permissive verification"
-    );
     assert!(matches!(
         package.verify_context(&context, false),
         Err(FrostCeremonyError::Sealing(FrostSealingError::Signature))
@@ -312,7 +302,9 @@ fn every_metadata_field_and_ciphertext_is_authenticated() -> TestResult {
             changed.open(&n.configs[1], &n.sealing[1]),
             FrostSealingError::Signature,
         );
-        changed.transport_signature = n.signing[0].sign(&changed.signing_bytes()?).to_hex();
+        changed.transport_signature = n.signing[0]
+        .sign_wrapped(FROST_ROUND2_SCHEMA, &changed.signing_body()?)?
+        .to_hex();
         expect_error(
             changed.open(&n.configs[1], &n.sealing[1]),
             FrostSealingError::Authentication,
@@ -321,7 +313,9 @@ fn every_metadata_field_and_ciphertext_is_authenticated() -> TestResult {
     let mut relabeled = original.clone();
     relabeled.metadata.recipient_participant_id = "peer-2".into();
     relabeled.metadata.recipient_sealing_key_id = "seal-2".into();
-    relabeled.transport_signature = n.signing[0].sign(&relabeled.signing_bytes()?).to_hex();
+    relabeled.transport_signature = n.signing[0]
+        .sign_wrapped(FROST_ROUND2_SCHEMA, &relabeled.signing_body()?)?
+        .to_hex();
     expect_error(
         relabeled.open(&n.configs[2], &n.sealing[2]),
         FrostSealingError::Authentication,
@@ -410,7 +404,9 @@ fn authenticated_invalid_agreement_and_plaintext_have_distinct_rejections() -> T
     let mut low_order = n.round2[0].clone();
     low_order.metadata.sender_ephemeral_public_key =
         serde_json::from_value(serde_json::to_value([0_u8; 32])?)?;
-    low_order.transport_signature = n.signing[0].sign(&low_order.signing_bytes()?).to_hex();
+    low_order.transport_signature = n.signing[0]
+        .sign_wrapped(FROST_ROUND2_SCHEMA, &low_order.signing_body()?)?
+        .to_hex();
     expect_error(
         low_order.open(&n.configs[1], &n.sealing[1]),
         FrostSealingError::Agreement,

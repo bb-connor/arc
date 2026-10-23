@@ -77,10 +77,13 @@ impl PheromoneRelayHttpRequest {
         }
         let peer = directory.peer(&self.sender_kernel_id)?;
         let signing_body = self.signing_body();
-        if !peer
-            .public_key
-            .verify_canonical(&signing_body, &self.signature)
-            .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?
+        if chio_core_types::crypto::verify_wrapped(
+            &peer.public_key,
+            PHEROMONE_RELAY_HTTP_REQUEST_SCHEMA,
+            &signing_body,
+            &self.signature,
+        )
+        .is_err()
         {
             return Err(PheromoneRelayError::SignatureInvalid);
         }
@@ -147,9 +150,9 @@ pub fn sign_relay_http_request<T: Serialize + ?Sized>(
         nonce: input.nonce.to_string(),
         sent_at_unix_ms: input.sent_at_unix_ms,
     };
-    let (signature, _) = input
-        .keypair
-        .sign_canonical(&signing_body)
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&signing_body)
+        .and_then(|canonical| input
+        .keypair.sign_wrapped(PHEROMONE_RELAY_HTTP_REQUEST_SCHEMA, &canonical))
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     Ok(PheromoneRelayHttpRequest {
         schema: signing_body.schema,

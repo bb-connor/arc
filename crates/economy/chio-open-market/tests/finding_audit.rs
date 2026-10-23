@@ -8,7 +8,7 @@
 //! unnoticed.
 
 use chio_finding::{
-    audit_epoch_precommitment_sha256, audit_seed_witness_signing_bytes, compute_audit_epoch_id,
+    audit_epoch_precommitment_sha256, sign_audit_seed_witness, compute_audit_epoch_id,
     compute_audit_report_id, compute_challenge_id, derive_audit_seed_commitment, derive_outcome_id,
     signed_envelope_sha256, FindingAuditEpoch, FindingAuditReport, FindingAuditRoundAuthorization,
     FindingAuthorityKeyPolicy, FindingAuthorityStatus, FindingChallenge,
@@ -297,14 +297,15 @@ fn epoch_for(eligible: &[EligibleListing], rate_bps: u64, budget_units: u64) -> 
         seed_witnessed_at,
         eligible_snapshot_at,
         seed_witness: seed_witness.public_key(),
-        seed_witness_signature: seed_witness.sign(&audit_seed_witness_signing_bytes(
+        seed_witness_signature: sign_audit_seed_witness(
+            &seed_witness,
             &audit_authority.public_key(),
             7,
             &eligible_snapshot_digest,
             &seed_commitment,
             eligible_snapshot_at,
             seed_witnessed_at,
-        )),
+        ).test_expect("seed witness signs"),
         eligible_snapshot_digest,
         eligible_listing_count: eligible.len() as u64,
         fee_schedule_envelope_sha256: sha256_hex(b"fee-schedule-envelope"),
@@ -1692,14 +1693,15 @@ fn a_snapshot_digest_substituted_after_the_seed_witness_signed_rejects() {
 fn a_seed_commitment_witnessed_before_eligibility_rejects() {
     let (eligible, mut epoch) = standard_round();
     epoch.seed_witnessed_at = epoch.eligible_snapshot_at;
-    epoch.seed_witness_signature = seed_witness().sign(&audit_seed_witness_signing_bytes(
+    epoch.seed_witness_signature = sign_audit_seed_witness(
+        &seed_witness(),
         &epoch.audit_authority,
         epoch.epoch_index,
         &epoch.eligible_snapshot_digest,
         &epoch.seed_commitment,
         epoch.eligible_snapshot_at,
         epoch.seed_witnessed_at,
-    ));
+    ).test_expect("seed witness signs");
     epoch.audit_epoch_id = String::new();
     epoch.audit_epoch_id = compute_audit_epoch_id(&epoch).test_expect("epoch id");
     assert_eq!(

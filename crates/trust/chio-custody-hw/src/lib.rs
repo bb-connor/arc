@@ -51,7 +51,9 @@ pub use attestation::{
 pub use capability::{PasskeyCapability, ScopeSet};
 pub use error::CustodyError;
 pub use issuer::{IssuerService, MintRequest, MintResponse};
-pub use mint::{sign_capability, signing_message};
+pub use mint::{
+    sign_capability, signing_body, verify_capability_signature, PASSKEY_CAPABILITY_SCHEMA,
+};
 #[cfg(feature = "sqlite-store")]
 pub use mobile_challenge::SqliteMobileChallengeStore;
 pub use mobile_challenge::{

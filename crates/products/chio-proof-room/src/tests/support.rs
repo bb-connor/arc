@@ -636,7 +636,7 @@ pub(crate) fn sign_bundle_signature_with_key(
     signature["payloadRef"]["sha256"] = serde_json::Value::String(sha256_hex(&manifest_bytes));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
     signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign(&signed_payload).to_hex());
+        serde_json::Value::String(keypair.sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, &signed_payload).to_hex());
     fs::write(&signature_path, json_bytes(&signature)?)?;
     Ok(())
 }
@@ -805,7 +805,10 @@ pub(crate) fn sign_first_run_receipt_projection_with_seed(
         .as_object_mut()
         .ok_or("receipt projection object missing")?
         .remove("signature");
-    let (signature, _canonical) = keypair.sign_canonical(&signed_body)?;
+    let signature = keypair.sign_wrapped(
+        "chio.receipt.v1",
+        &chio_core_types::CanonicalBytes::from_serializable(&signed_body)?,
+    )?;
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
     Ok(())
 }

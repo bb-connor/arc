@@ -63,7 +63,7 @@ pub fn verify_signed_runtime_attestation_verifier_descriptor(
             descriptor.body.descriptor_id
         )));
     }
-    if !descriptor.verify_signature()? {
+    if !descriptor.verify_signature(&descriptor.signer_key)? {
         return Err(crate::Error::CanonicalJson(format!(
             "runtime attestation verifier descriptor `{}` signature verification failed",
             descriptor.body.descriptor_id
@@ -125,7 +125,7 @@ pub fn verify_signed_runtime_attestation_reference_value_set(
             reference_value_set.body.reference_value_id
         )));
     }
-    if !reference_value_set.verify_signature()? {
+    if !reference_value_set.verify_signature(&reference_value_set.signer_key)? {
         return Err(crate::Error::CanonicalJson(format!(
             "runtime attestation reference-value set `{}` signature verification failed",
             reference_value_set.body.reference_value_id
@@ -167,7 +167,7 @@ pub fn verify_signed_runtime_attestation_trust_bundle(
     now: u64,
 ) -> ChioResult<RuntimeAttestationTrustBundleVerification> {
     validate_runtime_attestation_trust_bundle(&bundle.body, now)?;
-    if !bundle.verify_signature()? {
+    if !bundle.verify_signature(&bundle.signer_key)? {
         return Err(crate::Error::CanonicalJson(format!(
             "runtime attestation trust bundle `{}` signature verification failed",
             bundle.body.bundle_id

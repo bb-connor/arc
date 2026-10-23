@@ -857,8 +857,12 @@ pub(crate) fn sign_terminal_receipt(mut receipt: serde_json::Value) -> serde_jso
         "kernel_key".to_string(),
         serde_json::Value::String(keypair.public_key().to_hex()),
     );
-    let (signature, _) = keypair
-        .sign_canonical(&receipt)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.receipt.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&receipt)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("terminal receipt signs");
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
     receipt
@@ -910,9 +914,12 @@ fn sign_runtime_execution_lease(value: &serde_json::Value, keypair: &Keypair) ->
         body["maxInvocations"] = value["max_invocations"].clone();
     }
     keypair
-        .sign_canonical(&body)
+        .sign_wrapped(
+            "chio.runtime.execution-lease-signature.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("runtime execution lease signs")
-        .0
         .to_hex()
 }
 
@@ -942,9 +949,12 @@ fn sign_runtime_route_plan(value: &serde_json::Value, keypair: &Keypair) -> Stri
         "issuer": value["issuer"],
     });
     keypair
-        .sign_canonical(&body)
+        .sign_wrapped(
+            "chio.swarm.route-plan-receipt-signature.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("runtime route plan signs")
-        .0
         .to_hex()
 }
 
@@ -957,8 +967,12 @@ fn sign_public_settlement_bundle_value(settlement_bundle: &mut serde_json::Value
         serde_json::from_value(settlement_bundle.clone())
             .test_expect("typed public settlement proof bundle");
     let keypair = Keypair::from_seed(&PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED);
-    let (signature, _) = keypair
-        .sign_canonical(&typed_bundle)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.web3-settlement-proof-bundle.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&typed_bundle)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("public settlement proof bundle signs");
     settlement_bundle["bundle_signature"] = serde_json::json!({
         "algorithm": PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM,
@@ -999,9 +1013,12 @@ fn sign_runtime_terminal_receipt(value: &serde_json::Value, keypair: &Keypair) -
         body["incidentRef"] = value["incident_ref"].clone();
     }
     keypair
-        .sign_canonical(&body)
+        .sign_wrapped(
+            "chio.runtime.terminal-receipt-signature.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("runtime terminal receipt signs")
-        .0
         .to_hex()
 }
 
@@ -1046,8 +1063,12 @@ fn authorize_transaction_trust_root_subject(bundle: &Path, subject: &str) {
             .test_expect("trust root is object");
         object.remove("signature");
         let keypair = Keypair::from_seed(&[54u8; 32]);
-        let (signature, _) = keypair
-            .sign_canonical(&trust_root)
+        let signature = keypair
+            .sign_wrapped(
+                "chio.proof.first-run.trust-roots.v1",
+                &chio_core::canonical::CanonicalBytes::from_serializable(&trust_root)
+                    .test_expect("canonical signing body"),
+            )
             .test_expect("trust root signs");
         trust_root["signature"] = serde_json::Value::String(signature.to_hex());
         write_json(&trust_root_path, &trust_root);
@@ -1752,9 +1773,12 @@ fn sign_agent_web_envelope_value(
 ) {
     envelope["envelope_id"] = serde_json::Value::String(agent_web_envelope_id(envelope));
     let payload = agent_web_envelope_signature_payload(envelope);
-    let canonical =
-        chio_core_types::canonical_json_bytes(&payload).test_expect("Agent Web envelope signs");
-    let signature = keypair.sign(&canonical).to_hex();
+    let canonical = chio_core_types::CanonicalBytes::from_serializable(&payload)
+        .test_expect("canonical envelope payload");
+    let signature = keypair
+        .sign_wrapped("chio.agent-web-proof-envelope.v1", &canonical)
+        .test_expect("Agent Web envelope signs")
+        .to_hex();
     envelope["signature"] =
         serde_json::Value::String(format!("sig-ed25519:{public_key}:{signature}"));
 }
@@ -1907,7 +1931,7 @@ pub(crate) fn sign_bundle_signature_with_seed(
         serde_json::Value::String(hex::encode(Sha256::digest(&manifest_bytes)));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
     signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign(&signed_payload).to_hex());
+        serde_json::Value::String(keypair.sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload).to_hex());
 }
 
 pub(crate) fn proof_room_trust_roots_for_seed(seed: [u8; 32]) -> serde_json::Value {
@@ -1926,8 +1950,12 @@ pub(crate) fn proof_room_trust_roots_for_seed(seed: [u8; 32]) -> serde_json::Val
             }
         ]
     });
-    let (signature, _) = keypair
-        .sign_canonical(&trust_roots)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.proof.first-run.trust-roots.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&trust_roots)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("trust roots sign");
     trust_roots["signature"] = serde_json::Value::String(signature.to_hex());
     trust_roots
@@ -2710,8 +2738,12 @@ fn sign_commerce_payment_lifecycle(payment_lifecycle: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("payment lifecycle object")
         .remove("signature");
-    let (signature, _) = keypair
-        .sign_canonical(payment_lifecycle)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.commerce.payment-lifecycle.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(payment_lifecycle)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("payment lifecycle signs");
     payment_lifecycle["signature"] = serde_json::Value::String(signature.to_hex());
 }
@@ -3455,8 +3487,12 @@ fn sign_standalone_risk_report(risk_report: &mut serde_json::Value) {
     };
     report.remove("signature");
     let keypair = Keypair::from_seed(&[63u8; 32]);
-    let (signature, _) = keypair
-        .sign_canonical(risk_report)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.risk.comptroller-report.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(risk_report)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("risk comptroller report signs");
     risk_report["signature"] = serde_json::Value::String(format!(
         "sig-ed25519:{}:{}",

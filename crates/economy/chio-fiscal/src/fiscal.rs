@@ -382,7 +382,7 @@ impl VerifiedFiscalCharter {
     pub fn verify(signed: SignedFiscalCharter) -> Result<Self, FiscalError> {
         signed.body.validate()?;
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
         {
             return Err(FiscalError::InvalidSignature);
@@ -651,7 +651,7 @@ impl VerifiedFiscalSchedule {
 
     fn finish_verification(signed: SignedFiscalSchedule) -> Result<Self, FiscalError> {
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
         {
             return Err(FiscalError::InvalidSignature);
@@ -791,4 +791,12 @@ fn decode_prefixed_key(public_key: &PublicKey, prefix: &str) -> Result<Vec<u8>, 
         .and_then(|encoded| {
             hex::decode(encoded).map_err(|error| FiscalError::Canonicalization(error.to_string()))
         })
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalCharter {
+    const SCHEMA_ID: &'static str = FISCAL_CHARTER_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalSchedule {
+    const SCHEMA_ID: &'static str = FISCAL_SCHEDULE_SCHEMA;
 }

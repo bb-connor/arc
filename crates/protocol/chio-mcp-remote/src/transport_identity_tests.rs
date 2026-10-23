@@ -10,7 +10,7 @@ fn jwt(key: &Keypair, claims: Value) -> Result<String, serde_json::Error> {
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"EdDSA","typ":"JWT"}"#);
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims)?);
     let input = format!("{header}.{payload}");
-    let signature = URL_SAFE_NO_PAD.encode(key.sign(input.as_bytes()).to_bytes());
+    let signature = URL_SAFE_NO_PAD.encode(key.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, input.as_bytes()).to_bytes());
     Ok(format!("{input}.{signature}"))
 }
 fn verifier(key: &Keypair) -> Result<JwtBearerVerifier, chio_kernel::dpop::DpopError> {

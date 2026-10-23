@@ -206,7 +206,7 @@ mod tests {
             nonce: "bind-001".to_string(),
         };
         SignedWeb3IdentityBinding {
-            signature: keypair.sign_canonical(&certificate).test_unwrap().0,
+            signature: chio_core::canonical::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| keypair.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)).test_unwrap(),
             certificate,
         }
     }

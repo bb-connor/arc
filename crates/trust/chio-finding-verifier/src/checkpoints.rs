@@ -22,13 +22,13 @@ use chio_kernel::checkpoint::{
 use crate::verify::{policy_covers, FindingCheckpointSignerStatusTrust, ResolvedReceiptEvidence};
 
 fn has_strict_checkpoint_signature(checkpoint: &KernelCheckpoint) -> bool {
-    matches!(
-        checkpoint
-            .body
-            .kernel_key
-            .verify_canonical_strict(&checkpoint.body, &checkpoint.signature),
-        Ok(true)
+    chio_core_types::crypto::verify_wrapped(
+        &checkpoint.body.kernel_key,
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &checkpoint.body,
+        &checkpoint.signature,
     )
+    .is_ok()
 }
 
 /// Membership failures. Every variant is a rejection.

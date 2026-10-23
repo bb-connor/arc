@@ -83,12 +83,21 @@ fn optional_nonce_rejects_wrong_binding_issuer_and_operation_signature_domain(
     let signed = nonce(&keypair, &pending, &receipt)?;
     let mut foreign_binding = signed.clone();
     foreign_binding.nonce.bound_to.request_id = "other-logical-call".into();
-    foreign_binding.signature = keypair.sign_canonical(&foreign_binding.nonce)?.0;
+    foreign_binding.signature = keypair.sign_wrapped(
+        EXECUTION_NONCE_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&foreign_binding.nonce)?,
+    )?;
     let mut foreign_issuer = signed.clone();
-    foreign_issuer.signature = Keypair::generate().sign_canonical(&foreign_issuer.nonce)?.0;
+    foreign_issuer.signature = Keypair::generate().sign_wrapped(
+        EXECUTION_NONCE_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&foreign_issuer.nonce)?,
+    )?;
     let mut wrong_domain = signed;
     wrong_domain.nonce.schema = OPERATION_EXECUTION_NONCE_SCHEMA.into();
-    wrong_domain.signature = keypair.sign_canonical(&wrong_domain.nonce)?.0;
+    wrong_domain.signature = keypair.sign_wrapped(
+        EXECUTION_NONCE_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&wrong_domain.nonce)?,
+    )?;
     for candidate in [foreign_binding, foreign_issuer, wrong_domain] {
         let mut message = original.clone();
         message["result"]["_meta"]["chioExecutionNonce"] = serde_json::to_value(candidate)?;

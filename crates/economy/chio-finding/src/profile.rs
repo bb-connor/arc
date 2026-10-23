@@ -345,3 +345,7 @@ pub fn verify_signed_profile(
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_governance_authority, "profile")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingChallengeVerifierProfile {
+    const SCHEMA_ID: &'static str = FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1;
+}

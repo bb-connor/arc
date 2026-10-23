@@ -3,7 +3,7 @@ use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::{canonical_json_bytes, canonical_json_string};
 use chio_finding::{
-    audit_seed_witness_signing_bytes, compute_audit_epoch_id, compute_audit_report_id,
+    sign_audit_seed_witness, compute_audit_epoch_id, compute_audit_report_id,
     compute_challenge_id, compute_enforcement_id, compute_snapshot_id,
     derive_audit_seed_commitment, derive_outcome_id, FindingAffectedDelivery, FindingAuditEpoch,
     FindingAuditReport, FindingBuyerSubmission, FindingChallenge, FindingChallengeAuthorization,
@@ -519,14 +519,15 @@ pub(crate) fn audit_epoch_body() -> Result<FindingAuditEpoch, FindingError> {
         seed_witnessed_at,
         eligible_snapshot_at,
         seed_witness: seed_witness.public_key(),
-        seed_witness_signature: seed_witness.sign(&audit_seed_witness_signing_bytes(
+        seed_witness_signature: sign_audit_seed_witness(
+            &seed_witness,
             &audit_authority.public_key(),
             4,
             HEX64,
             &seed_commitment,
             eligible_snapshot_at,
             seed_witnessed_at,
-        )),
+        )?,
         eligible_snapshot_digest: HEX64.to_string(),
         eligible_listing_count: 128,
         fee_schedule_envelope_sha256: HEX64_ALT.to_string(),

@@ -130,3 +130,11 @@ pub fn verify_signed_authority_status(
     signed.body.validate()?;
     crate::envelope::verify_pinned_envelope(signed, pinned_status_authority, "authority_status")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingAuthorityStatus {
+    const SCHEMA_ID: &'static str = FINDING_AUTHORITY_STATUS_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingKeyRevocation {
+    const SCHEMA_ID: &'static str = FINDING_KEY_REVOCATION_SCHEMA_V1;
+}

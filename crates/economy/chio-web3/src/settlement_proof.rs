@@ -4,7 +4,7 @@ use crate::anchors::verify_oracle_conversion_evidence_signature;
 use crate::canonical::canonical_json_bytes;
 use crate::credit::CapitalBookEvidenceKind;
 use crate::crypto::sha256_hex;
-use crate::crypto::{PublicKey, Signature};
+use crate::crypto::{verify_wrapped, PublicKey, Signature};
 use crate::error::Web3ContractError;
 use crate::hashing::Hash;
 use crate::identity::{
@@ -36,7 +36,6 @@ pub const CLAIM_PUBLIC_SETTLEMENT_TRUST_MARKET_REFS_BOUND: &str =
 pub const CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED: &str =
     "claim.public_settlement.public_witness_verified";
 
-const PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM: &str = "ed25519-rfc8785-v1";
 pub(crate) const MAX_VERIFIED_CACHE_WITNESS_AGE_SECONDS: u64 = 3_600;
 
 #[cfg(test)]
@@ -186,12 +185,6 @@ fn validate_public_settlement_bundle_signature(
     let signature = bundle.bundle_signature.as_ref().ok_or_else(|| {
         Web3ContractError::InvalidProof("public settlement bundle signature missing".to_string())
     })?;
-    if signature.algorithm != PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM {
-        return Err(Web3ContractError::InvalidProof(format!(
-            "public settlement bundle signature algorithm unsupported: {}",
-            signature.algorithm
-        )));
-    }
     ensure_non_empty(
         &signature.signer_key,
         "public_settlement.bundle_signature.signer_key",
@@ -226,14 +219,21 @@ fn validate_public_settlement_bundle_signature(
         ))
     })?;
     let body = public_settlement_bundle_signature_body(bundle);
-    if !signer
-        .verify_canonical(&body, &signature)
-        .map_err(|error| {
-            Web3ContractError::InvalidProof(format!(
+    let verified = match verify_wrapped(
+        &signer,
+        CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA,
+        &body,
+        &signature,
+    ) {
+        Ok(()) => true,
+        Err(chio_core_types::Error::SignatureRejected) => false,
+        Err(error) => {
+            return Err(Web3ContractError::InvalidProof(format!(
                 "public settlement bundle signature canonicalization failed: {error}"
-            ))
-        })?
-    {
+            )))
+        }
+    };
+    if !verified {
         return Err(Web3ContractError::ProofSignatureInvalid(
             "public settlement bundle signature verification failed".to_string(),
         ));

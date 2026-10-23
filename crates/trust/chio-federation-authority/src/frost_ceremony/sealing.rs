@@ -2,7 +2,8 @@
 use super::*;
 use aws_lc_rs::{agreement, hkdf};
 use chacha20poly1305::{aead::AeadInPlace, ChaCha20Poly1305, KeyInit, Nonce};
-use chio_core_types::canonical::UntrustedJsonText;
+use chio_core_types::canonical::{CanonicalBytes, UntrustedJsonText};
+use chio_core_types::crypto::verify_wrapped_bytes;
 
 #[path = "sealing/keys.rs"]
 mod keys;
@@ -63,6 +64,12 @@ struct Metadata {
 }
 
 /// Untrusted public transport value. Deserialization grants no authority.
+#[derive(Serialize)]
+struct SealedSigningBody<'a> {
+    metadata: &'a Metadata,
+    ciphertext: String,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SealedFrostRound2Package {
@@ -148,10 +155,14 @@ impl SealedFrostRound2Package {
             .map_err(|e| FrostCeremonyError::Canonical(e.to_string()))
     }
 
-    fn signing_bytes(&self) -> Result<Vec<u8>, FrostCeremonyError> {
-        let mut bytes = self.metadata_bytes()?;
-        bytes.extend_from_slice(&self.ciphertext);
-        Ok(bytes)
+    /// Canonical body the transport key signs under
+    /// `chio.frost.dkg-round2-sealed.v1`: the metadata and the hex ciphertext.
+    fn signing_body(&self) -> Result<CanonicalBytes, FrostCeremonyError> {
+        CanonicalBytes::from_serializable(&SealedSigningBody {
+            metadata: &self.metadata,
+            ciphertext: hex::encode(&self.ciphertext),
+        })
+        .map_err(|e| FrostCeremonyError::Canonical(e.to_string()))
     }
 
     fn check_encoding(&self) -> Result<(), FrostSealingError> {
@@ -228,9 +239,13 @@ impl SealedFrostRound2Package {
         }
         let signature = Signature::from_hex(&self.transport_signature)
             .map_err(|_| FrostSealingError::Signature)?;
-        if !sender
-            .transport_public_key
-            .verify_strict(&self.signing_bytes()?, &signature)
+        if verify_wrapped_bytes(
+            &sender.transport_public_key,
+            FROST_ROUND2_SCHEMA,
+            &self.signing_body()?,
+            &signature,
+        )
+        .is_err()
         {
             return Err(FrostSealingError::Signature.into());
         }
@@ -319,7 +334,10 @@ impl SealedFrostRound2Package {
             )
             .map_err(|_| FrostSealingError::Authentication)?;
         sealed.ciphertext = std::mem::take(&mut *plaintext);
-        sealed.transport_signature = transport.sign(&sealed.signing_bytes()?).to_hex();
+        sealed.transport_signature = transport
+            .sign_wrapped(FROST_ROUND2_SCHEMA, &sealed.signing_body()?)
+            .map_err(|e| FrostCeremonyError::Canonical(e.to_string()))?
+            .to_hex();
         Ok(sealed)
     }
 }

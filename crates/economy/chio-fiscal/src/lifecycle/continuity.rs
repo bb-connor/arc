@@ -1088,3 +1088,7 @@ pub fn read_verified_fiscal_checkpoint(
     VerifiedFiscalContinuityCheckpoint::verify(signed, policy, charters)
         .map_err(|_| FiscalStateAnchorError::Divergence)
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalContinuityCheckpoint {
+    const SCHEMA_ID: &'static str = FISCAL_CONTINUITY_CHECKPOINT_SCHEMA;
+}

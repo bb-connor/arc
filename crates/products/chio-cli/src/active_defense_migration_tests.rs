@@ -190,8 +190,12 @@ fn rejects_the_old_manifest_shape_under_the_current_id_even_when_signed() {
         }],
         "public_key": signer.public_key().to_hex()
     });
-    let (signature, _) = signer
-        .sign_canonical(&old_shape)
+    let signature = signer
+        .sign_wrapped(
+            TOOL_MANIFEST_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&old_shape)
+                .test_expect("canonical manifest"),
+        )
         .test_expect("sign old-shape manifest");
     let input = ShadowMigrationInput {
         schema: SHADOW_MIGRATION_INPUT_SCHEMA.to_string(),
@@ -240,8 +244,12 @@ fn rejects_the_retired_manifest_id_even_when_signed() {
     let mut input = base_input(&signer);
     input.manifests[0].signed_envelope.manifest["schema"] =
         serde_json::Value::String("chio.manifest.v2".to_string());
-    let (signature, _) = signer
-        .sign_canonical(&input.manifests[0].signed_envelope.manifest)
+    let signature = signer
+        .sign_wrapped(
+            TOOL_MANIFEST_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&input.manifests[0].signed_envelope.manifest)
+                .test_expect("canonical manifest"),
+        )
         .test_expect("re-sign retired-id manifest");
     input.manifests[0].signed_envelope.signature = signature;
     assert!(matches!(build_shadow_migration_report(input),

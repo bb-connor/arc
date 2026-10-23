@@ -173,3 +173,7 @@ pub fn verify_signed_bond_backing(
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_collateral_authority, "bond_backing")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingBondBacking {
+    const SCHEMA_ID: &'static str = FINDING_BOND_BACKING_SCHEMA_V1;
+}

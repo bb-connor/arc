@@ -15,7 +15,8 @@
 //! it. Two artifacts, never one mutable one.
 
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +34,8 @@ pub const FINDING_AUDIT_EPOCH_SCHEMA_V1: &str =
 const AUDIT_SEED_COMMITMENT_DOMAIN: &[u8] = b"chio.finding.audit-seed.v1\0";
 
 /// Domain separator for the independently witnessed seed commitment.
-const AUDIT_SEED_WITNESS_DOMAIN: &str = "chio.finding.audit-seed-witness.v1";
+/// Signing-wrapper schema id of the audit seed witness statement.
+pub const AUDIT_SEED_WITNESS_SCHEMA: &str = "chio.finding.audit-seed-witness.v1";
 
 /// Upper bound on the published audit rate, in basis points.
 pub const MAX_PUBLISHED_RATE_BPS: u64 = 10_000;
@@ -49,26 +51,63 @@ pub fn derive_audit_seed_commitment(revealed_seed: &str) -> String {
     chio_core_types::crypto::sha256_hex(&preimage)
 }
 
-/// Exact bytes the independent randomness witness signs after the eligible
-/// listing snapshot is fixed.
+#[derive(Serialize)]
+struct AuditSeedWitnessStatement<'a> {
+    audit_authority: &'a PublicKey,
+    epoch_index: u64,
+    eligible_snapshot_digest: &'a str,
+    eligible_snapshot_at: u64,
+    seed_commitment: &'a str,
+    seed_witnessed_at: u64,
+}
+
+/// Canonical statement the independent randomness witness signs after the
+/// eligible listing snapshot is fixed.
 ///
 /// The witness controls and withholds the seed until the report. Binding the
 /// already committed snapshot digest prevents the venue from selecting or
 /// weighting listings after learning the seed commitment.
-#[must_use]
-pub fn audit_seed_witness_signing_bytes(
+fn audit_seed_witness_body(
     audit_authority: &PublicKey,
     epoch_index: u64,
     eligible_snapshot_digest: &str,
     seed_commitment: &str,
     eligible_snapshot_at: u64,
     seed_witnessed_at: u64,
-) -> Vec<u8> {
-    format!(
-        "{AUDIT_SEED_WITNESS_DOMAIN}\0{}\0{epoch_index}\0{eligible_snapshot_digest}\0{eligible_snapshot_at}\0{seed_commitment}\0{seed_witnessed_at}",
-        audit_authority.to_hex()
-    )
-    .into_bytes()
+) -> Result<CanonicalBytes, FindingError> {
+    CanonicalBytes::from_serializable(&AuditSeedWitnessStatement {
+        audit_authority,
+        epoch_index,
+        eligible_snapshot_digest,
+        eligible_snapshot_at,
+        seed_commitment,
+        seed_witnessed_at,
+    })
+    .map_err(|_| FindingError::Canonicalization)
+}
+
+/// Witness signature over the signing wrapper of the seed statement under
+/// `chio.finding.audit-seed-witness.v1`.
+pub fn sign_audit_seed_witness(
+    witness: &Keypair,
+    audit_authority: &PublicKey,
+    epoch_index: u64,
+    eligible_snapshot_digest: &str,
+    seed_commitment: &str,
+    eligible_snapshot_at: u64,
+    seed_witnessed_at: u64,
+) -> Result<Signature, FindingError> {
+    let body = audit_seed_witness_body(
+        audit_authority,
+        epoch_index,
+        eligible_snapshot_digest,
+        seed_commitment,
+        eligible_snapshot_at,
+        seed_witnessed_at,
+    )?;
+    witness
+        .sign_wrapped(AUDIT_SEED_WITNESS_SCHEMA, &body)
+        .map_err(|_| FindingError::Signing)
 }
 
 /// Audit epoch precommitment body.
@@ -91,7 +130,7 @@ pub struct FindingAuditEpoch {
     pub eligible_snapshot_at: u64,
     /// Independently pinned randomness-witness key.
     pub seed_witness: PublicKey,
-    /// Strict Ed25519 signature over [`audit_seed_witness_signing_bytes`].
+    /// Witness signature produced by [`sign_audit_seed_witness`].
     pub seed_witness_signature: Signature,
     /// Digest of the eligible listing snapshot this round samples from.
     pub eligible_snapshot_digest: String,
@@ -153,17 +192,21 @@ impl FindingAuditEpoch {
 
     /// Verify the independently pinned seed witness embedded in this body.
     pub fn verify_seed_witness(&self) -> Result<(), FindingError> {
-        let message = audit_seed_witness_signing_bytes(
+        let body = audit_seed_witness_body(
             &self.audit_authority,
             self.epoch_index,
             &self.eligible_snapshot_digest,
             &self.seed_commitment,
             self.eligible_snapshot_at,
             self.seed_witnessed_at,
-        );
-        if self
-            .seed_witness
-            .verify_strict(&message, &self.seed_witness_signature)
+        )?;
+        if verify_wrapped_bytes(
+            &self.seed_witness,
+            AUDIT_SEED_WITNESS_SCHEMA,
+            &body,
+            &self.seed_witness_signature,
+        )
+        .is_ok()
         {
             Ok(())
         } else {
@@ -206,4 +249,8 @@ pub fn verify_signed_audit_epoch(
         return Err(FindingError::AuthorityMismatch("audit_seed_witness"));
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_audit_authority, "audit_epoch")
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingAuditEpoch {
+    const SCHEMA_ID: &'static str = FINDING_AUDIT_EPOCH_SCHEMA_V1;
 }

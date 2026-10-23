@@ -300,7 +300,10 @@ fn pending_approval_projection_rejects_execution_authority() -> TestResult {
         reserved_hold_id: None,
         reserving_request_id: None,
     };
-    let signature = fixture.approver.sign_canonical(&nonce)?.0;
+    let signature = fixture.approver.sign_wrapped(
+        chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&nonce)?,
+    )?;
     response.execution_nonce = Some(Box::new(SignedExecutionNonce { nonce, signature }));
     assert!(tool_response_messages("pending-request".into(), response).is_err());
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);

@@ -30,6 +30,7 @@ use chio_pheromone_runtime::{
     ChioWorkflowProofPackage, ChioWorkflowVerificationContext, ChioWorkflowVerifierTrustBundle,
     PeerWeightProvider, PheromoneBatchOutcome, PheromoneReceiveReport, PheromoneReceiver,
     PheromoneReceiverConfig, PheromoneRuntimeError, PheromoneRuntimeStore,
+    RuntimeTransitPolicyDocument,
     StaticPeerWeightProvider, VerifiedChioWorkflowResolver,
 };
 
@@ -104,7 +105,7 @@ fn runtime_policy_loader_error(value: &serde_json::Value) -> String {
 }
 
 fn signed_runtime_policy_value(body: serde_json::Value) -> serde_json::Value {
-    let envelope = SignedExportEnvelope::sign(body, &key(42)).unwrap();
+    let envelope = SignedExportEnvelope::sign(RuntimeTransitPolicyDocument(body), &key(42)).unwrap();
     serde_json::to_value(envelope).unwrap()
 }
 
@@ -144,7 +145,7 @@ fn runtime_policy_loader_rejects_tampered_signed_policy_envelope() {
 
 #[test]
 fn runtime_policy_loader_rejects_untrusted_policy_signer() {
-    let envelope = SignedExportEnvelope::sign(runtime_policy_value(), &key(99)).unwrap();
+    let envelope = SignedExportEnvelope::sign(RuntimeTransitPolicyDocument(runtime_policy_value()), &key(99)).unwrap();
     let value = serde_json::to_value(envelope).unwrap();
 
     assert_eq!(runtime_policy_loader_error(&value), "invalid_field");
@@ -155,7 +156,7 @@ fn runtime_policy_loader_rejects_self_authorized_policy_signer() {
     let mut value = runtime_policy_value();
     value["admission"]["runtimePolicyIssuerPublicKeys"] = serde_json::json!([key(99).public_key()]);
     seal_runtime_policy_hashes(&mut value);
-    let envelope = SignedExportEnvelope::sign(value, &key(99)).unwrap();
+    let envelope = SignedExportEnvelope::sign(RuntimeTransitPolicyDocument(value), &key(99)).unwrap();
     let value = serde_json::to_value(envelope).unwrap();
 
     assert_eq!(runtime_policy_loader_error(&value), "invalid_field");
@@ -252,7 +253,12 @@ fn signed_cost_commitment(
         inclusion_proof: tree.inclusion_proof(0).unwrap(),
         leaf_preimage_sha256: sha256_hex(&leaf_bytes),
     };
-    let (signature, _) = verifier_key.sign_canonical(&statement).unwrap();
+    let signature = verifier_key
+        .sign_wrapped(
+            chio_pheromone::PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&statement).unwrap(),
+        )
+        .unwrap();
     PheromoneCostCommitment {
         schema: PHEROMONE_COST_COMMITMENT_SCHEMA.to_string(),
         statement,

@@ -83,7 +83,10 @@ fn signed_nonce() -> Result<chio_kernel::SignedExecutionNonce, chio_core::error:
         reserved_hold_id: None,
         reserving_request_id: None,
     };
-    let (signature, _) = key.sign_canonical(&nonce)?;
+    let signature = key.sign_wrapped(
+        chio_kernel::execution_nonce::EXECUTION_NONCE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&nonce)?,
+    )?;
     Ok(chio_kernel::SignedExecutionNonce { nonce, signature })
 }
 
@@ -155,9 +158,12 @@ fn original_nonce_objects_keep_full_width_signed_integers() -> TestResult {
                 .ok_or("missing object-form nonce")?;
             assert_eq!(decoded.nonce.issued_at, 9_007_199_254_740_993);
             assert_eq!(decoded.nonce.expires_at, i64::MAX);
-            assert!(key
-                .public_key()
-                .verify_canonical(&decoded.nonce, &decoded.signature)?);
+            chio_core::crypto::verify_wrapped(
+                &key.public_key(),
+                chio_kernel::execution_nonce::EXECUTION_NONCE_SCHEMA,
+                &decoded.nonce,
+                &decoded.signature,
+            )?;
         }
     }
     Ok(())

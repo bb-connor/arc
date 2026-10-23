@@ -1,10 +1,18 @@
 use std::collections::BTreeMap;
 
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::verify_wrapped_bytes;
 use chio_core_types::{PublicKey, Signature, SigningAlgorithm};
 
-use super::roster::{FrostEpochCheckpointV1, FrostRosterError, FrostRosterV1};
+use super::roster::{
+    FrostEpochCheckpointV1, FrostRosterError, FrostRosterV1, CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
+    CHIO_FROST_ROSTER_SCHEMA,
+};
 use super::types::validate_identifier;
-use super::verify::{FrostAuthorizationSlotCheckpointV1, FrostVerificationError};
+use super::verify::{
+    FrostAuthorizationSlotCheckpointV1, FrostVerificationError,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FrostArtifactAuthorityRole {
@@ -91,7 +99,8 @@ impl FrostArtifactTrustStore {
         self.verify(
             FrostArtifactAuthorityRole::Roster,
             &roster.roster_authority_key_id,
-            &roster.signing_bytes()?,
+            CHIO_FROST_ROSTER_SCHEMA,
+            &roster.signing_body()?,
             &roster.roster_authority_signature,
         )
     }
@@ -104,7 +113,8 @@ impl FrostArtifactTrustStore {
         self.verify(
             FrostArtifactAuthorityRole::EpochAnchor,
             &checkpoint.anchor_key_id,
-            &checkpoint.signing_bytes()?,
+            CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
+            &checkpoint.signing_body()?,
             &checkpoint.anchor_signature,
         )
     }
@@ -117,7 +127,8 @@ impl FrostArtifactTrustStore {
         self.verify(
             FrostArtifactAuthorityRole::AuthorizationSlotAnchor,
             &checkpoint.anchor_key_id,
-            &checkpoint.signing_bytes()?,
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+            &checkpoint.signing_body()?,
             &checkpoint.anchor_signature,
         )
     }
@@ -126,7 +137,8 @@ impl FrostArtifactTrustStore {
         &self,
         role: FrostArtifactAuthorityRole,
         key_id: &str,
-        message: &[u8],
+        schema_id: &str,
+        body: &CanonicalBytes,
         signature: &str,
     ) -> Result<(), FrostArtifactTrustError> {
         let key = self.roots.get(&(role, key_id.to_string())).ok_or_else(|| {
@@ -137,7 +149,7 @@ impl FrostArtifactTrustStore {
         })?;
         let signature = Signature::from_hex(signature)
             .map_err(|_| FrostArtifactTrustError::InvalidSignature(role))?;
-        if !key.verify(message, &signature) {
+        if verify_wrapped_bytes(key, schema_id, body, &signature).is_err() {
             return Err(FrostArtifactTrustError::InvalidSignature(role));
         }
         Ok(())

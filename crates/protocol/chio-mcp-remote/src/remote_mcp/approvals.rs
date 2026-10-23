@@ -145,7 +145,12 @@ fn storage(state: &RemoteAppState, headers: &HeaderMap) -> Result<(Connection, K
 }
 
 fn serialize_record(record: ApprovalRecord, signer: &Keypair) -> Result<String, Response> {
-    let (signature, _) = signer.sign_canonical(&record).map_err(internal)?;
+    let signature = signer
+        .sign_wrapped(
+            RECORD_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&record).map_err(internal)?,
+        )
+        .map_err(internal)?;
     serde_json::to_string(&SignedRecord { record, signature }).map_err(internal)
 }
 

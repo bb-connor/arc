@@ -164,7 +164,11 @@ fn rewrite_portable_compact(
     let payload_b64 = URL_SAFE_NO_PAD
         .encode(serde_json::to_vec(&Value::Object(payload_object)).test_ok("serialize payload"));
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let signature_b64 = URL_SAFE_NO_PAD.encode(issuer.sign(signing_input.as_bytes()).to_bytes());
+    let signature_b64 = URL_SAFE_NO_PAD.encode(
+        issuer
+            .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes())
+            .to_bytes(),
+    );
     let compact_jwt = format!("{signing_input}.{signature_b64}");
     format!("{compact_jwt}~{}~", disclosures.join("~"))
 }
@@ -252,8 +256,11 @@ fn passport_artifacts_with_canonical_schema_verify() {
         expires_at: 1_710_086_400,
         policy: policy.clone(),
     };
-    let (policy_signature, _) = signer
-        .sign_canonical(&policy_body)
+    let policy_signature = signer
+        .sign_wrapped(
+            PASSPORT_VERIFIER_POLICY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&policy_body).expect("canonical verifier policy"),
+        )
         .expect("sign verifier policy");
     let signed_policy = SignedPassportVerifierPolicy {
         body: policy_body,
@@ -282,7 +289,12 @@ fn passport_artifacts_with_canonical_schema_verify() {
         challenge: response.challenge.clone(),
         passport: response.passport.clone(),
     };
-    let (response_signature, _) = holder.sign_canonical(&unsigned).test_ok("sign response");
+    let response_signature = holder
+        .sign_wrapped(
+            PASSPORT_PRESENTATION_RESPONSE_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned).test_ok("canonical response"),
+        )
+        .test_ok("sign response");
     response.proof.proof_value = response_signature.to_hex();
     verify_passport_presentation_response(&response, Some(&challenge), 1_710_000_120)
         .expect("response verify");

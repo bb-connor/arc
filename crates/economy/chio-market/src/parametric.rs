@@ -486,7 +486,7 @@ impl VerifiedParametricPolicy {
             return Err(ParametricContractError::UntrustedPolicySigner);
         }
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))?
         {
             return Err(ParametricContractError::InvalidSignature);
@@ -891,7 +891,7 @@ fn verify_bound_coverage(
         ));
     }
     if !coverage
-        .verify_signature()
+        .verify_signature(&coverage.signer_key)
         .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))?
     {
         return Err(ParametricContractError::InvalidSignature);
@@ -1075,4 +1075,8 @@ fn domain_digest<T: Serialize>(domain: &str, value: &T) -> Result<String, Parame
     preimage.push(0);
     preimage.extend_from_slice(&canonical);
     Ok(sha256_hex(&preimage))
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ParametricPolicy {
+    const SCHEMA_ID: &'static str = PARAMETRIC_POLICY_SCHEMA;
 }

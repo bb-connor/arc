@@ -64,7 +64,7 @@ pub fn validate_capital_execution_authority_step_proof(
     }
     if !step
         .authority_proof
-        .verify_signature()
+        .verify_signature(&step.authority_proof.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err("capital execution authority proof signature verification failed".to_string());
@@ -84,4 +84,8 @@ pub fn validate_capital_execution_authority_step_proof(
         );
     }
     Ok(())
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalExecutionAuthorityStepProofBody {
+    const SCHEMA_ID: &'static str = crate::CAPITAL_EXECUTION_AUTHORITY_STEP_PROOF_SCHEMA;
 }

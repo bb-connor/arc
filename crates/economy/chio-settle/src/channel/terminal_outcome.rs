@@ -1,7 +1,5 @@
-use chio_core::canonical::canonical_json_bytes;
-#[cfg(test)]
-use chio_core::crypto::Keypair;
-use chio_core::crypto::{sha256_hex, PublicKey, Signature};
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
+use chio_core::crypto::{sha256_hex, verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use chio_core::economic_continuity::EconomicTerminalResultV1;
 use chio_core::receipt::body::ChioReceipt;
 use serde::{Deserialize, Serialize};
@@ -11,9 +9,6 @@ use super::{ChannelError, VerifiedAdmittedChannelReservationV1};
 
 pub const CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA: &str =
     "chio.channel.terminal-outcome-commitment.v1";
-
-const CHANNEL_TERMINAL_OUTCOME_SIGNING_DOMAIN: &[u8] =
-    b"CHIO-CHANNEL-TERMINAL-OUTCOME-COMMITMENT-V1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -67,16 +62,18 @@ impl ChannelTerminalOutcomeCommitmentBodyV1 {
         Ok(())
     }
 
-    #[doc(hidden)]
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, ChannelError> {
+    fn signing_body(&self) -> Result<CanonicalBytes, ChannelError> {
         self.validate()?;
-        let canonical = canonical_json_bytes(self)
-            .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
-        let mut bytes =
-            Vec::with_capacity(CHANNEL_TERMINAL_OUTCOME_SIGNING_DOMAIN.len() + canonical.len());
-        bytes.extend_from_slice(CHANNEL_TERMINAL_OUTCOME_SIGNING_DOMAIN);
-        bytes.extend_from_slice(&canonical);
-        Ok(bytes)
+        CanonicalBytes::from_serializable(self)
+            .map_err(|error| ChannelError::Canonicalization(error.to_string()))
+    }
+
+    /// Kernel signature over the signing wrapper of this body under
+    /// `chio.channel.terminal-outcome-commitment.v1`.
+    pub fn sign(&self, kernel_keypair: &Keypair) -> Result<Signature, ChannelError> {
+        kernel_keypair
+            .sign_wrapped(CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA, &self.signing_body()?)
+            .map_err(|error| ChannelError::Canonicalization(error.to_string()))
     }
 }
 
@@ -112,7 +109,7 @@ impl SignedChannelTerminalOutcomeCommitmentV1 {
             outcome_recorded_at_unix_ms,
             terminalized_at_unix_ms,
         };
-        let kernel_signature = kernel_keypair.sign(&body.signing_bytes()?);
+        let kernel_signature = body.sign(kernel_keypair)?;
         Ok(Self {
             body,
             kernel_key: kernel_keypair.public_key(),
@@ -121,9 +118,13 @@ impl SignedChannelTerminalOutcomeCommitmentV1 {
     }
 
     pub fn verify_signature(&self) -> Result<(), ChannelError> {
-        if self
-            .kernel_key
-            .verify(&self.body.signing_bytes()?, &self.kernel_signature)
+        if verify_wrapped_bytes(
+            &self.kernel_key,
+            CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA,
+            &self.body.signing_body()?,
+            &self.kernel_signature,
+        )
+        .is_ok()
         {
             Ok(())
         } else {

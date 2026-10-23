@@ -225,6 +225,10 @@ fn validate_non_empty(value: &str, field: &str) -> Result<(), String> {
     }
 }
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for OpenMarketFeeScheduleArtifact {
+    const SCHEMA_ID: &'static str = OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA;
+}
+
 #[cfg(test)]
 mod tests {
     use chio_test_support::prelude::*;

@@ -102,10 +102,13 @@ fn verified_nonce(
                 || nonce.nonce.expires_at <= nonce.nonce.issued_at
                 || now < nonce.nonce.issued_at
                 || now >= nonce.nonce.expires_at
-                || !receipt
-                    .kernel_key
-                    .verify_canonical_strict(&nonce.nonce, &nonce.signature)
-                    .ok()?
+                || chio_core::crypto::verify_wrapped(
+                    &receipt.kernel_key,
+                    EXECUTION_NONCE_SCHEMA,
+                    &nonce.nonce,
+                    &nonce.signature,
+                )
+                .is_err()
             {
                 return None;
             }

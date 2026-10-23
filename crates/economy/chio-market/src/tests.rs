@@ -270,7 +270,7 @@ fn sample_risk_package() -> SignedCreditProviderRiskPackage {
 
 fn sign_export<T>(body: T) -> SignedExportEnvelope<T>
 where
-    T: serde::Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
     let keypair = crate::crypto::Keypair::generate();
     require_ok(SignedExportEnvelope::sign(body, &keypair), "sign export")

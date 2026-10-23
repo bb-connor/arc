@@ -317,3 +317,7 @@ pub fn verify_signed_challenge_enforcement(
         "challenge_enforcement",
     )
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingChallengeEnforcement {
+    const SCHEMA_ID: &'static str = FINDING_CHALLENGE_ENFORCEMENT_SCHEMA_V1;
+}

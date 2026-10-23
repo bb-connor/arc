@@ -791,7 +791,12 @@ fn finding_pheromone_context(passport: &Keypair, kernel: &Keypair) -> PheromoneV
     };
     let root = PheromoneObservationCostVerifierRoot {
         issuer_signature: root_issuer
-            .sign(&canonical_json_bytes(&root_body).test_expect("canonical observation cost root")),
+            .sign_wrapped(
+                PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA,
+                &chio_core_types::CanonicalBytes::from_serializable(&root_body)
+                    .test_expect("canonical observation cost root"),
+            )
+            .test_expect("observation cost root signs"),
         body: root_body,
     };
     let trust_floor = PheromoneRuntimeTrustFloorState {
@@ -928,8 +933,13 @@ fn finding_pheromone_deposit(
             .test_expect("observation cost inclusion proof"),
         leaf_preimage_sha256: sha256_hex(&leaf_bytes),
     };
-    let signature =
-        keypair(84).sign(&canonical_json_bytes(&statement).test_expect("canonical cost statement"));
+    let signature = keypair(84)
+        .sign_wrapped(
+            PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&statement)
+                .test_expect("canonical cost statement"),
+        )
+        .test_expect("cost statement signs");
     deposit.body.cost_commitment = Some(PheromoneCostCommitment {
         schema: PHEROMONE_COST_COMMITMENT_SCHEMA.to_string(),
         statement,

@@ -50,7 +50,6 @@ impl PublicSettlementProofBundle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PublicSettlementBundleSignature {
-    pub algorithm: String,
     pub signer_key: String,
     pub signature: String,
 }

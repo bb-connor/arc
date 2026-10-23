@@ -30,7 +30,7 @@ pub fn ensure_generic_listing_signed_by_namespace_owner(
 ) -> Result<(), String> {
     listing.body.validate()?;
     if !listing
-        .verify_signature()
+        .verify_signature(&listing.signer_key)
         .map_err(|error| error.to_string())?
     {
         return Err(format!("{label} signature is invalid"));
@@ -312,7 +312,7 @@ fn validate_generic_listing_report(report: &GenericListingReport) -> Result<(), 
     for listing in &report.listings {
         listing.body.validate()?;
         if !listing
-            .verify_signature()
+            .verify_signature(&listing.signer_key)
             .map_err(|error| error.to_string())?
         {
             return Err(format!(

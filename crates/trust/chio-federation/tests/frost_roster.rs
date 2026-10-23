@@ -78,11 +78,13 @@ fn signed_roster() -> FrostRosterV1 {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("roster id must compute: {error}"));
     roster.roster_authority_signature = authority
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("roster must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -98,11 +100,13 @@ fn dealer_fixture_roster_is_never_active_resolution_material() {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
     roster.roster_authority_signature = authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("fixture roster must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core::receipt::lineage::SignedExportEnvelope;
+use chio_core::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core::Keypair;
 use serde::{Deserialize, Serialize};
 
@@ -95,6 +95,10 @@ pub struct EconsimQualificationMatrix {
 }
 
 pub type SignedEconsimQualificationMatrix = SignedExportEnvelope<EconsimQualificationMatrix>;
+
+impl SignedExportPayload for EconsimQualificationMatrix {
+    const SCHEMA_ID: &'static str = ECONSIM_QUALIFICATION_MATRIX_SCHEMA;
+}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum EconsimValidationError {
@@ -333,7 +337,7 @@ mod tests {
         let signed = sign_econsim_qualification_matrix(matrix(), &Keypair::from_seed(&[7; 32]))
             .unwrap_or_else(|error| panic!("complete econsim matrix signs: {error}"));
         assert!(signed
-            .verify_signature()
+            .verify_signature(&Keypair::from_seed(&[7; 32]).public_key())
             .unwrap_or_else(|error| panic!("signature verifies: {error}")));
     }
 

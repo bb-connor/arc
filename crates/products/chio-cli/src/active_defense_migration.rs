@@ -622,17 +622,21 @@ fn verify_registered_manifest(
             registration.registry_id
         )));
     }
-    let valid = registered_key
-        .verify_canonical(
-            &registration.signed_envelope.manifest,
-            &registration.signed_envelope.signature,
-        )
-        .map_err(|error| {
-            ShadowMigrationError::Invalid(format!(
+    let valid = match chio_core::crypto::verify_wrapped(
+        registered_key,
+        TOOL_MANIFEST_SCHEMA,
+        &registration.signed_envelope.manifest,
+        &registration.signed_envelope.signature,
+    ) {
+        Ok(()) => true,
+        Err(chio_core::Error::SignatureRejected) => false,
+        Err(error) => {
+            return Err(ShadowMigrationError::Invalid(format!(
                 "manifest {} signature verification failed: {error}",
                 registration.registry_id
-            ))
-        })?;
+            )))
+        }
+    };
     if !valid {
         return Err(ShadowMigrationError::Invalid(format!(
             "manifest {} signature is invalid",

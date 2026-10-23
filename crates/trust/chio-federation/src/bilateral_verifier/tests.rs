@@ -263,10 +263,16 @@ fn resign_envelope(
     envelope.payload = BASE64_STANDARD.encode(statement_bytes);
     let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, statement_bytes);
     let sig_a = Ed25519Backend::new(kp_a.clone())
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .unwrap();
     let sig_b = Ed25519Backend::new(kp_b.clone())
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .unwrap();
     envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
     envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());

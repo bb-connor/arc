@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, CanonicalBytes};
+use chio_core_types::crypto::verify_wrapped;
 use chio_core_types::{sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm};
 use frost_ed25519::keys::dkg::{self, round1, round2};
 use frost_ed25519::keys::{KeyPackage, PublicKeyPackage};
@@ -12,7 +13,6 @@ use zeroize::Zeroizing;
 const DKG_PACKAGE_SCHEMA: &str = "chio.frost.dkg-package.v1";
 const CEREMONY_ID_PREFIX: &[u8] = b"chio.frost.ceremony.id.v1\0";
 const PARTICIPANT_SET_DIGEST_PREFIX: &[u8] = b"chio.frost.participant-set.digest.v1\0";
-const DKG_PACKAGE_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-DKG-PACKAGE-V1\0";
 const TRANSCRIPT_DIGEST_PREFIX: &[u8] = b"chio.frost.ceremony-transcript.digest.v1\0";
 const MAX_DKG_PACKAGE_BYTES: usize = 256 * 1024;
 const MAX_CUSTODY_SECRET_BYTES: usize = 1024 * 1024;
@@ -873,11 +873,13 @@ fn validate_package(
             "transport signature is invalid",
         )
     })?;
-    let signing_bytes =
-        canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
-    if !sender
-        .transport_public_key
-        .verify_strict(&signing_bytes, &signature)
+    if verify_wrapped(
+        &sender.transport_public_key,
+        DKG_PACKAGE_SCHEMA,
+        &package.signing_preimage(),
+        &signature,
+    )
+    .is_err()
     {
         return Err(package_authentication_error(
             &package.sender_participant_id,
@@ -914,10 +916,12 @@ fn authenticated_package(
         transport_signature: String::new(),
     };
     package.transport_signature = transport_key
-        .sign(&canonical_prefixed_bytes(
-            DKG_PACKAGE_SIGNING_PREFIX,
-            &package.signing_preimage(),
-        )?)
+        .sign_wrapped(
+            DKG_PACKAGE_SCHEMA,
+            &CanonicalBytes::from_serializable(&package.signing_preimage())
+                .map_err(|e| FrostCeremonyError::Canonical(e.to_string()))?,
+        )
+        .map_err(|e| FrostCeremonyError::Canonical(e.to_string()))?
         .to_hex();
     validate_package(context, &package, round)?;
     Ok(package)

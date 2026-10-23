@@ -3,8 +3,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 pub use chio_core_types::oracle::OracleConversionEvidence;
 
-use crate::canonical::canonical_json_bytes;
-use crate::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
+use crate::crypto::{verify_wrapped, Keypair, PublicKey, Signature, SigningAlgorithm};
 use crate::error::Web3ContractError;
 use crate::hashing::Hash;
 use crate::identity::{
@@ -224,11 +224,15 @@ pub fn sign_oracle_conversion_evidence(
     evidence.oracle_public_key = Some(keypair.public_key());
     evidence.signature = None;
     let body = oracle_conversion_evidence_signature_body(evidence);
-    let (signature, _) = keypair.sign_canonical(&body).map_err(|error| {
-        Web3ContractError::InvalidProof(format!(
-            "oracle conversion evidence signing failed: {error}"
-        ))
-    })?;
+    let signature = CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            keypair.sign_wrapped(CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA, &canonical)
+        })
+        .map_err(|error| {
+            Web3ContractError::InvalidProof(format!(
+                "oracle conversion evidence signing failed: {error}"
+            ))
+        })?;
     evidence.signature = Some(signature);
     Ok(())
 }
@@ -257,13 +261,20 @@ pub fn verify_oracle_conversion_evidence_signature(
         Web3ContractError::InvalidProof("oracle conversion evidence signature missing".to_string())
     })?;
     let body = oracle_conversion_evidence_signature_body(evidence);
-    let signature_valid = oracle_public_key
-        .verify_canonical(&body, signature)
-        .map_err(|error| {
-            Web3ContractError::ProofSignatureInvalid(format!(
+    let signature_valid = match verify_wrapped(
+        oracle_public_key,
+        CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
+        &body,
+        signature,
+    ) {
+        Ok(()) => true,
+        Err(chio_core_types::Error::SignatureRejected) => false,
+        Err(error) => {
+            return Err(Web3ContractError::ProofSignatureInvalid(format!(
                 "oracle conversion evidence signature verification failed: {error}"
-            ))
-        })?;
+            )))
+        }
+    };
     if signature_valid {
         Ok(())
     } else {
@@ -499,10 +510,16 @@ pub fn verify_checkpoint_statement(
 ) -> Result<(), Web3ContractError> {
     validate_checkpoint_statement_shape(statement)?;
     let body = checkpoint_statement_body(statement);
-    let verified = statement
-        .kernel_key
-        .verify_canonical(&body, &statement.signature)
-        .map_err(|error| Web3ContractError::InvalidProof(error.to_string()))?;
+    let verified = match verify_wrapped(
+        &statement.kernel_key,
+        CHIO_CHECKPOINT_STATEMENT_SCHEMA,
+        &body,
+        &statement.signature,
+    ) {
+        Ok(()) => true,
+        Err(chio_core_types::Error::SignatureRejected) => false,
+        Err(error) => return Err(Web3ContractError::InvalidProof(error.to_string())),
+    };
     if !verified {
         return Err(Web3ContractError::ProofSignatureInvalid(
             "checkpoint statement signature verification failed".to_string(),

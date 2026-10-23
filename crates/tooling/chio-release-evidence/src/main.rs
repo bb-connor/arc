@@ -11,7 +11,8 @@ use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::{
-    canonical_json_bytes, canonical_json_bytes_from_str, receipt::lineage::SignedExportEnvelope,
+    canonical_json_bytes, canonical_json_bytes_from_str,
+    receipt::lineage::{SignedExportEnvelope, SignedExportPayload},
     Keypair, SigningAlgorithm,
 };
 use serde::{Deserialize, Serialize};
@@ -47,6 +48,10 @@ struct ReleaseQualificationManifest {
     workflow_run_attempt: Option<String>,
     qualification_scope: String,
     artifacts: Vec<QualificationArtifact>,
+}
+
+impl SignedExportPayload for ReleaseQualificationManifest {
+    const SCHEMA_ID: &'static str = MANIFEST_SCHEMA;
 }
 
 struct Args {
@@ -279,7 +284,7 @@ fn validate_signed_manifest(
     if signed.signer_key.algorithm() != SigningAlgorithm::Ed25519
         || signed.signer_key.is_weak_ed25519()
         || !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|_| "release qualification signature verification failed".to_owned())?
     {
         return Err("release qualification signature is invalid".to_owned());
@@ -753,7 +758,7 @@ mod tests {
         assert_eq!(signed.body.artifacts.len(), 1);
         assert_eq!(signed.body.artifacts[0].path, "gate.log");
         assert!(signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| error.to_string())?);
         assert_eq!(
             fs::read_to_string(&checksum_path).map_err(|error| error.to_string())?,

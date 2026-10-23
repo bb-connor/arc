@@ -240,11 +240,13 @@ fn sign_roster(roster: &mut FrostRosterV1) {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
     roster.roster_authority_signature = roster_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("fixture roster must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -275,11 +277,13 @@ fn epoch_checkpoint(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
 
 fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
     checkpoint.anchor_signature = epoch_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("epoch checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -288,11 +292,13 @@ fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
 
 fn sign_slot_checkpoint(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) {
     checkpoint.anchor_signature = slot_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -403,11 +409,13 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
     };
     let mut checkpoint = checkpoint;
     checkpoint.anchor_signature = slot_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()

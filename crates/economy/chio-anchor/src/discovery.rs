@@ -609,7 +609,7 @@ mod tests {
             nonce: "anchor-discovery-1".to_string(),
         };
         let binding = SignedWeb3IdentityBinding {
-            signature: keypair.sign_canonical(&certificate).test_unwrap().0,
+            signature: chio_core::canonical::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| keypair.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)).test_unwrap(),
             certificate,
         };
         (keypair, binding)
@@ -682,7 +682,7 @@ mod tests {
     fn discovery_artifact_rejects_binding_without_target_chain_scope() {
         let (keypair, mut binding) = sample_binding_with_keypair();
         binding.certificate.chain_scope = vec!["eip155:42161".to_string()];
-        binding.signature = keypair.sign_canonical(&binding.certificate).test_unwrap().0;
+        binding.signature = chio_core::canonical::CanonicalBytes::from_serializable(&binding.certificate).and_then(|canonical| keypair.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)).test_unwrap();
 
         let error = build_anchor_discovery_artifact(&sample_config(), &binding).test_unwrap_err();
 
@@ -694,7 +694,7 @@ mod tests {
         let (keypair, mut binding) = sample_binding_with_keypair();
         binding.certificate.settlement_address =
             "0x2222222222222222222222222222222222222222".to_string();
-        binding.signature = keypair.sign_canonical(&binding.certificate).test_unwrap().0;
+        binding.signature = chio_core::canonical::CanonicalBytes::from_serializable(&binding.certificate).and_then(|canonical| keypair.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical)).test_unwrap();
 
         let error = build_anchor_discovery_artifact(&sample_config(), &binding).test_unwrap_err();
 

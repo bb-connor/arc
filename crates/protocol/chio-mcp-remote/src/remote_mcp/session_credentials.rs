@@ -9,6 +9,7 @@ use rusqlite::{params, OptionalExtension};
 use subtle::ConstantTimeEq;
 
 const SCHEMA: &str = "chio.mcp.session-credential.v1";
+const CALL_SCHEMA: &str = "chio.mcp.session-credential-call.v1";
 const PREFIX: &str = "chio_session_v1_";
 const TABLE: &str = "remote_session_credentials";
 const MAX_TTL_SECONDS: u64 = 3600;
@@ -326,7 +327,8 @@ fn persist_record(
     keypair: &Keypair,
     record: &SessionCredential,
 ) -> Result<(), CliError> {
-    let (signature, _) = keypair.sign_canonical(record)?;
+    let signature =
+        keypair.sign_wrapped(SCHEMA, &chio_core::CanonicalBytes::from_serializable(record)?)?;
     open_db(path)?.execute(&format!(
         "INSERT INTO {TABLE} (session_id, token_hash, record_json, signature) VALUES (?1, ?2, ?3, ?4)
          ON CONFLICT(session_id) DO UPDATE SET token_hash=excluded.token_hash,
@@ -392,9 +394,8 @@ fn load_record(
     if record.schema != SCHEMA
         || record.token_hash != token_hash
         || record.session_id != session_id
-        || !keypair
-            .public_key()
-            .verify(&canonical_json_bytes(&record)?, &signature)
+        || chio_core::crypto::verify_wrapped(&keypair.public_key(), SCHEMA, &record, &signature)
+            .is_err()
     {
         return Ok(None);
     }
@@ -578,13 +579,11 @@ fn decode_call(
 ) -> Result<CredentialCall, Response> {
     let call = parse_call(encoded)?;
     let signature = Ed25519Signature::from_hex(signature).map_err(storage_error)?;
-    if call.schema != "chio.mcp.session-credential-call.v1"
+    if call.schema != CALL_SCHEMA
         || call.session_id != session_id
         || call.request_id != request_id
-        || !keypair.public_key().verify(
-            &canonical_json_bytes(&call).map_err(storage_error)?,
-            &signature,
-        )
+        || chio_core::crypto::verify_wrapped(&keypair.public_key(), CALL_SCHEMA, &call, &signature)
+            .is_err()
     {
         return Err(fence_error());
     }
@@ -620,7 +619,9 @@ fn write_call(
     let encoded = input::encode_session(call).map_err(storage_error)?;
     // A row is signed and stored only if the reader that reopens it accepts it.
     parse_call(&encoded)?;
-    let (signature, _) = keypair.sign_canonical(call).map_err(storage_error)?;
+    let signature = chio_core::CanonicalBytes::from_serializable(call)
+        .and_then(|canonical| keypair.sign_wrapped(CALL_SCHEMA, &canonical))
+        .map_err(storage_error)?;
     conn.execute(
         &format!(
             "INSERT INTO {CALL_TABLE} (session_id,request_id,record_json,signature)
@@ -732,7 +733,7 @@ fn reserve_at(
         return Err(fence_error());
     }
     let call = CredentialCall {
-        schema: "chio.mcp.session-credential-call.v1".to_owned(),
+        schema: CALL_SCHEMA.to_owned(),
         session_id: credential.session_id.clone(),
         subject_key: credential.subject_key.clone(),
         capability_ids: credential.capability_ids.clone(),

@@ -74,10 +74,10 @@ pub(super) fn signed_envelope_digest<T: Serialize>(
 
 pub(super) fn verify_envelope<T>(signed: &SignedExportEnvelope<T>) -> Result<(), FiscalError>
 where
-    T: Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
     if !signed
-        .verify_signature()
+        .verify_signature(&signed.signer_key)
         .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
     {
         return Err(FiscalError::InvalidSignature);

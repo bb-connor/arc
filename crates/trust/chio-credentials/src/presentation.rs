@@ -18,7 +18,8 @@ pub fn respond_to_passport_presentation_challenge(
         challenge: challenge.clone(),
         passport: passport.clone(),
     };
-    let (signature, _) = holder_keypair.sign_canonical(&unsigned)?;
+    let signature = holder_keypair
+        .sign_wrapped(PASSPORT_PRESENTATION_RESPONSE_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned)?)?;
 
     Ok(PassportPresentationResponse {
         schema: PASSPORT_PRESENTATION_RESPONSE_SCHEMA.to_string(),
@@ -110,9 +111,13 @@ pub fn verify_passport_presentation_response_with_policy(
         passport: response.passport.clone(),
     };
     let signature = Signature::from_hex(&response.proof.proof_value)?;
-    let signed = subject_did
-        .public_key()
-        .verify(&canonical_json_bytes(&unsigned)?, &signature);
+    let signed = chio_core::crypto::verify_wrapped(
+        &subject_did.public_key(),
+        PASSPORT_PRESENTATION_RESPONSE_SCHEMA,
+        &unsigned,
+        &signature,
+    )
+    .is_ok();
     if !signed {
         return Err(CredentialError::InvalidPresentationSignature);
     }

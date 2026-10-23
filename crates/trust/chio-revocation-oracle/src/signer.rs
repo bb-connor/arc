@@ -7,9 +7,9 @@
 //! merges the root (and the inclusion / non-inclusion proofs that bind to it)
 //! into its local cache.
 //!
-//! That proof is an Ed25519 signature over the RFC 8785 (JSON Canonicalization
-//! Scheme) bytes of the [`crate::EpochRoot`], prefixed with a fixed
-//! domain-separation context string. Signing is performed by
+//! That proof is an Ed25519 signature over the signing wrapper of the RFC 8785
+//! (JSON Canonicalization Scheme) bytes of the [`crate::EpochRoot`] under
+//! [`PASSPORT_REVOCATION_ROOT_SCHEMA`]. Signing is performed by
 //! [`Ed25519RootSigner`], which holds the private [`Keypair`]. Verification is
 //! performed by [`Ed25519RootVerifier`], which holds only the pinned
 //! [`PublicKey`] and the expected `signer_id`. The two halves are split across
@@ -18,15 +18,10 @@
 //!
 //! # Signed bytes
 //!
-//! The exact message fed to Ed25519 is:
-//!
-//! ```text
-//! DOMAIN_SEPARATION_CONTEXT || canonical_json_bytes(EpochRoot)
-//! ```
-//!
-//! where [`DOMAIN_SEPARATION_CONTEXT`] is a constant byte string that scopes the
-//! signature to this protocol and version, and `canonical_json_bytes` is the
-//! RFC 8785 serialization from `chio-core-types`. Because the canonical form is
+//! The exact message fed to Ed25519 is the 88-byte signing wrapper over
+//! `canonical_json_bytes(EpochRoot)` under [`PASSPORT_REVOCATION_ROOT_SCHEMA`],
+//! where `canonical_json_bytes` is the RFC 8785 serialization from
+//! `chio-core-types`. Because the canonical form is
 //! byte-stable across serde versions, a verifier that re-canonicalizes the same
 //! [`crate::EpochRoot`] reconstructs identical bytes, so signatures are
 //! reproducible in tests and across peers.
@@ -34,22 +29,18 @@
 //! # Fail-closed posture
 //!
 //! Every decode or verification error denies. A [`crate::RootSignature`] whose
-//! `signer_id` or `algorithm` does not match the verifier, whose
+//! `signer_id` does not match the verifier, whose
 //! `signature_bytes` are not exactly 64 bytes, or whose Ed25519 check fails,
 //! yields [`RevocationOracleError::SignatureVerificationFailed`]. Canonical-JSON
 //! serialization failures surface as [`RevocationOracleError::Serialization`].
 
-use chio_core_types::{canonical_json_bytes, Keypair, PublicKey, Signature};
+use chio_core_types::crypto::verify_wrapped_bytes;
+use chio_core_types::{CanonicalBytes, Keypair, PublicKey, Signature};
 
 use crate::{EpochRoot, Result, RevocationOracleError, RootSignature};
 
-/// Domain-separation context prepended to the canonical [`EpochRoot`] bytes
-/// before signing or verifying. Binds a signature to this protocol and version
-/// so a signature produced for a different context can never validate here.
-pub const DOMAIN_SEPARATION_CONTEXT: &[u8] = b"chio-revocation-oracle:v1:epoch-root";
-
-/// Wire tag carried in [`RootSignature::algorithm`] for Ed25519 signatures.
-pub const ALGORITHM_ED25519: &str = "ed25519";
+/// Signing-wrapper schema id of an oracle epoch root.
+pub const PASSPORT_REVOCATION_ROOT_SCHEMA: &str = "chio.trust.passport-revocation-root.v1";
 
 /// Byte length of a raw Ed25519 signature as carried in
 /// [`RootSignature::signature_bytes`].
@@ -89,20 +80,16 @@ pub trait EpochRootVerifier {
 
 /// Compute the exact byte sequence signed for `root`: the domain-separation
 /// context followed by the RFC 8785 canonical JSON of the root.
-fn signing_message(root: &EpochRoot) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(root)
-        .map_err(|err| RevocationOracleError::Serialization(err.to_string()))?;
-    let mut message = Vec::with_capacity(DOMAIN_SEPARATION_CONTEXT.len() + canonical.len());
-    message.extend_from_slice(DOMAIN_SEPARATION_CONTEXT);
-    message.extend_from_slice(&canonical);
-    Ok(message)
+fn signing_body(root: &EpochRoot) -> Result<CanonicalBytes> {
+    CanonicalBytes::from_serializable(root)
+        .map_err(|err| RevocationOracleError::Serialization(err.to_string()))
 }
 
 /// Ed25519 epoch-root signer holding the oracle's private [`Keypair`].
 ///
 /// This is the default production signer for the revocation oracle. It signs
-/// the domain-separated canonical JSON of an [`EpochRoot`] and tags the result
-/// with [`ALGORITHM_ED25519`] and the configured `signer_id`.
+/// the signing wrapper of the canonical [`EpochRoot`] and tags the result with
+/// the configured `signer_id`.
 #[derive(Clone)]
 pub struct Ed25519RootSigner {
     signer_id: String,
@@ -162,11 +149,12 @@ impl EpochRootSigner for Ed25519RootSigner {
     }
 
     fn sign_epoch_root(&self, root: &EpochRoot) -> Result<RootSignature> {
-        let message = signing_message(root)?;
-        let signature = self.keypair.sign(&message);
+        let signature = self
+            .keypair
+            .sign_wrapped(PASSPORT_REVOCATION_ROOT_SCHEMA, &signing_body(root)?)
+            .map_err(|err| RevocationOracleError::Serialization(err.to_string()))?;
         Ok(RootSignature {
             signer_id: self.signer_id.clone(),
-            algorithm: ALGORITHM_ED25519.to_string(),
             signature_bytes: signature.to_bytes().to_vec(),
         })
     }
@@ -218,7 +206,7 @@ impl EpochRootVerifier for Ed25519RootVerifier {
     }
 
     fn verify_epoch_root(&self, root: &EpochRoot, signature: &RootSignature) -> Result<()> {
-        if signature.signer_id != self.signer_id || signature.algorithm != ALGORITHM_ED25519 {
+        if signature.signer_id != self.signer_id {
             return Err(RevocationOracleError::SignatureVerificationFailed);
         }
         let signature_bytes: [u8; ED25519_SIGNATURE_LEN] = signature
@@ -227,8 +215,14 @@ impl EpochRootVerifier for Ed25519RootVerifier {
             .try_into()
             .map_err(|_| RevocationOracleError::SignatureVerificationFailed)?;
         let candidate = Signature::from_bytes(&signature_bytes);
-        let message = signing_message(root)?;
-        if self.public_key.verify(&message, &candidate) {
+        if verify_wrapped_bytes(
+            &self.public_key,
+            PASSPORT_REVOCATION_ROOT_SCHEMA,
+            &signing_body(root)?,
+            &candidate,
+        )
+        .is_ok()
+        {
             Ok(())
         } else {
             Err(RevocationOracleError::SignatureVerificationFailed)
@@ -259,7 +253,6 @@ mod tests {
         let verifier = signer.verifier();
         let root = epoch_root(7);
         let signature = signer.sign_epoch_root(&root).test_unwrap();
-        assert_eq!(signature.algorithm, ALGORITHM_ED25519);
         assert_eq!(signature.signer_id, "oracle-a");
         assert_eq!(signature.signature_bytes.len(), ED25519_SIGNATURE_LEN);
         verifier.verify_epoch_root(&root, &signature).test_unwrap();
@@ -336,19 +329,6 @@ mod tests {
     }
 
     #[test]
-    fn wrong_algorithm_tag_is_rejected() {
-        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
-        let verifier = signer.verifier();
-        let root = epoch_root(7);
-        let mut signature = signer.sign_epoch_root(&root).test_unwrap();
-        signature.algorithm = "digest-stub-sha256".to_string();
-        assert_eq!(
-            verifier.verify_epoch_root(&root, &signature),
-            Err(RevocationOracleError::SignatureVerificationFailed)
-        );
-    }
-
-    #[test]
     fn short_signature_bytes_fail_closed() {
         let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let verifier = signer.verifier();
@@ -395,14 +375,20 @@ mod tests {
     }
 
     #[test]
-    fn signing_message_is_domain_separated() {
+    fn signature_under_another_schema_id_is_rejected() {
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
         let root = epoch_root(1);
-        let message = signing_message(&root).test_unwrap();
-        assert!(message.starts_with(DOMAIN_SEPARATION_CONTEXT));
-        let canonical = canonical_json_bytes(&root).test_unwrap();
+        let other = signer
+            .keypair
+            .sign_wrapped("chio.receipt.v1", &signing_body(&root).test_unwrap())
+            .test_unwrap();
+        let signature = RootSignature {
+            signer_id: "oracle-a".to_string(),
+            signature_bytes: other.to_bytes().to_vec(),
+        };
         assert_eq!(
-            &message[DOMAIN_SEPARATION_CONTEXT.len()..],
-            canonical.as_slice()
+            signer.verifier().verify_epoch_root(&root, &signature),
+            Err(RevocationOracleError::SignatureVerificationFailed)
         );
     }
 }

@@ -13,7 +13,7 @@ use chio_attest_buyer_core::report::verify_package;
 use chio_attest_buyer_core::trust_bundle::verifier_trust_bundle_from_json;
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::crypto::sha256_hex;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_federation::{
     pheromone_gossip::PheromoneGossipBatch, pheromone_gossip::PheromoneGossipError,
     pheromone_gossip::PheromoneTransitPolicy,
@@ -32,6 +32,18 @@ pub mod store;
 pub const PHEROMONE_RECEIVE_REPORT_SCHEMA: &str = "chio.pheromone.receive-report.v1";
 pub const PHEROMONE_QUERY_REPORT_SCHEMA: &str = "chio.pheromone.query-report.v1";
 pub const PHEROMONE_PEER_WEIGHTS_SCHEMA: &str = "chio.pheromone.peer-weights.v1";
+/// Signing-wrapper schema id of an issuer-signed runtime transit policy.
+pub const PHEROMONE_TRANSIT_POLICY_SCHEMA: &str = "chio.pheromone-transit-policy.v1";
+
+/// Issuer-signed runtime transit policy, kept as the JSON document the issuer
+/// signed so the receiver re-derives the exact signed body.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RuntimeTransitPolicyDocument(pub serde_json::Value);
+
+impl SignedExportPayload for RuntimeTransitPolicyDocument {
+    const SCHEMA_ID: &'static str = PHEROMONE_TRANSIT_POLICY_SCHEMA;
+}
 const PHEROMONE_TRANSIT_POLICY_SCHEMA_JSON: &str =
     include_str!("../schemas/transit-policy.schema.json");
 const PHEROMONE_PEER_WEIGHTS_SCHEMA_JSON: &str =
@@ -297,16 +309,17 @@ pub fn runtime_policy_from_json(
 ) -> Result<(PheromoneTransitPolicy, PheromoneReceiverConfig), PheromoneRuntimeError> {
     let value: serde_json::Value = crate::input::decode(json.as_bytes())?;
     validate_runtime_policy_schema(&value)?;
-    let envelope: SignedExportEnvelope<serde_json::Value> = serde_json::from_value(value)?;
+    let envelope: SignedExportEnvelope<RuntimeTransitPolicyDocument> =
+        serde_json::from_value(value)?;
     if !envelope
-        .verify_signature()
+        .verify_signature(&envelope.signer_key)
         .map_err(|error| PheromoneRuntimeError::CanonicalJson(error.to_string()))?
     {
         return Err(PheromoneRuntimeError::InvalidField(
             "runtime policy envelope signature is invalid".to_string(),
         ));
     }
-    let mut body_value = envelope.body;
+    let mut body_value = envelope.body.0;
     let runtime_policy_sha256 = runtime_policy_document_sha256(&body_value)?;
     let admission_value = body_value
         .as_object_mut()

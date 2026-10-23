@@ -268,7 +268,10 @@ fn compliance_bundle_without_profile_does_not_assert_guard_or_scope_checks() -> 
 fn compliance_bundle_refuses_signed_time_coverage_mismatch() -> TestResult {
     let (signer, entries, config, mut certificate) = signed_fixture(&[1])?;
     certificate.body.issued_at = 50;
-    certificate.signature = signer.sign(&canonical_json_bytes(&certificate.body)?);
+    certificate.signature = signer.sign_wrapped(
+        COMPLIANCE_CERTIFICATE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&certificate.body)?,
+    )?;
     assert!(
         !verify_compliance_certificate(
             &certificate,

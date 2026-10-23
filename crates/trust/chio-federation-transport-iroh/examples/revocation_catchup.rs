@@ -30,8 +30,8 @@ use chio_core_types::Keypair;
 use chio_federation_transport_iroh::admission::DirectoryGate;
 use chio_federation_transport_iroh::catchup::BlobCatchupClient;
 use chio_federation_transport_iroh::catchup::CatchupError;
-use chio_federation_transport_iroh::identity::revocation_signer_endorsement_preimage;
-use chio_federation_transport_iroh::identity::transport_endorsement_preimage;
+use chio_federation_transport_iroh::identity::{sign_revocation_signer_endorsement, IdentityError};
+use chio_federation_transport_iroh::identity::sign_transport_endorsement;
 use chio_federation_transport_iroh::identity::RevocationSignerEntry;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleDocument;
@@ -75,17 +75,17 @@ fn admitted_entry(
     kernel_id: &str,
     passport_seed: u8,
     transport_seed: u8,
-) -> TransportDirectoryEntry {
+) -> Result<TransportDirectoryEntry, IdentityError> {
     let passport = Keypair::from_seed(&[passport_seed; 32]);
     let transport = endpoint_id(transport_seed);
-    TransportDirectoryEntry {
+    Ok(TransportDirectoryEntry {
         kernel_id: kernel_id.to_string(),
         passport_public_key: passport.public_key(),
         transport_endpoint_id: transport,
-        passport_endorsement: passport.sign(&transport_endorsement_preimage(kernel_id, &transport)),
+        passport_endorsement: sign_transport_endorsement(&passport, kernel_id, &transport)?,
         revocation_signers: Vec::new(),
         removed: false,
-    }
+    })
 }
 
 /// Build the ONE issuer-signed, load-time-verified transport directory. It admits
@@ -109,18 +109,11 @@ fn build_directory(pinned: &Ed25519RootSigner) -> Result<Arc<VerifiedDirectory>,
         kernel_id: AUTHORITY_KERNEL.to_string(),
         passport_public_key: authority_passport.public_key(),
         transport_endpoint_id: authority_transport,
-        passport_endorsement: authority_passport.sign(&transport_endorsement_preimage(
-            AUTHORITY_KERNEL,
-            &authority_transport,
-        )),
+        passport_endorsement: sign_transport_endorsement(&authority_passport, AUTHORITY_KERNEL, &authority_transport, )?,
         revocation_signers: vec![RevocationSignerEntry {
             signer_id: SIGNER_ID.to_string(),
             oracle_public_key: oracle_public_key.clone(),
-            oracle_endorsement: authority_passport.sign(&revocation_signer_endorsement_preimage(
-                AUTHORITY_KERNEL,
-                SIGNER_ID,
-                &oracle_public_key,
-            )),
+            oracle_endorsement: sign_revocation_signer_endorsement(&authority_passport, AUTHORITY_KERNEL, SIGNER_ID, &oracle_public_key, )?,
         }],
         removed: false,
     };
@@ -130,7 +123,7 @@ fn build_directory(pinned: &Ed25519RootSigner) -> Result<Arc<VerifiedDirectory>,
         local_kernel_id: AUTHORITY_KERNEL.to_string(),
         peers: vec![
             authority_entry,
-            admitted_entry(FOLLOWER_KERNEL, 1, FOLLOWER_SEED),
+            admitted_entry(FOLLOWER_KERNEL, 1, FOLLOWER_SEED)?,
         ],
         treaties: Vec::new(),
     };
@@ -145,7 +138,10 @@ fn build_directory(pinned: &Ed25519RootSigner) -> Result<Arc<VerifiedDirectory>,
         issued_at_unix_ms: NOW - 1,
         expires_at_unix_ms: NOW + 1,
     };
-    let (signature, _) = issuer.sign_canonical(&body)?;
+    let signature = issuer.sign_wrapped(
+        chio_federation_transport_iroh::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        &chio_core_types::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

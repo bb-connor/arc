@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::runtime_attestation::RuntimeAssuranceTier;
 use chio_core_types::crypto::{
-    sha256_hex, sign_canonical_with_backend, Keypair, Signature, SigningAlgorithm, SigningBackend,
+    sha256_hex, sign_wrapped, verify_wrapped, Keypair, Signature, SigningAlgorithm, SigningBackend,
 };
+use chio_core_types::CanonicalBytes;
 
 use crate::types::{Finding, FindingEvidenceClass, FindingGuaranteeClass, FINDING_SCHEMA_V1};
 
@@ -341,16 +342,16 @@ pub fn compute_finding_id(finding: &Finding) -> Result<String, FindingError> {
     Ok(sha256_hex(&bytes))
 }
 
-/// Sign the finding inline: signature is over the canonical body with
-/// `signature` cleared. The signer must be the artifact's issuer.
+/// Sign the finding inline: the signature covers the signing wrapper of the
+/// canonical body with `signature` cleared, under `chio.finding.v1`. The signer must be the artifact's issuer.
 pub fn sign_finding(mut finding: Finding, keypair: &Keypair) -> Result<Finding, FindingError> {
     if finding.issuer != keypair.public_key() {
         return Err(FindingError::Signing);
     }
     finding.signature.clear();
     finding.validate()?;
-    let (signature, _) = keypair
-        .sign_canonical(&finding)
+    let signature = CanonicalBytes::from_serializable(&finding)
+        .and_then(|canonical| keypair.sign_wrapped(FINDING_SCHEMA_V1, &canonical))
         .map_err(|_| FindingError::Signing)?;
     finding.signature = signature.to_hex();
     Ok(finding)
@@ -370,9 +371,9 @@ pub fn sign_finding_with_backend(
     }
     finding.signature.clear();
     finding.validate()?;
-    let (signature, _) =
-        sign_canonical_with_backend(backend, &finding).map_err(|_| FindingError::Signing)?;
-    finding.signature = signature.to_hex();
+    let (outcome, _) =
+        sign_wrapped(backend, FINDING_SCHEMA_V1, &finding).map_err(|_| FindingError::Signing)?;
+    finding.signature = outcome.signature.to_hex();
     Ok(finding)
 }
 
@@ -398,10 +399,8 @@ pub fn verify_finding_signature(finding: &Finding) -> Result<(), FindingError> {
         Signature::from_hex(&finding.signature).map_err(|_| FindingError::SignatureInvalid)?;
     let mut body = finding.clone();
     body.signature = String::new();
-    match finding.issuer.verify_canonical_strict(&body, &signature) {
-        Ok(true) => Ok(()),
-        _ => Err(FindingError::SignatureInvalid),
-    }
+    verify_wrapped(&finding.issuer, FINDING_SCHEMA_V1, &body, &signature)
+        .map_err(|_| FindingError::SignatureInvalid)
 }
 
 /// Verify artifact integrity for an already-deserialized finding:

@@ -31,7 +31,7 @@ use chio_federation::bilateral::DsseCoSigningRequest;
 use chio_federation::bilateral::DsseCoSigningResponse;
 use chio_federation::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA;
 use chio_federation_transport_iroh::admission::DirectoryGate;
-use chio_federation_transport_iroh::identity::transport_endorsement_preimage;
+use chio_federation_transport_iroh::identity::{sign_transport_endorsement, IdentityError};
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleDocument;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleTrust;
@@ -77,18 +77,15 @@ impl Peer {
         }
     }
 
-    fn entry(&self) -> TransportDirectoryEntry {
-        TransportDirectoryEntry {
+    fn entry(&self) -> Result<TransportDirectoryEntry, IdentityError> {
+        Ok(TransportDirectoryEntry {
             kernel_id: self.kernel_id.clone(),
             passport_public_key: self.passport.public_key(),
             transport_endpoint_id: self.transport_id,
-            passport_endorsement: self.passport.sign(&transport_endorsement_preimage(
-                &self.kernel_id,
-                &self.transport_id,
-            )),
+            passport_endorsement: sign_transport_endorsement(&self.passport, &self.kernel_id, &self.transport_id)?,
             revocation_signers: Vec::new(),
             removed: false,
-        }
+        })
     }
 }
 
@@ -98,7 +95,10 @@ fn verified_directory(peers: &[&Peer]) -> Result<Arc<VerifiedDirectory>, Box<dyn
     let directory = TransportDirectoryDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         local_kernel_id: ORG_A.to_string(),
-        peers: peers.iter().map(|peer| peer.entry()).collect(),
+        peers: peers
+            .iter()
+            .map(|peer| peer.entry())
+            .collect::<Result<Vec<_>, _>>()?,
         treaties: Vec::new(),
     };
     let directory_sha256 = sha256_hex(&canonical_json_bytes(&directory)?);
@@ -112,7 +112,10 @@ fn verified_directory(peers: &[&Peer]) -> Result<Arc<VerifiedDirectory>, Box<dyn
         issued_at_unix_ms: NOW - 1,
         expires_at_unix_ms: NOW + 1,
     };
-    let (signature, _) = issuer.sign_canonical(&body)?;
+    let signature = issuer.sign_wrapped(
+        chio_federation_transport_iroh::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        &chio_core_types::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,
@@ -225,7 +228,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         org_b.kernel_id.clone(),
         pae_bytes.clone(),
         // Org B signs the PAE bytes with its passport key.
-        org_b.passport.sign(&pae_bytes),
+        org_b
+            .passport
+            .sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, &pae_bytes),
     );
     println!(
         "Org B requests a co-signature over {} pae bytes:",
@@ -233,8 +238,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
     let cosign_ok = match cosign_with_timeout(&cosigner, &request).await {
         Ok(Ok(response)) => {
-            let verifies = org_a_public.verify(&pae_bytes, &response.org_a_signature);
-            let rejects_other = !org_a_public.verify(b"other bytes", &response.org_a_signature);
+            let verifies = chio_core_types::crypto::verify_exempt(
+                &org_a_public,
+                chio_core_types::crypto::ExemptFormat::DssePae,
+                &pae_bytes,
+                &response.org_a_signature,
+            )
+            .is_ok();
+            let rejects_other = chio_core_types::crypto::verify_exempt(
+                &org_a_public,
+                chio_core_types::crypto::ExemptFormat::DssePae,
+                b"other bytes",
+                &response.org_a_signature,
+            )
+            .is_err();
             println!("  -> Org A co-signed (schema={:?})", response.schema);
             println!("     org_a_signature verifies over pae_bytes:      {verifies}");
             println!("     org_a_signature rejects a different message:  {rejects_other}");
@@ -256,7 +273,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ORG_A.to_string(),
         "did:chio:evil-impersonator".to_string(),
         spoof_pae.clone(),
-        org_b.passport.sign(&spoof_pae),
+        org_b
+            .passport
+            .sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, &spoof_pae),
     );
     println!("\nOrg B (authenticated as {ORG_B}) claims to be did:chio:evil-impersonator:");
     let spoof_rejected = match cosign_with_timeout(&cosigner, &spoof_request).await {

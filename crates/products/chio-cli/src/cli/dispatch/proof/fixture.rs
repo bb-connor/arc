@@ -718,12 +718,10 @@ fn runtime_join_receipt_signature(
         CliError::cli_other_error("runtime join receipt signature body invalid".to_string())
     })?;
     object.remove("signature");
-    Ok(keypair
-        .sign_canonical(&body)
+    Ok(fixture_wrapped_signature(&keypair, "chio.swarm.join-receipt.v1", &body)
         .map_err(|error| {
             CliError::cli_other_error(format!("runtime join receipt signing failed: {error}"))
         })?
-        .0
         .to_hex())
 }
 
@@ -797,15 +795,15 @@ fn sign_runtime_tool_server_ack(ack: &serde_json::Value) -> Result<String, CliEr
         "terminalStatus": ack["terminal_status"],
         "issuedAt": ack["issued_at"],
     });
-    Ok(keypair
-        .sign_canonical(&body)
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "runtime tool-server acknowledgement signing failed: {error}"
-            ))
-        })?
-        .0
-        .to_hex())
+    Ok(
+        fixture_wrapped_signature(&keypair, "chio.runtime.tool-server-ack-signature.v1", &body)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "runtime tool-server acknowledgement signing failed: {error}"
+                ))
+            })?
+            .to_hex(),
+    )
 }
 
 fn proof_fixture_expected_failure(
@@ -2183,7 +2181,7 @@ fn write_signed_terminal_receipt(
         "policy_digest": policy_sha256,
         "kernel_key": keypair.public_key().to_hex()
     });
-    let (signature, _) = keypair.sign_canonical(&receipt).map_err(|error| {
+    let signature = fixture_wrapped_signature(&keypair, "chio.receipt.v1", &receipt).map_err(|error| {
         CliError::cli_other_error(format!("proof fixture receipt signing failed: {error}"))
     })?;
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
@@ -2807,7 +2805,12 @@ fn sign_public_settlement_proof_bundle(
     let keypair = Keypair::from_seed(&PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED);
     let typed_bundle: chio_web3::settlement_proof::PublicSettlementProofBundle =
         crate::input::project(settlement_proof.clone())?;
-    let (signature, _) = keypair.sign_canonical(&typed_bundle).map_err(|error| {
+    let signature = fixture_wrapped_signature(
+        &keypair,
+        "chio.web3-settlement-proof-bundle.v1",
+        &typed_bundle,
+    )
+    .map_err(|error| {
         CliError::cli_other_error(format!(
             "public settlement proof bundle signing failed: {}: {error}",
             settlement_proof_path.display()
@@ -3019,8 +3022,7 @@ fn reseal_public_settlement_anchor_receipt(
         kernel_key: statement.kernel_key.clone(),
         chain_root: statement.chain_root,
     };
-    let (signature, _) = anchor_keypair
-        .sign_canonical(&statement_body)
+    let signature = fixture_wrapped_signature(&anchor_keypair, &statement_body.schema, &statement_body)
         .map_err(|error| {
             CliError::cli_other_error(format!(
                 "public settlement checkpoint statement signing failed: {}: {error}",
@@ -3338,7 +3340,12 @@ fn sign_fixture_commerce_payment_lifecycle(
         CliError::cli_other_error("payment lifecycle fixture must be a JSON object")
     })?;
     body.remove("signature");
-    let (signature, _) = keypair.sign_canonical(payment_lifecycle).map_err(|error| {
+    let signature = fixture_wrapped_signature(
+        &keypair,
+        "chio.commerce.payment-lifecycle.v1",
+        payment_lifecycle,
+    )
+    .map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture payment lifecycle signing failed: {error}"
         ))
@@ -3357,7 +3364,8 @@ fn sign_fixture_commerce_provider_trust_artifact(path: &Path) -> Result<(), CliE
         ))
     })?;
     body.remove("signature");
-    let (signature, _) = keypair.sign_canonical(&artifact).map_err(|error| {
+    let schema_id = fixture_schema_id(&artifact)?;
+    let signature = fixture_wrapped_signature(&keypair, &schema_id, &artifact).map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture commerce provider trust signing failed: {error}"
         ))
@@ -5228,7 +5236,12 @@ fn sign_enterprise_approval_case(approval_case: &mut serde_json::Value) -> Resul
         fields.remove("signature");
     }
     let keypair = Keypair::from_seed(&[62u8; 32]);
-    let (signature, _) = keypair.sign_canonical(approval_case).map_err(|error| {
+    let signature = fixture_wrapped_signature(
+        &keypair,
+        "chio.enterprise.approval-case.v1",
+        approval_case,
+    )
+    .map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture approval case signing failed: {error}"
         ))
@@ -5253,7 +5266,12 @@ fn sign_enterprise_risk_comptroller_report(
         fields.remove("signature");
     }
     let keypair = Keypair::from_seed(&ENTERPRISE_RISK_COMPTROLLER_SIGNATURE_SEED);
-    let (signature, _) = keypair.sign_canonical(risk_report).map_err(|error| {
+    let signature = fixture_wrapped_signature(
+        &keypair,
+        "chio.risk.comptroller-report.v1",
+        risk_report,
+    )
+    .map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture risk comptroller report signing failed: {error}"
         ))
@@ -5276,7 +5294,8 @@ fn sign_trust_market_artifact(artifact: &mut serde_json::Value) -> Result<(), Cl
         fields.remove("signature");
     }
     let keypair = Keypair::from_seed(&TRUST_MARKET_AUTHORITY_SIGNATURE_SEED);
-    let (signature, _) = keypair.sign_canonical(artifact).map_err(|error| {
+    let schema_id = fixture_schema_id(artifact)?;
+    let signature = fixture_wrapped_signature(&keypair, &schema_id, artifact).map_err(|error| {
         CliError::cli_other_error(format!(
             "proof fixture trust-market artifact signing failed: {error}"
         ))
@@ -5287,6 +5306,23 @@ fn sign_trust_market_artifact(artifact: &mut serde_json::Value) -> Result<(), Cl
         signature.to_hex()
     ));
     Ok(())
+}
+
+fn fixture_wrapped_signature<T: serde::Serialize>(
+    keypair: &Keypair,
+    schema_id: &str,
+    value: &T,
+) -> Result<chio_core::Signature, chio_core::Error> {
+    chio_core::canonical::CanonicalBytes::from_serializable(value)
+        .and_then(|canonical| keypair.sign_wrapped(schema_id, &canonical))
+}
+
+fn fixture_schema_id(artifact: &serde_json::Value) -> Result<String, CliError> {
+    artifact
+        .get("schema")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| CliError::cli_other_error("proof fixture artifact must carry a schema"))
 }
 
 fn rebind_artifact_digest_ref(

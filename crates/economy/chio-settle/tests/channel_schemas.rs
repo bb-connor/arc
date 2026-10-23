@@ -369,7 +369,7 @@ fn artifacts() -> Result<Vec<(&'static str, Value)>, Box<dyn Error>> {
         terminalized_at_unix_ms: 1_750,
     };
     let terminal_outcome = SignedChannelTerminalOutcomeCommitmentV1 {
-        kernel_signature: authority_key.sign(&terminal_outcome_body.signing_bytes()?),
+        kernel_signature: terminal_outcome_body.sign(&authority_key)?,
         kernel_key: authority_key.public_key(),
         body: terminal_outcome_body,
     };

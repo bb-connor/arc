@@ -691,3 +691,7 @@ fn decode_hex_32(value: &str, field: &'static str) -> Result<[u8; 32], FindingEr
         .try_into()
         .map_err(|_| FindingError::MalformedDigest(field))
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingStatusEpoch {
+    const SCHEMA_ID: &'static str = FINDING_STATUS_EPOCH_SCHEMA_V1;
+}

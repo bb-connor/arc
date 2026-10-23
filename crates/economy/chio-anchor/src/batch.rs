@@ -2,7 +2,7 @@ use chio_core::canonical_json_bytes;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, MerkleProof, MerkleTree};
 use chio_core::signed_artifact::CHIO_ANCHOR_BATCH_V1_SCHEMA;
-use chio_core::{Keypair, PublicKey, Signature};
+use chio_core::{verify_wrapped, CanonicalBytes, Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
 use crate::witness::{
@@ -68,23 +68,24 @@ pub struct AnchorBatch {
 impl AnchorBatch {
     pub fn sign(body: AnchorBatchBody, keypair: &Keypair) -> Result<Self, AnchorError> {
         validate_anchor_batch_body(&body)?;
-        let (signature, _bytes) = keypair
-            .sign_canonical(&body)
+        let signature = CanonicalBytes::from_serializable(&body)
+            .and_then(|canonical| keypair.sign_wrapped(CHIO_ANCHOR_BATCH_V1_SCHEMA, &canonical))
             .map_err(|error| AnchorError::Serialization(error.to_string()))?;
         Ok(Self { body, signature })
     }
 
     pub fn verify_signature(&self) -> Result<bool, AnchorError> {
         validate_anchor_batch_body(&self.body)?;
-        if self
-            .body
-            .signer_key
-            .verify_canonical(&self.body, &self.signature)
-            .map_err(|error| AnchorError::Verification(error.to_string()))?
-        {
-            return Ok(true);
+        match verify_wrapped(
+            &self.body.signer_key,
+            CHIO_ANCHOR_BATCH_V1_SCHEMA,
+            &self.body,
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core::Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(AnchorError::Verification(error.to_string())),
         }
-        Ok(false)
     }
 }
 

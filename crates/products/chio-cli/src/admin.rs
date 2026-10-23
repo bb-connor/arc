@@ -696,7 +696,10 @@ pub(crate) fn cmd_trust_federated_delegation_policy_create(
         purpose: purpose.map(str::to_string),
         parent_capability_id: parent_capability_id.map(str::to_string),
     };
-    let (signature, _) = keypair.sign_canonical(&body)?;
+    let signature = keypair.sign_wrapped(
+        trust_control::FEDERATED_DELEGATION_POLICY_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let policy = trust_control::FederatedDelegationPolicyDocument { body, signature };
     trust_control::verify_federated_delegation_policy(&policy)?;
     fs::write(output_path, serde_json::to_vec_pretty(&policy)?)?;

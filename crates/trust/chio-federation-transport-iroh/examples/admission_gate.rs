@@ -22,7 +22,7 @@ use chio_core_types::sha256_hex;
 use chio_core_types::Keypair;
 use chio_federation_transport_iroh::admission::DirectoryGate;
 use chio_federation_transport_iroh::admission::NOT_ADMITTED_ERROR_CODE;
-use chio_federation_transport_iroh::identity::transport_endorsement_preimage;
+use chio_federation_transport_iroh::identity::sign_transport_endorsement;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleDocument;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleTrust;
@@ -70,20 +70,19 @@ fn build_gate(entries: &[(&str, u8, u8)]) -> Result<DirectoryGate, Box<dyn Error
         .map(|(kernel_id, passport_seed, transport_seed)| {
             let passport = Keypair::from_seed(&[*passport_seed; 32]);
             let transport = endpoint_id(*transport_seed);
-            TransportDirectoryEntry {
+            Ok::<_, chio_federation_transport_iroh::identity::IdentityError>(TransportDirectoryEntry {
                 kernel_id: (*kernel_id).to_string(),
                 passport_public_key: passport.public_key(),
                 transport_endpoint_id: transport,
                 // The passport-over-transport endorsement: the long-term passport
-                // signs the DOMAIN-SEPARATED preimage committing to the kernel_id
+                // signs the endorsement body binding the kernel_id
                 // and the transport endpoint, binding the two identities.
-                passport_endorsement: passport
-                    .sign(&transport_endorsement_preimage(kernel_id, &transport)),
+                passport_endorsement: sign_transport_endorsement(&passport, kernel_id, &transport)?,
                 revocation_signers: Vec::new(),
                 removed: false,
-            }
+            })
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
     let directory = TransportDirectoryDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         local_kernel_id: "did:chio:local".to_string(),
@@ -101,7 +100,10 @@ fn build_gate(entries: &[(&str, u8, u8)]) -> Result<DirectoryGate, Box<dyn Error
         issued_at_unix_ms: NOW - 1,
         expires_at_unix_ms: NOW + 1_000,
     };
-    let (signature, _) = issuer.sign_canonical(&body)?;
+    let signature = issuer.sign_wrapped(
+        chio_federation_transport_iroh::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        &chio_core_types::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

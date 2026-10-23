@@ -565,10 +565,10 @@
         )
         .unwrap();
 
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_signature(&envelope.signer_key).unwrap());
         let restored: SignedCreditBond =
             serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
-        assert!(restored.verify_signature().unwrap());
+        assert!(restored.verify_signature(&restored.signer_key).unwrap());
     }
 
     #[test]
@@ -762,10 +762,10 @@
         )
         .unwrap();
 
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_signature(&envelope.signer_key).unwrap());
         let restored: SignedCreditProviderRiskPackage =
             serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
-        assert!(restored.verify_signature().unwrap());
+        assert!(restored.verify_signature(&restored.signer_key).unwrap());
     }
 
     #[test]
@@ -891,10 +891,10 @@
         )
         .unwrap();
 
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_signature(&envelope.signer_key).unwrap());
         let restored: SignedCapitalBookReport =
             serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
-        assert!(restored.verify_signature().unwrap());
+        assert!(restored.verify_signature(&restored.signer_key).unwrap());
     }
 
     #[test]
@@ -977,10 +977,10 @@
         )
         .unwrap();
 
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_signature(&envelope.signer_key).unwrap());
         let restored: SignedCapitalExecutionInstruction =
             serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
-        assert!(restored.verify_signature().unwrap());
+        assert!(restored.verify_signature(&restored.signer_key).unwrap());
     }
 
     #[test]
@@ -1092,8 +1092,8 @@
         )
         .unwrap();
 
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_signature(&envelope.signer_key).unwrap());
         let restored: SignedCapitalAllocationDecision =
             serde_json::from_str(&serde_json::to_string(&envelope).unwrap()).unwrap();
-        assert!(restored.verify_signature().unwrap());
+        assert!(restored.verify_signature(&restored.signer_key).unwrap());
     }

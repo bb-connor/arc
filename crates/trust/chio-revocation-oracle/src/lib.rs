@@ -35,8 +35,8 @@ pub use passport_bridge::{
     PassportRevocationEvent, PASSPORT_REVOCATION_NONCE,
 };
 pub use signer::{
-    Ed25519RootSigner, Ed25519RootVerifier, EpochRootSigner, EpochRootVerifier, ALGORITHM_ED25519,
-    DOMAIN_SEPARATION_CONTEXT,
+    Ed25519RootSigner, Ed25519RootVerifier, EpochRootSigner, EpochRootVerifier,
+    PASSPORT_REVOCATION_ROOT_SCHEMA,
 };
 pub use sparse_merkle::InMemoryRevocationOracle;
 #[cfg(feature = "sqlite")]

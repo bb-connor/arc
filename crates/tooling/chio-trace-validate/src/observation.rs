@@ -1,4 +1,5 @@
-use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::body::ChioReceipt;
 use serde::{Deserialize, Serialize};
 
@@ -204,7 +205,10 @@ impl ObservationBody {
 impl SignedObservation {
     pub fn sign(body: ObservationBody, observer: &Keypair) -> Result<Self, TraceError> {
         body.validate()?;
-        let (signature, _) = observer.sign_canonical(&body)?;
+        let signature = observer.sign_wrapped(
+            TRACE_OBSERVATION_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             body,
             observer_key: observer.public_key(),
@@ -223,9 +227,13 @@ impl SignedObservation {
                 self.observer_key.to_hex()
             )));
         }
-        if !self
-            .observer_key
-            .verify_canonical(&self.body, &self.signature)?
+        if verify_wrapped(
+            &self.observer_key,
+            TRACE_OBSERVATION_SCHEMA,
+            &self.body,
+            &self.signature,
+        )
+        .is_err()
         {
             return Err(TraceError::InvalidInput(
                 "observation signature is invalid".to_string(),

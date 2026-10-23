@@ -21,6 +21,10 @@ pub struct ChioRevocationCheckpoint {
 
 pub type SignedChioRevocationCheckpoint = SignedExportEnvelope<ChioRevocationCheckpoint>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for ChioRevocationCheckpoint {
+    const SCHEMA_ID: &'static str = REVOCATION_CHECKPOINT_SCHEMA;
+}
+
 pub(crate) fn validate_revocation_checkpoint(
     checkpoint: &SignedChioRevocationCheckpoint,
 ) -> Result<(), ChioPackageError> {
@@ -40,8 +44,7 @@ pub(crate) fn validate_revocation_checkpoint(
         ));
     }
     revoked_key_fingerprints(&checkpoint.body.revoked_key_fingerprints)?;
-    if !checkpoint
-        .verify_signature()
+    if !checkpoint.verify_signature(&checkpoint.signer_key)
         .map_err(|error| ChioPackageError::TrustBundle(error.to_string()))?
     {
         return Err(ChioPackageError::TrustBundle(

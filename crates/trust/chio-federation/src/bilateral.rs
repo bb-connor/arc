@@ -211,16 +211,23 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
                 request.org_a_kernel_id.clone(),
             ));
         }
-        if !self
-            .tool_host_public_key
-            .verify(&request.pae_bytes, &request.org_b_signature)
+        if chio_core_types::crypto::verify_exempt(
+        &self.tool_host_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &request.pae_bytes,
+        &request.org_b_signature,
+    )
+    .is_err()
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
 
         let backend = Ed25519Backend::new(self.origin_keypair.clone());
         let signature = backend
-            .sign_bytes(&request.pae_bytes)
+            .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+                chio_core_types::crypto::ExemptFormat::DssePae,
+                &request.pae_bytes,
+            ))
             .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
         Ok(DsseCoSigningResponse {
             schema: BILATERAL_DSSE_COSIGNING_SCHEMA.to_string(),

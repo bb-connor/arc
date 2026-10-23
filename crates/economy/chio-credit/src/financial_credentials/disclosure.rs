@@ -42,7 +42,7 @@ pub fn validate_financial_source_disclosure(
                 parse_bundled_source_artifact(scorecard_artifact)?;
             let exposure: SignedExposureLedgerReport =
                 parse_bundled_source_artifact(exposure_artifact)?;
-            inspect_source_signature(scorecard.verify_signature())?;
+            inspect_source_signature(scorecard.verify_signature(&scorecard.signer_key))?;
             if &scorecard.signer_key != source_signer_key
                 || project_credit_scorecard_subject(&scorecard)?.id != subject
             {
@@ -69,7 +69,7 @@ pub fn validate_financial_source_disclosure(
             )?;
             let exposure: SignedExposureLedgerReport =
                 parse_bundled_source_artifact(exposure_artifact)?;
-            inspect_source_signature(exposure.verify_signature())?;
+            inspect_source_signature(exposure.verify_signature(&exposure.signer_key))?;
             if &exposure.signer_key != source_signer_key
                 || project_exposure_history_subject(&exposure)?.id != subject
             {

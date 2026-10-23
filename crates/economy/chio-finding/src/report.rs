@@ -336,3 +336,7 @@ pub fn verify_signed_verifier_report(
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_verifier_authority, "verifier_report")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingVerifierReport {
+    const SCHEMA_ID: &'static str = FINDING_VERIFIER_REPORT_SCHEMA_V1;
+}

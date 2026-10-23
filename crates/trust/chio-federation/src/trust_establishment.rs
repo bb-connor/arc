@@ -38,9 +38,11 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::capability::features::CapabilityNegotiation;
-use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
+use chio_core_types::crypto::{
+    verify_wrapped_bytes, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend,
+};
 use serde::{Deserialize, Serialize};
 
 pub const FEDERATION_HANDSHAKE_SCHEMA: &str = "chio.federation-kernel-handshake.v1";
@@ -283,13 +285,19 @@ impl HandshakeChallenge {
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, PeerHandshakeError> {
+        self.signing_body().map(CanonicalBytes::into_vec)
+    }
+
+    /// Canonical body the wrapper binds to `chio.federation-kernel-handshake.v1`.
+    pub fn signing_body(&self) -> Result<CanonicalBytes, PeerHandshakeError> {
         self.capabilities
             .validate()
             .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
         if let Some(ladder_manifest_ref) = &self.ladder_manifest_ref {
             ladder_manifest_ref.validate()?;
         }
-        canonical_json_bytes(self).map_err(|e| PeerHandshakeError::CanonicalJson(e.to_string()))
+        CanonicalBytes::from_serializable(self)
+            .map_err(|e| PeerHandshakeError::CanonicalJson(e.to_string()))
     }
 }
 
@@ -391,10 +399,10 @@ impl PeerHandshakeEnvelope {
         if let Some(ladder_manifest_ref) = ladder_manifest_ref {
             challenge = challenge.with_ladder_manifest_ref(ladder_manifest_ref);
         }
-        let bytes = challenge.canonical_bytes()?;
         let signature = local_backend
-            .sign_bytes(&bytes)
-            .map_err(|e| PeerHandshakeError::SigningFailed(e.to_string()))?;
+            .sign_wrapped(FEDERATION_HANDSHAKE_SCHEMA, &challenge.signing_body()?)
+            .map_err(|e| PeerHandshakeError::SigningFailed(e.to_string()))?
+            .signature;
         Ok(Self {
             challenge,
             declared_public_key: local_backend
@@ -440,8 +448,14 @@ impl PeerHandshakeEnvelope {
             .capabilities
             .validate()
             .map_err(|e| PeerHandshakeError::CapabilityNegotiation(e.to_string()))?;
-        let bytes = self.challenge.canonical_bytes()?;
-        if !self.declared_public_key.verify(&bytes, &self.signature) {
+        if verify_wrapped_bytes(
+            &self.declared_public_key,
+            FEDERATION_HANDSHAKE_SCHEMA,
+            &self.challenge.signing_body()?,
+            &self.signature,
+        )
+        .is_err()
+        {
             return Err(PeerHandshakeError::InvalidSignature);
         }
         Ok(())

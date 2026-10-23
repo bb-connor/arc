@@ -274,9 +274,9 @@ pub fn sign_peer_directory_bundle(
         issued_at_unix_ms: input.issued_at_unix_ms,
         expires_at_unix_ms: input.expires_at_unix_ms,
     };
-    let (signature, _) = input
-        .keypair
-        .sign_canonical(&body)
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| input
+        .keypair.sign_wrapped(PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA, &canonical))
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     Ok(PeerDirectoryBundleDocument {
         schema: PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA.to_string(),
@@ -329,10 +329,13 @@ impl PeerDirectoryBundleDocument {
                     self.body.issuer, self.body.key_id
                 ))
             })?;
-        if !issuer
-            .public_key
-            .verify_canonical(&self.body, &self.signature)
-            .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?
+        if chio_core_types::crypto::verify_wrapped(
+            &issuer.public_key,
+            PHEROMONE_PEER_DIRECTORY_BUNDLE_SCHEMA,
+            &self.body,
+            &self.signature,
+        )
+        .is_err()
         {
             return Err(PheromoneRelayError::SignatureInvalid);
         }

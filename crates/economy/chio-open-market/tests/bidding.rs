@@ -278,7 +278,7 @@ fn bid_happy_path_mints_token_and_accept_records_settlement() {
 
     assert_eq!(ask.body.schema, ASK_RESPONSE_SCHEMA);
     assert_eq!(ask.body.quoted_price.units, 100);
-    assert!(ask.verify_signature().test_expect("verify ask"));
+    assert!(ask.verify_signature(&ask.signer_key).test_expect("verify ask"));
 
     let reservation_receipt = verified_reservation_receipt(&ask, &issuer_keypair);
     let accepted =
@@ -287,7 +287,7 @@ fn bid_happy_path_mints_token_and_accept_records_settlement() {
     assert_eq!(accepted.body.bid_receipt_id, "receipt-from-settlement");
     assert_eq!(accepted.body.quoted_price.units, 100);
     assert!(accepted
-        .verify_signature()
+        .verify_signature(&accepted.signer_key)
         .test_expect("verify accepted bid"));
 }
 

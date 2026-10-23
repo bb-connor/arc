@@ -284,7 +284,9 @@ pub(super) fn provision(
         binding,
         routes,
     };
-    let (signature, _) = issuer.sign_canonical(&body).map_err(error)?;
+    let signature = issuer
+        .sign_wrapped(SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body).map_err(error)?)
+        .map_err(error)?;
     let (bundle_name, bundle_bytes) =
         if let [bundle] = bundles.as_slice() {
             (
@@ -320,10 +322,13 @@ pub(super) fn provision(
 fn load(directory: &Path, issuer: &Keypair) -> Result<SignedProfile, CliError> {
     let signed: SignedProfile = read_json(&directory.join(PROFILE))?;
     if signed.body.schema != SCHEMA
-        || !issuer
-            .public_key()
-            .verify_canonical(&signed.body, &signed.signature)
-            .map_err(error)?
+        || chio_core::crypto::verify_wrapped(
+            &issuer.public_key(),
+            SCHEMA,
+            &signed.body,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(error("invalid process swarm profile signature or schema"));
     }

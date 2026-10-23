@@ -197,7 +197,8 @@ fn run_class(class: &str) -> Outcome {
             let module_hash = hex::encode(sha2::Sha256::digest(&bytes));
             let signer_public_key = hex::encode(sk.verifying_key().to_bytes());
             let message =
-                signed_module_message(&module_hash, "evil-aggregate", "1.0.0", &signer_public_key);
+                signed_module_message(&module_hash, "evil-aggregate", "1.0.0", &signer_public_key)
+                    .unwrap_or_else(|error| panic!("signed module message: {error}"));
             let signature = sk.sign(&message);
             let signed = SignedWasmModule {
                 module_hash,

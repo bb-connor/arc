@@ -650,3 +650,11 @@ impl FiscalProposalAdmissionRegistry {
             .find(|state| state.signed_admission.body.admission_id == admission_id)
     }
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalProposal {
+    const SCHEMA_ID: &'static str = FISCAL_PROPOSAL_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalProposalAdmission {
+    const SCHEMA_ID: &'static str = FISCAL_PROPOSAL_ADMISSION_SCHEMA;
+}

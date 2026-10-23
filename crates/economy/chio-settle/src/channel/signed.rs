@@ -1,15 +1,16 @@
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::validation::{validate_positive, validate_text};
 use super::ChannelError;
 
-const CHANNEL_SIGNATURE_DOMAIN: &str = "chio.channel.signature.v1";
+/// Signing-wrapper schema id of a channel party signature.
+pub const CHANNEL_SIGNATURE_SCHEMA: &str = "chio.channel.signature.v1";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ChannelSignaturePayloadV1<'a, T> {
-    domain: &'static str,
     signer_id: &'a str,
     key_epoch: u64,
     signer_key: &'a PublicKey,
@@ -66,14 +67,13 @@ impl ChannelSignatureV1 {
         validate_positive("signer_key_epoch", key_epoch)?;
         let signer_key = keypair.public_key();
         let payload = ChannelSignaturePayloadV1 {
-            domain: CHANNEL_SIGNATURE_DOMAIN,
             signer_id: &signer_id,
             key_epoch,
             signer_key: &signer_key,
             body,
         };
-        let (signature, _) = keypair
-            .sign_canonical(&payload)
+        let signature = CanonicalBytes::from_serializable(&payload)
+            .and_then(|canonical| keypair.sign_wrapped(CHANNEL_SIGNATURE_SCHEMA, &canonical))
             .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
         Ok(Self {
             signer_id,
@@ -99,19 +99,17 @@ impl ChannelSignatureV1 {
             return Err(ChannelError::AuthorityVerification);
         }
         let payload = ChannelSignaturePayloadV1 {
-            domain: CHANNEL_SIGNATURE_DOMAIN,
             signer_id: &self.signer_id,
             key_epoch: self.key_epoch,
             signer_key: &self.signer_key,
             body,
         };
-        if !self
-            .signer_key
-            .verify_canonical(&payload, &self.signature)
-            .map_err(|_| ChannelError::AuthorityVerification)?
-        {
-            return Err(ChannelError::AuthorityVerification);
-        }
-        Ok(())
+        verify_wrapped(
+            expected_key,
+            CHANNEL_SIGNATURE_SCHEMA,
+            &payload,
+            &self.signature,
+        )
+        .map_err(|_| ChannelError::AuthorityVerification)
     }
 }

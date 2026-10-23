@@ -157,8 +157,12 @@ fn sync_wrapper_gate_fires_before_structural_verify() {
     batch.body.witness.root = forged_root;
     // Re-sign over the now-forged body. AnchorBatch::sign would reject
     // because the validator runs first; build the AnchorBatch directly.
-    let (signature, _bytes) = kp
-        .sign_canonical(&batch.body)
+    let signature = kp
+        .sign_wrapped(
+            chio_core::signed_artifact::CHIO_ANCHOR_BATCH_V1_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&batch.body)
+                .expect("canonical mutated body"),
+        )
         .expect("canonical signing of mutated body");
     let tampered = AnchorBatch {
         body: batch.body,
