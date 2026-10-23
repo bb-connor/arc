@@ -4891,6 +4891,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-recovery"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-reference-tools"
 version = "0.1.0"
 dependencies = [

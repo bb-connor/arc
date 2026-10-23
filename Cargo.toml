@@ -19,6 +19,7 @@ members = [
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
     "crates/security/chio-semantic-contracts",
+    "crates/security/chio-recovery",
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
