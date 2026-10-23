@@ -140,18 +140,22 @@ fn transaction_verifier_report_schema_requires_machine_result_fields() {
     );
 }
 
-fn signed_json_bytes(mut value: Value, keypair: &Keypair) -> Vec<u8> {
-    value
-        .as_object_mut()
-        .test_expect("signed artifact is an object")
-        .remove("signature");
+fn signed_json_bytes(value: Value, keypair: &Keypair) -> Vec<u8> {
     let schema_id = value["schema"]
         .as_str()
         .test_expect("signed artifact names its schema")
         .to_string();
+    signed_json_bytes_under(value, keypair, &schema_id)
+}
+
+fn signed_json_bytes_under(mut value: Value, keypair: &Keypair, schema_id: &str) -> Vec<u8> {
+    value
+        .as_object_mut()
+        .test_expect("signed artifact is an object")
+        .remove("signature");
     let signature = keypair
         .sign_wrapped(
-            &schema_id,
+            schema_id,
             &chio_core_types::CanonicalBytes::from_serializable(&value)
                 .test_expect("signed artifact canonicalizes"),
         )
@@ -178,6 +182,9 @@ fn replace_signed_artifact_key(
         signed_json_bytes(artifact, keypair),
     );
 }
+
+const MINIMAL_RECEIPT_SIGNATURE_INVALID: &str =
+    "invalid evidence graph artifact: minimal governed action evidence invalid: receipt signature invalid";
 
 fn valid_minimal_passport() -> chio_transaction_passport::TransactionPassport {
     chio_transaction_passport::TransactionPassport {
@@ -379,7 +386,7 @@ fn governed_action_artifacts_with_digest_binding(
     );
     let receipt_bytes = signed_json_bytes(
         json!({
-            "schema": "chio.receipt.v1",
+            "schema": "chio.evidence-graph.minimal-receipt.v1",
             "receipt_id": "receipt-minimal-allow",
             "capability_id": "cap-tool-read-demo",
             "guard_decision_id": "guard-decision",
@@ -467,7 +474,7 @@ fn governed_action_evidence_graph_bytes_with_verifier_policy_path(
             },
             {
                 "id": digest("kernel-receipt.json"),
-                "schema": "chio.receipt.v1",
+                "schema": "chio.evidence-graph.minimal-receipt.v1",
                 "path": "kernel-receipt.json",
                 "sha256": digest("kernel-receipt.json"),
                 "role": "receipt"
@@ -1082,7 +1089,7 @@ fn standalone_minimal_passport_accepts_verifier_policy_as_policy_digest_anchor()
         "kernel-receipt.json".to_string(),
         signed_json_bytes(
             json!({
-                "schema": "chio.receipt.v1",
+                "schema": "chio.evidence-graph.minimal-receipt.v1",
                 "receipt_id": "receipt-minimal-allow",
                 "capability_id": "cap-tool-read-demo",
                 "guard_decision_id": "guard-decision",
@@ -1467,6 +1474,114 @@ fn standalone_minimal_passport_rejects_forged_governed_action_signatures() {
             "{artifact_path} should fail with {expected_error}, got {error}"
         );
     }
+}
+
+#[test]
+fn standalone_minimal_passport_rejects_chio_receipt_signature_as_minimal_receipt() {
+    let mut artifacts = governed_action_artifacts();
+    let receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    artifacts.insert(
+        "kernel-receipt.json".to_string(),
+        signed_json_bytes_under(
+            receipt,
+            &Keypair::from_seed(&[53u8; 32]),
+            chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+        ),
+    );
+    let evidence_graph_bytes = governed_action_evidence_graph_bytes(&artifacts);
+    let verifier_policy_bytes = valid_verifier_policy_bytes();
+    let passport =
+        standalone_passport_for_artifact_bytes(&evidence_graph_bytes, verifier_policy_bytes);
+
+    let error = chio_transaction_passport::verify_standalone_minimal_passport_artifacts(
+        &passport,
+        "transaction-passport.json".to_string(),
+        &evidence_graph_bytes,
+        verifier_policy_bytes,
+        &artifacts,
+        &governed_action_trusted_root_keys(),
+    )
+    .test_expect_err("a chio.receipt.v1 signature must not verify as a minimal receipt");
+
+    assert_eq!(error.to_string(), MINIMAL_RECEIPT_SIGNATURE_INVALID);
+}
+
+#[test]
+fn standalone_minimal_passport_rejects_minimal_receipt_schema_member_mismatch() {
+    let mut artifacts = governed_action_artifacts();
+    let mut receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    receipt["schema"] = json!(chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA);
+    artifacts.insert(
+        "kernel-receipt.json".to_string(),
+        signed_json_bytes_under(
+            receipt,
+            &Keypair::from_seed(&[53u8; 32]),
+            chio_transaction_passport::EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
+        ),
+    );
+    let evidence_graph_bytes = governed_action_evidence_graph_bytes(&artifacts);
+    let verifier_policy_bytes = valid_verifier_policy_bytes();
+    let passport =
+        standalone_passport_for_artifact_bytes(&evidence_graph_bytes, verifier_policy_bytes);
+
+    let error = chio_transaction_passport::verify_standalone_minimal_passport_artifacts(
+        &passport,
+        "transaction-passport.json".to_string(),
+        &evidence_graph_bytes,
+        verifier_policy_bytes,
+        &artifacts,
+        &governed_action_trusted_root_keys(),
+    )
+    .test_expect_err("a minimal receipt must carry its own schema member");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid evidence graph artifact: minimal governed action evidence invalid: \
+         receipt schema is not chio.evidence-graph.minimal-receipt.v1"
+    );
+}
+
+#[test]
+fn minimal_receipt_signature_is_rejected_as_chio_receipt() {
+    let artifacts = governed_action_artifacts();
+    let mut receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    let signature = chio_core_types::crypto::Signature::from_hex(
+        receipt["signature"]
+            .as_str()
+            .test_expect("minimal receipt carries a signature"),
+    )
+    .test_expect("minimal receipt signature decodes");
+    receipt
+        .as_object_mut()
+        .test_expect("minimal receipt is an object")
+        .remove("signature");
+
+    let verdict = chio_core_types::crypto::verify_wrapped(
+        &Keypair::from_seed(&[53u8; 32]).public_key(),
+        chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+        &receipt,
+        &signature,
+    );
+
+    assert!(
+        matches!(verdict, Err(chio_core_types::Error::SignatureRejected)),
+        "{verdict:?}"
+    );
 }
 
 #[test]

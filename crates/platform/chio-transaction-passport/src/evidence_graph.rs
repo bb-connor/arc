@@ -1146,13 +1146,18 @@ fn trust_root_signer_identity(
     Ok(key_id.to_string())
 }
 
+/// Signing-wrapper schema id of the minimal receipt an evidence graph's
+/// receipt role carries. Distinct from `chio.receipt.v1` so a `ChioReceipt`
+/// signature never verifies as a minimal receipt, or the reverse.
+pub const EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA: &str = "chio.evidence-graph.minimal-receipt.v1";
+
 /// Signing-wrapper schema id of the artifact a signed evidence role carries.
 fn signed_role_wrapper_schema(role: EvidenceNodeRole) -> Option<&'static str> {
     match role {
         EvidenceNodeRole::Capability => Some("chio.capability.proof.v1"),
         EvidenceNodeRole::TrustRoot => Some("chio.trust.root.v1"),
         EvidenceNodeRole::GuardDecision => Some("chio.guard.decision.v1"),
-        EvidenceNodeRole::Receipt => Some("chio.receipt.v1"),
+        EvidenceNodeRole::Receipt => Some(EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA),
         _ => None,
     }
 }
@@ -1185,6 +1190,11 @@ fn verify_signed_role_artifact(
     let schema_id = signed_role_wrapper_schema(role).ok_or_else(|| {
         minimal_governed_action_binding_error(format!("{label} role is not a signed artifact"))
     })?;
+    if object.get("schema").and_then(serde_json::Value::as_str) != Some(schema_id) {
+        return Err(minimal_governed_action_binding_error(format!(
+            "{label} schema is not {schema_id}"
+        )));
+    }
     let verified =
         chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &artifact, &signature)
             .is_ok();

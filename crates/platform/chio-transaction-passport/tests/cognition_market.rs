@@ -25,7 +25,7 @@ use chio_finding::{
     FINDING_AUTHORITY_STATUS_SCHEMA_V1, FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1,
     FINDING_PURCHASE_RECORD_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
     FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
-    FINDING_STATUS_SIGNATURE_DOMAIN, FINDING_VERIFIER_REPORT_SCHEMA_V1,
+    FINDING_VERIFIER_REPORT_SCHEMA_V1,
 };
 use chio_open_market::purchase_verification::{
     derive_payment_operation_id, derive_purchase_intent_id,
@@ -300,7 +300,6 @@ fn status_proof_bytes_for_finding(inclusion: bool, finding_id: &str) -> TestResu
     let mut epoch = FindingStatusEpoch {
         schema: FINDING_STATUS_EPOCH_SCHEMA_V1.to_string(),
         status_epoch_id: String::new(),
-        signature_domain: FINDING_STATUS_SIGNATURE_DOMAIN.to_string(),
         status_map_version: FINDING_STATUS_MAP_VERSION.to_string(),
         proof_semantics: FINDING_STATUS_PROOF_SEMANTICS.to_string(),
         feed_id: STATUS_FEED_ID.to_string(),
@@ -817,7 +816,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
 
     let receipt_key = Keypair::from_seed(&[86_u8; 32]);
     let receipt_body = json!({
-        "schema": "chio.receipt.v1",
+        "schema": chio_transaction_passport::EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
         "receipt_id": "receipt-cognition-market-anchor",
         "capability_id": "cap-cognition-market-verify",
         "guard_decision_id": "guard-cognition-market-verify",
@@ -831,7 +830,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
     receipt["signature"] = Value::String(
         receipt_key
             .sign_wrapped(
-                "chio.receipt.v1",
+                chio_transaction_passport::EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
                 &chio_core_types::CanonicalBytes::from_serializable(&receipt_body)?,
             )?
             .to_hex(),
@@ -847,7 +846,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
         .push(node(
             "anchor-receipt.json",
             "receipt",
-            "chio.receipt.v1",
+            chio_transaction_passport::EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
             &receipt_bytes,
         ));
     bundle.evidence_graph["edges"]
