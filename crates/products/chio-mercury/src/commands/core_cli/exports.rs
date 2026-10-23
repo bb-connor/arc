@@ -52,10 +52,16 @@ pub(super) fn export_downstream_review(
     let qualification_dir = output.join("qualification");
     let (qualification_report, reviewer_package) =
         export_supervised_live_qualification(&qualification_dir)?;
+    let keys = run_kernel_key_set(
+        &qualification_report
+            .supervised_live
+            .export
+            .kernel_public_key,
+    );
     let proof_package_path = qualification_dir.join("supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
@@ -74,7 +80,7 @@ pub(super) fn export_downstream_review(
         false,
     )?;
     let internal_inquiry_report = internal_inquiry
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
     let internal_inquiry_path = internal_dir.join("inquiry-package.json");
     let internal_inquiry_report_path = internal_dir.join("inquiry-verification.json");
@@ -101,7 +107,7 @@ pub(super) fn export_downstream_review(
         false,
     )?;
     let external_inquiry_report = external_inquiry
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
     let external_inquiry_path = external_dir.join("inquiry-package.json");
     let external_inquiry_report_path = external_dir.join("inquiry-verification.json");
@@ -278,10 +284,16 @@ pub(crate) fn export_governance_workbench(
     let qualification_dir = output.join("qualification");
     let (qualification_report, reviewer_package) =
         export_supervised_live_qualification(&qualification_dir)?;
+    let keys = run_kernel_key_set(
+        &qualification_report
+            .supervised_live
+            .export
+            .kernel_public_key,
+    );
     let proof_package_path = qualification_dir.join("supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
@@ -301,7 +313,7 @@ pub(crate) fn export_governance_workbench(
         false,
     )?;
     let workflow_owner_inquiry_report = workflow_owner_inquiry
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
     let workflow_owner_inquiry_path = workflow_owner_dir.join("inquiry-package.json");
     let workflow_owner_inquiry_report_path = workflow_owner_dir.join("inquiry-verification.json");
@@ -318,7 +330,7 @@ pub(crate) fn export_governance_workbench(
         false,
     )?;
     let control_team_inquiry_report = control_team_inquiry
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
     let control_team_inquiry_path = control_team_dir.join("inquiry-package.json");
     let control_team_inquiry_report_path = control_team_dir.join("inquiry-verification.json");
@@ -397,6 +409,10 @@ pub(crate) fn export_governance_workbench(
 
     let summary = MercuryGovernanceWorkbenchExportSummary {
         workflow_id: qualification_report.workflow_id,
+        kernel_public_key: qualification_report
+            .supervised_live
+            .export
+            .kernel_public_key,
         workflow_path: MercuryGovernanceWorkflowPath::ChangeReviewReleaseControl
             .as_str()
             .to_string(),
@@ -438,7 +454,8 @@ pub(super) fn export_mercury_run(
 
     write_json_file(&input_file, input_value)?;
     let bundle_manifest_paths = write_bundle_manifests(&bundle_manifest_dir, bundle_manifests)?;
-    let kernel = populate_mercury_receipt_store(&receipt_db, capability_id, steps)?;
+    let kernel =
+        populate_mercury_receipt_store(&receipt_db, capability_id, steps, bundle_manifests)?;
     evidence_export::cmd_evidence_export(
         &evidence_dir,
         None,
@@ -467,9 +484,10 @@ pub(super) fn export_mercury_run(
         checkpoint_trust_anchor: None,
         required_columns: Vec::new(),
     };
+    let keys = trusted_kernel_key_set(&trust);
     let proof_package = build_proof_package(&evidence_dir, &bundle_manifest_paths, &trust)?;
     let proof_report = proof_package
-        .verify(unix_now())
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
         .map_err(|error| CliError::Other(error.to_string()))?;
     write_json_file(&proof_package_file, &proof_package)?;
     write_verification_report(&proof_verification_file, &proof_report)?;
@@ -482,7 +500,7 @@ pub(super) fn export_mercury_run(
             config.verifier_equivalent,
         )?;
         let inquiry_report = inquiry_package
-            .verify(unix_now())
+            .verify_with_trusted_kernel_keys(unix_now(), &keys)
             .map_err(|error| CliError::Other(error.to_string()))?;
         write_json_file(&inquiry_package_file, &inquiry_package)?;
         write_verification_report(&inquiry_verification_file, &inquiry_report)?;
@@ -495,6 +513,7 @@ pub(super) fn export_mercury_run(
     };
 
     Ok(MercuryExportRunPaths {
+        kernel_public_key: kernel.public_key().to_hex(),
         input_file: input_file.display().to_string(),
         receipt_db: receipt_db.display().to_string(),
         evidence_dir: evidence_dir.display().to_string(),
