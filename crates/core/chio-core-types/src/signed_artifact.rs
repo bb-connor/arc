@@ -2176,6 +2176,58 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("behavioral_feed", "signing-wrapper-v1")),
     ),
     (
+        "chio.finding.hosted-principal-lifecycle.v1",
+        Some(("hosted_principal_lifecycle", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted.aggregate-checkpoint.v1",
+        Some(("hosted_aggregate_checkpoint", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-sqlite-import-batch.v1",
+        Some(("hosted_sqlite_import_batch", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-replication-event.v1",
+        Some(("hosted_replication_event", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-principal-replication-event.v1",
+        Some(("hosted_principal_replication_event", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-replication-check.v1",
+        Some(("hosted_replication_check", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-authority-transition.v1",
+        Some(("hosted_authority_transition", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-journal-checkpoint.v1",
+        Some(("hosted_journal_checkpoint", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-archive-manifest.v1",
+        Some(("hosted_archive_manifest", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-legal-hold.v1",
+        Some(("hosted_legal_hold", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-restore-verification.v1",
+        Some(("hosted_restore_verification", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-quota-alert.v1",
+        Some(("hosted_quota_alert", "signing-wrapper-v1")),
+    ),
+    (
+        "chio.finding.hosted-gc-receipt.v1",
+        Some(("hosted_gc_receipt", "signing-wrapper-v1")),
+    ),
+    (
         "chio.finding-status-operator-authorization.v1",
         Some(("finding_status_operator_authorization", "signing-wrapper-v1")),
     ),

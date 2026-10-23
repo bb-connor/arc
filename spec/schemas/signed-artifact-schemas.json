@@ -458,11 +458,102 @@
       "title": "Chio finding hosted api key lifecycle signed body"
     },
     {
+      "schema": "chio.finding.hosted-archive-manifest.v1",
+      "artifactKind": "hosted_archive_manifest",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-archive-manifest.schema.json",
+      "title": "Chio finding hosted archive manifest signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-authority-transition.v1",
+      "artifactKind": "hosted_authority_transition",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-authority-transition.schema.json",
+      "title": "Chio finding hosted authority transition signed body"
+    },
+    {
       "schema": "chio.finding.hosted-canary-observation.v1",
       "artifactKind": "finding_hosted_canary_observation",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-canary-observation.schema.json",
       "title": "Chio finding hosted canary observation signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-gc-receipt.v1",
+      "artifactKind": "hosted_gc_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-gc-receipt.schema.json",
+      "title": "Chio finding hosted gc receipt signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-journal-checkpoint.v1",
+      "artifactKind": "hosted_journal_checkpoint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-journal-checkpoint.schema.json",
+      "title": "Chio finding hosted journal checkpoint signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-legal-hold.v1",
+      "artifactKind": "hosted_legal_hold",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-legal-hold.schema.json",
+      "title": "Chio finding hosted legal hold signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-principal-lifecycle.v1",
+      "artifactKind": "hosted_principal_lifecycle",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-principal-lifecycle.schema.json",
+      "title": "Chio finding hosted principal lifecycle signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-principal-replication-event.v1",
+      "artifactKind": "hosted_principal_replication_event",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-principal-replication-event.schema.json",
+      "title": "Chio finding hosted principal replication event signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-quota-alert.v1",
+      "artifactKind": "hosted_quota_alert",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-quota-alert.schema.json",
+      "title": "Chio finding hosted quota alert signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-replication-check.v1",
+      "artifactKind": "hosted_replication_check",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-replication-check.schema.json",
+      "title": "Chio finding hosted replication check signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-replication-event.v1",
+      "artifactKind": "hosted_replication_event",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-replication-event.schema.json",
+      "title": "Chio finding hosted replication event signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-restore-verification.v1",
+      "artifactKind": "hosted_restore_verification",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-restore-verification.schema.json",
+      "title": "Chio finding hosted restore verification signed body"
+    },
+    {
+      "schema": "chio.finding.hosted-sqlite-import-batch.v1",
+      "artifactKind": "hosted_sqlite_import_batch",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-sqlite-import-batch.schema.json",
+      "title": "Chio finding hosted sqlite import batch signed body"
+    },
+    {
+      "schema": "chio.finding.hosted.aggregate-checkpoint.v1",
+      "artifactKind": "hosted_aggregate_checkpoint",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-aggregate-checkpoint.schema.json",
+      "title": "Chio finding hosted aggregate checkpoint signed body"
     },
     {
       "schema": "chio.finding.operator-purchase-job.v1",
