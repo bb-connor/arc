@@ -233,6 +233,52 @@ ALLOWED = (
             ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
         ),
     },
+    {
+        "path": "crates/products/chio-cli/src/cli/receipt_verify.rs",
+        "owner": "verify_original_receipt",
+        "call": "crate::input::project(value.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/trust/receipt/explain.rs",
+        "owner": "explain_receipt_value",
+        "call": "crate::input::project(value)",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/trust/receipt/explain.rs", "cmd_receipt_explain", "crate::input::json::<serde_json::Value>("),
+            ("crates/products/chio-cli/src/cli/trust/receipt/explain.rs", "load_receipt_for_explain", "client.query_receipts("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/operations.rs", "query_receipts", "get_json_with_query("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "get_json_with_query", "request_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json", "request_json_capped("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "request_json_capped", "read_capped_json("),
+            ("crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs", "read_capped_json", "crate::json_input::read("),
+            ("crates/platform/chio-control-plane/src/json_input.rs", "read", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs",
+        "owner": "sign_public_settlement_proof_bundle",
+        "call": "crate::input::project(settlement_proof.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", "add_public_stage_settlement_trust_market_refs", "read_json_value("),
+            ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", "read_json_value", "crate::input::json("),
+            ("crates/products/chio-cli/src/cli/input.rs", "json", "decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs",
+        "owner": "reseal_public_settlement_anchor_receipt",
+        "call": "crate::input::project(receipt_value)",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", "add_public_settlement_deployment_provenance_to_bundle", "read_json_value("),
+            ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", "read_json_value", "crate::input::json("),
+            ("crates/products/chio-cli/src/cli/input.rs", "json", "decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
 )
 
 RAW_CALL = re.compile(r"(?<![\w.:])(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
@@ -245,6 +291,15 @@ TRAIT_CALL = re.compile(
     r"|<\s*([\w:]+)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
 )
 GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*(?:for\s*<[^<>]*>|[^,>{])*?\bDeserialize")
+CRATE_ALIAS = re.compile(r"\buse\s+serde_json\s+as\s+(\w+)\s*;")
+FUNCTION_ALIAS = re.compile(r"\bserde_json\s*::\s*(from_(?:str|slice|reader|value))\s+as\s+(\w+)")
+STREAM_CALL = re.compile(
+    r"(?<![\w.])(?:serde_json\s*::\s*)?(?:de\s*::\s*)?Deserializer\s*::\s*from_(?:str|slice|reader)\s*\("
+)
+INTO_ITER = re.compile(r"^\s*\.\s*into_iter\s*::\s*<")
+FROM_REQUEST = re.compile(r"\bfrom_request(?:_parts)?\s*\(")
+BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*(?:::\s*)?<")
+IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
 LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
 
 
@@ -383,14 +438,15 @@ def returned(fn_code: str, offset: int) -> bool:
     """Whether the call at `offset` is the function's value: its tail or a `return`."""
     statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
     prefix = fn_code[statement_start:offset].strip()
-    if prefix.startswith("return") or re.fullmatch(r"(?:Ok|Some)\(", prefix):
+    if prefix.startswith("return"):
         return True
-    if prefix:
+    pieces = prefix.split("(")
+    if pieces[-1].strip() or not all(re.fullmatch(r"\s*[A-Za-z_][\w:]*\s*", piece) for piece in pieces[:-1]):
         return False
     paren = fn_code.find("(", offset)
     end = _contracts.closing(fn_code, paren)
     rest = fn_code[end:]
-    rest = re.sub(r"^(?:\s*(?:\?|\.\s*\w+\s*(?:::<[^;{}]*?>)?\s*\([^;{}]*?\)))*", "", rest)
+    rest = re.sub(r"^(?:\s*(?:\?|\)|\.\s*\w+\s*(?:::<[^;{}]*?>)?\s*\([^;{}]*?\)))*", "", rest)
     return rest.strip() == "}"
 
 
@@ -416,7 +472,20 @@ def generic_parameters(fn_code: str) -> set[str]:
     return set(GENERIC_BOUND.findall(fn_code[:signature_end if signature_end >= 0 else len(fn_code)]))
 
 
-def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str]):
+def raw_aliases(code: str) -> tuple:
+    """Per-file patterns for `use serde_json as x` and `use serde_json::from_str as y`."""
+    patterns = []
+    crates = CRATE_ALIAS.findall(code)
+    if crates:
+        patterns.append(re.compile(
+            r"(?<![\w.:])(?:" + "|".join(map(re.escape, crates)) + r")\s*::\s*(from_(?:str|slice|reader|value))\s*(?=::|\()"
+        ))
+    for source, alias in FUNCTION_ALIAS.findall(code):
+        patterns.append(re.compile(r"(?<![\w.:])" + re.escape(alias) + r"(?P<" + source + r">)\s*(?=::|\()"))
+    return tuple(patterns)
+
+
+def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases: tuple = ()):
     """Yield (offset, explicit target or None, input kind) for each raw decode in a body.
 
     The input kind is "value" when the decode reads an already parsed Value and
@@ -430,8 +499,25 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str]):
             yield match.start(), target, kind
         else:
             yield match.start(), None, kind
+    for pattern in aliases:
+        for match in pattern.finditer(fn_code, body_start):
+            source = match.group(1) if pattern.groups and match.group(1) else next(iter(pattern.groupindex), "")
+            kind = "value" if source == "from_value" else "text"
+            after = fn_code[match.end():].lstrip()
+            if after.startswith("::"):
+                target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
+                yield match.start(), target, kind
+            else:
+                yield match.start(), None, kind
     for match in TRAIT_CALL.finditer(fn_code, body_start):
         yield match.start(), match.group(1) or match.group(2), "text"
+    for match in STREAM_CALL.finditer(fn_code, body_start):
+        end = _contracts.closing(fn_code, match.end() - 1)
+        if INTO_ITER.match(fn_code[end:]):
+            target, _ = angle_argument(fn_code, fn_code.index("<", end))
+            yield match.start(), target, "text"
+        elif "StreamDeserializer" in let_annotation(fn_code, match.start()):
+            yield match.start(), let_annotation(fn_code, match.start()), "text"
     if helpers:
         pattern = re.compile(r"(?<![\w.])(?:\w+\s*::\s*)*(" + "|".join(sorted(map(re.escape, helpers))) + r")\s*(?=::\s*<|\()")
         for match in pattern.finditer(fn_code, body_start):
@@ -507,10 +593,26 @@ def custody_breaks(by_path: dict[str, str], custody) -> str:
     return ""
 
 
+@functools.lru_cache(maxsize=64)
+def deserialize_impls(code: str) -> tuple[tuple[int, int], ...]:
+    """Extents of every `impl` of `Deserialize` or a serde `Visitor` in `code`."""
+    return tuple(
+        (match.start(), _contracts.closing(code, match.end() - 1, "{", "}"))
+        for match in IMPL_HEADER.finditer(code)
+        if re.search(r"\b(?:Deserialize|Visitor)\b", match.group(0))
+    )
+
+
+def in_deserialize_impl(code: str, offset: int) -> bool:
+    """Whether `offset` sits inside an `impl` of `Deserialize` or a serde `Visitor`."""
+    return any(start < offset < end for start, end in deserialize_impls(code))
+
+
 def scan(root: Path) -> list[str]:
     files = production_files(root)
     strict = strict_closure(files)
     helpers = generic_raw_helpers(files)
+    aliases = {rel: raw_aliases(code) for rel, code in files}
     findings = []
     for rel, code in files:
         for row in _contracts.functions(code):
@@ -522,10 +624,19 @@ def scan(root: Path) -> list[str]:
                 target, _ = angle_argument(arguments, match.end() - 1)
                 if mentions_strict(target, strict):
                     findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor", "text"))
-            if owner.split("#")[0] == "deserialize":
+            body_start = row[2] - row[1]
+            for match in FROM_REQUEST.finditer(fn_code, body_start):
+                statement_start = max(fn_code.rfind(c, 0, match.start()) for c in ";{}") + 1
+                statement = fn_code[statement_start:match.start()] + " " + let_annotation(fn_code, match.start())
+                for extractor in BODY_EXTRACTOR.finditer(statement):
+                    target, _ = angle_argument(statement, extractor.end() - 1)
+                    if mentions_strict(target, strict):
+                        findings.append((rel, owner, call_text(fn_code, match.start()), "extractor", "text"))
+                        break
+            if owner.split("#")[0] == "deserialize" and in_deserialize_impl(code, row[1]):
                 continue
             returns = return_type(fn_code)
-            for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], helpers.get(crate_of(rel), {})):
+            for offset, explicit, kind in decode_sites(fn_code, body_start, helpers.get(crate_of(rel), {}), aliases[rel]):
                 if mentions_strict(targets(fn_code, offset, explicit, returns), strict):
                     findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
     errors = []
@@ -578,6 +689,18 @@ FIXTURES = {
     "higher-ranked where bound": ("fn decode<T>(t: &str) -> Result<T, E>\nwhere\n    T: Clone + for<'de> serde::Deserialize<'de>,\n{\n    serde_json::from_str(t)\n}\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 1),
     "fully qualified trait": ("fn f(d: D) -> Result<ChioReceipt, E> { <ChioReceipt as serde::Deserialize>::deserialize(d) }", 1),
     "fully qualified trait with lifetime": ("fn f(d: D) -> Result<(), E> { let r = <ChioReceiptBody as Deserialize<'_>>::deserialize(d)?; Ok(()) }", 1),
+    "crate alias": ("use serde_json as json;\nfn f(t: &str) { json::from_str::<ChioReceipt>(t); }", 1),
+    "function alias": ("use serde_json::from_str as decode_raw;\nfn f(t: &str) -> Result<ChioReceipt, E> { decode_raw(t) }", 1),
+    "aliased Value read of another type": ("use serde_json as json;\nfn f(v: Value) { json::from_value::<Other>(v); }", 0),
+    "boxed return": ("fn f(raw: &str) -> Result<Box<ChioReceipt>, E> { Ok(Box::new(serde_json::from_str(raw)?)) }", 1),
+    "free function named deserialize": ("fn deserialize(raw: &str) { serde_json::from_str::<ChioReceipt>(raw); }", 1),
+    "inherent method named deserialize": ("impl Loader {\n    fn deserialize(&self, raw: &str) -> Result<ChioReceipt, E> { serde_json::from_str(raw) }\n}", 1),
+    "visitor impl": ("impl<'de> Visitor<'de> for V {\n    fn deserialize(self, d: D) -> Result<ChioReceipt, E> { ChioReceipt::deserialize(d) }\n}", 0),
+    "streaming decode": ("fn f(raw: &str) { for r in serde_json::Deserializer::from_str(raw).into_iter::<ChioReceipt>() { use_it(r); } }", 1),
+    "streaming decode of another type": ("fn f(raw: &str) { for r in serde_json::Deserializer::from_str(raw).into_iter::<Other>() { use_it(r); } }", 0),
+    "body extractor": ("async fn h(request: Request, state: &S) {\n    let Json(r): Json<ChioReceipt> = Json::from_request(request, state).await?;\n}", 1),
+    "body extractor turbofish": ("async fn h(request: Request, state: &S) { let r = Json::<ChildRequestReceipt>::from_request(request, state).await; }", 1),
+    "body extractor of another type": ("async fn h(request: Request, state: &S) { let Json(r): Json<Other> = Json::from_request(request, state).await?; }", 0),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
