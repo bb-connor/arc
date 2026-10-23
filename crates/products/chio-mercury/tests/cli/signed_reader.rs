@@ -8,7 +8,7 @@ pub(super) fn write_mercury_bundle_manifest(path: &Path) {
     .expect("write bundle manifest");
 }
 
-fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
+pub(super) fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
     let receipt_db_path = unique_path(&format!("{prefix}-db"), ".sqlite3");
     let output_dir = unique_path(&format!("{prefix}-export"), "");
     let bundle_manifest_path = unique_path(&format!("{prefix}-bundle"), ".json");
@@ -18,8 +18,8 @@ fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
         let seq = store
             .append_chio_receipt_returning_seq(&mercury_receipt_with_ts(
-                "rcpt-mercury-dup",
-                "cap-mercury-dup",
+                "rcpt-mercury-1",
+                "cap-mercury-proof",
                 100,
                 &issuer,
             ))
@@ -44,15 +44,13 @@ fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
     }
     export_fixture_package(&receipt_db_path, &output_dir);
     write_mercury_bundle_manifest(&bundle_manifest_path);
+    let trust = kernel_trust_file(&issuer.public_key());
     let proof_export = Command::new(env!("CARGO_BIN_EXE_mercury"))
         .current_dir(workspace_root())
         .arg("proof")
         .arg("export")
         .arg("--trust")
-        .arg(kernel_trust_file(
-            output_dir.parent().expect("package parent"),
-            &issuer.public_key(),
-        ))
+        .arg(&trust)
         .arg("--input")
         .arg(&output_dir)
         .arg("--output")
@@ -67,6 +65,7 @@ fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
         String::from_utf8_lossy(&proof_export.stderr)
     );
     let cleanup = vec![
+        trust,
         receipt_db_path,
         output_dir,
         bundle_manifest_path,
@@ -75,7 +74,7 @@ fn export_signed_proof_package(prefix: &str) -> (PathBuf, Vec<PathBuf>) {
     (proof_package_path, cleanup)
 }
 
-fn first_signed_receipt(value: &serde_json::Value) -> Option<&serde_json::Value> {
+pub(super) fn first_signed_receipt(value: &serde_json::Value) -> Option<&serde_json::Value> {
     match value {
         serde_json::Value::Object(map) => {
             if ["action", "kernel_key", "signature"]
@@ -94,15 +93,19 @@ fn first_signed_receipt(value: &serde_json::Value) -> Option<&serde_json::Value>
 fn mercury_verify_succeeds(text: &str, label: &str) -> bool {
     let path = unique_path(&format!("chio-mercury-{label}"), ".json");
     fs::write(&path, text).expect("write package variant");
+    let trust = kernel_trust_file(&Keypair::from_seed(&[58; 32]).public_key());
     let verify = Command::new(env!("CARGO_BIN_EXE_mercury"))
         .current_dir(workspace_root())
         .arg("--json")
         .arg("verify")
         .arg("--input")
         .arg(&path)
+        .arg("--trust")
+        .arg(&trust)
         .output()
         .expect("run mercury verify");
     let _ = fs::remove_file(path);
+    let _ = fs::remove_file(trust);
     verify.status.success()
 }
 

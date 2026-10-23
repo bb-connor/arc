@@ -9,6 +9,7 @@ pub(crate) struct PilotInquiryConfig<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MercuryPilotRunPaths {
+    pub(crate) kernel_public_key: String,
     pub(crate) events_file: String,
     pub(crate) receipt_db: String,
     pub(crate) evidence_dir: String,
@@ -24,6 +25,7 @@ pub(crate) struct MercuryPilotRunPaths {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MercuryExportRunPaths {
+    pub(crate) kernel_public_key: String,
     pub(crate) input_file: String,
     pub(crate) receipt_db: String,
     pub(crate) evidence_dir: String,
@@ -155,6 +157,7 @@ pub(crate) struct MercuryDownstreamReviewValidationReport {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MercuryGovernanceWorkbenchExportSummary {
     pub(crate) workflow_id: String,
+    pub(crate) kernel_public_key: String,
     pub(crate) workflow_path: String,
     pub(crate) workflow_owner: String,
     pub(crate) control_team_owner: String,
@@ -1002,6 +1005,7 @@ impl MercuryPilotRunPaths {
                     CliError::Other("pilot export is missing bundle manifest".to_string())
                 })?;
         Ok(Self {
+            kernel_public_key: paths.kernel_public_key,
             events_file: paths.input_file,
             receipt_db: paths.receipt_db,
             evidence_dir: paths.evidence_dir,

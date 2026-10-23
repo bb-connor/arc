@@ -8,7 +8,12 @@ pub(super) fn mercury_receipt_with_ts(
     timestamp: u64,
     keypair: &Keypair,
 ) -> ChioReceipt {
-    let mercury_metadata = sample_mercury_receipt_metadata();
+    let mut mercury_metadata = sample_mercury_receipt_metadata();
+    mercury_metadata.bundle_refs =
+        vec![
+            MercuryBundleReference::from_manifest(&sample_mercury_bundle_manifest())
+                .expect("bundle reference"),
+        ];
     let metadata = mercury_metadata
         .into_receipt_metadata_value()
         .expect("mercury metadata value");
@@ -69,8 +74,8 @@ pub(super) fn export_fixture_package(receipt_db_path: &Path, output_dir: &Path) 
 }
 
 /// A `chio.verifier-trust.v1` file pinning `key` as the only kernel key.
-pub(super) fn kernel_trust_file(dir: &Path, key: &chio_core::crypto::PublicKey) -> PathBuf {
-    let path = dir.join("verifier-trust.json");
+pub(super) fn kernel_trust_file(key: &chio_core::crypto::PublicKey) -> PathBuf {
+    let path = unique_path("chio-mercury-verifier-trust", ".json");
     let trust = serde_json::json!({
         "schema": "chio.verifier-trust.v1",
         "kernel_keys": [key.to_hex()],
