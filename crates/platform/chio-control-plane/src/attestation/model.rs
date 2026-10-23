@@ -284,7 +284,9 @@ impl RuntimeAttestationVerifierAdapter for EnterpriseVerifierAdapter {
             chio_core::canonical::UntrustedJsonText::from_wire((evidence).as_bytes(), 1024 * 1024)
                 .and_then(|input| input.decode_signed())
                 .map_err(EnterpriseVerifierVerificationError::from)?;
-        if !signed_evidence.verify_signature().map_err(|error| {
+        if !signed_evidence
+            .verify_signature(&signed_evidence.signer_key)
+            .map_err(|error| {
             EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
         })? {
             return Err(EnterpriseVerifierVerificationError::InvalidSignature);

@@ -333,7 +333,10 @@ fn signed_checkpoint_time_rewrite_cannot_replace_the_authenticated_checkpoint() 
     replacement.body.issued_at += 1;
     let issued_at = i64::try_from(replacement.body.issued_at).unwrap();
     replacement.signature =
-        evidence_receipt_keypair().sign(&canonical_json_bytes(&replacement.body).unwrap());
+        evidence_receipt_keypair().sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&replacement.body).unwrap(),
+    ).unwrap();
     let connection = rusqlite::Connection::open(directory.path().join("live.db")).unwrap();
     connection
         .set_db_config(

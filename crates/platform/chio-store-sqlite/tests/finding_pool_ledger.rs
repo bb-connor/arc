@@ -486,12 +486,14 @@ fn debit_at_with_policy_and_authority_and_tenant(
         expires_at: u64::MAX,
         delegation_chain: Vec::new(),
         aggregate_invocation_budget: None,
-        algorithm: None,
         caveats: Vec::new(),
         scope_attenuations: None,
         attenuation_proof: None,
         budget_share_bps: None,
-        signature: fixture.authority.sign(purchase_id.as_bytes()),
+        signature: fixture.authority.sign_exempt(
+            chio_core::crypto::ExemptFormat::JwsSigningInput,
+            purchase_id.as_bytes(),
+        ),
     };
     let agent_id = fixture.purchaser.public_key().to_hex();
     let session_id = kernel

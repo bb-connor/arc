@@ -184,7 +184,7 @@ pub fn verify_federation_admission_policy_record(
             record.schema
         )));
     }
-    if !record.policy.verify_signature()? {
+    if !record.policy.verify_signature(&record.policy.signer_key)? {
         return Err(CliError::cli_other_error(
             "federation admission policy signature verification failed".to_string(),
         ));

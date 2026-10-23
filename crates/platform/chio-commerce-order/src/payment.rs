@@ -4,7 +4,7 @@ use super::types::{CommerceOrderContext, CommercePaymentLifecycle};
 use super::validation::{
     parse_rfc3339_utc, require_non_empty, validate_money, validate_sha256_hex,
 };
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 
 pub(super) fn validate_payment_lifecycle(
     context: &CommerceOrderContext,
@@ -196,12 +196,14 @@ fn verify_payment_lifecycle_signature(
         CommerceOrderError::PaymentFailed("payment signature body invalid".to_string())
     })?;
     body.remove("signature");
-    let verified = signer_key
-        .verify_canonical(&signature_body, &signature)
-        .map_err(|_| {
-            CommerceOrderError::PaymentSignatureInvalid("payment signature invalid".to_string())
-        })?;
-    if verified {
+    if verify_wrapped(
+        &signer_key,
+        COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
+        &signature_body,
+        &signature,
+    )
+    .is_ok()
+    {
         Ok(())
     } else {
         Err(CommerceOrderError::PaymentSignatureInvalid(

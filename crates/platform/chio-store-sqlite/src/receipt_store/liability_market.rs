@@ -6,7 +6,7 @@ impl SqliteReceiptStore {
         provider: &SignedLiabilityProvider,
     ) -> Result<(), ReceiptStoreError> {
         if !provider
-            .verify_signature()
+            .verify_signature(&provider.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -276,7 +276,7 @@ impl SqliteReceiptStore {
         request: &SignedLiabilityQuoteRequest,
     ) -> Result<(), ReceiptStoreError> {
         if !request
-            .verify_signature()
+            .verify_signature(&request.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -383,7 +383,7 @@ impl SqliteReceiptStore {
         response: &SignedLiabilityQuoteResponse,
     ) -> Result<(), ReceiptStoreError> {
         if !response
-            .verify_signature()
+            .verify_signature(&response.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -530,7 +530,7 @@ impl SqliteReceiptStore {
         placement: &SignedLiabilityPlacement,
     ) -> Result<(), ReceiptStoreError> {
         if !placement
-            .verify_signature()
+            .verify_signature(&placement.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -693,7 +693,7 @@ impl SqliteReceiptStore {
         authority: &SignedLiabilityPricingAuthority,
     ) -> Result<(), ReceiptStoreError> {
         if !authority
-            .verify_signature()
+            .verify_signature(&authority.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -793,7 +793,7 @@ impl SqliteReceiptStore {
         coverage: &SignedLiabilityBoundCoverage,
     ) -> Result<(), ReceiptStoreError> {
         if !coverage
-            .verify_signature()
+            .verify_signature(&coverage.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -912,7 +912,7 @@ impl SqliteReceiptStore {
         decision: &SignedLiabilityAutoBindDecision,
     ) -> Result<(), ReceiptStoreError> {
         if !decision
-            .verify_signature()
+            .verify_signature(&decision.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(

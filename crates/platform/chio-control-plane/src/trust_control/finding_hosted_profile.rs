@@ -367,6 +367,10 @@ pub struct FindingHostedCanaryObservation {
 pub type SignedFindingHostedCanaryObservation =
     SignedExportEnvelope<FindingHostedCanaryObservation>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for FindingHostedCanaryObservation {
+    const SCHEMA_ID: &'static str = FINDING_HOSTED_CANARY_OBSERVATION_SCHEMA;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FindingHostedCanaryDecision {
     Promote,
@@ -1208,10 +1212,7 @@ fn evaluate_signed_canary_observation(
     if pinned_signer.algorithm() != SigningAlgorithm::Ed25519
         || pinned_signer.is_weak_ed25519()
         || observation.signer_key != *pinned_signer
-        || !matches!(
-            pinned_signer.verify_canonical_strict(&observation.body, &observation.signature),
-            Ok(true)
-        )
+        || !matches!(observation.verify_signature(pinned_signer), Ok(true))
     {
         return FindingHostedCanaryDecision::Rollback(FindingHostedRollbackReason::Binding);
     }

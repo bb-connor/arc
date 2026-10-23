@@ -235,7 +235,10 @@ fn intent_validation_rejects_unsigned_and_operator_substitution() {
 fn intent_validation_rejects_a_countersigned_forged_source_receipt() {
     let (operator, bond) = config();
     let mut body = submission();
-    body.source_receipt.signature = Keypair::from_seed(&[84; 32]).sign(b"forged source");
+    body.source_receipt.signature = Keypair::from_seed(&[84; 32]).sign_exempt(
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        b"forged source",
+    );
     body.source_receipt_sha256 = chio_finding::signed_envelope_sha256(&body.source_receipt)
         .test_expect("forged source receipt digest");
     body.intent_id = compute_intent_id(&body).test_expect("forged status intent id");

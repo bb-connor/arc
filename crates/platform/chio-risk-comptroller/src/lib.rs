@@ -357,10 +357,14 @@ pub fn validate_risk_report_signature(
         .as_object_mut()
         .ok_or_else(|| claim_failed("risk comptroller report signature payload invalid"))?
         .remove("signature");
-    let verified = public_key
-        .verify_canonical(&signed_value, &signature)
-        .map_err(|_| signature_invalid("risk comptroller report signature invalid"))?;
-    if verified {
+    if chio_core_types::crypto::verify_wrapped(
+        &public_key,
+        RISK_COMPTROLLER_REPORT_SCHEMA_ID,
+        &signed_value,
+        &signature,
+    )
+    .is_ok()
+    {
         Ok(())
     } else {
         Err(signature_invalid(

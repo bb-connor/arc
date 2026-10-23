@@ -1,5 +1,7 @@
-use chio_core::receipt::lineage::{ReceiptLineageStatement, SignedExportEnvelope};
-use serde::{de::DeserializeOwned, Serialize};
+use chio_core::receipt::lineage::{
+    ReceiptLineageStatement, SignedExportEnvelope, SignedExportPayload,
+};
+use serde::de::DeserializeOwned;
 
 use super::*;
 
@@ -17,11 +19,11 @@ pub(crate) fn decode_verified_signed_export<T>(
     raw: &str,
 ) -> Result<SignedExportEnvelope<T>, ReceiptStoreError>
 where
-    T: DeserializeOwned + Serialize + Clone,
+    T: DeserializeOwned + SignedExportPayload + Clone,
 {
     let envelope: SignedExportEnvelope<T> = decode_signed_json(raw)?;
     if !envelope
-        .verify_signature()
+        .verify_signature(&envelope.signer_key)
         .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
     {
         return Err(ReceiptStoreError::Conflict(

@@ -285,10 +285,11 @@ impl SqliteCapabilityAuthority {
             };
             body.chain_digest = budget_snapshot_anchor_chain_digest(&body)
                 .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?;
-            let signature = keypair
-                .sign_canonical(&body)
-                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?
-                .0;
+            let signature = chio_core::CanonicalBytes::from_serializable(&body)
+                .and_then(|canonical| {
+                    keypair.sign_wrapped("chio.budget-snapshot-anchor-commitment.v1", &canonical)
+                })
+                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?;
             let commit_sequence_sqlite = i64::try_from(commit_sequence).map_err(|_| {
                 AuthorityStoreError::Fence(
                     "budget snapshot anchor commitment sequence exceeds SQLite range".to_string(),

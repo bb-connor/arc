@@ -145,8 +145,16 @@ fn signed_json_bytes(mut value: Value, keypair: &Keypair) -> Vec<u8> {
         .as_object_mut()
         .test_expect("signed artifact is an object")
         .remove("signature");
-    let (signature, _) = keypair
-        .sign_canonical(&value)
+    let schema_id = value["schema"]
+        .as_str()
+        .test_expect("signed artifact names its schema")
+        .to_string();
+    let signature = keypair
+        .sign_wrapped(
+            &schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(&value)
+                .test_expect("signed artifact canonicalizes"),
+        )
         .test_expect("signed artifact signs");
     value["signature"] = Value::String(signature.to_hex());
     serde_json::to_vec(&value).test_expect("signed artifact serializes")
@@ -2451,10 +2459,12 @@ fn transparency_anchored_fixture(
         "chain_root": format!("0x{}", chain_root.to_hex())
     });
     let statement_signature = root_key
-        .sign(
-            &chio_core_types::canonical_json_bytes(&statement_body)
+        .sign_wrapped(
+            "chio.checkpoint_statement.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(&statement_body)
                 .test_expect("canonical statement body"),
         )
+        .test_expect("statement signs")
         .to_hex();
 
     let log_id = transparency_checkpoint_log_id();
@@ -2665,10 +2675,12 @@ fn standalone_minimal_passport_rejects_transparency_anchor_from_untrusted_signer
             let mut body = artifact["checkpoint_statement"]["body"].clone();
             body["kernel_key"] = json!(rogue.public_key().to_hex());
             let signature = rogue
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical rogue statement body"),
                 )
+                .test_expect("rogue statement signs")
                 .to_hex();
             artifact["checkpoint_statement"] = json!({
                 "body": body,

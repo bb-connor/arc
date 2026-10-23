@@ -39,7 +39,7 @@ fn http_receipt(verdict: Verdict) -> HttpReceipt {
 
 fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
         .test_unwrap());
     assert!(receipt.action.verify_hash().test_unwrap());
     let directory = chio_test_support::private_tempdir().test_unwrap();

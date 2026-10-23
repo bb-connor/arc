@@ -253,8 +253,16 @@ fn sign_provider_trust_value(value: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("provider trust artifact object")
         .remove("signature");
-    let (signature, _) = commerce_provider_trust_signer()
-        .sign_canonical(value)
+    let schema_id = value["schema"]
+        .as_str()
+        .test_expect("provider trust artifact names its schema")
+        .to_string();
+    let signature = commerce_provider_trust_signer()
+        .sign_wrapped(
+            &schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(value)
+                .test_expect("provider trust artifact canonicalizes"),
+        )
         .test_expect("provider trust artifact signs");
     value["signature"] = serde_json::Value::String(signature.to_hex());
 }
@@ -285,8 +293,12 @@ fn sign_payment_lifecycle_value(payment_lifecycle: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("payment lifecycle object")
         .remove("signature");
-    let (signature, _) = commerce_payment_signer()
-        .sign_canonical(payment_lifecycle)
+    let signature = commerce_payment_signer()
+        .sign_wrapped(
+            "chio.commerce.payment-lifecycle.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(payment_lifecycle)
+                .test_expect("payment lifecycle canonicalizes"),
+        )
         .test_expect("payment lifecycle signs");
     payment_lifecycle["signature"] = serde_json::Value::String(signature.to_hex());
 }

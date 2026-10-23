@@ -14,7 +14,10 @@
 
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::crypto::{Keypair, PublicKey};
-use chio_core_types::receipt::{body::ChioReceipt, lineage::SignedExportEnvelope};
+use chio_core_types::receipt::{
+    body::ChioReceipt,
+    lineage::{SignedExportEnvelope, SignedExportPayload},
+};
 use chio_kernel::ReceiptReadContext;
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +54,10 @@ pub struct RegulatoryReceiptExport {
 
 /// Signed envelope alias for regulatory receipt exports.
 pub type SignedRegulatoryReceiptExport = SignedExportEnvelope<RegulatoryReceiptExport>;
+
+impl SignedExportPayload for RegulatoryReceiptExport {
+    const SCHEMA_ID: &'static str = REGULATORY_RECEIPT_EXPORT_SCHEMA;
+}
 
 /// Query parameters for `GET /regulatory/receipts`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -260,7 +267,7 @@ pub fn verify_regulatory_export(
     // caller can distinguish malformed bodies from bad signatures.
     canonical_json_bytes(&envelope.body).map_err(|e| RegulatoryApiError::Signing(e.to_string()))?;
     envelope
-        .verify_signature()
+        .verify_signature(expected_signer)
         .map_err(|e| RegulatoryApiError::Signing(e.to_string()))
 }
 

@@ -63,11 +63,14 @@ impl KeyringRuntimeComposition {
     ) -> Result<chio_keyring::KeyringSigningResult, CliError> {
         self.ensure_bound_signing_topology()?;
         capability.validate_schema()?;
-        let bytes = chio_core::canonical_json_bytes(&capability.signing_body())?;
+        let wrapper = chio_core::crypto::SigningWrapper::new(
+            chio_core::capability::token::CHIO_CAPABILITY_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&capability.signing_body())?,
+        )?;
         self.router
             .persisted_signing_result_for_artifact(
                 &capability.issuer,
-                &bytes,
+                wrapper.as_bytes(),
                 &capability.signature,
             )
             .map_err(|error| CliError::cli_other_error(error.to_string()))

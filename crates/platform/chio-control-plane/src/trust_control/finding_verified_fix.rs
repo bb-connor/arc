@@ -1374,7 +1374,12 @@ fn signed_nonce(receipt: &ChioReceipt, kernel: &Keypair) -> Result<SignedExecuti
         reserving_request_id: None,
     };
     Ok(SignedExecutionNonce {
-        signature: kernel.sign(&canonical_json_bytes(&nonce).map_err(string_error)?),
+        signature: kernel
+            .sign_wrapped(
+                chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
+                &chio_core::CanonicalBytes::from_serializable(&nonce).map_err(string_error)?,
+            )
+            .map_err(string_error)?,
         nonce,
     })
 }
@@ -1576,7 +1581,10 @@ fn verify_listing(listing: &Listing, profile: &FindingOperatorProfile) -> Result
     )?;
     if listing.listing.signer_key != profile.market.listing.key().map_err(string_error)?
         || listing.pricing.signer_key != listing.listing.signer_key
-        || !listing.pricing.verify_signature().map_err(string_error)?
+        || !listing
+            .pricing
+            .verify_signature(&listing.listing.signer_key)
+            .map_err(string_error)?
     {
         return Err("verified-fix listing authority is invalid".to_owned());
     }

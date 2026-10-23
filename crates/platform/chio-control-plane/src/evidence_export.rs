@@ -607,10 +607,13 @@ pub(crate) fn verify_federation_policy(policy: &FederationPolicyDocument) -> Res
             "federation policy created_at must be less than or equal to expires_at".to_string(),
         ));
     }
-    if !policy
-        .body
-        .signer_public_key
-        .verify_canonical(&policy.body, &policy.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &policy.body.signer_public_key,
+        FEDERATION_POLICY_SCHEMA,
+        &policy.body,
+        &policy.signature,
+    )
+    .is_err()
     {
         return Err(CliError::attest_error(
             "federation policy signature verification failed".to_string(),
@@ -968,7 +971,10 @@ pub fn cmd_evidence_federation_policy_create(
         require_proofs: args.require_proofs,
         purpose: args.purpose.map(ToOwned::to_owned),
     };
-    let (signature, _) = keypair.sign_canonical(&body)?;
+    let signature = keypair.sign_wrapped(
+        FEDERATION_POLICY_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let policy = FederationPolicyDocument { body, signature };
     verify_federation_policy(&policy)?;
     fs::write(args.output, serde_json::to_vec_pretty(&policy)?)?;

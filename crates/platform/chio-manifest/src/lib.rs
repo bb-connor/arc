@@ -28,11 +28,15 @@ pub fn verify_manifest(
     if signed.signer_key != *public_key {
         return Err(ManifestError::VerificationFailed);
     }
-    let valid = public_key.verify_canonical(&signed.manifest, &signed.signature)?;
-    if valid {
-        Ok(())
-    } else {
-        Err(ManifestError::VerificationFailed)
+    match chio_core::crypto::verify_wrapped(
+        public_key,
+        TOOL_MANIFEST_SCHEMA,
+        &signed.manifest,
+        &signed.signature,
+    ) {
+        Ok(()) => Ok(()),
+        Err(chio_core::Error::SignatureRejected) => Err(ManifestError::VerificationFailed),
+        Err(error) => Err(error.into()),
     }
 }
 

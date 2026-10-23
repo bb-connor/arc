@@ -120,7 +120,7 @@ pub(super) fn verify_tool_receipts(
         // Offline evidence accepts classical and hybrid receipt signatures.
         if !record
             .receipt
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(&record.receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
             .map_err(|error| {
                 CliError::attest_error(format!(
                     "tool receipt signature verification failed: {}: {error}",
@@ -199,7 +199,7 @@ pub(super) fn verify_child_receipts(
         // their configured floor before export.
         if !record
             .receipt
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(&record.receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
             .map_err(|error| {
                 CliError::attest_error(format!(
                     "child receipt signature verification failed: {}: {error}",
@@ -433,7 +433,7 @@ pub(super) fn evidence_receipt_semantic_summary(
             && record.receipt.is_allowed()
             && record
                 .receipt
-                .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+                .verify_signature_with_floor(&record.receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
                 .unwrap_or(false)
             && record.receipt.action.verify_hash().unwrap_or(false)
         {

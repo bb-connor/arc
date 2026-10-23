@@ -763,7 +763,10 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
     )?;
     let mut winner = loser.clone();
     winner.body.issued_at = loser.body.issued_at.saturating_add(1_000);
-    winner.signature = keypair.sign(&canonical_json_bytes(&winner.body)?);
+    winner.signature = keypair.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&winner.body)?,
+    )?;
     assert_ne!(loser, winner);
     assert_eq!(loser.body.chain_root, winner.body.chain_root);
 
@@ -840,7 +843,10 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
     let attacker = Keypair::from_seed(&[0x5d; 32]);
     let mut forged = winner.clone();
     forged.body.kernel_key = attacker.public_key();
-    forged.signature = attacker.sign(&canonical_json_bytes(&forged.body)?);
+    forged.signature = attacker.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&forged.body)?,
+    )?;
     chio_kernel::checkpoint::validate_checkpoint(&forged)?;
     chio_kernel::checkpoint::validate_checkpoint_predecessor(&checkpoint_one, &forged)?;
     assert_eq!(forged.body.batch_start_seq, winner.body.batch_start_seq);

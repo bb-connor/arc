@@ -5,7 +5,8 @@
 //! cost attribution, and the overall outcome.
 
 use chio_core::capability::scope::MonetaryAmount;
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
+use chio_core::CanonicalBytes;
 use serde::{Deserialize, Serialize};
 
 /// Schema identifier for workflow receipts.
@@ -181,7 +182,10 @@ pub enum StepOutcome {
 impl WorkflowReceipt {
     /// Sign a workflow receipt body.
     pub fn sign(body: WorkflowReceiptBody, keypair: &Keypair) -> Result<Self, chio_core::Error> {
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            WORKFLOW_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             schema: body.schema,
@@ -228,8 +232,16 @@ impl WorkflowReceipt {
         if self.schema != WORKFLOW_RECEIPT_SCHEMA {
             return Ok(false);
         }
-        self.kernel_key
-            .verify_canonical(&self.body(), &self.signature)
+        match verify_wrapped(
+            &self.kernel_key,
+            WORKFLOW_RECEIPT_SCHEMA,
+            &self.body(),
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core::Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     /// Add a detached vendor co-signature over the canonical workflow body.
@@ -238,8 +250,8 @@ impl WorkflowReceipt {
         vendor_id: impl Into<String>,
         keypair: &Keypair,
     ) -> Result<(), WorkflowReceiptError> {
-        let (signature, _) = keypair
-            .sign_canonical(&self.body())
+        let signature = CanonicalBytes::from_serializable(&self.body())
+            .and_then(|canonical| keypair.sign_wrapped(WORKFLOW_RECEIPT_SCHEMA, &canonical))
             .map_err(|e| WorkflowReceiptError::Crypto(e.to_string()))?;
         self.vendor_signatures.push(WorkflowVendorSignature {
             vendor_id: vendor_id.into(),
@@ -268,10 +280,16 @@ impl WorkflowReceipt {
                     requirement.vendor_id.clone(),
                 ));
             }
-            let verified = signature
-                .public_key
-                .verify_canonical(&body, &signature.signature)
-                .map_err(|e| WorkflowReceiptError::Crypto(e.to_string()))?;
+            let verified = match verify_wrapped(
+                &signature.public_key,
+                WORKFLOW_RECEIPT_SCHEMA,
+                &body,
+                &signature.signature,
+            ) {
+                Ok(()) => true,
+                Err(chio_core::Error::SignatureRejected) => false,
+                Err(e) => return Err(WorkflowReceiptError::Crypto(e.to_string())),
+            };
             if !verified {
                 return Err(WorkflowReceiptError::InvalidVendorSignature(
                     requirement.vendor_id.clone(),
@@ -529,7 +547,10 @@ mod tests {
             Err(WorkflowReceiptError::MissingVendorSignature(id)) if id == "vendor-b"
         ));
 
-        receipt.vendor_signatures[0].signature = vendor_b.sign(b"not the workflow body");
+        receipt.vendor_signatures[0].signature = vendor_b.sign_exempt(
+            chio_core::crypto::ExemptFormat::JwsSigningInput,
+            b"not the workflow body",
+        );
         assert!(matches!(
             receipt.verify_vendor_signatures(&required),
             Err(WorkflowReceiptError::InvalidVendorSignature(id)) if id == "vendor-a"

@@ -931,9 +931,13 @@ fn verify_budget_snapshot_anchor_provenance<'a>(
         }
         let signer = PublicKey::from_hex(&body.signer_public_key)
             .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-        if !signer
-            .verify_canonical(body, &signed.signature)
-            .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?
+        if chio_core::crypto::verify_wrapped(
+            &signer,
+            "chio.budget-snapshot-anchor-commitment.v1",
+            body,
+            &signed.signature,
+        )
+        .is_err()
         {
             return Err(BudgetStoreError::Invariant(
                 "budget snapshot anchor provenance signature is invalid".to_string(),

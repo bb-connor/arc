@@ -121,7 +121,17 @@ fn signed_value_with_key(mut value: Value, keypair: &Keypair) -> Value {
         .as_object_mut()
         .test_expect("signed artifact is an object")
         .remove("signature");
-    let (signature, _) = keypair.sign_canonical(&value).test_expect("artifact signs");
+    let schema_id = value["schema"]
+        .as_str()
+        .test_expect("signed artifact names its schema")
+        .to_string();
+    let signature = keypair
+        .sign_wrapped(
+            &schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(&value)
+                .test_expect("artifact canonicalizes"),
+        )
+        .test_expect("artifact signs");
     value["signature"] = Value::String(format!(
         "sig-ed25519:{}:{}",
         keypair.public_key().to_hex(),

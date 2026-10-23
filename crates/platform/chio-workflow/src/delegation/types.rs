@@ -1,7 +1,8 @@
 use super::{DelegationError as Error, Result};
 use chio_core::{
     canonical_json_bytes,
-    crypto::{sha256_hex, Keypair, PublicKey, Signature},
+    crypto::{sha256_hex, verify_wrapped_bytes, Keypair, PublicKey, Signature},
+    CanonicalBytes,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -230,7 +231,9 @@ pub struct Signed<T> {
 impl<T: Serialize + sealed::Body> Signed<T> {
     pub fn sign(body: T, key: &Keypair) -> Result<Self> {
         let signer = key.public_key();
-        let signature = key.sign(&signing_message::<T>(&body, &signer)?);
+        let signature = key
+            .sign_wrapped(T::DOMAIN, &signing_body::<T>(&body, &signer)?)
+            .map_err(|e| Error::Invalid(e.to_string()))?;
         Ok(Self {
             body,
             signer,
@@ -238,17 +241,37 @@ impl<T: Serialize + sealed::Body> Signed<T> {
         })
     }
     pub fn verify(&self) -> Result<()> {
-        if !self.signer.verify_strict(
-            &signing_message::<T>(&self.body, &self.signer)?,
+        if verify_wrapped_bytes(
+            &self.signer,
+            T::DOMAIN,
+            &signing_body::<T>(&self.body, &self.signer)?,
             &self.signature,
-        ) {
+        )
+        .is_err()
+        {
             return Err(Error::Signature);
         }
         Ok(())
     }
 }
-fn signing_message<T: Serialize + sealed::Body>(body: &T, signer: &PublicKey) -> Result<Vec<u8>> {
-    canonical(&(T::DOMAIN, signer, body))
+#[derive(Serialize)]
+struct SignedBody<'a, T> {
+    body: &'a T,
+    signer: &'a PublicKey,
+}
+
+/// Canonical `{"body": body, "signer": signer}`; the wrapper binds it to the
+/// body type's schema id.
+fn signing_body<T: Serialize + sealed::Body>(
+    body: &T,
+    signer: &PublicKey,
+) -> Result<CanonicalBytes> {
+    let canonical = CanonicalBytes::from_serializable(&SignedBody { body, signer })
+        .map_err(|e| Error::Invalid(e.to_string()))?;
+    if canonical.len() > MAX_ENVELOPE_BYTES {
+        return invalid("envelope byte limit");
+    }
+    Ok(canonical)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

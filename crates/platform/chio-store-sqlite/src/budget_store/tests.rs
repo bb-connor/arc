@@ -660,7 +660,12 @@ fn elected_leader_provenance_bootstraps_a_fresh_follower() {
         signer_public_key: keypair.public_key().to_hex(),
     };
     body.chain_digest = budget_snapshot_anchor_chain_digest(&body).unwrap();
-    let signature = keypair.sign_canonical(&body).unwrap().0;
+    let signature = keypair
+        .sign_wrapped(
+            "chio.budget-snapshot-anchor-commitment.v1",
+            &chio_core::CanonicalBytes::from_serializable(&body).unwrap(),
+        )
+        .unwrap();
     let chain = vec![SignedBudgetSnapshotAnchorCommitment { body, signature }];
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
@@ -718,7 +723,12 @@ fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
     };
     body.chain_digest = budget_snapshot_anchor_chain_digest(&body).unwrap();
     let chain = vec![SignedBudgetSnapshotAnchorCommitment {
-        signature: keypair.sign_canonical(&body).unwrap().0,
+        signature: keypair
+            .sign_wrapped(
+                "chio.budget-snapshot-anchor-commitment.v1",
+                &chio_core::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap(),
         body,
     }];
     let provenance = BudgetSnapshotAnchorProvenance {

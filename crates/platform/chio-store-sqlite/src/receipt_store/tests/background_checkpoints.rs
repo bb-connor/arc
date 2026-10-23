@@ -386,8 +386,12 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
     let receipt_bytes = canonical_receipt_bytes(&store, 1, max_batch);
     let mut external = build_checkpoint(1, 1, max_batch, &receipt_bytes, &keypair)?;
     external.body.issued_at = external.body.issued_at.saturating_add(1_000);
-    let body_bytes = canonical_json_bytes(&external.body).test_unwrap();
-    external.signature = keypair.sign(&body_bytes);
+    external.signature = keypair
+        .sign_wrapped(
+            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&external.body).test_unwrap(),
+        )
+        .test_unwrap();
     store.store_checkpoint(&external)?;
 
     // "Instance A" holds a STALE head: its pre-check ran before B committed, so
@@ -611,8 +615,12 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
     // point at a digest that is NOT cp1's, then re-sign so the body/signature
     // still verify (same mechanics as the clock-skew re-sign fixtures).
     disconnected_two.body.previous_checkpoint_sha256 = Some("00".repeat(32));
-    let body_bytes = canonical_json_bytes(&disconnected_two.body).test_unwrap();
-    disconnected_two.signature = keypair.sign(&body_bytes);
+    disconnected_two.signature = keypair
+        .sign_wrapped(
+            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&disconnected_two.body).test_unwrap(),
+        )
+        .test_unwrap();
     insert_checkpoint_row(
         &bad_store,
         &disconnected_two,
@@ -868,8 +876,12 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     let receipt_bytes = canonical_receipt_bytes(&store, 1, max_batch);
     let mut loser = build_checkpoint(1, 1, max_batch, &receipt_bytes, &keypair)?;
     loser.body.issued_at = winner.body.issued_at.saturating_add(1_000);
-    let body_bytes = canonical_json_bytes(&loser.body).test_unwrap();
-    loser.signature = keypair.sign(&body_bytes);
+    loser.signature = keypair
+        .sign_wrapped(
+            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&loser.body).test_unwrap(),
+        )
+        .test_unwrap();
     assert_ne!(loser.body.issued_at, winner.body.issued_at);
     assert_ne!(loser, winner);
 
@@ -1124,7 +1136,10 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         .issued_at
         .checked_sub(1)
         .ok_or("checkpoint timestamp must permit a distinct predecessor")?;
-    replacement.signature = keypair.sign(&canonical_json_bytes(&replacement.body)?);
+    replacement.signature = keypair.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&replacement.body)?,
+    )?;
     chio_kernel::checkpoint::validate_checkpoint(&replacement)?;
     assert!(
         chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &checkpoint_two)
@@ -1207,7 +1222,10 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
     replacement_two.body.previous_checkpoint_sha256 = Some(
         chio_kernel::checkpoint::checkpoint_body_sha256(&replacement.body)?,
     );
-    replacement_two.signature = keypair.sign(&canonical_json_bytes(&replacement_two.body)?);
+    replacement_two.signature = keypair.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&replacement_two.body)?,
+    )?;
     chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &replacement_two)?;
     let replacement_two_json = serde_json::to_string(&replacement_two.body)?;
     let replacement_two_signature = replacement_two.signature.to_hex();
@@ -1355,7 +1373,10 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
         .issued_at
         .checked_sub(1)
         .ok_or("checkpoint timestamp must permit a distinct predecessor")?;
-    replacement_one.signature = keypair.sign(&canonical_json_bytes(&replacement_one.body)?);
+    replacement_one.signature = keypair.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&replacement_one.body)?,
+    )?;
     chio_kernel::checkpoint::validate_checkpoint(&replacement_one)?;
 
     let replacement_one_json = serde_json::to_string(&replacement_one.body)?;
