@@ -2171,6 +2171,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         "chio.proof-room.receipt-projection.v1",
         Some(("proof_room_receipt_projection", "signing-wrapper-v1")),
     ),
+    (
+        "chio.behavioral-feed.v1",
+        Some(("behavioral_feed", "signing-wrapper-v1")),
+    ),
 ];
 
 #[allow(
