@@ -13,7 +13,7 @@ use chio_attest_loopback::{
 };
 use chio_core_types::merkle::MerkleTree;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_core_types::{canonical_json_bytes, sha256_hex, Keypair, SigningAlgorithm};
+use chio_core_types::{canonical_json_bytes, sha256_hex, CanonicalBytes, Keypair};
 use chio_federation::{
     pheromone_gossip::verify_pheromone_gossip_frame, pheromone_gossip::PheromoneDepositGossip,
     pheromone_gossip::PheromoneGossipBatch, pheromone_gossip::PheromoneTransitChain,
@@ -132,7 +132,10 @@ fn execute_command(command: Command) -> Result<(), ChioPackageError> {
             let body: serde_json::Value = serde_json::from_str(&body_json)
                 .map_err(|error| ChioPackageError::Json(error.to_string()))?;
             let runtime_issuer_key = Keypair::from_seed(&[42; 32]);
-            let signed = SignedExportEnvelope::sign(body, &runtime_issuer_key)
+            let signed = SignedExportEnvelope::sign(
+                chio_pheromone_runtime::RuntimeTransitPolicyDocument(body),
+                &runtime_issuer_key,
+            )
                 .map_err(|error| ChioPackageError::Json(error.to_string()))?;
             write_json(out, &signed)?;
         }
@@ -524,7 +527,10 @@ fn write_pheromone_fixtures(
     let mut policy_document = transit_policy_document(&policy, &validation_context)?;
     seal_runtime_policy_document_hashes(&mut policy_document, &runtime_issuer_key)?;
     let signed_policy_document =
-        SignedExportEnvelope::sign(policy_document.clone(), &runtime_issuer_key)
+        SignedExportEnvelope::sign(
+            chio_pheromone_runtime::RuntimeTransitPolicyDocument(policy_document.clone()),
+            &runtime_issuer_key,
+        )
             .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     let (loaded_policy, receiver_config) = runtime_policy_from_json(
         &serde_json::to_string(&signed_policy_document)
@@ -724,8 +730,11 @@ fn seal_runtime_policy_document_hashes(
         root["runtimePolicySha256"] = serde_json::json!(runtime_policy_sha256);
         let parsed: PheromoneObservationCostVerifierRoot = serde_json::from_value(root.clone())
             .map_err(|error| ChioPackageError::Json(error.to_string()))?;
-        let (signature, _) = runtime_issuer_key
-            .sign_canonical(&parsed.body)
+        let signature = CanonicalBytes::from_serializable(&parsed.body)
+            .and_then(|canonical| {
+                runtime_issuer_key
+                    .sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
+            })
             .map_err(|error| ChioPackageError::Json(error.to_string()))?;
         root["issuerSignature"] = serde_json::json!(signature.to_hex());
     }
@@ -755,7 +764,6 @@ fn observation_cost_verifier_root(
         verifier_id: "did:chio:dataco-cost-verifier".to_string(),
         verifier_key_id: "cost-root-key-1".to_string(),
         public_key: verifier_key.public_key(),
-        signature_algorithm: SigningAlgorithm::Ed25519,
         valid_from_unix_ms: generated_at_unix_ms.saturating_sub(60_000),
         valid_until_unix_ms: generated_at_unix_ms.saturating_add(60_000),
         allowed_treaties: vec!["treaty:buyer-dataco:support-ops".to_string()],
@@ -764,8 +772,10 @@ fn observation_cost_verifier_root(
         runtime_policy_sha256: runtime_policy_sha256.to_string(),
         issuer_kernel_id: "did:chio:dataco-runtime".to_string(),
     };
-    let (issuer_signature, _) = runtime_issuer_key
-        .sign_canonical(&body)
+    let issuer_signature = CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            runtime_issuer_key.sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
+        })
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     Ok(PheromoneObservationCostVerifierRoot {
         body,
@@ -841,8 +851,10 @@ fn signed_cost_commitment(
             .map_err(|error| ChioPackageError::Json(error.to_string()))?,
         leaf_preimage_sha256: sha256_hex(&leaf_bytes),
     };
-    let (signature, _) = verifier_key
-        .sign_canonical(&statement)
+    let signature = CanonicalBytes::from_serializable(&statement)
+        .and_then(|canonical| {
+            verifier_key.sign_wrapped(PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA, &canonical)
+        })
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     Ok(PheromoneCostCommitment {
         schema: PHEROMONE_COST_COMMITMENT_SCHEMA.to_string(),
