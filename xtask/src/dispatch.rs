@@ -15,6 +15,7 @@ use crate::launch_acceptance;
 use crate::proof_coverage;
 use crate::qualify;
 use crate::recovery_authority_vectors;
+use crate::signed_fixtures;
 use crate::XtaskError;
 use crate::{crate_paths, eval_receipt_regen};
 use crate::{errors_regen, freeze_vectors, run_codegen, run_snippets, validate_scenarios};
@@ -37,6 +38,10 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
                 recovery_authority_vectors::run(check)
             }
             GenCommand::BrokerReceiptVectors { check } => broker_receipt_vectors::run(check),
+            GenCommand::SignedFixtures {
+                check,
+                require_complete,
+            } => signed_fixtures::run(check, require_complete),
         },
         // -- check group --
         cli::Command::Check { command } => match command {
