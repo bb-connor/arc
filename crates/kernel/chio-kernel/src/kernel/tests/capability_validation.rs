@@ -1077,6 +1077,15 @@ fn untrusted_issuer_denied() {
         reason.contains("not found among trusted") || reason.contains("not a trusted CA"),
         "reason was: {reason}"
     );
+    assert_eq!(
+        response.receipt.kernel_key,
+        kernel.receipt_signing_public_key().unwrap()
+    );
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
+    assert!(matches!(
+        response.receipt.decision,
+        Some(chio_core::receipt::decision::Decision::Deny { .. })
+    ));
 }
 
 #[test]
