@@ -407,11 +407,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "fiscal persistence surface; capped to current size until split",
         max_lines=2_931,
     ),
-    "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs": allow(
-        "2026-12-31",
-        "serving-owner commit chain persistence surface; capped to current size until split",
-        max_lines=2_554,
-    ),
     "crates/products/chio-cli/src/cli/dispatch/finding/unit_tests.rs": allow(
         "2026-11-30",
         "cognition-market CLI regression suite with status trust-input migration coverage; capped to current size until split",
