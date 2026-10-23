@@ -584,6 +584,20 @@
       "title": "Chio finding voluntary retraction receipt signed body"
     },
     {
+      "schema": "chio.finding.worker-attested-result.v1",
+      "artifactKind": "finding_worker_attested_result",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/worker-attested-result.schema.json",
+      "title": "Chio finding worker attested result signed body"
+    },
+    {
+      "schema": "chio.finding.worker-capability.v1",
+      "artifactKind": "finding_worker_capability",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/worker-capability.schema.json",
+      "title": "Chio finding worker capability signed body"
+    },
+    {
       "schema": "chio.frost.dkg-package.v1",
       "artifactKind": "frost_dkg_package",
       "introducedBy": "signing-wrapper-v1",
