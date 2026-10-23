@@ -112,11 +112,6 @@ pub fn frontier_digest(graph: &LineageGraph) -> FrontierDigest {
     }
 }
 
-/// Bytes that lineage frontier signatures cover.
-///
-/// This is domain-separated from the raw frontier digest so the same key
-/// cannot accidentally authenticate another Chio payload shape.
-#[must_use]
 /// Canonical body the frontier signature wraps: the hex frontier bytes.
 pub fn frontier_signature_body(graph: &LineageGraph) -> Result<CanonicalBytes, AnchorError> {
     use std::fmt::Write as _;
