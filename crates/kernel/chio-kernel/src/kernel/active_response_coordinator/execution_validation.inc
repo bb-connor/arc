@@ -420,11 +420,16 @@ fn verify_active_response_record_readback(
     Ok(snapshot)
 }
 
-fn verify_active_response_completion_receipt(
+pub(super) fn verify_active_response_completion_receipt(
     request: &ActiveResponseExecutionRequest,
     evidence: &ActiveResponseExecutionEvidence,
 ) -> Result<ActiveDefenseReceiptBody, KernelError> {
     let receipt = evidence.completion_receipt();
+    if &receipt.kernel_key != request.executor_subject() {
+        return Err(active_response_internal(
+            "active-response completion receipt signer is not the executor",
+        ));
+    }
     let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         active_response_internal(format!(
             "active-response completion receipt signature failed: {error}"
@@ -480,7 +485,6 @@ fn verify_active_response_completion_receipt(
         "occurred_at_unix_ms": active_body.header().occurred_at_unix_ms,
     });
     if !signature_valid
-        || &receipt.kernel_key != request.executor_subject()
         || receipt.capability_id != "chio.active-defense.system"
         || receipt.tool_server != "chio.kernel"
         || receipt.tool_name != active_body.kind().as_str()
@@ -527,6 +531,22 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
             "executor receipt validation requires a completed governed operation",
         ));
     }
+    let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
+        receipt.kernel_key.clone(),
+        anchor.executor_authority_generation,
+    )
+    .map_err(|error| {
+        active_response_internal(format!(
+            "active-response terminal executor identity is invalid: {error}"
+        ))
+    })?;
+    if executor_identity.authority_id() != anchor.executor_authority_id.as_str()
+        || executor_identity.authority_id() != operation.coordinator_authority_id()
+    {
+        return Err(active_response_internal(
+            "active-response terminal executor signer is not the anchored executor authority",
+        ));
+    }
     let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         active_response_internal(format!(
             "active-response terminal executor signature failed: {error}"
@@ -564,15 +584,6 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
         active_response_internal(
             "active-response terminal executor proof lacks its governed dispatch binding",
         )
-    })?;
-    let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
-        receipt.kernel_key.clone(),
-        anchor.executor_authority_generation,
-    )
-    .map_err(|error| {
-        active_response_internal(format!(
-            "active-response terminal executor identity is invalid: {error}"
-        ))
     })?;
     let evidence_id = active_body.evidence_id().map_err(|error| {
         active_response_internal(format!(
@@ -645,8 +656,6 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
         || execution_dispatch.admission_artifact_fingerprint
             != anchor.admission_artifact_fingerprint
         || execution_dispatch.dispatch_id != expected_dispatch_id
-        || executor_identity.authority_id() != operation.coordinator_authority_id()
-        || executor_identity.authority_id() != anchor.executor_authority_id.as_str()
         || execution_dispatch.executor_authority_id.as_str() != operation.coordinator_authority_id()
         || execution_dispatch.executor_authority_generation != anchor.executor_authority_generation
         || digest_hex(&execution_dispatch.authorization_capability_hash)

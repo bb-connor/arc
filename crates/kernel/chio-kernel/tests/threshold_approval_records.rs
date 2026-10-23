@@ -415,3 +415,29 @@ fn later_surplus_votes_preserve_the_original_quorum_time() -> TestResult {
     assert_eq!(record.votes().len(), 3);
     Ok(())
 }
+
+#[test]
+fn a_vote_validly_self_signed_by_an_ineligible_key_is_refused() -> TestResult {
+    let fixture = Fixture::new()?;
+    let outsider = Keypair::from_seed(&[93; 32]);
+    let token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "outsider-vote".into(),
+            approver: outsider.public_key(),
+            subject: fixture.parameters.subject.clone(),
+            governed_intent_hash: fixture.parameters.governed_intent_hash.clone(),
+            request_id: fixture.parameters.matched_request.request_id().into(),
+            threshold_proposal_hash: Some(fixture.registration.proposal().proposal_hash()?),
+            issued_at: 110,
+            expires_at: 180,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &outsider,
+    )?;
+    assert!(matches!(
+        ThresholdApprovalVoteRecord::validate_new(&fixture.registration, token, 110, false),
+        Err(ApprovalStoreError::Invalid(message))
+            if message == "approval token signer is not policy-eligible"
+    ));
+    Ok(())
+}

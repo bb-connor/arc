@@ -81,6 +81,16 @@ pub fn build_observation(
     receipt: &ChioReceipt,
     trusted_kernel_keys: &[PublicKey],
 ) -> SettlementObservationBuild {
+    if trusted_kernel_keys.is_empty()
+        || !trusted_kernel_keys
+            .iter()
+            .any(|trusted| trusted == &receipt.kernel_key)
+    {
+        return permanent(
+            SettlementFailureCode::UntrustedReceiptSigner,
+            "receipt signer is not trusted",
+        );
+    }
     match receipt.verify_integrity_embedded_key() {
         Ok(true) => {}
         Ok(false) => {
@@ -107,16 +117,6 @@ pub fn build_observation(
         Err(error) => {
             return permanent(SettlementFailureCode::InvalidActionHash, error.to_string());
         }
-    }
-    if trusted_kernel_keys.is_empty()
-        || !trusted_kernel_keys
-            .iter()
-            .any(|trusted| trusted == &receipt.kernel_key)
-    {
-        return permanent(
-            SettlementFailureCode::UntrustedReceiptSigner,
-            "receipt signer is not trusted",
-        );
     }
     let metadata = receipt.metadata.as_ref();
     let channelized = if let Some(channel_value) = metadata.and_then(|value| value.get("channel")) {
@@ -638,6 +638,26 @@ mod tests {
             SettlementObservationBuild::Permanent(ref reason)
                 if reason.code() == SettlementFailureCode::UntrustedReceiptSigner
         ));
+    }
+
+    #[test]
+    fn build_observation_refuses_a_receipt_self_signed_by_an_untrusted_kernel_first() {
+        let trusted = [Keypair::from_seed(&[94; 32]).public_key()];
+        let receipt = sign_with(
+            serde_json::json!({
+                "financial": {"cost_charged": 250, "currency": "USD"}
+            }),
+            Decision::Allow,
+        );
+        let mut tampered = receipt.clone();
+        tampered.tool_name = "tampered".to_string();
+        for presented in [&receipt, &tampered] {
+            assert!(matches!(
+                build_observation(presented, &trusted),
+                SettlementObservationBuild::Permanent(ref reason)
+                    if reason.code() == SettlementFailureCode::UntrustedReceiptSigner
+            ));
+        }
     }
 
     #[test]

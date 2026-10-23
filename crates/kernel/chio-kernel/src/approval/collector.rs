@@ -533,14 +533,6 @@ impl ThresholdApprovalVoteRecord {
                 "approval token signing algorithm is inconsistent".to_string(),
             ));
         }
-        if !token
-            .verify_integrity_embedded_key()
-            .map_err(|error| invalid(format!("approval token signature failed: {error}")))?
-        {
-            return Err(invalid(
-                "approval token signature did not verify".to_string(),
-            ));
-        }
         let approver_fingerprint = token.approver.to_hex();
         if !registration
             .eligible_approvers
@@ -549,6 +541,14 @@ impl ThresholdApprovalVoteRecord {
         {
             return Err(invalid(
                 "approval token signer is not policy-eligible".to_string(),
+            ));
+        }
+        if !token
+            .verify_integrity_embedded_key()
+            .map_err(|error| invalid(format!("approval token signature failed: {error}")))?
+        {
+            return Err(invalid(
+                "approval token signature did not verify".to_string(),
             ));
         }
         if registration.separation_of_duties

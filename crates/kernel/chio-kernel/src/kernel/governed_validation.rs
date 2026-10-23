@@ -792,6 +792,17 @@ impl ChioKernel {
                 "governed call_chain continuation token is malformed: {error}"
             ))
         })? {
+            let signer_matches_capability_lineage = cap
+                .delegation_chain
+                .last()
+                .is_some_and(|link| link.delegator == continuation_token.signer);
+            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
+                && !signer_matches_capability_lineage
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token signer is not trusted".to_string(),
+                ));
+            }
             let signature_valid =
                 continuation_token
                     .verify_integrity_embedded_key()
@@ -824,17 +835,6 @@ impl ChioKernel {
                 ));
             }
 
-            let signer_matches_capability_lineage = cap
-                .delegation_chain
-                .last()
-                .is_some_and(|link| link.delegator == continuation_token.signer);
-            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
-                && !signer_matches_capability_lineage
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "governed call_chain continuation token signer is not trusted".to_string(),
-                ));
-            }
             if continuation_token.chain_id != call_chain.chain_id {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed call_chain continuation token chain_id does not match the asserted call_chain".to_string(),
@@ -1013,6 +1013,17 @@ impl ChioKernel {
             return Ok(None);
         };
 
+        let Some(expected_signer) = cap.delegation_chain.last().map(|link| &link.delegator) else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof requires a delegated capability lineage"
+                    .to_string(),
+            ));
+        };
+        if upstream_proof.signer != *expected_signer {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof signer does not match the validated capability delegation source".to_string(),
+            ));
+        }
         let signature_valid = upstream_proof
             .verify_integrity_embedded_key()
             .map_err(|error| {
@@ -1037,17 +1048,6 @@ impl ChioKernel {
             ));
         }
 
-        let Some(expected_signer) = cap.delegation_chain.last().map(|link| &link.delegator) else {
-            return Err(KernelError::GovernedTransactionDenied(
-                "governed call_chain upstream proof requires a delegated capability lineage"
-                    .to_string(),
-            ));
-        };
-        if upstream_proof.signer != *expected_signer {
-            return Err(KernelError::GovernedTransactionDenied(
-                "governed call_chain upstream proof signer does not match the validated capability delegation source".to_string(),
-            ));
-        }
         if upstream_proof.chain_id != call_chain.chain_id {
             return Err(KernelError::GovernedTransactionDenied(
                 "governed call_chain upstream proof chain_id does not match the asserted call_chain".to_string(),

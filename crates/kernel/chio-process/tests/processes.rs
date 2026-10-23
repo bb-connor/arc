@@ -232,33 +232,46 @@ fn prepared_invocations_survive_reopen_without_reissuing_and_share_storage_limit
     Ok(())
 }
 
+#[test]
+fn a_root_capability_self_signed_by_an_untrusted_issuer_is_refused() -> Result {
+    let dir = tempfile::tempdir()?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel(dir.path(), server(&calls))?;
+    let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
+    let mut capability =
+        kernel.issue_capability(&parent_key().public_key(), scope(&["append", "read"]), 3600)?;
+    let other = Keypair::generate();
+    capability.issuer = other.public_key();
+    capability.signature = other.sign_wrapped(
+        chio_core_types::capability::token::CHIO_CAPABILITY_SCHEMA,
+        &chio_core_types::canonical::CanonicalBytes::from_serializable(&capability.signing_body())?,
+    )?;
+    assert!(matches!(
+        runtime.create_root("root", &capability, support::limits(2)),
+        Err(ProcessError::Invalid(
+            "capability issuer is not trusted by the kernel"
+        ))
+    ));
+    assert!(matches!(
+        runtime.process("root"),
+        Err(ProcessError::NotFound(_))
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 #[tokio::test]
 async fn invalid_process_lineage_produces_attributed_signed_denials_without_dispatch() -> Result {
-    for refusal in [
-        "expired",
-        "revoked_leaf",
-        "revoked_parent",
-        "untrusted_leaf",
-    ] {
+    for refusal in ["expired", "revoked_leaf", "revoked_parent"] {
         let dir = tempfile::tempdir()?;
         let calls = Arc::new(AtomicUsize::new(0));
         let kernel = kernel(dir.path(), server(&calls))?;
         let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
-        let mut capability = kernel.issue_capability(
+        let capability = kernel.issue_capability(
             &parent_key().public_key(),
             scope(&["append", "read"]),
             3600,
         )?;
-        if refusal == "untrusted_leaf" {
-            let other = Keypair::generate();
-            capability.issuer = other.public_key();
-            capability.signature = other.sign_wrapped(
-                chio_core_types::capability::token::CHIO_CAPABILITY_SCHEMA,
-                &chio_core_types::canonical::CanonicalBytes::from_serializable(
-                    &capability.signing_body(),
-                )?,
-            )?;
-        }
         runtime.create_root("root", &capability, support::limits(2))?;
         let process_id = if refusal == "revoked_parent" {
             let delegated = child(
