@@ -1217,8 +1217,8 @@ mod tests {
             kernel_id: kernel_id.to_string(),
             passport_public_key: passport.public_key(),
             transport_endpoint_id: transport,
-            passport_endorsement: passport
-                sign_transport_endorsement(&, kernel_id, &transport).unwrap(),
+            passport_endorsement: sign_transport_endorsement(&passport, kernel_id, &transport)
+                .unwrap(),
             revocation_signers: Vec::new(),
             removed,
         };
@@ -1243,7 +1243,8 @@ mod tests {
             .sign_wrapped(
                 crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
                 &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,

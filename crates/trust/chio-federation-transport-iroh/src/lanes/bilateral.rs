@@ -52,7 +52,7 @@
 //! maps 1:1 as opaque bytes and is NEVER re-derived server-side (ADAPTER-SPEC 4.2:
 //! sign/verify the exact bytes received).
 
-use chio_core_types::crypto::{ExemptFormat, SigningMessage, verify_exempt};
+use chio_core_types::crypto::{verify_exempt, ExemptFormat, SigningMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -748,14 +748,24 @@ impl BilateralCoSignHandler {
         // Verify Org B's signature over the exact pae_bytes against the
         // directory-bound key (above iroh; the pinned map having been proven to
         // match it).
-        if verify_exempt(&directory_key, ExemptFormat::DssePae, &request.pae_bytes, &request.org_b_signature).is_err() {
+        if verify_exempt(
+            &directory_key,
+            ExemptFormat::DssePae,
+            &request.pae_bytes,
+            &request.org_b_signature,
+        )
+        .is_err()
+        {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
 
         // Success: sign the SAME opaque pae_bytes (never re-derived).
         let backend = Ed25519Backend::new(self.origin_keypair.clone());
         let signature = backend
-            .sign_bytes(SigningMessage::exempt(ExemptFormat::DssePae, &request.pae_bytes))
+            .sign_bytes(SigningMessage::exempt(
+                ExemptFormat::DssePae,
+                &request.pae_bytes,
+            ))
             .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
         Ok(DsseCoSigningResponse {
             schema: BILATERAL_DSSE_COSIGNING_SCHEMA.to_string(),
@@ -921,7 +931,12 @@ mod tests {
                 kernel_id: self.kernel_id.clone(),
                 passport_public_key: self.passport.public_key(),
                 transport_endpoint_id: self.transport_id,
-                passport_endorsement: sign_transport_endorsement(&self.passport, &self.kernel_id, &self.transport_id, ).unwrap(),
+                passport_endorsement: sign_transport_endorsement(
+                    &self.passport,
+                    &self.kernel_id,
+                    &self.transport_id,
+                )
+                .unwrap(),
                 revocation_signers: Vec::new(),
                 removed: false,
             }
@@ -952,7 +967,8 @@ mod tests {
             .sign_wrapped(
                 crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
                 &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1079,7 +1095,8 @@ mod tests {
             ExemptFormat::DssePae,
             b"other bytes",
             &response.org_a_signature,
-        ).is_err());
+        )
+        .is_err());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1155,7 +1172,9 @@ mod tests {
 
         // Org B is admitted as `did:chio:org-b`, but CLAIMS to be someone else.
         let pae_bytes = b"pae for a spoofed org_b".to_vec();
-        let org_b_signature = org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes);
+        let org_b_signature = org_b
+            .passport
+            .sign_exempt(ExemptFormat::DssePae, &pae_bytes);
         let request = DsseCoSigningRequest::new(
             ORIGIN_KERNEL.to_string(),
             "did:chio:evil-impersonator".to_string(),
@@ -1185,7 +1204,9 @@ mod tests {
         // The signature is over DIFFERENT bytes than the pae_bytes carried, so the
         // server's verify(pae_bytes, org_b_signature) fails.
         let pae_bytes = b"the bytes org a is asked to co-sign".to_vec();
-        let wrong_signature = org_b.passport.sign_exempt(ExemptFormat::DssePae, b"a different message entirely");
+        let wrong_signature = org_b
+            .passport
+            .sign_exempt(ExemptFormat::DssePae, b"a different message entirely");
         let request = DsseCoSigningRequest::new(
             ORIGIN_KERNEL.to_string(),
             org_b.kernel_id.clone(),
@@ -1241,7 +1262,9 @@ mod tests {
             "did:chio:some-other-origin".to_string(),
             org_b.kernel_id.clone(),
             pae_bytes.clone(),
-            org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes),
+            org_b
+                .passport
+                .sign_exempt(ExemptFormat::DssePae, &pae_bytes),
         );
         assert_eq!(
             handler.cosign(&org_b.transport_id, &request),
@@ -1270,7 +1293,9 @@ mod tests {
             "did:chio:some-other-origin".to_string(),
             org_b.kernel_id.clone(),
             pae_bytes.clone(),
-            org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes),
+            org_b
+                .passport
+                .sign_exempt(ExemptFormat::DssePae, &pae_bytes),
         );
 
         let before =
@@ -1310,7 +1335,9 @@ mod tests {
             ORIGIN_KERNEL.to_string(),
             org_b.kernel_id.clone(),
             pae_bytes.clone(),
-            org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes),
+            org_b
+                .passport
+                .sign_exempt(ExemptFormat::DssePae, &pae_bytes),
         );
         let response = handler
             .cosign(&org_b.transport_id, &request)
@@ -1351,7 +1378,9 @@ mod tests {
             ORIGIN_KERNEL.to_string(),
             org_b.kernel_id.clone(),
             pae_bytes.clone(),
-            org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes),
+            org_b
+                .passport
+                .sign_exempt(ExemptFormat::DssePae, &pae_bytes),
         );
         assert_eq!(
             handler.cosign(&org_b.transport_id, &request),
@@ -1396,7 +1425,9 @@ mod tests {
             ORIGIN_KERNEL.to_string(),
             org_b.kernel_id.clone(),
             pae_bytes.clone(),
-            org_b.passport.sign_exempt(ExemptFormat::DssePae, &pae_bytes),
+            org_b
+                .passport
+                .sign_exempt(ExemptFormat::DssePae, &pae_bytes),
         );
         assert_eq!(
             handler.cosign(&org_b.transport_id, &request),
@@ -1500,12 +1531,12 @@ mod tests {
         assert_eq!(response.schema, BILATERAL_DSSE_COSIGNING_SCHEMA);
         assert!(
             verify_exempt(
-            &org_a.passport.public_key(),
-            ExemptFormat::DssePae,
-            &pae_bytes,
-            &response.org_a_signature,
-        )
-        .is_ok(),
+                &org_a.passport.public_key(),
+                ExemptFormat::DssePae,
+                &pae_bytes,
+                &response.org_a_signature,
+            )
+            .is_ok(),
             "the co-signature verifies over the exact pae_bytes: verification was not weakened"
         );
     }
@@ -1598,12 +1629,12 @@ mod tests {
             .expect("the full exchange yields a real co-signature");
         assert!(
             verify_exempt(
-            &org_a.passport.public_key(),
-            ExemptFormat::DssePae,
-            &pae_bytes,
-            &response.org_a_signature,
-        )
-        .is_ok(),
+                &org_a.passport.public_key(),
+                ExemptFormat::DssePae,
+                &pae_bytes,
+                &response.org_a_signature,
+            )
+            .is_ok(),
             "the co-signature is valid: the exchange genuinely completed"
         );
 

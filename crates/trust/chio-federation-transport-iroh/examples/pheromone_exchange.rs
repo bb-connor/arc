@@ -88,14 +88,18 @@ fn build_gate(entries: &[(&str, u8, u8)]) -> Result<DirectoryGate, Box<dyn Error
         .map(|(kernel_id, passport_seed, transport_seed)| {
             let passport = Keypair::from_seed(&[*passport_seed; 32]);
             let transport = endpoint_id(*transport_seed);
-            Ok::<_, chio_federation_transport_iroh::identity::IdentityError>(TransportDirectoryEntry {
-                kernel_id: (*kernel_id).to_string(),
-                passport_public_key: passport.public_key(),
-                transport_endpoint_id: transport,
-                passport_endorsement: sign_transport_endorsement(&passport, kernel_id, &transport)?,
-                revocation_signers: Vec::new(),
-                removed: false,
-            })
+            Ok::<_, chio_federation_transport_iroh::identity::IdentityError>(
+                TransportDirectoryEntry {
+                    kernel_id: (*kernel_id).to_string(),
+                    passport_public_key: passport.public_key(),
+                    transport_endpoint_id: transport,
+                    passport_endorsement: sign_transport_endorsement(
+                        &passport, kernel_id, &transport,
+                    )?,
+                    revocation_signers: Vec::new(),
+                    removed: false,
+                },
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
     let directory = TransportDirectoryDocument {

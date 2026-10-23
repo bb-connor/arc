@@ -102,7 +102,13 @@ fn build_peer_entry(spec: &PeerSpec) -> TransportDirectoryEntry {
         .map(|(signer_id, seed)| {
             let oracle = signer(signer_id, seed);
             let oracle_public_key = oracle.public_key();
-            let oracle_endorsement = sign_revocation_signer_endorsement(&passport, spec.kernel_id, signer_id, &oracle_public_key, ).unwrap();
+            let oracle_endorsement = sign_revocation_signer_endorsement(
+                &passport,
+                spec.kernel_id,
+                signer_id,
+                &oracle_public_key,
+            )
+            .unwrap();
             RevocationSignerEntry {
                 signer_id: signer_id.to_string(),
                 oracle_public_key,
@@ -141,10 +147,12 @@ fn verified_directory_of(peers: &[PeerSpec]) -> Arc<VerifiedDirectory> {
         issued_at_unix_ms: NOW - 1,
         expires_at_unix_ms: NOW + 1,
     };
-    let signature = issuer.sign_wrapped(
-        crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-        &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-    ).unwrap();
+    let signature = issuer
+        .sign_wrapped(
+            crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+            &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+        )
+        .unwrap();
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

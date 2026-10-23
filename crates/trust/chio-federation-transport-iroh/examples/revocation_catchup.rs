@@ -30,7 +30,6 @@ use chio_core_types::Keypair;
 use chio_federation_transport_iroh::admission::DirectoryGate;
 use chio_federation_transport_iroh::catchup::BlobCatchupClient;
 use chio_federation_transport_iroh::catchup::CatchupError;
-use chio_federation_transport_iroh::identity::{sign_revocation_signer_endorsement, IdentityError};
 use chio_federation_transport_iroh::identity::sign_transport_endorsement;
 use chio_federation_transport_iroh::identity::RevocationSignerEntry;
 use chio_federation_transport_iroh::identity::TransportDirectoryBundleBody;
@@ -41,6 +40,7 @@ use chio_federation_transport_iroh::identity::TransportDirectoryEntry;
 use chio_federation_transport_iroh::identity::TrustedTransportDirectoryIssuer;
 use chio_federation_transport_iroh::identity::VerifiedDirectory;
 use chio_federation_transport_iroh::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA;
+use chio_federation_transport_iroh::identity::{sign_revocation_signer_endorsement, IdentityError};
 use chio_revocation_oracle::Ed25519RootSigner;
 use chio_revocation_oracle::EpochRoot;
 use chio_revocation_oracle::SignedEpochRoot;
@@ -109,11 +109,20 @@ fn build_directory(pinned: &Ed25519RootSigner) -> Result<Arc<VerifiedDirectory>,
         kernel_id: AUTHORITY_KERNEL.to_string(),
         passport_public_key: authority_passport.public_key(),
         transport_endpoint_id: authority_transport,
-        passport_endorsement: sign_transport_endorsement(&authority_passport, AUTHORITY_KERNEL, &authority_transport, )?,
+        passport_endorsement: sign_transport_endorsement(
+            &authority_passport,
+            AUTHORITY_KERNEL,
+            &authority_transport,
+        )?,
         revocation_signers: vec![RevocationSignerEntry {
             signer_id: SIGNER_ID.to_string(),
             oracle_public_key: oracle_public_key.clone(),
-            oracle_endorsement: sign_revocation_signer_endorsement(&authority_passport, AUTHORITY_KERNEL, SIGNER_ID, &oracle_public_key, )?,
+            oracle_endorsement: sign_revocation_signer_endorsement(
+                &authority_passport,
+                AUTHORITY_KERNEL,
+                SIGNER_ID,
+                &oracle_public_key,
+            )?,
         }],
         removed: false,
     };
