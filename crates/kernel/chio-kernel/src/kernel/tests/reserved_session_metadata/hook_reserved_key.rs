@@ -96,7 +96,11 @@ fn assert_hook_forgery_refused(
     let metadata = response.receipt.metadata.as_ref().expect("denial metadata");
     assert!(metadata.get(hook.forged_key).is_none());
     assert_eq!(hook.released().len(), 1);
-    assert!(hook.released()[0].get(hook.forged_key).is_none());
+    assert_eq!(
+        hook.released()[0].get(hook.forged_key),
+        Some(&hook.forged_value),
+        "release must receive the hook's own metadata"
+    );
 }
 
 #[test]
@@ -338,4 +342,33 @@ fn legacy_hook_scalar_metadata_is_released_as_returned_on_the_nested_path() {
         )
         .expect("runtime admission denial");
     assert_non_object_refusal(response, &hook, &invocations, &metadata);
+}
+
+/// A denied federation treaty re-admission during completed replay releases
+/// the hook's reservation with the hook's own metadata before refusing.
+#[test]
+fn completed_replay_readmission_refusal_releases_with_hook_metadata() {
+    let (mut kernel, _request, _context, _invocations) = fixture();
+    let hook = StdArc::new(NonObjectMetadataHook {
+        metadata: serde_json::json!(7),
+        allow: true,
+        released: Mutex::new(Vec::new()),
+    });
+    kernel.set_runtime_admission_hook(hook.clone());
+    let mut decision = RuntimeAdmissionDecision::deny(NON_OBJECT_REFUSAL, None);
+    decision.hook_release_metadata = Some(serde_json::json!(7));
+    let error = kernel.refuse_completed_replay_readmission(decision);
+    assert_eq!(
+        error.to_string(),
+        KernelError::Internal(format!(
+            "federation runtime treaty re-admission failed during completed replay: {NON_OBJECT_REFUSAL}"
+        ))
+        .to_string()
+    );
+    let released = hook
+        .released
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    assert_eq!(released, vec![serde_json::json!(7)]);
 }

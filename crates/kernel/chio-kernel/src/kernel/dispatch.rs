@@ -1528,6 +1528,31 @@ impl ChioKernel {
         self.release_runtime_admission_reservations_for_hook_denial(operation, metadata, None)
     }
 
+    /// Refuses a completed replay whose federation treaty re-admission was
+    /// denied, after releasing whatever the hook reserved for that attempt.
+    pub(crate) fn refuse_completed_replay_readmission(
+        &self,
+        decision: RuntimeAdmissionDecision,
+    ) -> KernelError {
+        let (_, released) = self.release_runtime_admission_reservations_for_hook_denial(
+            None,
+            decision.metadata,
+            decision.hook_release_metadata.as_ref(),
+        );
+        let reason = decision
+            .reason
+            .unwrap_or_else(|| "runtime admission denied".to_string());
+        if released {
+            KernelError::Internal(format!(
+                "federation runtime treaty re-admission failed during completed replay: {reason}"
+            ))
+        } else {
+            KernelError::Internal(format!(
+                "federation runtime treaty re-admission failed during completed replay and its runtime reservation release failed: {reason}"
+            ))
+        }
+    }
+
     /// Release with the hook's own metadata when the kernel replaced it in
     /// the denial, so the hook can still identify what it reserved.
     pub(crate) fn release_runtime_admission_reservations_for_hook_denial(

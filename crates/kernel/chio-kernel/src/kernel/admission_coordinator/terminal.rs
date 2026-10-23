@@ -628,12 +628,7 @@ impl ChioKernel {
                     None,
                 );
                 if !treaty_admission.allowed {
-                    return Err(KernelError::Internal(format!(
-                        "federation runtime treaty re-admission failed during completed replay: {}",
-                        treaty_admission
-                            .reason
-                            .unwrap_or_else(|| "runtime admission denied".to_string())
-                    )));
+                    return Err(self.refuse_completed_replay_readmission(treaty_admission));
                 }
             }
             self.apply_federation_cosign_for_admitted_request(request, &receipt)?;

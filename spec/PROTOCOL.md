@@ -1520,11 +1520,15 @@ Nested flows such as sampling, elicitation, and resource reads use
 
 ### 6.4 Receipt Metadata
 
-The shipped metadata surface is extensible JSON. The top-level keys below are
-reserved: the kernel writes its typed blocks under them, merges them last, and
-rejects a pre-existing collision from caller or hook metadata, so a verifier can
-treat a block found under a reserved key as kernel-authored and covered by the
-receipt signature. Unknown fields and unsupported schema versions fail closed.
+The shipped metadata surface is extensible JSON for every top-level key not
+listed below. The keys below are reserved: only a Chio signer writes them (the
+kernel, the receipt signing path, or the HTTP receipt projection). The kernel
+refuses caller metadata that names any of them before any effect, and a
+runtime-admission hook may write only `chio_runtime`; hook metadata naming any
+other reserved key, or hook metadata that is not a JSON object, turns the hook
+decision into a runtime-admission denial. A verifier can therefore treat a block
+found under a reserved key as Chio-authored and covered by the receipt
+signature. Unknown fields and unsupported schema versions fail closed.
 
 | Key | Written by | Contents |
 |-----|------------|----------|
@@ -1532,12 +1536,37 @@ receipt signature. Unknown fields and unsupported schema versions fail closed.
 | `original_metadata` | signing path | A non-object caller metadata value displaced when the signing nonce is bound. |
 | `financial` | kernel | Financial attribution and settlement metadata. |
 | `budget_authority` | kernel | Budget-authority lineage for monetary receipts. |
-| `channel` | kernel | Streamed-output channel accounting metadata. |
+| `channel` | reserved | Streamed-output channel accounting metadata; no current writer. |
 | `governed_transaction` | kernel | Governed-transaction intent and approval metadata. |
 | `admission_operation` | kernel | Durable admission projection, schema `chio.admission-receipt.v1` (see below). |
 | `delivery_contract` | kernel | Output-digest delivery evidence, schema `chio.delivery-contract.v1` (see below). |
 | `caller_delivery` | kernel | Authenticated historical caller observation digests, executor/claim identity and times, schema `chio.authenticated-caller-observation.v1`. No raw output. |
 | `finding_delivery` | kernel | Purchased-finding delivery overlay, schema `chio.finding.delivery.v1` (see below). |
+| `attribution` | kernel | Capability subject and issuer keys, delegation depth and matched grant index. |
+| `chio_manifest_security_v1` | kernel | Registry-validated bridge security sidecar. |
+| `protocol_admission` | kernel | Admission projection on protocol-level receipts. |
+| `budget_denial_authority` | reserved | Budget denial lineage; no current writer. |
+| `protocol_refusal` | kernel | Session protocol refusal record. |
+| `chio_runtime` | kernel or runtime-admission hook | Runtime admission and reservation state. |
+| `receipt_context` | kernel | Request id and request namespace digest. |
+| `governed_transaction_diagnostics` | kernel | Asserted call chain and lineage references. |
+| `model_metadata` | kernel | Model id, provider, safety tier and provenance class. |
+| `finding_recovery` | kernel | No-charge finding redelivery lineage, schema `chio.finding.recovery.v1`. |
+| `finding_purchase_replay_snapshot` | kernel | Frozen verified purchase binding for replay. |
+| `finding_recovery_replay_snapshot` | kernel | Frozen verified recovery binding for replay. |
+| `findingDenial` | kernel | Finding denial code. |
+| `stream` | kernel | Streamed-output chunk accounting. |
+| `threshold_approval` | kernel | Threshold approval proposal reference and state. |
+| `memory_provenance` | kernel | Governed memory read or write provenance. |
+| `post_invocation` | kernel | Post-invocation hook outcome. |
+| `execution_nonce` | kernel | Execution-nonce stage and cleanup flags. |
+| `chio_kernel` | kernel | Kernel rejection code. |
+| `runtime_admission` | kernel | Kernel record of a runtime-admission hook failure or refusal. |
+| `active_response_terminal_evidence` | kernel | Active-response executor receipt reference. |
+| `chio_http_receipt_v1` | HTTP receipt projection | The HTTP receipt embedded in its projected receipt. |
+| `finding_pool_mutation` | kernel | Finding-pool mutation record. |
+| `session_report` | kernel | Session report record. |
+| `prior_metadata` | kernel | A non-object metadata value displaced on a rejection receipt. |
 
 Subject and issuer attribution, streamed-output chunk metadata, and
 portable-trust and federation provenance are additive extensions layered over
