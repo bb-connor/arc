@@ -1100,11 +1100,13 @@ impl ChioKernel {
         })?;
 
         let signed_bond = &bond_row.bond;
-        let signature_valid = signed_bond.verify_signature(&signed_bond.signer_key).map_err(|error| {
-            KernelError::GovernedTransactionDenied(format!(
-                "delegation bond `{bond_id}` failed signature verification: {error}"
-            ))
-        })?;
+        let signature_valid = signed_bond
+            .verify_signature(&signed_bond.signer_key)
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "delegation bond `{bond_id}` failed signature verification: {error}"
+                ))
+            })?;
         if !signature_valid {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "delegation bond `{bond_id}` failed signature verification"

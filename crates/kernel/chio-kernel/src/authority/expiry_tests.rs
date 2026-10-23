@@ -25,9 +25,12 @@ impl SigningBackend for CountingBackend {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         Ok(self.key.public_key())
     }
-    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> chio_core::error::Result<Signature> {
         self.signs.fetch_add(1, Ordering::SeqCst);
-        Ok(self.key.sign(message))
+        chio_core::crypto::Ed25519Backend::new(self.key.clone()).sign_bytes(message)
     }
 }
 

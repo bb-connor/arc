@@ -229,6 +229,9 @@ fn verify_capability_base(
         Err(error @ CapabilityFloorVerifyError::RejectedByCryptoFloor { .. }) => {
             return Err(CapabilityError::CryptoFloorRejected(error.to_string()));
         }
+        Err(CapabilityFloorVerifyError::Crypto(CoreError::SignatureAlgorithmMismatch {
+            ..
+        })) => return Err(CapabilityError::InvalidSignature),
         Err(CapabilityFloorVerifyError::Crypto(error)) => {
             return Err(CapabilityError::Internal(error.to_string()));
         }

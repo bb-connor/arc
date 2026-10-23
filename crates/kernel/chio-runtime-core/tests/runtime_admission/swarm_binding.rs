@@ -201,7 +201,12 @@ fn swarm_binding_denies_changed_subject_issuer_scope_and_signature() -> TestResu
         request.capability = CapabilityToken::sign(body, &signer)?;
         request.agent_id = request.capability.subject.to_hex();
         if mutation == "signature" {
-            request.capability.signature = signer.sign(b"unrelated payload");
+            request.capability.signature = signer.sign_wrapped(
+                chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(
+                    &"unrelated payload",
+                )?,
+            )?;
         } else {
             assert!(request.capability.verify_signature()?);
         }

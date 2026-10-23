@@ -51,7 +51,7 @@ pub(crate) fn evaluate_runtime_pheromone_policy(
         &policy.body.verifier_id,
         &policy.body.key_id,
         &policy.signer_key,
-        || policy.verify_signature(),
+        || policy.verify_signature(&policy.signer_key),
         input.trusted_verifier_keys,
         input.now_unix_ms,
     )
@@ -61,7 +61,7 @@ pub(crate) fn evaluate_runtime_pheromone_policy(
         return Err("runtime_pheromone_policy_query_report_signer_mismatch");
     }
     if !query_report
-        .verify_signature()
+        .verify_signature(&policy.signer_key)
         .map_err(|_| "runtime_pheromone_query_report_signature_invalid")?
     {
         return Err("runtime_pheromone_query_report_signature_invalid");
@@ -69,7 +69,7 @@ pub(crate) fn evaluate_runtime_pheromone_policy(
     input
         .checks
         .push(passed("runtime_pheromone_query_report.signature"));
-    let advisory = runtime_pheromone_advisory_from_query_report_value(&query_report.body)
+    let advisory = runtime_pheromone_advisory_from_query_report_value(&query_report.body.0)
         .map_err(|_| "invalid_pheromone_query_report")?;
     if !advisory.observe_only {
         return Err("runtime_pheromone_advisory_not_observe_only");
@@ -84,7 +84,7 @@ pub(crate) fn evaluate_runtime_pheromone_policy(
         &peer_weights.body.verifier_id,
         &peer_weights.body.key_id,
         &peer_weights.signer_key,
-        || peer_weights.verify_signature(),
+        || peer_weights.verify_signature(&peer_weights.signer_key),
         input.trusted_verifier_keys,
         input.now_unix_ms,
     )

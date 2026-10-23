@@ -1,3 +1,4 @@
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::capability::{
     attenuation::{
         compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
@@ -6,15 +7,25 @@ use chio_core_types::capability::{
     crypto_floor::CapabilityCryptoFloor,
     features::CapabilityNegotiation,
     scope::{ChioScope, Operation, ToolGrant},
-    token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
+    token::{
+        CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody,
+        CHIO_CAPABILITY_SCHEMA,
+    },
 };
-use chio_core_types::crypto::{Keypair, PublicKey};
+use chio_core_types::crypto::{Keypair, PublicKey, Signature};
 use chio_kernel_core::{
     verify_capability_full_with_evidence, CapabilityEvidenceContext, CapabilityFeatureContext,
     FixedClock, NoopBudgetRegistry,
 };
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn resign(issuer: &Keypair, token: &CapabilityToken) -> Result<Signature> {
+    Ok(issuer.sign_wrapped(
+        CHIO_CAPABILITY_SCHEMA,
+        &CanonicalBytes::from_serializable(&token.signing_body())?,
+    )?)
+}
 
 fn scope(tools: &[&str]) -> ChioScope {
     ChioScope {
@@ -268,9 +279,9 @@ fn signed_lineage_refuses_invalid_link_times_at_the_validity_boundary() -> Resul
         )?;
         if index == 0 {
             child.delegation_chain[0] = leaf.delegation_chain[0].clone();
-            child.signature = f.issuer.sign_canonical(&child.signing_body())?.0;
+            child.signature = resign(&f.issuer, &child)?;
         }
-        leaf.signature = f.issuer.sign_canonical(&leaf.signing_body())?.0;
+        leaf.signature = resign(&f.issuer, &leaf)?;
         let error = lineage_refusal(&f, &[f.root.clone(), child], &leaf, None)?;
         assert!(
             error.contains("delegated validity or budget share widens its signed parent"),
@@ -285,7 +296,7 @@ fn signed_lineage_refuses_repeated_identity_and_mismatched_negotiated_root() -> 
     let f = fixture()?;
     let mut repeated = f.leaf.clone();
     repeated.id = f.child.id.clone();
-    repeated.signature = f.issuer.sign_canonical(&repeated.signing_body())?.0;
+    repeated.signature = resign(&f.issuer, &repeated)?;
     let error = lineage_refusal(&f, &[f.root.clone(), f.child.clone()], &repeated, None)?;
     assert!(
         error.contains("signed lineage repeats a capability identity"),
@@ -409,7 +420,7 @@ fn a_signed_leaf_cannot_extend_its_parents_validity_or_budget_share() -> Result 
     let peer = CapabilityNegotiation::v1_default();
     let mut late = f.leaf.clone();
     late.expires_at = 260;
-    late.signature = f.issuer.sign_canonical(&late.signing_body())?.0;
+    late.signature = resign(&f.issuer, &late)?;
     assert!(!accepted(
         &f,
         &[f.root.clone(), f.child.clone()],
@@ -418,7 +429,7 @@ fn a_signed_leaf_cannot_extend_its_parents_validity_or_budget_share() -> Result 
     )?);
     let mut oversized = f.leaf.clone();
     oversized.budget_share_bps = Some(1001);
-    oversized.signature = f.issuer.sign_canonical(&oversized.signing_body())?.0;
+    oversized.signature = resign(&f.issuer, &oversized)?;
     assert!(!accepted(
         &f,
         &[f.root.clone(), f.child.clone()],

@@ -127,8 +127,8 @@ impl DpopProof {
     /// The signature covers the signing wrapper of the canonical body under
     /// `chio.dpop_proof.v1`.
     pub fn sign(body: DpopProofBody, keypair: &Keypair) -> Result<DpopProof, KernelError> {
-        let canonical =
-            CanonicalBytes::from_serializable(&body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
+        let canonical = CanonicalBytes::from_serializable(&body)
+            .map_err(|e| DpopError::Encoding(Box::new(e)))?;
         let signature = keypair
             .sign_wrapped(DPOP_SCHEMA, &canonical)
             .map_err(|e| DpopError::Signing(Box::new(e)))?;
@@ -144,8 +144,8 @@ impl DpopProof {
         body: DpopProofBody,
         backend: &dyn SigningBackend,
     ) -> Result<DpopProof, KernelError> {
-        let canonical =
-            CanonicalBytes::from_serializable(&body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
+        let canonical = CanonicalBytes::from_serializable(&body)
+            .map_err(|e| DpopError::Encoding(Box::new(e)))?;
         let signature = backend
             .sign_wrapped(DPOP_SCHEMA, &canonical)
             .map_err(|e| DpopError::Signing(Box::new(e)))?
@@ -611,7 +611,13 @@ mod backend_tests {
             agent_key: kp.public_key(),
         };
         let proof = DpopProof::sign_with_backend(body.clone(), &backend).unwrap();
-        verify_wrapped(&proof.body.agent_key, DPOP_SCHEMA, &proof.body, &proof.signature).unwrap();
+        verify_wrapped(
+            &proof.body.agent_key,
+            DPOP_SCHEMA,
+            &proof.body,
+            &proof.signature,
+        )
+        .unwrap();
         assert_eq!(proof, DpopProof::sign(body, &kp).unwrap());
     }
 

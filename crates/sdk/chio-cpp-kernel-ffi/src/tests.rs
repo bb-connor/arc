@@ -160,7 +160,12 @@ fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> St
         expires_at,
         payload_canonical_bytes: canonical_json_bytes(&payload).unwrap(),
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = issuer
+        .sign_wrapped(
+            PORTABLE_PASSPORT_SCHEMA,
+            &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+        )
+        .unwrap();
     serde_json::to_string(&PortablePassportEnvelope { body, signature }).unwrap()
 }
 

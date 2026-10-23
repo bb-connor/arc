@@ -187,7 +187,10 @@ fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() ->
             .into_iter()
             .map(|key| DsseSignature {
                 keyid: chio_federation::bilateral_dsse::Keyid::from_public_key(&key.public_key()).0,
-                sig: encoding.encode(key.sign(&preimage).to_bytes()),
+                sig: encoding.encode(
+                    key.sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, &preimage)
+                        .to_bytes(),
+                ),
             })
             .collect();
         chio_federation::bilateral_dsse::verify_chio_bilateral_dsse_envelope(

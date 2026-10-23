@@ -463,3 +463,7 @@ fn public_key_material_is_zero(encoded: &str) -> bool {
 fn denied(message: &str) -> KernelError {
     KernelError::GovernedTransactionDenied(format!("active response denied: {message}"))
 }
+
+#[cfg(test)]
+#[path = "active_response_artifact/wrapper_refusal_tests.rs"]
+mod wrapper_refusal_tests;

@@ -273,7 +273,7 @@ pub(crate) fn validate_runtime_trust_input(
     checks.push(passed("runtime_trust.schema"));
 
     let signature_valid = envelope
-        .verify_signature()
+        .verify_signature(&envelope.signer_key)
         .map_err(|_| "runtime_trust_signature_invalid")?;
     if !signature_valid {
         return Err("runtime_trust_signature_invalid");

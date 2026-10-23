@@ -1595,6 +1595,26 @@ fn kernel_terminal_outcome_adapter_derives_exact_private_evidence() -> TestResul
         &fixture.base.reservation,
         fixture.base.receipt.receipt(),
     )?;
+    for (label, kernel_signature) in
+        crate::wrapper_refusals::refused_signatures(&kernel, &signed.body)
+    {
+        let refused = SignedChannelTerminalOutcomeCommitmentV1 {
+            kernel_signature,
+            ..signed.clone()
+        };
+        assert!(
+            matches!(
+                verify_channel_terminal_outcome_commitment(
+                    &refused,
+                    &kernel.public_key(),
+                    &fixture.base.reservation,
+                    fixture.base.receipt.receipt(),
+                ),
+                Err(ChannelError::AuthorityVerification)
+            ),
+            "{label}"
+        );
+    }
 
     let alternate = build_fixture(7, "kernel-outcome-adapter-alternate")?;
     assert!(sign_channel_terminal_outcome_commitment(
@@ -1867,10 +1887,10 @@ fn resigned_terminal_envelope_rejects_substituted_obligation_record() -> TestRes
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     *replay_digest = serde_json::Value::String(projection_digest);
 
-    let canonical_body = canonical_json_bytes(&encoded["body"])?;
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend_from_slice(&canonical_body);
-    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    encoded["signature"] = serde_json::to_value(kernel.sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::canonical::CanonicalBytes::from_serializable(&encoded["body"])?,
+    )?)?;
     let substituted: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
         substituted.verify(),

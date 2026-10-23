@@ -224,8 +224,10 @@ impl SignedAuthorityTransition {
             issuer_set_digest: digest(&next.trusted_keys)?,
             change,
         };
-        let signature =
-            signer.sign_wrapped(TRANSITION_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
+        let signature = signer.sign_wrapped(
+            TRANSITION_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self { body, signature })
     }
 

@@ -1,6 +1,15 @@
 use std::collections::BTreeMap;
 
-use chio_core_types::{receipt::lineage::SignedExportEnvelope, PublicKey};
+use chio_core_types::{
+    receipt::lineage::{SignedExportEnvelope, SignedExportPayload},
+    PublicKey,
+};
+
+use crate::schema::{
+    CHIO_PHEROMONE_QUERY_REPORT_SCHEMA, CHIO_RUNTIME_ADMISSION_REPORT_SCHEMA,
+    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
+    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,6 +58,10 @@ pub struct RuntimeVerifierTrustBundle {
     pub expires_at_unix_ms: u64,
 }
 
+impl SignedExportPayload for RuntimeVerifierTrustBundle {
+    const SCHEMA_ID: &'static str = CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA;
+}
+
 pub type SignedRuntimeVerifierTrustBundle = SignedExportEnvelope<RuntimeVerifierTrustBundle>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,6 +81,10 @@ pub struct RuntimePeerWeights {
     pub issued_at_unix_ms: u64,
     pub expires_at_unix_ms: u64,
     pub weights: Vec<RuntimePeerWeight>,
+}
+
+impl SignedExportPayload for RuntimePeerWeights {
+    const SCHEMA_ID: &'static str = CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA;
 }
 
 pub type SignedRuntimePeerWeights = SignedExportEnvelope<RuntimePeerWeights>;
@@ -101,6 +118,10 @@ pub struct RuntimePheromonePolicy {
     pub runtime_trust_bundle_sha256: String,
     pub peer_weights_sha256: String,
     pub rules: Vec<RuntimePheromonePolicyRule>,
+}
+
+impl SignedExportPayload for RuntimePheromonePolicy {
+    const SCHEMA_ID: &'static str = CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA;
 }
 
 pub type SignedRuntimePheromonePolicy = SignedExportEnvelope<RuntimePheromonePolicy>;
@@ -473,6 +494,10 @@ pub struct RuntimeAdmissionReport {
     pub receipt_metadata: serde_json::Value,
 }
 
+impl SignedExportPayload for RuntimeAdmissionReport {
+    const SCHEMA_ID: &'static str = CHIO_RUNTIME_ADMISSION_REPORT_SCHEMA;
+}
+
 pub type SignedRuntimeAdmissionReport = SignedExportEnvelope<RuntimeAdmissionReport>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -490,7 +515,16 @@ pub struct RuntimePheromoneAdvisory {
     pub observe_only: bool,
 }
 
-pub type SignedRuntimePheromoneQueryReport = SignedExportEnvelope<serde_json::Value>;
+/// A pheromone query report exactly as the pheromone runtime emits it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RuntimePheromoneQueryReport(pub serde_json::Value);
+
+impl SignedExportPayload for RuntimePheromoneQueryReport {
+    const SCHEMA_ID: &'static str = CHIO_PHEROMONE_QUERY_REPORT_SCHEMA;
+}
+
+pub type SignedRuntimePheromoneQueryReport = SignedExportEnvelope<RuntimePheromoneQueryReport>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

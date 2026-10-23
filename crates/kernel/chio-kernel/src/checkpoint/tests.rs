@@ -18,6 +18,14 @@ fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+fn sign_checkpoint_body(key: &Keypair, body: &KernelCheckpointBody) -> Signature {
+    key.sign_wrapped(
+        CHECKPOINT_SCHEMA,
+        &CanonicalBytes::from_serializable(body).expect("canonical checkpoint body"),
+    )
+    .expect("sign checkpoint body")
+}
+
 fn make_receipt_bytes(n: usize) -> Vec<Vec<u8>> {
     (0..n)
         .map(|i| format!("{{\"receipt_id\":\"rcpt-{i:04}\",\"seq\":{i}}}").into_bytes())
@@ -48,6 +56,23 @@ fn build_checkpoint_signature_verifies() {
         verify_checkpoint_signature(&cp).expect("verify failed"),
         "signature should be valid"
     );
+}
+
+#[test]
+fn checkpoint_validation_refuses_unwrapped_and_foreign_id_signatures() {
+    let kp = Keypair::generate();
+    let mut cp = build_checkpoint(1, 1, 5, &make_receipt_bytes(5), &kp).unwrap();
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &cp.body) {
+        cp.signature = signature;
+        assert!(!verify_checkpoint_signature(&cp).unwrap(), "{label}");
+        assert!(
+            matches!(
+                validate_checkpoint(&cp),
+                Err(CheckpointError::InvalidSignature)
+            ),
+            "{label}"
+        );
+    }
 }
 
 #[test]
@@ -758,9 +783,7 @@ fn indexed_equivocation_matches_pairwise_orientation_and_priority() {
     let keypair = Keypair::generate();
     let with_predecessor = |mut checkpoint: KernelCheckpoint, digest: &str| {
         checkpoint.body.previous_checkpoint_sha256 = Some(digest.repeat(32));
-        checkpoint.signature = keypair.sign(
-            &canonical_json_bytes(&checkpoint.body).expect("canonical checkpoint with predecessor"),
-        );
+        checkpoint.signature = sign_checkpoint_body(&keypair, &checkpoint.body);
         checkpoint
     };
 
@@ -1064,8 +1087,7 @@ fn transparency_rejects_divergent_chain_root_at_key_rotation() {
     .expect("rotated checkpoint");
     second.body.chain_root =
         Some(checkpoint_chain_root(&[leaf_hash(b"unrelated-rotated-history")]).expect("root"));
-    second.signature = rotated_key
-        .sign(&canonical_json_bytes(&second.body).expect("canonical rotated checkpoint body"));
+    second.signature = sign_checkpoint_body(&rotated_key, &second.body);
 
     let error = build_checkpoint_transparency(&[first, second])
         .expect_err("key rotation must not bypass the global chain commitment");
@@ -1101,8 +1123,7 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
     let mut rewritten = second.clone();
     rewritten.body.chain_root =
         Some(checkpoint_chain_root(&[leaf_hash(b"rewritten-history")]).expect("root"));
-    rewritten.signature = kp
-        .sign(&canonical_json_bytes(&rewritten.body).expect("canonical rewritten checkpoint body"));
+    rewritten.signature = sign_checkpoint_body(&kp, &rewritten.body);
 
     let mut forged = honest.clone();
     forged.to_checkpoint_sha256 =
@@ -1153,8 +1174,7 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
         MerkleTree::from_hashes(vec![leaves[0], smuggled_leaf]).expect("smuggled chain");
     let mut smuggled = second.clone();
     smuggled.body.chain_root = Some(smuggled_chain.root());
-    smuggled.signature =
-        kp.sign(&canonical_json_bytes(&smuggled.body).expect("canonical smuggled checkpoint body"));
+    smuggled.signature = sign_checkpoint_body(&kp, &smuggled.body);
     let mut smuggled_proof = honest.clone();
     smuggled_proof.to_checkpoint_sha256 =
         checkpoint_body_sha256(&smuggled.body).expect("smuggled digest");
@@ -1221,14 +1241,12 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
 
     let mut forged_second = second.clone();
     forged_second.body.chain_root = Some(forged_from_tree.root());
-    forged_second.signature =
-        kp.sign(&canonical_json_bytes(&forged_second.body).expect("canonical forged second body"));
+    forged_second.signature = sign_checkpoint_body(&kp, &forged_second.body);
     let mut forged_third = third.clone();
     forged_third.body.previous_checkpoint_sha256 =
         Some(checkpoint_body_sha256(&forged_second.body).expect("forged second digest"));
     forged_third.body.chain_root = Some(forged_to_tree.root());
-    forged_third.signature =
-        kp.sign(&canonical_json_bytes(&forged_third.body).expect("canonical forged third body"));
+    forged_third.signature = sign_checkpoint_body(&kp, &forged_third.body);
 
     let forged = CheckpointConsistencyProof {
         from_checkpoint_sha256: checkpoint_body_sha256(&forged_second.body)
@@ -1311,14 +1329,12 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
 
     let mut forged_second = second.clone();
     forged_second.body.chain_root = Some(forged_from_tree.root());
-    forged_second.signature =
-        kp.sign(&canonical_json_bytes(&forged_second.body).expect("canonical forged second body"));
+    forged_second.signature = sign_checkpoint_body(&kp, &forged_second.body);
     let mut forged_third = third.clone();
     forged_third.body.previous_checkpoint_sha256 =
         Some(checkpoint_body_sha256(&forged_second.body).expect("forged second digest"));
     forged_third.body.chain_root = Some(forged_to_tree.root());
-    forged_third.signature =
-        kp.sign(&canonical_json_bytes(&forged_third.body).expect("canonical forged third body"));
+    forged_third.signature = sign_checkpoint_body(&kp, &forged_third.body);
 
     let forged = CheckpointConsistencyProof {
         from_checkpoint_sha256: checkpoint_body_sha256(&forged_second.body)
@@ -1383,9 +1399,7 @@ fn checkpoint_consistency_proof_requires_chain_commitment() {
 
     let mut rootless_second = second.clone();
     rootless_second.body.chain_root = None;
-    rootless_second.signature = kp.sign(
-        &canonical_json_bytes(&rootless_second.body).expect("canonical rootless second body"),
-    );
+    rootless_second.signature = sign_checkpoint_body(&kp, &rootless_second.body);
 
     let error = verify_checkpoint_consistency_proof(&first, &rootless_second, &proof)
         .expect_err("a rootless endpoint cannot carry a consistency proof");
@@ -1412,8 +1426,7 @@ fn validate_checkpoint_predecessor_rejects_chain_commitment_downgrade() {
     )
     .expect("second");
     second.body.chain_root = None;
-    second.signature =
-        kp.sign(&canonical_json_bytes(&second.body).expect("canonical downgraded checkpoint body"));
+    second.signature = sign_checkpoint_body(&kp, &second.body);
 
     let error =
         validate_checkpoint_predecessor(&first, &second).expect_err("downgrade should fail");
@@ -1431,8 +1444,7 @@ fn validate_checkpoint_rejects_first_checkpoint_chain_root_mismatch() {
     let mut checkpoint =
         build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
     checkpoint.body.chain_root = Some(Hash::zero());
-    checkpoint.signature = kp
-        .sign(&canonical_json_bytes(&checkpoint.body).expect("canonical tampered checkpoint body"));
+    checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
     let error = validate_checkpoint(&checkpoint).expect_err("checkpoint should be invalid");
     assert!(
@@ -1473,8 +1485,7 @@ fn validate_checkpoint_rejects_a_first_checkpoint_without_chain_root() {
     let mut checkpoint =
         build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
     checkpoint.body.chain_root = None;
-    checkpoint.signature =
-        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical rootless body"));
+    checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
     let error = validate_checkpoint(&checkpoint).expect_err("checkpoint 1 needs its chain root");
     assert_eq!(
@@ -1489,8 +1500,7 @@ fn validate_checkpoint_rejects_retired_statement_schema() {
     let mut checkpoint =
         build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
     checkpoint.body.schema = "chio.checkpoint_statement.v2".to_string();
-    checkpoint.signature =
-        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical retired body"));
+    checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
     let error = validate_checkpoint(&checkpoint).expect_err("retired schema must be refused");
     assert_eq!(
@@ -1607,8 +1617,7 @@ fn validate_checkpoint_rejects_tree_size_that_does_not_match_entry_range() {
     let batch = make_receipt_bytes(3);
     let mut checkpoint = build_checkpoint(1, 1, 3, &batch, &kp).expect("build failed");
     checkpoint.body.tree_size = 2;
-    checkpoint.signature =
-        kp.sign(&canonical_json_bytes(&checkpoint.body).expect("canonical checkpoint body"));
+    checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
     let error = validate_checkpoint(&checkpoint).expect_err("checkpoint should be invalid");
     assert!(
@@ -1644,8 +1653,7 @@ fn validate_checkpoint_predecessor_rejects_batch_gap() {
     let mut second = build_checkpoint(2, 5, 6, &make_receipt_bytes(2), &kp).expect("build failed");
     second.body.previous_checkpoint_sha256 =
         Some(checkpoint_body_sha256(&first.body).expect("predecessor digest"));
-    second.signature =
-        kp.sign(&canonical_json_bytes(&second.body).expect("canonical checkpoint body"));
+    second.signature = sign_checkpoint_body(&kp, &second.body);
 
     let error =
         validate_checkpoint_predecessor(&first, &second).expect_err("continuity should fail");
@@ -1670,8 +1678,7 @@ fn validate_checkpoint_predecessor_rejects_wrong_predecessor_digest() {
     )
     .expect("build failed");
     second.body.previous_checkpoint_sha256 = Some("00".repeat(32));
-    second.signature =
-        kp.sign(&canonical_json_bytes(&second.body).expect("canonical second checkpoint body"));
+    second.signature = sign_checkpoint_body(&kp, &second.body);
 
     let error =
         validate_checkpoint_predecessor(&first, &second).expect_err("continuity should fail");
@@ -1724,8 +1731,7 @@ fn validate_checkpoint_transparency_rejects_predecessor_fork() {
     .expect("fork checkpoint");
     fork.body.previous_checkpoint_sha256 =
         Some(checkpoint_body_sha256(&first.body).expect("first checkpoint digest"));
-    fork.signature =
-        kp.sign(&canonical_json_bytes(&fork.body).expect("canonical fork checkpoint body"));
+    fork.signature = sign_checkpoint_body(&kp, &fork.body);
 
     let error = validate_checkpoint_transparency(&[first, second, fork])
         .expect_err("forked checkpoint set should fail");

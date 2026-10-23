@@ -697,6 +697,7 @@ pub(crate) mod tests {
         attenuation::{DelegationLink, DelegationLinkBody},
         scope::{Constraint, MonetaryAmount, Operation, ToolGrant},
     };
+    use chio_core::crypto::SigningMessage;
 
     fn tool_scope() -> ChioScope {
         ChioScope {
@@ -1203,7 +1204,10 @@ pub(crate) mod tests {
             ))
         }
 
-        fn sign_bytes(&self, message: chio_core::crypto::SigningMessage<'_>) -> chio_core::error::Result<chio_core::Signature> {
+        fn sign_bytes(
+            &self,
+            message: SigningMessage<'_>,
+        ) -> chio_core::error::Result<chio_core::Signature> {
             self.0.sign_bytes(message)
         }
     }

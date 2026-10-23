@@ -548,6 +548,31 @@ mod tests {
     }
 
     #[test]
+    fn admission_refuses_unwrapped_and_foreign_id_nonce_signatures() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let mut signed =
+            mint_execution_nonce(&kp, binding.clone(), &ExecutionNonceConfig::default(), now)
+                .unwrap();
+        for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &signed.nonce) {
+            signed.signature = signature;
+            assert!(
+                matches!(
+                    verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store),
+                    Err(ExecutionNonceError::InvalidSignature)
+                ),
+                "{label}"
+            );
+        }
+        assert!(!store.is_consumed(signed.nonce_id()).unwrap());
+    }
+
+    #[test]
     fn mint_then_verify_roundtrip() {
         let kp = Keypair::generate();
         let store = InMemoryExecutionNonceStore::with_clock(

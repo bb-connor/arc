@@ -228,7 +228,10 @@ impl chio_core::SigningBackend for UnavailableSigner {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         Ok(self.0.clone())
     }
-    fn sign_bytes(&self, _: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        _: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<chio_core::Signature, chio_core::Error> {
         Err(chio_core::Error::InvalidSignature(
             "test signer unavailable".into(),
         ))

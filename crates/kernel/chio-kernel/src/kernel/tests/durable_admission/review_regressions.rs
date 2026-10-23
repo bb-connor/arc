@@ -301,9 +301,14 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
         request.capability.signature = kernel
             .config
             .keypair
-            .sign_canonical(&request.capability.signing_body())
-            .expect("sign request")
-            .0;
+            .sign_wrapped(
+                chio_core::capability::token::CHIO_CAPABILITY_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(
+                    &request.capability.signing_body(),
+                )
+                .expect("canonical request"),
+            )
+            .expect("sign request");
         kernel.register_tool_server(Box::new(UnknownRead {
             inner: DurableUrlElicitationServer {
                 store: store.clone(),

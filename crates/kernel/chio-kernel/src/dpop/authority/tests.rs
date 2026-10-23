@@ -128,10 +128,6 @@ fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
 #[test]
 fn durable_dpop_rejects_weak_key_forgery() {
     let (cap, proof) = weak_key_forgery();
-    assert!(proof.body.agent_key.verify(
-        &canonical_json_bytes(&proof.body).unwrap(),
-        &proof.signature
-    ));
     assert!(matches!(
         verify(&proof, &cap, &authority(), NOW),
         Err(KernelError::Dpop(crate::dpop::DpopError::Signature))

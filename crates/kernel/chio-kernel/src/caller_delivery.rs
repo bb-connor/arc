@@ -5,7 +5,7 @@
 //! These codecs do not reinterpret reservation nonces as dispatch permissions.
 //! Kernel start publication and executor-ledger integration are separate ports.
 
-use chio_core::canonical::CanonicalBytes;
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::crypto::{sha256_hex, verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
