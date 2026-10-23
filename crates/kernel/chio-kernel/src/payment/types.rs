@@ -174,6 +174,10 @@ pub struct PaymentAuthorizeRequest {
     /// authorize this spend. A rail authorization must not outlive it.
     #[serde(skip)]
     pub authority_expires_at: Option<u64>,
+    /// True when `reference` is a durable admission operation that refuses a
+    /// second authorization attempt, which makes retries idempotent.
+    #[serde(skip)]
+    pub reference_is_durable: bool,
 }
 
 /// Rail references for one settled x402 prepayment, carried in
@@ -190,7 +194,9 @@ pub struct X402SettlementRef {
     pub payer: String,
     /// SHA-256 of the canonical JSON `paymentPayload`.
     pub payment_payload_digest: String,
-    /// SHA-256 of the canonical JSON facilitator settlement response.
+    /// SHA-256 of the canonical JSON of the decoded facilitator settlement
+    /// response (`success`, `errorReason`, `payer`, `transaction`, `network`).
+    /// Fields outside that projection are not covered.
     pub settlement_response_digest: String,
 }
 

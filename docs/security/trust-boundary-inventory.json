@@ -18983,7 +18983,6 @@
       "settlement_state#2::shared-reader::crates/kernel/chio-kernel/src/payment.rs::get_json"
     ],
     "crates/kernel/chio-kernel/src/payment/x402.rs": [
-      "call::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
       "settle::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json",
       "verify::shared-reader::crates/kernel/chio-kernel/src/payment.rs::post_json"
     ],

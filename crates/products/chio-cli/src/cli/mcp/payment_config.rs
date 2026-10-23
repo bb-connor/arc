@@ -11,10 +11,7 @@ use chio_kernel::{
 pub enum PaymentAdapterConfig {
     Sim,
     HttpX402 {
-        base_url: String,
-        bearer_token: Option<String>,
-        rpc_url: String,
-        rail: X402RailConfig,
+        adapter: X402PaymentAdapter,
     },
     HttpAcp {
         base_url: String,
@@ -37,9 +34,10 @@ impl PaymentAdapterConfig {
     /// `http-x402` also requires the rail it settles to:
     /// `CHIO_PAYMENT_X402_NETWORK` (CAIP-2, testnet allowlist only),
     /// `CHIO_PAYMENT_X402_ASSET` (EIP-3009 token contract),
-    /// `CHIO_PAYMENT_X402_CURRENCY` (currency code charged for that asset),
-    /// `CHIO_PAYMENT_X402_PAY_TO` (payee address), and
-    /// `CHIO_PAYMENT_X402_RPC_URL` (read-only JSON-RPC for recovery).
+    /// `CHIO_PAYMENT_X402_TOKEN_SYMBOL` (the charge currency on this rail),
+    /// `CHIO_PAYMENT_X402_TOKEN_DECIMALS` (ERC-20 `decimals`), and
+    /// `CHIO_PAYMENT_X402_PAY_TO` (payee address). The facilitator URL and the
+    /// rail are validated here, at load.
     ///
     /// Returns `Ok(None)` when `CHIO_PAYMENT_ADAPTER` is absent or set to `sim`
     /// (the caller then uses the documented default). Returns `Err` when the
@@ -61,19 +59,23 @@ impl PaymentAdapterConfig {
                 };
                 let network = X402Network::allowlisted(&required("CHIO_PAYMENT_X402_NETWORK")?)
                     .map_err(|error| format!("CHIO_PAYMENT_X402_NETWORK: {error}"))?;
+                let token_decimals = required("CHIO_PAYMENT_X402_TOKEN_DECIMALS")?
+                    .parse::<u8>()
+                    .map_err(|_| "CHIO_PAYMENT_X402_TOKEN_DECIMALS must be 0-255".to_string())?;
                 let rail = X402RailConfig::new(
                     network,
                     &required("CHIO_PAYMENT_X402_ASSET")?,
-                    &required("CHIO_PAYMENT_X402_CURRENCY")?,
+                    &required("CHIO_PAYMENT_X402_TOKEN_SYMBOL")?,
+                    token_decimals,
                     &required("CHIO_PAYMENT_X402_PAY_TO")?,
                 )
                 .map_err(|error| format!("http-x402 rail: {error}"))?;
-                Ok(Some(Self::HttpX402 {
-                    base_url,
-                    bearer_token,
-                    rpc_url: required("CHIO_PAYMENT_X402_RPC_URL")?,
-                    rail,
-                }))
+                let mut adapter = X402PaymentAdapter::new(base_url, rail)
+                    .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
+                if let Some(token) = bearer_token {
+                    adapter = adapter.with_bearer_token(token);
+                }
+                Ok(Some(Self::HttpX402 { adapter }))
             }
             "http-acp" => Ok(Some(Self::HttpAcp {
                 base_url,
@@ -92,18 +94,7 @@ impl PaymentAdapterConfig {
     /// fail-closed enforcement is the kernel runtime MustPrepay gate.
     pub fn validate(&self) -> Result<(), String> {
         match self {
-            Self::Sim => Ok(()),
-            Self::HttpX402 {
-                base_url, rpc_url, ..
-            } => {
-                if base_url.trim().is_empty() {
-                    return Err("http payment adapter requires a non-empty base_url".to_string());
-                }
-                if rpc_url.trim().is_empty() {
-                    return Err("http-x402 requires a non-empty rpc_url".to_string());
-                }
-                Ok(())
-            }
+            Self::Sim | Self::HttpX402 { .. } => Ok(()),
             Self::HttpAcp { base_url, .. } => {
                 if base_url.trim().is_empty() {
                     return Err("http payment adapter requires a non-empty base_url".to_string());
@@ -117,19 +108,7 @@ impl PaymentAdapterConfig {
     pub fn build_adapter(&self) -> Box<dyn PaymentAdapter> {
         match self {
             Self::Sim => Box::new(SimPaymentAdapter::new()),
-            Self::HttpX402 {
-                base_url,
-                bearer_token,
-                rpc_url,
-                rail,
-            } => {
-                let mut adapter =
-                    X402PaymentAdapter::new(base_url.clone(), rpc_url.clone(), rail.clone());
-                if let Some(token) = bearer_token {
-                    adapter = adapter.with_bearer_token(token.clone());
-                }
-                Box::new(adapter)
-            }
+            Self::HttpX402 { adapter } => Box::new(adapter.clone()),
             Self::HttpAcp {
                 base_url,
                 bearer_token,
@@ -172,42 +151,21 @@ mod tests {
         );
     }
 
-    fn test_rail() -> X402RailConfig {
-        X402RailConfig::new(
+    #[test]
+    fn http_x402_holds_an_adapter_validated_at_load() {
+        let rail = X402RailConfig::new(
             X402Network::allowlisted("eip155:84532").test_unwrap(),
             "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
             "USDC",
+            6,
             "0x2000000000000000000000000000000000000002",
         )
-        .test_unwrap()
-    }
-
-    #[test]
-    fn http_x402_requires_non_empty_base_url() {
+        .test_unwrap();
         let cfg = PaymentAdapterConfig::HttpX402 {
-            base_url: "   ".to_string(),
-            bearer_token: None,
-            rpc_url: "https://sepolia.base.org".to_string(),
-            rail: test_rail(),
+            adapter: X402PaymentAdapter::new("https://facilitator.example", rail).test_unwrap(),
         };
-        let error = cfg
-            .validate()
-            .test_expect_err("blank base_url must reject at load time");
-        assert_eq!(error, "http payment adapter requires a non-empty base_url");
-    }
-
-    #[test]
-    fn http_x402_requires_non_empty_rpc_url() {
-        let cfg = PaymentAdapterConfig::HttpX402 {
-            base_url: "https://facilitator.example".to_string(),
-            bearer_token: None,
-            rpc_url: " ".to_string(),
-            rail: test_rail(),
-        };
-        let error = cfg
-            .validate()
-            .test_expect_err("blank rpc_url must reject at load time");
-        assert_eq!(error, "http-x402 requires a non-empty rpc_url");
+        cfg.validate().test_unwrap();
+        assert_eq!(cfg.build_adapter().rail_id(), "x402");
     }
 
     #[test]

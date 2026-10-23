@@ -1144,6 +1144,7 @@ mod tests {
             }),
             x402: None,
             authority_expires_at: None,
+            reference_is_durable: false,
         };
         let request_digest = acp_request_digest(&payment_request)
             .expect("ACP authorization request should canonicalize");
@@ -1432,15 +1433,16 @@ mod tests {
     fn payment_adapters_redact_bearer_credentials_from_debug() {
         let x402 = X402PaymentAdapter::new(
             "https://payments.example",
-            "https://rpc.example",
             X402RailConfig::new(
                 X402Network::allowlisted("eip155:84532").expect("allowlisted network"),
                 "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
                 "USDC",
+                6,
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
         )
+        .expect("valid facilitator")
         .with_bearer_token("x402-secret");
         let acp = AcpPaymentAdapter::new("https://acp.example").with_bearer_token("acp-secret");
 
@@ -1507,6 +1509,7 @@ mod tests {
             commerce: None,
             x402: None,
             authority_expires_at: None,
+            reference_is_durable: false,
         }
     }
 }

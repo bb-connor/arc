@@ -23,13 +23,16 @@ fn test_rail() -> X402RailConfig {
         X402Network::allowlisted(NETWORK).expect("allowlisted network"),
         ASSET,
         "USDC",
+        6,
         PAY_TO,
     )
     .expect("valid rail")
 }
 
-fn adapter(facilitator: &str, rpc: &str) -> X402PaymentAdapter {
-    X402PaymentAdapter::new(facilitator, rpc, test_rail()).with_timeout(Duration::from_secs(2))
+fn adapter(facilitator: &str) -> X402PaymentAdapter {
+    X402PaymentAdapter::new(facilitator, test_rail())
+        .expect("valid facilitator")
+        .with_timeout(Duration::from_secs(2))
 }
 
 fn requirements() -> X402PaymentRequirements {
@@ -78,6 +81,7 @@ fn request(context: Option<X402PaymentContext>) -> PaymentAuthorizeRequest {
         commerce: None,
         x402: context,
         authority_expires_at: Some(VALID_BEFORE),
+        reference_is_durable: true,
     }
 }
 
@@ -97,7 +101,7 @@ fn refused(error: PaymentError, refusal: X402Refusal) -> bool {
 fn refuse_before_network(mutate: impl FnOnce(&mut PaymentAuthorizeRequest)) -> PaymentError {
     let mut request = request(Some(context()));
     mutate(&mut request);
-    adapter(UNREACHABLE, UNREACHABLE)
+    adapter(UNREACHABLE)
         .authorize(&request)
         .expect_err("the payment must be refused")
 }
@@ -112,7 +116,7 @@ fn authorize_verifies_then_settles_and_returns_the_rail_identity() {
         (200, serde_json::json!({ "isValid": true, "payer": PAYER })),
         (200, settle_success()),
     ]);
-    let authorization = adapter(&url, UNREACHABLE)
+    let authorization = adapter(&url)
         .with_bearer_token("facilitator-token")
         .authorize(&request(Some(context())))
         .expect("payment settles");
@@ -151,7 +155,7 @@ fn authorize_verifies_then_settles_and_returns_the_rail_identity() {
 
 #[test]
 fn authorize_refuses_a_missing_payment() {
-    let error = adapter(UNREACHABLE, UNREACHABLE)
+    let error = adapter(UNREACHABLE)
         .authorize(&request(None))
         .expect_err("no payment presented");
     assert!(refused(error, X402Refusal::PaymentMissing));
@@ -225,9 +229,6 @@ fn authorize_refuses_a_payment_to_another_rail() {
     });
     assert!(refused(error, X402Refusal::RailMismatch));
 
-    let error = refuse_before_network(|request| request.currency = "USD".to_owned());
-    assert!(refused(error, X402Refusal::RailMismatch));
-
     let error = refuse_before_network(|request| {
         x402_mut(request).payment_payload.payload.authorization.to = PAYER.to_owned();
     });
@@ -288,7 +289,7 @@ fn authorize_refuses_a_malformed_authorization() {
 fn authorize_stops_at_a_rejected_verification() {
     let (url, requests, handle) =
         spawn_once_json_server(200, serde_json::json!({ "isValid": false }));
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&request(Some(context())))
         .expect_err("verification rejected");
     handle.join().expect("facilitator stub exits");
@@ -307,7 +308,7 @@ fn authorize_stops_at_a_rejected_verification() {
 #[test]
 fn authorize_refuses_when_verification_is_unavailable() {
     let (url, _requests, handle) = spawn_once_json_server(503, serde_json::json!({}));
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&request(Some(context())))
         .expect_err("verification unavailable");
     handle.join().expect("facilitator stub exits");
@@ -328,7 +329,7 @@ fn unconfirmed_settlement_is_ambiguous() {
             }),
         ),
     ]);
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&request(Some(context())))
         .expect_err("settlement not confirmed");
     handle.join().expect("facilitator stub exits");
@@ -345,7 +346,7 @@ fn settlement_on_another_network_is_rejected() {
         (200, serde_json::json!({ "isValid": true })),
         (200, response),
     ]);
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&request(Some(context())))
         .expect_err("settlement binding invalid");
     handle.join().expect("facilitator stub exits");
@@ -360,7 +361,7 @@ fn unavailable_settlement_stays_unavailable() {
         (200, serde_json::json!({ "isValid": true })),
         (503, serde_json::json!({})),
     ]);
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&request(Some(context())))
         .expect_err("settlement unavailable");
     handle.join().expect("facilitator stub exits");
@@ -369,150 +370,97 @@ fn unavailable_settlement_stays_unavailable() {
     );
 }
 
+fn no_status_query(error: PaymentError) -> bool {
+    matches!(error, PaymentError::Unavailable(message) if message == "x402 has no settlement status query")
+}
+
 #[test]
-fn recovery_without_the_authorization_identity_is_unavailable() {
-    let error = adapter(UNREACHABLE, UNREACHABLE)
-        .settlement_state("operation-1", None)
-        .expect_err("no identity");
-    assert!(
-        matches!(error, PaymentError::Unavailable(message) if message == "x402 settlement state requires the authorization identity")
+fn recovery_has_no_rail_status_query() {
+    let adapter = adapter(UNREACHABLE);
+    assert!(no_status_query(
+        adapter
+            .settlement_state("operation-1", None)
+            .expect_err("no status query")
+    ));
+    assert!(no_status_query(
+        adapter
+            .settlement_state("operation-1", Some(&identity_string()))
+            .expect_err("no status query")
+    ));
+}
+
+#[test]
+fn authorize_refuses_a_reference_without_durable_admission() {
+    let error = refuse_before_network(|request| request.reference_is_durable = false);
+    assert!(refused(error, X402Refusal::DurableReferenceRequired));
+}
+
+#[test]
+fn authorize_refuses_a_charge_outside_the_token_base_unit() {
+    let error = refuse_before_network(|request| request.currency = "USD".to_owned());
+    assert!(refused(error, X402Refusal::UnitMismatch));
+}
+
+#[test]
+fn rail_config_refuses_invalid_values() {
+    let network = || X402Network::allowlisted(NETWORK).expect("allowlisted network");
+    assert_eq!(
+        X402RailConfig::new(network(), ASSET, "USDC", 37, PAY_TO),
+        Err(X402Refusal::InvalidRailConfig)
     );
-}
-
-fn rpc_result(result: serde_json::Value) -> (u16, serde_json::Value) {
-    (
-        200,
-        serde_json::json!({ "jsonrpc": "2.0", "id": 1, "result": result }),
-    )
-}
-
-fn state_word(used: bool) -> serde_json::Value {
-    serde_json::json!(format!("0x{:064}", u8::from(used)))
-}
-
-fn log(topic: &str) -> serde_json::Value {
-    serde_json::json!([{
-        "address": ASSET,
-        "topics": [topic, format!("0x{:0>64}", &PAYER[2..]), NONCE],
-        "transactionHash": TRANSACTION,
-        "removed": false,
-    }])
-}
-
-#[test]
-fn used_authorization_with_its_event_is_settled() {
-    let (rpc, requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(true)),
-        rpc_result(log(AUTHORIZATION_USED_TOPIC)),
-    ]);
-    let identity = identity_string();
-    let state = adapter(UNREACHABLE, &format!("{rpc}/rpc"))
-        .settlement_state("operation-1", Some(&identity))
-        .expect("rail state");
-    handle.join().expect("rpc stub exits");
-
-    let RailSettlementState::Settled {
-        authorization_id,
-        result,
-    } = state
-    else {
-        panic!("expected a settled state, got {state:?}");
-    };
-    assert_eq!(authorization_id, identity);
-    assert_eq!(result.transaction_id, identity);
-    assert_eq!(result.settlement_status, RailSettlementStatus::Settled);
-    assert_eq!(result.metadata["transaction"], TRANSACTION);
-
-    let call = requests.recv().expect("eth_call request");
-    assert!(call.starts_with("POST /rpc HTTP/1.1"));
-    assert!(call.contains("\"method\":\"eth_call\""));
-    assert!(call.contains(&format!(
-        "\"data\":\"0xe94a0102{:0>64}{}\"",
-        &PAYER[2..],
-        &NONCE[2..]
-    )));
-    let logs = requests.recv().expect("eth_getLogs request");
-    assert!(logs.contains("\"method\":\"eth_getLogs\""));
-    assert!(logs.contains(AUTHORIZATION_USED_TOPIC));
-}
-
-#[test]
-fn canceled_authorization_moved_no_money() {
-    let (rpc, _requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(true)),
-        rpc_result(serde_json::json!([])),
-        rpc_result(log(AUTHORIZATION_CANCELED_TOPIC)),
-    ]);
-    let state = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect("rail state");
-    handle.join().expect("rpc stub exits");
-    assert_eq!(state, RailSettlementState::NoAuthorization);
-}
-
-#[test]
-fn consumed_authorization_without_an_event_is_unavailable() {
-    let (rpc, _requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(true)),
-        rpc_result(serde_json::json!([])),
-        rpc_result(serde_json::json!([])),
-    ]);
-    let error = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect_err("no event");
-    handle.join().expect("rpc stub exits");
-    assert!(
-        matches!(error, PaymentError::Unavailable(message) if message == "x402 authorization is consumed but its rail event was not found")
+    assert_eq!(
+        X402RailConfig::new(network(), ASSET, "US DC", 6, PAY_TO),
+        Err(X402Refusal::InvalidRailConfig)
+    );
+    assert_eq!(
+        X402RailConfig::new(network(), "0x1234", "USDC", 6, PAY_TO),
+        Err(X402Refusal::InvalidRailConfig)
     );
 }
 
 #[test]
-fn unused_authorization_past_valid_before_moved_no_money() {
-    let (rpc, _requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(false)),
-        rpc_result(serde_json::json!({ "timestamp": format!("0x{VALID_BEFORE:x}") })),
-    ]);
-    let state = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect("rail state");
-    handle.join().expect("rpc stub exits");
-    assert_eq!(state, RailSettlementState::NoAuthorization);
+fn facilitator_url_is_validated_at_construction() {
+    for url in [
+        "http://facilitator.example",
+        "https://facilitator.example?key=secret",
+        "https://user:pass@facilitator.example",
+        "https://facilitator.example#fragment",
+        "not a url",
+    ] {
+        let error = X402PaymentAdapter::new(url, test_rail()).expect_err(url);
+        assert!(
+            matches!(&error, PaymentError::RailError(message) if message == "payment rail URL is invalid"),
+            "{url}: {error:?}"
+        );
+    }
+    X402PaymentAdapter::new("https://facilitator.example/x402", test_rail())
+        .expect("an https facilitator with a path is valid");
 }
 
 #[test]
-fn unused_live_authorization_is_unavailable() {
-    let (rpc, _requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(false)),
-        rpc_result(serde_json::json!({ "timestamp": format!("0x{:x}", VALID_BEFORE - 1) })),
+fn settlement_without_a_payer_is_rejected() {
+    let mut response = settle_success();
+    response
+        .as_object_mut()
+        .expect("settle response object")
+        .remove("payer");
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (200, response),
     ]);
-    let error = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect_err("still live");
-    handle.join().expect("rpc stub exits");
+    let error = adapter(&url)
+        .authorize(&request(Some(context())))
+        .expect_err("payer missing");
+    handle.join().expect("facilitator stub exits");
     assert!(
-        matches!(error, PaymentError::Unavailable(message) if message == "x402 authorization is unused and still valid")
-    );
-}
-
-#[test]
-fn rpc_errors_are_unavailable() {
-    let (rpc, _requests, handle) = spawn_once_json_server(
-        200,
-        serde_json::json!({ "jsonrpc": "2.0", "id": 1, "error": { "code": -32000, "message": "boom" } }),
-    );
-    let error = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect_err("rpc error");
-    handle.join().expect("rpc stub exits");
-    assert!(
-        matches!(error, PaymentError::Unavailable(message) if message == "x402 rail RPC is unavailable")
+        matches!(error, PaymentError::RailError(message) if message == "x402 settlement response binding is invalid")
     );
 }
 
 #[test]
 fn recovery_refuses_an_identity_outside_the_configured_rail() {
     let other_asset = identity_string().replace(&ASSET.to_ascii_lowercase(), PAY_TO);
-    let error = adapter(UNREACHABLE, UNREACHABLE)
+    let error = adapter(UNREACHABLE)
         .settlement_state("operation-1", Some(&other_asset))
         .expect_err("other asset");
     assert!(
@@ -560,7 +508,7 @@ fn non_canonical_authorization_identities_are_refused_exactly() {
             None,
             "{invalid}"
         );
-        let error = adapter(UNREACHABLE, UNREACHABLE)
+        let error = adapter(UNREACHABLE)
             .settlement_state("operation-1", Some(&invalid))
             .expect_err("non-canonical identity");
         assert!(
@@ -576,7 +524,7 @@ fn valid_before_is_bound_to_exactly_the_authority_expiry() {
         spawn_once_json_server(200, serde_json::json!({ "isValid": false }));
     let mut at_expiry = request(Some(context()));
     at_expiry.authority_expires_at = Some(VALID_BEFORE);
-    let error = adapter(&url, UNREACHABLE)
+    let error = adapter(&url)
         .authorize(&at_expiry)
         .expect_err("verification stub rejects");
     handle.join().expect("facilitator stub exits");
@@ -588,33 +536,15 @@ fn valid_before_is_bound_to_exactly_the_authority_expiry() {
 
     let mut one_second_past = request(Some(context()));
     one_second_past.authority_expires_at = Some(VALID_BEFORE - 1);
-    let error = adapter(UNREACHABLE, UNREACHABLE)
+    let error = adapter(UNREACHABLE)
         .authorize(&one_second_past)
         .expect_err("one second past the authority expiry");
     assert!(refused(error, X402Refusal::OutlivesAuthority));
 }
 
 #[test]
-fn missing_chain_time_is_unavailable() {
-    let (rpc, _requests, handle) = spawn_json_server(vec![
-        rpc_result(state_word(false)),
-        (
-            200,
-            serde_json::json!({ "jsonrpc": "2.0", "id": 1, "error": { "code": -32000, "message": "no block" } }),
-        ),
-    ]);
-    let error = adapter(UNREACHABLE, &rpc)
-        .settlement_state("operation-1", Some(&identity_string()))
-        .expect_err("no chain time");
-    handle.join().expect("rpc stub exits");
-    assert!(
-        matches!(error, PaymentError::Unavailable(message) if message == "x402 rail RPC is unavailable")
-    );
-}
-
-#[test]
 fn final_prepayment_has_no_release_or_refund() {
-    let adapter = adapter(UNREACHABLE, UNREACHABLE);
+    let adapter = adapter(UNREACHABLE);
     assert!(
         matches!(adapter.release("authorization", "operation-1"), Err(PaymentError::Unavailable(message)) if message == "x402 final prepayment has no releasable hold")
     );

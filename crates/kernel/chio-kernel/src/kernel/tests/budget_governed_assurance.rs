@@ -1084,16 +1084,17 @@ fn governed_x402_without_a_presented_payment_denies_before_any_rail_call() {
     kernel.set_payment_adapter(Box::new(
         X402PaymentAdapter::new(
             "http://127.0.0.1:1",
-            "http://127.0.0.1:1",
             crate::payment::X402RailConfig::new(
                 crate::payment::X402Network::allowlisted("eip155:84532")
                     .expect("allowlisted network"),
                 "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
                 "USD",
+                2,
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
         )
+        .expect("valid facilitator")
         .with_timeout(Duration::from_millis(50)),
     ));
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
@@ -1245,6 +1246,31 @@ fn payment_authority_expiry_is_the_earliest_capability_or_approval_expiry() {
     assert_eq!(
         ChioKernel::payment_authority_expires_at(&request),
         1_744_000_100
+    );
+
+    request.threshold_approval_proposal = Some(
+        chio_core::capability::governance::ThresholdApprovalProposal {
+            body: chio_core::capability::governance::ThresholdApprovalProposalBody {
+                schema: "proposal-schema".to_string(),
+                proposal_id: "proposal-authority-expiry".to_string(),
+                request_id: request_id.to_string(),
+                governed_intent_hash: "intent-hash".to_string(),
+                subject: agent_kp.public_key(),
+                authorizing_capability_digest: "capability-digest".to_string(),
+                policy_hash: "policy-hash".to_string(),
+                threshold: 1,
+                eligible_set_digest: "eligible-set".to_string(),
+                proposal_created_at: 1_744_000_000,
+                proposal_deadline: 1_744_000_050,
+                policy_authority: kernel.config.keypair.public_key(),
+            },
+            algorithm: None,
+            signature: kernel.config.keypair.sign(b"payment-authority-expiry"),
+        },
+    );
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        1_744_000_050
     );
 }
 
