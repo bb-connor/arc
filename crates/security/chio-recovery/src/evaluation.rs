@@ -1,4 +1,5 @@
 //! Finite deterministic evaluation over supplied data, without ambient state.
+use crate::work::Work;
 use alloc::vec::Vec;
 use chio_security_types::recovery::{
     BoundedList, ContractError, EffectObservationV1, ExplanationAssessmentV1,
@@ -8,37 +9,6 @@ use chio_security_types::recovery::{
     RecoveryRemedyRegistryV1, RecoveryRemedyTemplateV1, RecoverySnapshotV1, SafeInteger,
 };
 use chio_security_types::InformationLabel;
-
-/// A fixed allowance charged before each bounded step.
-struct Work {
-    used: u64,
-    ceiling: u64,
-}
-
-impl Work {
-    const fn new(ceiling: u64) -> Self {
-        Self { used: 0, ceiling }
-    }
-
-    fn spend(&mut self, amount: u64) -> Result<(), ContractError> {
-        let next = self
-            .used
-            .checked_add(amount)
-            .ok_or(ContractError::ArithmeticOverflow)?;
-        if next > self.ceiling {
-            return Err(ContractError::WorkBudgetExceeded);
-        }
-        self.used = next;
-        Ok(())
-    }
-
-    /// One unit per label operation. Label cardinality and identifier sizes
-    /// have their own protocol ceilings, so a valid label cannot alone consume
-    /// the whole allowance.
-    fn label(&mut self, _: &InformationLabel) -> Result<(), ContractError> {
-        self.spend(1)
-    }
-}
 
 /// Advisory results under the observed basis. Every template and fact
 /// identity is checked before evaluation, even beyond a search bound.
@@ -83,7 +53,7 @@ pub fn evaluate_explanation(
         planner_version: RecoveryPlannerVersion::V1,
         assessment,
         complete,
-        work_used: SafeInteger::new(work.used)?,
+        work_used: SafeInteger::new(work.used())?,
         classification,
         candidates: BoundedList::new(candidates)?,
     })
@@ -163,7 +133,7 @@ fn join(
         .map_err(|_| ContractError::WorkBudgetExceeded)
 }
 
-fn assess(
+pub(crate) fn assess(
     snapshot: &RecoverySnapshotV1,
     template: &RecoveryRemedyTemplateV1,
     work: &mut Work,

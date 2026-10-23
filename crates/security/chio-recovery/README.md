@@ -1,7 +1,7 @@
 # chio-recovery
 
-Pure, deterministic recovery explanations for Chio. The crate defaults to
-`no_std + alloc` and depends only on the portable core and security data types.
+Pure, deterministic recovery explanations and graph planning for Chio. The crate defaults to
+`no_std + alloc` and uses portable core/security data types and the pure semantic-contract validator.
 Its additive `std` feature adds no runtime, storage, transport, clock, signer or
 random-number source.
 
@@ -27,3 +27,24 @@ admission and capture path.
 
 Signed reports and views use their own signature domains and have no conversion
 into `SignedRecoveryGrant` or `SignedDisclosureGrant`.
+
+
+The classified graph planner accepts explicit registered plans, with up to 16
+offers, 8 top-level steps, 32 total nodes and depth 8 under one allowance of at
+most 4,096 work units. The semantic graph representation further limits each
+registered graph to 16 nodes. Deployments can lower these limits.
+
+- `plan` validates scope, intent, graph identities, dependencies and estimated
+  costs, then returns plans by identifier with deterministic topological steps.
+  Every step is assessed against the supplied snapshot. A future step never
+  supplies missing evidence for a later step.
+- Any exhausted limit returns `SearchBoundReached`, the exact limit and a
+  `Top` classification, with no partially searched candidates. It makes no
+  validity claim about unsearched graphs.
+- All input labels contribute to the result classification, including unused
+  remedies. Planner results are classified input to an authorized consumer;
+  they are not recipient-safe projections or signed materialized offers.
+- Candidate scope, workflow, intent and plan identities remain the supplied
+  claims. The native consumer must authenticate workflow ownership and recheck
+  current authority before materialization. Candidate plans cannot convert into
+  recovery grants.
