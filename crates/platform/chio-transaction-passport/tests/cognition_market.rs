@@ -4,31 +4,18 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use chio_core_types::canonical_json_bytes;
-use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_core_types::receipt::metadata::{
-    DeliveryResult, FindingDelivery, FindingDeliverySettlementMode, FindingMediaTypeCheck,
-    FindingTransformProfile, FINDING_DELIVERY_SCHEMA,
-};
 use chio_finding::{
     build_status_inclusion_proof_input, build_status_non_inclusion_proof_input, compute_finding_id,
-    compute_profile_id, compute_report_id, compute_status_epoch_id, derive_purchase_key,
-    finding_checkpoint_log_id, sign_finding, signed_envelope_sha256, FindingAuthorityKeyPolicy,
-    FindingAuthorityStatus, FindingBbsIssuerPolicy, FindingChallengeVerifierProfile,
-    FindingCheckpointLogPolicy, FindingClaimedVerdict, FindingFacetKind, FindingFacetOutcome,
-    FindingFacetResult, FindingPredicate, FindingPurchaseRecord, FindingReceiptRole,
-    FindingReceiptSignerRole, FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind,
-    FindingReplayRecipeInput, FindingResourceCaps, FindingStatusEpoch,
-    FindingStatusFreshnessPolicy, FindingStatusOperatorAuthorization, FindingStatusOperatorRole,
-    FindingStatusProofInput, FindingVerifierReport, SignedFindingChallengeVerifierProfile,
-    FINDING_AUTHORITY_STATUS_SCHEMA_V1, FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1,
-    FINDING_PURCHASE_RECORD_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
+    compute_profile_id, compute_report_id, compute_status_epoch_id, sign_finding,
+    signed_envelope_sha256, FindingAuthorityKeyPolicy, FindingAuthorityStatus,
+    FindingChallengeVerifierProfile, FindingFacetKind, FindingFacetOutcome, FindingPurchaseRecord,
+    FindingReplayRecipeInput, FindingStatusEpoch, FindingStatusFreshnessPolicy,
+    FindingStatusOperatorAuthorization, FindingStatusOperatorRole, FindingStatusProofInput,
+    FindingVerifierReport, SignedFindingChallengeVerifierProfile,
+    FINDING_AUTHORITY_STATUS_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
     FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
-    FINDING_VERIFIER_REPORT_SCHEMA_V1,
-};
-use chio_open_market::purchase_verification::{
-    derive_payment_operation_id, derive_purchase_intent_id,
 };
 use chio_revocation_oracle::{
     finding_status_empty_leaf_hash, FindingStatusSparseMap, FINDING_STATUS_BRANCH_DOMAIN,
@@ -170,18 +157,6 @@ fn verifier_keypair() -> Keypair {
     Keypair::from_seed(&[9_u8; 32])
 }
 
-fn verifier_signer_policy() -> FindingAuthorityKeyPolicy {
-    FindingAuthorityKeyPolicy {
-        authority_id: "qualified-finding-verifier".to_string(),
-        key: verifier_keypair().public_key(),
-        key_epoch: 1,
-        valid_from: GENERATED_AT - 60,
-        valid_until: GENERATED_AT + 600,
-        rotation_policy_ref: "rotation/qualified-finding-verifier-v1".to_string(),
-        revocation_status_ref: "revocations/qualified-finding-verifier-v1".to_string(),
-    }
-}
-
 fn profile_key_policy(seed: u8, authority_id: &str) -> FindingAuthorityKeyPolicy {
     FindingAuthorityKeyPolicy {
         authority_id: authority_id.to_owned(),
@@ -194,66 +169,16 @@ fn profile_key_policy(seed: u8, authority_id: &str) -> FindingAuthorityKeyPolicy
     }
 }
 
-#[allow(
-    clippy::expect_used,
-    reason = "The fixture uses an Ed25519 checkpoint key."
-)]
-fn verifier_profile() -> TestResult<SignedFindingChallengeVerifierProfile> {
-    let governance = Keypair::from_seed(&[8_u8; 32]);
-    let mut profile = FindingChallengeVerifierProfile {
-        schema: FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1.to_owned(),
-        profile_id: String::new(),
-        governance_authority: governance.public_key(),
-        operator: "qualified-market-operator".to_owned(),
-        receipt_signers: vec![
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Production,
-                policy: profile_key_policy(18, "production-receipts"),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Delivery,
-                policy: profile_key_policy(19, "delivery-receipts"),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Replay,
-                policy: profile_key_policy(20, "replay-receipts"),
-            },
-        ],
-        checkpoint_logs: vec![FindingCheckpointLogPolicy {
-            log_id: finding_checkpoint_log_id(&profile_key_policy(21, "checkpoint-log").key)
-                .expect("Ed25519 checkpoint fixture"),
-            signer: profile_key_policy(21, "checkpoint-log"),
-        }],
-        bbs_projection_issuer: FindingBbsIssuerPolicy {
-            issuer_fingerprint: "qualified-bbs-issuer".to_owned(),
-            key_hex: HEX64.to_owned(),
-            registry_ref: "registry/qualified-bbs-issuers".to_owned(),
-            key_epoch: 1,
-            valid_from: GENERATED_AT - 60,
-            valid_until: GENERATED_AT + 600,
-            revocation_status_ref: "revocations/qualified-bbs-issuer-v1".to_owned(),
-        },
-        allowed_runner_manifests: vec!["66".repeat(32)],
-        required_receipt_semantics: "chio.mediated_spend.v1".to_owned(),
-        resolver_policy_ref: "resolver/qualified-finding-v1".to_owned(),
-        retention_policy_ref: "retention/qualified-finding-v1".to_owned(),
-        resource_caps: FindingResourceCaps {
-            max_recipe_bytes: 65_536,
-            max_evidence_receipts: 8,
-            max_runtime_secs: 600,
-            max_memory_bytes: 1_073_741_824,
-        },
-        predicate_engine: "chio-replay-v1".to_owned(),
-        allowed_predicates: vec![FindingPredicate::BaselineFailsCandidatePassesV1],
-        required_facets: Vec::new(),
-        verifier_report_signer: verifier_signer_policy(),
-        purchase_authority: profile_key_policy(11, "purchase-authority"),
-        failed_delivery_authority: profile_key_policy(23, "failed-delivery-authority"),
-        issued_at: GENERATED_AT - 60,
-        expires_at: GENERATED_AT + 600,
-    };
-    profile.profile_id = compute_profile_id(&profile)?;
-    Ok(SignedExportEnvelope::sign(profile, &governance)?)
+fn golden_bytes(relative: &str) -> TestResult<Vec<u8>> {
+    Ok(std::fs::read(
+        workspace_root().join(GOLDEN_RELATIVE).join(relative),
+    )?)
+}
+
+fn golden_verifier_profile() -> TestResult<SignedFindingChallengeVerifierProfile> {
+    Ok(serde_json::from_slice(&golden_bytes(
+        "deployment/verifier-profile.json",
+    )?)?)
 }
 
 fn status_keypair() -> Keypair {
@@ -275,10 +200,6 @@ fn status_authorization(keypair: &Keypair) -> FindingStatusOperatorAuthorization
         },
         revoked_from: None,
     }
-}
-
-fn status_proof_bytes() -> TestResult<Vec<u8>> {
-    status_proof_bytes_for(false)
 }
 
 fn status_proof_bytes_for(inclusion: bool) -> TestResult<Vec<u8>> {
@@ -338,63 +259,26 @@ fn status_proof_bytes_for_finding(inclusion: bool, finding_id: &str) -> TestResu
 }
 
 fn recipe_bytes(payload_suffix: &str) -> TestResult<Vec<u8>> {
-    let profile = verifier_profile()?;
+    let profile = golden_verifier_profile()?;
     recipe_bytes_for_profile(payload_suffix, &signed_envelope_sha256(&profile)?)
 }
 
+/// The golden replay recipe with its payload digest and pinned profile
+/// digest replaced.
 fn recipe_bytes_for_profile(
     payload_suffix: &str,
     verifier_profile_digest: &str,
 ) -> TestResult<Vec<u8>> {
-    let caps = FindingResourceCaps {
-        max_recipe_bytes: 65_536,
-        max_evidence_receipts: 8,
-        max_runtime_secs: 600,
-        max_memory_bytes: 1_073_741_824,
-    };
-    let environment = FindingRecipeEnvironment {
-        runtime_image_sha256: "22".repeat(32),
-        platform: "linux-amd64".to_string(),
-        network_policy: "deny_all".to_string(),
-        clock_policy: "fixed".to_string(),
-        randomness_policy: "seeded".to_string(),
-        locale: "C.UTF-8".to_string(),
-        timezone: "UTC".to_string(),
-    };
-    let recipe = FindingReplayRecipeInput {
-        schema: FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1.to_string(),
-        decision_rule_ref: "decision/baseline-fails-candidate-passes-v1".to_string(),
-        verifier_profile_envelope_sha256: verifier_profile_digest.to_owned(),
-        context_sha256: "aa".repeat(32),
-        payload_sha256: payload_suffix.repeat(32),
-        runner_server: "qualified-replay-runner".to_string(),
-        runner_tool: "replay_patch".to_string(),
-        runner_manifest_sha256: "66".repeat(32),
-        phases: vec![
-            FindingRecipePhase {
-                phase: FindingRecipePhaseKind::Baseline,
-                input_bundle_sha256: "77".repeat(32),
-                payload_application: "not_applied".to_string(),
-            },
-            FindingRecipePhase {
-                phase: FindingRecipePhaseKind::Candidate,
-                input_bundle_sha256: "88".repeat(32),
-                payload_application: "apply_patch_v1".to_string(),
-            },
-        ],
-        parameters_sha256: "99".repeat(32),
-        environment,
-        resource_bounds: caps,
-        predicate: FindingPredicate::BaselineFailsCandidatePassesV1,
-        pre_run_template_sha256: "aa".repeat(32),
-        claimed_verdict: FindingClaimedVerdict::PredicateHolds,
-    };
+    let mut recipe: FindingReplayRecipeInput =
+        serde_json::from_slice(&golden_bytes("attachments/replay-recipe-input.json")?)?;
+    recipe.payload_sha256 = payload_suffix.repeat(32);
+    recipe.verifier_profile_envelope_sha256 = verifier_profile_digest.to_owned();
     recipe.validate()?;
     Ok(canonical_json_bytes(&recipe)?)
 }
 
 fn report_bytes(recipe: &[u8], status: &[u8]) -> TestResult<Vec<u8>> {
-    let profile = verifier_profile()?;
+    let profile = golden_verifier_profile()?;
     report_bytes_for_profile(
         recipe,
         status,
@@ -403,97 +287,25 @@ fn report_bytes(recipe: &[u8], status: &[u8]) -> TestResult<Vec<u8>> {
     )
 }
 
+/// The golden verifier report re-bound to `recipe`, `status`, and the given
+/// profile, then re-signed by the verifier key.
 fn report_bytes_for_profile(
     recipe: &[u8],
     status: &[u8],
     verifier_profile_id: &str,
     verifier_profile_digest: &str,
 ) -> TestResult<Vec<u8>> {
-    let verifier = verifier_keypair();
-    let facets = FindingFacetKind::ALL
-        .into_iter()
-        .map(|facet| FindingFacetResult {
-            facet,
-            outcome: FindingFacetOutcome::Verified,
-            reason: "independently verified for the bounded cognition-market profile".to_string(),
-            evidence_refs: Vec::new(),
-        })
-        .collect();
-    let mut report = FindingVerifierReport {
-        schema: FINDING_VERIFIER_REPORT_SCHEMA_V1.to_string(),
-        report_id: String::new(),
-        finding_id: FINDING_ID.to_string(),
-        finding_artifact_sha256: sha256_hex(&expiry_regressions::finding_fixture_bytes()?),
-        verifier_profile_id: verifier_profile_id.to_owned(),
-        verifier_profile_envelope_sha256: verifier_profile_digest.to_owned(),
-        verifier_implementation_id: "chio-finding-verifier/0.1-qualified".to_string(),
-        resolved_evidence_bundle_sha256: "34".repeat(32),
-        replay_recipe_input_sha256: Some(sha256_hex(recipe)),
-        status_proof_input_sha256: Some(sha256_hex(status)),
-        finding_delivery_receipt_id: Some("89".repeat(32)),
-        finding_delivery: Some(finding_delivery_overlay()),
-        trust_root_snapshot_sha256: "45".repeat(32),
-        resolver_policy_sha256: "56".repeat(32),
-        trusted_time_input_sha256: "67".repeat(32),
-        facets,
-        backing_allocation_id: Some("78".repeat(32)),
-        verifier_authority: verifier.public_key(),
-        verifier_key_epoch: 1,
-        evaluation_time: CHECKED_AT,
-    };
+    let golden: SignedExportEnvelope<FindingVerifierReport> =
+        serde_json::from_slice(&golden_bytes("report.json")?)?;
+    let mut report = golden.body;
+    report.verifier_profile_id = verifier_profile_id.to_owned();
+    report.verifier_profile_envelope_sha256 = verifier_profile_digest.to_owned();
+    report.replay_recipe_input_sha256 = Some(sha256_hex(recipe));
+    report.status_proof_input_sha256 = Some(sha256_hex(status));
     report.report_id = compute_report_id(&report)?;
     report.validate()?;
-    let signed = SignedExportEnvelope::sign(report, &verifier)?;
+    let signed = SignedExportEnvelope::sign(report, &verifier_keypair())?;
     Ok(canonical_json_bytes(&signed)?)
-}
-
-fn claim_set_bytes(
-    report_path: &str,
-    purchase_record_path: &str,
-    recipe_path: &str,
-    status_path: &str,
-) -> TestResult<Vec<u8>> {
-    let paths = [
-        vec![report_path, purchase_record_path],
-        vec![report_path, recipe_path],
-        vec![report_path, status_path],
-        vec![report_path],
-    ];
-    let claims = COGNITION_MARKET_CLAIMS
-        .iter()
-        .zip(paths)
-        .map(|(claim_id, evidence)| {
-            json!({
-                "claim_id": claim_id,
-                "status": "verified",
-                "required_evidence": evidence,
-                "evidence_refs": evidence,
-                "verifier_module": "chio-finding-verifier"
-            })
-        })
-        .collect::<Vec<_>>();
-    Ok(canonical_json_bytes(&json!({
-        "schema": "chio.transaction.claim-set.v1",
-        "id": "claim-set-cognition-market-qualified-profile",
-        "issued_at": "2026-07-31T20:00:30Z",
-        "subject": {
-            "kind": "finding",
-            "id": FINDING_ID,
-            "artifact_sha256": sha256_hex(&expiry_regressions::finding_fixture_bytes()?)
-        },
-        "claims": claims
-    }))?)
-}
-
-fn verifier_policy_bytes() -> TestResult<Vec<u8>> {
-    Ok(canonical_json_bytes(&json!({
-        "schema": "chio.transaction.verifier-policy.v1",
-        "id": "verifier-policy-cognition-market-qualified-profile",
-        "issued_at": "2026-07-31T20:00:30Z",
-        "required_claims": COGNITION_MARKET_CLAIMS,
-        "omitted_claims": [],
-        "required_evidence_roles": ["report", "commerce-order-context", "advisory-observation"]
-    }))?)
 }
 
 fn node(path: &str, role: &str, schema: &str, bytes: &[u8]) -> Value {
@@ -507,82 +319,33 @@ fn node(path: &str, role: &str, schema: &str, bytes: &[u8]) -> Value {
     })
 }
 
+const GOLDEN_ARTIFACT_PATHS: [&str; 7] = [
+    "claim-set.json",
+    "verifier-policy.json",
+    "finding.json",
+    "report.json",
+    "purchase-record.json",
+    "attachments/replay-recipe-input.json",
+    "attachments/status-proof-input.json",
+];
+
+/// The committed golden bundle plus the deployment trust it verifies under.
 fn build_bundle() -> TestResult<QualifiedBundle> {
-    let finding_path = "finding.json";
-    let recipe_path = "attachments/replay-recipe-input.json";
-    let status_path = "attachments/status-proof-input.json";
-    let report_path = "report.json";
-    let purchase_record_path = "purchase-record.json";
-    let recipe = recipe_bytes("bb")?;
-    let status = status_proof_bytes()?;
-    let report = report_bytes(&recipe, &status)?;
-    let purchase_record = purchase_record_bytes()?;
-    let finding = expiry_regressions::finding_fixture_bytes()?;
-    let claim_set = claim_set_bytes(report_path, purchase_record_path, recipe_path, status_path)?;
-    let verifier_policy = verifier_policy_bytes()?;
-
-    let report_id = sha256_hex(&report);
-    let purchase_record_id = sha256_hex(&purchase_record);
-    let finding_node_id = sha256_hex(&finding);
-    let recipe_id = sha256_hex(&recipe);
-    let status_id = sha256_hex(&status);
-    let claim_set_id = sha256_hex(&claim_set);
-    let policy_id = sha256_hex(&verifier_policy);
-    let graph = json!({
-        "schema": "chio.transaction.evidence-graph.v1",
-        "id": "evidence-graph-cognition-market-qualified-profile",
-        "issued_at": "2026-07-31T20:00:30Z",
-        "nodes": [
-            node("claim-set.json", "claim-set", "chio.transaction.claim-set.v1", &claim_set),
-            node("verifier-policy.json", "verifier-policy", "chio.transaction.verifier-policy.v1", &verifier_policy),
-            node(finding_path, "external-subject", chio_finding::FINDING_SCHEMA_V1, &finding),
-            node(report_path, "report", FINDING_VERIFIER_REPORT_SCHEMA_V1, &report),
-            node(purchase_record_path, "commerce-order-context", FINDING_PURCHASE_RECORD_SCHEMA_V1, &purchase_record),
-            node(recipe_path, "advisory-observation", FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1, &recipe),
-            node(status_path, "advisory-observation", FINDING_STATUS_PROOF_INPUT_SCHEMA_V1, &status)
-        ],
-        "edges": [
-            {"from": claim_set_id, "to": policy_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": claim_set_id, "to": report_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": claim_set_id, "to": finding_node_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": report_id, "to": finding_node_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": claim_set_id, "to": purchase_record_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": report_id, "to": purchase_record_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": report_id, "to": recipe_id, "predicate": "binds", "evidence_class": "digest-bound-reference"},
-            {"from": report_id, "to": status_id, "predicate": "binds", "evidence_class": "digest-bound-reference"}
-        ]
-    });
-    let evidence_graph_bytes = canonical_json_bytes(&graph)?;
+    let passport: TransactionPassport =
+        serde_json::from_slice(&golden_bytes("transaction-passport.json")?)?;
+    let evidence_graph_bytes = golden_bytes("evidence-graph.json")?;
+    let evidence_graph: Value = serde_json::from_slice(&evidence_graph_bytes)?;
+    let mut artifacts = BTreeMap::new();
+    for path in GOLDEN_ARTIFACT_PATHS {
+        artifacts.insert(path.to_string(), golden_bytes(path)?);
+    }
+    let verifier_policy = artifacts
+        .get("verifier-policy.json")
+        .ok_or("verifier policy missing")?
+        .clone();
     let root = root_keypair();
-    let mut passport = TransactionPassport {
-        schema: "chio.transaction-passport.v1".to_string(),
-        id: "passport-cognition-market-qualified-profile".to_string(),
-        issued_at: "2026-07-31T20:00:30Z".to_string(),
-        not_before: None,
-        expires_at: None,
-        issuer: format!("did:chio:{}", root.public_key().to_hex()),
-        evidence_graph_sha256: sha256_hex(&evidence_graph_bytes),
-        evidence_graph_path: "evidence-graph.json".to_string(),
-        claim_set_sha256: claim_set_id,
-        claim_set_path: "claim-set.json".to_string(),
-        verifier_policy_sha256: policy_id,
-        verifier_policy_path: "verifier-policy.json".to_string(),
-        omission_policy: Vec::new(),
-        signature: String::new(),
-    };
-    passport.signature = sign_transaction_passport(&passport, &root)?;
-
-    let artifacts = BTreeMap::from([
-        ("claim-set.json".to_string(), claim_set),
-        ("verifier-policy.json".to_string(), verifier_policy.clone()),
-        (finding_path.to_string(), finding),
-        (report_path.to_string(), report),
-        (purchase_record_path.to_string(), purchase_record),
-        (recipe_path.to_string(), recipe),
-        (status_path.to_string(), status),
-    ]);
     let status_keypair = status_keypair();
-    let trusted_verifier_profile = verifier_profile()?;
+    let trusted_verifier_profile = golden_verifier_profile()?;
     let trusted_verifier_profile_envelope_sha256 =
         signed_envelope_sha256(&trusted_verifier_profile)?;
     let verifier_status_authority = Keypair::from_seed(&[10_u8; 32]);
@@ -683,7 +446,7 @@ fn build_bundle() -> TestResult<QualifiedBundle> {
     };
     Ok(QualifiedBundle {
         passport,
-        evidence_graph: graph,
+        evidence_graph,
         evidence_graph_bytes,
         verifier_policy_bytes: verifier_policy,
         artifacts,
@@ -2121,34 +1884,6 @@ fn cognition_market_qualified_profile_rejects_extra_finding_claim() -> TestResul
         error.contains("unqualified Finding claim"),
         "unexpected error: {error}"
     );
-    Ok(())
-}
-
-#[path = "cognition_market/golden.rs"]
-mod golden;
-
-#[test]
-#[ignore = "writes the checked-in cognition-market proof-room golden"]
-fn regenerate_cognition_market_golden() -> TestResult {
-    let bundle = build_bundle()?;
-    let root = workspace_root().join(GOLDEN_RELATIVE);
-    std::fs::create_dir_all(root.join("attachments"))?;
-    std::fs::create_dir_all(root.join("deployment"))?;
-    std::fs::write(
-        root.join("deployment/verifier-profile.json"),
-        canonical_json_bytes(&bundle.trust.trusted_verifier_profile)?,
-    )?;
-    std::fs::write(
-        root.join("transaction-passport.json"),
-        canonical_json_bytes(&bundle.passport)?,
-    )?;
-    std::fs::write(
-        root.join("evidence-graph.json"),
-        &bundle.evidence_graph_bytes,
-    )?;
-    for (path, bytes) in &bundle.artifacts {
-        std::fs::write(root.join(path), bytes)?;
-    }
     Ok(())
 }
 

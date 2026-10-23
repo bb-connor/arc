@@ -5,6 +5,8 @@ EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 
 CHIO_BIN="${CHIO_BIN:-${ROOT}/target/debug/chio}"
+# Public key derived from the fixture generator's fixed kernel seed.
+TRUSTED_KERNEL_PUBKEY="d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737"
 if [[ ! -x "${CHIO_BIN}" ]]; then
   (cd "${ROOT}" && cargo build --bin chio >/dev/null)
 fi
@@ -17,7 +19,7 @@ mkdir -p "${ARTIFACT_ROOT}"
 cp -R "${EXAMPLE_ROOT}/fixtures/minimal-evidence" "${INPUT_DIR}"
 cp -R "${EXAMPLE_ROOT}/fixtures/minimal-evidence" "${TAMPERED_DIR}"
 
-"${CHIO_BIN}" evidence verify --input "${INPUT_DIR}" --json > "${ARTIFACT_ROOT}/verify.json"
+"${CHIO_BIN}" evidence verify --input "${INPUT_DIR}" --trusted-kernel-pubkey "${TRUSTED_KERNEL_PUBKEY}" --json > "${ARTIFACT_ROOT}/verify.json"
 
 python3 - "${TAMPERED_DIR}/query.json" <<'PY'
 from pathlib import Path
@@ -26,7 +28,7 @@ import sys
 Path(sys.argv[1]).write_text('{"tampered":true}\n', encoding="utf-8")
 PY
 
-if "${CHIO_BIN}" evidence verify --input "${TAMPERED_DIR}" --json > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json"; then
+if "${CHIO_BIN}" evidence verify --input "${TAMPERED_DIR}" --trusted-kernel-pubkey "${TRUSTED_KERNEL_PUBKEY}" --json > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json"; then
   echo "expected tampered package verification to fail" >&2
   exit 1
 fi

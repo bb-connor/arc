@@ -1,36 +1,21 @@
 //! JSON Schema conformance and golden-fixture coverage for the seven
 //! market artifact families. Behavioral wire-type coverage lives in
 //! `market_families.rs`; this file pins the registered schemas and the
-//! deterministic fixtures against both the schema and the Rust verify
-//! paths.
+//! committed fixtures, written by `chio proof fixture regenerate`, against
+//! both the schema and the Rust verify paths.
 
 use std::error::Error;
 use std::path::PathBuf;
 
-use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::Keypair;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::{canonical_json_bytes, canonical_json_bytes_from_str};
 use chio_finding::{
-    compute_admission_id, compute_allocation_id, compute_authorization_id, compute_profile_id,
-    compute_report_id, compute_terms_id, finding_checkpoint_log_id, signed_envelope_sha256,
-    verify_signed_admission, verify_signed_bond_backing, verify_signed_market_terms,
-    verify_signed_seller_authorization, verify_signed_verifier_report, FindingAdmission,
-    FindingAuthorityKeyPolicy, FindingBackingRequirement, FindingBbsIssuerPolicy,
-    FindingBondBacking, FindingBondClass, FindingChallengeBondLimit,
-    FindingChallengeVerifierProfile, FindingCheckpointLogPolicy, FindingClaimedVerdict,
-    FindingCollateralVault, FindingError, FindingFacetKind, FindingFacetOutcome,
-    FindingFacetResult, FindingFeeEvent, FindingFeeTerminalBinding, FindingGuaranteeClass,
-    FindingMarketTerms, FindingPayee, FindingPoolBinding, FindingPredicate, FindingReceiptRole,
-    FindingReceiptSignerRole, FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind,
-    FindingReplayRecipeInput, FindingResourceCaps, FindingSellerAuthorization,
-    FindingVerifierReport, SignedFindingAdmission, SignedFindingBondBacking,
+    signed_envelope_sha256, verify_signed_admission, verify_signed_bond_backing,
+    verify_signed_market_terms, verify_signed_seller_authorization, verify_signed_verifier_report,
+    FindingReplayRecipeInput, SignedFindingAdmission, SignedFindingBondBacking,
     SignedFindingChallengeVerifierProfile, SignedFindingMarketTerms,
-    SignedFindingSellerAuthorization, SignedFindingVerifierReport, FINDING_ADMISSION_SCHEMA_V1,
-    FINDING_BOND_BACKING_SCHEMA_V1, FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1,
-    FINDING_MARKET_TERMS_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
-    FINDING_SELLER_AUTHORIZATION_SCHEMA_V1, FINDING_VERIFIER_REPORT_SCHEMA_V1,
-    MAX_FINDING_ARTIFACT_ITEMS, MAX_FINDING_IDENTIFIER_BYTES, MAX_FINDING_TEXT_BYTES,
+    SignedFindingSellerAuthorization, SignedFindingVerifierReport, MAX_FINDING_ARTIFACT_ITEMS,
+    MAX_FINDING_IDENTIFIER_BYTES, MAX_FINDING_TEXT_BYTES,
 };
 use serde_json::{json, Value};
 
@@ -162,398 +147,32 @@ fn keypair(seed: u8) -> Keypair {
     Keypair::from_seed(&[seed; 32])
 }
 
-fn key_policy(seed: u8, label: &str) -> FindingAuthorityKeyPolicy {
-    FindingAuthorityKeyPolicy {
-        authority_id: format!("authority-{label}"),
-        key: keypair(seed).public_key(),
-        key_epoch: 1,
-        valid_from: 1_700_000_000,
-        valid_until: 1_900_000_000,
-        rotation_policy_ref: "rotation-policy-v1".to_string(),
-        revocation_status_ref: "revocations/finding-market".to_string(),
-    }
-}
-
-fn resource_caps() -> FindingResourceCaps {
-    FindingResourceCaps {
-        max_recipe_bytes: 262_144,
-        max_evidence_receipts: 64,
-        max_runtime_secs: 900,
-        max_memory_bytes: 2_147_483_648,
-    }
-}
-
-#[allow(
-    clippy::expect_used,
-    reason = "The fixed Ed25519 fixture must construct a valid checkpoint signer."
-)]
-fn profile_body() -> Result<FindingChallengeVerifierProfile, FindingError> {
-    let mut profile = FindingChallengeVerifierProfile {
-        schema: FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1.to_string(),
-        profile_id: String::new(),
-        governance_authority: keypair(1).public_key(),
-        operator: "venue-operator".to_string(),
-        receipt_signers: vec![
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Production,
-                policy: key_policy(11, "production"),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Delivery,
-                policy: key_policy(12, "delivery"),
-            },
-            FindingReceiptSignerRole {
-                role: FindingReceiptRole::Replay,
-                policy: key_policy(13, "replay"),
-            },
-        ],
-        checkpoint_logs: vec![FindingCheckpointLogPolicy {
-            log_id: finding_checkpoint_log_id(&keypair(14).public_key())
-                .expect("Ed25519 checkpoint fixture"),
-            signer: key_policy(14, "checkpoint"),
-        }],
-        bbs_projection_issuer: FindingBbsIssuerPolicy {
-            issuer_fingerprint: "bbs-issuer-fp".to_string(),
-            key_hex: HEX64.to_string(),
-            registry_ref: "registry/bbs-issuers".to_string(),
-            key_epoch: 1,
-            valid_from: 1_700_000_000,
-            valid_until: 1_900_000_000,
-            revocation_status_ref: "revocations/bbs".to_string(),
-        },
-        allowed_runner_manifests: vec![HEX64.to_string()],
-        required_receipt_semantics: "chio.mediated_spend.v1".to_string(),
-        resolver_policy_ref: "resolver-policy-v1".to_string(),
-        retention_policy_ref: "retention-forever-v1".to_string(),
-        resource_caps: resource_caps(),
-        predicate_engine: "chio-replay-v1".to_string(),
-        allowed_predicates: vec![FindingPredicate::BaselineFailsCandidatePassesV1],
-        required_facets: vec![
-            FindingFacetKind::ArtifactIntegrity,
-            FindingFacetKind::ReceiptAuthenticity,
-            FindingFacetKind::CheckpointMembership,
-            FindingFacetKind::BondBacking,
-            FindingFacetKind::GuaranteeConsistency,
-        ],
-        verifier_report_signer: key_policy(15, "verifier-report"),
-        purchase_authority: key_policy(16, "purchase"),
-        failed_delivery_authority: key_policy(17, "failed-delivery"),
-        issued_at: 1_700_000_000,
-        expires_at: 1_900_000_000,
-    };
-    profile.profile_id = compute_profile_id(&profile)?;
-    Ok(profile)
-}
-
-fn terms_body(seller: &Keypair) -> Result<FindingMarketTerms, FindingError> {
-    let mut terms = FindingMarketTerms {
-        schema: FINDING_MARKET_TERMS_SCHEMA_V1.to_string(),
-        terms_id: String::new(),
-        finding_id: HEX64.to_string(),
-        finding_artifact_sha256: HEX64.to_string(),
-        listing_id: "finding-listing-01".to_string(),
-        seller: seller.public_key(),
-        backing_requirement: FindingBackingRequirement {
-            base_finding_stake: MonetaryAmount {
-                units: 50,
-                currency: "USD".to_string(),
-            },
-            maximum_sale_exposure: MonetaryAmount {
-                units: 450,
-                currency: "USD".to_string(),
-            },
-            collateral_policy: "venue_ledger_exclusive_v1".to_string(),
-        },
-        filing_window_secs: 86_400,
-        claim_window_secs: 604_800,
-        appeal_window_secs: 259_200,
-        audit_epoch_length_secs: 2_592_000,
-        audit_eligible: true,
-        decision_rule_refs: vec!["decision/replay-v1".to_string()],
-        verifier_profile_envelope_sha256: HEX64.to_string(),
-        challenge_bond_limits: vec![FindingChallengeBondLimit {
-            guarantee_class: FindingGuaranteeClass::DeterministicReplay,
-            min_bond: MonetaryAmount {
-                units: 10,
-                currency: "USD".to_string(),
-            },
-            max_bond: MonetaryAmount {
-                units: 100,
-                currency: "USD".to_string(),
-            },
-        }],
-        payout_policy: "pro_rata_capped_v1".to_string(),
-        issued_at: 1_700_000_000,
-        expires_at: 1_900_000_000,
-    };
-    terms.terms_id = compute_terms_id(&terms)?;
-    Ok(terms)
-}
-
-fn authorization_body(
-    issuer: &Keypair,
-    seller: &Keypair,
-) -> Result<FindingSellerAuthorization, FindingError> {
-    let mut authorization = FindingSellerAuthorization {
-        schema: FINDING_SELLER_AUTHORIZATION_SCHEMA_V1.to_string(),
-        authorization_id: String::new(),
-        finding_id: HEX64.to_string(),
-        finding_artifact_sha256: HEX64.to_string(),
-        listing_id: "finding-listing-01".to_string(),
-        issuer: issuer.public_key(),
-        seller: seller.public_key(),
-        provider_server_id: "finding-server".to_string(),
-        provider_tool: "finding.reveal".to_string(),
-        payee: FindingPayee::Beneficiary {
-            destination: "rail:venue-ledger:seller-42".to_string(),
-            currency: "USD".to_string(),
-        },
-        revocation_status_ref: "revocations/seller-auth".to_string(),
-        issued_at: 1_700_000_000,
-        expires_at: 1_900_000_000,
-    };
-    authorization.authorization_id = compute_authorization_id(&authorization)?;
-    Ok(authorization)
-}
-
-fn backing_body(authority: &Keypair, seller: &Keypair) -> Result<FindingBondBacking, FindingError> {
-    let mut backing = FindingBondBacking {
-        schema: FINDING_BOND_BACKING_SCHEMA_V1.to_string(),
-        allocation_id: String::new(),
-        collateral_authority: authority.public_key(),
-        seller: seller.public_key(),
-        authorization_envelope_sha256: HEX64.to_string(),
-        finding_id: HEX64.to_string(),
-        listing_id: "finding-listing-01".to_string(),
-        terms_envelope_sha256: HEX64.to_string(),
-        profile_envelope_sha256: HEX64.to_string(),
-        fee_requirement_sha256: HEX64.to_string(),
-        fee_schedule_envelope_sha256: HEX64.to_string(),
-        bond_class: FindingBondClass::Listing,
-        locked_amount: MonetaryAmount {
-            units: 500,
-            currency: "USD".to_string(),
-        },
-        maximum_sale_exposure: MonetaryAmount {
-            units: 450,
-            currency: "USD".to_string(),
-        },
-        claim_horizon_secs: 604_800,
-        audit_horizon_secs: 2_592_000,
-        appeal_horizon_secs: 259_200,
-        settlement_buffer_secs: 86_400,
-        vault: FindingCollateralVault::VenueLedger {
-            ledger_account: "vault:finding-collateral".to_string(),
-            operator_epoch: 1,
-        },
-        issued_at: 1_700_000_000,
-        expires_at: 1_900_000_000,
-    };
-    backing.allocation_id = compute_allocation_id(&backing)?;
-    Ok(backing)
-}
-
-fn verified_facets() -> Vec<FindingFacetResult> {
-    FindingFacetKind::ALL
-        .into_iter()
-        .map(|facet| {
-            let outcome = match facet {
-                FindingFacetKind::StatusLiveness => FindingFacetOutcome::Unavailable,
-                _ => FindingFacetOutcome::Verified,
-            };
-            FindingFacetResult {
-                facet,
-                outcome,
-                reason: "evaluated under the pinned verifier profile".to_string(),
-                evidence_refs: Vec::new(),
-            }
-        })
-        .collect()
-}
-
-fn report_body(verifier: &Keypair) -> Result<FindingVerifierReport, FindingError> {
-    let mut report = FindingVerifierReport {
-        schema: FINDING_VERIFIER_REPORT_SCHEMA_V1.to_string(),
-        report_id: String::new(),
-        finding_id: HEX64.to_string(),
-        finding_artifact_sha256: HEX64.to_string(),
-        verifier_profile_id: HEX64.to_string(),
-        verifier_profile_envelope_sha256: HEX64.to_string(),
-        verifier_implementation_id: "chio-finding-verifier/0.1".to_string(),
-        resolved_evidence_bundle_sha256: HEX64.to_string(),
-        replay_recipe_input_sha256: None,
-        status_proof_input_sha256: None,
-        finding_delivery_receipt_id: None,
-        finding_delivery: None,
-        trust_root_snapshot_sha256: HEX64.to_string(),
-        resolver_policy_sha256: HEX64.to_string(),
-        trusted_time_input_sha256: HEX64.to_string(),
-        facets: verified_facets(),
-        backing_allocation_id: Some(HEX64.to_string()),
-        verifier_authority: verifier.public_key(),
-        verifier_key_epoch: 1,
-        evaluation_time: 1_750_000_000,
-    };
-    report.report_id = compute_report_id(&report)?;
-    Ok(report)
-}
-
-fn admission_body(venue: &Keypair) -> Result<FindingAdmission, FindingError> {
-    let mut admission = FindingAdmission {
-        schema: FINDING_ADMISSION_SCHEMA_V1.to_string(),
-        admission_id: String::new(),
-        venue: venue.public_key(),
-        venue_id: "venue-wedge".to_string(),
-        finding_id: HEX64.to_string(),
-        finding_artifact_sha256: HEX64.to_string(),
-        seller_authorization_envelope_sha256: HEX64.to_string(),
-        listing_id: "finding-listing-01".to_string(),
-        listing_envelope_sha256: HEX64.to_string(),
-        server_id: "finding-server".to_string(),
-        metadata_url: format!("https://venue.example/v1/findings/{HEX64}"),
-        pricing_hint_envelope_sha256: HEX64.to_string(),
-        capability_scope: format!("finding:{HEX64}"),
-        publisher_operator_id: "venue-operator".to_string(),
-        payee_destination: "rail:venue-ledger:seller-42".to_string(),
-        fee_schedule_envelope_sha256: HEX64.to_string(),
-        verifier_report_id: HEX64.to_string(),
-        verifier_report_envelope_sha256: HEX64.to_string(),
-        terms_envelope_sha256: HEX64.to_string(),
-        profile_envelope_sha256: HEX64.to_string(),
-        fee_terminals: vec![
-            FindingFeeTerminalBinding {
-                fee_schedule_envelope_sha256: HEX64.to_string(),
-                event: FindingFeeEvent::Publication,
-                payer: "seller-42".to_string(),
-                amount: MonetaryAmount {
-                    units: 5,
-                    currency: "USD".to_string(),
-                },
-                pool_principal_id: "pool:audit".to_string(),
-                rail_destination: "rail:venue-ledger:audit-pool".to_string(),
-                instruction_sha256: HEX64.to_string(),
-                observation_sha256: HEX64.to_string(),
-            },
-            FindingFeeTerminalBinding {
-                fee_schedule_envelope_sha256: HEX64.to_string(),
-                event: FindingFeeEvent::ParticipationEpoch { epoch_index: 0 },
-                payer: "seller-42".to_string(),
-                amount: MonetaryAmount {
-                    units: 3,
-                    currency: "USD".to_string(),
-                },
-                pool_principal_id: "pool:audit".to_string(),
-                rail_destination: "rail:venue-ledger:audit-pool".to_string(),
-                instruction_sha256: HEX64.to_string(),
-                observation_sha256: HEX64.to_string(),
-            },
-        ],
-        backing_allocation_id: HEX64.to_string(),
-        backing_envelope_sha256: HEX64.to_string(),
-        audit_pool: FindingPoolBinding {
-            principal_id: "pool:audit".to_string(),
-            rail_destination: "rail:venue-ledger:audit-pool".to_string(),
-            currency: "USD".to_string(),
-            authority_epoch: 1,
-        },
-        challenge_administration_pool: FindingPoolBinding {
-            principal_id: "pool:challenge-admin".to_string(),
-            rail_destination: "rail:venue-ledger:challenge-admin".to_string(),
-            currency: "USD".to_string(),
-            authority_epoch: 1,
-        },
-        community_fund_destination: "0xcccccccccccccccccccccccccccccccccccccccc".to_string(),
-        status_feed_operator_ref: "status-feed/venue-wedge".to_string(),
-        purchase_authority: key_policy(16, "purchase"),
-        failed_delivery_authority: key_policy(17, "failed-delivery"),
-        issued_at: 1_700_000_000,
-        expires_at: 1_800_000_000,
-    };
-    admission.admission_id = compute_admission_id(&admission)?;
-    Ok(admission)
-}
-
-fn recipe_environment() -> FindingRecipeEnvironment {
-    FindingRecipeEnvironment {
-        runtime_image_sha256: HEX64.to_string(),
-        platform: "linux/amd64".to_string(),
-        network_policy: "deny_all".to_string(),
-        clock_policy: "fixed:1700000000".to_string(),
-        randomness_policy: "seed:42".to_string(),
-        locale: "C".to_string(),
-        timezone: "UTC".to_string(),
-    }
-}
-
-fn recipe_body() -> FindingReplayRecipeInput {
-    FindingReplayRecipeInput {
-        schema: FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1.to_string(),
-        decision_rule_ref: "decision/replay-v1".to_string(),
-        verifier_profile_envelope_sha256: HEX64.to_string(),
-        context_sha256: HEX64.to_string(),
-        payload_sha256: HEX64.to_string(),
-        runner_server: "finding-server".to_string(),
-        runner_tool: "finding.replay".to_string(),
-        runner_manifest_sha256: HEX64.to_string(),
-        phases: vec![
-            FindingRecipePhase {
-                phase: FindingRecipePhaseKind::Baseline,
-                input_bundle_sha256: HEX64.to_string(),
-                payload_application: "not_applied".to_string(),
-            },
-            FindingRecipePhase {
-                phase: FindingRecipePhaseKind::Candidate,
-                input_bundle_sha256: HEX64.to_string(),
-                payload_application: "apply_patch_v1".to_string(),
-            },
-        ],
-        parameters_sha256: HEX64.to_string(),
-        environment: recipe_environment(),
-        resource_bounds: resource_caps(),
-        predicate: FindingPredicate::BaselineFailsCandidatePassesV1,
-        pre_run_template_sha256: HEX64.to_string(),
-        claimed_verdict: FindingClaimedVerdict::PredicateHolds,
-    }
-}
-
 fn signed_profile() -> Result<SignedFindingChallengeVerifierProfile, Box<dyn Error>> {
-    Ok(SignedExportEnvelope::sign(profile_body()?, &keypair(1))?)
+    Ok(serde_json::from_str(GOLDEN_PROFILE_RAW)?)
 }
 
 fn signed_terms() -> Result<SignedFindingMarketTerms, Box<dyn Error>> {
-    let seller = keypair(2);
-    Ok(SignedExportEnvelope::sign(terms_body(&seller)?, &seller)?)
+    Ok(serde_json::from_str(GOLDEN_TERMS_RAW)?)
 }
 
 fn signed_authorization() -> Result<SignedFindingSellerAuthorization, Box<dyn Error>> {
-    let issuer = keypair(3);
-    let seller = keypair(2);
-    Ok(SignedExportEnvelope::sign(
-        authorization_body(&issuer, &seller)?,
-        &issuer,
-    )?)
+    Ok(serde_json::from_str(GOLDEN_AUTHORIZATION_RAW)?)
 }
 
 fn signed_backing() -> Result<SignedFindingBondBacking, Box<dyn Error>> {
-    let collateral = keypair(4);
-    let seller = keypair(2);
-    Ok(SignedExportEnvelope::sign(
-        backing_body(&collateral, &seller)?,
-        &collateral,
-    )?)
+    Ok(serde_json::from_str(GOLDEN_BACKING_RAW)?)
 }
 
 fn signed_report() -> Result<SignedFindingVerifierReport, Box<dyn Error>> {
-    let verifier = keypair(15);
-    Ok(SignedExportEnvelope::sign(
-        report_body(&verifier)?,
-        &verifier,
-    )?)
+    Ok(serde_json::from_str(GOLDEN_REPORT_RAW)?)
 }
 
 fn signed_admission() -> Result<SignedFindingAdmission, Box<dyn Error>> {
-    let venue = keypair(6);
-    Ok(SignedExportEnvelope::sign(admission_body(&venue)?, &venue)?)
+    Ok(serde_json::from_str(GOLDEN_ADMISSION_RAW)?)
+}
+
+fn recipe_body() -> Result<FindingReplayRecipeInput, Box<dyn Error>> {
+    Ok(serde_json::from_str(GOLDEN_RECIPE_RAW)?)
 }
 
 #[test]
@@ -809,27 +428,27 @@ fn market_family_schemas_reject_oversized_collections() -> TestResult {
 
 #[test]
 fn recipe_conforms_to_schema() -> TestResult {
-    validate_family_schema(&RECIPE, &serde_json::to_value(recipe_body())?)?;
+    validate_family_schema(&RECIPE, &serde_json::to_value(recipe_body()?)?)?;
     Ok(())
 }
 
 #[test]
 fn recipe_schema_rejects_unknown_top_level_member() -> TestResult {
-    let mut value = serde_json::to_value(recipe_body())?;
+    let mut value = serde_json::to_value(recipe_body()?)?;
     value["surprise"] = json!(true);
     assert_family_schema_rejects(&RECIPE, &value, "unknown top-level member")
 }
 
 #[test]
 fn recipe_schema_rejects_wrong_schema_const() -> TestResult {
-    let mut value = serde_json::to_value(recipe_body())?;
+    let mut value = serde_json::to_value(recipe_body()?)?;
     value["schema"] = json!("chio.finding.replay-recipe-input.v999");
     assert_family_schema_rejects(&RECIPE, &value, "wrong schema const")
 }
 
 #[test]
 fn recipe_schema_rejects_swapped_phase_order() -> TestResult {
-    let mut value = serde_json::to_value(recipe_body())?;
+    let mut value = serde_json::to_value(recipe_body()?)?;
     if let Some(phases) = value["phases"].as_array_mut() {
         phases.swap(0, 1);
     }
@@ -838,7 +457,7 @@ fn recipe_schema_rejects_swapped_phase_order() -> TestResult {
 
 #[test]
 fn recipe_schema_rejects_unknown_payload_application() -> TestResult {
-    let mut value = serde_json::to_value(recipe_body())?;
+    let mut value = serde_json::to_value(recipe_body()?)?;
     value["phases"][1]["payload_application"] = json!("replace_tree_v1");
     assert_family_schema_rejects(&RECIPE, &value, "unknown payload application")
 }
@@ -986,29 +605,5 @@ fn golden_replay_recipe_fixture_validates() -> TestResult {
     assert_eq!(strict_canonical, canonical_json_bytes(&recipe)?);
     recipe.validate()?;
     assert_eq!(recipe.canonical_sha256()?, GOLDEN_RECIPE_SHA256);
-    Ok(())
-}
-
-fn write_fixture<T: serde::Serialize>(family: &Family, artifact: &T) -> TestResult {
-    let json = serde_json::to_string_pretty(artifact)?;
-    let path = fixture_path(family);
-    let parent = path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("golden fixture path has no parent"))?;
-    std::fs::create_dir_all(parent)?;
-    std::fs::write(path, format!("{json}\n"))?;
-    Ok(())
-}
-
-#[test]
-#[ignore = "regenerates the deterministic golden fixtures; run manually"]
-fn regenerate_market_golden_fixtures() -> TestResult {
-    write_fixture(&PROFILE, &signed_profile()?)?;
-    write_fixture(&TERMS, &signed_terms()?)?;
-    write_fixture(&AUTHORIZATION, &signed_authorization()?)?;
-    write_fixture(&BACKING, &signed_backing()?)?;
-    write_fixture(&REPORT, &signed_report()?)?;
-    write_fixture(&ADMISSION, &signed_admission()?)?;
-    write_fixture(&RECIPE, &recipe_body())?;
     Ok(())
 }

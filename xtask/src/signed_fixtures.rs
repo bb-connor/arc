@@ -12,8 +12,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::{
-    broker_receipt_vectors, cage_vectors, eval_receipt_regen, freeze_vectors,
-    recovery_authority_vectors, workspace_root, XtaskError,
+    broker_receipt_vectors, cage_vectors, eval_receipt_regen, fixtures, freeze_vectors, hash_pinned, recovery_authority_vectors, vector_seeds, workspace_root, XtaskError,
 };
 
 /// Passes after which a regeneration that has not converged is refused.
@@ -43,6 +42,8 @@ pub(crate) enum InternalGenerator {
     CageVectors,
     RecoveryAuthorityVectors,
     EvalReceipt,
+    VectorSeeds,
+    ThreeVendorFixtures,
     FreezeVectors,
 }
 
@@ -507,6 +508,19 @@ pub(crate) const STEPS: &[Step] = &[
         owns: &["spec/schemas/chio-fiscal/v1/fixtures/**"],
     },
     Step {
+        name: "vector-projected demo and fuzz seeds",
+        regenerate: Invocation::Internal(InternalGenerator::VectorSeeds),
+        check: Invocation::Internal(InternalGenerator::VectorSeeds),
+        owns: &[
+            "docs/demo/fixtures/allow-receipt.json",
+            "fuzz/corpus/capability_receipt/binding-*.json",
+            "fuzz/corpus/capability_receipt/minimal-receipts.ndjson",
+            "fuzz/corpus/capability_receipt/tenant-receipt.json",
+            "fuzz/corpus/frost_round2_envelope/**",
+            "fuzz/corpus/fuzz_merkle_checkpoint/minimal-receipts.ndjson",
+        ],
+    },
+    Step {
         name: "stop operator config fixtures",
         regenerate: cargo_env(
             &["test", "-p", "chio-kernel", "--lib", "stop::config::tests"],
@@ -514,6 +528,27 @@ pub(crate) const STEPS: &[Step] = &[
         ),
         check: cargo(&["test", "-p", "chio-kernel", "--lib", "stop::config::tests"]),
         owns: &["crates/kernel/chio-kernel/tests/fixtures/stop_operator_config/**"],
+    },
+    Step {
+        name: "chio-temporal caller delivery golden",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-kernel",
+                "--lib",
+                "caller_delivery::tests::temporal_golden_is_the_generator_output",
+            ],
+            &[("CHIO_WRITE_TEMPORAL_GOLDEN", "1")],
+        ),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-kernel",
+            "--lib",
+            "caller_delivery::tests::temporal_golden_is_the_generator_output",
+        ]),
+        owns: &["sdks/python/chio-temporal/tests/fixtures/caller_delivery_golden_v1.json"],
     },
     Step {
         name: "eval receipt vector",
@@ -608,60 +643,6 @@ pub(crate) const STEPS: &[Step] = &[
         ],
     },
     Step {
-        name: "finding golden fixture",
-        regenerate: cargo(&[
-            "test",
-            "-p",
-            "chio-finding",
-            "--test",
-            "finding",
-            "--",
-            "--ignored",
-            "--exact",
-            "regenerate_golden_fixture",
-        ]),
-        check: cargo(&["test", "-p", "chio-finding", "--test", "finding"]),
-        owns: &[],
-    },
-    Step {
-        name: "finding market golden fixtures",
-        regenerate: cargo(&[
-            "test",
-            "-p",
-            "chio-finding",
-            "--test",
-            "market_schemas",
-            "--",
-            "--ignored",
-            "--exact",
-            "regenerate_market_golden_fixtures",
-        ]),
-        check: cargo(&["test", "-p", "chio-finding", "--test", "market_schemas"]),
-        owns: &[],
-    },
-    Step {
-        name: "cognition-market proof-room golden",
-        regenerate: cargo(&[
-            "test",
-            "-p",
-            "chio-transaction-passport",
-            "--test",
-            "cognition_market",
-            "--",
-            "--ignored",
-            "--exact",
-            "regenerate_cognition_market_golden",
-        ]),
-        check: cargo(&[
-            "test",
-            "-p",
-            "chio-transaction-passport",
-            "--test",
-            "cognition_market",
-        ]),
-        owns: &[],
-    },
-    Step {
         name: "adversarial suite manifest",
         regenerate: cargo(&[
             "test",
@@ -724,6 +705,84 @@ pub(crate) const STEPS: &[Step] = &[
         ]),
         check: cargo(&["test", "-p", "chio-cli", "--test", "replay"]),
         owns: &["crates/products/chio-cli/tests/fixtures/replay/**"],
+    },
+    Step {
+        name: "web3 reference artifacts",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-web3",
+                "--lib",
+                "tests::reference_artifacts_are_the_generator_output",
+            ],
+            &[("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS", "1")],
+        ),
+        check: cargo(&["test", "-p", "chio-web3", "--lib", "tests::reference_artifacts"]),
+        owns: &[
+            "docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
+            "docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json",
+            "docs/standards/CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json",
+            "docs/standards/CHIO_WEB3_TRUST_PROFILE.json",
+        ],
+    },
+    Step {
+        name: "anchor reference artifacts",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-anchor",
+                "--lib",
+                "reference_artifacts_are_the_generator_output",
+            ],
+            &[("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS", "1")],
+        ),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-anchor",
+            "--lib",
+            "reference_artifacts_are_the_generator_output",
+        ]),
+        owns: &[
+            "docs/standards/CHIO_ANCHOR_DISCOVERY_EXAMPLE.json",
+            "docs/standards/CHIO_ANCHOR_PROOF_BUNDLE_EXAMPLE.json",
+            "docs/standards/CHIO_FUNCTIONS_REQUEST_EXAMPLE.json",
+        ],
+    },
+    Step {
+        name: "three-vendor, attestation loopback and pheromone relay fixtures",
+        regenerate: Invocation::Internal(InternalGenerator::ThreeVendorFixtures),
+        check: Invocation::Internal(InternalGenerator::ThreeVendorFixtures),
+        owns: &[
+            "crates/trust/chio-attest-loopback/fixtures/**",
+            "examples/chio-3vendor/fixtures/*.json",
+            "examples/chio-3vendor/fixtures/pheromone/*.json",
+            "examples/chio-3vendor/fixtures/pheromone/relay/alert-assurance/export-bundle/**",
+            "examples/chio-3vendor/fixtures/pheromone/relay/peer-directory*.json",
+        ],
+    },
+    Step {
+        name: "hello-receipt-verify evidence package",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-control-plane",
+                "--lib",
+                "committed_hello_receipt_fixture_is_the_generator_output",
+            ],
+            &[("CHIO_WRITE_HELLO_RECEIPT_FIXTURES", "1")],
+        ),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-control-plane",
+            "--lib",
+            "committed_hello_receipt_fixture_is_the_generator_output",
+        ]),
+        owns: &["examples/hello-receipt-verify/fixtures/**"],
     },
     Step {
         name: "IETF appendix renderings",
@@ -804,6 +863,67 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
         },
         reason: "upstream trust root, not Chio-signed",
     },
+    ClosedEntry {
+        pattern: "crates/products/chio-cli/tests/replay_traffic/fixtures/**",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-cli --test replay_traffic \
+                               replay_from_tee_rejects_the_committed_placeholder_tenant_sig",
+        },
+        reason: "unsigned TEE capture frames: every tenant_sig is an `ed25519:AAAA...` \
+                 placeholder; the tests sign copies at runtime",
+    },
+    ClosedEntry {
+        pattern: "crates/sdk/chio-eval-receipt/tests/fixtures/**",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-eval-receipt --test export_roundtrip \
+                               production_verifier_rejects_the_committed_placeholder_bundles",
+        },
+        reason: "receipt payloads carry the `p2-fixture-signature` placeholder, accepted only \
+                 by digest in fixture mode",
+    },
+    ClosedEntry {
+        pattern: "examples/eval-receipt-ingest/metr/out/**",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-eval-receipt --test export_roundtrip \
+                               production_verifier_rejects_the_committed_placeholder_bundles",
+        },
+        reason: "placeholder receipt payloads under a `test-sha256` bundle digest, not a \
+                 signature",
+    },
+    ClosedEntry {
+        pattern: "fuzz/corpus/eval_receipt_bundle/**",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-eval-receipt --test export_roundtrip \
+                               production_verifier_rejects_the_committed_placeholder_bundles",
+        },
+        reason: "fuzz seeds built from the placeholder eval bundle and its `test-sha256` digest",
+    },
+    ClosedEntry {
+        pattern: "spec/eval/receipt-format.v1.json",
+        kind: ClosedKind::Schema,
+        reason: "JSON Schema of the eval report bundle",
+    },
+    ClosedEntry {
+        pattern: "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/**",
+        kind: ClosedKind::ManualRecapture {
+            procedure: "scripts/recapture-process-worker-outcomes.sh on the x86_64 native-cage \
+                        qualification host",
+            wrapper_id: "chio.receipt.v1",
+        },
+        reason: "retained native process-worker evidence; private keys never leave the run, \
+                 read by chio-cli process_host::call_evidence::outcomes_native",
+    },
+    ClosedEntry {
+        pattern: "examples/internet-of-agents-web3-network/app/tests/fixtures/good-bundle/**",
+        kind: ClosedKind::HashPinned {
+            wrapper_signed: false,
+            pin: "examples/internet-of-agents-web3-network/app/tests/fixtures/good-bundle/\
+                  bundle-manifest.json",
+        },
+        reason: "evidence console UI fixture compared by digest only; \
+                 hash_pinned::check_web3_good_bundle_unverified fails when a reader or \
+                 signature verifier appears",
+    },
 ];
 
 /// Placeholder signatures inside a step-owned file: the step's generator
@@ -826,22 +946,6 @@ pub(crate) const EMBEDDED_PLACEHOLDERS: &[EmbeddedPlaceholder] = &[EmbeddedPlace
 pub(crate) const UNOWNED_SETS: &[&str] = &[
     "tests/bindings/fixtures/dpop-authority-v1.json",
     "crates/core/chio-adversarial-suite/cases/**",
-    "crates/products/chio-cli/tests/fixtures/process-worker-outcomes/**",
-    "crates/products/chio-cli/tests/replay_traffic/fixtures/**",
-    "crates/sdk/chio-eval-receipt/tests/fixtures/**",
-    "examples/eval-receipt-ingest/metr/out/**",
-    "spec/eval/receipt-format.v1.json",
-    "crates/trust/chio-attest-loopback/fixtures/**",
-    "examples/chio-3vendor/fixtures/**",
-    "examples/internet-of-agents-web3-network/app/tests/fixtures/good-bundle/**",
-    "examples/hello-receipt-verify/fixtures/**",
-    "docs/demo/fixtures/allow-receipt.json",
-    "docs/standards/CHIO_*.json",
-    "fuzz/corpus/capability_receipt/**",
-    "fuzz/corpus/eval_receipt_bundle/**",
-    "fuzz/corpus/federation_trust_establishment/**",
-    "fuzz/corpus/fuzz_merkle_checkpoint/**",
-    "sdks/python/chio-temporal/tests/fixtures/caller_delivery_golden_v1.json",
 ];
 
 pub(crate) fn run(check: bool, require_complete: bool) -> Result<(), XtaskError> {
@@ -1052,6 +1156,9 @@ fn check_pass(root: &Path) -> Result<(), XtaskError> {
             failed.push(format!("{}: {error}", step.name));
         }
     }
+    if let Err(error) = hash_pinned::check_web3_good_bundle_unverified(root) {
+        failed.push(format!("web3 good-bundle: {error}"));
+    }
     if failed.is_empty() {
         Ok(())
     } else {
@@ -1099,6 +1206,8 @@ fn run_internal(generator: InternalGenerator, check: bool) -> Result<(), XtaskEr
         InternalGenerator::CageVectors => cage_vectors::run(check),
         InternalGenerator::RecoveryAuthorityVectors => recovery_authority_vectors::run(check),
         InternalGenerator::EvalReceipt => eval_receipt_regen::run(argv),
+        InternalGenerator::VectorSeeds => vector_seeds::run(check),
+        InternalGenerator::ThreeVendorFixtures => fixtures::regenerate_three_vendor_fixtures(check),
         InternalGenerator::FreezeVectors => freeze_vectors(argv),
     }
 }

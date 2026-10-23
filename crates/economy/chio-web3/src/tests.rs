@@ -2700,3 +2700,47 @@ fn reference_artifacts_parse_and_validate() {
     validate_web3_settlement_execution_receipt(&receipt).unwrap();
     validate_web3_qualification_matrix(&matrix).unwrap();
 }
+
+const REFERENCE_ARTIFACTS_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/standards");
+
+fn reference_artifact_bytes<T: serde::Serialize>(artifact: &T) -> Vec<u8> {
+    let mut bytes = serde_json::to_vec_pretty(artifact).unwrap();
+    bytes.push(b'\n');
+    bytes
+}
+
+fn generated_reference_artifacts() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (
+            "CHIO_WEB3_TRUST_PROFILE.json",
+            reference_artifact_bytes(&sample_trust_profile()),
+        ),
+        (
+            "CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
+            reference_artifact_bytes(&sample_anchor_inclusion_proof()),
+        ),
+        (
+            "CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json",
+            reference_artifact_bytes(&sample_dispatch()),
+        ),
+        (
+            "CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json",
+            reference_artifact_bytes(&sample_execution_receipt()),
+        ),
+    ]
+}
+
+/// Set `CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS=1` to rewrite the committed
+/// reference artifacts from this generator.
+#[test]
+fn reference_artifacts_are_the_generator_output() {
+    let write = std::env::var_os("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS").is_some();
+    for (name, bytes) in generated_reference_artifacts() {
+        let path = std::path::Path::new(REFERENCE_ARTIFACTS_DIR).join(name);
+        if write {
+            std::fs::write(&path, &bytes).unwrap();
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), bytes, "{name}");
+    }
+}

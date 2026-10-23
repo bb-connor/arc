@@ -7,8 +7,8 @@
   "generatedAtUnixMs": 1766000000500,
   "previousVersion": 1,
   "promotedVersion": 2,
-  "activeBundleSha256": "ba11b3973fd724f84ab400a7798023dab3f9b3c1aedabd55f7f302bbeaa5a5dd",
-  "candidateBundleSha256": "ba11b3973fd724f84ab400a7798023dab3f9b3c1aedabd55f7f302bbeaa5a5dd",
+  "activeBundleSha256": "832bd25f7e93f31002ab10c732061a7846e8f82d9dc4936ce41d313bdb70ba70",
+  "candidateBundleSha256": "832bd25f7e93f31002ab10c732061a7846e8f82d9dc4936ce41d313bdb70ba70",
   "removedPeerIds": [
     "did:chio:buyer-kernel"
   ]

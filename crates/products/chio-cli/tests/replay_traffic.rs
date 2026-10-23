@@ -162,6 +162,20 @@ fn replay_from_tee_accepts_signed_capture_with_pubkey() {
 }
 
 #[test]
+fn replay_from_tee_rejects_the_committed_placeholder_tenant_sig() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let pubkey_path = write_tenant_pubkey(dir.path(), &tenant_signing_key());
+    let extra = vec![
+        "--tenant-pubkey".to_string(),
+        pubkey_path.display().to_string(),
+    ];
+
+    let output = run_from_tee(&fixture_path("clean_match.ndjson"), &extra);
+
+    assert_exit(&output, 20);
+}
+
+#[test]
 fn verdict_drift_exits_ten() {
     let dir = tempfile::tempdir().expect("tempdir");
     let policy = write_allow_all_policy(dir.path());

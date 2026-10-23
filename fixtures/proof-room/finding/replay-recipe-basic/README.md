@@ -1,8 +1,7 @@
 # Replay recipe input fixture
 
-`recipe.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The artifact is unsigned by design (it is
+`recipe.json` is generated deterministically by
+`chio proof fixture regenerate`. The artifact is unsigned by design (it is
 committed by digest from a Finding), so no key seed is involved; every
 member is a fixed deterministic constant.
 

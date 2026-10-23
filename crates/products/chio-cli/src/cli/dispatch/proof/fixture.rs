@@ -25,6 +25,10 @@ mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
 #[path = "fixture_regenerate.rs"]
 mod fixture_regenerate;
+#[path = "fixture_finding.rs"]
+mod fixture_finding;
+#[path = "fixture_finding_cognition.rs"]
+mod fixture_finding_cognition;
 #[path = "fixture_committed_disclosure.rs"]
 mod fixture_committed_disclosure;
 use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;

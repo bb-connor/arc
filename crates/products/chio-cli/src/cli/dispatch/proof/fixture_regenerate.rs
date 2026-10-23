@@ -1,6 +1,9 @@
 use super::fixture_committed_disclosure::{
     committed_selective_disclosure_proofs, offer_committed_selective_disclosure_proofs,
 };
+use super::fixture_finding::{
+    finding_fixture_descriptors, materialize_finding_fixture, FINDING_FIXTURE_KIND,
+};
 use super::*;
 
 const AGENT_WEB_REPLAY_STORE_PATH_ENV: &str = "CHIO_AGENT_WEB_REPLAY_STORE_PATH";
@@ -186,7 +189,8 @@ pub(super) fn regenerate_proof_fixtures(
 ) -> Result<(), CliError> {
     let root = fs::canonicalize(root)?;
     let _environment = fixture_environment(&root);
-    let descriptors = regeneration_order(proof_fixtures()?);
+    let mut descriptors = regeneration_order(proof_fixtures()?);
+    descriptors.extend(finding_fixture_descriptors(&root));
     let staging = tempfile::tempdir()?;
     let staging_root = fs::canonicalize(staging.path())?;
 
@@ -283,12 +287,16 @@ fn regenerate_pass(
         );
         let out = work.path().join(&descriptor.id);
         let target = root.join(installed_fixture_path(descriptor));
-        let layout = if target.join("manifest.json").is_file() {
-            FixtureLayout::Sealed
+        if descriptor.kind == FINDING_FIXTURE_KIND {
+            materialize_finding_fixture(descriptor, &target, &out)?;
         } else {
-            FixtureLayout::Unsealed
-        };
-        materialize_proof_fixture(descriptor, &out, layout)?;
+            let layout = if target.join("manifest.json").is_file() {
+                FixtureLayout::Sealed
+            } else {
+                FixtureLayout::Unsealed
+            };
+            materialize_proof_fixture(descriptor, &out, layout)?;
+        }
         if directory_contents(&out)? != directory_contents(&target)? {
             changed.push(installed_fixture_path(descriptor).to_string());
             if !check {

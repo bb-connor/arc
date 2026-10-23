@@ -1,8 +1,7 @@
 # Seller authorization fixture
 
-`authorization.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The issuer, who signs the envelope, uses the
+`authorization.json` is generated deterministically by
+`chio proof fixture regenerate`. The issuer, who signs the envelope, uses the
 test-only seed `[3_u8; 32]`; the authorized seller uses seed `[2_u8; 32]`.
 
 The fixture proves JSON Schema conformance, strict canonical parsing,

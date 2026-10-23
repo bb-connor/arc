@@ -45,7 +45,7 @@
               "expiresAt": 1743293800
             },
             "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-            "signature": "0f7cd244afd2f95c383ab5b0f89978b3517a050cdea1c65f00e7b0ca190c1a39344502be465c33363e3983fd3d2914b964285aa6b1e2a894624b1cf14e5bb406"
+            "signature": "ed39c1f04aeb115b37332929187ed205acd3d5db6e95484890f07ae99c44bfe729e3e6f66d263333ea11c19109e251bed540a17bd9a1fea45d8a576234d62e07"
           },
           "note": "governed release"
         },
@@ -63,7 +63,7 @@
               "expiresAt": 1743293800
             },
             "signerKey": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
-            "signature": "0ae4a3e6de1bfc13f714aa2b2d5e29300b4557e236d8b324aababa9dfd49d0ee36773e623a910dbebb91055f21442dd2f3c16567173974fca522eec2f9d6af05"
+            "signature": "3a92ca8e76f52b661a512fa2036e9fb7a10307c77db4800c6446045cb8beb58d48e3db128ceb21ea48dedc6f09d6deaa60c7fdd79f05e9455b51881d68f0f008"
           },
           "note": "official web3 stack"
         }
@@ -94,12 +94,18 @@
           "referenceId": "rcpt-web3-1",
           "observedAt": 1743292800,
           "locator": "receipt:rcpt-web3-1"
+        },
+        {
+          "kind": "commerce_order",
+          "referenceId": "order-public-settlement-1",
+          "observedAt": 1743292800,
+          "locator": "commerce-order:order-public-settlement-1"
         }
       ],
       "description": "release escrow over the official web3 rail"
     },
     "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-    "signature": "a63339b5f7c7526549b9dc7971af90df54e01c9735d5c3a52f5c28bb381de8f786eccde0d0c29e5a963358ff5a64bd71a8bc7e6facc3b16e14c23f0c2d4a170a"
+    "signature": "1694047a94cbf480d8686653da7ed0b900bd209ea362ef97381fdb606e75d9eeffb025acac4eeefcbdd0c729c6dcfe53c7b3ede538606be85976907580f89909"
   },
   "settlement_path": "merkle_proof",
   "settlement_amount": {

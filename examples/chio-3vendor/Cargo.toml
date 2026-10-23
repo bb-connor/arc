@@ -24,6 +24,7 @@ chio-attest-loopback = { workspace = true }
 chio-core-types = { workspace = true }
 chio-federation = { workspace = true }
 chio-pheromone = { workspace = true }
+chio-pheromone-relay = { workspace = true }
 chio-pheromone-runtime = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

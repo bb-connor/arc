@@ -1,8 +1,7 @@
 # Venue admission fixture
 
-`admission.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The venue authority, who signs the envelope
+`admission.json` is generated deterministically by
+`chio proof fixture regenerate`. The venue authority, who signs the envelope
 for `venue_id` `venue-wedge`, uses the test-only seed `[6_u8; 32]`; the
 embedded purchase and failed-delivery key policies use seeds `[16_u8; 32]`
 and `[17_u8; 32]`.

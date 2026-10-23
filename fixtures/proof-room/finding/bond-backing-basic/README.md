@@ -1,8 +1,7 @@
 # Bond backing fixture
 
-`backing.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The collateral authority, who signs the
+`backing.json` is generated deterministically by
+`chio proof fixture regenerate`. The collateral authority, who signs the
 envelope, uses the test-only seed `[4_u8; 32]`; the backed seller uses
 seed `[2_u8; 32]`.
 

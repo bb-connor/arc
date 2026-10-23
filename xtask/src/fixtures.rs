@@ -1132,6 +1132,7 @@ include!("fixtures_facets.rs");
 include!("fixtures_facets_meta.rs");
 include!("fixtures_facets_alert.rs");
 include!("fixtures_facets_assurance.rs");
+include!("fixtures_regenerate.rs");
 #[path = "fixtures_runtime_policy.rs"]
 mod runtime_policy;
 use runtime_policy::{
