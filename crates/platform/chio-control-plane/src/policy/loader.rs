@@ -155,7 +155,10 @@ fn hushspec_auxiliary_asset_digests(
     };
 
     let resolved_path = resolve_policy_asset_path(pattern_db, source_dir);
-    let bytes = std::fs::read(&resolved_path).map_err(|error| {
+    let bytes = chio_guards::embedding_anomaly::EmbeddingAnomalyPatternDb::read_file_bytes(
+        &resolved_path,
+    )
+    .map_err(|error| {
         PolicyError::Invalid(format!(
             "failed to read HushSpec auxiliary asset detection.threat_intel.pattern_db '{}' (resolved to '{}'): {error}",
             pattern_db,

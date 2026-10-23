@@ -155,11 +155,17 @@ impl EmbeddingAnomalyPatternDb {
     /// Read a pattern database from a regular file of at most
     /// [`MAX_PATTERN_BYTES`] bytes and validate it as [`Self::from_json`] does.
     pub fn from_json_file(path: &std::path::Path) -> Result<Self, EmbeddingAnomalyError> {
-        let bytes = crate::input::read_file(path, MAX_PATTERN_BYTES)?;
+        let bytes = Self::read_file_bytes(path)?;
         let entries =
             chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_PATTERN_BYTES)?
                 .decode_document()?;
         Self::from_entries(entries)
+    }
+
+    /// Read the raw bytes of a pattern database file under the same regular
+    /// file and [`MAX_PATTERN_BYTES`] bounds as [`Self::from_json_file`].
+    pub fn read_file_bytes(path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+        crate::input::read_file(path, MAX_PATTERN_BYTES)
     }
 
     /// Build from an explicit entry vector (convenience for tests).
