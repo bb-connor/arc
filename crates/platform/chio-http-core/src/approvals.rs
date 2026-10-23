@@ -125,6 +125,11 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
 impl From<KernelError> for ApprovalHandlerError {
     fn from(e: KernelError) -> Self {
         match e {
+            KernelError::Internal(_) => Self::Internal(
+                chio_errors::_generated::error_codes::KERNEL_INTERNAL_ERROR
+                    .urn
+                    .into(),
+            ),
             KernelError::ApprovalRejected(m) => {
                 if m.contains("replay") {
                     Self::ReplayDetected(m)

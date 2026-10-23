@@ -527,3 +527,6 @@ fn approval_schema_refusal_has_a_fixed_internal_error_body() {
         })
     );
 }
+
+#[path = "approvals_endpoints/schema_refusal.rs"]
+mod schema_refusal;
