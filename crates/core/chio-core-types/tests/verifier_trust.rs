@@ -1,10 +1,5 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Test fixtures deliberately fail on violated setup invariants."
-)]
-
 use chio_core_types::root_authority::{ReportColumn, VerifierTrust, VerifierTrustError};
+use chio_test_support::prelude::*;
 
 const EXAMPLES: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -14,12 +9,12 @@ const EXAMPLES: &str = concat!(
 const WEAK_KEY: &str = "0100000000000000000000000000000000000000000000000000000000000000";
 
 fn example(path: &str) -> serde_json::Value {
-    let bytes = std::fs::read(format!("{EXAMPLES}/{path}")).expect("example");
-    serde_json::from_slice(&bytes).expect("example json")
+    let bytes = std::fs::read(format!("{EXAMPLES}/{path}")).test_unwrap();
+    serde_json::from_slice(&bytes).test_unwrap()
 }
 
 fn load(value: &serde_json::Value) -> Result<VerifierTrust, VerifierTrustError> {
-    VerifierTrust::load(&serde_json::to_vec(value).expect("encode"))
+    VerifierTrust::load(&serde_json::to_vec(value).test_unwrap())
 }
 
 fn kernel_key(value: &serde_json::Value) -> serde_json::Value {
@@ -28,7 +23,7 @@ fn kernel_key(value: &serde_json::Value) -> serde_json::Value {
 
 #[test]
 fn staged_valid_example_loads() {
-    let trust = load(&example("valid/verifier-trust.json")).expect("valid trust file");
+    let trust = load(&example("valid/verifier-trust.json")).test_unwrap();
     assert_eq!(trust.kernel_keys.len(), 1);
     assert_eq!(
         trust.required_columns,
@@ -56,7 +51,7 @@ fn rootless_trust_with_only_kernel_keys_loads() {
     let mut value = example("valid/verifier-trust.json");
     value["exchange_keys"] = serde_json::json!([]);
     value["root_policy_keys"] = serde_json::json!([]);
-    load(&value).expect("exchange and root policy keys may be empty");
+    load(&value).test_unwrap();
 }
 
 #[test]
@@ -127,8 +122,8 @@ fn checkpoint_trust_anchor_round_trips_and_requires_every_member() {
         "signerCertRef": "cert-chain-1",
         "publicationProfileVersion": "profile-1"
     });
-    let trust = load(&value).expect("anchored trust file");
-    let anchor = trust.checkpoint_trust_anchor.expect("anchor");
+    let trust = load(&value).test_unwrap();
+    let anchor = trust.checkpoint_trust_anchor.test_unwrap();
     assert_eq!(anchor.trust_anchor_ref, "anchor-root-1");
 
     value["checkpoint_trust_anchor"]["trustAnchorRef"] = serde_json::json!("   ");
@@ -148,7 +143,7 @@ fn wrong_schema_refuses() {
 #[test]
 fn nested_duplicate_key_refuses_as_signed_json() {
     let value = example("valid/verifier-trust.json");
-    let text = serde_json::to_string(&value).expect("encode");
+    let text = serde_json::to_string(&value).test_unwrap();
     let tampered = text.replacen(
         "\"kid\":\"k-okta-1\"",
         "\"kid\":\"k-okta-1\",\"kid\":\"k-okta-0\"",
