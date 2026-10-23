@@ -71,7 +71,7 @@ pub(crate) fn cmd_chio_runtime_sign_pheromone_query_report(
     })?;
     let keypair = crate::load_existing_authority_keypair(signing_seed_file)?;
     let signed = chio_core::receipt::lineage::SignedExportEnvelope::sign(
-        chio_runtime_core::RuntimePheromoneQueryReport(body),
+        chio_runtime::RuntimePheromoneQueryReport(body),
         &keypair,
     )
     .map_err(|error| {
