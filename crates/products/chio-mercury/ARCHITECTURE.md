@@ -70,9 +70,6 @@ are validated declarations supplied in the input.
 Each synthetic receipt signs a reference to every bundle manifest packaged for
 its run, so the trusted verify finds signed coverage for each packaged manifest.
 
-Each synthetic receipt signs a reference to every bundle manifest packaged for
-its run, so the trusted verify finds signed coverage for each packaged manifest.
-
 `read_json_file` uses duplicate-aware signed decoding on the original input.
 It first calls `fs::read`, so this helper places no size bound on allocation.
 `bundle_manifest_file_name` rejects separators, colons, control characters,
