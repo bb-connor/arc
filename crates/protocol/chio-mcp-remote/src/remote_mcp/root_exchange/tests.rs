@@ -792,7 +792,7 @@ async fn jws_header_rules_are_enforced() {
         refusal(with_crit, id_jag_claims()).await,
         RootExchangeError::ForbiddenHeaderMember("crit")
     );
-    for alg in ["HS256", "none"] {
+    for alg in ["HS256", "none", "ES512"] {
         let header = edit(id_jag_header(), |header| {
             header.insert("alg".into(), json!(alg));
         });
@@ -1007,6 +1007,87 @@ async fn scope_projection_rules_are_enforced() {
         refusal(id_jag_header(), no_scope).await,
         RootExchangeError::EmptyEffectiveScope
     );
+}
+
+#[tokio::test]
+async fn projection_target_with_two_separators_is_refused() {
+    let harness = Harness::with(
+        |_| {},
+        |policy| {
+            policy["rules"][0]["idp_scope_projection"]["crm.read"] = json!(["crm/search/extra"]);
+        },
+    );
+    assert_eq!(
+        harness
+            .run(id_jag_header(), id_jag_claims())
+            .await
+            .unwrap_err(),
+        RootExchangeError::ProjectionTargetMalformed
+    );
+}
+
+#[tokio::test]
+async fn wildcard_ceiling_grant_issues_the_projected_tools() {
+    let mut wildcard = grant("*");
+    wildcard.operations = vec![Operation::Invoke];
+    let ceiling = ChioScope {
+        grants: vec![wildcard],
+        ..ChioScope::default()
+    };
+    let harness = Harness::with(
+        |_| {},
+        |policy| {
+            policy["rules"][0]["ceiling_scope"] = serde_json::to_value(&ceiling).unwrap();
+            policy["rules"][0]["ceiling_scope_hash"] =
+                serde_json::to_value(digest_of(&ceiling)).unwrap();
+        },
+    );
+    let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
+    let tools: Vec<_> = prepared
+        .body
+        .scope
+        .grants
+        .iter()
+        .map(|grant| (grant.server_id.as_str(), grant.tool_name.as_str()))
+        .collect();
+    assert_eq!(tools, [("crm", "get"), ("crm", "search")]);
+}
+
+#[tokio::test]
+async fn resource_parameter_must_name_the_protected_resource() {
+    let harness = Harness::new();
+    let assertion = client_assertion(&client_assertion_claims());
+    let body = |resource: &str| {
+        form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", &id_jag()),
+            ("client_id", CLIENT_ID),
+            ("client_assertion_type", CLIENT_ASSERTION_TYPE_JWT_BEARER),
+            ("client_assertion", &assertion),
+            ("resource", resource),
+        ])
+    };
+    assert_eq!(
+        harness
+            .run_body(&body("https://other.example/mcp"), None, NOW)
+            .await
+            .unwrap_err(),
+        RootExchangeError::ResourceMismatch
+    );
+    harness.run_body(&body(RESOURCE), None, NOW).await.unwrap();
+}
+
+#[tokio::test]
+async fn exchange_key_outside_the_policy_refuses_before_any_replay_is_spent() {
+    let mut harness = Harness::new();
+    harness.exchange.exchange_key = policy_keypair().public_key();
+    let body = jwt_bearer_body(&id_jag(), &client_assertion(&client_assertion_claims()));
+    assert_eq!(
+        harness.run_body(&body, None, NOW).await.unwrap_err(),
+        RootExchangeError::ExchangeKeyNotListed
+    );
+    harness.exchange.exchange_key = exchange_keypair().public_key();
+    harness.run_body(&body, None, NOW).await.unwrap();
 }
 
 #[tokio::test]

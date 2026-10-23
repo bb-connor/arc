@@ -119,6 +119,7 @@ impl CompactJws {
             .get("alg")
             .cloned()
             .and_then(|alg| serde_json::from_value::<JwsAlgorithm>(alg).ok())
+            .filter(|alg| *alg != JwsAlgorithm::ES512)
             .ok_or(RootExchangeError::AlgorithmNotAdmitted)?;
         let kid = match header.get("kid") {
             Some(Value::String(kid)) => Identifier::new(kid.as_str())
