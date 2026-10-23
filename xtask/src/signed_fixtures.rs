@@ -440,6 +440,28 @@ pub(crate) const STEPS: &[Step] = &[
         owns: &["spec/vectors/recovery/v1/product-contracts.json"],
     },
     Step {
+        name: "recovery semantic contract vectors",
+        regenerate: cargo(&[
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_semantic_contracts",
+            "--",
+            "--ignored",
+            "--exact",
+            "write_semantic_vectors",
+        ]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_semantic_contracts",
+        ]),
+        owns: &["spec/vectors/recovery/v1/semantic-contracts.json"],
+    },
+    Step {
         name: "frost sealed round-two vectors",
         regenerate: cargo(&[
             "test",
