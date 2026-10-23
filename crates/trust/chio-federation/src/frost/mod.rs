@@ -46,7 +46,7 @@ pub use trust::{
 };
 pub use types::{
     FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationError,
-    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX,
+    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
 };
 pub use verify::{
     frost_authorization_session_id, frost_authorization_slot_id,

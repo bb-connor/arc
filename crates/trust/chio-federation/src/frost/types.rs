@@ -1,11 +1,12 @@
-use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, SigningWrapper};
 use serde::{Deserialize, Serialize};
 
 use super::action::FrostActionPreimageV1;
 use super::registry::frost_action_registration;
+use super::verify::CHIO_FROST_AUTHORIZATION_SCHEMA;
 
 pub const CHIO_FROST_AUTHORIZATION_BODY_SCHEMA: &str = "chio.frost.authorization-body.v1";
-pub const CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-AUTHORIZATION-V1\0";
 const CHIO_FROST_AUTHORIZATION_ID_PREFIX: &[u8] = b"chio.frost.authorization.id.v1\0";
 const IJSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
@@ -138,15 +139,15 @@ impl FrostAuthorizationBodyV1 {
         Ok(sha256_hex(&bytes))
     }
 
+    /// The message every FROST share signs: the signing wrapper over this
+    /// body's canonical JSON under `chio.frost.authorization.v1`.
     pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostAuthorizationError> {
         self.validate()?;
-        let canonical = canonical_json_bytes(self)
+        let canonical = CanonicalBytes::from_serializable(self)
             .map_err(|error| FrostAuthorizationError::Canonical(error.to_string()))?;
-        let mut bytes =
-            Vec::with_capacity(CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX.len() + canonical.len());
-        bytes.extend_from_slice(CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX);
-        bytes.extend_from_slice(&canonical);
-        Ok(bytes)
+        let wrapper = SigningWrapper::new(CHIO_FROST_AUTHORIZATION_SCHEMA, &canonical)
+            .map_err(|error| FrostAuthorizationError::Canonical(error.to_string()))?;
+        Ok(wrapper.as_bytes().to_vec())
     }
 
     pub fn validate(&self) -> Result<(), FrostAuthorizationError> {

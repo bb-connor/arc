@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::SigningWrapper;
 use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
@@ -331,6 +333,19 @@ fn historical_slot_pair(
 }
 
 fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
+    fixture_signed_over(roster_key, signing_key, |body| {
+        body.signing_bytes()
+            .unwrap_or_else(|error| panic!("fixture body must produce signing bytes: {error}"))
+    })
+}
+
+/// A fixture whose group signature covers `message(body)`; the anchored
+/// checkpoints still commit the body's real signing message.
+fn fixture_signed_over(
+    roster_key: &str,
+    signing_key: &str,
+    message: impl Fn(&FrostAuthorizationBodyV1) -> Vec<u8>,
+) -> Fixture {
     let roster = roster(roster_key, 4);
     let registration = frost_action_registration(FrostAuthorizationDomain::SettleCommitment)
         .unwrap_or_else(|| panic!("settlement authorization domain must be registered"));
@@ -363,7 +378,7 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
         .unwrap_or_else(|error| panic!("fixture body must produce signing bytes: {error}"));
     let secret = SigningKey::deserialize(&decode_hex(signing_key))
         .unwrap_or_else(|error| panic!("official group secret must decode: {error}"));
-    let signature = secret.sign(ChaCha20Rng::from_seed([7; 32]), &signing_bytes);
+    let signature = secret.sign(ChaCha20Rng::from_seed([7; 32]), &message(&body));
     let signature_bytes = signature
         .serialize()
         .unwrap_or_else(|error| panic!("fixture signature must serialize: {error}"));
@@ -892,6 +907,54 @@ fn refused_slot_error(
     )
     .err()
     .unwrap_or_else(|| panic!("slot must refuse"))
+}
+
+#[test]
+fn group_signature_covers_only_the_authorization_signing_wrapper() {
+    let canonical = |body: &FrostAuthorizationBodyV1| {
+        CanonicalBytes::from_serializable(body)
+            .unwrap_or_else(|error| panic!("body must canonicalize: {error}"))
+    };
+    let body = fixture().proof.body;
+    assert_eq!(
+        body.signing_bytes()
+            .unwrap_or_else(|error| panic!("signing bytes: {error}")),
+        SigningWrapper::new(CHIO_FROST_AUTHORIZATION_SCHEMA, &canonical(&body))
+            .unwrap_or_else(|error| panic!("wrapper: {error}"))
+            .as_bytes()
+            .to_vec()
+    );
+
+    let wrapped = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        SigningWrapper::new(CHIO_FROST_AUTHORIZATION_SCHEMA, &canonical(body))
+            .unwrap_or_else(|error| panic!("wrapper: {error}"))
+            .as_bytes()
+            .to_vec()
+    });
+    verify_fixture_at(&wrapped, 250)
+        .unwrap_or_else(|error| panic!("wrapper signature must verify: {error}"));
+
+    let raw_prefix = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        let mut message = b"CHIO-FROST-AUTHORIZATION-V1\0".to_vec();
+        message.extend_from_slice(canonical(body).as_bytes());
+        message
+    });
+    let cross_id = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        SigningWrapper::new(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+            &canonical(body),
+        )
+        .unwrap_or_else(|error| panic!("wrapper: {error}"))
+        .as_bytes()
+        .to_vec()
+    });
+    for (label, refused) in [("raw prefix", raw_prefix), ("foreign schema id", cross_id)] {
+        assert_eq!(
+            verify_fixture_at(&refused, 250).err(),
+            Some(FrostVerificationError::InvalidGroupSignature),
+            "{label}"
+        );
+    }
 }
 
 #[test]
