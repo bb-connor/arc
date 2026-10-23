@@ -112,7 +112,7 @@ pub fn verify_passport_presentation_response_with_policy(
     };
     let signature = Signature::from_hex(&response.proof.proof_value)?;
     let signed = chio_core::crypto::verify_wrapped(
-        &subject_did.public_key(),
+        subject_did.public_key(),
         PASSPORT_PRESENTATION_RESPONSE_SCHEMA,
         &unsigned,
         &signature,

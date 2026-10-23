@@ -587,7 +587,7 @@ pub fn inspect_financial_passport_presentation_response(
     };
     let signature = Signature::from_hex(&response.proof.proof_value)?;
     if chio_core::crypto::verify_wrapped(
-        &holder.public_key(),
+        holder.public_key(),
         FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1,
         &unsigned,
         &signature,

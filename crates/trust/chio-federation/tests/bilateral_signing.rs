@@ -185,10 +185,8 @@ fn origin_signature_under_unpinned_key_is_rejected() {
 fn dual_signed_receipt_shape_is_not_a_dsse_envelope() {
     let tool_host_kp = Keypair::generate();
     let receipt = sample_receipt(&tool_host_kp);
-    let signature = tool_host_kp.sign_exempt(
-        chio_core_types::crypto::ExemptFormat::DssePae,
-        b"bilateral",
-    );
+    let signature =
+        tool_host_kp.sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, b"bilateral");
     let value = serde_json::json!({
         "schema": "chio.bilateral.dual-signed-receipt.v1",
         "body": receipt,

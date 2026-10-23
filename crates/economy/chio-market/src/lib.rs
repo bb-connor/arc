@@ -30,8 +30,6 @@ pub use insurance_flow::{
 };
 pub use parametric::*;
 
-use serde::Serialize;
-
 use crate::capability::scope::MonetaryAmount;
 use crate::receipt::lineage::SignedExportEnvelope;
 
@@ -143,11 +141,14 @@ fn verify_signed_artifact<T>(
 where
     T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
-    if artifact.verify_signature(&artifact.signer_key).map_err(|error| {
-        MarketError::signature_invalid(format!(
-            "{field_name} signature verification failed: {error}"
-        ))
-    })? {
+    if artifact
+        .verify_signature(&artifact.signer_key)
+        .map_err(|error| {
+            MarketError::signature_invalid(format!(
+                "{field_name} signature verification failed: {error}"
+            ))
+        })?
+    {
         Ok(())
     } else {
         Err(MarketError::signature_invalid(format!(

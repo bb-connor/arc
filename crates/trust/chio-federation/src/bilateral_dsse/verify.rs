@@ -138,22 +138,24 @@ pub fn verify_dsse_envelope(
 
     // Spec §7 step 11.
     if chio_core_types::crypto::verify_exempt(
-        &org_a_public_key,
+        org_a_public_key,
         chio_core_types::crypto::ExemptFormat::DssePae,
         &pae_bytes,
         &sig_a_struct,
     )
-    .is_err() {
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
     // Spec §7 step 12.
     if chio_core_types::crypto::verify_exempt(
-        &org_b_public_key,
+        org_b_public_key,
         chio_core_types::crypto::ExemptFormat::DssePae,
         &pae_bytes,
         &sig_b_struct,
     )
-    .is_err() {
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 
@@ -254,21 +256,23 @@ fn verify_chio_bilateral_dsse_envelope_inner(
     let sig_a_struct = Signature::from_bytes(&sig_a_bytes);
     let sig_b_struct = Signature::from_bytes(&sig_b_bytes);
     if chio_core_types::crypto::verify_exempt(
-        &org_a_public_key,
+        org_a_public_key,
         chio_core_types::crypto::ExemptFormat::DssePae,
         &pae_bytes,
         &sig_a_struct,
     )
-    .is_err() {
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
     if chio_core_types::crypto::verify_exempt(
-        &org_b_public_key,
+        org_b_public_key,
         chio_core_types::crypto::ExemptFormat::DssePae,
         &pae_bytes,
         &sig_b_struct,
     )
-    .is_err() {
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 

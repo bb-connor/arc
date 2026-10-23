@@ -1009,7 +1009,10 @@ mod tests {
     fn sign_fixture_receipt(keypair: &Keypair, canonical: &[u8]) -> Signature {
         let value: serde_json::Value = serde_json::from_slice(canonical).unwrap();
         keypair
-            .sign_wrapped(CHIO_RECEIPT_SCHEMA, &CanonicalBytes::from_value(&value).unwrap())
+            .sign_wrapped(
+                CHIO_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_value(&value).unwrap(),
+            )
             .unwrap()
     }
 

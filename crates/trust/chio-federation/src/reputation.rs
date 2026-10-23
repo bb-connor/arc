@@ -94,7 +94,9 @@ pub struct FederatedReputationClearingArtifact {
 pub type SignedFederatedReputationClearing =
     SignedExportEnvelope<FederatedReputationClearingArtifact>;
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for FederatedReputationClearingArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FederatedReputationClearingArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_FEDERATION_REPUTATION_CLEARING_SCHEMA;
 }
 

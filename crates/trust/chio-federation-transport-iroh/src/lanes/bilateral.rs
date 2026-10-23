@@ -749,7 +749,7 @@ impl BilateralCoSignHandler {
         // directory-bound key (above iroh; the pinned map having been proven to
         // match it).
         if verify_exempt(
-            &directory_key,
+            directory_key,
             ExemptFormat::DssePae,
             &request.pae_bytes,
             &request.org_b_signature,

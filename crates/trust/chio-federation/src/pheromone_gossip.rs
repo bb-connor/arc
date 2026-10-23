@@ -7,8 +7,8 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::{Mutex, PoisonError};
 
-pub use chio_pheromone::PHEROMONE_DEPOSIT_SCHEMA;
 use chio_pheromone::PheromoneDeposit;
+pub use chio_pheromone::PHEROMONE_DEPOSIT_SCHEMA;
 use serde::{Deserialize, Serialize};
 
 pub const PHEROMONE_GOSSIP_SCHEMA: &str = "chio.pheromone-deposit-gossip.v1";

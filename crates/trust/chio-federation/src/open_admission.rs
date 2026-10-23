@@ -50,7 +50,9 @@ pub struct FederatedOpenAdmissionPolicyArtifact {
 pub type SignedFederatedOpenAdmissionPolicy =
     SignedExportEnvelope<FederatedOpenAdmissionPolicyArtifact>;
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for FederatedOpenAdmissionPolicyArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FederatedOpenAdmissionPolicyArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_FEDERATION_OPEN_ADMISSION_POLICY_SCHEMA;
 }
 

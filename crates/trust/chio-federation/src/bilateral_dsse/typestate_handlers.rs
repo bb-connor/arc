@@ -92,9 +92,9 @@ pub(crate) fn sign_host(
     let backend = Ed25519Backend::new(drafted.org_b_keypair.clone());
     let org_b_signature = backend
         .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
-                chio_core_types::crypto::ExemptFormat::DssePae,
-                &drafted.pae_bytes,
-            ))
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &drafted.pae_bytes,
+        ))
         .map_err(|error| BilateralCoSigningError::TransportFailure(error.to_string()))?;
     let request = DsseCoSigningRequest::new(
         drafted.org_a_kernel_id.to_string(),
@@ -124,7 +124,7 @@ pub(crate) fn request_cosignature(
         return Err(BilateralCoSigningError::UnsupportedSchema(response.schema));
     }
     if chio_core_types::crypto::verify_exempt(
-        &host_signed.org_a_public_key,
+        host_signed.org_a_public_key,
         chio_core_types::crypto::ExemptFormat::DssePae,
         &host_signed.request.pae_bytes,
         &response.org_a_signature,

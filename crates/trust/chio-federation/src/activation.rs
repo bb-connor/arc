@@ -38,7 +38,9 @@ pub struct FederationActivationExchangeArtifact {
 pub type SignedFederationActivationExchange =
     SignedExportEnvelope<FederationActivationExchangeArtifact>;
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for FederationActivationExchangeArtifact {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FederationActivationExchangeArtifact
+{
     const SCHEMA_ID: &'static str = CHIO_FEDERATION_ACTIVATION_EXCHANGE_SCHEMA;
 }
 

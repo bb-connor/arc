@@ -45,7 +45,10 @@ fn portable_sd_jwt_passport_projection_roundtrip_verifies() {
         let signing_input = format!("{}.{}", URL_SAFE_NO_PAD.encode(header), parts[1]);
         let signature = URL_SAFE_NO_PAD.encode(
             issuer
-                .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes())
+                .sign_exempt(
+                    chio_core::crypto::ExemptFormat::JwsSigningInput,
+                    signing_input.as_bytes(),
+                )
                 .to_bytes(),
         );
         let malformed = format!("{signing_input}.{signature}~{disclosures}");
