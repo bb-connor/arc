@@ -902,6 +902,7 @@ fn executable_on_path(name: &str) -> Option<PathBuf> {
     find_executable(name, std::env::var_os("PATH")?.as_os_str())
 }
 
+#[cfg(unix)]
 fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
     use std::os::unix::fs::PermissionsExt as _;
 
@@ -911,6 +912,11 @@ fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf>
             fs::metadata(candidate)
                 .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
         })
+}
+
+#[cfg(not(unix))]
+fn find_executable(_name: &str, _search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+    None
 }
 
 fn bounded_runtime_path(executable: &Path, args: &[&str], label: &str) -> Result<PathBuf, String> {
@@ -1007,6 +1013,15 @@ fn sandbox_path() -> String {
     "/usr/bin:/runtime/bin".to_owned()
 }
 
+#[cfg(not(unix))]
+pub(super) fn require_sandbox() -> Result<(), CliError> {
+    Err(CliError::cli_other_error(
+        "verified-fix packaging requires a Unix host with bubblewrap and cgroup isolation"
+            .to_owned(),
+    ))
+}
+
+#[cfg(unix)]
 pub(super) fn require_sandbox() -> Result<(), CliError> {
     for (command, message) in [
         (
@@ -1106,7 +1121,7 @@ fn command_version(command: &str, args: &[&str]) -> Result<String, CliError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
