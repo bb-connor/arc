@@ -158,13 +158,12 @@ fn witness_signatures_bind_checkpoint_hash_and_require_distinct_known_quorum() {
     assert_eq!(checkpoint.verify_witnesses(&keys).test_unwrap().len(), 2);
 
     let mut altered_operator_envelope = checkpoint.clone();
-    altered_operator_envelope.operator_signature =
-        operator
-            .sign_bytes(SigningMessage::exempt(
-                ExemptFormat::JwsSigningInput,
-                b"other statement",
-            ))
-            .test_unwrap();
+    altered_operator_envelope.operator_signature = operator
+        .sign_bytes(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"other statement",
+        ))
+        .test_unwrap();
     let result = altered_operator_envelope.verify_witness_signatures(&keys);
     assert!(
         matches!(result, Err(KeyringError::InvalidSignature)),

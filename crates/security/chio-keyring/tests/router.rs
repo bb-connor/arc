@@ -272,14 +272,13 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
         .test_unwrap()
     );
     let mut corrupted_evidence = first.clone();
-    corrupted_evidence.artifact_signature =
-        ready
-            .old
-            .sign_bytes(SigningMessage::exempt(
-                ExemptFormat::JwsSigningInput,
-                b"corrupted evidence",
-            ))
-            .test_unwrap();
+    corrupted_evidence.artifact_signature = ready
+        .old
+        .sign_bytes(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"corrupted evidence",
+        ))
+        .test_unwrap();
     assert!(matches!(
         corrupted_evidence.verify(&ready.old.public_key().test_unwrap()),
         Err(chio_keyring::KeyringError::InvalidSignature)
@@ -370,7 +369,10 @@ fn keyring_public_key_errors_when_selector_lock_is_poisoned() {
         Err(chio_keyring::KeyringError::Synchronization)
     ));
     assert!(matches!(
-        router.sign_message_with_identity(SigningMessage::exempt(ExemptFormat::JwsSigningInput, b"m")),
+        router.sign_message_with_identity(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"m"
+        )),
         Err(chio_keyring::KeyringError::Synchronization)
     ));
 }
@@ -421,7 +423,11 @@ fn retired_backend_drop_panic_leaves_the_selector_usable() {
         ready.new.public_key().test_unwrap()
     );
     let signed = router
-        .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": "after-retired-drop"}))
+        .sign_canonical(
+            1,
+            ARTIFACT_SCHEMA,
+            &serde_json::json!({"artifact": "after-retired-drop"}),
+        )
         .test_unwrap();
     assert_eq!(signed.signing_epoch, 1);
     assert_eq!(
@@ -519,8 +525,9 @@ fn activation_waits_until_inflight_signature_is_durably_anchored() {
         .test_unwrap();
 
     let signer = Arc::clone(&router);
-    let sign_thread =
-        std::thread::spawn(move || signer.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"race": true})));
+    let sign_thread = std::thread::spawn(move || {
+        signer.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"race": true}))
+    });
     started_rx.recv().test_unwrap();
 
     let activator = Arc::clone(&router);
@@ -854,7 +861,7 @@ fn enterprise_router_rejects_legacy_artifact_without_trusted_time() {
     legacy
         .sign_wrapped_with_identity(
             ARTIFACT_SCHEMA,
-            &artifact_body("artifact without a time anchor")
+            &artifact_body("artifact without a time anchor"),
         )
         .test_unwrap();
     drop(legacy);

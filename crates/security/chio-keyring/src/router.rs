@@ -473,9 +473,9 @@ impl KeyringSigningRouter {
             });
         }
         let artifact_outcome = match input {
-            RouterArtifact::Forwarded(message) => {
-                router.active.sign_bytes_for_identity(&public_key, message)?
-            }
+            RouterArtifact::Forwarded(message) => router
+                .active
+                .sign_bytes_for_identity(&public_key, message)?,
             RouterArtifact::Canonical {
                 schema_id,
                 canonical,
