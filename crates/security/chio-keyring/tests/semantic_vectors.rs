@@ -6,11 +6,13 @@ use std::sync::Arc;
 
 use chio_core_types::{canonical_json_bytes, Ed25519Backend, Keypair, SigningBackend};
 use chio_keyring::{
-    AnchorId, AuthorityId, KeyLogPin, KeyLogPolicy, KeyLogPolicyConfig, KeyLogState,
-    KeyLogSyncResponse, KeyringError, LogId, RecoveryPolicyId, SignedKeyActivationCommit,
-    SignedKeyEnterpriseReceipt, SignedKeyLogCheckpoint, SignedKeyLogEvent,
-    SqlitePinnedKeyLogVerifier, WitnessId, WitnessRosterId, WitnessSignature,
-    WitnessedActivationSet,
+    derive_key_id, AnchorId, AuthorityId, BootstrapAuthorization, EventId, EventReason,
+    KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation, KeyLogPin, KeyLogPolicy,
+    KeyLogPolicyConfig, KeyLogState, KeyLogSyncResponse, KeyringError, LogId,
+    NewKeyProofOfPossession, OldKeyAuthorization, RecoveryPolicyId, SignedKeyActivationCommit,
+    SignedKeyEnterpriseReceipt, SignedKeyLogCheckpoint, SignedKeyLogEvent, SigningTopology,
+    SqliteKeyLogStore, SqlitePinnedKeyLogVerifier, WitnessId, WitnessRosterId, WitnessSignature,
+    WitnessedActivationSet, KEY_LOG_EVENT_SCHEMA,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -549,5 +551,193 @@ fn hex_nibble(value: u8) -> u8 {
         b'a'..=b'f' => value - b'a' + 10,
         b'A'..=b'F' => value - b'A' + 10,
         _ => panic!("invalid hex mutation byte"),
+    }
+}
+
+fn genesis_event(keys: &DeterministicKeys) -> SignedKeyLogEvent {
+    let public_key = keys.old_artifact.public_key().test_unwrap();
+    let body = KeyLogEventBody {
+        schema: KEY_LOG_EVENT_SCHEMA.to_string(),
+        log_id: keys.policy.log_id().clone(),
+        sequence: 0,
+        event_id: EventId::new("event.receipt.genesis").test_unwrap(),
+        previous_event_hash: None,
+        authority_id: keys.policy.authority_id().clone(),
+        key_id: derive_key_id(public_key.algorithm(), &public_key).test_unwrap(),
+        algorithm: public_key.algorithm(),
+        public_key,
+        operation: KeyLogOperation::Genesis,
+        effective_at: 1_000,
+        verify_until: None,
+        reason: Some(EventReason::new("receipt-secret-canary-7a9e").test_unwrap()),
+        issued_at: 1_000,
+    };
+    SignedKeyLogEvent {
+        authorizations: KeyLogAuthorizations::bootstrap(
+            BootstrapAuthorization::sign(&body, &keys.bootstrap).test_unwrap(),
+        ),
+        body,
+    }
+}
+
+fn rotation_event(keys: &DeterministicKeys, genesis: &SignedKeyLogEvent) -> SignedKeyLogEvent {
+    let public_key = keys.new_artifact.public_key().test_unwrap();
+    let body = KeyLogEventBody {
+        schema: KEY_LOG_EVENT_SCHEMA.to_string(),
+        log_id: genesis.body.log_id.clone(),
+        sequence: 1,
+        event_id: EventId::new("event.receipt.rotation").test_unwrap(),
+        previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
+        authority_id: genesis.body.authority_id.clone(),
+        key_id: derive_key_id(public_key.algorithm(), &public_key).test_unwrap(),
+        algorithm: public_key.algorithm(),
+        public_key,
+        operation: KeyLogOperation::Rotate {
+            previous_key_id: genesis.body.key_id,
+            witness_roster_id: WitnessRosterId::new("roster.enterprise.receipt.v1").test_unwrap(),
+            witness_roster_binding: keys.policy.witness_roster_binding().test_unwrap(),
+        },
+        effective_at: 2_000,
+        verify_until: Some(9_000),
+        reason: Some(EventReason::new("witnessed receipt rotation").test_unwrap()),
+        issued_at: 2_000,
+    };
+    SignedKeyLogEvent {
+        authorizations: KeyLogAuthorizations::rotation(
+            OldKeyAuthorization::sign(&body, &keys.old_artifact).test_unwrap(),
+            NewKeyProofOfPossession::sign(&body, &keys.new_artifact).test_unwrap(),
+        ),
+        body,
+    }
+}
+
+fn canonical<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    canonical_json_bytes(value).test_unwrap()
+}
+
+/// Builds every committed positive from the production store under a fixed
+/// clock, in the order the index lists them.
+fn generated_positives() -> Vec<(&'static str, Vec<u8>)> {
+    let keys = DeterministicKeys::new();
+    let directory = private_tempdir().test_unwrap();
+    let store = SqliteKeyLogStore::open_with_clock(
+        trusted_temp_path(&directory, "semantic-vector-generator.sqlite"),
+        keys.policy.clone(),
+        SigningTopology::LocalSingleWriter,
+        Arc::new(FixedClock(3_000)),
+    )
+    .test_unwrap();
+    let genesis = genesis_event(&keys);
+    let genesis_checkpoint = store.append_event(&genesis, &keys.operator).test_unwrap();
+    let rotation = rotation_event(&keys, &genesis);
+    let rotation_checkpoint = store.append_event(&rotation, &keys.operator).test_unwrap();
+    let checkpoint_hash = rotation_checkpoint.checkpoint_hash().test_unwrap();
+    for (witness_id, witness) in [
+        ("witness.a", &keys.witnesses[0]),
+        ("witness.b", &keys.witnesses[1]),
+    ] {
+        let signature = WitnessSignature::sign(
+            &rotation_checkpoint,
+            WitnessId::new(witness_id).test_unwrap(),
+            witness,
+        )
+        .test_unwrap();
+        store
+            .store_witness_signature(&checkpoint_hash, &signature)
+            .test_unwrap();
+    }
+    store
+        .activate_rotation(&rotation.body.event_id, &checkpoint_hash, &keys.operator)
+        .test_unwrap();
+
+    let witnessed_checkpoint = store
+        .load_checkpoints()
+        .test_unwrap()
+        .pop()
+        .test_unwrap()
+        .checkpoint;
+    let activation = store
+        .synchronization_response(None)
+        .test_unwrap()
+        .activation_commits
+        .pop()
+        .test_unwrap();
+    let receipt = store.load_enterprise_receipts().test_unwrap().remove(2);
+    let base = KeyLogPin {
+        checkpoint_sequence: genesis_checkpoint.body.checkpoint_sequence,
+        tree_size: genesis_checkpoint.body.tree_size,
+        checkpoint_hash: genesis_checkpoint.checkpoint_hash().test_unwrap(),
+        root_hash: genesis_checkpoint.body.root_hash,
+        signing_epoch: 0,
+    };
+    let page = store.synchronization_response(Some(&base)).test_unwrap();
+
+    vec![
+        (
+            "positive/key-log-event-body-rotation-v1.json",
+            canonical(&rotation.body),
+        ),
+        (
+            "positive/key-log-event-envelope-genesis-v1.json",
+            canonical(&genesis),
+        ),
+        (
+            "positive/key-log-event-envelope-rotation-v1.json",
+            canonical(&rotation),
+        ),
+        (
+            "positive/key-log-checkpoint-body-witnessed-v1.json",
+            canonical(&witnessed_checkpoint.body),
+        ),
+        (
+            "positive/key-log-checkpoint-envelope-genesis-v1.json",
+            canonical(&genesis_checkpoint),
+        ),
+        (
+            "positive/key-log-checkpoint-envelope-witnessed-v1.json",
+            canonical(&witnessed_checkpoint),
+        ),
+        (
+            "positive/key-log-witness-signature-v1.json",
+            canonical(&witnessed_checkpoint.witness_signatures[0]),
+        ),
+        (
+            "positive/key-log-activation-commit-body-v1.json",
+            canonical(&activation.body),
+        ),
+        (
+            "positive/key-log-activation-commit-envelope-v1.json",
+            canonical(&activation),
+        ),
+        (
+            "positive/key-log-enterprise-receipt-body-active-v1.json",
+            canonical(&receipt.body),
+        ),
+        (
+            "positive/key-log-enterprise-receipt-envelope-active-v1.json",
+            canonical(&receipt),
+        ),
+        (
+            "positive/key-log-sync-response-paged-v1.json",
+            canonical(&page),
+        ),
+    ]
+}
+
+#[test]
+fn committed_positives_match_the_production_builders() {
+    for (relative, expected) in generated_positives() {
+        assert!(
+            read_vector(relative) == expected,
+            "fixture tests/bindings/vectors/security/key-log/{relative} is out of date"
+        );
+    }
+}
+
+#[test]
+#[ignore = "regenerator: rewrites tests/bindings/vectors/security/key-log/positive"]
+fn regenerate_key_log_positives() {
+    for (relative, bytes) in generated_positives() {
+        std::fs::write(vector_root().join(relative), bytes).test_unwrap();
     }
 }

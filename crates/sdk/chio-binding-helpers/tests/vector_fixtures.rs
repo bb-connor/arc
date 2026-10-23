@@ -843,9 +843,18 @@ fn refresh_receipt_vector_fixture() {
 }
 
 #[test]
-#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn signing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&signing_fixture_path(), &signing_vector_fixture());
+}
+
+#[test]
+#[ignore = "regenerator: rewrite the signing vector fixture from signing_vector_fixture(); run with --ignored, then `cargo xtask freeze-vectors`"]
+fn regenerate_signing_vector_fixture() {
+    fs::write(
+        signing_fixture_path(),
+        pretty_json(&signing_vector_fixture()),
+    )
+    .test_unwrap("write signing vector fixture");
 }
 
 #[test]

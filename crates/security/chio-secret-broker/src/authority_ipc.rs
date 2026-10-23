@@ -648,9 +648,17 @@ fn sign_authority_request(
         schema: AUTHORITY_REQUEST_SCHEMA.to_string(),
         request_id: hex::encode(random),
         issued_at_unix_seconds,
-        broker: expected_broker.clone(),
+        broker: expected_broker,
         operation,
     };
+    sign_authority_request_body(body, signer)
+}
+
+pub(crate) fn sign_authority_request_body(
+    body: AuthorityRequestBody,
+    signer: &dyn SigningBackend,
+) -> Result<SignedAuthorityRequest> {
+    let expected_broker = body.broker.clone();
     let canonical = CanonicalBytes::from_serializable(&body).map_err(|error| {
         BrokerError::Invariant(format!(
             "authority request signing input encoding failed: {error}"
@@ -720,7 +728,7 @@ fn verify_authority_request(
     Ok(())
 }
 
-fn sign_authority_response(
+pub(crate) fn sign_authority_response(
     request_id: &str,
     request_digest: &str,
     result: AuthorityResult,
@@ -886,7 +894,7 @@ fn validate_signed_frame_identity(
     Ok(())
 }
 
-fn signed_request_digest(request: &SignedAuthorityRequest) -> Result<String> {
+pub(crate) fn signed_request_digest(request: &SignedAuthorityRequest) -> Result<String> {
     let canonical = canonical_json_bytes(request).map_err(|error| {
         BrokerError::Invariant(format!("authority request digest failed: {error}"))
     })?;

@@ -33,17 +33,71 @@ fn runtime_registry(version: &str) -> TestResult<FiscalRuntimeAdapterRegistry> {
     .map_err(Into::into)
 }
 
-fn fiscal_fixture(name: &str) -> TestResult<Value> {
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+fn fiscal_fixture_path(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
         "../../../spec/schemas/chio-fiscal/v1/fixtures/{name}.positive.json"
-    ));
-    Ok(serde_json::from_slice(&std::fs::read(path)?)?)
+    ))
 }
 
-fn assert_fiscal_fixture<T: serde::Serialize>(name: &str, expected: &T) -> TestResult {
-    let actual = fiscal_fixture(name)?;
-    let canonical_expected: Value = serde_json::from_slice(&canonical_json_bytes(expected)?)?;
-    assert_eq!(actual, canonical_expected, "{name} fixture drifted");
+fn fiscal_fixture(name: &str) -> TestResult<Value> {
+    Ok(serde_json::from_slice(&std::fs::read(
+        fiscal_fixture_path(name),
+    )?)?)
+}
+
+fn render_fiscal_fixture<T: serde::Serialize>(value: &T) -> TestResult<String> {
+    let canonical: Value = serde_json::from_slice(&canonical_json_bytes(value)?)?;
+    let mut text = serde_json::to_string_pretty(&canonical)?;
+    text.push('\n');
+    Ok(text)
+}
+
+fn published_fiscal_fixtures(
+    fixture: &ContinuityFixture,
+) -> TestResult<Vec<(&'static str, String)>> {
+    Ok(vec![
+        (
+            "charter",
+            render_fiscal_fixture(fixture.amendment.charter.signed())?,
+        ),
+        (
+            "schedule",
+            render_fiscal_fixture(fixture.amendment.schedule.signed())?,
+        ),
+        ("genesis-policy", render_fiscal_fixture(&fixture.policy)?),
+        (
+            "proposal",
+            render_fiscal_fixture(fixture.amendment.proposal.signed())?,
+        ),
+        (
+            "proposal-admission",
+            render_fiscal_fixture(fixture.amendment.admission.signed())?,
+        ),
+        (
+            "approval",
+            render_fiscal_fixture(&fixture.amendment.activation.body().approvals[0])?,
+        ),
+        (
+            "activation",
+            render_fiscal_fixture(fixture.amendment.activation.signed())?,
+        ),
+        (
+            "consumer-readiness",
+            render_fiscal_fixture(fixture.readiness.signed())?,
+        ),
+        (
+            "continuity-checkpoint",
+            render_fiscal_fixture(fixture.genesis.signed())?,
+        ),
+    ])
+}
+
+#[test]
+#[ignore = "regenerator: rewrites spec/schemas/chio-fiscal/v1/fixtures from the pinned builders"]
+fn regenerate_published_fiscal_fixtures() -> TestResult {
+    for (name, text) in published_fiscal_fixtures(&continuity_fixture()?)? {
+        std::fs::write(fiscal_fixture_path(name), text)?;
+    }
     Ok(())
 }
 
@@ -533,18 +587,13 @@ fn continuity_advance_retains_reverifiable_canonical_evidence() -> TestResult {
 #[test]
 fn published_fiscal_fixtures_match_runtime_types_and_signatures() -> TestResult {
     let fixture = continuity_fixture()?;
-    assert_fiscal_fixture("charter", fixture.amendment.charter.signed())?;
-    assert_fiscal_fixture("schedule", fixture.amendment.schedule.signed())?;
-    assert_fiscal_fixture("genesis-policy", &fixture.policy)?;
-    assert_fiscal_fixture("proposal", fixture.amendment.proposal.signed())?;
-    assert_fiscal_fixture("proposal-admission", fixture.amendment.admission.signed())?;
-    assert_fiscal_fixture(
-        "approval",
-        &fixture.amendment.activation.body().approvals[0],
-    )?;
-    assert_fiscal_fixture("activation", fixture.amendment.activation.signed())?;
-    assert_fiscal_fixture("consumer-readiness", fixture.readiness.signed())?;
-    assert_fiscal_fixture("continuity-checkpoint", fixture.genesis.signed())?;
+    for (name, expected) in published_fiscal_fixtures(&fixture)? {
+        let committed = std::fs::read_to_string(fiscal_fixture_path(name))?;
+        assert_eq!(
+            committed, expected,
+            "fixture spec/schemas/chio-fiscal/v1/fixtures/{name}.positive.json is out of date"
+        );
+    }
 
     verify_fiscal_fixture_signature::<FiscalCharter>("charter")?;
     verify_fiscal_fixture_signature::<FiscalSchedule>("schedule")?;

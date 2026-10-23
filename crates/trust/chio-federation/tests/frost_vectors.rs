@@ -1713,3 +1713,108 @@ fn historical_completion_requires_the_exact_bound_slot_and_live_completion_windo
         FrostVerificationError::NotCurrent("historical authorization completion window")
     );
 }
+
+fn published_fixture_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../spec/schemas/chio-frost/v1/fixtures")
+}
+
+fn render_published<T: serde::Serialize>(value: &T) -> String {
+    let canonical = chio_core_types::canonical_json_bytes(value)
+        .unwrap_or_else(|error| panic!("published fixture must canonicalize: {error}"));
+    let value: serde_json::Value = serde_json::from_slice(&canonical)
+        .unwrap_or_else(|error| panic!("canonical fixture must parse: {error}"));
+    let mut text = serde_json::to_string_pretty(&value)
+        .unwrap_or_else(|error| panic!("published fixture must render: {error}"));
+    text.push('\n');
+    text
+}
+
+fn tampered_published_roster(roster: &FrostRosterV1) -> FrostRosterV1 {
+    let mut tampered = roster.clone();
+    let first = if tampered.roster_authority_signature.starts_with('0') {
+        "1"
+    } else {
+        "0"
+    };
+    tampered
+        .roster_authority_signature
+        .replace_range(..1, first);
+    tampered.roster_digest = tampered
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("tampered roster digest must compute: {error}"));
+    tampered
+}
+
+fn published_fixture_files() -> Vec<(&'static str, String)> {
+    let fixture = fixture();
+    vec![
+        ("roster.positive.json", render_published(&fixture.roster)),
+        (
+            "roster.tampered-signature.json",
+            render_published(&tampered_published_roster(&fixture.roster)),
+        ),
+        (
+            "epoch-checkpoint.positive.json",
+            render_published(&fixture.epoch_checkpoint),
+        ),
+        (
+            "authorization-slot-checkpoint.positive.json",
+            render_published(&fixture.slot.checkpoint),
+        ),
+        (
+            "authorization.positive.json",
+            render_published(&fixture.proof),
+        ),
+    ]
+}
+
+#[test]
+#[ignore = "regenerator: rewrites spec/schemas/chio-frost/v1/fixtures from the pinned builders"]
+fn regenerate_published_frost_fixtures() {
+    let dir = published_fixture_dir();
+    for (name, text) in published_fixture_files() {
+        std::fs::write(dir.join(name), text)
+            .unwrap_or_else(|error| panic!("write {name}: {error}"));
+    }
+}
+
+#[test]
+fn published_frost_fixtures_are_current_and_verify() {
+    let dir = published_fixture_dir();
+    for (name, expected) in published_fixture_files() {
+        let committed = std::fs::read_to_string(dir.join(name))
+            .unwrap_or_else(|error| panic!("read {name}: {error}"));
+        assert_eq!(
+            committed, expected,
+            "fixture spec/schemas/chio-frost/v1/fixtures/{name} is out of date"
+        );
+    }
+
+    let read = |name: &str| {
+        std::fs::read_to_string(dir.join(name))
+            .unwrap_or_else(|error| panic!("read {name}: {error}"))
+    };
+    let trust = artifact_trust();
+    let roster: FrostRosterV1 = serde_json::from_str(&read("roster.positive.json"))
+        .unwrap_or_else(|error| panic!("roster fixture must decode: {error}"));
+    trust
+        .verify_roster(&roster)
+        .unwrap_or_else(|error| panic!("roster fixture must verify: {error}"));
+    let tampered: FrostRosterV1 = serde_json::from_str(&read("roster.tampered-signature.json"))
+        .unwrap_or_else(|error| panic!("tampered roster fixture must decode: {error}"));
+    assert!(trust.verify_roster(&tampered).is_err());
+    let epoch: FrostEpochCheckpointV1 =
+        serde_json::from_str(&read("epoch-checkpoint.positive.json"))
+            .unwrap_or_else(|error| panic!("epoch fixture must decode: {error}"));
+    trust
+        .verify_epoch_checkpoint(&epoch)
+        .unwrap_or_else(|error| panic!("epoch fixture must verify: {error}"));
+    let slot: FrostAuthorizationSlotCheckpointV1 =
+        serde_json::from_str(&read("authorization-slot-checkpoint.positive.json"))
+            .unwrap_or_else(|error| panic!("slot fixture must decode: {error}"));
+    trust
+        .verify_authorization_slot_checkpoint(&slot)
+        .unwrap_or_else(|error| panic!("slot fixture must verify: {error}"));
+    let _: FrostAuthorizationV1 = serde_json::from_str(&read("authorization.positive.json"))
+        .unwrap_or_else(|error| panic!("authorization fixture must decode: {error}"));
+}

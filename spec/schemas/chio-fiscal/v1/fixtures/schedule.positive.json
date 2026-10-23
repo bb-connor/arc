@@ -1,6 +1,6 @@
 {
   "body": {
-    "charterDigest": "a79930cdbd1c5d68208e437f8b8851dcd0f66114b5d34c25cb48a670bf2a22fa",
+    "charterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
     "charterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
     "domain": "tier_limits",
     "issuedAt": 70,
@@ -26,12 +26,12 @@
       ],
       "kind": "tier_limits"
     },
-    "scheduleId": "4f49e92187f7c116b66d028a22e1498a8a8fc8c72fb9b42f50fb4df7b464a6a7",
+    "scheduleId": "2063081889a93c429de4aed8930ef3b6e786f5970a4ab2a4a717ba4b25c3feb2",
     "schema": "chio.fiscal.schedule.v1",
     "sequence": 1,
     "validFrom": 70,
     "validUntil": 900
   },
-  "signature": "28c9502a77c965174840f276fded5b9f22754ad933dbd8dc5efc8e2c280f1384856469fa19313f5a7beef47fc20126838a819988f38b82c711865b15381e6e0e",
+  "signature": "6726a4bcd766d940520378c491ed42aa54c7398e80f6b32a4c3494b0a4618ecd89a05f4c888e6bd31834bd8350ef78cee76946b017373f7e71cca132e02ce401",
   "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
 }

@@ -64,6 +64,48 @@ enum RouterArtifact<'a> {
 }
 
 impl KeyringArtifactSignature {
+    /// Signs the fence statement binding `artifact_outcome` to the active key
+    /// and epoch under `chio.keyring.artifact-signature.v1`.
+    pub(crate) fn sign_fence(
+        active: &dyn SigningBackend,
+        public_key: &PublicKey,
+        artifact_hash: Hash,
+        key_id: KeyId,
+        signing_epoch: u64,
+        artifact_outcome: SigningOutcome,
+    ) -> Result<Self> {
+        let artifact_signature = artifact_outcome.signature;
+        let statement = CanonicalBytes::from_serializable(&ArtifactSignatureStatement {
+            schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+            artifact_hash,
+            key_id,
+            signing_epoch,
+            artifact_signature: &artifact_signature,
+        })?;
+        let fence_outcome = active.sign_wrapped_for_identity(
+            public_key,
+            KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
+            &statement,
+        )?;
+        let fence_signature = fence_outcome.signature;
+        let algorithm = public_key.algorithm();
+        if artifact_outcome.algorithm != algorithm
+            || fence_outcome.algorithm != algorithm
+            || artifact_signature.algorithm() != algorithm
+            || fence_signature.algorithm() != algorithm
+        {
+            return Err(KeyringError::AlgorithmMismatch);
+        }
+        Ok(Self {
+            schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA.to_string(),
+            artifact_hash,
+            key_id,
+            signing_epoch,
+            artifact_signature,
+            fence_signature,
+        })
+    }
+
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self> {
         crate::from_bounded_json(bytes)
     }
@@ -483,36 +525,14 @@ impl KeyringSigningRouter {
                 .active
                 .sign_wrapped_for_identity(&public_key, schema_id, canonical)?,
         };
-        let artifact_signature = artifact_outcome.signature;
-        let statement = CanonicalBytes::from_serializable(&ArtifactSignatureStatement {
-            schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
-            artifact_hash,
-            key_id: router.active_key_id,
-            signing_epoch: router.signing_epoch,
-            artifact_signature: &artifact_signature,
-        })?;
-        let fence_outcome = router.active.sign_wrapped_for_identity(
+        let evidence = KeyringArtifactSignature::sign_fence(
+            router.active.as_ref(),
             &public_key,
-            KEYRING_ARTIFACT_SIGNATURE_SCHEMA,
-            &statement,
-        )?;
-        let fence_signature = fence_outcome.signature;
-        let algorithm = public_key.algorithm();
-        if artifact_outcome.algorithm != algorithm
-            || fence_outcome.algorithm != algorithm
-            || artifact_signature.algorithm() != algorithm
-            || fence_signature.algorithm() != algorithm
-        {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
-        let evidence = KeyringArtifactSignature {
-            schema: KEYRING_ARTIFACT_SIGNATURE_SCHEMA.to_string(),
             artifact_hash,
-            key_id: router.active_key_id,
-            signing_epoch: router.signing_epoch,
-            artifact_signature,
-            fence_signature,
-        };
+            router.active_key_id,
+            router.signing_epoch,
+            artifact_outcome,
+        )?;
         evidence.verify(&public_key)?;
         evidence.verify_artifact_bytes(&public_key, artifact)?;
         let (persisted, time_anchor) = match &self.artifact_time_signer {
@@ -756,3 +776,6 @@ fn domain_hash(domain: &[u8], bytes: &[u8]) -> Result<Hash> {
     input.extend_from_slice(bytes);
     Ok(sha256(&input))
 }
+
+#[cfg(test)]
+mod signed_wire_vector_tests;

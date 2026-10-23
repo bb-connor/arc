@@ -1086,34 +1086,39 @@ def broker_audit_comparison_body_semantic_valid(value: Any) -> bool:
     )
 
 
+SIGNING_WRAPPER_PREFIX = b"chio.signing-wrapper.v1\0"
+BROKER_AUDIT_RUNNER_SIGNING_SCHEMA = "chio.broker-audit-runner-authorization.v1"
+BROKER_AUDIT_COMPARISON_SIGNING_SCHEMA = "chio.broker-audit-comparison.v1"
+
+
+def signing_wrapper(schema_id: str, body: Any) -> bytes:
+    return (
+        SIGNING_WRAPPER_PREFIX
+        + hashlib.sha256(schema_id.encode("utf-8")).digest()
+        + hashlib.sha256(canonical_json(body)).digest()
+    )
+
+
 def broker_audit_signed_envelope_semantic_valid(
     value: Any, runner: bool
 ) -> bool:
     if not isinstance(value, dict) or set(value) != {
         "body",
         "signer",
-        "algorithm",
         "signature",
     }:
         return False
     body = value.get("body")
     if runner:
         body_valid = broker_audit_runner_body_semantic_valid(body)
-        message = b"chio.broker-audit-runner-authorization-signature.v1\0" + canonical_json(
-            body
-        )
+        schema_id = BROKER_AUDIT_RUNNER_SIGNING_SCHEMA
     else:
         body_valid = broker_audit_comparison_body_semantic_valid(body)
-        message = canonical_json(
-            {
-                "domain": "chio.broker-audit-comparison-signature.v1\0",
-                "body": body,
-            }
-        )
-    return (
-        body_valid
-        and value.get("algorithm") == "ed25519"
-        and ed25519_verify(value.get("signer"), value.get("signature"), message)
+        schema_id = BROKER_AUDIT_COMPARISON_SIGNING_SCHEMA
+    return body_valid and ed25519_verify(
+        value.get("signer"),
+        value.get("signature"),
+        signing_wrapper(schema_id, body),
     )
 
 

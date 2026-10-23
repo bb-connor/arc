@@ -7,7 +7,8 @@ use chio_core_types::{
 };
 use chio_decoy::{SignedWatermarkEnvelope, WatermarkPayload, MAX_IJSON_INTEGER};
 use chio_test_support::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 const WATERMARK_ENVELOPE_SCHEMA: &str = "chio.signed-watermark-envelope.v1";
 
@@ -15,6 +16,9 @@ const POSITIVE_VECTORS: &str =
     include_str!("../../../tooling/chio-conformance/vectors/security/watermark/v1.json");
 const REJECTION_VECTORS: &str =
     include_str!("../../../tooling/chio-conformance/vectors/security/watermark/v1-rejections.json");
+
+const SIGNING_KEY_SEED_HEX: &str =
+    "0909090909090909090909090909090909090909090909090909090909090909";
 
 #[derive(Deserialize)]
 struct WatermarkVectors {
@@ -51,6 +55,107 @@ struct WatermarkRejectionVector {
     field: String,
     value_decimal: String,
     expected_error: String,
+}
+
+#[derive(Serialize)]
+struct GeneratedVectors {
+    schema: &'static str,
+    signing_key_seed_hex: &'static str,
+    cases: Vec<GeneratedVector>,
+}
+
+#[derive(Serialize)]
+struct GeneratedVector {
+    id: &'static str,
+    description: &'static str,
+    payload: WatermarkPayload,
+    canonical_payload_json: String,
+    signing_message_hex: String,
+    encoded_payload: String,
+    public_key_hex: String,
+    signature_hex: String,
+    envelope: SignedWatermarkEnvelope,
+    canonical_envelope_json: String,
+    token: String,
+}
+
+fn max_safe_sequence_payload() -> WatermarkPayload {
+    serde_json::from_value(serde_json::json!({
+        "tenant_id": "tenant-alpha",
+        "application_id": "app-support",
+        "session_id": "session-2026-07-13-001",
+        "source_receipt_id": "receipt-000042",
+        "tool_id": "tool.crm.lookup",
+        "sequence": MAX_IJSON_INTEGER,
+        "issued_at_unix_ms": 1_783_951_200_000_u64,
+        "expires_at_unix_ms": 1_783_954_800_000_u64,
+        "marker_ref": "wm-marker-7f3c2a",
+        "key_id": "wm-key-2026-07",
+        "encoding": "base64_url_canonical_json"
+    }))
+    .test_expect("typed watermark payload")
+}
+
+fn generated_positive_vectors() -> String {
+    let payload = max_safe_sequence_payload();
+    let keypair =
+        Keypair::from_seed_hex(SIGNING_KEY_SEED_HEX).test_expect("valid fixed Ed25519 seed");
+    let canonical_payload = canonical_json_bytes(&payload).test_expect("canonical payload");
+    let wrapper_body = CanonicalBytes::from_serializable(&payload).test_expect("wrapper body");
+    let wrapper = SigningWrapper::new(WATERMARK_ENVELOPE_SCHEMA, &wrapper_body)
+        .test_expect("registered watermark schema id");
+    let signature = keypair
+        .sign_wrapped(WATERMARK_ENVELOPE_SCHEMA, &wrapper_body)
+        .test_expect("sign watermark wrapper");
+    let encoded_payload =
+        SignedWatermarkEnvelope::encode_payload(&payload).test_expect("encode watermark payload");
+    let envelope = SignedWatermarkEnvelope {
+        schema: WATERMARK_ENVELOPE_SCHEMA.to_string(),
+        payload: payload.clone(),
+        encoded_payload: encoded_payload.clone(),
+        signature: signature.clone(),
+    };
+    let document = GeneratedVectors {
+        schema: "chio.signed-watermark-vectors.v1",
+        signing_key_seed_hex: SIGNING_KEY_SEED_HEX,
+        cases: vec![GeneratedVector {
+            id: "max_safe_sequence",
+            description: "A signed watermark at the I-JSON safe-integer boundary pins every canonical and cryptographic byte surface.",
+            canonical_payload_json: String::from_utf8(canonical_payload)
+                .test_expect("canonical payload is UTF-8"),
+            signing_message_hex: hex::encode(wrapper.as_bytes()),
+            encoded_payload,
+            public_key_hex: keypair.public_key().to_hex(),
+            signature_hex: signature.to_hex(),
+            canonical_envelope_json: String::from_utf8(
+                canonical_json_bytes(&envelope).test_expect("canonical envelope"),
+            )
+            .test_expect("canonical envelope is UTF-8"),
+            token: envelope.encode_token().test_expect("encode watermark token"),
+            envelope,
+            payload,
+        }],
+    };
+    let mut text = serde_json::to_string_pretty(&document).test_expect("serialize vectors");
+    text.push('\n');
+    text
+}
+
+#[test]
+#[ignore = "regenerator: rewrites the shared watermark vector from the issuer types"]
+fn regenerate_watermark_vectors() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tooling/chio-conformance/vectors/security/watermark/v1.json");
+    std::fs::write(path, generated_positive_vectors()).test_expect("write watermark vectors");
+}
+
+#[test]
+fn committed_watermark_vectors_match_generator() {
+    assert_eq!(
+        POSITIVE_VECTORS,
+        generated_positive_vectors(),
+        "fixture crates/tooling/chio-conformance/vectors/security/watermark/v1.json is out of date"
+    );
 }
 
 #[test]

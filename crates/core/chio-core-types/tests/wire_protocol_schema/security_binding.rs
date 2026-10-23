@@ -150,3 +150,259 @@ fn security_binding_vectors_match_native_verifier_and_published_schemas() {
         mismatches.join("\n  ")
     );
 }
+
+#[derive(serde::Serialize)]
+struct VectorCaveat {
+    kind: &'static str,
+    predicate: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sig: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct VectorCase {
+    id: &'static str,
+    caveats: Vec<VectorCaveat>,
+    native_valid: bool,
+    schema_valid: bool,
+}
+
+#[derive(serde::Serialize)]
+struct VectorFile {
+    version: u32,
+    description: &'static str,
+    binding_schema: &'static str,
+    workload_signer_seed_hex: String,
+    cases: Vec<VectorCase>,
+}
+
+const WORKLOAD_SIGNER_SEED_HEX: &str =
+    "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+
+fn reference_binding(workload: &Keypair) -> CapabilitySecurityBinding {
+    CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.to_string(),
+        tenant_id: "tenant-1".to_string(),
+        lineage_id: "lineage-1".to_string(),
+        session_id: "session-1".to_string(),
+        principal_id: "agent-1".to_string(),
+        isolation_epoch_id: "epoch-1".to_string(),
+        context_generation: 7,
+        workload_id: "workload-1".to_string(),
+        server_id: "server-1".to_string(),
+        workload_signer_public_key: workload.public_key().to_hex(),
+    }
+}
+
+fn binding_caveat(predicate: String) -> VectorCaveat {
+    VectorCaveat {
+        kind: "bind_security_context",
+        predicate,
+        sig: None,
+    }
+}
+
+fn mutated_predicate(
+    canonical: &str,
+    mutate: impl FnOnce(&mut serde_json::Map<String, Value>),
+) -> String {
+    let mut decoded: Value = serde_json::from_str(canonical).expect("canonical predicate decodes");
+    mutate(decoded.as_object_mut().expect("predicate is an object"));
+    serde_json::to_string(&decoded).expect("mutated predicate encodes")
+}
+
+fn vector_case(
+    id: &'static str,
+    caveats: Vec<VectorCaveat>,
+    native_valid: bool,
+    schema_valid: bool,
+) -> VectorCase {
+    VectorCase {
+        id,
+        caveats,
+        native_valid,
+        schema_valid,
+    }
+}
+
+fn single_invalid(id: &'static str, predicate: String) -> VectorCase {
+    vector_case(id, vec![binding_caveat(predicate)], false, false)
+}
+
+fn security_binding_vector_file() -> VectorFile {
+    let workload = Keypair::from_seed_hex(WORKLOAD_SIGNER_SEED_HEX).expect("workload seed decodes");
+    let binding = reference_binding(&workload);
+    let canonical = Caveat::bind_security_context(&binding)
+        .expect("reference binding is valid")
+        .predicate;
+
+    let spaced = canonical.replace("\":", "\": ").replace(",\"", ", \"");
+    let reordered = {
+        let decoded: Value = serde_json::from_str(&canonical).expect("canonical predicate decodes");
+        let members: Vec<String> = [
+            "schema",
+            "tenantId",
+            "lineageId",
+            "sessionId",
+            "principalId",
+            "isolationEpochId",
+            "contextGeneration",
+            "workloadId",
+            "serverId",
+            "workloadSignerPublicKey",
+        ]
+        .iter()
+        .map(|key| format!("\"{key}\":{}", decoded[*key]))
+        .collect();
+        format!("{{{}}}", members.join(","))
+    };
+    let workload_key = binding.workload_signer_public_key.clone();
+
+    let cases = vec![
+        vector_case(
+            "bound-workload",
+            vec![binding_caveat(canonical.clone())],
+            true,
+            true,
+        ),
+        vector_case("no-caveats", vec![], true, true),
+        vector_case(
+            "detached-signature",
+            vec![VectorCaveat {
+                sig: Some("0".repeat(128)),
+                ..binding_caveat(canonical.clone())
+            }],
+            false,
+            false,
+        ),
+        vector_case(
+            "noncanonical-whitespace",
+            vec![binding_caveat(spaced)],
+            false,
+            true,
+        ),
+        vector_case(
+            "noncanonical-key-order",
+            vec![binding_caveat(reordered)],
+            false,
+            true,
+        ),
+        single_invalid(
+            "unknown-binding-field",
+            mutated_predicate(&canonical, |members| {
+                members.insert("region".to_string(), Value::from("eu-1"));
+            }),
+        ),
+        single_invalid(
+            "missing-server-id",
+            mutated_predicate(&canonical, |members| {
+                members.remove("serverId");
+            }),
+        ),
+        single_invalid(
+            "zero-context-generation",
+            mutated_predicate(&canonical, |members| {
+                members.insert("contextGeneration".to_string(), Value::from(0));
+            }),
+        ),
+        single_invalid(
+            "foreign-binding-schema",
+            mutated_predicate(&canonical, |members| {
+                members.insert(
+                    "schema".to_string(),
+                    Value::from("chio.capability-security-binding.v2"),
+                );
+            }),
+        ),
+        single_invalid(
+            "padded-tenant-id",
+            mutated_predicate(&canonical, |members| {
+                members.insert("tenantId".to_string(), Value::from(" tenant-1"));
+            }),
+        ),
+        single_invalid(
+            "control-character-session-id",
+            mutated_predicate(&canonical, |members| {
+                members.insert("sessionId".to_string(), Value::from("session\u{7}1"));
+            }),
+        ),
+        single_invalid(
+            "uppercase-workload-key",
+            mutated_predicate(&canonical, |members| {
+                members.insert(
+                    "workloadSignerPublicKey".to_string(),
+                    Value::from(workload_key.to_uppercase()),
+                );
+            }),
+        ),
+        single_invalid(
+            "prefixed-workload-key",
+            mutated_predicate(&canonical, |members| {
+                members.insert(
+                    "workloadSignerPublicKey".to_string(),
+                    Value::from(format!("0x{workload_key}")),
+                );
+            }),
+        ),
+        vector_case(
+            "two-bindings",
+            vec![
+                binding_caveat(canonical.clone()),
+                binding_caveat(canonical.clone()),
+            ],
+            false,
+            false,
+        ),
+        vector_case(
+            "unenforced-caveat-kind",
+            vec![VectorCaveat {
+                kind: "restrict_tool",
+                predicate: "server-1/tool-1".to_string(),
+                sig: None,
+            }],
+            false,
+            false,
+        ),
+    ];
+
+    VectorFile {
+        version: 1,
+        description: "bind_security_context caveat vectors. native_valid is the verdict of CapabilityToken::validate_schema; schema_valid is the verdict of capability/token.schema.json on the token together with capability/security-binding.schema.json on each decoded bind_security_context predicate. The canonical-bytes rule is the only native rule the schemas cannot state.",
+        binding_schema: CAPABILITY_SECURITY_BINDING_SCHEMA,
+        workload_signer_seed_hex: WORKLOAD_SIGNER_SEED_HEX.to_string(),
+        cases,
+    }
+}
+
+fn security_binding_vector_path() -> std::path::PathBuf {
+    repo_root().join("tests/bindings/vectors/capability/security-binding-v1.json")
+}
+
+fn security_binding_vector_text() -> String {
+    let mut rendered = serde_json::to_string_pretty(&security_binding_vector_file())
+        .expect("security binding vectors serialize");
+    rendered.push('\n');
+    rendered
+}
+
+#[test]
+fn security_binding_vectors_are_current() {
+    let path = security_binding_vector_path();
+    let committed = std::fs::read_to_string(&path).expect("security binding vectors exist");
+    assert_eq!(
+        committed,
+        security_binding_vector_text(),
+        "fixture {} is out of date",
+        path.display()
+    );
+}
+
+#[test]
+#[ignore = "regenerator: rewrite the security binding vectors from security_binding_vector_file(); run with --ignored, then `cargo xtask freeze-vectors`"]
+fn regenerate_security_binding_vectors() {
+    std::fs::write(
+        security_binding_vector_path(),
+        security_binding_vector_text(),
+    )
+    .expect("write security binding vectors");
+}

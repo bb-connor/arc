@@ -1518,3 +1518,6 @@ mod tests {
         assert!(SignedBrokerAuditComparison::from_canonical_bytes(&oversized).is_err());
     }
 }
+
+#[cfg(test)]
+mod signed_wire_vector_tests;

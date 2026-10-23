@@ -2,7 +2,7 @@
   "body": {
     "anchorId": "fiscal-anchor",
     "anchorNamespace": "fiscal-main",
-    "checkpointId": "2763aee9f3c7974e79cd64f19c35cca3bd4af8cd62cc2bfb4774dc384556c00f",
+    "checkpointId": "552255eb15c7682bc74cda76579f378dcac401660a07adfb558ddc6fa3ee5020",
     "continuitySequence": 0,
     "domains": [
       {
@@ -26,18 +26,18 @@
         "everActivated": false
       }
     ],
-    "genesisPolicyDigest": "7d6c9a8d34ef5ce9e662043fb168e4dd824f41763b82558ec68aa6e4b3e4d30e",
-    "genesisPolicyId": "4b98f64e78f6ec56310ad17a180d36d5a9f3d8a8c621d1a9cc45449c173cd9b7",
+    "genesisPolicyDigest": "cae65af4fa2f86f8a31387454fce3e81923b2ebc836ee13735b533e4fe45be52",
+    "genesisPolicyId": "b567fc99500509c4f9e611958122520ee82212de4335a185bad0624e7316b41b",
     "governingOperatorId": "operator.example",
-    "pinnedCharterDigest": "a79930cdbd1c5d68208e437f8b8851dcd0f66114b5d34c25cb48a670bf2a22fa",
+    "pinnedCharterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
     "pinnedCharterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
     "pinnedCharterSequence": 1,
-    "runtimeReadinessDigest": "5df1acf7b95203e09f06522ba5756fbacedbbf03ade8b61cba3865078384709e",
+    "runtimeReadinessDigest": "90bbae37d5a49e80e336711b8847d5349d08ca74c53f7f774ae58521e10a3389",
     "schema": "chio.fiscal.continuity-checkpoint.v1",
     "signerKeyEpoch": 1,
     "signerKeyId": "5c29b78f10a35a49a6231d08ee840a04bcc3a37a4f9d46df327dec56b8a9b7c9",
     "trustedClockHighWater": 55
   },
-  "signature": "cbcd18d58819195fbd6362025f543c9ef35f2f6ba4de40a6459f2cf3a2629a7e0c146b80ad3bad01e40f007543445aa620ed0d65128469ac874910fead1d830b",
+  "signature": "8e90772391760d32afc3dc00bd38c7acf73f5f450c70399f47c8ba67434feebb272a9c28badb955141deee9f27681e89586d89fb4a07f186da0cb91b7625a309",
   "signerKey": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca"
 }
