@@ -416,6 +416,13 @@
       "title": "Chio finding pool store identity proof signed body"
     },
     {
+      "schema": "chio.finding-status-operator-authorization.v1",
+      "artifactKind": "finding_status_operator_authorization",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/finding/status-operator-authorization.schema.json",
+      "title": "Chio finding status operator authorization signed body"
+    },
+    {
       "schema": "chio.finding.anchor-checkpoint-publication.v1",
       "artifactKind": "finding_anchor_checkpoint_publication",
       "introducedBy": "signing-wrapper-v1",
