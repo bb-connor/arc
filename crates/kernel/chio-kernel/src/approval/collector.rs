@@ -259,10 +259,7 @@ impl ThresholdApprovalProposalRegistration {
                 "threshold proposal exceeds the collector storage limit".to_string(),
             ));
         }
-        let algorithm = self.proposal.algorithm.unwrap_or_default();
-        if self.proposal.policy_authority().algorithm() != algorithm
-            || self.proposal.signature.algorithm() != algorithm
-            || !self
+        if !self
                 .proposal
                 .verify_signature()
                 .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
@@ -531,10 +528,7 @@ impl ThresholdApprovalVoteRecord {
                 "approval token expiry is outside the proposal window".to_string(),
             ));
         }
-        let expected_algorithm = token.algorithm.unwrap_or_default();
-        if token.approver.algorithm() != expected_algorithm
-            || token.signature.algorithm() != expected_algorithm
-        {
+        if token.approver.algorithm() != token.signature.algorithm() {
             return Err(invalid(
                 "approval token signing algorithm is inconsistent".to_string(),
             ));

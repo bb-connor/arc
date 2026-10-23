@@ -252,7 +252,7 @@ pub(crate) fn sign_channel_terminal_outcome_commitment(
         outcome_recorded_at_unix_ms: tool_outcome.outcome_recorded_at_unix_ms,
         terminalized_at_unix_ms: context.trusted_time_unix_ms,
     };
-    let kernel_signature = kernel_keypair.sign(&body.signing_bytes().map_err(|_| mismatch())?);
+    let kernel_signature = body.sign(kernel_keypair).map_err(|_| mismatch())?;
     let signed = SignedChannelTerminalOutcomeCommitmentV1 {
         body,
         kernel_key: kernel_keypair.public_key(),

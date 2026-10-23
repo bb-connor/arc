@@ -655,7 +655,7 @@ pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 #[cfg(not(loom))]
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
-    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
     bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
     prepare_response_dispatch, AcquiredNativeSecurityEgress, ActiveResponseAdmissionRequest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,

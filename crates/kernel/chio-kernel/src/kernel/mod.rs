@@ -59,7 +59,7 @@ pub use active_response_admission::{
 pub use active_response_artifact::ActiveResponseArtifactAuthorityAttestationInput;
 pub use active_response_artifact::{
     active_response_admission_artifact_payload_digest,
-    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,

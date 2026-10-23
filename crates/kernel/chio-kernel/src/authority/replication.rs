@@ -6,7 +6,9 @@ use super::lifecycle::{
 };
 use super::{AuthoritySnapshot, AuthorityStoreError};
 use chio_core::canonical::CanonicalBytes;
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core::crypto::{
+    sha256_hex, verify_wrapped, Keypair, PublicKey, Signature, SigningAlgorithm,
+};
 use chio_security_types::clock::{validate_future_skew, UnixMillis};
 use serde::{Deserialize, Serialize};
 
@@ -222,7 +224,8 @@ impl SignedAuthorityTransition {
             issuer_set_digest: digest(&next.trusted_keys)?,
             change,
         };
-        let signature = signer.sign_canonical(&body)?.0;
+        let signature =
+            signer.sign_wrapped(TRANSITION_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
         Ok(Self { body, signature })
     }
 
@@ -264,7 +267,7 @@ pub fn verify_authority_chain(
             state.public_key_hex.as_str()
         };
         let key = canonical_key(signer)?;
-        if !key.verify_canonical_strict(body, &transition.signature)? {
+        if verify_wrapped(&key, TRANSITION_SCHEMA, body, &transition.signature).is_err() {
             return Err(refused("authority transition signature invalid"));
         }
         require_distinct_recovery_root(anchor, &body.public_key_hex)?;
@@ -314,7 +317,8 @@ impl SignedAuthoritySnapshot {
             expires_at,
             snapshot: &snapshot,
         };
-        let signature = signer.sign_canonical(&body)?.0;
+        let signature =
+            signer.sign_wrapped(ENVELOPE_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
         Ok(Self {
             snapshot,
             proof: Some(AuthoritySnapshotProof {
@@ -410,8 +414,13 @@ impl SignedAuthoritySnapshot {
             expires_at: proof.expires_at,
             snapshot: &self.snapshot,
         };
-        if !canonical_key(&self.snapshot.public_key_hex)?
-            .verify_canonical_strict(&body, &proof.signature)?
+        if verify_wrapped(
+            &canonical_key(&self.snapshot.public_key_hex)?,
+            ENVELOPE_SCHEMA,
+            &body,
+            &proof.signature,
+        )
+        .is_err()
         {
             return Err(refused("authority envelope signature invalid"));
         }

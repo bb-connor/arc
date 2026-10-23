@@ -8,7 +8,7 @@
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::crypto::{sha256_hex, PublicKey};
 use chio_core_types::receipt::body::ChioReceipt;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::session::{OperationContext, OperationKind};
 use chio_swarm_authority::finding_pool::{
     verify_finding_pool_allocation, SignedFindingPoolAllocation,
@@ -59,6 +59,10 @@ pub struct FindingPoolDebitAuthorization {
 }
 
 pub type SignedFindingPoolDebitAuthorization = SignedExportEnvelope<FindingPoolDebitAuthorization>;
+
+impl SignedExportPayload for FindingPoolDebitAuthorization {
+    const SCHEMA_ID: &'static str = FINDING_POOL_DEBIT_AUTHORIZATION_SCHEMA_V1;
+}
 
 /// Stable subset of a debit authorization that must remain identical across
 /// response-loss retries. The trusted-time expiry may be renewed, but no
@@ -1334,13 +1338,10 @@ fn verify_purchaser_authorization(
     if authorization.signer_key != *payer_key {
         return Err(FindingPoolDebitError::PurchaserMismatch);
     }
-    match payer_key.verify_canonical_strict(body, &authorization.signature) {
-        Ok(true) => {}
-        _ => {
-            return Err(FindingPoolDebitError::PurchaserAuthorization(
-                "signature is invalid".to_owned(),
-            ));
-        }
+    if !matches!(authorization.verify_signature(payer_key), Ok(true)) {
+        return Err(FindingPoolDebitError::PurchaserAuthorization(
+            "signature is invalid".to_owned(),
+        ));
     }
     validate_purchase_arguments(request.purchase_context.arguments)?;
     let canonical_arguments =

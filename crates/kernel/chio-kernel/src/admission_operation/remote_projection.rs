@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chio_core::capability::scope::MonetaryAmount;
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use chio_core::receipt::{
     body::ChioReceipt,
     decision::Decision,
@@ -24,7 +25,6 @@ use crate::tool_outcome::{VerifiedPreDispatchNoEffect, VerifiedTransportNotAccep
 use super::*;
 
 const SIGNED_TERMINAL_PROJECTION_SCHEMA: &str = "chio.signed-admission-terminal-projection.v1";
-const SIGNED_TERMINAL_PROJECTION_DOMAIN: &[u8] = b"chio.signed-admission-terminal-projection.v1\0";
 pub const MAX_ADMISSION_TERMINAL_PROJECTION_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ADMISSION_TERMINAL_MANIFEST_BYTES: usize = 256 * 1024;
 pub const MAX_ADMISSION_TERMINAL_RECORD_BYTES: usize = 1024 * 1024;
@@ -288,7 +288,7 @@ impl SignedAdmissionTerminalProjectionV1 {
             authorization_consumption,
             observer,
         };
-        let signature = signer.sign(&signing_preimage(&body)?);
+        let signature = sign_projection(signer, &body)?;
         let envelope = Self { body, signature };
         envelope.verify()?;
         Ok(envelope)
@@ -297,10 +297,13 @@ impl SignedAdmissionTerminalProjectionV1 {
     pub fn verify(&self) -> Result<VerifiedAdmissionTerminalProjectionV1, AdmissionOperationError> {
         let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
         if self.body.schema != SIGNED_TERMINAL_PROJECTION_SCHEMA
-            || !self
-                .body
-                .signer_key
-                .verify(&signing_preimage(&self.body)?, &self.signature)
+            || verify_wrapped_bytes(
+                &self.body.signer_key,
+                SIGNED_TERMINAL_PROJECTION_SCHEMA,
+                &signing_body(&self.body)?,
+                &self.signature,
+            )
+            .is_err()
         {
             return Err(mismatch());
         }
@@ -409,7 +412,7 @@ impl SignedAdmissionTerminalProjectionV1 {
             return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
         };
         *replay_receipt_id = receipt_id;
-        self.signature = signer.sign(&signing_preimage(&self.body)?);
+        self.signature = sign_projection(signer, &self.body)?;
         Ok(self)
     }
 }
@@ -490,16 +493,20 @@ impl VerifiedAdmissionTerminalProjectionV1 {
     }
 }
 
-fn signing_preimage(
+fn signing_body(
     body: &SignedAdmissionTerminalProjectionBodyV1,
-) -> Result<Vec<u8>, AdmissionOperationError> {
-    let canonical = canonical_json_bytes(body)
-        .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
-    let mut preimage =
-        Vec::with_capacity(SIGNED_TERMINAL_PROJECTION_DOMAIN.len() + canonical.len());
-    preimage.extend_from_slice(SIGNED_TERMINAL_PROJECTION_DOMAIN);
-    preimage.extend_from_slice(&canonical);
-    Ok(preimage)
+) -> Result<CanonicalBytes, AdmissionOperationError> {
+    CanonicalBytes::from_serializable(body)
+        .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))
+}
+
+fn sign_projection(
+    signer: &Keypair,
+    body: &SignedAdmissionTerminalProjectionBodyV1,
+) -> Result<Signature, AdmissionOperationError> {
+    signer
+        .sign_wrapped(SIGNED_TERMINAL_PROJECTION_SCHEMA, &signing_body(body)?)
+        .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))
 }
 
 fn decode_bounded(value: &str, maximum: usize) -> Result<Vec<u8>, AdmissionOperationError> {

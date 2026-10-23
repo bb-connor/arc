@@ -8,8 +8,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
+use chio_core::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use chio_core::hashing::sha256_hex;
 use chio_core::hashing::Hash;
 use chio_core::merkle::{leaf_hash, verify_consistency_proof, MerkleProof, MerkleTree};
@@ -1515,12 +1515,18 @@ pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool
     CHECKPOINT_SIGNATURE_VERIFICATION_COUNT.with(|count| {
         count.set(count.get().saturating_add(1));
     });
-    let body_bytes = canonical_json_bytes(&checkpoint.body)
+    let canonical = CanonicalBytes::from_serializable(&checkpoint.body)
         .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
-    Ok(checkpoint
-        .body
-        .kernel_key
-        .verify_strict(&body_bytes, &checkpoint.signature))
+    match verify_wrapped_bytes(
+        &checkpoint.body.kernel_key,
+        CHECKPOINT_SCHEMA,
+        &canonical,
+        &checkpoint.signature,
+    ) {
+        Ok(()) => Ok(true),
+        Err(chio_core::Error::SignatureRejected) => Ok(false),
+        Err(error) => Err(CheckpointError::Serialization(error.to_string())),
+    }
 }
 
 #[cfg(test)]

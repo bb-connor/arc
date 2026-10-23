@@ -203,10 +203,9 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
                 "approval token binding or validity is invalid",
             ));
         }
-        let algorithm = token.algorithm.unwrap_or_default();
-        if !input.allowed_signing_algorithms.contains(&algorithm)
-            || token.approver.algorithm() != algorithm
-            || token.signature.algorithm() != algorithm
+        if !input
+            .allowed_signing_algorithms
+            .contains(&token.approver.algorithm())
             || !eligible.contains(&token.approver.to_hex())
             || !token.verify_signature().map_err(|error| {
                 threshold_denied(&format!("approval token signature failed: {error}"))
@@ -257,12 +256,9 @@ pub(crate) fn verify_threshold_approval_proposal(
     }
     let proposal = input.proposal;
     let body = &proposal.body;
-    let proposal_algorithm = proposal.algorithm.unwrap_or_default();
     if !input
         .allowed_signing_algorithms
-        .contains(&proposal_algorithm)
-        || body.policy_authority.algorithm() != proposal_algorithm
-        || proposal.signature.algorithm() != proposal_algorithm
+        .contains(&body.policy_authority.algorithm())
     {
         return Err(threshold_denied(
             "threshold proposal algorithm is not permitted or consistent",

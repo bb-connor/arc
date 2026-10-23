@@ -30,7 +30,7 @@ pub enum ReceiptSigningError {
         claimed: alloc::string::String,
     },
     /// The canonical-JSON signing pipeline raised an error (bubbled up
-    /// from `chio-core-types::crypto::sign_canonical_with_backend`).
+    /// from `chio-core-types::crypto::sign_wrapped`).
     SigningFailed(alloc::string::String),
 }
 
@@ -171,10 +171,10 @@ pub fn sign_receipt_relaying_trusted_body(
         // preservation into the returned receipt. Move every body field, as
         // production does, so this model neither resets metadata nor retains
         // discarded fields whose destructors inflate the proof state.
+        let model_wrapper = chio_core_types::crypto::SigningWrapper::from_digests([0; 32], [0; 32]);
         let signature = backend
-            .sign_bytes(b"kani-receipt-signing-model")
+            .sign_bytes(chio_core_types::crypto::SigningMessage::of_wrapper(&model_wrapper))
             .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
-        let algorithm = body.kernel_key.algorithm();
         return Ok(ChioReceipt {
             id: body.id,
             timestamp: body.timestamp,
@@ -198,7 +198,6 @@ pub fn sign_receipt_relaying_trusted_body(
             bbs_projection_version: body.bbs_projection_version,
             kernel_key: body.kernel_key,
             bbs_signature: None,
-            algorithm: Some(algorithm),
             signature,
         });
     }

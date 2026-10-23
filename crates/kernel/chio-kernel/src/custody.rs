@@ -8,10 +8,9 @@
 //!    empty signatures NEVER verify).
 //! 2. Checks the audience pin matches the kernel's configured identity.
 //! 3. Checks the capability is live (`now < exp`).
-//! 4. Reconstructs the signing message via
-//!    [`chio_custody_hw::mint::signing_message`] and verifies the
-//!    detached signature against the configured issuer
-//!    [`chio_core_types::crypto::PublicKey`].
+//! 4. Verifies the signing wrapper signature via
+//!    [`chio_custody_hw::mint::verify_capability_signature`] against the
+//!    configured issuer [`chio_core_types::crypto::PublicKey`].
 //!
 //! All four gates are fail-closed: any path that does not strictly
 //! satisfy its precondition returns a typed [`CustodyError`] with a
@@ -23,10 +22,10 @@
 //! `PasskeyCapabilityVerifier::verify` takes `&self` so it can be shared
 //! behind an `Arc<>` and consumed concurrently from the async kernel.
 
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::PublicKey;
 use chio_custody_hw::capability::PasskeyCapability;
 use chio_custody_hw::error::CustodyError;
-use chio_custody_hw::mint::signing_message;
+use chio_custody_hw::mint::verify_capability_signature;
 use chrono::{DateTime, Utc};
 
 /// Kernel-side verifier for [`PasskeyCapability`] envelopes.
@@ -101,15 +100,11 @@ impl PasskeyCapabilityVerifier {
         capability.require_live(now)?;
 
         // Gate 4: cryptographic verification.
-        let message = signing_message(capability)?;
-        let signature = Signature::from_hex(&capability.signature).map_err(|err| {
-            CustodyError::AssertionRejected(format!("signature hex decode failed: {err}"))
-        })?;
-        if !self.issuer_public_key.verify(&message, &signature) {
-            return Err(CustodyError::AssertionRejected(
+        verify_capability_signature(capability, &self.issuer_public_key).map_err(|_| {
+            CustodyError::AssertionRejected(
                 "PasskeyCapability signature did not verify against issuer public key".into(),
-            ));
-        }
+            )
+        })?;
 
         Ok(())
     }

@@ -128,7 +128,10 @@ mod tests {
             .ok_or("root binding")?
             .body
             .max_invocations = 3;
-        changed.signature = key.sign_canonical(&changed.signing_body())?.0;
+        changed.signature = key.sign_wrapped(
+            chio_core::capability::token::CHIO_CAPABILITY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&changed.signing_body())?,
+        )?;
         assert!(validate(&changed, 2).is_err());
         assert!(matches!(validate_issued_aggregate_family_root_response(
             &root,
