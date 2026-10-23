@@ -25,9 +25,9 @@ CLASSES = re.compile(r"^(INTEGRITY-ONLY|NEEDS-TRUST-CONTEXT:SELF-KEY-PIN-[A-Z0-9
 # (file, enclosing fn): (class, count)
 ALLOWLIST: dict[tuple[str, str], tuple[str, int]] = {}
 
-CARRIED = r"(?:signer_key|kernel_key|issuer|authority_key|signer|producer_key|root_issuer|approver|delegator|public_key)"
+CARRIED = r"(?:signer_key|kernel_key|issuer|authority_key|signer|producer_key|root_issuer|approver|delegator|public_key|policy_authority)"
 CALL = re.compile(
-    r"\b(?:verify_signature(?:_with_floor)?|verify_wrapped(?:_bytes)?)\(\s*&?\s*(?P<expr>(?:self|[a-z_][\w]*)(?:\.[a-z_][\w]*|\(\))*\."
+    r"\b(?:verify_signature(?:_with_floor|_against)?|verify_wrapped(?:_bytes)?)\(\s*&?\s*(?P<expr>(?:self|[a-z_][\w]*)(?:\.[a-z_][\w]*|\(\))*\."
     + CARRIED
     + r")\b"
 )
