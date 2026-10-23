@@ -160,8 +160,6 @@ const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
 const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-use chio_core::receipt::metadata::RESERVED_RECEIPT_METADATA_KEYS;
-
 /// Refusal reason for runtime-admission hook metadata that is present but not
 /// a JSON object; such metadata would displace every later kernel block.
 const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
@@ -171,24 +169,23 @@ const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
 /// writes `runtime_admission` itself, only on its own error paths and never
 /// from hook output, so a hook can never supply it.
 fn is_hook_forbidden_metadata_key(key: &str) -> bool {
-    key != RUNTIME_ADMISSION_METADATA_KEY && RESERVED_RECEIPT_METADATA_KEYS.contains(&key)
+    key != RUNTIME_ADMISSION_METADATA_KEY
+        && chio_core::receipt::metadata::reserved_receipt_metadata_keys()
+            .any(|reserved| reserved == key)
 }
 
 /// The first reserved key a runtime-admission hook may not write, if its
 /// metadata names one.
 fn reserved_hook_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
-    RESERVED_RECEIPT_METADATA_KEYS
-        .iter()
-        .copied()
+    chio_core::receipt::metadata::reserved_receipt_metadata_keys()
         .find(|key| object.contains_key(*key) && is_hook_forbidden_metadata_key(key))
 }
 
+/// The first reserved key, in registry order, that caller metadata names.
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
-    RESERVED_RECEIPT_METADATA_KEYS
-        .iter()
-        .copied()
+    chio_core::receipt::metadata::reserved_receipt_metadata_keys()
         .find(|key| object.contains_key(*key))
 }
 
