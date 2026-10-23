@@ -109,6 +109,7 @@ mod qualify;
 mod recovery_authority_vectors;
 mod rust_packages;
 mod scenarios;
+mod signed_fixtures;
 mod snippets_subcommand;
 mod support;
 mod vectors;
