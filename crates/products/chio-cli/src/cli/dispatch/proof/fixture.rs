@@ -1643,6 +1643,9 @@ fn normalize_commerce_order_passport_binding(
     if !out.join("evidence-graph.json").is_file() || !out.join("order-context.json").is_file() {
         return Ok(());
     }
+    if out.join("authority-receipts").is_dir() {
+        add_commerce_event_authority_receipts(out)?;
+    }
     if descriptor.id == "commerce-offline-psp" {
         strip_collected_bundle_outputs(out)?;
         return refresh_commerce_order_passport_bundle(out);
@@ -2112,9 +2115,7 @@ fn write_commerce_event_authority_receipt(
             "proof fixture commerce authority receipt signing failed: {error}"
         ))
     })?;
-    let mut receipt_value = serde_json::to_value(receipt)?;
-    receipt_value["schema"] = serde_json::Value::String("chio.receipt.v1".to_string());
-    write_json_line_file(destination, &receipt_value)
+    write_json_line_file(destination, &serde_json::to_value(receipt)?)
 }
 
 fn required_event_string(event: &serde_json::Value, field: &str) -> Result<String, CliError> {

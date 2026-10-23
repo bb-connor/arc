@@ -117,8 +117,12 @@ fn append_chio_receipt_canonical_rejects_unsigned_extra_fields() {
         .test_unwrap_err();
     assert!(matches!(
         error,
-        chio_kernel::ReceiptStoreError::Canonical(message)
-            if message.contains("do not match ChioReceipt serialization")
+        chio_kernel::ReceiptStoreError::UntrustedInput(error)
+            if matches!(
+                error.as_ref(),
+                chio_core::canonical::UntrustedJsonError::Decode(decode)
+                    if decode.to_string().starts_with("unknown field `unsigned_extra`, expected")
+            )
     ));
 
     let _ = fs::remove_file(path);

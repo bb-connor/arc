@@ -1979,8 +1979,7 @@ fn write_commerce_event_authority_receipt(
         &keypair,
     )
     .test_expect("commerce authority receipt signs");
-    let mut value = serde_json::to_value(receipt).test_expect("commerce receipt serializes");
-    value["schema"] = serde_json::Value::String("chio.receipt.v1".to_string());
+    let value = serde_json::to_value(receipt).test_expect("commerce receipt serializes");
     write_json(destination, &value);
 }
 

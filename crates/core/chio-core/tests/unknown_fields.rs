@@ -1,8 +1,8 @@
-// Unknown-member handling for chio-core signed artifacts.
+// Unknown-member refusal for chio-core signed artifacts.
 //
-// Receipts and child receipts sign their body and ignore members outside it.
-// The capability tree and signed manifests are closed: an unknown member at
-// any layer fails to decode with serde's `unknown field` error.
+// Capability tokens, delegation links, signed manifests, receipts and child
+// receipts are closed: an unknown member at any layer fails to decode with
+// serde's `unknown field` error.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -185,37 +185,22 @@ fn token_refuses_unknown_members() {
 }
 
 #[test]
-fn receipt_with_unknown_fields_accepted() {
+fn receipt_refuses_unknown_members() {
     let kp = Keypair::generate();
-    let body = make_receipt_body(&kp);
-    let receipt = ChioReceipt::sign(body, &kp).unwrap();
+    let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+    let value = serde_json::to_value(&receipt).unwrap();
 
-    let mut value: serde_json::Value = serde_json::to_value(&receipt).unwrap();
+    let mut envelope = value.clone();
+    envelope["billing_ref"] = serde_json::json!("inv-2026-0001");
+    assert_unknown_field_refused::<ChioReceipt>(envelope, "billing_ref");
 
-    // Inject at top level
-    value["billing_ref"] = serde_json::Value::String("inv-2026-0001".to_string());
-    value["future_trace_id"] = serde_json::json!("trace-abc123");
+    let mut evidence = value.clone();
+    evidence["evidence"][0]["confidence_score"] = serde_json::json!(0.98);
+    assert_unknown_field_refused::<ChioReceipt>(evidence, "confidence_score");
 
-    // Inject inside evidence[0]
-    if let Some(ev) = value["evidence"].get_mut(0) {
-        ev["confidence_score"] = serde_json::json!(0.98);
-        ev["future_rule_version"] = serde_json::json!("1.2.0");
-    }
-
-    // Inject inside action
-    value["action"]["execution_time_ms"] = serde_json::json!(12);
-
-    let json_with_unknowns = serde_json::to_string(&value).unwrap();
-
-    let restored: ChioReceipt =
-        serde_json::from_str(&json_with_unknowns).expect("ChioReceipt must accept unknown fields");
-
-    assert_eq!(receipt.id, restored.id);
-    assert_eq!(receipt.capability_id, restored.capability_id);
-    assert_eq!(receipt.tool_name, restored.tool_name);
-    assert_eq!(receipt.content_hash, restored.content_hash);
-    assert_eq!(receipt.signature.to_hex(), restored.signature.to_hex());
-    assert!(restored.verify_signature().unwrap());
+    let mut action = value;
+    action["action"]["execution_time_ms"] = serde_json::json!(12);
+    assert_unknown_field_refused::<ChioReceipt>(action, "execution_time_ms");
 }
 
 #[test]
@@ -286,28 +271,11 @@ fn assert_unknown_field_refused<T: serde::de::DeserializeOwned>(
 }
 
 #[test]
-fn child_receipt_with_unknown_fields() {
+fn child_receipt_refuses_unknown_members() {
     let kp = Keypair::generate();
-    let body = make_child_receipt_body(&kp);
-    let original_id = body.id.clone();
-    let receipt = ChildRequestReceipt::sign(body, &kp).unwrap();
+    let receipt = ChildRequestReceipt::sign(make_child_receipt_body(&kp), &kp).unwrap();
 
-    let mut value: serde_json::Value = serde_json::to_value(&receipt).unwrap();
-
-    // Inject unknown fields simulating child receipt extensions.
-    value["sampling_cost"] = serde_json::json!({"tokens": 512, "model": "claude-3"});
-    value["future_trace_parent"] = serde_json::json!("00-abc123-xyz456-01");
-
-    let json_with_unknowns = serde_json::to_string(&value).unwrap();
-
-    let restored: ChildRequestReceipt = serde_json::from_str(&json_with_unknowns)
-        .expect("ChildRequestReceipt must accept unknown fields");
-
-    assert_eq!(original_id, restored.id);
-    assert_eq!(receipt.session_id, restored.session_id);
-    assert_eq!(receipt.parent_request_id, restored.parent_request_id);
-    assert_eq!(receipt.request_id, restored.request_id);
-    assert_eq!(receipt.outcome_hash, restored.outcome_hash);
-    assert_eq!(receipt.signature.to_hex(), restored.signature.to_hex());
-    assert!(restored.verify_signature().unwrap());
+    let mut value = serde_json::to_value(&receipt).unwrap();
+    value["sampling_cost"] = serde_json::json!({"tokens": 512});
+    assert_unknown_field_refused::<ChildRequestReceipt>(value, "sampling_cost");
 }

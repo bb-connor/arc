@@ -24,6 +24,7 @@ use super::crypto_floor::{
 
 /// Signed audit record for a nested child request handled under a parent tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChildRequestReceipt {
     pub id: String,
     pub timestamp: u64,
@@ -45,6 +46,7 @@ pub struct ChildRequestReceipt {
 
 /// The body of a child-request receipt (everything except the signature).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChildRequestReceiptBody {
     pub id: String,
     pub timestamp: u64,

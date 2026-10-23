@@ -135,6 +135,7 @@
     "crates/platform/chio-commerce-order/src/mandate.rs",
     "crates/platform/chio-commerce-order/src/replay.rs",
     "crates/platform/chio-commerce-order/src/settlement.rs",
+    "crates/platform/chio-commerce-order/src/types.rs",
     "crates/platform/chio-control-plane/src/attestation/model.rs",
     "crates/platform/chio-control-plane/src/attestation/verification.rs",
     "crates/platform/chio-control-plane/src/certify/helpers.rs",
@@ -16865,11 +16866,15 @@
       "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     },
     "crates/platform/chio-commerce-order/src/replay.rs": {
-      "contract": "Receipt original bytes validate before Value/schema/ChioReceipt projection. Issuer, signature, event sequencing and action bindings remain; duplicate root fields cannot disappear into signed receipt verification.",
+      "contract": "Authority receipts decode through decode_authority_receipt before issuer, signature, event sequencing and action bindings are checked. Duplicate root fields and unknown members refuse before signed receipt verification.",
       "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     },
     "crates/platform/chio-commerce-order/src/settlement.rs": {
-      "contract": "Settlement dispatch receipt bytes validate before schema and typed projection. Receipt signature and exact order/settlement transition bindings remain independent authority gates.",
+      "contract": "Settlement dispatch receipts decode through decode_authority_receipt. Receipt signature and exact order/settlement transition bindings remain independent authority gates.",
+      "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
+    },
+    "crates/platform/chio-commerce-order/src/types.rs": {
+      "contract": "decode_authority_receipt requires the artifact route schema chio.receipt.v1, then decodes the original bounded receipt bytes directly as a closed ChioReceipt. A wrong route, a duplicate key or an unknown member refuses.",
       "review": "docs/reviews/2026-10-01-platform-authority-readers-execution.md"
     },
     "crates/platform/chio-control-plane/src/error.rs": {
@@ -19248,14 +19253,15 @@
       "validate_protocol_projections::shared-reader::crates/platform/chio-commerce-order/src/mandate.rs::validate_protocol_payload_document"
     ],
     "crates/platform/chio-commerce-order/src/replay.rs": [
-      "authority_receipts_by_ref::shared-reader::crates/platform/chio-commerce-order/src/replay.rs::parse_authority_receipt",
-      "parse_authority_receipt::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
+      "authority_receipts_by_ref::shared-reader::crates/platform/chio-commerce-order/src/types.rs::decode_authority_receipt",
       "replay_event_log::shared-reader::crates/platform/chio-commerce-order/src/replay.rs::authority_receipts_by_ref"
     ],
     "crates/platform/chio-commerce-order/src/settlement.rs": [
-      "parse_settlement_dispatch_receipt::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
-      "validate_settlement_dispatch_receipt::shared-reader::crates/platform/chio-commerce-order/src/settlement.rs::parse_settlement_dispatch_receipt",
+      "validate_settlement_dispatch_receipt::shared-reader::crates/platform/chio-commerce-order/src/types.rs::decode_authority_receipt",
       "validate_settlement_packet::shared-reader::crates/platform/chio-commerce-order/src/settlement.rs::validate_settlement_dispatch_receipt"
+    ],
+    "crates/platform/chio-commerce-order/src/types.rs": [
+      "decode_authority_receipt::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode"
     ],
     "crates/platform/chio-config/src/fuzz.rs": [
       "fuzz_chio_yaml_parse::shared-reader::crates/platform/chio-config/src/loader.rs::load_from_str"

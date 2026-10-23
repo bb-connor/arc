@@ -6,17 +6,23 @@ use crate::AgentId;
 
 use super::identifiers::{ProgressToken, RequestId, SessionId};
 
-/// Terminal runtime state for a session-scoped request.
-///
-/// This tracks lifecycle completion independently from authorization verdicts.
-/// A denied request still reaches a terminal `Completed` state, while cancelled
-/// or interrupted work records a different terminal outcome.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "state", rename_all = "snake_case")]
-pub enum OperationTerminalState {
-    Completed,
-    Cancelled { reason: String },
-    Incomplete { reason: String },
+chio_security_types::lossless_serde! {
+    /// Terminal runtime state for a session-scoped request.
+    ///
+    /// This tracks lifecycle completion independently from authorization verdicts.
+    /// A denied request still reaches a terminal `Completed` state, while cancelled
+    /// or interrupted work records a different terminal outcome.
+    #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+    #[serde(
+        tag = "state",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum OperationTerminalState {
+        Completed,
+        Cancelled { reason: String },
+        Incomplete { reason: String },
+    }
 }
 
 impl OperationTerminalState {

@@ -1,8 +1,8 @@
 use super::error::CommerceOrderError;
 use super::ids::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID;
 use super::types::{
-    CommerceEventAuthorityReceiptArtifact, CommerceOrderContext, CommercePaymentLifecycle,
-    CommerceSettlementPacket,
+    decode_authority_receipt, CommerceEventAuthorityReceiptArtifact, CommerceOrderContext,
+    CommercePaymentLifecycle, CommerceSettlementPacket,
 };
 use super::validation::{
     parse_rfc3339_utc, require_non_empty, validate_money, validate_sha256_hex,
@@ -10,7 +10,7 @@ use super::validation::{
 use chio_core_types::{
     crypto::PublicKey,
     receipt::{
-        body::{ChioReceipt, CHIO_RECEIPT_SCHEMA},
+        body::ChioReceipt,
         decision::Decision,
         kinds::{BoundaryClass, ReceiptKind, TrustLevel},
     },
@@ -143,7 +143,7 @@ fn validate_settlement_dispatch_receipt(
                 settlement.dispatch_receipt_ref
             ))
         })?;
-    let receipt = parse_settlement_dispatch_receipt(artifact)?;
+    let receipt = decode_authority_receipt(artifact, "settlement dispatch receipt")?;
     let replayed_dispatch_receipt_ref = replayed_dispatch_receipt_ref.ok_or_else(|| {
         CommerceOrderError::SettlementFailed(
             "settlement dispatch event missing from replay".to_string(),
@@ -210,28 +210,6 @@ fn validate_settlement_dispatch_receipt(
     require_receipt_action_string(&receipt, "order_id", &settlement.order_id)?;
     require_receipt_action_string(&receipt, "transition", "dispatch_settlement")?;
     Ok(())
-}
-
-fn parse_settlement_dispatch_receipt(
-    artifact: &CommerceEventAuthorityReceiptArtifact,
-) -> Result<ChioReceipt, CommerceOrderError> {
-    let value: serde_json::Value = crate::input::decode(&artifact.receipt_bytes)?;
-    let schema = value
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            CommerceOrderError::SettlementFailed(format!(
-                "settlement dispatch receipt schema missing: {}",
-                artifact.receipt_ref
-            ))
-        })?;
-    if schema != CHIO_RECEIPT_SCHEMA {
-        return Err(CommerceOrderError::UnsupportedSchema {
-            field: "settlement dispatch receipt",
-            schema: schema.to_string(),
-        });
-    }
-    crate::input::project(value)
 }
 
 fn require_receipt_action_string(

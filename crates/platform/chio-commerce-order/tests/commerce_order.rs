@@ -233,11 +233,10 @@ fn event_authority_receipt_artifact(
         &commerce_event_authority_receipt_signer(),
     )
     .test_expect("authority receipt signs");
-    let mut receipt_value = serde_json::to_value(receipt).test_expect("receipt serializes");
-    receipt_value["schema"] = serde_json::Value::String("chio.receipt.v1".to_string());
     chio_commerce_order::CommerceEventAuthorityReceiptArtifact {
         receipt_ref,
-        receipt_bytes: serde_json::to_vec(&receipt_value).test_expect("receipt JSON serializes"),
+        schema: "chio.receipt.v1".to_string(),
+        receipt_bytes: serde_json::to_vec(&receipt).test_expect("receipt JSON serializes"),
     }
 }
 
@@ -1742,17 +1741,96 @@ fn commerce_order_replay_rejects_refund_before_completion() {
 }
 
 #[test]
-fn original_authority_receipt_duplicate_schema_is_rejected() {
+fn original_authority_receipt_duplicate_member_is_rejected() {
     let mut bundle = load_bundle("offline-psp-valid");
     chio_commerce_order::verify_commerce_order(&bundle).test_expect("positive control verifies");
     let receipt = &mut bundle.event_authority_receipts[0].receipt_bytes;
     let value: serde_json::Value = serde_json::from_slice(receipt).test_expect("fixture parses");
-    let schema = serde_json::to_string(&value["schema"]).test_expect("schema serializes");
+    let id = serde_json::to_string(&value["id"]).test_expect("id serializes");
     let mut original = String::from_utf8(receipt.clone()).test_expect("JSON is UTF-8");
     let end = original.rfind('}').test_expect("object has closing brace");
-    original.insert_str(end, &format!(",\"schema\":{schema}"));
+    original.insert_str(end, &format!(",\"id\":{id}"));
     *receipt = original.into_bytes();
     let error = chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect_err("duplicate receipt fields must reject before signature projection");
-    assert!(std::error::Error::source(&error).is_some());
+    assert!(
+        matches!(
+            &error,
+            chio_commerce_order::CommerceOrderError::Input(input)
+                if input.code() == "urn:chio:error:attest:signed-json-invalid-input"
+        ),
+        "{error:?}"
+    );
+    assert!(
+        error_chain_starts_with(&error, "canonical JSON error: duplicate object key: \"id\""),
+        "{error:?}"
+    );
+}
+
+fn error_chain_starts_with(error: &dyn std::error::Error, prefix: &str) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if error.to_string().starts_with(prefix) {
+            return true;
+        }
+        current = error.source();
+    }
+    false
+}
+
+#[test]
+fn authority_receipt_with_an_unsigned_schema_member_is_rejected() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    chio_commerce_order::verify_commerce_order(&bundle).test_expect("positive control verifies");
+    let receipt = &mut bundle.event_authority_receipts[0].receipt_bytes;
+    let mut value: serde_json::Value =
+        serde_json::from_slice(receipt).test_expect("receipt parses");
+    value["schema"] = serde_json::json!("chio.receipt.v1");
+    *receipt = serde_json::to_vec(&value).test_expect("padded receipt serializes");
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("a padded authority receipt must not decode");
+
+    assert!(matches!(
+        error,
+        chio_commerce_order::CommerceOrderError::Input(_)
+    ));
+    assert!(
+        error_chain_starts_with(&error, "unknown field `schema`, expected"),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn authority_receipt_with_a_wrong_route_is_rejected() {
+    let mut bundle = load_bundle("offline-psp-valid");
+    bundle.event_authority_receipts[0].schema = "chio.receipt.v2".to_string();
+
+    let error = chio_commerce_order::verify_commerce_order(&bundle)
+        .test_expect_err("an authority receipt routed to another schema must not decode");
+
+    assert_eq!(
+        error,
+        chio_commerce_order::CommerceOrderError::UnsupportedSchema {
+            field: "authority receipt",
+            schema: "chio.receipt.v2".to_string(),
+        }
+    );
+}
+
+#[test]
+fn authority_receipt_artifact_without_a_route_is_rejected() {
+    let bundle = load_bundle("offline-psp-valid");
+    let mut value = serde_json::to_value(&bundle.event_authority_receipts[0])
+        .test_expect("artifact serializes");
+    value
+        .as_object_mut()
+        .test_expect("artifact object")
+        .remove("schema");
+
+    let error =
+        serde_json::from_value::<chio_commerce_order::CommerceEventAuthorityReceiptArtifact>(value)
+            .test_expect_err("an authority receipt artifact must carry its route");
+
+    assert_eq!(error.to_string(), "missing field `schema`");
 }
