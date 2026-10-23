@@ -158,6 +158,11 @@ pub(crate) enum ReceiptCommands {
         /// Explicitly read across all tenants as an administrative operation.
         #[arg(long, default_value_t = false, conflicts_with = "tenant")]
         admin_all: bool,
+        /// Independently trusted kernel public key (raw bytes or algorithm-aware
+        /// hex). Repeat to allow key rotation. Without one the explanation is
+        /// integrity-only and never reports the receipt as authorized.
+        #[arg(long)]
+        trusted_kernel_pubkey: Vec<PathBuf>,
     },
 }
 

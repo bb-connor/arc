@@ -130,6 +130,7 @@ pub(crate) fn dispatch_receipt(
                 inspect_bilateral,
                 tenant,
                 admin_all,
+                trusted_kernel_pubkey,
             } => cmd_receipt_explain(
                 ReceiptExplainArgs {
                     receipt_id: &receipt_id,
@@ -139,6 +140,7 @@ pub(crate) fn dispatch_receipt(
                     inspect_bilateral,
                     tenant: tenant.as_deref(),
                     admin_all,
+                    trusted_kernel_pubkeys: &trusted_kernel_pubkey,
                 },
                 QueryBackend {
                     json_output,

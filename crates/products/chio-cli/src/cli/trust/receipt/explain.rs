@@ -12,12 +12,27 @@ pub(crate) struct ReceiptExplainArgs<'a> {
     pub(crate) inspect_bilateral: bool,
     pub(crate) tenant: Option<&'a str>,
     pub(crate) admin_all: bool,
+    pub(crate) trusted_kernel_pubkeys: &'a [PathBuf],
 }
+
+/// What an explanation establishes about the receipt signer.
+const SCOPE_INTEGRITY_ONLY: &str = "integrity_only";
+const SCOPE_UNTRUSTED_KERNEL_KEY: &str = "untrusted_kernel_key";
+const SCOPE_TRUSTED_KERNEL_AUTHORITY: &str = "trusted_kernel_authority";
 
 pub(crate) fn cmd_receipt_explain(
     args: ReceiptExplainArgs<'_>,
     backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
+    let trusted_kernel_keys = args
+        .trusted_kernel_pubkeys
+        .iter()
+        .map(|path| {
+            crate::load_trusted_kernel_pubkey(path).map_err(|error| {
+                CliError::cli_other_error(format!("invalid trusted kernel key: {error}"))
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let value = if let Some(input_file) = args.input_file {
         crate::input::json::<serde_json::Value>(&crate::input::read(input_file)?)?
     } else {
@@ -26,7 +41,13 @@ pub(crate) fn cmd_receipt_explain(
     if is_dsse_envelope_value(&value) {
         return render_bilateral_explain(&value, &args, &backend);
     }
-    let report = explain_receipt_value(args.receipt_id, value, args.depth, args.fanout_limit)?;
+    let report = explain_receipt_value(
+        args.receipt_id,
+        value,
+        args.depth,
+        args.fanout_limit,
+        &trusted_kernel_keys,
+    )?;
     if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
@@ -43,6 +64,7 @@ pub(crate) fn cmd_receipt_explain(
             "decision: {}",
             report["decision"].as_str().unwrap_or("unknown")
         );
+        println!("{}", explain_authority_line(&report));
         if let Some(reason) = report.get("reason").and_then(|value| value.as_str()) {
             println!("reason: {reason}");
         }
@@ -734,6 +756,7 @@ pub(crate) fn explain_receipt_value(
     value: serde_json::Value,
     depth: usize,
     fanout_limit: usize,
+    trusted_kernel_keys: &[chio_core::PublicKey],
 ) -> Result<serde_json::Value, CliError> {
     let receipt: chio_core::receipt::body::ChioReceipt = crate::input::project(value)?;
     let signature_ok = receipt.verify_integrity_embedded_key()?;
@@ -743,12 +766,19 @@ pub(crate) fn explain_receipt_value(
     let semantics = receipt.semantic_fields();
     let semantic_authorized = semantics.is_authorized(receipt.decision.as_ref());
     let verified = signature_ok && receipt_id_ok && parameter_hash_ok;
-    let result = if verified || !semantic_authorized {
+    let scope = if trusted_kernel_keys.is_empty() {
+        SCOPE_INTEGRITY_ONLY
+    } else if trusted_kernel_keys.contains(&receipt.kernel_key) {
+        SCOPE_TRUSTED_KERNEL_AUTHORITY
+    } else {
+        SCOPE_UNTRUSTED_KERNEL_KEY
+    };
+    let authorized = verified && semantic_authorized && scope == SCOPE_TRUSTED_KERNEL_AUTHORITY;
+    let result = if authorized || !semantic_authorized {
         semantics.result_label(receipt.decision.as_ref())
     } else {
         "Unverified"
     };
-    let authorized = verified && semantic_authorized;
     let receipt_kind = semantics.receipt_kind.as_str();
     let boundary_class = semantics.boundary_class.as_str();
     let observation_outcome = semantics
@@ -781,6 +811,8 @@ pub(crate) fn explain_receipt_value(
         "receipt_id": receipt.id,
         "identity": receipt.id,
         "requested_id": requested_id,
+        "signer_key": receipt.kernel_key.to_hex(),
+        "scope": scope,
         "signature_ok": signature_ok,
         "receipt_id_ok": receipt_id_ok,
         "parameter_hash_ok": parameter_hash_ok,
@@ -803,6 +835,21 @@ pub(crate) fn explain_receipt_value(
         "batch_witness": batch_witness,
         "repair_hint": repair_hint(receipt.decision.as_ref()),
     }))
+}
+
+/// The human-readable signer authority line for an explanation report.
+pub(crate) fn explain_authority_line(report: &serde_json::Value) -> String {
+    let signer = report["signer_key"].as_str().unwrap_or("unknown");
+    let authorized = report["authorized"].as_bool().unwrap_or(false);
+    match report["scope"].as_str() {
+        Some(SCOPE_TRUSTED_KERNEL_AUTHORITY) => {
+            format!("authority: trusted kernel key {signer}; authorized: {authorized}")
+        }
+        Some(SCOPE_UNTRUSTED_KERNEL_KEY) => {
+            format!("authority: kernel key {signer} is not a trusted kernel key; authorized: false")
+        }
+        _ => "authority: integrity-only, no --trusted-kernel-pubkey given; signer authority not evaluated".to_string(),
+    }
 }
 
 pub(crate) fn explain_decision_label(
@@ -965,8 +1012,13 @@ mod receipt_explain_tests {
     #[test]
     fn receipt_explain_reports_semantic_authorization_fields() -> Result<(), CliError> {
         let mediated = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
-        let mediated_explain =
-            explain_receipt_value(&mediated.id, serde_json::to_value(&mediated)?, 1, 1)?;
+        let mediated_explain = explain_receipt_value(
+            &mediated.id,
+            serde_json::to_value(&mediated)?,
+            1,
+            1,
+            std::slice::from_ref(&mediated.kernel_key),
+        )?;
         assert_eq!(
             mediated_explain["receipt_kind"].as_str(),
             Some("mediated_decision")
@@ -981,7 +1033,13 @@ mod receipt_explain_tests {
             },
             Some(chio_core::receipt::metadata::ReceiptSemanticFields::trace_detect_only()),
         );
-        let trace_explain = explain_receipt_value(&trace.id, serde_json::to_value(&trace)?, 1, 1)?;
+        let trace_explain = explain_receipt_value(
+            &trace.id,
+            serde_json::to_value(&trace)?,
+            1,
+            1,
+            std::slice::from_ref(&trace.kernel_key),
+        )?;
         assert_eq!(
             trace_explain["receipt_kind"].as_str(),
             Some("trace_observation")
@@ -1003,12 +1061,74 @@ mod receipt_explain_tests {
         for trust_level in ["verified", "advisory"] {
             let mut value = serde_json::to_value(&receipt)?;
             value["trust_level"] = serde_json::json!(trust_level);
-            let explain = explain_receipt_value(&receipt.id, value, 1, 1)?;
+            let explain =
+                explain_receipt_value(&receipt.id, value, 1, 1, std::slice::from_ref(&receipt.kernel_key))?;
 
             assert_eq!(explain["result"].as_str(), Some("Allowed"));
             assert_eq!(explain["authorized"].as_bool(), Some(false));
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_explain_without_trusted_key_is_integrity_only() -> Result<(), CliError> {
+        let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
+        let explain = explain_receipt_value(&receipt.id, serde_json::to_value(&receipt)?, 1, 1, &[])?;
+
+        assert_eq!(explain["signature_ok"].as_bool(), Some(true));
+        assert_eq!(explain["scope"].as_str(), Some("integrity_only"));
+        assert_eq!(explain["authorized"].as_bool(), Some(false));
+        assert_eq!(explain["result"].as_str(), Some("Unverified"));
+        assert_eq!(
+            explain_authority_line(&explain),
+            "authority: integrity-only, no --trusted-kernel-pubkey given; signer authority not evaluated"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_explain_with_untrusted_kernel_key_is_not_authorized() -> Result<(), CliError> {
+        let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
+        let other = Keypair::generate().public_key();
+        let explain =
+            explain_receipt_value(&receipt.id, serde_json::to_value(&receipt)?, 1, 1, &[other])?;
+
+        assert_eq!(explain["signature_ok"].as_bool(), Some(true));
+        assert_eq!(explain["scope"].as_str(), Some("untrusted_kernel_key"));
+        assert_eq!(explain["authorized"].as_bool(), Some(false));
+        assert_eq!(explain["result"].as_str(), Some("Unverified"));
+        assert_eq!(
+            explain_authority_line(&explain),
+            format!(
+                "authority: kernel key {} is not a trusted kernel key; authorized: false",
+                receipt.kernel_key.to_hex()
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_explain_with_trusted_kernel_key_is_authorized() -> Result<(), CliError> {
+        let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
+        let explain = explain_receipt_value(
+            &receipt.id,
+            serde_json::to_value(&receipt)?,
+            1,
+            1,
+            &[Keypair::generate().public_key(), receipt.kernel_key.clone()],
+        )?;
+
+        assert_eq!(explain["scope"].as_str(), Some("trusted_kernel_authority"));
+        assert_eq!(explain["authorized"].as_bool(), Some(true));
+        assert_eq!(explain["result"].as_str(), Some("Authorized"));
+        assert_eq!(
+            explain_authority_line(&explain),
+            format!(
+                "authority: trusted kernel key {}; authorized: true",
+                receipt.kernel_key.to_hex()
+            )
+        );
         Ok(())
     }
 }
