@@ -26,7 +26,7 @@ pub enum RequestedTokenType {
 /// Upper bound on a token request body.
 pub const MAX_TOKEN_REQUEST_BYTES: usize = 32 * 1024;
 
-const PARAMETERS: [&str; 8] = [
+const PARAMETERS: [&str; 9] = [
     "grant_type",
     "assertion",
     "subject_token",
@@ -35,6 +35,7 @@ const PARAMETERS: [&str; 8] = [
     "client_id",
     "client_assertion_type",
     "client_assertion",
+    "resource",
 ];
 
 /// A token request presenting an ID-JAG, by either grant.
@@ -45,6 +46,7 @@ pub struct IdJagGrant {
     client_assertion_type: Option<String>,
     client_assertion: Option<String>,
     requested_token_type: RequestedTokenType,
+    resource: Option<String>,
     request_digest: Sha256Digest,
 }
 
@@ -56,6 +58,7 @@ struct RequestDigestInput<'a> {
     id_jag: &'a str,
     requested_token_type: RequestedTokenType,
     client_id: Option<&'a str>,
+    resource: Option<&'a str>,
 }
 
 impl IdJagGrant {
@@ -72,7 +75,7 @@ impl IdJagGrant {
                 "body exceeds the size bound",
             ));
         }
-        let mut values: [Option<String>; 8] = Default::default();
+        let mut values: [Option<String>; 9] = Default::default();
         for (name, value) in url::form_urlencoded::parse(body) {
             let Some(index) = PARAMETERS.iter().position(|known| *known == name) else {
                 continue;
@@ -92,7 +95,7 @@ impl IdJagGrant {
                 return Err(RootExchangeError::MalformedRequest("repeated parameter"));
             }
         }
-        let [grant_type, assertion, subject_token, subject_token_type, requested_token_type, client_id, client_assertion_type, client_assertion] =
+        let [grant_type, assertion, subject_token, subject_token_type, requested_token_type, client_id, client_assertion_type, client_assertion, resource] =
             values;
         let mut requested = RequestedTokenType::AccessToken;
         let id_jag = match grant_type.as_deref() {
@@ -132,6 +135,7 @@ impl IdJagGrant {
             id_jag: &id_jag,
             requested_token_type: requested,
             client_id: client_id.as_deref(),
+            resource: resource.as_deref(),
         };
         let canonical = chio_core::canonical_json_bytes(&digest_input)
             .map_err(|_| RootExchangeError::MalformedRequest("request does not canonicalize"))?;
@@ -142,6 +146,7 @@ impl IdJagGrant {
             client_assertion_type,
             client_assertion,
             requested_token_type: requested,
+            resource,
             request_digest,
         })
     }
@@ -150,6 +155,12 @@ impl IdJagGrant {
     #[must_use]
     pub fn id_jag(&self) -> &str {
         &self.id_jag
+    }
+
+    /// The RFC 8707 `resource` parameter, when present.
+    #[must_use]
+    pub fn resource(&self) -> Option<&str> {
+        self.resource.as_deref()
     }
 
     #[must_use]

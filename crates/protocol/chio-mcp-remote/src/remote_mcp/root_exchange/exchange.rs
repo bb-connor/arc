@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::canonical_json_bytes;
 use chio_core::capability::anchor::{AnchorKind, RootAnchor};
-use chio_core::capability::scope::ChioScope;
+use chio_core::capability::scope::{ChioScope, ToolGrant};
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::root_authority::{
@@ -191,6 +191,8 @@ fn claims_match(
 }
 
 /// `ceiling_scope` restricted to the tools the IdP scope values project to.
+/// A projection target is one `server/tool` pair; a ceiling grant covers it
+/// when each side is equal or `*`, and is issued narrowed to that pair.
 fn effective_scope(
     rule: &RootPolicyRule,
     scope_values: &[String],
@@ -204,19 +206,29 @@ fn effective_scope(
         let projected = projection
             .get(value)
             .ok_or(RootExchangeError::ScopeNotProjected)?;
-        tools.extend(
-            projected
-                .iter()
-                .filter_map(|tool| tool.as_str().split_once('/')),
-        );
+        for target in projected {
+            let pair = target
+                .as_str()
+                .split_once('/')
+                .filter(|(server, tool)| {
+                    !server.is_empty() && !tool.is_empty() && !tool.contains('/')
+                })
+                .ok_or(RootExchangeError::ProjectionTargetMalformed)?;
+            tools.insert(pair);
+        }
     }
-    let grants: Vec<_> = rule
-        .ceiling_scope
-        .grants
-        .iter()
-        .filter(|grant| tools.contains(&(grant.server_id.as_str(), grant.tool_name.as_str())))
-        .cloned()
-        .collect();
+    let covers = |pattern: &str, value: &str| pattern == "*" || pattern == value;
+    let mut grants: Vec<ToolGrant> = Vec::new();
+    for grant in &rule.ceiling_scope.grants {
+        for &(server, tool) in &tools {
+            if covers(&grant.server_id, server) && covers(&grant.tool_name, tool) {
+                let mut narrowed = grant.clone();
+                narrowed.server_id = server.to_owned();
+                narrowed.tool_name = tool.to_owned();
+                grants.push(narrowed);
+            }
+        }
+    }
     if grants.is_empty() {
         return Err(RootExchangeError::EmptyEffectiveScope);
     }
@@ -359,6 +371,15 @@ impl RootExchange {
         self.policy
             .check_valid_at(now)
             .map_err(|_| RootExchangeError::PolicyOutOfForce)?;
+        if !self.policy.lists_exchange_key(&self.exchange_key) {
+            return Err(RootExchangeError::ExchangeKeyNotListed);
+        }
+        if grant
+            .resource()
+            .is_some_and(|resource| resource != self.protected_resource)
+        {
+            return Err(RootExchangeError::ResourceMismatch);
+        }
         let client = authenticate_client(
             &self.clients,
             grant.client_credentials(),

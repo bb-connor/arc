@@ -117,6 +117,8 @@ pub enum RootExchangeError {
     RuleMatchCount { matched: usize },
     #[error("scope value is absent from the rule projection")]
     ScopeNotProjected,
+    #[error("idp_scope_projection target is not one server/tool pair")]
+    ProjectionTargetMalformed,
     #[error("effective root scope is empty")]
     EmptyEffectiveScope,
     #[error("holder class {} is not allowed by the rule", .0.as_str())]
@@ -132,6 +134,8 @@ pub enum RootExchangeError {
 
     #[error("entropy source failed")]
     EntropyUnavailable,
+    #[error("the exchange key is not listed in the loaded root policy")]
+    ExchangeKeyNotListed,
     #[error("replay store is unavailable: {0}")]
     ReplayStoreUnavailable(String),
     #[error("canonicalization failed: {0}")]
@@ -181,6 +185,9 @@ impl RootExchangeError {
             | Self::RecordedClaimMissing(_)
             | Self::RootLifetimeEmpty => OAuthErrorCode::InvalidGrant,
             Self::ScopeNotProjected | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
+            Self::ProjectionTargetMalformed | Self::ExchangeKeyNotListed => {
+                OAuthErrorCode::ServerError
+            }
             Self::KeysUnavailable(_) | Self::ReplayStoreUnavailable(_) => {
                 OAuthErrorCode::TemporarilyUnavailable
             }
