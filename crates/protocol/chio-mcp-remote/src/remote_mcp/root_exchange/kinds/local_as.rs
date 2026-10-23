@@ -12,10 +12,11 @@
 //! Issuance spends `(chio_local_as, urn:chio:local-as, jti)` and anchors at
 //! the token's `exp`. A re-exchange spends the subject token's `jti` once in
 //! its own namespace, so a token whose root was minted at issuance can still
-//! be re-exchanged once. It narrows the requested `scope` and `resource` to
-//! a subset of the subject token's, inherits the subject root's
-//! `assertion_exp`, and its root scope is the subject root's within the
-//! rule ceiling. It is open to the client the subject token was issued to,
+//! be re-exchanged once. The requested `scope` and `resource` must be a
+//! subset of the subject token's and the requested root scope a subset of
+//! the subject root's; the root takes the requested root scope, or the
+//! subject root's, within the rule ceiling, records the requested `scope`
+//! values, and inherits the subject root's `assertion_exp`. It is open to the client the subject token was issued to,
 //! public clients included.
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -70,9 +71,12 @@ pub struct SubjectRoot<'a> {
 /// The narrowing members of a re-exchange request.
 #[derive(Debug, Clone, Copy)]
 pub struct ReExchangeRequest<'a> {
+    /// The requested OAuth scope values, a subset of the subject token's.
     pub scope: Option<&'a [String]>,
     pub resource: Option<&'a str>,
     pub client_id: Option<&'a str>,
+    /// The requested root capability scope, a subset of the subject root's.
+    pub root_scope: Option<&'a ChioScope>,
     /// SHA-256 of the exact request body.
     pub request_digest: Sha256Digest,
 }
@@ -225,6 +229,17 @@ pub fn verify_reexchange(
     {
         return Err(RootExchangeError::ReExchangeWidens);
     }
+    let root_scope = match request.root_scope {
+        Some(narrowed) if !narrowed.is_subset_of(subject_root.scope) => {
+            return Err(RootExchangeError::ReExchangeWidens);
+        }
+        Some(narrowed) => narrowed.clone(),
+        None => subject_root.scope.clone(),
+    };
+    let mut claims = local.claims;
+    if let Some(requested) = request.scope {
+        claims.insert("scope".to_owned(), Value::String(requested.join(" ")));
+    }
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
@@ -240,10 +255,10 @@ pub fn verify_reexchange(
         jws: None,
         artifact_digest: Some(local.token_digest),
         request_digest: request.request_digest,
-        claims: local.claims,
+        claims,
         scope_values: Vec::new(),
         provider_id: None,
-        scope_bound: Some(subject_root.scope.clone()),
+        scope_bound: Some(root_scope),
         holder: None,
     })
 }
