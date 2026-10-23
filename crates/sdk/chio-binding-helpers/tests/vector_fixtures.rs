@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 use chio_binding_helpers::{
     canonicalize_json_str, capability_signing_body_canonical_json, receipt_body_canonical_json,
-    sha256_hex_utf8, sign_json_str_ed25519, sign_utf8_message_ed25519,
-    signed_manifest_body_canonical_json, verify_capability, verify_json_str_signature_ed25519,
-    verify_receipt, verify_receipt_json, verify_receipt_json_with_trusted_signer_hex,
-    verify_receipt_with_trusted_signers, verify_signed_manifest, verify_utf8_message_ed25519,
+    sha256_hex_utf8, sign_wrapped_json_ed25519, signed_manifest_body_canonical_json,
+    verify_capability, verify_receipt, verify_receipt_json,
+    verify_receipt_json_with_trusted_signer_hex, verify_receipt_with_trusted_signers,
+    verify_signed_manifest, verify_wrapped_json,
     CapabilityVerification, ErrorCode, ManifestVerification, ReceiptVerification,
 };
 use chio_core::{
@@ -199,27 +199,11 @@ fn hashing_vector_fixture() -> Value {
     })
 }
 
-fn signing_utf8_case_value(
-    id: &str,
-    description: &str,
-    input_utf8: &str,
-    public_key_hex: &str,
-    signature_hex: &str,
-    expected_verify: bool,
-) -> Value {
-    json!({
-        "id": id,
-        "description": description,
-        "input_utf8": input_utf8,
-        "public_key_hex": public_key_hex,
-        "signature_hex": signature_hex,
-        "expected_verify": expected_verify,
-    })
-}
-
+#[allow(clippy::too_many_arguments)]
 fn signing_json_case_value(
     id: &str,
     description: &str,
+    schema_id: &str,
     input_json: &str,
     canonical_json: &str,
     public_key_hex: &str,
@@ -229,6 +213,7 @@ fn signing_json_case_value(
     json!({
         "id": id,
         "description": description,
+        "schema_id": schema_id,
         "input_json": input_json,
         "canonical_json": canonical_json,
         "public_key_hex": public_key_hex,
@@ -237,39 +222,23 @@ fn signing_json_case_value(
     })
 }
 
+const SIGNING_VECTOR_SCHEMA_ID: &str = "chio.receipt.v1";
+
 fn signing_vector_fixture() -> Value {
     let seed_hex = "09".repeat(32);
-    let signed_utf8 =
-        sign_utf8_message_ed25519("hello chio", &seed_hex).test_unwrap("sign utf8 message");
     let signed_json =
-        sign_json_str_ed25519("{\"z\":1,\"a\":2}", &seed_hex).test_unwrap("sign json string");
+        sign_wrapped_json_ed25519(SIGNING_VECTOR_SCHEMA_ID, "{\"z\":1,\"a\":2}", &seed_hex)
+            .test_unwrap("sign json string");
 
     json!({
         "version": 1,
         "generated_by": "chio-binding-helpers",
         "signing_key_seed_hex": seed_hex,
-        "utf8_cases": [
-            signing_utf8_case_value(
-                "valid_utf8_message",
-                "A UTF-8 message signs and verifies with a deterministic Ed25519 seed.",
-                "hello chio",
-                &signed_utf8.public_key_hex,
-                &signed_utf8.signature_hex,
-                true,
-            ),
-            signing_utf8_case_value(
-                "tampered_utf8_message",
-                "The same signature fails if the UTF-8 message bytes change.",
-                "hello chio!",
-                &signed_utf8.public_key_hex,
-                &signed_utf8.signature_hex,
-                false,
-            ),
-        ],
         "json_cases": [
             signing_json_case_value(
-                "valid_canonical_json_message",
-                "Signing raw JSON first canonicalizes it, then signs the canonical bytes.",
+                "valid_wrapped_json_message",
+                "Signing raw JSON canonicalizes it, then signs the signing wrapper under the schema id.",
+                SIGNING_VECTOR_SCHEMA_ID,
                 "{\"z\":1,\"a\":2}",
                 &signed_json.canonical_json,
                 &signed_json.public_key_hex,
@@ -277,10 +246,21 @@ fn signing_vector_fixture() -> Value {
                 true,
             ),
             signing_json_case_value(
-                "tampered_canonical_json_message",
+                "tampered_wrapped_json_message",
                 "Verification fails if the JSON payload changes after signing.",
+                SIGNING_VECTOR_SCHEMA_ID,
                 "{\"z\":2,\"a\":2}",
                 &canonicalize_json_str("{\"z\":2,\"a\":2}").test_unwrap("canonicalize tampered json"),
+                &signed_json.public_key_hex,
+                &signed_json.signature_hex,
+                false,
+            ),
+            signing_json_case_value(
+                "substituted_schema_id",
+                "Verification fails if the signature is checked under another schema id.",
+                "chio.capability.v1",
+                "{\"z\":1,\"a\":2}",
+                &signed_json.canonical_json,
                 &signed_json.public_key_hex,
                 &signed_json.signature_hex,
                 false,
@@ -581,8 +561,12 @@ fn signed_manifest_with_manual_signature(
     manifest: SignedToolManifest,
     signer: &Keypair,
 ) -> SignedManifest {
-    let (signature, _bytes) = signer
-        .sign_canonical(&manifest)
+    let signature = signer
+        .sign_wrapped(
+            chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&manifest)
+                .test_unwrap("canonical manifest"),
+        )
         .test_unwrap("manual manifest signature");
     SignedManifest {
         manifest,
@@ -773,8 +757,14 @@ fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLev
     body.trust_level = trust_level;
     bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).test_unwrap("trust level receipt id");
-    let (signature, _bytes) = keypair
-        .sign_canonical(&ChioReceiptSigningBody::from(&body))
+    let signature = keypair
+        .sign_wrapped(
+            chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&ChioReceiptSigningBody::from(
+                &body,
+            ))
+            .test_unwrap("canonical trust level receipt body"),
+        )
         .test_unwrap("sign trust level receipt body");
     let mut receipt_json = serde_json::to_value(&body).test_unwrap("serialize trust level body");
     receipt_json["signature"] =
@@ -1215,45 +1205,11 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         .as_str()
         .test_unwrap("signing_key_seed_hex");
 
-    for case in fixture["utf8_cases"]
-        .as_array()
-        .test_unwrap("utf8_cases array")
-    {
-        let input = case["input_utf8"].as_str().test_unwrap("input_utf8");
-        let public_key_hex = case["public_key_hex"]
-            .as_str()
-            .test_unwrap("public_key_hex");
-        let signature_hex = case["signature_hex"].as_str().test_unwrap("signature_hex");
-        let expected_verify = case["expected_verify"]
-            .as_bool()
-            .test_unwrap("expected_verify");
-        let seed_hex = case["signing_key_seed_hex"]
-            .as_str()
-            .unwrap_or(global_seed_hex);
-
-        if expected_verify {
-            let signed = sign_utf8_message_ed25519(input, seed_hex).test_unwrap("sign utf8 case");
-            assert_eq!(
-                signed.public_key_hex, public_key_hex,
-                "utf8 sign {}",
-                case["id"]
-            );
-            assert_eq!(
-                signed.signature_hex, signature_hex,
-                "utf8 sign {}",
-                case["id"]
-            );
-        }
-
-        let actual = verify_utf8_message_ed25519(input, public_key_hex, signature_hex)
-            .test_unwrap("verify utf8 case");
-        assert_eq!(actual, expected_verify, "utf8 verify {}", case["id"]);
-    }
-
     for case in fixture["json_cases"]
         .as_array()
         .test_unwrap("json_cases array")
     {
+        let schema_id = case["schema_id"].as_str().test_unwrap("schema_id");
         let input = case["input_json"].as_str().test_unwrap("input_json");
         let canonical_json = case["canonical_json"]
             .as_str()
@@ -1277,7 +1233,8 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         );
 
         if expected_verify {
-            let signed = sign_json_str_ed25519(input, seed_hex).test_unwrap("sign json case");
+            let signed = sign_wrapped_json_ed25519(schema_id, input, seed_hex)
+                .test_unwrap("sign json case");
             assert_eq!(
                 signed.canonical_json, canonical_json,
                 "json sign {}",
@@ -1295,9 +1252,20 @@ fn signing_fixture_cases_round_trip_through_public_api() {
             );
         }
 
-        let actual = verify_json_str_signature_ed25519(input, public_key_hex, signature_hex)
-            .test_unwrap("verify json case");
-        assert_eq!(actual, expected_verify, "json verify {}", case["id"]);
+        let actual = verify_wrapped_json(schema_id, input, public_key_hex, signature_hex);
+        assert_eq!(actual.is_ok(), expected_verify, "json verify {}", case["id"]);
+        if !expected_verify {
+            assert!(
+                matches!(
+                    actual,
+                    Err(chio_binding_helpers::Error::Core(
+                        chio_core::Error::SignatureRejected
+                    ))
+                ),
+                "json verify refusal {}",
+                case["id"]
+            );
+        }
     }
 }
 
@@ -1375,8 +1343,12 @@ fn old_manifest_shape_under_the_current_id_is_refused_structurally() {
         serde_json::to_value(&sample_signed_manifest(public_key.clone(), &["file_read"]).tools[0])
             .test_unwrap("current tool definition");
     let signed = |manifest: Value| {
-        let (signature, _) = server
-            .sign_canonical(&manifest)
+        let signature = server
+            .sign_wrapped(
+                chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&manifest)
+                    .test_unwrap("canonical old-shape manifest"),
+            )
             .test_unwrap("sign old-shape manifest");
         json!({
             "manifest": manifest,

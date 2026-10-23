@@ -15,6 +15,18 @@ type ReceiptVerification struct {
 	TrustLevel         string `json:"trust_level"`
 }
 
+// ReceiptSchema is the wrapper id of a Chio receipt signature.
+const ReceiptSchema = "chio.receipt.v1"
+
+var receiptMembers = map[string]struct{}{
+	"id": {}, "timestamp": {}, "capability_id": {}, "tool_server": {}, "tool_name": {},
+	"action": {}, "decision": {}, "receipt_kind": {}, "boundary_class": {},
+	"observation_outcome": {}, "tool_origin": {}, "redaction_mode": {}, "actor_chain": {},
+	"content_hash": {}, "policy_hash": {}, "evidence": {}, "metadata": {}, "trust_level": {},
+	"tenant_id": {}, "bbs_projection_version": {}, "kernel_key": {}, "bbs_signature": {},
+	"signature": {},
+}
+
 func ParseReceiptJSON(input string) (map[string]any, error) {
 	value, err := ParseJSONText(input)
 	if err != nil {
@@ -24,13 +36,16 @@ func ParseReceiptJSON(input string) (map[string]any, error) {
 	if !ok {
 		return nil, newInvariantError("json", "receipt must be a JSON object")
 	}
+	if err := rejectUnknownMembers(receipt, receiptMembers, "receipt"); err != nil {
+		return nil, err
+	}
 	return receipt, nil
 }
 
 func ReceiptBodyCanonicalJSON(receipt map[string]any) (string, error) {
 	body := make(map[string]any, len(receipt))
 	for key, value := range receipt {
-		if key == "algorithm" || key == "signature" || value == nil {
+		if key == "signature" || value == nil {
 			continue
 		}
 		body[key] = value
@@ -73,7 +88,10 @@ func VerifyReceiptWithTrustedSigners(
 	if err != nil {
 		return ReceiptVerification{}, err
 	}
-	signatureValid, err := VerifyUTF8MessageEd25519(body, kernelKey, signature)
+	if err := rejectUnknownMembers(receipt, receiptMembers, "receipt"); err != nil {
+		return ReceiptVerification{}, err
+	}
+	signatureValid, err := wrappedSignatureValid(ReceiptSchema, body, kernelKey, signature)
 	if err != nil {
 		return ReceiptVerification{}, err
 	}

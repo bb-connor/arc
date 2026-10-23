@@ -7,8 +7,44 @@ from .hashing import sha256_hex_utf8
 from .json import canonicalize_json
 from .signing import (
     public_key_hex_matches,
-    verify_chio_signature,
+    wrapped_signature_valid,
 )
+
+RECEIPT_SCHEMA = "chio.receipt.v1"
+
+_RECEIPT_MEMBERS = frozenset(
+    {
+        "id",
+        "timestamp",
+        "capability_id",
+        "tool_server",
+        "tool_name",
+        "action",
+        "decision",
+        "receipt_kind",
+        "boundary_class",
+        "observation_outcome",
+        "tool_origin",
+        "redaction_mode",
+        "actor_chain",
+        "content_hash",
+        "policy_hash",
+        "evidence",
+        "metadata",
+        "trust_level",
+        "tenant_id",
+        "bbs_projection_version",
+        "kernel_key",
+        "bbs_signature",
+        "signature",
+    }
+)
+
+
+def _reject_unknown_receipt_members(receipt: dict[str, Any]) -> None:
+    for key in sorted(receipt):
+        if key not in _RECEIPT_MEMBERS:
+            raise ChioInvariantError("json", f"receipt has unknown member {key}")
 
 
 def _safe_verify_receipt_signature(
@@ -16,15 +52,10 @@ def _safe_verify_receipt_signature(
     signature: str,
     public_key: str,
 ) -> bool:
-    """Dispatch through ``verify_chio_signature``, swallowing algorithm errors.
-
-    Receipts signed with algorithms this SDK build does not yet support fail
-    closed by reporting ``signature_valid: False`` rather than propagating an
-    exception, mirroring the TS behaviour.
-    """
+    """Receipts whose signature this SDK cannot check report ``False``."""
 
     try:
-        return verify_chio_signature(signed_text, signature, public_key)
+        return wrapped_signature_valid(RECEIPT_SCHEMA, signed_text, public_key, signature)
     except ChioInvariantError:
         return False
 
@@ -39,7 +70,7 @@ def _receipt_body(receipt: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in receipt.items()
-        if key not in {"algorithm", "signature"} and value is not None
+        if key != "signature" and value is not None
     }
 
 
@@ -145,6 +176,7 @@ def verify_receipt(
     receipt: dict[str, Any],
     trusted_signers: list[str] | None = None,
 ) -> dict[str, Any]:
+    _reject_unknown_receipt_members(receipt)
     decision_value = receipt.get("decision")
     decision = (
         decision_value.get("verdict", "none")

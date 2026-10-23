@@ -37,7 +37,6 @@ pub use receipt::{
     verify_receipt_with_trusted_signers, ReceiptDecisionKind, ReceiptVerification,
 };
 pub use signing::{
-    is_valid_public_key_hex, is_valid_signature_hex, public_key_hex_matches, sign_json_str_ed25519,
-    sign_utf8_message_ed25519, verify_json_str_signature_ed25519, verify_utf8_message_ed25519,
-    CanonicalJsonSignature, Utf8MessageSignature,
+    is_valid_public_key_hex, is_valid_signature_hex, public_key_from_seed_ed25519,
+    public_key_hex_matches, sign_wrapped_json_ed25519, verify_wrapped_json, WrappedJsonSignature,
 };

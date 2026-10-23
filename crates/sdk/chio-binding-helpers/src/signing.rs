@@ -2,14 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 
+/// Wrapped signature over caller JSON under a registered schema id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Utf8MessageSignature {
-    pub public_key_hex: String,
-    pub signature_hex: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CanonicalJsonSignature {
+pub struct WrappedJsonSignature {
+    pub schema_id: String,
     pub canonical_json: String,
     pub public_key_hex: String,
     pub signature_hex: String,
@@ -34,88 +30,98 @@ pub fn is_valid_signature_hex(value: &str) -> bool {
     chio_core::Signature::from_hex(value).is_ok()
 }
 
-pub fn sign_utf8_message_ed25519(input: &str, seed_hex: &str) -> Result<Utf8MessageSignature> {
-    let keypair = chio_core::Keypair::from_seed_hex(seed_hex)?;
-    let signature = keypair.sign(input.as_bytes());
-    Ok(Utf8MessageSignature {
-        public_key_hex: keypair.public_key().to_hex(),
-        signature_hex: signature.to_hex(),
-    })
+/// Public key of the Ed25519 seed.
+pub fn public_key_from_seed_ed25519(seed_hex: &str) -> Result<String> {
+    Ok(chio_core::Keypair::from_seed_hex(seed_hex)?
+        .public_key()
+        .to_hex())
 }
 
-pub fn verify_utf8_message_ed25519(
-    input: &str,
-    public_key_hex: &str,
-    signature_hex: &str,
-) -> Result<bool> {
-    let public_key = chio_core::PublicKey::from_hex(public_key_hex)?;
-    let signature = chio_core::Signature::from_hex(signature_hex)?;
-    Ok(public_key.verify(input.as_bytes(), &signature))
-}
-
-pub fn sign_json_str_ed25519(input: &str, seed_hex: &str) -> Result<CanonicalJsonSignature> {
-    let value: serde_json::Value = serde_json::from_str(input)?;
+/// Sign the signing wrapper of the canonical form of `input_json` under
+/// `schema_id`; an id outside the signed-artifact registry is refused.
+pub fn sign_wrapped_json_ed25519(
+    schema_id: &str,
+    input_json: &str,
+    seed_hex: &str,
+) -> Result<WrappedJsonSignature> {
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&serde_json::from_str(
+        input_json,
+    )?)?;
     let keypair = chio_core::Keypair::from_seed_hex(seed_hex)?;
-    let (signature, canonical_bytes) = keypair.sign_canonical(&value)?;
-    let canonical_json = String::from_utf8(canonical_bytes)
+    let signature = keypair.sign_wrapped(schema_id, &canonical)?;
+    let canonical_json = String::from_utf8(canonical.into_vec())
         .map_err(|error| chio_core::Error::CanonicalJson(error.to_string()))?;
-
-    Ok(CanonicalJsonSignature {
+    Ok(WrappedJsonSignature {
+        schema_id: schema_id.to_owned(),
         canonical_json,
         public_key_hex: keypair.public_key().to_hex(),
         signature_hex: signature.to_hex(),
     })
 }
 
-pub fn verify_json_str_signature_ed25519(
-    input: &str,
+/// Verify a signature over the signing wrapper of the canonical form of
+/// `input_json` under `schema_id`.
+pub fn verify_wrapped_json(
+    schema_id: &str,
+    input_json: &str,
     public_key_hex: &str,
     signature_hex: &str,
-) -> Result<bool> {
-    let value: serde_json::Value = serde_json::from_str(input)?;
+) -> Result<()> {
+    let value: serde_json::Value = serde_json::from_str(input_json)?;
     let public_key = chio_core::PublicKey::from_hex(public_key_hex)?;
     let signature = chio_core::Signature::from_hex(signature_hex)?;
-    Ok(public_key.verify_canonical(&value, &signature)?)
+    chio_core::crypto::verify_wrapped(&public_key, schema_id, &value, &signature)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        public_key_hex_matches, sign_json_str_ed25519, sign_utf8_message_ed25519,
-        verify_json_str_signature_ed25519, verify_utf8_message_ed25519,
+        public_key_from_seed_ed25519, public_key_hex_matches, sign_wrapped_json_ed25519,
+        verify_wrapped_json,
     };
+    use crate::Error;
 
     #[test]
-    fn sign_and_verify_utf8_message() -> crate::Result<()> {
-        let signed = sign_utf8_message_ed25519("hello chio", &"09".repeat(32))?;
-        assert!(verify_utf8_message_ed25519(
-            "hello chio",
+    fn sign_and_verify_wrapped_json() -> crate::Result<()> {
+        let seed = "09".repeat(32);
+        let signed = sign_wrapped_json_ed25519("chio.receipt.v1", "{\"z\":1,\"a\":2}", &seed)?;
+        assert_eq!(signed.canonical_json, "{\"a\":2,\"z\":1}");
+        assert_eq!(signed.public_key_hex, public_key_from_seed_ed25519(&seed)?);
+        verify_wrapped_json(
+            "chio.receipt.v1",
+            "{\"z\":1,\"a\":2}",
             &signed.public_key_hex,
             &signed.signature_hex,
-        )?);
-        assert!(!verify_utf8_message_ed25519(
-            "hello chio!",
-            &signed.public_key_hex,
-            &signed.signature_hex,
-        )?);
+        )?;
+        assert!(matches!(
+            verify_wrapped_json(
+                "chio.receipt.v1",
+                "{\"z\":2,\"a\":2}",
+                &signed.public_key_hex,
+                &signed.signature_hex,
+            ),
+            Err(Error::Core(chio_core::Error::SignatureRejected))
+        ));
+        assert!(matches!(
+            verify_wrapped_json(
+                "chio.capability.v1",
+                "{\"z\":1,\"a\":2}",
+                &signed.public_key_hex,
+                &signed.signature_hex,
+            ),
+            Err(Error::Core(chio_core::Error::SignatureRejected))
+        ));
         Ok(())
     }
 
     #[test]
-    fn sign_and_verify_json_string() -> crate::Result<()> {
-        let signed = sign_json_str_ed25519("{\"z\":1,\"a\":2}", &"09".repeat(32))?;
-        assert_eq!(signed.canonical_json, "{\"a\":2,\"z\":1}");
-        assert!(verify_json_str_signature_ed25519(
-            "{\"z\":1,\"a\":2}",
-            &signed.public_key_hex,
-            &signed.signature_hex,
-        )?);
-        assert!(!verify_json_str_signature_ed25519(
-            "{\"z\":2,\"a\":2}",
-            &signed.public_key_hex,
-            &signed.signature_hex,
-        )?);
-        Ok(())
+    fn unregistered_schema_id_refuses() {
+        assert!(matches!(
+            sign_wrapped_json_ed25519("chio.unregistered-fixture.v1", "{}", &"09".repeat(32)),
+            Err(Error::Core(chio_core::Error::UnregisteredSchemaId(ref id)))
+                if id == "chio.unregistered-fixture.v1"
+        ));
     }
 
     #[test]

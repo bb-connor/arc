@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -222,18 +223,44 @@ func parseCapabilityToken(raw string) (CapabilityToken, error) {
 	return token, nil
 }
 
-// capabilitySchema is the only capability schema the webhook accepts.
+// capabilitySchema is the only capability schema the webhook accepts and the
+// signing-wrapper id its signature covers.
 const capabilitySchema = "chio.capability.v1"
 
-// verifyCapabilitySignature reconstructs the canonical signing input from the
+// signingWrapperPrefix opens every Chio signing wrapper; byte 23 is 0x00.
+const signingWrapperPrefix = "chio.signing-wrapper.v1\x00"
+
+var capabilityMembers = map[string]struct{}{
+	"schema": {}, "id": {}, "issuer": {}, "subject": {}, "scope": {}, "issued_at": {},
+	"expires_at": {}, "delegation_chain": {}, "aggregate_invocation_budget": {}, "caveats": {},
+	"scope_attenuations": {}, "attenuation_proof": {}, "budget_share_bps": {},
+	"parameter_binding": {}, "signature": {},
+}
+
+// signingWrapper returns the 88 bytes a Chio capability signature covers.
+func signingWrapper(schemaID string, canonical []byte) []byte {
+	schemaDigest := sha256.Sum256([]byte(schemaID))
+	bodyDigest := sha256.Sum256(canonical)
+	wrapper := make([]byte, 0, 88)
+	wrapper = append(wrapper, signingWrapperPrefix...)
+	wrapper = append(wrapper, schemaDigest[:]...)
+	return append(wrapper, bodyDigest[:]...)
+}
+
+// verifyCapabilitySignature reconstructs the canonical signing body from the
 // raw token bytes (the token without its signature) and verifies the ed25519
-// signature against the issuer public key.
+// signature over its signing wrapper against the issuer public key.
 func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 	var parsed map[string]any
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.UseNumber()
 	if err := decoder.Decode(&parsed); err != nil {
 		return fmt.Errorf("malformed capability token: %w", err)
+	}
+	for key := range parsed {
+		if _, ok := capabilityMembers[key]; !ok {
+			return fmt.Errorf("malformed capability token: unknown member %q", key)
+		}
 	}
 	delete(parsed, "signature")
 	if parsed["schema"] != capabilitySchema {
@@ -254,7 +281,7 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 		return fmt.Errorf("capability signature verification failed: %w", err)
 	}
 
-	if !ed25519.Verify(ed25519.PublicKey(publicKey), canonical, signature) {
+	if !ed25519.Verify(ed25519.PublicKey(publicKey), signingWrapper(capabilitySchema, canonical), signature) {
 		return fmt.Errorf("capability signature verification failed")
 	}
 	return nil

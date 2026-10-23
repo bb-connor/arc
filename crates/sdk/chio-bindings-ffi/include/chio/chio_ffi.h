@@ -83,6 +83,12 @@
 
 #define CHIO_FFI_ERROR_UNTRUSTED_INPUT 29
 
+#define CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID 30
+
+#define CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH 31
+
+#define CHIO_FFI_ERROR_SIGNATURE_REJECTED 32
+
 #define CHIO_FFI_ERROR_INTERNAL 255
 
 typedef struct {
@@ -112,17 +118,20 @@ ChioFfiResult chio_sha256_hex_utf8(const char *input_utf8);
 
 ChioFfiResult chio_sha256_hex_bytes(const uint8_t *input, size_t input_len);
 
-ChioFfiResult chio_sign_utf8_message_ed25519(const char *input_utf8, const char *seed_hex);
+ChioFfiResult chio_public_key_from_seed_ed25519(const char *seed_hex);
 
-ChioFfiResult chio_verify_utf8_message_ed25519(const char *input_utf8,
-                                               const char *public_key_hex,
-                                               const char *signature_hex);
+ChioFfiResult chio_sign_wrapped_json_ed25519(const char *schema_id,
+                                             const char *input_json,
+                                             const char *seed_hex);
 
-ChioFfiResult chio_sign_json_ed25519(const char *input_json, const char *seed_hex);
-
-ChioFfiResult chio_verify_json_signature_ed25519(const char *input_json,
-                                                 const char *public_key_hex,
-                                                 const char *signature_hex);
+/**
+ * Succeeds with `true` only when the signature verifies; every refusal is an
+ * error result.
+ */
+ChioFfiResult chio_verify_wrapped_json(const char *schema_id,
+                                       const char *input_json,
+                                       const char *public_key_hex,
+                                       const char *signature_hex);
 
 ChioFfiResult chio_verify_capability_json(const char *input_json,
                                           uint64_t now_secs,

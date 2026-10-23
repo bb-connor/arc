@@ -6,7 +6,11 @@ import {
   verify as verifySignature,
 } from "node:crypto";
 
+import { KNOWN_SIGNED_ARTIFACT_SCHEMAS } from "./_generated/signed_artifact_schemas.ts";
 import { ChioInvariantError } from "./errors.ts";
+
+/** Opens every Chio signing wrapper; byte 23 is 0x00. */
+export const SIGNING_WRAPPER_PREFIX = Buffer.from("chio.signing-wrapper.v1\0", "utf8");
 
 const ED25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
@@ -104,7 +108,7 @@ export function publicKeyHexMatches(left: string, right: string): boolean {
   return normalizeHex(left) === normalizeHex(right);
 }
 
-function publicKeyHexFromSeedHex(seedHex: string): string {
+export function publicKeyFromSeedEd25519(seedHex: string): string {
   const privateKey = createEd25519PrivateKey(seedHex);
   const publicKeyDer = createPublicKey(privateKey).export({
     format: "der",
@@ -113,31 +117,105 @@ function publicKeyHexFromSeedHex(seedHex: string): string {
   return Buffer.from(publicKeyDer).subarray(ED25519_SPKI_PREFIX.length).toString("hex");
 }
 
-export function signEd25519Message(
-  message: string | Buffer,
+/** The 88 bytes a Chio signature covers; refuses an unregistered schema id. */
+export function signingWrapper(schemaId: string, canonicalJson: string): Buffer {
+  if (!KNOWN_SIGNED_ARTIFACT_SCHEMAS.has(schemaId)) {
+    throw new ChioInvariantError(
+      "unregistered_schema_id",
+      `unregistered signed-artifact schema id: ${schemaId}`,
+    );
+  }
+  return Buffer.concat([
+    SIGNING_WRAPPER_PREFIX,
+    createHash("sha256").update(schemaId, "utf8").digest(),
+    createHash("sha256").update(canonicalJson, "utf8").digest(),
+  ]);
+}
+
+export function signWrappedCanonicalEd25519(
+  schemaId: string,
+  canonicalJson: string,
   seedHex: string,
 ): { public_key_hex: string; signature_hex: string } {
+  const wrapper = signingWrapper(schemaId, canonicalJson);
   const privateKey = createEd25519PrivateKey(seedHex);
-  const messageBuffer = Buffer.isBuffer(message) ? message : Buffer.from(message, "utf8");
   return {
-    public_key_hex: publicKeyHexFromSeedHex(seedHex),
-    signature_hex: Buffer.from(signMessage(null, messageBuffer, privateKey)).toString("hex"),
+    public_key_hex: publicKeyFromSeedEd25519(seedHex),
+    signature_hex: Buffer.from(signMessage(null, wrapper, privateKey)).toString("hex"),
   };
 }
 
-export function verifyEd25519Signature(
-  message: string | Buffer,
-  publicKeyHex: string,
-  signatureHex: string,
+function encodedAlgorithm(value: string): string {
+  for (const prefix of ["p256", "p384", "hybrid"]) {
+    if (value.startsWith(`${prefix}:`)) {
+      return prefix;
+    }
+  }
+  return "ed25519";
+}
+
+function stripAlgorithmPrefix(value: string, algorithm: string): string {
+  return algorithm === "ed25519" ? value : value.slice(algorithm.length + 1);
+}
+
+/**
+ * Verify a signature over the wrapper of `canonicalJson` under `schemaId`. The
+ * pinned key's encoding alone selects the algorithm; a signature encoded for
+ * another algorithm throws before any cryptographic check.
+ */
+export function verifyWrappedCanonical(
+  schemaId: string,
+  canonicalJson: string,
+  publicKey: string,
+  signature: string,
+): void {
+  const wrapper = signingWrapper(schemaId, canonicalJson);
+  const keyAlgorithm = encodedAlgorithm(publicKey);
+  const signatureAlgorithm = encodedAlgorithm(signature);
+  if (keyAlgorithm !== signatureAlgorithm) {
+    throw new ChioInvariantError(
+      "signature_algorithm_mismatch",
+      `signature algorithm ${signatureAlgorithm} does not match the pinned key algorithm ${keyAlgorithm}`,
+    );
+  }
+  let verified: boolean;
+  if (keyAlgorithm === "ed25519") {
+    const signatureBytes = hexToBuffer(signature, 64, "invalid_signature");
+    verified = verifySignature(null, wrapper, createEd25519PublicKey(publicKey), signatureBytes);
+  } else if (keyAlgorithm === "p256" || keyAlgorithm === "p384") {
+    verified = verifyEcdsaSignature(
+      wrapper,
+      stripAlgorithmPrefix(publicKey, keyAlgorithm),
+      stripAlgorithmPrefix(signature, keyAlgorithm),
+      keyAlgorithm === "p256" ? "P-256" : "P-384",
+    );
+  } else {
+    throw new ChioInvariantError(
+      "unsupported_algorithm",
+      `signature algorithm ${keyAlgorithm} is not supported by this SDK`,
+    );
+  }
+  if (!verified) {
+    throw new ChioInvariantError("signature_rejected", "signature rejected");
+  }
+}
+
+/** A rejected signature is `false`; every other refusal throws. */
+export function wrappedSignatureValid(
+  schemaId: string,
+  canonicalJson: string,
+  publicKey: string,
+  signature: string,
 ): boolean {
-  const signatureBytes = hexToBuffer(signatureHex, 64, "invalid_signature");
-  const key = createEd25519PublicKey(publicKeyHex);
-  return verifySignature(
-    null,
-    Buffer.isBuffer(message) ? message : Buffer.from(message, "utf8"),
-    key,
-    signatureBytes,
-  );
+  try {
+    verifyWrappedCanonical(schemaId, canonicalJson, publicKey, signature);
+    return true;
+  } catch (error) {
+    if (error instanceof ChioInvariantError && error.code === "signature_rejected") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 function hexBodyToBuffer(hexBody: string): Buffer {
@@ -219,28 +297,4 @@ function verifyEcdsaSignature(
       { cause },
     );
   }
-}
-
-export function verifyChioSignature(
-  signedBytes: string | Buffer,
-  signature: string,
-  publicKey: string,
-): boolean {
-  const message = Buffer.isBuffer(signedBytes) ? signedBytes : Buffer.from(signedBytes, "utf8");
-
-  if (signature.startsWith("p256:")) {
-    return verifyEcdsaSignature(message, publicKey, signature.slice("p256:".length), "P-256");
-  }
-  if (signature.startsWith("p384:")) {
-    return verifyEcdsaSignature(message, publicKey, signature.slice("p384:".length), "P-384");
-  }
-  if (signature.startsWith("hybrid:")) {
-    throw new ChioInvariantError(
-      "invalid_signature",
-      "hybrid post-quantum signatures are not supported by this SDK build",
-    );
-  }
-  // No recognised prefix means a bare 128-char hex Ed25519 signature; the
-  // existing verifier already enforces the 64-byte length.
-  return verifyEd25519Signature(message, publicKey, signature);
 }

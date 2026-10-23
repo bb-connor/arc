@@ -109,42 +109,34 @@ Result<std::string> sha256_hex_bytes(const std::vector<std::uint8_t>& input) {
                   "invariants::sha256_hex_bytes");
 }
 
-Result<std::string> sign_utf8_message_ed25519(std::string_view input_utf8,
+Result<std::string> public_key_from_seed_ed25519(std::string_view seed_hex) {
+  auto seed = owned(seed_hex);
+  return from_ffi(chio_public_key_from_seed_ed25519(seed.c_str()),
+                  "invariants::public_key_from_seed_ed25519");
+}
+
+Result<std::string> sign_wrapped_json_ed25519(std::string_view schema_id,
+                                              std::string_view input_json,
                                               std::string_view seed_hex) {
-  auto input = owned(input_utf8);
-  auto seed = owned(seed_hex);
-  return from_ffi(chio_sign_utf8_message_ed25519(input.c_str(), seed.c_str()),
-                  "invariants::sign_utf8_message_ed25519");
-}
-
-Result<bool> verify_utf8_message_ed25519(std::string_view input_utf8,
-                                         std::string_view public_key_hex,
-                                         std::string_view signature_hex) {
-  auto input = owned(input_utf8);
-  auto key = owned(public_key_hex);
-  auto sig = owned(signature_hex);
-  return bool_from_ffi(
-      chio_verify_utf8_message_ed25519(input.c_str(), key.c_str(), sig.c_str()),
-      "invariants::verify_utf8_message_ed25519");
-}
-
-Result<std::string> sign_json_ed25519(std::string_view input_json,
-                                      std::string_view seed_hex) {
+  auto schema = owned(schema_id);
   auto input = owned(input_json);
   auto seed = owned(seed_hex);
-  return from_ffi(chio_sign_json_ed25519(input.c_str(), seed.c_str()),
-                  "invariants::sign_json_ed25519");
+  return from_ffi(
+      chio_sign_wrapped_json_ed25519(schema.c_str(), input.c_str(), seed.c_str()),
+      "invariants::sign_wrapped_json_ed25519");
 }
 
-Result<bool> verify_json_signature_ed25519(std::string_view input_json,
-                                           std::string_view public_key_hex,
-                                           std::string_view signature_hex) {
+Result<bool> verify_wrapped_json(std::string_view schema_id,
+                                 std::string_view input_json,
+                                 std::string_view public_key_hex,
+                                 std::string_view signature_hex) {
+  auto schema = owned(schema_id);
   auto input = owned(input_json);
   auto key = owned(public_key_hex);
   auto sig = owned(signature_hex);
-  return bool_from_ffi(
-      chio_verify_json_signature_ed25519(input.c_str(), key.c_str(), sig.c_str()),
-      "invariants::verify_json_signature_ed25519");
+  return bool_from_ffi(chio_verify_wrapped_json(schema.c_str(), input.c_str(),
+                                                key.c_str(), sig.c_str()),
+                       "invariants::verify_wrapped_json");
 }
 
 Result<std::string> verify_capability_json(std::string_view input_json,

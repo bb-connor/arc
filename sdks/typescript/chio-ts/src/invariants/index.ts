@@ -1,6 +1,6 @@
 export { canonicalizeJson, canonicalizeJsonString } from "./json.ts";
 export type { JsonPrimitive, JsonValue } from "./json.ts";
-export { sha256Hex, verifyChioSignature } from "./crypto.ts";
+export { SIGNING_WRAPPER_PREFIX, sha256Hex, signingWrapper } from "./crypto.ts";
 export { sha256HexBytes, sha256HexUtf8 } from "./hashing.ts";
 export {
   parseReceiptJson,
@@ -9,6 +9,7 @@ export {
   verifyReceipt,
   verifyReceiptJson,
   verifyReceiptWithTrustedSigners,
+  RECEIPT_SCHEMA,
 } from "./receipt.ts";
 export type { ChioReceipt, ReceiptDecisionKind, ReceiptVerification } from "./receipt.ts";
 export {
@@ -17,6 +18,8 @@ export {
   parseCapabilityJson,
   verifyCapability,
   verifyCapabilityJson,
+  CAPABILITY_SCHEMA,
+  DELEGATION_LINK_SCHEMA,
 } from "./capability.ts";
 export type {
   CapabilityTimeStatus,
@@ -27,12 +30,11 @@ export type {
 export {
   isValidPublicKeyHex,
   isValidSignatureHex,
+  publicKeyFromSeedEd25519,
   publicKeyHexMatches,
-  signJsonStringEd25519,
-  signUtf8MessageEd25519,
-  verifyJsonStringSignatureEd25519,
-  verifyUtf8MessageEd25519,
+  signWrappedJsonEd25519,
+  verifyWrappedJson,
 } from "./signing.ts";
-export type { CanonicalJsonSignature, Utf8MessageSignature } from "./signing.ts";
+export type { WrappedJsonSignature } from "./signing.ts";
 export { ChioInvariantError, parseJsonText } from "./errors.ts";
 export type { ChioInvariantErrorCode } from "./errors.ts";

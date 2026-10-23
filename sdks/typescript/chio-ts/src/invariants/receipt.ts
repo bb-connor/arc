@@ -1,18 +1,52 @@
 import { canonicalizeJson, canonicalizeJsonString, parseJsonTextUniqueKeys } from "./json.ts";
-import { publicKeyHexMatches, sha256Hex, verifyChioSignature } from "./crypto.ts";
+import { publicKeyHexMatches, sha256Hex, wrappedSignatureValid } from "./crypto.ts";
 import { ChioInvariantError } from "./errors.ts";
 
+export const RECEIPT_SCHEMA = "chio.receipt.v1";
+
+const RECEIPT_MEMBERS: ReadonlySet<string> = new Set([
+  "id",
+  "timestamp",
+  "capability_id",
+  "tool_server",
+  "tool_name",
+  "action",
+  "decision",
+  "receipt_kind",
+  "boundary_class",
+  "observation_outcome",
+  "tool_origin",
+  "redaction_mode",
+  "actor_chain",
+  "content_hash",
+  "policy_hash",
+  "evidence",
+  "metadata",
+  "trust_level",
+  "tenant_id",
+  "bbs_projection_version",
+  "kernel_key",
+  "bbs_signature",
+  "signature",
+]);
+
+function rejectUnknownReceiptMembers(receipt: object): void {
+  for (const key of Object.keys(receipt).sort()) {
+    if (!RECEIPT_MEMBERS.has(key)) {
+      throw new ChioInvariantError("json", `receipt has unknown member ${key}`);
+    }
+  }
+}
+
 function safeVerifyReceiptSignature(
-  signedBytes: string,
+  signingBodyCanonicalJson: string,
   signature: string,
   publicKey: string,
 ): boolean {
   try {
-    return verifyChioSignature(signedBytes, signature, publicKey);
+    return wrappedSignatureValid(RECEIPT_SCHEMA, signingBodyCanonicalJson, publicKey, signature);
   } catch (error) {
     if (error instanceof ChioInvariantError) {
-      // Fail-closed: receipts signed with unsupported algorithms or malformed
-      // keys/signatures verify as false rather than propagating an exception.
       return false;
     }
     throw error;
@@ -58,7 +92,6 @@ export interface ChioReceipt {
   trust_level: "mediated" | "verified" | "advisory" | string;
   tenant_id?: string;
   kernel_key: string;
-  algorithm?: unknown;
   signature: string;
 }
 
@@ -82,11 +115,11 @@ export function parseReceiptJson(input: string): ChioReceipt {
   return parseJsonTextUniqueKeys(input);
 }
 
-export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "algorithm" | "signature"> {
-  const { signature: _signature, algorithm: _algorithm, ...body } = receipt;
+export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "signature"> {
+  const { signature: _signature, ...body } = receipt;
   return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)) as Omit<
     ChioReceipt,
-    "algorithm" | "signature"
+    "signature"
   >;
 }
 
@@ -203,6 +236,7 @@ function semanticallySignable(receipt: ChioReceipt, decision: ReceiptDecisionKin
 }
 
 export function verifyReceipt(receipt: ChioReceipt, trustedSigners: string[] = []): ReceiptVerification {
+  rejectUnknownReceiptMembers(receipt);
   const signingBodyCanonicalJson = receiptSigningBodyCanonicalJson(receipt);
   const parameterCanonicalJson = canonicalizeJson(receipt.action.parameters);
   const decision = receipt.decision?.verdict ?? "none";
