@@ -195,7 +195,8 @@ pub use status::{
     FindingStatusFreshnessPolicy, FindingStatusInclusionProofInput,
     FindingStatusNonInclusionProofInput, FindingStatusOperatorAuthorization,
     FindingStatusOperatorRole, FindingStatusProofInput, FindingStatusValue,
-    SignedFindingStatusEpoch, FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
+    SignedFindingStatusEpoch, FINDING_STATUS_EPOCH_SCHEMA_V1,
+    FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
     MAX_FINDING_STATUS_ANCHOR_REFS, MAX_FINDING_STATUS_ENCODED_BYTES,
     MAX_FINDING_STATUS_EPOCH_BYTES, MAX_FINDING_STATUS_PROOF_BYTES,
 };
