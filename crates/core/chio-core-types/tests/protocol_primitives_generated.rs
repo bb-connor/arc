@@ -376,7 +376,7 @@ mod receipt_fixture {
         receipt["tool_origin"] = json!("caller_executed");
         serde_json::from_value::<ChioReceipt>(receipt)
             .unwrap()
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap()
     }
 }
