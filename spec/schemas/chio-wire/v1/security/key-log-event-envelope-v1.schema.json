@@ -20,10 +20,9 @@
   },
   "$defs": {
     "hash": { "type": "string", "pattern": "^0x[0-9a-f]{64}$" },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": { "type": "string", "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$" },
     "keyLogIdentifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:/-]+$" },
-    "keyAuthorization": { "type": "object", "additionalProperties": false, "required": ["key_id", "algorithm", "signature"], "properties": { "key_id": { "$ref": "#/$defs/hash" }, "algorithm": { "$ref": "#/$defs/algorithm" }, "signature": { "$ref": "#/$defs/signature" } } },
-    "recoveryAuthorization": { "type": "object", "additionalProperties": false, "required": ["authorizer_id", "algorithm", "signature"], "properties": { "authorizer_id": { "$ref": "#/$defs/keyLogIdentifier" }, "algorithm": { "$ref": "#/$defs/algorithm" }, "signature": { "$ref": "#/$defs/signature" } } }
+    "keyAuthorization": { "type": "object", "additionalProperties": false, "required": ["key_id", "signature"], "properties": { "key_id": { "$ref": "#/$defs/hash" }, "signature": { "$ref": "#/$defs/signature" } } },
+    "recoveryAuthorization": { "type": "object", "additionalProperties": false, "required": ["authorizer_id", "signature"], "properties": { "authorizer_id": { "$ref": "#/$defs/keyLogIdentifier" }, "signature": { "$ref": "#/$defs/signature" } } }
   }
 }

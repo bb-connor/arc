@@ -4,7 +4,7 @@
   "title": "Signed Chio Credit IOU Envelope V2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["body", "signerKey", "algorithm", "signature"],
+  "required": ["body", "signerKey", "signature"],
   "properties": {
     "body": {
       "type": "object",
@@ -70,7 +70,6 @@
       }
     },
     "signerKey": { "$ref": "#/$defs/cryptoMaterial" },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": { "$ref": "#/$defs/cryptoMaterial" }
   },
   "$defs": {

@@ -38,7 +38,6 @@
         "root_expires_at": { "type": "integer", "minimum": 0 }
       }
     },
-    "algorithm": { "$ref": "#/$defs/cumulativeRootSigningAlgorithm" },
     "signature": { "$ref": "#/$defs/cumulativeRootSignature" }
   },
   "$defs": {
@@ -55,7 +54,6 @@
       "type": "string",
       "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     },
-    "cumulativeRootSigningAlgorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "cumulativeRootSignature": {
       "type": "string",
       "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"

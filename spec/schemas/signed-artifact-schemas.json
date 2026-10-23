@@ -261,6 +261,13 @@
       "title": "Chio enterprise migration transition signed body"
     },
     {
+      "schema": "chio.evidence-graph.minimal-receipt.v1",
+      "artifactKind": "evidence_graph_minimal_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/evidence-graph/minimal-receipt.schema.json",
+      "title": "Chio evidence graph minimal receipt signed body"
+    },
+    {
       "schema": "chio.evidence_export_commitment.v1",
       "artifactKind": "evidence_export_commitment",
       "introducedBy": "signing-wrapper-v1",
@@ -782,6 +789,13 @@
       "title": "Chio process swarm profile signed body"
     },
     {
+      "schema": "chio.proof-room.receipt-projection.v1",
+      "artifactKind": "proof_room_receipt_projection",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/proof-room/receipt-projection.schema.json",
+      "title": "Chio proof room receipt projection signed body"
+    },
+    {
       "schema": "chio.provenance-stamp.v1",
       "artifactKind": "provenance_stamp",
       "introducedBy": "signing-wrapper-v1",
@@ -864,13 +878,6 @@
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/release/release-qualification-manifest.schema.json",
       "title": "Chio release qualification manifest signed body"
-    },
-    {
-      "schema": "chio.replay.bless-checkpoint.v1",
-      "artifactKind": "replay_bless_checkpoint",
-      "introducedBy": "signing-wrapper-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/replay/bless-checkpoint.schema.json",
-      "title": "Chio replay bless checkpoint signed body"
     },
     {
       "schema": "chio.reputation-credential.v1",
