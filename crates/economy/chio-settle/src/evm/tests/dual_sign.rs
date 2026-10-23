@@ -1,5 +1,40 @@
 use super::*;
 
+const DUAL_SIGN_OPERATOR_PRIVATE_KEY: &str =
+    "0x1000000000000000000000000000000000000000000000000000000000000002";
+
+fn trusted_registry_server(dispatch: &Web3SettlementDispatchArtifact) -> MockJsonRpcServer {
+    let registry_block_hash = "0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef";
+    MockJsonRpcServer::spawn(vec![
+        rpc_result(json!({
+            "number": "0x65",
+            "hash": registry_block_hash,
+            "timestamp": "0x6553f100"
+        })),
+        rpc_result(json!(encode_hex(
+            IChioIdentityRegistry::getOperatorCall::abi_encode_returns(
+                &IChioIdentityRegistry::OperatorRecord {
+                    edKeyHash: parse_b256_hex(
+                        &dispatch.operator_key_hash,
+                        "dispatch.operator_key_hash",
+                    )
+                    .test_unwrap(),
+                    settlementKey: signer_address_from_private_key(DUAL_SIGN_OPERATOR_PRIVATE_KEY)
+                        .test_unwrap(),
+                    registeredAt: 7,
+                    operatorEpoch: 1,
+                    active: true,
+                },
+            )
+        ))),
+        rpc_result(json!({
+            "number": "0x65",
+            "hash": registry_block_hash,
+            "timestamp": "0x6553f100"
+        })),
+    ])
+}
+
 #[tokio::test]
 async fn dual_sign_release_refuses_receipt_from_untrusted_kernel_key() {
     let dual_dispatch = hex_dispatch();
@@ -37,9 +72,14 @@ async fn dual_sign_release_refuses_receipt_from_untrusted_kernel_key() {
 #[tokio::test]
 async fn dual_sign_release_refuses_receipt_from_rotated_out_kernel_key() {
     let dual_dispatch = hex_dispatch();
-    let mut config = sample_config();
+    let server = trusted_registry_server(&dual_dispatch);
+    let mut config = sample_config_with_rpc_url(server.base_url());
     config.chain_id = dual_dispatch.chain_id.clone();
     config.escrow_contract = dual_dispatch.escrow_contract.clone();
+    config.kernel_authority.trusted_keys = vec![
+        operator_keypair().public_key(),
+        instruction_keypair().public_key(),
+    ];
     let receipt = sample_receipt(
         &operator_keypair(),
         "cap-dual-rotated",
@@ -48,16 +88,15 @@ async fn dual_sign_release_refuses_receipt_from_rotated_out_kernel_key() {
         &dual_dispatch.beneficiary_address,
     );
     let input = DualSignReleaseInput::new(
-        "0x1000000000000000000000000000000000000000000000000000000000000002",
+        DUAL_SIGN_OPERATOR_PRIVATE_KEY,
         dual_dispatch.settlement_amount.clone(),
     );
-    config.kernel_authority.trusted_keys = vec![
-        operator_keypair().public_key(),
-        instruction_keypair().public_key(),
-    ];
-    assert!(config.kernel_authority.trusts(&receipt.kernel_key));
-    config.kernel_authority.trusted_keys = vec![instruction_keypair().public_key()];
+    prepare_dual_sign_release(&config, &dual_dispatch, &receipt, &input)
+        .await
+        .test_expect("the receipt should prepare before rotation");
+    server.join();
 
+    config.kernel_authority.trusted_keys = vec![instruction_keypair().public_key()];
     let error = prepare_dual_sign_release(&config, &dual_dispatch, &receipt, &input)
         .await
         .test_expect_err("a rotated-out kernel key should block dual-sign prep");
@@ -109,36 +148,7 @@ async fn dual_sign_release_refuses_trusted_kernel_key_over_foreign_signature() {
 #[tokio::test]
 async fn dual_sign_release_accepts_receipt_from_any_trusted_kernel_key() {
     let dual_dispatch = hex_dispatch();
-    let operator_private_key = "0x1000000000000000000000000000000000000000000000000000000000000002";
-    let registry_block_hash = "0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef";
-    let server = MockJsonRpcServer::spawn(vec![
-        rpc_result(json!({
-            "number": "0x65",
-            "hash": registry_block_hash,
-            "timestamp": "0x6553f100"
-        })),
-        rpc_result(json!(encode_hex(
-            IChioIdentityRegistry::getOperatorCall::abi_encode_returns(
-                &IChioIdentityRegistry::OperatorRecord {
-                    edKeyHash: parse_b256_hex(
-                        &dual_dispatch.operator_key_hash,
-                        "dual_dispatch.operator_key_hash",
-                    )
-                    .test_unwrap(),
-                    settlementKey: signer_address_from_private_key(operator_private_key)
-                        .test_unwrap(),
-                    registeredAt: 7,
-                    operatorEpoch: 1,
-                    active: true,
-                },
-            )
-        ))),
-        rpc_result(json!({
-            "number": "0x65",
-            "hash": registry_block_hash,
-            "timestamp": "0x6553f100"
-        })),
-    ]);
+    let server = trusted_registry_server(&dual_dispatch);
     let mut config = sample_config_with_rpc_url(server.base_url());
     config.chain_id = dual_dispatch.chain_id.clone();
     config.escrow_contract = dual_dispatch.escrow_contract.clone();
@@ -158,7 +168,7 @@ async fn dual_sign_release_accepts_receipt_from_any_trusted_kernel_key() {
         &dual_dispatch,
         &receipt,
         &DualSignReleaseInput::new(
-            operator_private_key,
+            DUAL_SIGN_OPERATOR_PRIVATE_KEY,
             dual_dispatch.settlement_amount.clone(),
         ),
     )

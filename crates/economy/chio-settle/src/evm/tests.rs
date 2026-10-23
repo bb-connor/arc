@@ -54,6 +54,7 @@ assert_not_prepared_evm_submission!(PreparedBondImpair);
 assert_not_prepared_evm_submission!(PreparedBondExpiry);
 
 mod dual_sign;
+mod merkle_trust;
 
 fn sample_config() -> SettlementChainConfig {
     sample_config_with_rpc_url("http://127.0.0.1:8545".to_string())
@@ -246,6 +247,12 @@ fn align_config_to_anchor_proof(config: &mut SettlementChainConfig, proof: &Anch
     config.chain_id = chain_anchor.chain_id.clone();
     config.root_registry_contract = chain_anchor.contract_address.clone();
     config.operator_address = chain_anchor.operator_address.clone();
+    if !config.kernel_authority.trusts(&proof.receipt.kernel_key) {
+        config
+            .kernel_authority
+            .trusted_keys
+            .push(proof.receipt.kernel_key.clone());
+    }
 }
 
 fn sample_anchor_content_binding() -> SettlementAnchorContentBinding {

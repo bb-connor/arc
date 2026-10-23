@@ -232,11 +232,29 @@ pub struct SettlementChainConfig {
     pub kernel_authority: SettlementKernelAuthority,
 }
 
-/// Kernel keys whose signed receipts may authorize a dual-signature release.
+/// Kernel keys whose signed receipts may authorize an escrow release.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "SettlementKernelAuthorityFields")]
 pub struct SettlementKernelAuthority {
     pub trusted_keys: Vec<PublicKey>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettlementKernelAuthorityFields {
+    trusted_keys: Vec<PublicKey>,
+}
+
+impl TryFrom<SettlementKernelAuthorityFields> for SettlementKernelAuthority {
+    type Error = SettlementError;
+
+    fn try_from(fields: SettlementKernelAuthorityFields) -> Result<Self, Self::Error> {
+        let authority = Self {
+            trusted_keys: fields.trusted_keys,
+        };
+        authority.validate()?;
+        Ok(authority)
+    }
 }
 
 impl SettlementKernelAuthority {
@@ -245,6 +263,13 @@ impl SettlementKernelAuthority {
             return Err(SettlementError::invalid_input(
                 "settlement config kernel_authority.trusted_keys must name at least one kernel key",
             ));
+        }
+        for (index, key) in self.trusted_keys.iter().enumerate() {
+            if self.trusted_keys[..index].contains(key) {
+                return Err(SettlementError::invalid_input(
+                    "settlement config kernel_authority.trusted_keys must not repeat a kernel key",
+                ));
+            }
         }
         Ok(())
     }
@@ -554,6 +579,49 @@ mod tests {
 
         let error = config.validate().test_unwrap_err();
         assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_duplicate_kernel_keys() {
+        let mut config = sample_chain_config();
+        let key = config.kernel_authority.trusted_keys[0].clone();
+        config.kernel_authority.trusted_keys.push(key);
+
+        let error = config.validate().test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid input: settlement config kernel_authority.trusted_keys must not repeat a kernel key"
+        );
+    }
+
+    #[test]
+    fn chain_config_refuses_empty_kernel_authority_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        value["kernel_authority"]["trusted_keys"] = serde_json::json!([]);
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_unknown_kernel_authority_field_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        value["kernel_authority"]["fallback"] = serde_json::json!(true);
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "unknown field `fallback`, expected `trusted_keys`"
+        );
+    }
+
+    #[test]
+    fn chain_config_round_trips_kernel_authority() {
+        let config = sample_chain_config();
+        let value = serde_json::to_value(&config).test_unwrap();
+
+        let parsed = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap();
+        assert_eq!(parsed, config);
     }
 
     #[test]

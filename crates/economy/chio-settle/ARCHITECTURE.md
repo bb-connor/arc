@@ -73,12 +73,13 @@ amount allocation, and verified FROST authorization before EVM preparation.
 ## Trust and invariants
 
 `SettlementChainConfig::validate` requires nonempty fields, amount policy,
-evidence flags, a nonempty `kernel_authority.trusted_keys` set, and a
-dispatchable pinned-DNS `HttpEgressContract` matching the RPC URL.
-`prepare_dual_sign_release` refuses a receipt whose `kernel_key` is not in
-`kernel_authority.trusted_keys` before it verifies the receipt signature. RPC helpers use the contract-aware HTTP client. Evidence flags express
-required integration posture; setting them does not create or inspect durable
-receipts, checkpoints, or signer equality.
+evidence flags, a nonempty and duplicate-free `kernel_authority.trusted_keys`
+set, and a dispatchable pinned-DNS `HttpEgressContract` matching the RPC URL.
+`prepare_dual_sign_release` and `prepare_merkle_release` refuse a receipt
+whose `kernel_key` is not in `kernel_authority.trusted_keys` before they
+verify the receipt or its anchor proof. RPC helpers use the contract-aware
+HTTP client. Evidence flags express required integration posture; setting them
+does not create or inspect durable receipts, checkpoints, or signer equality.
 
 `settlement_completion_flow_row_id` and its inverse require a nonblank,
 unpadded receipt id and the `economic-completion-flow:` prefix. Instruction
