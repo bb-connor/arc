@@ -5,11 +5,10 @@
   "description": "Broker-signed challenge binding one privileged audit session to an exact runner authorization body.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["body", "signer", "algorithm", "signature"],
+  "required": ["body", "signer", "signature"],
   "properties": {
     "body": { "$ref": "#/$defs/challengeBody" },
     "signer": { "$ref": "#/$defs/publicKey" },
-    "algorithm": { "$ref": "#/$defs/algorithm" },
     "signature": { "$ref": "#/$defs/signature" }
   },
   "$defs": {
@@ -45,7 +44,6 @@
       "type": "string",
       "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": {
       "type": "string",
       "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"

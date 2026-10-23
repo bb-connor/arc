@@ -156,16 +156,6 @@
       "$ref": "#/$defs/bbsReceiptSignature",
       "description": "Optional BBS signature material for selective disclosure. When present, the Ed25519 receipt signature covers this material through ChioReceiptSigningBody."
     },
-    "algorithm": {
-      "type": "string",
-      "enum": [
-        "ed25519",
-        "p256",
-        "p384",
-        "hybrid"
-      ],
-      "description": "Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field."
-    },
     "signature": {
       "type": "string",
       "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2})+|p384:([0-9a-f]{2})+|hybrid:[0-9a-f]{128}:[0-9a-f]{6618}:ed25519\\+mldsa65|hybrid:p256:([0-9a-f]{2})+:[0-9a-f]{6618}:p256\\+mldsa65|hybrid:p384:([0-9a-f]{2})+:[0-9a-f]{6618}:p384\\+mldsa65)$",

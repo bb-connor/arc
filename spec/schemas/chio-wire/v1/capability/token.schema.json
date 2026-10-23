@@ -52,15 +52,6 @@
     "aggregate_invocation_budget": {
       "$ref": "aggregate-invocation-budget.schema.json"
     },
-    "algorithm": {
-      "type": "string",
-      "enum": [
-        "ed25519",
-        "p256",
-        "p384",
-        "hybrid"
-      ]
-    },
     "caveats": {
       "description": "At most one caveat, which must be bind_security_context.",
       "type": "array",

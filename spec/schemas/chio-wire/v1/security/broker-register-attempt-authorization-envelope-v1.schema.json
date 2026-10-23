@@ -4,10 +4,9 @@
   "title": "Chio signed broker register-attempt authorization v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["body", "algorithm", "signature"],
+  "required": ["body", "signature"],
   "properties": {
     "body": { "$ref": "broker-register-attempt-authorization-body-v1.schema.json" },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": { "$ref": "#/$defs/signature" }
   },
   "$defs": {
