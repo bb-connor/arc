@@ -80,6 +80,10 @@ pub struct ChannelStateBodyV1 {
     pub asset_binding_digest: String,
 }
 
+impl super::signed::ChannelSignedBody for ChannelStateBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_STATE_SCHEMA;
+}
+
 impl ChannelStateBodyV1 {
     pub fn initial(
         channel_id: String,

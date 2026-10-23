@@ -3,25 +3,25 @@ use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::{canonical_json_bytes, canonical_json_string};
 use chio_finding::{
-    sign_audit_seed_witness, compute_audit_epoch_id, compute_audit_report_id,
-    compute_challenge_id, compute_enforcement_id, compute_snapshot_id,
-    derive_audit_seed_commitment, derive_outcome_id, FindingAffectedDelivery, FindingAuditEpoch,
-    FindingAuditReport, FindingBuyerSubmission, FindingChallenge, FindingChallengeAuthorization,
-    FindingChallengeAuthorizationKind, FindingChallengeEnforcement, FindingChallengeEvidence,
-    FindingChallengeFacet, FindingChallengeOutcome, FindingChallengeStanding,
-    FindingChallengeVerdict, FindingCheckpointRef, FindingDigestMismatchFacet,
-    FindingDisputeBondClass, FindingDisputeFeeEvent, FindingDisputeFeeTerminal,
-    FindingDisputeLockRef, FindingEffectIntentBinding, FindingEffectIntentKind,
-    FindingEnforcementDestination, FindingError, FindingFinalizedBondSnapshot, FindingMissedAudit,
-    FindingObservedFinality, FindingPenaltyCalculation, FindingPredicate, FindingReceiptRef,
-    FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind,
-    FindingReplayContradictionFacet, FindingReplayObservation, FindingReplayPredicateResult,
-    FindingReplayRecipeInput, FindingReplayReproduction, FindingReplayTerminalResult,
-    FindingResourceCaps, FindingVaultReference, FindingVenueAuditAuthorization,
-    FINDING_AUDIT_EPOCH_SCHEMA_V1, FINDING_AUDIT_REPORT_SCHEMA_V1,
-    FINDING_CHALLENGE_ENFORCEMENT_SCHEMA_V1, FINDING_CHALLENGE_OUTCOME_SCHEMA_V1,
-    FINDING_CHALLENGE_SCHEMA_V1, FINDING_FINALIZED_BOND_SNAPSHOT_SCHEMA_V1,
-    FINDING_REPLAY_OBSERVATION_SCHEMA_V1, FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
+    compute_audit_epoch_id, compute_audit_report_id, compute_challenge_id, compute_enforcement_id,
+    compute_snapshot_id, derive_audit_seed_commitment, derive_outcome_id, sign_audit_seed_witness,
+    FindingAffectedDelivery, FindingAuditEpoch, FindingAuditReport, FindingBuyerSubmission,
+    FindingChallenge, FindingChallengeAuthorization, FindingChallengeAuthorizationKind,
+    FindingChallengeEnforcement, FindingChallengeEvidence, FindingChallengeFacet,
+    FindingChallengeOutcome, FindingChallengeStanding, FindingChallengeVerdict,
+    FindingCheckpointRef, FindingDigestMismatchFacet, FindingDisputeBondClass,
+    FindingDisputeFeeEvent, FindingDisputeFeeTerminal, FindingDisputeLockRef,
+    FindingEffectIntentBinding, FindingEffectIntentKind, FindingEnforcementDestination,
+    FindingError, FindingFinalizedBondSnapshot, FindingMissedAudit, FindingObservedFinality,
+    FindingPenaltyCalculation, FindingPredicate, FindingReceiptRef, FindingRecipeEnvironment,
+    FindingRecipePhase, FindingRecipePhaseKind, FindingReplayContradictionFacet,
+    FindingReplayObservation, FindingReplayPredicateResult, FindingReplayRecipeInput,
+    FindingReplayReproduction, FindingReplayTerminalResult, FindingResourceCaps,
+    FindingVaultReference, FindingVenueAuditAuthorization, FINDING_AUDIT_EPOCH_SCHEMA_V1,
+    FINDING_AUDIT_REPORT_SCHEMA_V1, FINDING_CHALLENGE_ENFORCEMENT_SCHEMA_V1,
+    FINDING_CHALLENGE_OUTCOME_SCHEMA_V1, FINDING_CHALLENGE_SCHEMA_V1,
+    FINDING_FINALIZED_BOND_SNAPSHOT_SCHEMA_V1, FINDING_REPLAY_OBSERVATION_SCHEMA_V1,
+    FINDING_REPLAY_RECIPE_INPUT_SCHEMA_V1,
 };
 use serde_json::{json, Value};
 use std::error::Error;
@@ -590,6 +590,15 @@ pub(crate) fn market_penalty_envelope() -> Result<Value, Box<dyn Error>> {
         ],
         "issuedBy": "venue-operator",
     });
-    let envelope = SignedExportEnvelope::sign(body, &authority)?;
+    let envelope = SignedExportEnvelope::sign(MarketPenaltyBody(body), &authority)?;
     Ok(serde_json::to_value(&envelope)?)
+}
+
+/// The market penalty body as the registry schema describes it.
+#[derive(Clone, serde::Serialize)]
+#[serde(transparent)]
+struct MarketPenaltyBody(Value);
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for MarketPenaltyBody {
+    const SCHEMA_ID: &'static str = "chio.registry.market-penalty.v1";
 }

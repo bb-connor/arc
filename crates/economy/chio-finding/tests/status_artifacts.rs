@@ -12,7 +12,7 @@ use chio_finding::{
     status_epoch_envelope_sha256, verify_signed_status_epoch, verify_status_proof_input,
     FindingAuthorityKeyPolicy, FindingError, FindingStatusEpoch, FindingStatusFreshnessPolicy,
     FindingStatusOperatorAuthorization, FindingStatusOperatorRole, FindingStatusProofInput,
-    FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_SIGNATURE_DOMAIN,
+    FINDING_STATUS_EPOCH_SCHEMA_V1,
 };
 use chio_revocation_oracle::{
     finding_status_empty_leaf_hash, FindingStatusSparseMap, FINDING_STATUS_BRANCH_DOMAIN,
@@ -66,7 +66,6 @@ fn signed_epoch(
     let mut body = FindingStatusEpoch {
         schema: FINDING_STATUS_EPOCH_SCHEMA_V1.to_string(),
         status_epoch_id: String::new(),
-        signature_domain: FINDING_STATUS_SIGNATURE_DOMAIN.to_string(),
         status_map_version: FINDING_STATUS_MAP_VERSION.to_string(),
         proof_semantics: FINDING_STATUS_PROOF_SEMANTICS.to_string(),
         feed_id: "venue-status-feed".to_string(),
@@ -259,14 +258,13 @@ fn exact_canonical_proof_bytes_round_trip() -> TestResult {
 }
 
 #[test]
-fn epoch_version_domain_and_ordinary_root_substitution_reject() -> TestResult {
+fn epoch_version_and_ordinary_root_substitution_reject() -> TestResult {
     let (_, auth, signed) = inclusion_fixture()?;
     let keypair = operator();
-    for field in ["schema", "domain", "map", "proof", "hash", "empty"] {
+    for field in ["schema", "map", "proof", "hash", "empty"] {
         let mut body = signed.body.clone();
         match field {
             "schema" => body.schema = "chio.revocation.epoch-root.v1".to_string(),
-            "domain" => body.signature_domain = "chio-revocation-oracle:v1".to_string(),
             "map" => body.status_map_version = "append_only_v1".to_string(),
             "proof" => body.proof_semantics = "ordinary_merkle_v1".to_string(),
             "hash" => body.branch_domain = "chio.revocation.branch".to_string(),
@@ -279,7 +277,6 @@ fn epoch_version_domain_and_ordinary_root_substitution_reject() -> TestResult {
             "schema" => {
                 FindingError::UnsupportedSchema("chio.revocation.epoch-root.v1".to_string())
             }
-            "domain" => FindingError::InvalidField("signature_domain"),
             "map" => FindingError::InvalidField("status_map_version"),
             "proof" => FindingError::InvalidField("proof_semantics"),
             "hash" => FindingError::InvalidField("branch_domain"),

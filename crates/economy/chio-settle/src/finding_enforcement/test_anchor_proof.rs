@@ -40,7 +40,13 @@ pub(super) fn enforcement_anchor_proof(
         .as_object_mut()
         .test_expect("checkpoint statement body is an object")
         .remove("signature");
-    let signature = chio_core::canonical::CanonicalBytes::from_serializable(&statement).and_then(|canonical| kernel.sign_wrapped(chio_core::web3::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical))
+    let signature = chio_core::canonical::CanonicalBytes::from_serializable(&statement)
+        .and_then(|canonical| {
+            kernel.sign_wrapped(
+                chio_core::web3::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA,
+                &canonical,
+            )
+        })
         .test_expect("checkpoint statement signs");
     proof.checkpoint_statement.signature = signature;
     proof

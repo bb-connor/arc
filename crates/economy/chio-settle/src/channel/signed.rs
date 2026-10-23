@@ -5,8 +5,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use super::validation::{validate_positive, validate_text};
 use super::ChannelError;
 
-/// Signing-wrapper schema id of a channel party signature.
-pub const CHANNEL_SIGNATURE_SCHEMA: &str = "chio.channel.signature.v1";
+/// A channel body a party signs. Its `schema` id is the signing-wrapper id, so
+/// a signature over one body kind never verifies as another.
+pub trait ChannelSignedBody: Serialize {
+    const SIGNATURE_SCHEMA: &'static str;
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +60,7 @@ where
 }
 
 impl ChannelSignatureV1 {
-    pub fn sign<T: Serialize>(
+    pub fn sign<T: ChannelSignedBody>(
         body: &T,
         signer_id: String,
         key_epoch: u64,
@@ -73,7 +76,7 @@ impl ChannelSignatureV1 {
             body,
         };
         let signature = CanonicalBytes::from_serializable(&payload)
-            .and_then(|canonical| keypair.sign_wrapped(CHANNEL_SIGNATURE_SCHEMA, &canonical))
+            .and_then(|canonical| keypair.sign_wrapped(T::SIGNATURE_SCHEMA, &canonical))
             .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
         Ok(Self {
             signer_id,
@@ -83,7 +86,7 @@ impl ChannelSignatureV1 {
         })
     }
 
-    pub fn verify<T: Serialize>(
+    pub fn verify<T: ChannelSignedBody>(
         &self,
         body: &T,
         expected_signer_id: &str,
@@ -104,12 +107,7 @@ impl ChannelSignatureV1 {
             signer_key: &self.signer_key,
             body,
         };
-        verify_wrapped(
-            expected_key,
-            CHANNEL_SIGNATURE_SCHEMA,
-            &payload,
-            &self.signature,
-        )
-        .map_err(|_| ChannelError::AuthorityVerification)
+        verify_wrapped(expected_key, T::SIGNATURE_SCHEMA, &payload, &self.signature)
+            .map_err(|_| ChannelError::AuthorityVerification)
     }
 }

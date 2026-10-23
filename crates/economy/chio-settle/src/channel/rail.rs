@@ -106,6 +106,10 @@ pub struct ChannelReleaseAuthorizationBodyV1 {
     pub release_broadcast: ChannelReleaseMutationBindingV1,
 }
 
+impl super::signed::ChannelSignedBody for ChannelReleaseAuthorizationBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA;
+}
+
 impl ChannelReleaseAuthorizationBodyV1 {
     fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA {

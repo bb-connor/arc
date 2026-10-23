@@ -336,11 +336,17 @@ pub fn bid(
     let listing = context.listing;
 
     // Fail-closed: verify the underlying artifacts haven't been tampered.
-    match listing.listing.verify_signature(&listing.listing.signer_key) {
+    match listing
+        .listing
+        .verify_signature(&listing.listing.signer_key)
+    {
         Ok(true) => {}
         _ => return Err(BiddingError::ListingSignatureInvalid),
     }
-    match listing.pricing.verify_signature(&listing.pricing.signer_key) {
+    match listing
+        .pricing
+        .verify_signature(&listing.pricing.signer_key)
+    {
         Ok(true) => {}
         _ => return Err(BiddingError::PricingSignatureInvalid),
     }

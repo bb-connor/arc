@@ -43,7 +43,10 @@ pub(crate) fn verify_signed_charter(
 
 pub(crate) fn verify_signed_case(case: &SignedGenericGovernanceCase) -> Result<(), String> {
     case.body.validate()?;
-    if !case.verify_signature(&case.signer_key).map_err(|error| error.to_string())? {
+    if !case
+        .verify_signature(&case.signer_key)
+        .map_err(|error| error.to_string())?
+    {
         return Err("governance case signature is invalid".to_string());
     }
     Ok(())
