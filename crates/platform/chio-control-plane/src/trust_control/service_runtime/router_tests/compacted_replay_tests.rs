@@ -287,6 +287,16 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
             KernelError::ReceiptPersistence(ReceiptStoreError::Fenced)
         ));
     }
+    if mode == 2 {
+        assert!(
+            matches!(
+                &error,
+                KernelError::ReceiptPersistence(ReceiptStoreError::ReadBoundary(reason))
+                    if reason.starts_with("unknown field `algorithm`")
+            ),
+            "a receipt carrying an algorithm member must fail decoding: {error:?}"
+        );
+    }
     if mode == 3 || mode == 7 {
         let mut source = error.source();
         let mut found = false;
@@ -348,8 +358,8 @@ fn compacted_payload_rpc_receipt_fence_preserves_native_store_cause() -> TestRes
     replay_fault(1, "CHIO-KERNEL-RECEIPT-PERSISTENCE", true)
 }
 #[test]
-fn compacted_payload_rpc_receipt_algorithm_preserves_native_verification_cause() -> TestResult {
-    replay_fault(2, "urn:chio:error:attest:receipt-verification-failed", true)
+fn compacted_payload_rpc_receipt_algorithm_member_is_refused_at_the_read_boundary() -> TestResult {
+    replay_fault(2, "CHIO-KERNEL-RECEIPT-PERSISTENCE", false)
 }
 
 #[test]
