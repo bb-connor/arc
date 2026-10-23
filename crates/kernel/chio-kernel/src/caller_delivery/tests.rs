@@ -1,4 +1,5 @@
 use super::*;
+use chio_core::canonical::canonical_json_bytes;
 use crate::admission_operation::{ProviderAttemptBindingV1, StoreMutationFence};
 
 mod schema;
