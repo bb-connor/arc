@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::Path;
 
-use chio_core_types::{canonical_json_bytes, sha256_hex, Keypair};
+use chio_core_types::{canonical_json_bytes, sha256_hex, CanonicalBytes, Keypair};
 use serde_json::{json, Value};
 
 use super::{display_path, freeze_vectors, workspace_root, XtaskError};
@@ -18,7 +18,7 @@ const EVIDENCE: &str = "broker-execution-evidence-v1.json";
 const ENVELOPE: &str = "broker-execution-receipt-envelope-v1.json";
 const RESPONSE: &str = "broker-execute-response-v1.json";
 const SIGNER_SEED: [u8; 32] = [43; 32];
-const RECEIPT_DOMAIN: &str = "chio.broker-execution-receipt-signature.v1\0";
+const RECEIPT_SCHEMA: &str = "chio.broker-execution-receipt.v1";
 
 pub(crate) fn run(check: bool) -> Result<(), XtaskError> {
     let directory = workspace_root()?.join(VECTOR_DIR);
@@ -30,11 +30,12 @@ pub(crate) fn run(check: bool) -> Result<(), XtaskError> {
         )));
     }
     let signer = Keypair::from_seed(&SIGNER_SEED);
-    let signing_input = canonical(&json!({ "body": body, "domain": RECEIPT_DOMAIN }))?;
+    let signature = CanonicalBytes::from_value(&body)
+        .and_then(|canonical| signer.sign_wrapped(RECEIPT_SCHEMA, &canonical))
+        .map_err(|err| XtaskError::Validation(format!("broker receipt signing failed: {err}")))?;
     let envelope = json!({
-        "algorithm": "ed25519",
         "body": body,
-        "signature": signer.sign(&signing_input),
+        "signature": signature,
         "signer": signer.public_key(),
     });
     let envelope_bytes = canonical(&envelope)?;
