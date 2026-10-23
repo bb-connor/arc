@@ -129,6 +129,7 @@ pub type RuntimeWorkflowRunReport = chio_runtime_core::RuntimeWorkflowRunReport;
 pub type SignedRuntimeAdmissionReport = chio_runtime_core::SignedRuntimeAdmissionReport;
 pub type SignedRuntimePeerWeights = chio_runtime_core::SignedRuntimePeerWeights;
 pub type SignedRuntimePheromonePolicy = chio_runtime_core::SignedRuntimePheromonePolicy;
+pub use chio_runtime_core::RuntimePheromoneQueryReport;
 pub type SignedRuntimePheromoneQueryReport = chio_runtime_core::SignedRuntimePheromoneQueryReport;
 pub type SignedRuntimeVerifierTrustBundle = chio_runtime_core::SignedRuntimeVerifierTrustBundle;
 pub type SwarmAuthorityBundle = chio_swarm_authority::SwarmAuthorityBundle;
