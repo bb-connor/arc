@@ -503,7 +503,7 @@ fn operation_owned_allow_naming_a_reserved_key_is_refused_and_released() {
     operation_owned_hook_is_refused_and_released(
         forged("delivery_contract"),
         true,
-        "delivery_contract is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
         Some("delivery_contract"),
     );
 }
@@ -513,7 +513,7 @@ fn operation_owned_deny_forging_the_kernel_runtime_admission_record_is_refused_a
     operation_owned_hook_is_refused_and_released(
         forged("runtime_admission"),
         false,
-        "runtime_admission is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
         Some("runtime_admission"),
     );
 }

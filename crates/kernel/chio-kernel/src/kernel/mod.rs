@@ -165,21 +165,22 @@ const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
     "runtime admission hook metadata must be a JSON object";
 
-/// Hook output may name only `chio_runtime` among the reserved keys. The kernel
-/// writes `runtime_admission` itself, only on its own error paths and never
-/// from hook output, so a hook can never supply it.
-fn is_hook_forbidden_metadata_key(key: &str) -> bool {
-    key != RUNTIME_ADMISSION_METADATA_KEY
-        && chio_core::receipt::metadata::reserved_receipt_metadata_keys()
-            .any(|reserved| reserved == key)
+/// Refusal reason for runtime-admission hook metadata that names any top-level
+/// key other than `chio_runtime`.
+const HOOK_METADATA_KEY_REFUSAL: &str =
+    "runtime admission hook metadata may name only chio_runtime";
+
+/// A runtime-admission hook writes only `chio_runtime`. The kernel writes
+/// `runtime_admission` itself on its own error paths, never from hook output.
+fn is_hook_metadata_key(key: &str) -> bool {
+    key == RUNTIME_ADMISSION_METADATA_KEY
 }
 
-/// The first reserved key a runtime-admission hook may not write, if its
-/// metadata names one.
-fn reserved_hook_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
-    let object = metadata.and_then(serde_json::Value::as_object)?;
-    chio_core::receipt::metadata::reserved_receipt_metadata_keys()
-        .find(|key| object.contains_key(*key) && is_hook_forbidden_metadata_key(key))
+/// True when hook metadata names a top-level key a hook may not write.
+fn hook_metadata_names_forbidden_key(metadata: Option<&serde_json::Value>) -> bool {
+    metadata
+        .and_then(serde_json::Value::as_object)
+        .is_some_and(|object| object.keys().any(|key| !is_hook_metadata_key(key)))
 }
 
 /// The first reserved key, in registry order, that caller metadata names.

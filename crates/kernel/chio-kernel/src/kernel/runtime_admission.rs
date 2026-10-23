@@ -97,8 +97,8 @@ impl RuntimeAdmissionDecision {
 
 /// Optional pre-dispatch admission hook for product-specific runtime gates.
 ///
-/// Decision metadata may name only `chio_runtime` among the kernel-reserved
-/// receipt-metadata keys; any other reserved key turns the decision into a
+/// Decision metadata, when present, is a JSON object whose only top-level key
+/// is `chio_runtime`; any other key turns the decision into a
 /// runtime-admission denial. Output must not echo context metadata, which can
 /// carry kernel-written blocks.
 pub trait RuntimeAdmissionHook: Send + Sync {
