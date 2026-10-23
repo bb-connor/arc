@@ -318,7 +318,7 @@ EMBEDDED_KEY_CALLERS: dict[tuple[str, str], tuple[str, int]] = {
     ("crates/products/chio-api-protect/src/proxy/sidecar.rs", "sidecar_validate_capability_handler"): ("GUARDED", 1),
     ("crates/products/chio-cli/src/active_defense_migration.rs", "verify_backfill_receipts"): ("PINNED", 1),
     ("crates/products/chio-cli/src/cli/replay/verify.rs", "verify_receipt"): ("PINNED", 1),
-    ("crates/products/chio-cli/src/cli/trust/receipt/explain.rs", "explain_receipt_value"): ("NEEDS-TRUST-CONTEXT:SELF-KEY-PIN-PRODUCTS-RECEIPT-EXPLAIN", 1),
+    ("crates/products/chio-cli/src/cli/trust/receipt/explain.rs", "explain_receipt_value"): ("PINNED", 1),
     ("crates/products/chio-mercury-core/src/proof_package.rs", "verify_chio_bundle"): ("NEEDS-TRUST-CONTEXT:SELF-KEY-PIN-PRODUCTS", 2),
     ("crates/protocol/chio-acp-edge/src/edge.rs", "evaluate_permission_with_kernel"): ("GUARDED", 1),
     ("crates/protocol/chio-acp-proxy/src/compliance.rs", "validate_compliance_receipt"): ("GUARDED", 1),
