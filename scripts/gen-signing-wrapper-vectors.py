@@ -74,73 +74,6 @@ WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 WRAPPER_LEN = 88
 MAX_SAFE_INTEGER = 2**53 - 1
 
-# Registry rows that never carry a wrapper: a DPoP profile id that collapses to v1.
-EXCLUDED_WRAPPER_IDS = frozenset({"chio.dpop_proof.v2"})
-
-# Wrapper ids that PROTOCOL section 4.5 names but `spec/schemas/registry.json`
-# does not list yet. Each id is registered with its type before any
-# implementation signs or verifies it.
-SECTION_4_5_UNREGISTERED_IDS = (
-    "chio.active-response-artifact-authority-attestation.v1",
-    "chio.active-response-policy-authority-request.v1",
-    "chio.active-response-policy-authority-response.v1",
-    "chio.active-response-submission.v1",
-    "chio.ag-ui-receipt.v1",
-    "chio.agent-passport-presentation-response.v1",
-    "chio.authority-lifecycle.v1",
-    "chio.authority-snapshot.v1",
-    "chio.budget-snapshot-anchor-commitment.v1",
-    "chio.call_chain_continuation.v1",
-    "chio.certify.check.v1",
-    "chio.channel.signature.v1",
-    "chio.checkpoint_statement.v1",
-    "chio.child-request-receipt.v1",
-    "chio.compliance.certificate.v1",
-    "chio.credit.iou-envelope.v1",
-    "chio.cross-issuer-migration.v1",
-    "chio.delegation-link.v1",
-    "chio.enterprise-migration-transition.v1",
-    "chio.evidence_export_commitment.v1",
-    "chio.execution_nonce.v1",
-    "chio.federated-delegation-policy.v1",
-    "chio.federation-kernel-handshake.v1",
-    "chio.federation-policy.v1",
-    "chio.financial-agent-passport-presentation-response.v1",
-    "chio.finding-pool.store-identity-proof.v1",
-    "chio.frost.dkg-package.v1",
-    "chio.governed-approval-token.v1",
-    "chio.governed-upstream-call-chain-proof.v1",
-    "chio.key-log.witness-statement.v1",
-    "chio.mcp.operator-approval.v1",
-    "chio.mcp.session-credential-call.v1",
-    "chio.mcp.session-credential.v1",
-    "chio.operation_execution_nonce.v1",
-    "chio.passkey-capability.v1",
-    "chio.passport-verifier-policy.v1",
-    "chio.process.container-launch.v1",
-    "chio.process.swarm-profile.v1",
-    "chio.provenance-stamp.v1",
-    "chio.public-discovery-transparency.v1",
-    "chio.public-issuer-discovery.v1",
-    "chio.public-verifier-discovery.v1",
-    "chio.reputation-credential.v1",
-    "chio.runtime.tool-server-ack-signature.v1",
-    "chio.session-compliance-certificate.v1",
-    "chio.session_anchor.v1",
-    "chio.signed-admission-terminal-projection.v1",
-    "chio.signed-watermark-envelope.v1",
-    "chio.signer-readiness-probe.v1",
-    "chio.stop-operator-config-approval.v1",
-    "chio.stop-operator-config.v1",
-    "chio.swarm.delegation-witness-hop-signature.v1",
-    "chio.tee-bless-audit.v1",
-    "chio.trace-observation.v1",
-    "chio.work-dispatch-permit.v1",
-    "chio.work-offer.v1",
-    "chio.work-selection.v1",
-    "chio.work-subdivision.v1",
-    "chio.workflow-receipt.v1",
-)
 
 SIGNATURE_SCHEMA_IDS = (
     "chio.receipt.v1",
@@ -393,10 +326,7 @@ def verify_wrapped(
 
 def known_wrapper_ids() -> list[str]:
     registry = json.loads(REGISTRY_PATH.read_bytes())
-    ids = {row["schema"] for row in registry["artifacts"]}
-    ids.update(SECTION_4_5_UNREGISTERED_IDS)
-    ids.difference_update(EXCLUDED_WRAPPER_IDS)
-    return sorted(ids)
+    return sorted({row["schema"] for row in registry["artifacts"]})
 
 
 def dump(document: object) -> bytes:
@@ -412,6 +342,7 @@ def flip_low_bit(data: bytes, index: int = 0) -> bytes:
 # Signing-wrapper vectors.
 
 SIGNATURE_BODY = canonical_json({"fixture": "signing-wrapper", "n": 1})
+ALGORITHM_MEMBER_BODY = canonical_json({"algorithm": "ed25519", "fixture": "signing-wrapper", "n": 1})
 SIGNATURE_BODY_ONE_BIT = canonical_json({"fixture": "signing-wrapper", "n": 0})
 WRAPPER_CASE_BODY = canonical_json({"a": 1})
 
@@ -521,6 +452,18 @@ def build_wrapper_document(keys: Keys, ids: list[str]) -> dict:
             keys.sign(sig_alg, wrapper("chio.receipt.v1", SIGNATURE_BODY)),
             False,
         )
+
+    add(
+        "p256-key/ed25519-signature/algorithm-member",
+        "A body carrying an algorithm member that names ed25519, with an Ed25519 signature, under a pinned P-256 key; the key alone selects the verifier and the signature rejects on its encoding prefix.",
+        "ed25519",
+        "chio.receipt.v1",
+        "chio.receipt.v1",
+        ALGORITHM_MEMBER_BODY,
+        keys.public_hex("p256"),
+        keys.sign("ed25519", wrapper("chio.receipt.v1", ALGORITHM_MEMBER_BODY)),
+        False,
+    )
 
     receipt_wrapper = wrapper("chio.receipt.v1", SIGNATURE_BODY)
     add(
