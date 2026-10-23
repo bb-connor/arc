@@ -565,6 +565,7 @@ fn peer_nonce_replay_refuses() {
         .test_unwrap_err();
     assert_eq!(error, PeerAuthError::ReplayedNonce);
     assert_eq!(error.to_string(), "cluster peer nonce was already used");
+    assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
     let fresh = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
     access
         .peers
@@ -595,19 +596,22 @@ fn peer_nonce_cache_refuses_when_full() {
             .test_unwrap();
     }
     let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    let full = access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap_err();
+    assert_eq!(full, PeerAuthError::ReplayCacheUnavailable);
     assert_eq!(
-        access
-            .peers
-            .verify(
-                &headers,
-                &target,
-                ISSUED_AT,
-                Scope::ClusterReplicate,
-                &nonces
-            )
-            .test_unwrap_err(),
-        PeerAuthError::ReplayCacheUnavailable
+        full.to_string(),
+        "cluster peer replay cache cannot admit another request"
     );
+    assert_eq!(full.status(), StatusCode::SERVICE_UNAVAILABLE);
     let after_window = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS + 1;
     let later = signed_peer_headers(&keypair, NODE_B, &target, after_window, None);
     access
@@ -633,21 +637,31 @@ fn peer_headers_must_carry_nonce_and_body_digest() {
         body: b"",
     };
     for header in [CLUSTER_AUTH_NONCE_HEADER, CLUSTER_AUTH_BODY_SHA256_HEADER] {
-        let mut headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
-        headers.remove(header);
-        assert_eq!(
-            access
-                .peers
-                .verify(
-                    &headers,
-                    &target,
-                    ISSUED_AT,
-                    Scope::ClusterReplicate,
-                    &PeerNonceCache::default(),
-                )
-                .test_unwrap_err(),
-            PeerAuthError::Unauthenticated
-        );
+        let mut missing = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+        missing.remove(header);
+        let mut uppercase = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+        let value = uppercase
+            .get(header)
+            .and_then(|value| value.to_str().ok())
+            .test_unwrap()
+            .to_ascii_uppercase();
+        uppercase.insert(header, HeaderValue::from_str(&value).test_unwrap());
+        for headers in [missing, uppercase] {
+            assert_eq!(
+                access
+                    .peers
+                    .verify(
+                        &headers,
+                        &target,
+                        ISSUED_AT,
+                        Scope::ClusterReplicate,
+                        &PeerNonceCache::default(),
+                    )
+                    .test_unwrap_err(),
+                PeerAuthError::Unauthenticated,
+                "{header}"
+            );
+        }
     }
 }
 
@@ -783,19 +797,34 @@ fn peer_request_for_another_receiver_refuses() {
         ISSUED_AT,
         Some(2),
     );
+    let refused = access
+        .peers
+        .verify(
+            &for_node_c,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap_err();
+    assert_eq!(refused, PeerAuthError::BadSignature);
     assert_eq!(
-        access
-            .peers
-            .verify(
-                &for_node_c,
-                &target,
-                ISSUED_AT,
-                Scope::ClusterReplicate,
-                &PeerNonceCache::default(),
-            )
-            .test_unwrap_err(),
-        PeerAuthError::BadSignature
+        refused.to_string(),
+        "cluster peer signature does not verify under a pinned key"
     );
+    assert_eq!(refused.status(), StatusCode::UNAUTHORIZED);
+    let for_this_node =
+        signed_peer_headers_for(&keypair, NODE_B, SELF_NODE, &target, ISSUED_AT, Some(2));
+    access
+        .peers
+        .verify(
+            &for_this_node,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap();
 }
 
 #[test]
@@ -822,25 +851,38 @@ fn peer_request_for_another_deployment_refuses() {
     )
     .test_unwrap();
     let mut headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, Some(2));
+    access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap();
     for (name, value) in [
         (CLUSTER_AUTH_SIGNATURE_HEADER, other_deployment.signature),
         (CLUSTER_AUTH_NONCE_HEADER, other_deployment.nonce),
     ] {
         headers.insert(name, HeaderValue::from_str(&value).test_unwrap());
     }
+    let refused = access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap_err();
+    assert_eq!(refused, PeerAuthError::BadSignature);
     assert_eq!(
-        access
-            .peers
-            .verify(
-                &headers,
-                &target,
-                ISSUED_AT,
-                Scope::ClusterReplicate,
-                &PeerNonceCache::default(),
-            )
-            .test_unwrap_err(),
-        PeerAuthError::BadSignature
+        refused.to_string(),
+        "cluster peer signature does not verify under a pinned key"
     );
+    assert_eq!(refused.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[test]
@@ -912,6 +954,22 @@ fn cluster_identity_rules_refuse_at_startup() {
             peer(SELF_NODE, &keypair, &["cluster:replicate"])
         ))),
         TrustAccessError::SelfPinned(SELF_NODE.to_string())
+    );
+    let invalid_node_id = refusal(
+        &config(&format!(
+            "{}{}",
+            reader(),
+            peer(NODE_B, &keypair, &["cluster:replicate"])
+        ))
+        .replace(&format!("node_id = \"{SELF_NODE}\""), "node_id = \"  /\""),
+    );
+    assert_eq!(
+        invalid_node_id,
+        TrustAccessError::InvalidClusterNodeId("  /".to_string())
+    );
+    assert_eq!(
+        invalid_node_id.to_string(),
+        "[cluster] node_id \"  /\" is invalid"
     );
 }
 

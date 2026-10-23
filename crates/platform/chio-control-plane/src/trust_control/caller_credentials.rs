@@ -29,7 +29,7 @@ use super::{
 /// scheme, node id, method, path, raw query, SHA-256 of the request body,
 /// single-use nonce, issue time, cluster term, the deployment and the
 /// recipient node id.
-pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-request.v1";
+pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-signature.v1";
 
 /// A peer request is fresh only within this many seconds of the receiver's clock.
 pub const CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS: i64 = 60;
@@ -210,6 +210,8 @@ pub enum TrustAccessError {
     PeerNonClusterScope { node_id: String, scope: String },
     #[error("cluster peer \"{node_id}\" names scope \"{scope}\" more than once")]
     DuplicatePeerScope { node_id: String, scope: Scope },
+    #[error("[cluster] node_id {0:?} is invalid")]
+    InvalidClusterNodeId(String),
     #[error("[cluster] declares peers but no node_id and node_key_file for this node")]
     ClusterIdentityRequired,
     #[error("[cluster] node_id and node_key_file are declared without any peer")]
@@ -843,7 +845,7 @@ impl ClusterPeerPins {
             (None, None) => None,
             (Some(node_id), Some(node_key_file)) => Some(ClusterNodeIdentity {
                 node_id: normalize_cluster_url(&node_id)
-                    .map_err(|_| TrustAccessError::InvalidPeerNodeId(node_id.clone()))?,
+                    .map_err(|_| TrustAccessError::InvalidClusterNodeId(node_id.clone()))?,
                 node_key_file,
             }),
             _ => return Err(TrustAccessError::ClusterIdentityRequired),

@@ -1050,9 +1050,9 @@ files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "9019771960"
 
 [[schema]]
-value = "chio.cluster.peer-request.v1"
+value = "chio.cluster.peer-signature.v1"
 files = ["crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs"]
-first_seen = "bf5c7cfdc3"
+first_seen = "4d148bde15"
 
 [[schema]]
 value = "chio.commerce.event-log.v1"

@@ -102,7 +102,7 @@ other trust-control nodes and operators. TLS settings apply to both listeners.
 
 Clustered nodes authenticate to each other with Ed25519 signatures. Each request carries a signature by the sender's node key over:
 
-- the scheme `chio.cluster.peer-request.v1`
+- the scheme `chio.cluster.peer-signature.v1`
 - the deployment
 - the recipient node id and the sender node id
 - the HTTP method, path, and query
@@ -111,9 +111,12 @@ Clustered nodes authenticate to each other with Ed25519 signatures. Each request
 - `issued_at`, accepted within 60 seconds
 - the sender's term
 
-The receiver refuses a reused nonce, an altered body, a request addressed to
-another node, a stale `issued_at`, and a key that is not pinned in its
-`[[cluster.peers]]`.
+The receiver checks the deployment and recipient against its own configuration.
+It refuses a reused nonce, an altered body, a request signed for another node
+or another deployment, a stale `issued_at`, and a key that is not pinned in its
+`[[cluster.peers]]`. It remembers each nonce until its `issued_at` leaves the
+window, holds at most 65,536 of them, and refuses every new peer request with
+503 while that store is full.
 
 Followers forward writes to the leader with the caller's own bearer secret, so
 the leader applies the caller's credential, scopes, and tenant authority.
