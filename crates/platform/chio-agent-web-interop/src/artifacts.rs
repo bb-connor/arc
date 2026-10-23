@@ -283,9 +283,14 @@ fn verify_envelope_signature(
     let signature = Signature::from_hex(signature_ref)
         .map_err(|_| signature_invalid("Agent Web envelope signature invalid"))?;
     let payload = envelope_signature_payload(envelope);
-    let canonical = chio_core_types::canonical_json_bytes(&payload)
-        .map_err(|_| signature_invalid("Agent Web envelope signature invalid"))?;
-    if !public_key.verify(&canonical, &signature) {
+    if chio_core_types::crypto::verify_wrapped(
+        &public_key,
+        "chio.agent-web-proof-envelope.v1",
+        &payload,
+        &signature,
+    )
+    .is_err()
+    {
         return Err(signature_invalid("Agent Web envelope signature invalid"));
     }
     Ok(())
