@@ -107,6 +107,13 @@
       "title": "Chio autonomous rollback plan signed body"
     },
     {
+      "schema": "chio.behavioral-feed.v1",
+      "artifactKind": "behavioral_feed",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/behavioral-feed.schema.json",
+      "title": "Chio behavioral feed signed body"
+    },
+    {
       "schema": "chio.budget-snapshot-anchor-commitment.v1",
       "artifactKind": "budget_snapshot_anchor_commitment",
       "introducedBy": "signing-wrapper-v1",
