@@ -366,7 +366,9 @@ mod snapshot_recovery {
     }
 
     impl Fixture {
-        fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        /// A foreign database, plus an abandoned snapshot of the receipt
+        /// database named `receipts` in the same directory.
+        fn new(receipts: &str) -> Result<Self, Box<dyn std::error::Error>> {
             let directory = chio_test_support::private_tempdir()?;
             let database = directory.path().join("foreign.sqlite3");
             let connection = rusqlite::Connection::open(&database)?;
@@ -380,7 +382,12 @@ mod snapshot_recovery {
             // Model the on-disk liveness state after owner death: no handle
             // holds the child lock. Actual SIGKILL behavior is covered by the
             // backing crate's killed-owner controls.
-            let parent = directory.path().join("chio-receipt-snapshots");
+            let digest = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(receipts.as_bytes()));
+            let parent = directory.path().join(format!(
+                "chio-receipt-snapshots-{}-{}",
+                rustix::process::geteuid().as_raw(),
+                &digest[..16]
+            ));
             fs::DirBuilder::new().mode(0o700).create(&parent)?;
             let cursor = parent.join("reclaim-cursor");
             fs::OpenOptions::new()
@@ -418,7 +425,7 @@ mod snapshot_recovery {
 
     #[test]
     fn final12_plain_startup_reclaims_before_receipt_store_open_can_refuse() -> TestResult {
-        let fixture = Fixture::new()?;
+        let fixture = Fixture::new("foreign.sqlite3")?;
         let error = match open_service_receipt_store(Some(&fixture.database)) {
             Ok(_) => return Err("a foreign receipt database was admitted".into()),
             Err(error) => error,
@@ -430,7 +437,7 @@ mod snapshot_recovery {
     async fn assert_plain_serve_reclaims_before_store_refusal(
         configure_store: impl FnOnce(&mut TrustServiceConfig, &Path),
     ) -> TestResult {
-        let fixture = Fixture::new()?;
+        let fixture = Fixture::new("receipts.sqlite3")?;
         let mut config = test_config(fixture.directory.path().join("unused-joint.sqlite3"));
         config.joint_authority_db_path = None;
         config.receipt_db_path = Some(fixture.directory.path().join("receipts.sqlite3"));
@@ -492,7 +499,7 @@ mod snapshot_recovery {
     #[tokio::test]
     async fn final12_anchored_startup_reclaims_before_receipt_store_open_can_refuse() -> TestResult
     {
-        let fixture = Fixture::new()?;
+        let fixture = Fixture::new("foreign.sqlite3")?;
         let mut config = test_config(fixture.directory.path().join("unused-joint.sqlite3"));
         config.joint_authority_db_path = None;
         config.receipt_db_path = Some(fixture.database.clone());

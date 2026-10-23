@@ -135,7 +135,7 @@ fn an_unusable_cursor_is_refused_and_left_untouched() -> TestResult {
             SnapshotLocationRefusal::UnusableCursor,
         )?;
         require_unusable(
-            reclaim_abandoned(Some(root.path())),
+            reclaim_abandoned(Some(&database(root.path()))),
             SnapshotLocationRefusal::UnusableCursor,
         )?;
 
@@ -185,7 +185,7 @@ fn a_failed_cursor_update_refuses_after_reclaiming_and_publishes_nothing() -> Te
 
     let abandoned = abandoned_directory(&snapshot_parent(root.path()))?;
     fault::fail_next_cursor_write(rustix::io::Errno::NOSPC.raw_os_error());
-    require_no_space(reclaim_abandoned(Some(root.path())))?;
+    require_no_space(reclaim_abandoned(Some(&database(root.path()))))?;
     assert!(!abandoned.exists());
     assert_eq!(fs::read(cursor_path(root.path()))?, before);
 

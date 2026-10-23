@@ -35,8 +35,22 @@ use rustix::io::Errno;
 use super::directory::{directory_flags, DirectoryCustody};
 use super::{SnapshotBackingError, SnapshotLocationRefusal};
 
-/// Versioned name of the private parent of every snapshot directory.
+/// Versioned name prefix of every private snapshot parent.
 pub(super) const PARENT_NAME: &str = "chio-receipt-snapshots";
+/// Hex digits of the database file name digest in a data directory parent.
+const DATABASE_DIGEST_HEX: usize = 16;
+
+/// The parent name, in a data directory, for user `euid` and the database file
+/// named `database`: `PARENT_NAME-<euid>-<first 16 hex digits of
+/// SHA-256(database file name bytes)>`.
+pub(super) fn database_parent_name(euid: u32, database: &std::ffi::OsStr) -> String {
+    use sha2::Digest;
+    use std::os::unix::ffi::OsStrExt;
+    let digest = hex::encode(sha2::Sha256::digest(database.as_bytes()));
+    let prefix = digest.get(..DATABASE_DIGEST_HEX).unwrap_or(&digest);
+    format!("{PARENT_NAME}-{euid}-{prefix}")
+}
+
 const CURSOR_NAME: &str = "reclaim-cursor";
 /// Directory entries one attempt reads.
 const SCAN_ENTRIES: usize = 256;
