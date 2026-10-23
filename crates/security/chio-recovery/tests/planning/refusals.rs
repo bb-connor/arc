@@ -6,7 +6,7 @@ fn refuse(f: &Fixture, graph: &RecoveryPlanningRegistryV1, expected: ContractErr
             &f.snapshot,
             &f.registry,
             graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, 4096)?
+            PlannerLimitsV1::new(16, 8, 16, 8, 4096)?
         ),
         Err(expected)
     );

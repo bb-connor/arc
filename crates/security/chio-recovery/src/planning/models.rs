@@ -1,10 +1,13 @@
 use alloc::vec::Vec;
 use chio_security_types::{recovery::*, InformationLabel};
-use chio_semantic_contracts::DependencyGraphV1;
+use chio_semantic_contracts::{DependencyGraphV1, MAX_DEPENDENCY_GRAPH_NODES};
+
+pub const MAX_PLAN_OFFERS: usize = 16;
+pub const MAX_PLAN_TOP_LEVEL_STEPS: usize = 8;
+pub const MAX_PLAN_NODES: usize = MAX_DEPENDENCY_GRAPH_NODES;
+pub const MAX_PLAN_DEPTH: usize = 8;
 
 /// Caller-selected deployment ceilings may only lower the protocol profile.
-/// Each registered graph is bounded separately at 16 nodes, so node ceilings
-/// from 16 through 32 accept the same representable graphs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PlannerLimitsV1 {
     pub(super) offers: usize,
@@ -21,9 +24,14 @@ impl PlannerLimitsV1 {
         depth: usize,
         work: u32,
     ) -> Result<Self, ContractError> {
-        if [(offers, 16), (steps, 8), (nodes, 32), (depth, 8)]
-            .iter()
-            .any(|(value, ceiling)| *value == 0 || value > ceiling)
+        if [
+            (offers, MAX_PLAN_OFFERS),
+            (steps, MAX_PLAN_TOP_LEVEL_STEPS),
+            (nodes, MAX_PLAN_NODES),
+            (depth, MAX_PLAN_DEPTH),
+        ]
+        .iter()
+        .any(|(value, ceiling)| *value == 0 || value > ceiling)
             || work == 0
             || work > MAX_RECOVERY_VERIFICATION_WORK
         {
@@ -57,13 +65,13 @@ pub struct RecoveryPlanningRegistryV1 {
     pub workflow_id: WorkflowId,
     pub intent_digest: IntentDigest,
     pub classification: InformationLabel,
-    pub plans: BoundedList<RegisteredCandidatePlanV1, 16>,
+    pub plans: BoundedList<RegisteredCandidatePlanV1, MAX_PLAN_OFFERS>,
 }
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct RegisteredCandidatePlanV1 {
     pub plan_id: PlanId,
-    pub top_level_steps: NonEmptyBoundedList<StepId, 8>,
+    pub top_level_steps: NonEmptyBoundedList<StepId, MAX_PLAN_TOP_LEVEL_STEPS>,
     pub graph: DependencyGraphV1,
 }
 

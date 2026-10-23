@@ -8,7 +8,7 @@ fn every_insufficient_work_allowance_returns_only_classified_incompleteness() ->
         &f.snapshot,
         &f.registry,
         &graph,
-        PlannerLimitsV1::new(16, 8, 32, 8, MAX_RECOVERY_VERIFICATION_WORK)?,
+        PlannerLimitsV1::new(16, 8, 16, 8, MAX_RECOVERY_VERIFICATION_WORK)?,
     )?;
     let mut first_complete = None;
     for work in 1..=MAX_RECOVERY_VERIFICATION_WORK {
@@ -16,7 +16,7 @@ fn every_insufficient_work_allowance_returns_only_classified_incompleteness() ->
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, work)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, work)?,
         )?;
         if matches!(&decision, PlanDecision::Candidates { .. }) {
             assert_eq!(decision, expected);
@@ -38,7 +38,7 @@ fn every_insufficient_work_allowance_returns_only_classified_incompleteness() ->
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, first_complete + 1)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, first_complete + 1)?,
         )?,
         expected
     );
@@ -64,7 +64,7 @@ fn prerequisite_nodes_are_assessed_even_when_the_root_is_feasible() -> Result {
         &f.snapshot,
         &f.registry,
         &graph,
-        PlannerLimitsV1::new(16, 8, 32, 8, 4096)?,
+        PlannerLimitsV1::new(16, 8, 16, 8, 4096)?,
     )?
     else {
         return Err("the registered graph must retain its unmet prerequisite".into());
@@ -89,7 +89,7 @@ fn empty_plan_registries_preserve_labels_and_work_exhaustion() -> Result {
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, 4096)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, 4096)?,
         )?,
         PlanDecision::NoRegisteredRemedy {
             classification: InformationLabel::Top,
@@ -100,7 +100,7 @@ fn empty_plan_registries_preserve_labels_and_work_exhaustion() -> Result {
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, 1)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, 1)?,
         )?,
         PlanDecision::SearchBoundReached {
             limit: PlannerSearchLimit::Work,

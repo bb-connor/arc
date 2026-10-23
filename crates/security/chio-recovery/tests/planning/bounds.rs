@@ -1,7 +1,7 @@
 use super::*;
 
 fn limits(work: u32) -> Result<PlannerLimitsV1> {
-    Ok(PlannerLimitsV1::new(16, 8, 32, 8, work)?)
+    Ok(PlannerLimitsV1::new(16, 8, 16, 8, work)?)
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn sixteen_nodes_at_eight_dense_levels_fit_the_protocol_work_budget() -> Result 
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 7, 4096)?
+            PlannerLimitsV1::new(16, 8, 16, 7, 4096)?
         )?,
         PlanDecision::SearchBoundReached {
             limit: PlannerSearchLimit::Depth,
@@ -137,7 +137,7 @@ fn offers_are_canonical_and_share_one_work_budget() -> Result {
     );
     for (limits, bound) in [
         (
-            PlannerLimitsV1::new(15, 8, 32, 8, 4096)?,
+            PlannerLimitsV1::new(15, 8, 16, 8, 4096)?,
             PlannerSearchLimit::Offers,
         ),
         (limits(100)?, PlannerSearchLimit::Work),
@@ -183,11 +183,11 @@ fn a_bound_makes_no_validity_claim_about_unsearched_graphs() -> Result {
     graph.plans = BoundedList::new(vec![cyclic, first])?;
     for (limits, limit) in [
         (
-            PlannerLimitsV1::new(16, 1, 32, 8, 4096)?,
+            PlannerLimitsV1::new(16, 1, 16, 8, 4096)?,
             PlannerSearchLimit::Steps,
         ),
         (
-            PlannerLimitsV1::new(1, 8, 32, 8, 4096)?,
+            PlannerLimitsV1::new(1, 8, 16, 8, 4096)?,
             PlannerSearchLimit::Offers,
         ),
     ] {

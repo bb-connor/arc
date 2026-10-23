@@ -28,11 +28,9 @@ admission and capture path.
 Signed reports and views use their own signature domains and have no conversion
 into `SignedRecoveryGrant` or `SignedDisclosureGrant`.
 
-
 The classified graph planner accepts explicit registered plans, with up to 16
-offers, 8 top-level steps, 32 total nodes and depth 8 under one allowance of at
-most 4,096 work units. The semantic graph representation further limits each
-registered graph to 16 nodes. Deployments can lower these limits.
+offers, 8 top-level steps, 16 nodes per registered graph and depth 8 under one
+allowance of at most 4,096 work units. Deployments can lower these limits.
 
 - `plan` validates scope, intent, graph identities, dependencies and estimated
   costs, then returns plans by identifier with deterministic topological steps.

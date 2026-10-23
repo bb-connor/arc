@@ -54,7 +54,8 @@ pub use decision::PlanDecision;
 pub use evaluation::evaluate_explanation;
 pub use planning::{
     plan, CandidatePlanV1, PlannerLimitsV1, PlannerSearchLimit, RecoveryPlanningRegistryV1,
-    RegisteredCandidatePlanV1,
+    RegisteredCandidatePlanV1, MAX_PLAN_DEPTH, MAX_PLAN_NODES, MAX_PLAN_OFFERS,
+    MAX_PLAN_TOP_LEVEL_STEPS,
 };
 pub use projection::project_explanation;
 pub use report::{

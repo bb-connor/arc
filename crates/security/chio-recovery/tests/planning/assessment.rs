@@ -35,7 +35,7 @@ fn unresolved_original_effects_never_become_feasible_candidates() -> Result {
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, 4096)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, 4096)?,
         )?
         else {
             return Err("unresolved originals must retain unknown-outcome advice".into());
@@ -77,7 +77,7 @@ fn settled_original_effects_do_not_produce_another_remedy() -> Result {
                 &f.snapshot,
                 &f.registry,
                 &graph,
-                PlannerLimitsV1::new(16, 8, 32, 8, 4096)?
+                PlannerLimitsV1::new(16, 8, 16, 8, 4096)?
             )?,
             PlanDecision::NoRegisteredRemedy {
                 classification: f.snapshot.context_label.clone()
@@ -121,7 +121,7 @@ fn every_private_input_label_raises_the_candidate_classification() -> Result {
             &f.snapshot,
             &f.registry,
             &graph,
-            PlannerLimitsV1::new(16, 8, 32, 8, 4096)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, 4096)?,
         )?
         else {
             return Err("classified valid inputs must produce advisory candidates".into());

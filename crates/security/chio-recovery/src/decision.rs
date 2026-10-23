@@ -1,4 +1,4 @@
-use crate::planning::{CandidatePlanV1, PlannerSearchLimit};
+use crate::planning::{CandidatePlanV1, PlannerSearchLimit, MAX_PLAN_OFFERS};
 use chio_security_types::recovery::BoundedList;
 use chio_security_types::InformationLabel;
 
@@ -6,7 +6,7 @@ use chio_security_types::InformationLabel;
 #[derive(Clone, Eq, PartialEq)]
 pub enum PlanDecision {
     Candidates {
-        plans: BoundedList<CandidatePlanV1, 16>,
+        plans: BoundedList<CandidatePlanV1, MAX_PLAN_OFFERS>,
         classification: InformationLabel,
     },
     NoRegisteredRemedy {

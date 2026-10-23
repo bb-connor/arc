@@ -48,7 +48,7 @@ fn registry(f: &Fixture, nodes: usize) -> Result<RecoveryPlanningRegistryV1> {
 fn planning_produces_a_bounded_multistep_candidate_in_canonical_order() -> Result {
     let f = Fixture::new()?;
     let mut graph = registry(&f, 3)?;
-    let limits = PlannerLimitsV1::new(16, 8, 32, 8, 4096)?;
+    let limits = PlannerLimitsV1::new(16, 8, 16, 8, 4096)?;
     let planned = plan(&f.snapshot, &f.registry, &graph, limits)?;
     let PlanDecision::Candidates {
         plans,
@@ -91,11 +91,11 @@ fn planning_names_the_exact_step_node_depth_or_work_bound() -> Result {
             PlannerSearchLimit::Nodes,
         ),
         (
-            PlannerLimitsV1::new(16, 8, 32, 2, 4096)?,
+            PlannerLimitsV1::new(16, 8, 16, 2, 4096)?,
             PlannerSearchLimit::Depth,
         ),
         (
-            PlannerLimitsV1::new(16, 8, 32, 8, 1)?,
+            PlannerLimitsV1::new(16, 8, 16, 8, 1)?,
             PlannerSearchLimit::Work,
         ),
     ] {
@@ -117,7 +117,7 @@ fn planning_names_the_exact_step_node_depth_or_work_bound() -> Result {
             &f.snapshot,
             &f.registry,
             &multiple_roots,
-            PlannerLimitsV1::new(16, 1, 32, 8, 4096)?
+            PlannerLimitsV1::new(16, 1, 16, 8, 4096)?
         )?,
         PlanDecision::SearchBoundReached {
             limit: PlannerSearchLimit::Steps,
@@ -125,16 +125,16 @@ fn planning_names_the_exact_step_node_depth_or_work_bound() -> Result {
         },
     );
     for values in [
-        (0, 8, 32, 8, 4096),
-        (16, 0, 32, 8, 4096),
+        (0, 8, 16, 8, 4096),
+        (16, 0, 16, 8, 4096),
         (16, 8, 0, 8, 4096),
-        (16, 8, 32, 0, 4096),
-        (16, 8, 32, 8, 0),
-        (17, 8, 32, 8, 4096),
-        (16, 9, 32, 8, 4096),
-        (16, 8, 33, 8, 4096),
-        (16, 8, 32, 9, 4096),
-        (16, 8, 32, 8, 4097),
+        (16, 8, 16, 0, 4096),
+        (16, 8, 16, 8, 0),
+        (17, 8, 16, 8, 4096),
+        (16, 9, 16, 8, 4096),
+        (16, 8, 17, 8, 4096),
+        (16, 8, 16, 9, 4096),
+        (16, 8, 16, 8, 4097),
     ] {
         assert_eq!(
             PlannerLimitsV1::new(values.0, values.1, values.2, values.3, values.4),
@@ -145,10 +145,21 @@ fn planning_names_the_exact_step_node_depth_or_work_bound() -> Result {
 }
 
 #[test]
+fn the_node_ceiling_is_the_dependency_graph_maximum() -> Result {
+    assert_eq!(MAX_PLAN_NODES, 16);
+    assert!(PlannerLimitsV1::new(16, 8, MAX_PLAN_NODES, 8, 4096).is_ok());
+    assert_eq!(
+        PlannerLimitsV1::new(16, 8, MAX_PLAN_NODES + 1, 8, 4096),
+        Err(ContractError::LimitExceeded)
+    );
+    Ok(())
+}
+
+#[test]
 fn planning_refuses_foreign_intents_cycles_and_missing_templates() -> Result {
     let f = Fixture::new()?;
     let graph = registry(&f, 3)?;
-    let limits = PlannerLimitsV1::new(16, 8, 32, 8, 4096)?;
+    let limits = PlannerLimitsV1::new(16, 8, 16, 8, 4096)?;
     for (mutation, expected) in [
         (0, ContractError::BindingMismatch),
         (1, ContractError::DependencyCycle),
@@ -193,7 +204,7 @@ fn symbolic_steps_never_establish_future_evidence_or_disclose_through_debug() ->
         &f.snapshot,
         &f.registry,
         &graph,
-        PlannerLimitsV1::new(16, 8, 32, 8, 4096)?,
+        PlannerLimitsV1::new(16, 8, 16, 8, 4096)?,
     )?;
     assert_eq!(format!("{decision:?}"), "PlanDecision([redacted])");
     let PlanDecision::Candidates { plans, .. } = decision else {
