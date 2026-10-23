@@ -296,14 +296,6 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
         }
         .into());
     }
-    let bootstrapped: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM authority_state WHERE singleton_id = 1)",
-        [],
-        |row| row.get(0),
-    )?;
-    if !bootstrapped {
-        return Err(AuthorityInspectionError::Uninitialized);
-    }
     SqliteCapabilityAuthority::validate_required_rows(connection)?;
     Ok(())
 }

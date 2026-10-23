@@ -105,19 +105,32 @@ fn inspection_refuses_absent_or_uninitialized_storage_without_creating_it() -> T
     ));
     assert_eq!(std::fs::metadata(&empty)?.len(), 0);
 
-    let (_provisioned, unbootstrapped, owner) = provisioned()?;
+    Ok(())
+}
+
+#[test]
+fn inspection_preserves_missing_identity_without_recreating_state() -> TestResult {
+    let (_directory, path, owner) = provisioned()?;
     drop(owner);
-    Connection::open(&unbootstrapped)?.execute("DELETE FROM authority_state", [])?;
+    Connection::open(&path)?.execute("DELETE FROM authority_state", [])?;
+    let witness = Witness::open(&path)?;
+    let version = witness.data_version()?;
     assert!(matches!(
-        SqliteAuthorityInspection::open_existing_with_clock(&unbootstrapped, clock),
-        Err(AuthorityInspectionError::Uninitialized)
+        SqliteAuthorityInspection::open_existing_with_clock(&path, fixed(PROVISIONED_AT_MS)),
+        Err(AuthorityInspectionError::Store(
+            AuthorityStoreError::MissingIdentity
+        ))
     ));
-    let rows: i64 = Witness::open(&unbootstrapped)?.0.query_row(
-        "SELECT COUNT(*) FROM authority_state",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(rows, 0, "inspection must never bootstrap signing material");
+    assert_eq!(witness.data_version()?, version);
+    assert!(matches!(
+        SqliteCapabilityAuthority::open_with_clock(&path, fixed(PROVISIONED_AT_MS)),
+        Err(AuthorityStoreError::MissingIdentity)
+    ));
+    assert_eq!(witness.data_version()?, version);
+    let rows: i64 = witness
+        .0
+        .query_row("SELECT COUNT(*) FROM authority_state", [], |row| row.get(0))?;
+    assert_eq!(rows, 0);
     Ok(())
 }
 
