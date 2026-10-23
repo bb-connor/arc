@@ -87,7 +87,7 @@ impl SqliteCapabilityAuthority {
             &mut connection,
             &[AUTHORITY_STORE_SCHEMA_KEY],
         )
-        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        .map_err(AuthorityStoreError::from)?;
         if schema.is_fresh() {
             schema.connection().execute_batch(AUTHORITY_SCHEMA)?;
             schema.connection().execute(
@@ -100,7 +100,7 @@ impl SqliteCapabilityAuthority {
         }
         schema
             .validate_catalog(AUTHORITY_SCHEMA)
-            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+            .map_err(AuthorityStoreError::from)?;
         Self::validate_required_rows(schema.connection())?;
         let transaction = schema.connection();
         let current_public_key = transaction
@@ -128,9 +128,7 @@ impl SqliteCapabilityAuthority {
         // A head without persisted issuer history is not evidence of issuer
         // trust. Never repair it by inserting a follower's local key.
         if !status.trusted_public_keys.contains(&status.public_key) {
-            return Err(AuthorityStoreError::Schema(
-                "authority head is absent from persisted issuer history; restore an authenticated backup before reopening".into(),
-            ));
+            return Err(AuthorityStoreError::MissingIssuerHistory);
         }
         replication::observe_replication_time(
             transaction,
@@ -141,11 +139,9 @@ impl SqliteCapabilityAuthority {
         if schema.is_fresh() {
             schema
                 .stamp(AUTHORITY_STORE_SCHEMA_KEY)
-                .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+                .map_err(AuthorityStoreError::from)?;
         }
-        schema
-            .commit()
-            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        schema.commit().map_err(AuthorityStoreError::from)?;
         connection.execute_batch(
             "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
@@ -426,9 +422,7 @@ impl SqliteCapabilityAuthority {
             |row| row.get(0),
         )?;
         if !identity {
-            return Err(AuthorityStoreError::Schema(
-                "authority identity is missing".into(),
-            ));
+            return Err(AuthorityStoreError::MissingIdentity);
         }
         let fence: bool = connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM authority_cluster_fence WHERE singleton_id = 1)",
@@ -436,9 +430,7 @@ impl SqliteCapabilityAuthority {
             |row| row.get(0),
         )?;
         if !fence {
-            return Err(AuthorityStoreError::Schema(
-                "authority cluster fence is missing".into(),
-            ));
+            return Err(AuthorityStoreError::MissingClusterFence);
         }
         Ok(())
     }
@@ -449,12 +441,10 @@ impl SqliteCapabilityAuthority {
         let mut connection = custody.open_connection()?;
         let snapshot = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         if crate::schema_version::inspect_schema(&snapshot, &[AUTHORITY_STORE_SCHEMA_KEY])
-            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
+            .map_err(AuthorityStoreError::from)?
             != crate::SchemaState::Current
         {
-            return Err(AuthorityStoreError::Schema(
-                "authority identity is missing".into(),
-            ));
+            return Err(AuthorityStoreError::MissingIdentity);
         }
         Self::validate_required_rows(&snapshot)?;
         custody.validate(&snapshot)?;

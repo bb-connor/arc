@@ -250,10 +250,7 @@ impl SqliteAuthorityInspection {
         )?;
         let head = SqliteCapabilityAuthority::read_status_from_connection(&transaction)?;
         if !head.trusted_public_keys.contains(&head.public_key) {
-            return Err(AuthorityStoreError::Schema(
-                "authority head is absent from persisted issuer history; restore an authenticated backup before reopening".into(),
-            )
-            .into());
+            return Err(AuthorityStoreError::MissingIssuerHistory.into());
         }
         let value = inspect(&transaction, now)?;
         self.custody.validate(&transaction)?;
@@ -277,32 +274,27 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
         connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
     if application_id == 0 {
         return Err(AuthorityStoreError::Schema(
-            "authority storage carries no Chio schema stamp".into(),
+            chio_security_types::schema::SchemaRefusal::ForeignDatabase {
+                found: application_id,
+                expected: crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
+            },
         )
         .into());
     }
     if crate::schema_version::inspect_schema(connection, &[AUTHORITY_STORE_SCHEMA_KEY])
-        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
+        .map_err(AuthorityStoreError::from)?
         != crate::SchemaState::Current
     {
         return Err(AuthorityInspectionError::Uninitialized);
     }
     crate::schema_version::validate_catalog(connection, AUTHORITY_SCHEMA)
-        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        .map_err(AuthorityStoreError::from)?;
     let journal_mode: String = connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
     if !journal_mode.eq_ignore_ascii_case("wal") {
-        return Err(AuthorityStoreError::Schema(format!(
-            "authority storage uses journal mode `{journal_mode}`; readers require WAL"
-        ))
+        return Err(AuthorityStoreError::UnsupportedJournalMode {
+            found: journal_mode,
+        }
         .into());
-    }
-    let bootstrapped: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM authority_state WHERE singleton_id = 1)",
-        [],
-        |row| row.get(0),
-    )?;
-    if !bootstrapped {
-        return Err(AuthorityInspectionError::Uninitialized);
     }
     SqliteCapabilityAuthority::validate_required_rows(connection)?;
     Ok(())

@@ -436,10 +436,10 @@ fn schema_reopen_refuses_deleted_identity_without_repair() -> TestResult {
     let count: i64 =
         connection.query_row("SELECT COUNT(*) FROM authority_state", [], |row| row.get(0))?;
     assert_eq!(count, 0);
-    assert!(
-        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
-        if message == "authority identity is missing")
-    );
+    assert!(matches!(
+        result,
+        Err(chio_kernel::AuthorityStoreError::MissingIdentity)
+    ));
     Ok(())
 }
 
@@ -456,10 +456,10 @@ fn schema_reopen_refuses_deleted_fence_without_repair() -> TestResult {
             row.get(0)
         })?;
     assert_eq!(count, 0);
-    assert!(
-        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
-        if message == "authority cluster fence is missing")
-    );
+    assert!(matches!(
+        result,
+        Err(chio_kernel::AuthorityStoreError::MissingClusterFence)
+    ));
     Ok(())
 }
 
@@ -478,8 +478,8 @@ fn schema_reopen_refuses_deleted_stamp_without_repair() -> TestResult {
     )?;
     assert_eq!(count, 0);
     assert!(
-        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(message))
-        if message == "schema namespace authority is missing")
+        matches!(result, Err(chio_kernel::AuthorityStoreError::Schema(chio_security_types::schema::SchemaRefusal::MissingSchema { store_key }))
+        if store_key == "authority")
     );
     Ok(())
 }

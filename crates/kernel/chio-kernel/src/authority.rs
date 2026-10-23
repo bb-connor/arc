@@ -1296,6 +1296,18 @@ pub enum AuthorityStoreError {
     #[error("authority fence rejected mutation: {0}")]
     Fence(String),
 
-    #[error("{0}")]
-    Schema(String),
+    #[error(transparent)]
+    Schema(#[from] chio_security_types::schema::SchemaRefusal),
+
+    #[error("authority head is absent from persisted issuer history; restore an authenticated backup before reopening")]
+    MissingIssuerHistory,
+
+    #[error("authority identity is missing")]
+    MissingIdentity,
+
+    #[error("authority cluster fence is missing")]
+    MissingClusterFence,
+
+    #[error("authority storage uses journal mode `{found}`; readers require WAL")]
+    UnsupportedJournalMode { found: String },
 }
