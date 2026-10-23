@@ -24,8 +24,14 @@ one exact call in one function that reads an already parsed `Value`, together
 with the duplicate-refusing reader that produced it. The script checks itself
 against fixture trees on every run before it scans the workspace.
 
-The scan is lexical. It does not resolve imports, trait dispatch, or helpers
-in other crates, so a pass is evidence for the listed forms only.
+Every production workspace member is scanned: `crates/` and each other
+top-level member directory except `bench`, `examples` and `tests`. A renamed
+import (`use path::ChioReceipt as Receipt`) is read as an alias.
+
+The scan is lexical. It does not resolve paths, trait dispatch, or helpers in
+other crates, and a short type name defined differently in two crates is only
+strict when every definition is, so a pass is evidence for the listed forms
+only.
 """
 
 from __future__ import annotations
@@ -36,6 +42,7 @@ import importlib.util
 import re
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,14 +70,18 @@ STRICT_TYPES = frozenset({
     "ChioReceiptSigningBody",
     "ChildRequestReceipt",
     "ChildRequestReceiptBody",
+    "FinancialReceiptMetadata",
     "ToolCallAction",
 })
 
 # Each entry names one call (whitespace-normalized) in one function that reads
 # an already parsed Value, and the custody chain that produced that Value. Each
-# custody link (path, function, call) requires that function to make that call;
-# the last link must call decode_signed and hold no raw text decode, so a
-# producer that regresses to a raw serde_json read fails the gate.
+# custody link (path, function, call) requires that function to make that call.
+# By default the last link must call decode_signed and hold no raw text decode,
+# so a producer that regresses to a raw serde_json read fails the gate. An
+# "origin" of "receipt member" reads a member of a typed strict receipt, whose
+# own decode this gate covers; "kernel built" reads metadata the listed kernel
+# callers assemble in process.
 ALLOWED = (
     {
         "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
@@ -283,6 +294,59 @@ ALLOWED = (
             ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
         ),
     },
+    {
+        "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs",
+        "owner": "validate_retained_financial_receipt",
+        "call": "serde_json::from_value::<FinancialReceiptMetadata>).transpose()",
+        "origin": "receipt member",
+        "custody": (
+            ("crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs", "validate_retained_financial_receipt", "ChioReceipt"),
+            ("crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs", "validate_retained_financial_receipt", ".metadata"),
+        ),
+    },
+    {
+        "path": "crates/observability/chio-siem/src/event.rs",
+        "owner": "from_receipt_with_trusted_kernel_keys",
+        "call": "serde_json::from_value::<FinancialReceiptMetadata>(val.clone())",
+        "origin": "receipt member",
+        "custody": (
+            ("crates/observability/chio-siem/src/event.rs", "from_receipt_with_trusted_kernel_keys", "ChioReceipt"),
+            ("crates/observability/chio-siem/src/event.rs", "from_receipt_with_trusted_kernel_keys", ".metadata"),
+        ),
+    },
+    {
+        "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/metadata.rs",
+        "owner": "extract_financial_metadata",
+        "call": "serde_json::from_value::<FinancialReceiptMetadata>(value)",
+        "origin": "receipt member",
+        "custody": (
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/metadata.rs", "extract_financial_metadata", "ChioReceipt"),
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/metadata.rs", "extract_financial_metadata", ".metadata"),
+        ),
+    },
+    {
+        "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs",
+        "owner": "receipt_cost_projection",
+        "call": "serde_json::from_value::<FinancialReceiptMetadata>(financial.clone())",
+        "origin": "receipt member",
+        "custody": (
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs", "receipt_cost_projection", "ChioReceipt"),
+            ("crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/schema.rs", "receipt_cost_projection", ".metadata"),
+        ),
+    },
+    {
+        "path": "crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs",
+        "owner": "request_receipt_metadata_with_payee_binding",
+        "call": "serde_json::from_value::<FinancialReceiptMetadata>(financial)",
+        "origin": "kernel built",
+        "custody": (
+            ("crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs", "request_receipt_metadata", "request_receipt_metadata_with_payee_binding("),
+            ("crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs", "prepare_post_effect", "request_receipt_metadata_with_payee_binding("),
+            ("crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs", "record_pre_dispatch_cleanup_fault_receipt", "request_receipt_metadata_with_payee_binding("),
+            ("crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs", "build_pre_execution_monetary_deny_response_with_recording", "request_receipt_metadata_with_payee_binding("),
+            ("crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs", "prepare_deny_response_with_recording", "request_receipt_metadata_with_payee_binding("),
+        ),
+    },
 )
 
 RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
@@ -305,6 +369,8 @@ FROM_REQUEST = re.compile(r"\bfrom_request(?:_parts)?\s*\(")
 BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*(?:::\s*)?<")
 IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
 BLOCK_HEADER = re.compile(r"\b(?:impl|trait)\b[^{};]*\{")
+USE_STATEMENT = re.compile(r"\buse\s[^;]*;")
+USE_RENAME = re.compile(r"\b(\w+)\s+as\s+(\w+)\b")
 VARIANT_NAME = re.compile(r"([{,]\s*(?:#\[[^\]]*\]\s*)*)[A-Z]\w*(?=\s*(?:[,{(}]|=))")
 DOCUMENT_CALL = re.compile(r"\.\s*decode_document\s*(?=::|\()")
 STATIC_ITEM = re.compile(r"\b(?:static|const)\s+(?:mut\s+)?(\w+)\s*:\s*([^=;]+?)\s*=(?![=>])")
@@ -325,9 +391,23 @@ def without_test_items(code: str) -> str:
     return "".join(output)
 
 
+NONPRODUCTION_ROOTS = frozenset({"bench", "examples", "tests"})
+
+
+def production_roots(root: Path) -> list[str]:
+    """Top-level directories that hold production workspace members."""
+    roots = {"crates"}
+    manifest = root / "Cargo.toml"
+    if manifest.is_file():
+        members = tomllib.loads(manifest.read_text(encoding="utf-8")).get("workspace", {}).get("members", [])
+        roots |= {member.split("/")[0] for member in members} - NONPRODUCTION_ROOTS
+    return sorted(roots)
+
+
 def production_files(root: Path) -> list[tuple[str, str]]:
     files = []
-    for path in sorted((root / "crates").rglob("*")):
+    paths = sorted(path for top in production_roots(root) for path in (root / top).rglob("*"))
+    for path in paths:
         rel = path.relative_to(root).as_posix()
         if path.suffix not in {".rs", ".inc"} or not _gate.production(path) or "examples" in rel.split("/") or path.name == "fuzz.rs":
             continue
@@ -388,6 +468,10 @@ def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
                 body = VARIANT_NAME.sub(r"\1", body)
             if not match.group(1).endswith("Error"):
                 definitions.setdefault(match.group(1), []).append(body)
+        for statement in USE_STATEMENT.finditer(code):
+            for original, alias in USE_RENAME.findall(statement.group(0)):
+                if original != alias:
+                    definitions.setdefault(alias, []).append(original)
         for match in TYPE_ALIAS.finditer(code):
             if not any(start < match.start() < end for start, end, _ in block_spans(code)):
                 definitions.setdefault(match.group(1), []).append(match.group(2))
@@ -665,9 +749,12 @@ def generic_raw_helpers(files: list[tuple[str, str]]) -> dict[str, dict[str, str
     return helpers
 
 
-def custody_breaks(by_path: dict[str, str], custody) -> str:
+def custody_breaks(by_path: dict[str, str], custody, origin: str = "decode_signed") -> str:
     """The first custody link its source does not satisfy, or an empty string."""
-    if not custody or "decode_signed" not in custody[-1][2]:
+    if origin not in {"decode_signed", "receipt member", "kernel built"}:
+        return f"an unknown origin {origin}"
+    signed = origin == "decode_signed"
+    if not custody or signed and "decode_signed" not in custody[-1][2]:
         return "a chain that does not end in decode_signed"
     for index, (path, function, call) in enumerate(custody):
         code = by_path.get(path, "")
@@ -678,7 +765,7 @@ def custody_breaks(by_path: dict[str, str], custody) -> str:
         ]
         token = re.sub(r"\s+", "", call)
         holders = [body for body in bodies if token in re.sub(r"\s+", "", body)]
-        if index == len(custody) - 1:
+        if signed and index == len(custody) - 1:
             holders = [
                 body for body in holders
                 if all(kind == "value" for _, _, kind in decode_sites(body, body.find("{"), {}))
@@ -754,7 +841,7 @@ def scan(root: Path) -> list[str]:
         key = (entry["path"], entry["owner"], normalized(entry["call"]), "decode", "value")
         count = entry.get("count", 1)
         matched = [finding for finding in remaining if finding == key]
-        broken = custody_breaks(by_path, entry["custody"])
+        broken = custody_breaks(by_path, entry["custody"], entry.get("origin", "decode_signed"))
         if len(matched) != count:
             errors.append(f"{entry['path']}::{entry['owner']}: approved call {entry['call']} expects {count}, found {len(matched)}")
         elif broken:
@@ -828,6 +915,10 @@ FIXTURES = {
     "decode_document of another type": ("fn f(raw: &str) -> Result<Other, E> { UntrustedJsonText::new(raw).decode_document() }", 0),
     "enum variant named like a strict type": ("struct Published { r: ChioReceipt }\nenum State {\n    Intent,\n    Published,\n    Conflict { actual: String },\n}\nfn f(t: &str) { serde_json::from_str::<State>(t); }", 0),
     "enum variant holding a strict type": ("enum State {\n    Intent,\n    Sealed(ChioReceipt),\n}\nfn f(t: &str) { serde_json::from_str::<State>(t); }", 1),
+    "renamed import": ("use chio_core::receipt::body::ChioReceipt as Receipt;\nfn f(raw: &str) { serde_json::from_str::<Receipt>(raw); }", 1),
+    "grouped renamed import": ("use chio_core::receipt::{body::ChioReceipt as Signed, lineage::ChildRequestReceipt};\nfn f(raw: &str) -> Result<Signed, E> { serde_json::from_str(raw) }", 1),
+    "renamed import of another type": ("use other::Thing as Receipt;\nfn f(raw: &str) { serde_json::from_str::<Receipt>(raw); }", 0),
+    "financial receipt metadata": ("fn f(raw: &str) { serde_json::from_str::<FinancialReceiptMetadata>(raw); }", 1),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
@@ -850,6 +941,17 @@ def self_test() -> None:
             fragment.unlink()
             if found != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
+        manifest = root / "Cargo.toml"
+        manifest.write_text('[workspace]\nmembers = ["crates/demo", "integrations/demo", "examples/demo"]\n', encoding="utf-8")
+        for label, top, expected in (("workspace member outside crates", "integrations", 1), ("example member", "examples", 0)):
+            member_source = root / top / "demo/src/lib.rs"
+            member_source.parent.mkdir(parents=True, exist_ok=True)
+            member_source.write_text("fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
+            found = len(scan(root)) - len(ALLOWED)
+            member_source.write_text("\n", encoding="utf-8")
+            if found != expected:
+                raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
+        manifest.unlink()
         allowed = ALLOWED[0]
         target = root / allowed["path"]
         target.parent.mkdir(parents=True)
@@ -884,6 +986,22 @@ def self_test() -> None:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
         other.write_text("\n", encoding="utf-8")
         source.write_text("\n", encoding="utf-8")
+        member = next(entry for entry in ALLOWED if entry["owner"] == "extract_financial_metadata")
+        target = root / member["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        for label, read, expected in (
+            ("receipt member", "receipt.metadata.as_ref()", 0),
+            ("receipt member read from elsewhere", "other.as_ref()", 1),
+        ):
+            target.write_text(
+                f"fn {member['owner']}(receipt: &ChioReceipt, other: Option<Value>) {{ let value = {read}; "
+                f"let projection = {member['call']}; }}\n",
+                encoding="utf-8",
+            )
+            matched = [error for error in scan(root) if member["owner"] in error]
+            if len(matched) != expected:
+                raise SystemExit(f"self-test {label}: expected {expected} findings, got {matched}")
+        target.write_text("\n", encoding="utf-8")
         helper_entry = next(entry for entry in ALLOWED if entry["owner"] == "verify_backfill_receipts")
         target = root / helper_entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
