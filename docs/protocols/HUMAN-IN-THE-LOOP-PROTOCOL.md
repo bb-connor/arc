@@ -453,7 +453,9 @@ impl ApprovalChannel for WebhookChannel {
         };
 
         // Sign the payload so the receiver can verify it came from Chio.
-        let signature = self.signing_key.sign_canonical(&payload)?;
+        let signature = self
+            .signing_key
+            .sign_wrapped(APPROVAL_WEBHOOK_SCHEMA, &CanonicalBytes::from_serializable(&payload)?)?;
 
         let response = self.http_client
             .post(self.endpoint.clone())

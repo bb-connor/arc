@@ -188,7 +188,10 @@ let execution_nonce = if self.execution_nonce_config.is_some() {
         argument_hash: action.parameter_hash.clone(),
         expires_at: now + config.nonce_ttl_secs,
     };
-    let (signature, _) = self.config.keypair.sign_canonical(&body)?;
+    let signature = self
+        .config
+        .keypair
+        .sign_wrapped(EXECUTION_NONCE_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
     Some(ExecutionNonce {
         schema: body.schema,
         nonce_id: body.nonce_id,
@@ -269,7 +272,7 @@ fn verify_execution_nonce(
     }
     // 4. Signature verification
     let body = ExecutionNonceBody { /* reconstruct from nonce fields */ };
-    if !kernel_pubkey.verify_canonical(&body, &nonce.signature)? {
+    if verify_wrapped(kernel_pubkey, EXECUTION_NONCE_SCHEMA, &body, &nonce.signature).is_err() {
         return Err(VerifyError::InvalidSignature);
     }
     // 5. Replay check (single-use)
@@ -886,7 +889,9 @@ fn load_module(
                 version: manifest.version.clone(),
                 signer: manifest.signer.clone(),
             };
-            if !manifest.signer.verify_canonical(&body, &manifest.signature)? {
+            if verify_wrapped(&manifest.signer, WASM_MODULE_SCHEMA, &body, &manifest.signature)
+                .is_err()
+            {
                 return Err(WasmGuardError::InvalidModuleSignature);
             }
         }

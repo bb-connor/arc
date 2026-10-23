@@ -248,7 +248,8 @@ generate_compliance_certificate(session_id) -> Result<SessionComplianceCertifica
 
 4.  Build MerkleTree::from_leaves(&receipt_hashes). Record merkle_root.
 5.  Assemble SessionComplianceCertificateBody with all accumulated data.
-6.  Sign: keypair.sign_canonical(&body) -> (signature, _bytes).
+6.  Sign the signing wrapper under chio.session-compliance-certificate.v1 over
+    the canonical body: sign_wrapped(backend, SCHEMA, &body) -> signature.
 7.  Return SessionComplianceCertificate { body, signature }.
 ```
 

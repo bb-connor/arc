@@ -312,7 +312,8 @@ Behavior:
      `BudgetExceeded`.
    - Otherwise the outcome is `Completed`.
 3. Construct `WorkflowReceiptBody` with all execution data.
-4. Sign the body: `keypair.sign_canonical(body)`.
+4. Sign the signing wrapper over the canonical body under
+   `chio.workflow-receipt.v1`: `keypair.sign_wrapped(WORKFLOW_RECEIPT_SCHEMA, &canonical_body)`.
 5. Increment the authority's `execution_count`.
 6. Return the signed `WorkflowReceipt`.
 

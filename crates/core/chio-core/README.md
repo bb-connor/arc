@@ -7,17 +7,18 @@ and portable identity binding descriptions locally.
 
 ## Usage
 
-Sign an already typed JSON value and retain the exact canonical bytes:
+Sign the signing wrapper over a canonical body under a registered schema id:
 
 ```rust
-use chio_core::Keypair;
+use chio_core::{verify_wrapped_bytes, CanonicalBytes, Keypair};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key = Keypair::from_seed(&[7; 32]);
-    let (signature, bytes) = key.sign_canonical(&json!({"b": 2, "a": 1}))?;
-    assert_eq!(bytes, br#"{"a":1,"b":2}"#);
-    assert!(key.public_key().verify_strict(&bytes, &signature));
+    let body = CanonicalBytes::from_serializable(&json!({"b": 2, "a": 1}))?;
+    assert_eq!(body.as_bytes(), br#"{"a":1,"b":2}"#);
+    let signature = key.sign_wrapped("chio.receipt.v1", &body)?;
+    verify_wrapped_bytes(&key.public_key(), "chio.receipt.v1", &body, &signature)?;
     Ok(())
 }
 ```
@@ -34,7 +35,8 @@ own signing keys and trusted issuer selection.
 
 ## Guarantees
 
-- `Keypair::sign_canonical` serializes once and returns the bytes it signs.
+- `Keypair::sign_wrapped` signs only the signing wrapper under a registered
+  schema id.
 - `validate_extension_inventory` rejects writable canonical truth surfaces
   and inconsistent evidence-mode policy activation requirements.
 - `negotiate_extension` reports malformed inventories, packages, and manifests
