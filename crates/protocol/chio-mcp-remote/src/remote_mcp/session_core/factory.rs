@@ -1,6 +1,11 @@
 use super::*;
 
 impl RemoteSessionFactory {
+    /// The auth contract as it reads now, including the provider registry digest.
+    pub(super) fn auth_contract_fingerprint(&self) -> Result<String, CliError> {
+        fingerprint_remote_auth_contract(&self.config, self.enterprise_provider_registry.as_ref())
+    }
+
     pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
         session_core_authority_mode::validate_remote_authority_config(&config)?;
         if let Some(proxy) = &config.trusted_proxy {
@@ -115,6 +120,10 @@ impl RemoteSessionFactory {
             chio_kernel::stop::StopControl::process_local,
             DurableAdmissionRuntime::stop_control,
         );
+        let enterprise_provider_registry = config
+            .enterprise_providers_file
+            .as_deref()
+            .map(EnterpriseProviderRegistryFile::new);
         let factory = Self {
             config,
             manifest_registry,
@@ -122,6 +131,7 @@ impl RemoteSessionFactory {
             durable_admission,
             session_store_lease,
             resume_hmac_keyring,
+            enterprise_provider_registry,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy,
             stop,
@@ -372,7 +382,7 @@ impl RemoteSessionFactory {
         let session_id = Keypair::generate().public_key().to_hex();
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let dpop_authority = self.config.dpop_replay_authority.clone();
-        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let auth_mode_fingerprint = self.auth_contract_fingerprint()?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         let hosted_isolation = self.configured_hosted_isolation();
@@ -576,7 +586,7 @@ impl RemoteSessionFactory {
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let dpop_authority = self.config.dpop_replay_authority.clone();
-        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let auth_mode_fingerprint = self.auth_contract_fingerprint()?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         if default_capabilities.iter().any(|cap| {

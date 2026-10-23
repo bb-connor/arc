@@ -6,7 +6,7 @@ use super::*;
 
 const ISSUER: &str = "https://issuer.enterprise.example";
 const PING: &[u8] = br#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#;
-const CREDENTIAL_REFUSAL: &str = "invalid, expired, or revoked session credential";
+const CREDENTIAL_REFUSAL: &[u8] = b"invalid, expired, or revoked session credential";
 
 fn provider_record(enabled: bool, issuer: &str, jwks_url: &str) -> Value {
     json!({
@@ -109,16 +109,25 @@ impl RegistryFixture {
         Ok(())
     }
 
-    async fn assert_refused(&self, status: StatusCode, body: &str) -> TestResult {
+    /// The body is exactly `body`: no registry path, provider record or
+    /// parse error reaches the peer.
+    async fn assert_refused(&self, status: StatusCode, body: &[u8]) -> TestResult {
         let response = self.ping().await?;
         assert_eq!(response.status(), status);
         let bytes = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
-        let text = std::str::from_utf8(&bytes)?;
-        assert_eq!(text, body);
-        assert!(
-            !text.contains(&*self.http.directory.path().to_string_lossy()),
-            "refusal body disclosed the registry path"
-        );
+        assert_eq!(&bytes[..], body);
+        let text = String::from_utf8_lossy(&bytes);
+        for detail in [
+            &*self.http.directory.path().to_string_lossy(),
+            "enterprise-providers.json",
+            "enterprise-login",
+            ISSUER,
+            "EOF",
+            "line",
+            "column",
+        ] {
+            assert!(!text.contains(detail), "refusal body disclosed {detail:?}");
+        }
         assert_eq!(self.http.calls.load(Ordering::SeqCst), 0);
         Ok(())
     }
@@ -150,7 +159,7 @@ async fn session_credential_is_refused_after_the_registry_becomes_invalid() -> T
     fixture
         .assert_refused(
             StatusCode::SERVICE_UNAVAILABLE,
-            "enterprise provider registry is invalid",
+            b"urn:chio:error:transport:provider-registry-invalid",
         )
         .await?;
     fixture.shutdown().await
@@ -163,7 +172,7 @@ async fn session_credential_is_refused_after_the_registry_becomes_unreadable() -
     fixture
         .assert_refused(
             StatusCode::SERVICE_UNAVAILABLE,
-            "enterprise provider registry is unreadable",
+            b"urn:chio:error:transport:provider-registry-unreadable",
         )
         .await?;
     fixture.shutdown().await

@@ -9,16 +9,79 @@ use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
 use chio_control_plane::CliError;
 use chio_core::canonical::{canonical_json_bytes, UntrustedJsonError};
 use chio_core::crypto::sha256_hex;
-use chio_errors::_generated::error_codes::{CLI_IO, CLI_JSON};
+use chio_errors::_generated::error_codes::{
+    CLI_IO, CLI_JSON, TRANSPORT_PROVIDER_REGISTRY_INVALID, TRANSPORT_PROVIDER_REGISTRY_OVERSIZED,
+    TRANSPORT_PROVIDER_REGISTRY_UNREADABLE,
+};
 use tracing::{info, warn};
 
+use crate::RemoteClock;
+
+/// A change to the file's last status change time later than this many
+/// milliseconds lands on a later timestamp tick on every supported filesystem.
+const SETTLE_MILLIS: u64 = 2_000;
+
 /// The only source of provider identity: bearer admission and the resume
-/// binding each read the file, and no parsed copy outlives one read.
+/// binding each read the file, and no parsed copy outlives one read. Only the
+/// digest is kept, and only for the file identity it was read under.
 #[derive(Clone, Debug)]
 pub(crate) struct EnterpriseProviderRegistryFile {
     path: Arc<PathBuf>,
     /// The health last reported by `load_for_health`, shared by every clone.
     health: Arc<Mutex<RegistryHealth>>,
+    /// The last settled digest, shared by every clone.
+    digest_cache: Arc<Mutex<Option<CachedDigest>>>,
+}
+
+#[derive(Clone, Debug)]
+struct CachedDigest {
+    identity: FileIdentity,
+    digest: String,
+}
+
+/// What one stat of the file observed. Every write, in place or by rename,
+/// changes the inode or the status change time, which no writer can set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FileIdentity {
+    dev: u64,
+    ino: u64,
+    len: u64,
+    mtime: (i64, i64),
+    ctime: (i64, i64),
+}
+
+impl FileIdentity {
+    #[cfg(unix)]
+    fn of(path: &Path) -> Option<Self> {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = std::fs::metadata(path).ok()?;
+        Some(Self {
+            dev: metadata.dev(),
+            ino: metadata.ino(),
+            len: metadata.len(),
+            mtime: (metadata.mtime(), metadata.mtime_nsec()),
+            ctime: (metadata.ctime(), metadata.ctime_nsec()),
+        })
+    }
+
+    #[cfg(not(unix))]
+    fn of(_path: &Path) -> Option<Self> {
+        None
+    }
+
+    /// True when the last status change is at least `SETTLE_MILLIS` before
+    /// `now_millis`, so any later write yields a different identity.
+    fn settled_at(&self, now_millis: u64) -> bool {
+        let (seconds, nanos) = self.ctime;
+        let (Ok(seconds), Ok(nanos)) = (u64::try_from(seconds), u64::try_from(nanos)) else {
+            return false;
+        };
+        seconds
+            .checked_mul(1_000)
+            .and_then(|millis| millis.checked_add(nanos / 1_000_000))
+            .and_then(|millis| millis.checked_add(SETTLE_MILLIS))
+            .is_some_and(|settled| settled <= now_millis)
+    }
 }
 
 /// What one registry read observed; health polling logs only its changes.
@@ -36,6 +99,7 @@ impl EnterpriseProviderRegistryFile {
         Self {
             path: Arc::new(path.to_path_buf()),
             health: Arc::new(Mutex::new(RegistryHealth::Readable)),
+            digest_cache: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -54,8 +118,44 @@ impl EnterpriseProviderRegistryFile {
     }
 
     /// Digest of the registry as it reads now, over its canonical validated
-    /// form, so any provider change yields a different digest.
-    pub(crate) fn digest(&self) -> Result<String, EnterpriseProviderRegistryRefusal> {
+    /// form, so any provider change yields a different digest. A digest is
+    /// reused only while a stat shows the settled identity it was read under;
+    /// a failed stat reads the file, so an unusable registry always refuses.
+    pub(crate) fn digest(
+        &self,
+        clock: &RemoteClock,
+    ) -> Result<String, EnterpriseProviderRegistryRefusal> {
+        let before = FileIdentity::of(&self.path);
+        if let Some(digest) = before.and_then(|identity| self.cached_digest(identity)) {
+            return Ok(digest);
+        }
+        let digest = self.read_digest()?;
+        if let (Some(identity), Ok(now)) = (before, clock.millis()) {
+            if identity.settled_at(now) && FileIdentity::of(&self.path) == Some(identity) {
+                self.store_digest(identity, &digest);
+            }
+        }
+        Ok(digest)
+    }
+
+    fn cached_digest(&self, identity: FileIdentity) -> Option<String> {
+        let cache = self.digest_cache.lock().ok()?;
+        cache
+            .as_ref()
+            .filter(|cached| cached.identity == identity)
+            .map(|cached| cached.digest.clone())
+    }
+
+    fn store_digest(&self, identity: FileIdentity, digest: &str) {
+        if let Ok(mut cache) = self.digest_cache.lock() {
+            *cache = Some(CachedDigest {
+                identity,
+                digest: digest.to_owned(),
+            });
+        }
+    }
+
+    fn read_digest(&self) -> Result<String, EnterpriseProviderRegistryRefusal> {
         self.read()
             .and_then(|registry| {
                 canonical_json_bytes(&registry)
@@ -93,14 +193,15 @@ impl EnterpriseProviderRegistryFile {
 }
 
 /// Why a read of the enterprise provider registry admitted nothing. The
-/// message is the whole peer-visible text; the cause stays local.
+/// message is the whole peer-visible text, a registered URN; the cause stays
+/// local.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum EnterpriseProviderRegistryRefusal {
-    #[error("enterprise provider registry is unreadable")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_UNREADABLE.urn)]
     Unreadable(#[source] CliError),
-    #[error("enterprise provider registry exceeds the bounded read limit")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_OVERSIZED.urn)]
     Oversized(#[source] CliError),
-    #[error("enterprise provider registry is invalid")]
+    #[error("{}", TRANSPORT_PROVIDER_REGISTRY_INVALID.urn)]
     Invalid(#[source] CliError),
 }
 
@@ -172,8 +273,270 @@ impl From<EnterpriseProviderRegistryRefusal> for CliError {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use chio_security_types::clock::{
+        Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
+    };
+    use std::io::Write as _;
+
+    struct FixedClock(u64);
+
+    impl Clock for FixedClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            Ok(ClockReading::new(
+                UnixMillis::new(self.0),
+                MonotonicInstant::from_nanos(1),
+            ))
+        }
+    }
+
+    /// A clock reading `offset` milliseconds after the file's status change.
+    fn clock_after_change(path: &Path, offset: u64) -> RemoteClock {
+        let identity = FileIdentity::of(path).unwrap();
+        let change = u64::try_from(identity.ctime.0).unwrap() * 1_000
+            + u64::try_from(identity.ctime.1).unwrap() / 1_000_000;
+        RemoteClock::new(Arc::new(FixedClock(change + offset)))
+    }
+
+    /// A one-provider registry; issuers of equal length give equal file lengths.
+    fn registry_bytes(issuer: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "version": "chio.enterprise-providers.v1",
+            "providers": {
+                "enterprise-login": {
+                    "provider_id": "enterprise-login",
+                    "kind": "oidc_jwks",
+                    "enabled": true,
+                    "provenance": {
+                        "configured_from": "manual",
+                        "source_ref": "operator",
+                        "trust_material_ref": "jwks:enterprise-login",
+                        "subject_mapping_source": "manual"
+                    },
+                    "trust_boundary": {
+                        "allowed_issuers": [issuer],
+                        "allowed_tenants": ["tenant-123"],
+                        "allowed_organizations": ["org-789"]
+                    },
+                    "issuer": issuer,
+                    "jwks_url": "https://issuer.enterprise.example/jwks",
+                    "tenant_id": "tenant-123",
+                    "organization_id": "org-789",
+                    "subject_mapping": {
+                        "principal_source": "sub",
+                        "tenant_id_field": "tid",
+                        "organization_id_field": "org_id",
+                        "groups_field": "groups",
+                        "roles_field": "roles"
+                    }
+                }
+            }
+        }))
+        .unwrap()
+    }
+
+    fn cached(file: &EnterpriseProviderRegistryFile) -> Option<String> {
+        file.digest_cache
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|cached| cached.digest.clone())
+    }
+
+    #[test]
+    fn each_refusal_answers_its_registered_urn() {
+        let cause = || CliError::cli_io_error("/srv/chio/enterprise-providers.json");
+        for (refusal, urn, string_code) in [
+            (
+                EnterpriseProviderRegistryRefusal::Unreadable(cause()),
+                "urn:chio:error:transport:provider-registry-unreadable",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-UNREADABLE",
+            ),
+            (
+                EnterpriseProviderRegistryRefusal::Oversized(cause()),
+                "urn:chio:error:transport:provider-registry-oversized",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-OVERSIZED",
+            ),
+            (
+                EnterpriseProviderRegistryRefusal::Invalid(cause()),
+                "urn:chio:error:transport:provider-registry-invalid",
+                "CHIO-TRANSPORT-PROVIDER-REGISTRY-INVALID",
+            ),
+        ] {
+            assert_eq!(refusal.to_string(), urn);
+            let spec = chio_errors::lookup_error_code(urn).unwrap();
+            assert_eq!(spec.domain, chio_errors::Domain::Transport);
+            assert_eq!(spec.severity, chio_errors::Severity::Error);
+            assert_eq!(spec.string_code, string_code);
+            assert!(spec.consumed_by.contains(&"chio-mcp-remote"));
+        }
+    }
+
+    #[test]
+    fn digest_is_kept_only_for_a_settled_identity() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        std::fs::write(&path, registry_bytes("https://issuer-a.example")).unwrap();
+        let file = EnterpriseProviderRegistryFile::new(&path);
+
+        let fresh = file
+            .digest(&clock_after_change(&path, SETTLE_MILLIS - 1))
+            .unwrap();
+        assert_eq!(cached(&file), None, "an unsettled identity was cached");
+
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        assert_eq!(file.digest(&settled).unwrap(), fresh);
+        assert_eq!(cached(&file), Some(fresh.clone()));
+        assert_eq!(file.clone().digest(&settled).unwrap(), fresh);
+    }
+
+    #[test]
+    fn an_in_place_rewrite_with_the_same_length_and_mtime_is_read_again() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let original = registry_bytes("https://issuer-a.example");
+        let rewritten = registry_bytes("https://issuer-b.example");
+        assert_eq!(original.len(), rewritten.len());
+        std::fs::write(&path, &original).unwrap();
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        let before = file.digest(&settled).unwrap();
+        assert_eq!(cached(&file), Some(before.clone()));
+        let admitted = FileIdentity::of(&path).unwrap();
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+
+        // The settle interval separates the rewrite from the admitted change.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let mut handle = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        handle.write_all(&rewritten).unwrap();
+        handle.set_modified(modified).unwrap();
+        drop(handle);
+        let rewritten_identity = FileIdentity::of(&path).unwrap();
+        assert_eq!(
+            (rewritten_identity.dev, rewritten_identity.ino),
+            (admitted.dev, admitted.ino)
+        );
+        assert_eq!(rewritten_identity.len, admitted.len);
+        assert_eq!(rewritten_identity.mtime, admitted.mtime);
+
+        let after = file.digest(&settled).unwrap();
+        assert_ne!(
+            after, before,
+            "a rewrite under the cached identity was missed"
+        );
+        assert_eq!(
+            after,
+            EnterpriseProviderRegistryFile::new(&path)
+                .digest(&RemoteClock::new(Arc::new(FixedClock(0))))
+                .unwrap()
+        );
+    }
+
+    /// A digest of `path` read by a handle that holds no cached entry.
+    fn fresh_digest(path: &Path) -> String {
+        EnterpriseProviderRegistryFile::new(path)
+            .digest(&RemoteClock::new(Arc::new(FixedClock(0))))
+            .unwrap()
+    }
+
+    #[test]
+    fn a_rename_replace_with_the_same_length_and_mtime_is_read_again() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let staged = directory.path().join("enterprise-providers.json.next");
+        let original = registry_bytes("https://issuer-a.example");
+        let replacement = registry_bytes("https://issuer-b.example");
+        assert_eq!(original.len(), replacement.len());
+        std::fs::write(&path, &original).unwrap();
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        let before = file.digest(&settled).unwrap();
+        assert_eq!(cached(&file), Some(before.clone()));
+        let admitted = FileIdentity::of(&path).unwrap();
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+
+        std::fs::write(&staged, &replacement).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&staged)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+        std::fs::rename(&staged, &path).unwrap();
+        let replaced = FileIdentity::of(&path).unwrap();
+        assert_ne!(replaced.ino, admitted.ino);
+        assert_eq!(
+            (replaced.dev, replaced.len, replaced.mtime),
+            (admitted.dev, admitted.len, admitted.mtime)
+        );
+
+        let after = file.digest(&settled).unwrap();
+        assert_ne!(
+            after, before,
+            "a rename-replace under the cached digest was missed"
+        );
+        assert_eq!(after, fresh_digest(&path));
+    }
+
+    #[test]
+    fn a_delete_and_recreate_within_one_second_is_read_again() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let original = registry_bytes("https://issuer-a.example");
+        let recreated = registry_bytes("https://issuer-b.example");
+        assert_eq!(original.len(), recreated.len());
+        std::fs::write(&path, &original).unwrap();
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        // A cached identity is at least the settle interval old, so its
+        // ctime differs from any later write whether or not the inode is reused.
+        std::thread::sleep(std::time::Duration::from_millis(SETTLE_MILLIS + 100));
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let before = file.digest(&settled).unwrap();
+        assert_eq!(cached(&file), Some(before.clone()));
+        let admitted = FileIdentity::of(&path).unwrap();
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::write(&path, &recreated).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+        let recreated_identity = FileIdentity::of(&path).unwrap();
+        assert_eq!(
+            (recreated_identity.len, recreated_identity.mtime),
+            (admitted.len, admitted.mtime)
+        );
+        assert_ne!(recreated_identity.ctime, admitted.ctime);
+
+        let after = file.digest(&settled).unwrap();
+        assert_ne!(
+            after, before,
+            "a recreated registry under the cached digest was missed"
+        );
+        assert_eq!(after, fresh_digest(&path));
+    }
+
+    #[test]
+    fn a_removed_registry_refuses_after_a_cached_digest() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        std::fs::write(&path, registry_bytes("https://issuer-a.example")).unwrap();
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        file.digest(&settled).unwrap();
+        assert!(cached(&file).is_some());
+
+        std::fs::remove_file(&path).unwrap();
+        assert!(matches!(
+            file.digest(&settled),
+            Err(EnterpriseProviderRegistryRefusal::Unreadable(_))
+        ));
+    }
 
     #[test]
     fn health_polling_reports_only_changes() {

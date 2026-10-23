@@ -103,7 +103,10 @@ async fn static_bearer_initialize_refuses_an_unreadable_registry_without_its_pat
     std::fs::remove_file(&fixture.registry_path).unwrap();
     let response = handle_post(State(state.clone()), initialize_request()).await;
     fixture
-        .assert_refusal_body(response, "enterprise provider registry is unreadable")
+        .assert_refusal_body(
+            response,
+            "urn:chio:error:transport:provider-registry-unreadable",
+        )
         .await;
     assert!(state.sessions.active.lock().await.is_empty());
 }
@@ -117,7 +120,7 @@ async fn static_bearer_initialize_refuses_an_oversized_registry_without_its_path
     fixture
         .assert_refusal_body(
             response,
-            "enterprise provider registry exceeds the bounded read limit",
+            "urn:chio:error:transport:provider-registry-oversized",
         )
         .await;
     assert!(state.sessions.active.lock().await.is_empty());
@@ -148,7 +151,7 @@ async fn a_registry_corrupted_between_admission_and_spawn_refuses_the_session() 
     fixture
         .assert_refusal_body(
             spawn_session_error(error),
-            "enterprise provider registry is invalid",
+            "urn:chio:error:transport:provider-registry-invalid",
         )
         .await;
 }
