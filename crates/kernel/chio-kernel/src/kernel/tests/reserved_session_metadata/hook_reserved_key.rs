@@ -1,7 +1,8 @@
 //! A runtime-admission hook writes only `chio_runtime`. A hook whose `Ok`
 //! decision, allow or deny, names any other reserved key is refused on the
-//! runtime-admission denial path: its reservations are released, the tool
-//! never runs, and the forged block is absent from the signed denial.
+//! runtime-admission denial path: its reservations are released with the
+//! metadata it returned, the tool never runs, and the forged block is absent
+//! from the signed denial.
 use super::*;
 use std::sync::{Mutex, PoisonError};
 
@@ -96,7 +97,10 @@ fn assert_hook_forgery_refused(
     let metadata = response.receipt.metadata.as_ref().expect("denial metadata");
     assert!(metadata.get(hook.forged_key).is_none());
     assert_eq!(hook.released().len(), 1);
-    assert!(hook.released()[0].get(hook.forged_key).is_none());
+    assert_eq!(
+        hook.released()[0].get(hook.forged_key),
+        Some(&hook.forged_value)
+    );
 }
 
 #[test]

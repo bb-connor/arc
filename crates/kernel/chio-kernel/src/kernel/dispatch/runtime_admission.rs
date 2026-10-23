@@ -133,6 +133,7 @@ impl ChioKernel {
                 if let Some(key) =
                     crate::kernel::reserved_hook_metadata_key(decision.metadata.as_ref())
                 {
+                    let hook_release_metadata = decision.metadata.clone();
                     if let Some(metadata) = decision
                         .metadata
                         .as_mut()
@@ -141,10 +142,12 @@ impl ChioKernel {
                         metadata
                             .retain(|name, _| !crate::kernel::is_hook_forbidden_metadata_key(name));
                     }
-                    return RuntimeAdmissionDecision::deny(
+                    let mut refusal = RuntimeAdmissionDecision::deny(
                         format!("{key} is reserved for kernel-derived receipts"),
                         decision.metadata,
                     );
+                    refusal.hook_release_metadata = hook_release_metadata;
+                    return refusal;
                 }
                 if decision.allowed {
                     match decision.verified_treaty_material.take() {
