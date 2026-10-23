@@ -36,6 +36,7 @@ use tokio::net::TcpListener;
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::token::CapabilityToken;
 use chio_core_types::crypto::PublicKey;
 use chio_kernel_core::clock::{SystemClock, UnixMillis};
@@ -303,7 +304,7 @@ async fn handle(
         ("POST", "/v1/evaluate") => {
             let (parts, body) = req.into_parts();
             match read_body(body).await {
-                Ok(body) => match serde_json::from_slice::<EvaluateRequest>(&body) {
+                Ok(body) => match decode_evaluate_request(&body) {
                     Ok(mut request) => {
                         if let Err(error) =
                             hydrate_request_from_headers(&parts.headers, &mut request)
@@ -313,11 +314,7 @@ async fn handle(
                             evaluate(request, state).await
                         }
                     }
-                    Err(err) => error_json(
-                        StatusCode::BAD_REQUEST,
-                        "invalid_json",
-                        format!("failed to decode evaluate request: {err}"),
-                    ),
+                    Err(err) => error_json(StatusCode::BAD_REQUEST, "invalid_json", err),
                 },
                 Err(err) => error_json(
                     StatusCode::BAD_REQUEST,
@@ -335,6 +332,14 @@ async fn handle(
     Ok(response)
 }
 
+fn decode_evaluate_request(body: &[u8]) -> Result<EvaluateRequest, String> {
+    let text = std::str::from_utf8(body)
+        .map_err(|error| format!("failed to decode evaluate request: {error}"))?;
+    UntrustedJsonText::new(text)
+        .decode_document()
+        .map_err(|error| format!("failed to decode evaluate request: {error}"))
+}
+
 async fn read_body(body: Incoming) -> Result<Vec<u8>, hyper::Error> {
     let collected = body.collect().await?;
     Ok(collected.to_bytes().to_vec())
@@ -350,7 +355,8 @@ fn hydrate_request_from_headers(
                 .to_str()
                 .map_err(|error| format!("invalid x-chio-capability header: {error}"))?;
             request.capability = Some(
-                serde_json::from_str(raw_capability)
+                UntrustedJsonText::new(raw_capability)
+                    .decode_document()
                     .map_err(|error| format!("invalid x-chio-capability JSON: {error}"))?,
             );
         }
@@ -500,7 +506,8 @@ fn resolve_capability(request: &EvaluateRequest) -> Result<CapabilityToken, Stri
 
     let raw = std::env::var(CAPABILITY_TOKENS_ENV)
         .map_err(|_| format!("missing {CAPABILITY_TOKENS_ENV} and no inline capability token"))?;
-    let tokens: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw)
+    let tokens: serde_json::Map<String, serde_json::Value> = UntrustedJsonText::new(&raw)
+        .decode_document()
         .map_err(|error| format!("invalid {CAPABILITY_TOKENS_ENV}: {error}"))?;
     let capability = tokens
         .get(&request.capability_id)
@@ -903,5 +910,79 @@ mod tests {
                 "{err}"
             );
         }
+    }
+
+    const REPEATED_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+
+    fn repeat_member(json: &str, member: &str) -> String {
+        assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+        json.replacen(member, &format!("{member},{member}"), 1)
+    }
+
+    #[tokio::test]
+    async fn request_body_header_and_configured_tokens_refuse_a_repeated_key() {
+        let issuer = Keypair::generate();
+        let capability = signed_capability(&issuer);
+        let token = serde_json::to_string(&capability).unwrap();
+        let member = r#""id":"cap""#;
+
+        let body = serde_json::json!({
+            "capability_id": "cap",
+            "tool_server": "srv",
+            "tool_name": "tool",
+            "capability": capability,
+        })
+        .to_string();
+        assert_eq!(
+            decode_evaluate_request(body.as_bytes())
+                .unwrap()
+                .capability
+                .and_then(|token| token["id"].as_str().map(str::to_owned)),
+            Some("cap".to_string())
+        );
+        assert_eq!(
+            decode_evaluate_request(repeat_member(&body, member).as_bytes()).err(),
+            Some(format!("failed to decode evaluate request: {REPEATED_KEY}"))
+        );
+
+        let bare = br#"{"tool_server":"srv","tool_name":"tool"}"#;
+        let mut request = decode_evaluate_request(bare).unwrap();
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert("x-chio-capability", token.parse().unwrap());
+        hydrate_request_from_headers(&headers, &mut request).unwrap();
+        assert_eq!(request.capability_id, "cap");
+
+        let mut request = decode_evaluate_request(bare).unwrap();
+        headers.insert(
+            "x-chio-capability",
+            repeat_member(&token, member).parse().unwrap(),
+        );
+        assert_eq!(
+            hydrate_request_from_headers(&headers, &mut request).err(),
+            Some(format!("invalid x-chio-capability JSON: {REPEATED_KEY}"))
+        );
+
+        request.capability_id = "cap".into();
+        let configured = format!(r#"{{"cap":{token}}}"#);
+        let resolved = with_env_var(CAPABILITY_TOKENS_ENV, &configured, async {
+            resolve_capability(&request)
+        })
+        .await;
+        assert_eq!(resolved.map(|token| token.id), Ok("cap".to_string()));
+        let configured = format!(r#"{{"cap":{token},"cap-b":{{"id":7}}}}"#);
+        let resolved = with_env_var(CAPABILITY_TOKENS_ENV, &configured, async {
+            resolve_capability(&request)
+        })
+        .await;
+        assert_eq!(resolved.map(|token| token.id), Ok("cap".to_string()));
+        let configured = format!(r#"{{"cap":{token},"cap":{token}}}"#);
+        let resolved = with_env_var(CAPABILITY_TOKENS_ENV, &configured, async {
+            resolve_capability(&request)
+        })
+        .await;
+        assert_eq!(
+            resolved.err(),
+            Some(format!("invalid {CAPABILITY_TOKENS_ENV}: {REPEATED_KEY}"))
+        );
     }
 }
