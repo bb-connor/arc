@@ -161,6 +161,9 @@ impl DelegationLink {
     }
 
     /// Verify this link's signature against the delegator's key.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         if let Some(marker) = self.aggregate_budget.as_ref() {
             marker.validate()?;

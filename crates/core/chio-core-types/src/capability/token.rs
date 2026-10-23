@@ -863,6 +863,9 @@ impl CapabilityToken {
     /// The issuer key alone selects the algorithm. For FIPS algorithms, the
     /// `fips` feature must be enabled at the crate level or verification
     /// returns `Ok(false)`.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         self.validate_schema()?;
         wrapped_verdict(verify_wrapped(
@@ -899,6 +902,9 @@ impl CapabilityToken {
     /// [`CapabilityFloorVerifyError::Crypto`] when canonical
     /// re-serialization fails or the signature algorithm differs from the
     /// issuer key's.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature_with_floor(
         &self,
         floor: CapabilityCryptoFloor,
@@ -955,6 +961,9 @@ impl CapabilityToken {
     /// not verify. Returns [`Error::CapabilityNotYetValid`] /
     /// [`Error::CapabilityExpired`] when the signature is valid but the token
     /// is outside its validity window.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
         if !self.verify_signature()? {
             return Ok(false);
@@ -979,6 +988,9 @@ impl CapabilityToken {
     /// and floor pass but the token is outside its validity window, the time
     /// error is surfaced as [`CapabilityFloorVerifyError::Crypto`] wrapping
     /// [`Error::CapabilityNotYetValid`] / [`Error::CapabilityExpired`].
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature_with_floor_at(
         &self,
         floor: CapabilityCryptoFloor,

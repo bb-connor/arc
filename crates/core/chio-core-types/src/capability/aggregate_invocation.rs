@@ -141,6 +141,8 @@ impl AggregateBudgetRootBinding {
         Ok(Self { body, signature })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         if self.body.schema != AGGREGATE_BUDGET_ROOT_SCHEMA {
             return Err(violation(format!(

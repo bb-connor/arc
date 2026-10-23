@@ -290,6 +290,8 @@ impl GovernedUpstreamCallChainProof {
         })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
         wrapped_verdict(verify_wrapped(
@@ -489,6 +491,8 @@ impl CallChainContinuationToken {
         })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         ensure_schema_matches(
             &self.schema,
@@ -1426,6 +1430,8 @@ impl GovernedApprovalToken {
         })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
         wrapped_verdict(verify_wrapped(
@@ -1708,6 +1714,8 @@ impl ThresholdApprovalProposal {
         })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         self.body.validate()?;
         wrapped_verdict(verify_wrapped(

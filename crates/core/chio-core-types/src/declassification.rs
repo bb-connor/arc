@@ -50,6 +50,8 @@ impl SignedDeclassificationGrant {
         })
     }
 
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
     pub fn verify_signature(&self) -> Result<bool> {
         self.body
             .validate()

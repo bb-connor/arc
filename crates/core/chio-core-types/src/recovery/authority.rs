@@ -73,6 +73,8 @@ macro_rules! signed_authority {
                     signature: signed.signature,
                 })
             }
+            /// Verifies integrity under the embedded key; the caller must bind that key
+            /// to a trusted source before acting on the result.
             pub fn verify_signature(&self) -> Result<bool> {
                 ($validate)(&self.body)?;
                 $crate::crypto::wrapped_verdict($crate::crypto::verify_wrapped(
