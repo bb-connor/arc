@@ -143,12 +143,23 @@ type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
 type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
 type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 
+/// How a registered client authenticates at the token endpoint.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TokenEndpointAuth {
+    /// A public client: `authorization_code` and local re-exchange only.
+    None,
+    /// A confidential client proving its key with a `private_key_jwt`
+    /// client assertion (RFC 7523 section 2.2).
+    PrivateKeyJwt(Box<chio_core::root_authority::Jwk>),
+}
+
 /// One `--auth-client CLIENT_ID=REDIRECT_URI` registration for the embedded
 /// authorization server.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OAuthClientRegistration {
     pub client_id: String,
     pub redirect_uri: String,
+    pub token_endpoint_auth: TokenEndpointAuth,
 }
 
 impl std::str::FromStr for OAuthClientRegistration {
@@ -162,6 +173,7 @@ impl std::str::FromStr for OAuthClientRegistration {
         Ok(Self {
             client_id: client_id.to_string(),
             redirect_uri: redirect_uri.to_string(),
+            token_endpoint_auth: TokenEndpointAuth::None,
         })
     }
 }
