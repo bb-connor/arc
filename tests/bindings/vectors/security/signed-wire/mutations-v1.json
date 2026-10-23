@@ -29,7 +29,7 @@
     {
       "id": "broker_audit_runner_signer_tampered",
       "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/signer", "value": "da74b4d2194ba67ccbb8df1a75d3e23c60a0fbd686e7c9fc2f9900b2ff6e0fc3" },
+      "mutation": { "op": "replace", "path": "/signer", "value": "65e8f9b0bc6eae124169f0576f97362d295a8cf5f770b45e14357ce647d33eec" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "runner_signer_binding" }
     },
     {
@@ -89,7 +89,7 @@
     {
       "id": "broker_audit_comparison_signer_tampered",
       "base": "positive/broker-audit-comparison-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/signer", "value": "8edce6750687ae5c03ed36cfb624cdf7e83ae2e59ef25510c837958dc89d4ac3" },
+      "mutation": { "op": "replace", "path": "/signer", "value": "bc7cbcb5636375fa1d82434d466724d92377f53b980695dd49d26d0ce12205a5" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "comparison_signer_binding" }
     },
     {
