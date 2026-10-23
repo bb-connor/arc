@@ -1386,7 +1386,8 @@ fn authority_current_selector_refuses_after_router_poison() {
                 if message == chio_keyring::KeyringError::Synchronization.to_string()
         )
     };
-    let message = SigningMessage::exempt(ExemptFormat::JwsSigningInput, b"poisoned selector artifact");
+    let message =
+        SigningMessage::exempt(ExemptFormat::JwsSigningInput, b"poisoned selector artifact");
     assert!(refused(authority.sign_bytes(message).map(drop)));
     assert!(refused(
         authority.sign_bytes_with_identity(message).map(drop)
@@ -1398,6 +1399,8 @@ fn authority_current_selector_refuses_after_router_poison() {
     ));
     let canonical = chio_core_types::CanonicalBytes::from_serializable(&"poisoned").test_unwrap();
     assert!(refused(
-        authority.sign_wrapped("chio.receipt.v1", &canonical).map(drop)
+        authority
+            .sign_wrapped("chio.receipt.v1", &canonical)
+            .map(drop)
     ));
 }

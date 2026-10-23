@@ -322,8 +322,7 @@ impl RecoveryAuthorization {
         authorizer_id: RecoveryAuthorizerId,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        let outcome =
-            sign_wrapped_canonical(backend, KEY_LOG_EVENT_SCHEMA, &body.signing_body()?)?;
+        let outcome = sign_wrapped_canonical(backend, KEY_LOG_EVENT_SCHEMA, &body.signing_body()?)?;
         Ok(Self {
             authorizer_id,
             signature: outcome.signature,
@@ -693,11 +692,7 @@ impl SignedKeyLogEvent {
             let key = recovery_keys
                 .get(&authorization.authorizer_id)
                 .ok_or(KeyringError::InvalidSignature)?;
-            verify_signature(
-                key,
-                &authorization.signature,
-                &body,
-            )?;
+            verify_signature(key, &authorization.signature, &body)?;
         }
         if verified.len() < threshold {
             return Err(KeyringError::InvalidSignature);
@@ -708,12 +703,7 @@ impl SignedKeyLogEvent {
                 .new_key
                 .as_ref()
                 .ok_or(KeyringError::InvalidAuthorizationSet)?;
-            verify_key_authorization(
-                &self.body.public_key,
-                proof.key_id,
-                &proof.signature,
-                &body,
-            )?;
+            verify_key_authorization(&self.body.public_key, proof.key_id, &proof.signature, &body)?;
         }
         Ok(())
     }
