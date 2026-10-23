@@ -216,7 +216,7 @@ pub enum EvidenceDisclosure {
 /// `details` and declares them unsafe cannot be expressed, so no such guard
 /// can be registered:
 ///
-/// ```compile_fail
+/// ```compile_fail,E0451
 /// use chio_core_types::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
 /// let _ = GuardEvidenceDeclaration {
 ///     details: EvidenceDisclosure::Unsafe,
@@ -230,24 +230,28 @@ pub struct GuardEvidenceDeclaration {
 }
 
 impl GuardEvidenceDeclaration {
+    /// Builds each declaration constant. Required unsafe `details` fail const
+    /// evaluation.
+    const fn declare(details: EvidenceDisclosure, details_required: bool) -> Self {
+        assert!(
+            !(matches!(details, EvidenceDisclosure::Unsafe) && details_required),
+            "unsafe evidence details cannot be required"
+        );
+        Self {
+            details,
+            details_required,
+        }
+    }
+
     /// `details` never carry an argument or result value and may be dropped.
-    pub const SAFE: Self = Self {
-        details: EvidenceDisclosure::Safe,
-        details_required: false,
-    };
+    pub const SAFE: Self = Self::declare(EvidenceDisclosure::Safe, false);
 
     /// `details` never carry an argument or result value and must be kept.
-    pub const SAFE_REQUIRED: Self = Self {
-        details: EvidenceDisclosure::Safe,
-        details_required: true,
-    };
+    pub const SAFE_REQUIRED: Self = Self::declare(EvidenceDisclosure::Safe, true);
 
     /// `details` may carry an argument or result value and are dropped
     /// before signing a committed receipt.
-    pub const UNSAFE: Self = Self {
-        details: EvidenceDisclosure::Unsafe,
-        details_required: false,
-    };
+    pub const UNSAFE: Self = Self::declare(EvidenceDisclosure::Unsafe, false);
 
     #[must_use]
     pub const fn details(self) -> EvidenceDisclosure {
