@@ -257,8 +257,9 @@ async fn receipt_retention_runs_from_the_actual_proxy_serving_lifetime(
     })
     .await??;
     assert!(archive.is_file());
-    let bundle =
-        store.build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+    let bundle = store.build_evidence_export_bundle(
+        &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+    )?;
     assert_eq!(bundle.tool_receipts.len(), 1);
     assert_eq!(bundle.inclusion_proofs.len(), 1);
     task.abort();
