@@ -3,6 +3,8 @@
 //! refusal is pinned to its exact error.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+mod kinds;
+
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -10,9 +12,9 @@ use std::sync::Mutex;
 use crate::root_exchange::OAuthErrorCode;
 use crate::root_exchange::{
     jws::{CompactJws, VerifyingKey},
-    ClientRegistry, ConfidentialClient, ExchangeReplayStore, ExchangeServices, IdJagGrant, IdpKey,
-    IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey,
-    RequestedTokenType, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    ClientRegistry, ExchangeReplayStore, ExchangeServices, IdJagGrant, IdpKey, IdpKeyLookup,
+    PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey, RequestedTokenType,
+    RootExchange, RootExchangeConfig, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -360,12 +362,15 @@ impl Harness {
         let policy = loaded_policy(*pinned.identity_digest(), edit_policy);
         let mut providers = BTreeMap::new();
         providers.insert("acme-okta".to_owned(), record);
-        let clients = ClientRegistry::new(vec![ConfidentialClient {
+        let clients = ClientRegistry::new(&[crate::OAuthClientRegistration {
             client_id: CLIENT_ID.to_owned(),
-            key: serde_json::from_value(client_jwk()).unwrap(),
+            redirect_uri: "https://client.example/callback".to_owned(),
+            token_endpoint_auth: crate::TokenEndpointAuth::PrivateKeyJwt(Box::new(
+                serde_json::from_value(client_jwk()).unwrap(),
+            )),
         }])
         .unwrap();
-        let exchange = RootExchange {
+        let exchange = RootExchange::new(RootExchangeConfig {
             policy,
             providers,
             clients,
@@ -374,7 +379,8 @@ impl Harness {
             token_endpoint: TOKEN_ENDPOINT.to_owned(),
             protected_resource: RESOURCE.to_owned(),
             client_assertion_skew_secs: 5,
-        };
+        })
+        .unwrap();
         Self {
             exchange,
             keys: StubKeys::serving(&[idp_jwk(IDP_KID)]),

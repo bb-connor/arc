@@ -30,6 +30,44 @@ impl OAuthErrorCode {
     }
 }
 
+/// A sender binding of the presented token that the request does not meet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SenderConstraintFailure {
+    /// The token is confirmed by a Chio sender key, which needs a DPoP proof.
+    DpopUnavailable,
+    /// The `cnf` member is outside the closed confirmation profile.
+    Confirmation,
+    /// The request's mTLS certificate is not the one the token names.
+    Mtls,
+    /// The request's runtime attestation is not the one the token names.
+    Attestation,
+}
+
+impl SenderConstraintFailure {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DpopUnavailable => "dpop_unavailable",
+            Self::Confirmation => "confirmation",
+            Self::Mtls => "mtls",
+            Self::Attestation => "attestation",
+        }
+    }
+}
+
+/// Why an exchange cannot be built from its configuration.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RootExchangeConfigError {
+    #[error(
+        "rule `{rule_id}` is an oidc_jwt rule whose provider record has a Microsoft Entra issuer"
+    )]
+    EntraIssuerOnOidcRule { rule_id: String },
+    #[error(
+        "rule `{rule_id}` is an entra_jwt rule whose provider record issuer is not tenant-specific"
+    )]
+    IssuerNotTenantSpecific { rule_id: String },
+}
+
 /// Why a token request yields no anchored root.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RootExchangeError {
@@ -114,6 +152,26 @@ pub enum RootExchangeError {
     AssertionLifetimeTooLong { lifetime: u64, max: u64 },
     #[error("assertion jti was already exchanged")]
     AssertionReplay,
+    #[error("static bearer token is not the configured token")]
+    StaticBearerMismatch,
+    #[error("introspected token is not active")]
+    IntrospectionInactive,
+    #[error("token introspection is unavailable: {0}")]
+    IntrospectionUnavailable(String),
+    #[error("token introspection response is invalid: {0}")]
+    IntrospectionInvalid(&'static str),
+    #[error("more than one provider record serves token introspection")]
+    IntrospectionRecordAmbiguous,
+    #[error("request does not meet the token's sender constraint: {}", .0.as_str())]
+    SenderConstraintUnmet(SenderConstraintFailure),
+    #[error("re-exchange requests scope or resource beyond the subject token")]
+    ReExchangeWidens,
+    #[error("re-exchange client is not the client the subject token was issued to")]
+    ReExchangeClientMismatch,
+    #[error("operator root request is malformed: {0}")]
+    OperatorRequestMalformed(&'static str),
+    #[error("operator root request names no tenant_value")]
+    OperatorRequestTenantMissing,
 
     #[error("root policy is out of force")]
     PolicyOutOfForce,
@@ -129,6 +187,10 @@ pub enum RootExchangeError {
     EmptyEffectiveScope,
     #[error("holder class {} is not allowed by the rule", .0.as_str())]
     HolderClassNotAllowed(HolderClass),
+    #[error("holder class {} is not the one the request names", .0.as_str())]
+    RequestedHolderMismatch(HolderClass),
+    #[error("requested root scope exceeds the rule ceiling")]
+    ScopeExceedsCeiling,
     #[error("edge_session root would carry a proof-required grant")]
     ProofRequiredGrantForEdgeSession,
     #[error("recorded claim `{0}` is absent from the assertion")]
@@ -158,7 +220,10 @@ impl RootExchangeError {
             Self::MalformedRequest(_)
             | Self::UnsupportedSubjectTokenType
             | Self::UnsupportedRequestedTokenType
-            | Self::ClientAuthenticationAmbiguous => OAuthErrorCode::InvalidRequest,
+            | Self::ClientAuthenticationAmbiguous
+            | Self::OperatorRequestMalformed(_)
+            | Self::OperatorRequestTenantMissing
+            | Self::RequestedHolderMismatch(_) => OAuthErrorCode::InvalidRequest,
             Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
             Self::ClientAssertionMissing
             | Self::ClientAssertionTypeUnsupported
@@ -186,6 +251,10 @@ impl RootExchangeError {
             | Self::AssertionNotYetValid
             | Self::AssertionLifetimeTooLong { .. }
             | Self::AssertionReplay
+            | Self::StaticBearerMismatch
+            | Self::IntrospectionInactive
+            | Self::SenderConstraintUnmet(_)
+            | Self::ReExchangeClientMismatch
             | Self::RuleMatchCount { .. }
             | Self::HolderClassNotAllowed(_)
             | Self::ProofRequiredGrantForEdgeSession
@@ -193,14 +262,16 @@ impl RootExchangeError {
             | Self::RootLifetimeEmpty => OAuthErrorCode::InvalidGrant,
             Self::RequestedScopeMalformed
             | Self::RequestedScopeExceedsAssertion
+            | Self::ScopeExceedsCeiling
+            | Self::ReExchangeWidens
             | Self::ScopeNotProjected
             | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
             Self::ProjectionTargetMalformed | Self::ExchangeKeyNotListed => {
                 OAuthErrorCode::ServerError
             }
-            Self::KeysUnavailable(_) | Self::ReplayStoreUnavailable(_) => {
-                OAuthErrorCode::TemporarilyUnavailable
-            }
+            Self::KeysUnavailable(_)
+            | Self::ReplayStoreUnavailable(_)
+            | Self::IntrospectionUnavailable(_) => OAuthErrorCode::TemporarilyUnavailable,
             Self::IdpKeyUnusable
             | Self::ProviderRecordMissing(_)
             | Self::ProviderRecordDisabled(_)
@@ -208,6 +279,8 @@ impl RootExchangeError {
             | Self::ProviderIdentityMismatch(_)
             | Self::PolicyOutOfForce
             | Self::KindNotExchanged(_)
+            | Self::IntrospectionInvalid(_)
+            | Self::IntrospectionRecordAmbiguous
             | Self::EntropyUnavailable
             | Self::Canonicalization(_) => OAuthErrorCode::ServerError,
         }

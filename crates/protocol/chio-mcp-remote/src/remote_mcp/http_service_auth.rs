@@ -657,6 +657,7 @@ fn build_client_registry(
         let OAuthClientRegistration {
             client_id,
             redirect_uri,
+            ..
         } = registration;
         if client_id.trim().is_empty() || client_id.trim() != client_id {
             return Err(CliError::cli_other_error(format!(
