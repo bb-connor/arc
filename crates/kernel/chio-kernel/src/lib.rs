@@ -159,6 +159,8 @@ pub mod tool_outcome;
 pub mod transport;
 #[cfg(not(loom))]
 pub mod weights_binding;
+#[cfg(all(test, not(loom)))]
+pub(crate) mod wrapper_refusals;
 
 #[cfg(not(loom))]
 pub(crate) use std::collections::HashMap;

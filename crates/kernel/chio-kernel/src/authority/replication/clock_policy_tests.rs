@@ -104,7 +104,10 @@ fn final_f11_skew_never_bypasses_signature_domain_or_replay_checks(
             .as_mut()
             .ok_or_else(|| refused("test envelope missing proof"))?;
         match tamper {
-            "signature" => proof.signature = Keypair::from_seed(&[43; 32]).sign(b"substitution"),
+            "signature" => {
+                proof.signature =
+                    crate::wrapper_refusals::unrelated_signature(&Keypair::from_seed(&[43; 32]))
+            }
             "domain" => proof.stream_id = "another-authority".into(),
             "commitment" => proof.chain_commitment = "00".repeat(32),
             "epoch" => forged.snapshot.generation = 2,
@@ -114,6 +117,62 @@ fn final_f11_skew_never_bypasses_signature_domain_or_replay_checks(
         assert!(
             matches!(forged.verify_with_clock_policy(&anchor, &anchor.snapshot, &commitment, 100, policy), Err(AuthorityStoreError::Fence(message)) if message == refusal),
             "skew admitted a forged {tamper}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn lifecycle_and_snapshot_refuse_unwrapped_and_foreign_id_signatures(
+) -> Result<(), AuthorityStoreError> {
+    let (signed, anchor) = envelope()?;
+    let commitment = anchor.commitment()?;
+    let signer = Keypair::from_seed(&[42; 32]);
+    let policy = AuthorityEnvelopeClockPolicy::new(1)?;
+    let proof = signed
+        .proof
+        .as_ref()
+        .ok_or_else(|| refused("test envelope missing proof"))?;
+    let body = EnvelopeBody {
+        schema: &proof.schema,
+        stream_id: &proof.stream_id,
+        anchor_digest: &proof.anchor_digest,
+        chain_commitment: &proof.chain_commitment,
+        issued_at: proof.issued_at,
+        expires_at: proof.expires_at,
+        snapshot: &signed.snapshot,
+    };
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(&signer, &body) {
+        let mut forged = signed.clone();
+        forged
+            .proof
+            .as_mut()
+            .ok_or_else(|| refused("test envelope missing proof"))?
+            .signature = signature;
+        assert!(
+            matches!(forged.verify_with_clock_policy(&anchor, &anchor.snapshot, &commitment, 100, policy), Err(AuthorityStoreError::Fence(message)) if message == "authority envelope signature invalid"),
+            "{label}"
+        );
+    }
+
+    let transition = SignedAuthorityTransition::sign(
+        &anchor,
+        &anchor.snapshot,
+        &commitment,
+        &Keypair::from_seed(&[44; 32]).public_key(),
+        102,
+        &signer,
+    )?;
+    verify_authority_chain(&anchor, std::slice::from_ref(&transition))?;
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(&signer, &transition.body)
+    {
+        let forged = SignedAuthorityTransition {
+            signature,
+            ..transition.clone()
+        };
+        assert!(
+            matches!(verify_authority_chain(&anchor, &[forged]), Err(AuthorityStoreError::Fence(message)) if message == "authority transition signature invalid"),
+            "{label}"
         );
     }
     Ok(())

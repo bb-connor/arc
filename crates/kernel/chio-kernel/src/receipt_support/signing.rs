@@ -250,7 +250,9 @@ pub fn sign_receipt_body_hybrid_canonical(
 ) -> Result<SignedHybridReceipt, KernelError> {
     use chio_core::crypto::{canonical_json_shared_bytes, sign_shared_wrapped, PublicKey};
     use chio_core::receipt::{
-        body::{chio_receipt_id, CHIO_RECEIPT_SCHEMA}, signing::bind_receipt_signing_nonce, signing::ChioReceiptSigningBody,
+        body::{chio_receipt_id, CHIO_RECEIPT_SCHEMA},
+        signing::bind_receipt_signing_nonce,
+        signing::ChioReceiptSigningBody,
     };
 
     // WYSIWYS recompute-and-refuse FIRST, inside the trust boundary, before any
@@ -325,9 +327,10 @@ pub fn sign_receipt_body_hybrid_canonical(
     // Sign through the shared-bytes path so the backend is fed the EXACT
     // buffer downstream consumers will consume. `Arc::clone` keeps the
     // allocation; no second canonicalization happens.
-    let signed = sign_shared_wrapped(backend, CHIO_RECEIPT_SCHEMA, canonical.clone()).map_err(
-        |error| KernelError::ReceiptSigningFailed(format!("hybrid signing failed: {error}")),
-    )?;
+    let signed =
+        sign_shared_wrapped(backend, CHIO_RECEIPT_SCHEMA, canonical.clone()).map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!("hybrid signing failed: {error}"))
+        })?;
     let (signature, signed_canonical) = signed.into_parts();
 
     // Defence-in-depth: the buffer the backend signed MUST be the same

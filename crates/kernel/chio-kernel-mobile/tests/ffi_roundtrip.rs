@@ -12,13 +12,14 @@
 //! core correctly, and produces a JSON result that round-trips through
 //! the expected schema.
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
     scope::{ChioScope, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core_types::crypto::Keypair;
+use chio_core_types::crypto::{Keypair, Signature};
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
@@ -709,6 +710,15 @@ fn verify_capability_rejects_untrusted_issuer() {
     }
 }
 
+fn sign_passport_body(issuer: &Keypair, body: &PortablePassportBody) -> Signature {
+    issuer
+        .sign_wrapped(
+            PORTABLE_PASSPORT_SCHEMA,
+            &CanonicalBytes::from_serializable(body).unwrap(),
+        )
+        .unwrap()
+}
+
 #[test]
 fn verify_passport_happy_path() {
     let issuer = Keypair::generate();
@@ -726,7 +736,7 @@ fn verify_passport_happy_path() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: payload_canonical_bytes.clone(),
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 
@@ -758,7 +768,7 @@ fn verify_passport_rejects_expired_envelope() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: vec![],
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 
@@ -788,7 +798,7 @@ fn verify_passport_rejects_untrusted_issuer() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: vec![],
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 

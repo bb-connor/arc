@@ -241,9 +241,10 @@ fn start_rejects_each_substituted_binding_and_unpinned_signer() -> TestResult {
         }
     }
     let mut forged = fixture.authorization.clone();
-    forged.signature = fixture
-        .executor
-        .sign(&canonical_json_bytes(&forged.authorization)?);
+    forged.signature = fixture.executor.sign_wrapped(
+        CALLER_DISPATCH_AUTHORIZATION_SCHEMA,
+        &CanonicalBytes::from_serializable(&forged.authorization)?,
+    )?;
     assert!(verify(&fixture, &forged, 1_100).is_err());
     Ok(())
 }
@@ -316,8 +317,43 @@ fn reports_reject_rebinding_modified_output_cost_time_claim_and_other_executor()
         assert!(verify_report(&fixture, &signed).is_err());
     }
     let mut forged = report;
-    forged.signature = fixture.kernel.sign(&canonical_json_bytes(&forged.report)?);
+    forged.signature = fixture.kernel.sign_wrapped(
+        CALLER_DELIVERY_REPORT_SCHEMA,
+        &CanonicalBytes::from_serializable(&forged.report)?,
+    )?;
     assert!(verify_report(&fixture, &forged).is_err());
+    Ok(())
+}
+
+#[test]
+fn authorization_and_report_refuse_unwrapped_and_foreign_id_signatures() -> TestResult {
+    let fixture = fixture()?;
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(
+        &fixture.kernel,
+        &fixture.authorization.authorization,
+    ) {
+        let mut refused = fixture.authorization.clone();
+        refused.signature = signature;
+        assert!(
+            matches!(
+                verify(&fixture, &refused, 1_100),
+                Err(CallerDeliveryError::Signature)
+            ),
+            "{label}"
+        );
+    }
+    let report = report(&fixture)?;
+    for (label, signature) in
+        crate::wrapper_refusals::refused_signatures(&fixture.executor, &report.report)
+    {
+        let mut refused = report.clone();
+        refused.signature = signature;
+        assert_eq!(
+            verify_report(&fixture, &refused),
+            Err(CallerDeliveryError::Signature),
+            "{label}"
+        );
+    }
     Ok(())
 }
 

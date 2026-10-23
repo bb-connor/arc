@@ -210,7 +210,10 @@ fn original_request_bound_artifacts_individually_exclude_new_id_eligibility() ->
             "execution_nonce" => {
                 let nonce = ExecutionNonce { schema: "chio.execution-nonce.v1".into(), nonce_id: "nonce".into(), issued_at: i64::try_from(request.capability.issued_at)?, expires_at: i64::try_from(request.capability.expires_at)?,
                     bound_to: NonceBinding { subject_id: request.agent_id.clone(), request_id: request.request_id.clone(), capability_id: request.capability.id.clone(), tool_server: request.server_id.clone(), tool_name: request.tool_name.clone(), parameter_hash: sha256_hex(&canonical_json_bytes(&request.arguments)?) }, reserved_hold_id: None, reserving_request_id: None };
-                let signature = support::issuer().sign_canonical(&nonce)?.0;
+                let signature = support::issuer().sign_wrapped(
+                    chio_kernel::execution_nonce::EXECUTION_NONCE_SCHEMA,
+                    &chio_core_types::canonical::CanonicalBytes::from_serializable(&nonce)?,
+                )?;
                 request.execution_nonce = Some(SignedExecutionNonce { nonce, signature });
             }
             "intent" => request.governed_intent = Some(intent.clone()),

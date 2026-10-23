@@ -261,7 +261,7 @@ fn signed_query_report(
     verifier: &Keypair,
 ) -> Result<SignedRuntimePheromoneQueryReport, Box<dyn std::error::Error>> {
     Ok(SignedExportEnvelope::sign(
-        query_report_body(advisory),
+        chio_runtime_core::RuntimePheromoneQueryReport(query_report_body(advisory)),
         verifier,
     )?)
 }

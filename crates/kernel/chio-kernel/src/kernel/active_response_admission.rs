@@ -6,8 +6,8 @@ use chio_core::capability::governance::{
 };
 use chio_core::capability::scope::Operation;
 use chio_core::capability::token::CapabilityToken;
-use chio_core::receipt::security::{ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody};
 use chio_core::crypto::verify_wrapped_bytes;
+use chio_core::receipt::security::{ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody};
 use chio_core::{canonical_json_bytes, CanonicalBytes, Hash, PublicKey, Signature, SigningBackend};
 use chio_security_types::ports::{
     ActionId, Digest32, OpaqueReceiptRef, RecordId, RESPONSE_AFFECTED_SET_DOMAIN,
@@ -1035,3 +1035,7 @@ fn denied(reason: &str) -> KernelError {
         "active-response authorization denied: {reason}"
     ))
 }
+
+#[cfg(test)]
+#[path = "active_response_admission/wrapper_refusal_tests.rs"]
+mod wrapper_refusal_tests;

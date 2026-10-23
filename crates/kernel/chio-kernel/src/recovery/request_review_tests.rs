@@ -132,7 +132,7 @@ fn authorization_variants(
     proposal["policy_authority"] = serde_json::to_value(signer.public_key())?;
     let mut variants = Vec::new();
     let mut changed = request.clone();
-    changed.capability.signature = signer.sign(b"presented-capability-signature");
+    changed.capability.signature = crate::wrapper_refusals::unrelated_signature(&signer);
     variants.push((changed, "capability"));
     let mut changed = request.clone();
     changed.dpop_proof = Some(DpopProof::sign(

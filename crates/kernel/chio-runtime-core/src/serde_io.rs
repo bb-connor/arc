@@ -137,7 +137,7 @@ pub fn verify_signed_runtime_admission_report(
     report: &SignedRuntimeAdmissionReport,
 ) -> Result<bool, ChioRuntimeError> {
     report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .map_err(|error| ChioRuntimeError::Canonical(error.to_string()))
 }
 
@@ -173,7 +173,7 @@ pub(crate) fn runtime_pheromone_advisory_from_query_report_value(
     let canonical = canonical_json_bytes(value)
         .map_err(|error| ChioRuntimeError::Canonical(error.to_string()))?;
     let schema = value.get("schema").and_then(|item| item.as_str());
-    if schema != Some("chio.pheromone.query-report.v1") {
+    if schema != Some(CHIO_PHEROMONE_QUERY_REPORT_SCHEMA) {
         return Err(ChioRuntimeError::Rejected {
             code: "unsupported_pheromone_query_report_schema",
             detail: "runtime pheromone advisory requires chio.pheromone.query-report.v1"

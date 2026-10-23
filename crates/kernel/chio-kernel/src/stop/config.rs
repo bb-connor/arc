@@ -10,7 +10,9 @@
 use std::collections::BTreeSet;
 
 use chio_core_types::canonical::CanonicalBytes;
-use chio_core_types::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::crypto::{
+    verify_wrapped_bytes, Keypair, PublicKey, Signature, SigningAlgorithm,
+};
 use serde::{Deserialize, Serialize};
 
 use super::StopScope;

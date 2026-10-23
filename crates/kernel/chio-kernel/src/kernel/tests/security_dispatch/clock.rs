@@ -119,7 +119,10 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
             match kind {
                 0 => proof.body.action_hash = "wrong-action".into(),
                 1 => proof.body.issued_at = 1,
-                2 => proof.signature = Keypair::generate().sign(b"not-the-proof"),
+                2 => {
+                    proof.signature =
+                        crate::wrapper_refusals::unrelated_signature(&Keypair::generate())
+                }
                 3 => proof.body.replay_authority = crate::dpop::test_authority(),
                 _ => {}
             }

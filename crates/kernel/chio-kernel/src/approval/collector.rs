@@ -260,9 +260,9 @@ impl ThresholdApprovalProposalRegistration {
             ));
         }
         if !self
-                .proposal
-                .verify_signature()
-                .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
+            .proposal
+            .verify_signature()
+            .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
         {
             return Err(invalid(
                 "threshold proposal signature did not verify".to_string(),

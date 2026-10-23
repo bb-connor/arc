@@ -232,3 +232,7 @@ fn signing_algorithm_label(alg: SigningAlgorithm) -> &'static str {
         SigningAlgorithm::Hybrid => "hybrid",
     }
 }
+
+#[cfg(test)]
+#[path = "compliance_certificate/tests.rs"]
+mod tests;

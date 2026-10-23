@@ -173,7 +173,9 @@ pub fn sign_receipt_relaying_trusted_body(
         // discarded fields whose destructors inflate the proof state.
         let model_wrapper = chio_core_types::crypto::SigningWrapper::from_digests([0; 32], [0; 32]);
         let signature = backend
-            .sign_bytes(chio_core_types::crypto::SigningMessage::of_wrapper(&model_wrapper))
+            .sign_bytes(chio_core_types::crypto::SigningMessage::of_wrapper(
+                &model_wrapper,
+            ))
             .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
         return Ok(ChioReceipt {
             id: body.id,

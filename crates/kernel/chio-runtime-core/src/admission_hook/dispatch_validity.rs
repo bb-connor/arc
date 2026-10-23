@@ -33,7 +33,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
                 .as_ref()
                 .ok_or_else(|| invalid("missing verified runtime query report"))?;
             let advisory =
-                crate::serde_io::runtime_pheromone_advisory_from_query_report_value(&report.body)
+                crate::serde_io::runtime_pheromone_advisory_from_query_report_value(&report.body.0)
                     .map_err(|_| invalid("invalid verified runtime query report"))?;
             // Policy permits age == max_age. Convert that inclusive boundary to
             // an exclusive millisecond deadline with checked arithmetic.

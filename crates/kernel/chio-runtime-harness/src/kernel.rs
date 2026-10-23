@@ -246,13 +246,15 @@ pub(crate) fn runtime_loopback_policy_inputs(
             "evaluatedAtUnixMs": evaluation_now_unix_ms.saturating_sub(2_000)
         }
     });
-    let signed_query_report =
-        chio_core::receipt::lineage::SignedExportEnvelope::sign(query_report_body, &verifier_key)
-            .map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback pheromone query report signing: {error}"
-            ))
-        })?;
+    let signed_query_report = chio_core::receipt::lineage::SignedExportEnvelope::sign(
+        chio_runtime_core::RuntimePheromoneQueryReport(query_report_body),
+        &verifier_key,
+    )
+    .map_err(|error| {
+        RuntimeLoopbackError::message(format!(
+            "Chio runtime loopback pheromone query report signing: {error}"
+        ))
+    })?;
     Ok((
         signed_trust,
         trusted_keys,

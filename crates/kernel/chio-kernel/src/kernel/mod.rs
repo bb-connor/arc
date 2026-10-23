@@ -753,17 +753,17 @@ impl LocalReceiptArtifact {
             Self::Tool(receipt) => receipt
                 .verify_signature_with_floor(&receipt.kernel_key, floor)
                 .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "governed call_chain parent receipt failed signature verification: {error}"
-                ))
-            }),
+                    KernelError::GovernedTransactionDenied(format!(
+                        "governed call_chain parent receipt failed signature verification: {error}"
+                    ))
+                }),
             Self::Child(receipt) => receipt
                 .verify_signature_with_floor(&receipt.kernel_key, floor)
                 .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "governed call_chain parent receipt failed signature verification: {error}"
-                ))
-            }),
+                    KernelError::GovernedTransactionDenied(format!(
+                        "governed call_chain parent receipt failed signature verification: {error}"
+                    ))
+                }),
         }
     }
 

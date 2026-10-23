@@ -413,7 +413,10 @@ impl chio_core::crypto::SigningBackend for RecoveringSigner {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.backend.public_key()
     }
-    fn sign_bytes(&self, bytes: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        bytes: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<chio_core::Signature, chio_core::Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if self.ready.load(Ordering::SeqCst) {
             self.backend.sign_bytes(bytes)
@@ -524,7 +527,10 @@ impl chio_core::crypto::SigningBackend for LockInspectingSigner {
         }
         self.backend.public_key()
     }
-    fn sign_bytes(&self, bytes: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        bytes: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<chio_core::Signature, chio_core::Error> {
         self.backend.sign_bytes(bytes)
     }
 }

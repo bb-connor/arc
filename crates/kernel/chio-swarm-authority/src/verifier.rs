@@ -30,10 +30,11 @@ use super::types::{
     SwarmJoinReceipt, SwarmJoinReceiptMintRequest, SwarmRevocationEpoch, SwarmRoutePlanReceipt,
     SwarmTaskGraph, SwarmTerminalBudgetRollup, SwarmTerminalGraphReceipt,
     CHIO_SWARM_AUTHORITY_VERIFIER_REPORT_SCHEMA, CHIO_SWARM_BUDGET_POOL_SCHEMA,
-    CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA, CHIO_SWARM_JOIN_RECEIPT_SCHEMA, CHIO_SWARM_TASK_GRAPH_SCHEMA,
+    CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA, CHIO_SWARM_JOIN_RECEIPT_SCHEMA,
     CHIO_SWARM_REVOCATION_EPOCH_SCHEMA, CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA,
-    CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA, CLAIM_SWARM_ATTENUATION_WITNESS_CHAIN_BOUND,
-    CLAIM_SWARM_BUDGET_POOL_BOUND, CLAIM_SWARM_CONTINUATION_FRESH, CLAIM_SWARM_JOIN_RECEIPT_BOUND,
+    CHIO_SWARM_TASK_GRAPH_SCHEMA, CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA,
+    CLAIM_SWARM_ATTENUATION_WITNESS_CHAIN_BOUND, CLAIM_SWARM_BUDGET_POOL_BOUND,
+    CLAIM_SWARM_CONTINUATION_FRESH, CLAIM_SWARM_JOIN_RECEIPT_BOUND,
     CLAIM_SWARM_REVOCATION_EPOCH_BOUND, CLAIM_SWARM_ROUTE_PLAN_BOUND, CLAIM_SWARM_TASK_GRAPH_BOUND,
     CLAIM_SWARM_TERMINAL_GRAPH_RECEIPT_BOUND,
 };
@@ -249,7 +250,12 @@ pub fn sign_swarm_delegation_witness_hop(
     }
     let body = witness_signature_body(chain, hop);
     let signature = CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| keypair.sign_wrapped(witness::CHIO_SWARM_DELEGATION_WITNESS_HOP_SIGNATURE_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            keypair.sign_wrapped(
+                witness::CHIO_SWARM_DELEGATION_WITNESS_HOP_SIGNATURE_SCHEMA,
+                &canonical,
+            )
+        })
         .map_err(|error| SwarmAuthorityError::Canonical(error.to_string()))?;
     Ok(signature.to_hex())
 }
@@ -295,7 +301,9 @@ pub fn sign_swarm_continuation_token(
     }
     let body = continuation_token_signature_body(token)?;
     let signature = CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| keypair.sign_wrapped(CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            keypair.sign_wrapped(CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA, &canonical)
+        })
         .map_err(|error| SwarmAuthorityError::Canonical(error.to_string()))?;
     Ok(signature.to_hex())
 }
@@ -552,7 +560,9 @@ pub fn sign_swarm_route_plan_receipt(
     }
     let body = route_plan_signature_body(receipt)?;
     let signature = CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| keypair.sign_wrapped(CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            keypair.sign_wrapped(CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA, &canonical)
+        })
         .map_err(|error| SwarmAuthorityError::Canonical(error.to_string()))?;
     Ok(signature.to_hex())
 }
@@ -598,7 +608,9 @@ pub fn sign_swarm_terminal_graph_receipt(
     }
     let body = terminal_graph_receipt_signature_body(receipt)?;
     let signature = CanonicalBytes::from_serializable(&body)
-        .and_then(|canonical| keypair.sign_wrapped(CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA, &canonical))
+        .and_then(|canonical| {
+            keypair.sign_wrapped(CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA, &canonical)
+        })
         .map_err(|error| SwarmAuthorityError::Canonical(error.to_string()))?;
     Ok(signature.to_hex())
 }
@@ -616,7 +628,8 @@ fn verify_task_graph_signature(
         ))
     })?;
     let body = task_graph_signature_body(graph)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_TASK_GRAPH_SCHEMA, &body, &signature).is_ok();
+    let verified =
+        verify_wrapped(&public_key, CHIO_SWARM_TASK_GRAPH_SCHEMA, &body, &signature).is_ok();
     if verified {
         Ok(())
     } else {
@@ -816,7 +829,13 @@ fn verify_route_plan_signature(
         ))
     })?;
     let body = route_plan_signature_body(receipt)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA, &body, &signature).is_ok();
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {
@@ -1121,7 +1140,13 @@ fn verify_join_receipt_signature(
         ))
     })?;
     let body = join_receipt_signature_body(receipt)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_JOIN_RECEIPT_SCHEMA, &body, &signature).is_ok();
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_JOIN_RECEIPT_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {
@@ -1294,7 +1319,13 @@ fn verify_revocation_epoch_signature(
         ))
     })?;
     let body = revocation_epoch_signature_body(epoch)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_REVOCATION_EPOCH_SCHEMA, &body, &signature).is_ok();
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_REVOCATION_EPOCH_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {
@@ -1572,7 +1603,13 @@ fn verify_terminal_graph_receipt_signature(
         ))
     })?;
     let body = terminal_graph_receipt_signature_body(receipt)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA, &body, &signature).is_ok();
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {
@@ -1816,7 +1853,13 @@ fn verify_continuation_token_signature(
         ))
     })?;
     let body = continuation_token_signature_body(token)?;
-    let verified = verify_wrapped(&public_key, CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA, &body, &signature).is_ok();
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {

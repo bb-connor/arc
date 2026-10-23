@@ -23,8 +23,11 @@ fn signing_body(
     operation_id: &crate::admission_operation::AdmissionOperationId,
     nonce: &ExecutionNonce,
 ) -> Result<CanonicalBytes, AdmissionOperationStoreError> {
-    let body =
-        CanonicalBytes::from_serializable(&SigningContext { operation_id, nonce }).map_err(invalid)?;
+    let body = CanonicalBytes::from_serializable(&SigningContext {
+        operation_id,
+        nonce,
+    })
+    .map_err(invalid)?;
     if body.len() > MAX_NONCE_BYTES {
         return Err(invalid("operation nonce exceeds its signing bound"));
     }
@@ -170,8 +173,10 @@ mod tests {
             reserved_hold_id: None,
             reserving_request_id: None,
         };
-        let signature =
-            key.sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &signing_body(&operation, &nonce)?)?;
+        let signature = key.sign_wrapped(
+            OPERATION_EXECUTION_NONCE_SCHEMA,
+            &signing_body(&operation, &nonce)?,
+        )?;
         let signed = SignedExecutionNonce { nonce, signature };
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 100)?;
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 129)?;
@@ -227,6 +232,24 @@ mod tests {
             100
         )
         .is_err());
+        let body = signing_body(&operation, &signed.nonce)?;
+        for (label, signature) in crate::wrapper_refusals::refused_signatures_over(&key, &body) {
+            let mut refused = signed.clone();
+            refused.signature = signature;
+            assert_eq!(
+                verify_operation_execution_nonce_at(
+                    &refused,
+                    &operation,
+                    &key.public_key(),
+                    &binding,
+                    100
+                ),
+                Err(AdmissionOperationStoreError::Invariant(
+                    "operation-bound execution nonce signature is invalid".into()
+                )),
+                "{label}"
+            );
+        }
         let mut substituted = binding;
         substituted.request_id = "another-request".into();
         assert!(verify_operation_execution_nonce_at(

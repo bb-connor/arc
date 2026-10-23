@@ -99,11 +99,19 @@ fn host_retains_process_signer_and_selects_exact_supplemental_route() -> Result 
         .registry()
         .with_process_signer("root", |parent, signer| {
             assert_eq!(parent.id, capability.id);
-            signer.sign_canonical(&json!({"request": "original"}))
+            signer.sign_wrapped(
+                chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(
+                    &json!({"request": "original"}),
+                )?,
+            )
         })??;
-    assert!(capability
-        .subject
-        .verify_canonical(&json!({"request": "original"}), &signed.0)?);
+    chio_core_types::crypto::verify_wrapped(
+        &capability.subject,
+        chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+        &json!({"request": "original"}),
+        &signed,
+    )?;
     let original = json!({"b": 2, "a": 1});
     let request = runtime.tool_request("root", "broker", "tools", "append", original.clone())?;
     let extension = request
@@ -244,7 +252,12 @@ async fn invalid_process_lineage_produces_attributed_signed_denials_without_disp
         if refusal == "untrusted_leaf" {
             let other = Keypair::generate();
             capability.issuer = other.public_key();
-            capability.signature = other.sign_canonical(&capability.signing_body())?.0;
+            capability.signature = other.sign_wrapped(
+                chio_core_types::capability::token::CHIO_CAPABILITY_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(
+                    &capability.signing_body(),
+                )?,
+            )?;
         }
         runtime.create_root("root", &capability, support::limits(2))?;
         let process_id = if refusal == "revoked_parent" {

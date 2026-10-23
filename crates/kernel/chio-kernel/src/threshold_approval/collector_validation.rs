@@ -227,8 +227,7 @@ impl ThresholdApprovalCollectorProposal {
                 "threshold approval submitter cannot approve their own proposal",
             ));
         }
-        if !token.verify_signature().map_err(conflict)?
-        {
+        if !token.verify_signature().map_err(conflict)? {
             return Err(conflict(
                 "threshold approval token signature did not verify",
             ));

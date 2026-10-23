@@ -1,7 +1,11 @@
 //! Test composition-root verifier with a genuinely signed, request-bound artifact.
-use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Signature};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, verify_wrapped, Signature};
 use chio_kernel::supplemental_quota::*;
 use serde::{Deserialize, Serialize};
+
+/// Registered id the test artifact signs under.
+const ARTIFACT_SCHEMA: &str = chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA;
 
 #[derive(Serialize, Deserialize)]
 struct Body {
@@ -28,7 +32,8 @@ pub fn issue(request: &chio_kernel::ToolCallRequest) -> super::Result<String> {
         }))?)?,
         expires_at: request.capability.expires_at,
     };
-    let (signature, _) = super::issuer().sign_canonical(&body)?;
+    let signature = super::issuer()
+        .sign_wrapped(ARTIFACT_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
     Ok(serde_json::to_string(&Artifact { body, signature })?)
 }
 
@@ -42,9 +47,13 @@ impl SupplementalQuotaVerifier for Verifier {
         let checked = || -> super::Result<SupplementalQuotaVerificationRecord> {
             let artifact: Artifact = serde_json::from_slice(bytes)?;
             let body = artifact.body;
-            if !super::issuer()
-                .public_key()
-                .verify_canonical(&body, &artifact.signature)?
+            if verify_wrapped(
+                &super::issuer().public_key(),
+                ARTIFACT_SCHEMA,
+                &body,
+                &artifact.signature,
+            )
+            .is_err()
                 || body.capability_id != context.capability_id
                 || body.request_id != context.request_id
                 || body.arguments_hash != context.arguments_hash
