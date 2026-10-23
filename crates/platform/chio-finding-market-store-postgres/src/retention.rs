@@ -1,5 +1,5 @@
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{canonical_json_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPoolOptions;
@@ -65,6 +65,10 @@ pub struct HostedJournalCheckpointBody {
 
 pub type SignedHostedJournalCheckpoint = SignedExportEnvelope<HostedJournalCheckpointBody>;
 
+impl SignedExportPayload for HostedJournalCheckpointBody {
+    const SCHEMA_ID: &'static str = HOSTED_JOURNAL_CHECKPOINT_SCHEMA;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedJournalCommitment {
@@ -90,6 +94,10 @@ pub struct HostedArchiveManifestBody {
 }
 
 pub type SignedHostedArchiveManifest = SignedExportEnvelope<HostedArchiveManifestBody>;
+
+impl SignedExportPayload for HostedArchiveManifestBody {
+    const SCHEMA_ID: &'static str = HOSTED_ARCHIVE_MANIFEST_SCHEMA;
+}
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -121,6 +129,10 @@ pub struct HostedLegalHoldBody {
 
 pub type SignedHostedLegalHold = SignedExportEnvelope<HostedLegalHoldBody>;
 
+impl SignedExportPayload for HostedLegalHoldBody {
+    const SCHEMA_ID: &'static str = HOSTED_LEGAL_HOLD_SCHEMA;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedRestoreVerificationBody {
@@ -132,6 +144,10 @@ pub struct HostedRestoreVerificationBody {
 }
 
 pub type SignedHostedRestoreVerification = SignedExportEnvelope<HostedRestoreVerificationBody>;
+
+impl SignedExportPayload for HostedRestoreVerificationBody {
+    const SCHEMA_ID: &'static str = HOSTED_RESTORE_VERIFICATION_SCHEMA;
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -146,6 +162,10 @@ pub struct HostedQuotaAlertBody {
 
 pub type SignedHostedQuotaAlert = SignedExportEnvelope<HostedQuotaAlertBody>;
 
+impl SignedExportPayload for HostedQuotaAlertBody {
+    const SCHEMA_ID: &'static str = HOSTED_QUOTA_ALERT_SCHEMA;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedGcReceiptBody {
@@ -157,6 +177,10 @@ pub struct HostedGcReceiptBody {
 }
 
 pub type SignedHostedGcReceipt = SignedExportEnvelope<HostedGcReceiptBody>;
+
+impl SignedExportPayload for HostedGcReceiptBody {
+    const SCHEMA_ID: &'static str = HOSTED_GC_RECEIPT_SCHEMA;
+}
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1016,7 +1040,7 @@ fn validate_target(target: &HostedRetentionTarget) -> Result<(), HostedMarketSto
     }
 }
 
-fn validate_signed<T: Serialize + Clone>(
+fn validate_signed<T: SignedExportPayload + Clone>(
     tenant: &HostedTenantId,
     expected_signer: &PublicKey,
     envelope: &SignedExportEnvelope<T>,
@@ -1026,7 +1050,7 @@ fn validate_signed<T: Serialize + Clone>(
     if actual_schema != expected_schema
         || expected_signer.is_weak_ed25519()
         || envelope.signer_key != *expected_signer
-        || !matches!(envelope.verify_signature(), Ok(true))
+        || !matches!(envelope.verify_signature(expected_signer), Ok(true))
     {
         return Err(HostedMarketStoreError::Invalid("signed retention artifact"));
     }

@@ -1,5 +1,5 @@
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{canonical_json_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPoolOptions, PgRow};
@@ -103,6 +103,10 @@ pub struct HostedReplicationEventBody {
 
 pub type SignedHostedReplicationEvent = SignedExportEnvelope<HostedReplicationEventBody>;
 
+impl SignedExportPayload for HostedReplicationEventBody {
+    const SCHEMA_ID: &'static str = HOSTED_REPLICATION_EVENT_SCHEMA;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostedPrincipalReplicationEventBody {
@@ -117,6 +121,10 @@ pub struct HostedPrincipalReplicationEventBody {
 
 pub type SignedHostedPrincipalReplicationEvent =
     SignedExportEnvelope<HostedPrincipalReplicationEventBody>;
+
+impl SignedExportPayload for HostedPrincipalReplicationEventBody {
+    const SCHEMA_ID: &'static str = HOSTED_PRINCIPAL_REPLICATION_EVENT_SCHEMA;
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -135,6 +143,10 @@ pub struct HostedReplicationCheckBody {
 }
 
 pub type SignedHostedReplicationCheck = SignedExportEnvelope<HostedReplicationCheckBody>;
+
+impl SignedExportPayload for HostedReplicationCheckBody {
+    const SCHEMA_ID: &'static str = HOSTED_REPLICATION_CHECK_SCHEMA;
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -268,6 +280,10 @@ pub struct HostedAuthorityTransitionBody {
 }
 
 pub type SignedHostedAuthorityTransition = SignedExportEnvelope<HostedAuthorityTransitionBody>;
+
+impl SignedExportPayload for HostedAuthorityTransitionBody {
+    const SCHEMA_ID: &'static str = HOSTED_AUTHORITY_TRANSITION_SCHEMA;
+}
 
 /// Separate replication credential. It can append verified mirror records and
 /// apply signed authority barriers, but cannot invoke public market commands.
@@ -1090,7 +1106,7 @@ async fn load_authority_state(
     })
 }
 
-pub(crate) fn validate_signed<T: Serialize + Clone>(
+pub(crate) fn validate_signed<T: SignedExportPayload + Clone>(
     tenant: &HostedTenantId,
     expected_signer: &PublicKey,
     envelope: &SignedExportEnvelope<T>,
@@ -1100,7 +1116,7 @@ pub(crate) fn validate_signed<T: Serialize + Clone>(
     if actual_schema != expected_schema
         || envelope.signer_key != *expected_signer
         || expected_signer.is_weak_ed25519()
-        || !matches!(envelope.verify_signature(), Ok(true))
+        || !matches!(envelope.verify_signature(expected_signer), Ok(true))
     {
         return Err(HostedMarketStoreError::Invalid(
             "signed replication artifact",

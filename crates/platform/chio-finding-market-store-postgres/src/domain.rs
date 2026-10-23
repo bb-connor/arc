@@ -1,6 +1,6 @@
 use chio_core_types::crypto::PublicKey;
 use chio_core_types::receipt::decision::Decision;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::receipt::metadata::{FindingDelivery, FINDING_DELIVERY_METADATA_KEY};
 use chio_core_types::{canonical_json_bytes, sha256_hex};
 use chio_finding::{
@@ -967,7 +967,7 @@ fn parse_canonical<T: DeserializeOwned + Serialize>(
     crate::validation::decode_artifact(payload_json)
 }
 
-fn parse_signed<T: DeserializeOwned + Serialize>(
+fn parse_signed<T: DeserializeOwned + SignedExportPayload>(
     payload_json: &[u8],
     expected_signer: &PublicKey,
 ) -> Result<SignedExportEnvelope<T>, HostedMarketStoreError> {

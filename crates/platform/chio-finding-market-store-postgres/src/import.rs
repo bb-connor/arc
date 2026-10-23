@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -64,6 +64,10 @@ pub struct HostedSqliteImportBatchBody {
 }
 
 pub type SignedHostedSqliteImportBatch = SignedExportEnvelope<HostedSqliteImportBatchBody>;
+
+impl SignedExportPayload for HostedSqliteImportBatchBody {
+    const SCHEMA_ID: &'static str = HOSTED_SQLITE_IMPORT_BATCH_SCHEMA;
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostedSqliteImportOutcome {

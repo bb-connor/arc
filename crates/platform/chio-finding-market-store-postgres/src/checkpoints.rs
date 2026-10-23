@@ -1,5 +1,5 @@
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{canonical_json_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 use sqlx::Row as _;
@@ -29,6 +29,10 @@ pub struct HostedAggregateCheckpointBody {
 }
 
 pub type SignedHostedAggregateCheckpoint = SignedExportEnvelope<HostedAggregateCheckpointBody>;
+
+impl SignedExportPayload for HostedAggregateCheckpointBody {
+    const SCHEMA_ID: &'static str = HOSTED_AGGREGATE_CHECKPOINT_SCHEMA;
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostedAggregateCheckpointRecord {
@@ -211,7 +215,7 @@ fn validate_checkpoint(
         || body.tenant_id != tenant.as_str()
         || checkpoint.signer_key != *expected_signer
         || expected_signer.is_weak_ed25519()
-        || !matches!(checkpoint.verify_signature(), Ok(true))
+        || !matches!(checkpoint.verify_signature(expected_signer), Ok(true))
         || body.revision == 0
         || body.created_at == 0
     {
