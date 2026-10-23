@@ -386,3 +386,7 @@ pub struct LiabilityProviderResolutionReport {
     pub matched_policy: LiabilityJurisdictionPolicy,
     pub support_boundary: LiabilityProviderSupportBoundary,
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityProviderArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_PROVIDER_ARTIFACT_SCHEMA;
+}

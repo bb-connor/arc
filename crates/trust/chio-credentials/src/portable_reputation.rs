@@ -223,6 +223,10 @@ impl PortableReputationSummaryArtifact {
 
 pub type SignedPortableReputationSummary = SignedExportEnvelope<PortableReputationSummaryArtifact>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for PortableReputationSummaryArtifact {
+    const SCHEMA_ID: &'static str = PORTABLE_REPUTATION_SUMMARY_SCHEMA;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PortableNegativeEventArtifact {
@@ -283,6 +287,10 @@ impl PortableNegativeEventArtifact {
 }
 
 pub type SignedPortableNegativeEvent = SignedExportEnvelope<PortableNegativeEventArtifact>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for PortableNegativeEventArtifact {
+    const SCHEMA_ID: &'static str = PORTABLE_NEGATIVE_EVENT_SCHEMA;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -540,7 +548,7 @@ pub fn evaluate_portable_reputation(
     for summary in &request.summaries {
         let issuer = Some(summary.body.issuer_operator_id.clone());
         let reference = Some(summary.body.summary_id.clone());
-        match summary.verify_signature() {
+        match summary.verify_signature(&summary.signer_key) {
             Ok(true) => {}
             _ => {
                 rejected_summary_count += 1;
@@ -661,7 +669,7 @@ pub fn evaluate_portable_reputation(
     for event in &request.negative_events {
         let issuer = Some(event.body.issuer_operator_id.clone());
         let reference = Some(event.body.event_id.clone());
-        match event.verify_signature() {
+        match event.verify_signature(&event.signer_key) {
             Ok(true) => {}
             _ => {
                 rejected_negative_event_count += 1;
@@ -1060,7 +1068,7 @@ mod portable_reputation_tests {
         let decoded: SignedPortableReputationSummary =
             serde_json::from_str(&encoded).expect("deserialize summary");
         assert!(
-            decoded.verify_signature().expect("verify summary"),
+            decoded.verify_signature(&decoded.signer_key).expect("verify summary"),
             "summary roundtrip invalidated signature: {encoded}"
         );
     }

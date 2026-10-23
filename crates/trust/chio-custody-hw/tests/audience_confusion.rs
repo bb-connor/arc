@@ -18,7 +18,7 @@ use chio_core_types::crypto::{Ed25519Backend, Keypair, Signature, SigningBackend
 use chio_custody_hw::capability::{PasskeyCapability, ScopeSet};
 use chio_custody_hw::error::CustodyError;
 use chio_custody_hw::issuer::{IssuerService, MintRequest};
-use chio_custody_hw::mint::signing_message;
+use chio_custody_hw::mint::signing_body;
 use chio_custody_hw::verifier::VerifiedAssertion;
 use chrono::{TimeZone, Utc};
 use proptest::prelude::*;
@@ -79,15 +79,15 @@ fn audience_bit_flip_invalidates_signature_pinned() {
         Err(e) => panic!("audience tamper must remain UTF-8: {e}"),
     };
 
-    let message = match signing_message(&tampered) {
+    let message = match signing_body(&tampered) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
     let signature = match Signature::from_hex(&tampered.signature) {
         Ok(s) => s,
         Err(e) => panic!("hex must decode: {e}"),
     };
-    assert!(!public.verify(&message, &signature));
+    assert!(chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err());
 }
 
 proptest! {
@@ -118,15 +118,15 @@ proptest! {
         // invalidates the signature.
         let mut tampered = cap.clone();
         tampered.audience = attacker_audience;
-        let message = match signing_message(&tampered) {
+        let message = match signing_body(&tampered) {
             Ok(b) => b,
-            Err(e) => panic!("signing_message must encode: {e}"),
+            Err(e) => panic!("signing_body must encode: {e}"),
         };
         let signature = match Signature::from_hex(&tampered.signature) {
             Ok(s) => s,
             Err(e) => panic!("hex must decode: {e}"),
         };
-        prop_assert!(!public.verify(&message, &signature));
+        prop_assert!(chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err());
     }
 
     /// An audience-bit-flip MUST always invalidate the signature, even
@@ -144,14 +144,14 @@ proptest! {
         prop_assume!(new_audience != cap.audience);
         let mut tampered = cap.clone();
         tampered.audience = new_audience;
-        let message = match signing_message(&tampered) {
+        let message = match signing_body(&tampered) {
             Ok(b) => b,
-            Err(e) => panic!("signing_message must encode: {e}"),
+            Err(e) => panic!("signing_body must encode: {e}"),
         };
         let signature = match Signature::from_hex(&tampered.signature) {
             Ok(s) => s,
             Err(e) => panic!("hex must decode: {e}"),
         };
-        prop_assert!(!public.verify(&message, &signature));
+        prop_assert!(chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err());
     }
 }

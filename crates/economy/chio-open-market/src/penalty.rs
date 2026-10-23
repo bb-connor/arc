@@ -271,3 +271,7 @@ pub fn build_open_market_penalty_artifact_with_trusted_signers(
     artifact.validate()?;
     Ok(artifact)
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OpenMarketPenaltyArtifact {
+    const SCHEMA_ID: &'static str = OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA;
+}

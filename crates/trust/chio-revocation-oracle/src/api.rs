@@ -91,9 +91,9 @@ pub struct EpochRoot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RootSignature {
     pub signer_id: String,
-    pub algorithm: String,
     pub signature_bytes: Vec<u8>,
 }
 

@@ -406,12 +406,14 @@ fn sign_agent_web_envelope_value(
 ) -> Result<(), CliError> {
     envelope["envelope_id"] = serde_json::Value::String(agent_web_envelope_id(envelope)?);
     let payload = agent_web_envelope_signature_payload(envelope)?;
-    let canonical = chio_core_types::canonical_json_bytes(&payload).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof fixture Agent Web envelope signing failed: {error}"
-        ))
-    })?;
-    let signature = keypair.sign(&canonical).to_hex();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&payload)
+        .and_then(|canonical| keypair.sign_wrapped("chio.agent-web-proof-envelope.v1", &canonical))
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "proof fixture Agent Web envelope signing failed: {error}"
+            ))
+        })?
+        .to_hex();
     envelope["signature"] =
         serde_json::Value::String(format!("sig-ed25519:{public_key}:{signature}"));
     Ok(())

@@ -349,8 +349,11 @@ fn relay_alert_assurance_archive_package_binds_source_reports_and_members() {
 
     let mut mismatched_bundle_package = package.clone();
     mismatched_bundle_package.manifest.body.bundles[0].artifact_count += 1;
-    let (signature, _) = packager
-        .sign_canonical(&mismatched_bundle_package.manifest.body)
+    let signature = packager
+        .sign_wrapped(
+            chio_pheromone_relay::PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&mismatched_bundle_package.manifest.body).unwrap(),
+        )
         .unwrap();
     mismatched_bundle_package.manifest.signature = signature;
     let err = verify_relay_alert_assurance_archive_package(
@@ -370,8 +373,11 @@ fn relay_alert_assurance_archive_package_binds_source_reports_and_members() {
     outside_package.manifest.body.members[0].path =
         format!("outside/{}", outside_package.manifest.body.members[0].path);
     outside_package.files[0].path = outside_package.manifest.body.members[0].path.clone();
-    let (signature, _) = packager
-        .sign_canonical(&outside_package.manifest.body)
+    let signature = packager
+        .sign_wrapped(
+            chio_pheromone_relay::PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&outside_package.manifest.body).unwrap(),
+        )
         .unwrap();
     outside_package.manifest.signature = signature;
     let err = verify_relay_alert_assurance_archive_package(

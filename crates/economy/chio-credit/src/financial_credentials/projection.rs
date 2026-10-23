@@ -194,7 +194,7 @@ pub(super) fn ordered_underwriting_decisions(
     let mut ids = BTreeSet::new();
     let signer = &ordered[0].signer_key;
     for decision in &ordered {
-        inspect_source_signature(decision.verify_signature())?;
+        inspect_source_signature(decision.verify_signature(&decision.signer_key))?;
         if decision.body.schema != crate::underwriting::UNDERWRITING_DECISION_ARTIFACT_SCHEMA
             || !ids.insert(decision.body.decision_id.as_str())
             || &decision.signer_key != signer
@@ -229,7 +229,7 @@ pub(super) fn ordered_loss_events(
     let mut ids = BTreeSet::new();
     let mut bond_times = BTreeSet::new();
     for event in &ordered {
-        inspect_source_signature(event.verify_signature())?;
+        inspect_source_signature(event.verify_signature(&event.signer_key))?;
         ensure_i_json(event.body.issued_at)?;
         ensure_i_json(event.body.report.generated_at)?;
         if event.body.schema != CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA

@@ -78,7 +78,7 @@ pub use admission::{
     FINDING_ADMISSION_SCHEMA_V1,
 };
 pub use audit_epoch::{
-    audit_seed_witness_signing_bytes, compute_audit_epoch_id, derive_audit_seed_commitment,
+    sign_audit_seed_witness, compute_audit_epoch_id, derive_audit_seed_commitment,
     verify_signed_audit_epoch, FindingAuditEpoch, SignedFindingAuditEpoch,
     FINDING_AUDIT_EPOCH_SCHEMA_V1, MAX_PUBLISHED_RATE_BPS,
 };

@@ -1131,7 +1131,7 @@ mod tests {
             .collect()
     }
 
-    use crate::identity::transport_endorsement_preimage;
+    use crate::identity::sign_transport_endorsement;
     use crate::identity::TransportDirectoryBundleBody;
     use crate::identity::TransportDirectoryBundleDocument;
     use crate::identity::TransportDirectoryBundleTrust;
@@ -1218,7 +1218,7 @@ mod tests {
             passport_public_key: passport.public_key(),
             transport_endpoint_id: transport,
             passport_endorsement: passport
-                .sign(&transport_endorsement_preimage(kernel_id, &transport)),
+                sign_transport_endorsement(&, kernel_id, &transport).unwrap(),
             revocation_signers: Vec::new(),
             removed,
         };
@@ -1239,7 +1239,11 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            ).unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1263,7 +1267,10 @@ mod tests {
     /// direct-frame verifier does not check the deposit signature, so any
     /// well-formed signature suffices to exercise the sender-equality checks.
     fn signature_value() -> serde_json::Value {
-        let sig = Keypair::from_seed(&[9; 32]).sign(b"pheromone-lane-fixture");
+        let sig = Keypair::from_seed(&[9; 32]).sign_exempt(
+            chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+            b"pheromone-lane-fixture",
+        );
         serde_json::to_value(sig).unwrap()
     }
 

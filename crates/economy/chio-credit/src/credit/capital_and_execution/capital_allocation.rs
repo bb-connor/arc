@@ -117,3 +117,7 @@ pub struct CapitalAllocationDecisionArtifact {
 }
 
 pub type SignedCapitalAllocationDecision = SignedExportEnvelope<CapitalAllocationDecisionArtifact>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalAllocationDecisionArtifact {
+    const SCHEMA_ID: &'static str = crate::CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA;
+}

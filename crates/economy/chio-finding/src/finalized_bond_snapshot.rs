@@ -194,3 +194,7 @@ pub fn verify_signed_finalized_bond_snapshot(
         "finalized_bond_snapshot",
     )
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingFinalizedBondSnapshot {
+    const SCHEMA_ID: &'static str = FINDING_FINALIZED_BOND_SNAPSHOT_SCHEMA_V1;
+}

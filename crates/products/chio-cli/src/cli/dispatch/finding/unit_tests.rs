@@ -755,7 +755,12 @@ fn cli_nonce_evidence() -> (ChioReceipt, SignedExecutionNonce) {
         reserved_hold_id: Some("hold-cli-finding-1".to_string()),
         reserving_request_id: None,
     };
-    let signature = kernel.sign(&canonical_json_bytes(&nonce).unwrap());
+    let signature = kernel
+        .sign_wrapped(
+            chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&nonce).unwrap(),
+        )
+        .unwrap();
     (receipt, SignedExecutionNonce { nonce, signature })
 }
 

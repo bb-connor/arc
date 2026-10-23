@@ -1312,7 +1312,7 @@ pub async fn prepare_bond_lock(
     let operator_key_hash = settlement_operator_key_hash(binding)?;
     let verified = request
         .bond
-        .verify_signature()
+        .verify_signature(&request.bond.signer_key)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(

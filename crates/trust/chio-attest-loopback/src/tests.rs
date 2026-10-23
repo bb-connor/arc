@@ -32,10 +32,16 @@ fn resign_bilateral_envelope_unanimous_deny(
     envelope.payload = BASE64_STANDARD.encode(&statement_bytes);
     let pae_bytes = pae(PAYLOAD_TYPE_IN_TOTO, &statement_bytes);
     let sig_a = Ed25519Backend::new(buyer_key.clone())
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
     let sig_b = Ed25519Backend::new(vendor_key.clone())
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|error| ChioPackageError::Federation(error.to_string()))?;
     envelope.signatures[0].sig = BASE64_STANDARD.encode(sig_a.to_bytes());
     envelope.signatures[1].sig = BASE64_STANDARD.encode(sig_b.to_bytes());
@@ -500,7 +506,10 @@ fn tampered_step_parent_hash_fails_closed() {
 fn bad_vendor_signature_fails_closed() {
     let mut package = fresh_proof_package().unwrap();
     package.workflow_receipt.vendor_signatures[0].signature =
-        Keypair::from_seed(&[99; 32]).sign(b"not the workflow body");
+        Keypair::from_seed(&[99; 32]).sign_exempt(
+            chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+            b"not the workflow body",
+        );
     let trust_bundle = verifier_trust_bundle().unwrap();
     let context = verification_context();
     let error = verify_package(&package, &trust_bundle, &context).unwrap_err();

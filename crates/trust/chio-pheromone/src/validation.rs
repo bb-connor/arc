@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::crypto::verify_wrapped;
 use chio_core_types::{PublicKey, Signature};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -157,9 +158,14 @@ pub(crate) fn verify_deposit_signature(
     deposit: &PheromoneDeposit,
     public_key: &PublicKey,
 ) -> Result<(), PheromoneError> {
-    let canonical = canonical_json_bytes(&deposit_signature_body(&deposit.body))
-        .map_err(|error| PheromoneError::CanonicalJson(error.to_string()))?;
-    if public_key.verify(&canonical, &deposit.signature) {
+    if verify_wrapped(
+        public_key,
+        PHEROMONE_DEPOSIT_SCHEMA,
+        &deposit_signature_body(&deposit.body),
+        &deposit.signature,
+    )
+    .is_ok()
+    {
         Ok(())
     } else {
         Err(PheromoneError::SignatureInvalid)
@@ -638,7 +644,6 @@ fn resolve_observation_cost_verifier_root<'a>(
                     .allowed_subject_classes
                     .iter()
                     .any(|allowed| allowed == &statement.subject_class)
-                && root.body.signature_algorithm == root.body.public_key.algorithm()
                 && verifier_root_issuer_signature_is_valid(context, root)
         })
         .collect::<Vec<_>>();
@@ -654,13 +659,18 @@ fn verifier_root_issuer_signature_is_valid(
     context: &PheromoneValidationContext,
     root: &PheromoneObservationCostVerifierRoot,
 ) -> bool {
-    let Ok(canonical) = canonical_json_bytes(&root.body) else {
-        return false;
-    };
     context
         .runtime_policy_issuer_public_keys
         .iter()
-        .any(|public_key| public_key.verify(&canonical, &root.issuer_signature))
+        .any(|public_key| {
+            verify_wrapped(
+                public_key,
+                PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA,
+                &root.body,
+                &root.issuer_signature,
+            )
+            .is_ok()
+        })
 }
 
 fn observation_cost_root_is_revoked(
@@ -688,17 +698,13 @@ fn verify_observation_cost_signature(
     commitment: &PheromoneCostCommitment,
     root: &PheromoneObservationCostVerifierRoot,
 ) -> Result<(), PheromoneError> {
-    if commitment.signature.algorithm() != root.body.signature_algorithm {
-        return Err(PheromoneError::ObservationCostSignatureInvalid(
-            commitment.statement.commitment_id.clone(),
-        ));
-    }
-    let canonical = canonical_json_bytes(&commitment.statement)
-        .map_err(|error| PheromoneError::CanonicalJson(error.to_string()))?;
-    if root
-        .body
-        .public_key
-        .verify(&canonical, &commitment.signature)
+    if verify_wrapped(
+        &root.body.public_key,
+        PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+        &commitment.statement,
+        &commitment.signature,
+    )
+    .is_ok()
     {
         Ok(())
     } else {

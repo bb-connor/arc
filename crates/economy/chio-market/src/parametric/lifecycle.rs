@@ -76,7 +76,7 @@ impl ParametricFiredTriggerRecordV1 {
         self.signed_policy.body.validate()?;
         if !self
             .signed_policy
-            .verify_signature()
+            .verify_signature(&self.signed_policy.signer_key)
             .map_err(|_| ParametricLifecycleError::Conflict)?
         {
             return Err(ParametricLifecycleError::Conflict);

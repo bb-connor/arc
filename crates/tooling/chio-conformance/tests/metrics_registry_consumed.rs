@@ -944,7 +944,10 @@ fn iroh_transport_bundle(
         issued_at_unix_ms: now - 1,
         expires_at_unix_ms: now + 1,
     };
-    let (signature, _) = issuer.sign_canonical(&body)?;
+    let signature = issuer.sign_wrapped(
+        TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

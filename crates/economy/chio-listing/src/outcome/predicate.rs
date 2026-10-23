@@ -221,7 +221,7 @@ pub fn verify_outcome_predicate(
     if signed.0.signer_key != *context.trust.key()
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -450,4 +450,8 @@ fn canonical_equal(left: &Value, right: &Value) -> bool {
         (Ok(left), Ok(right)) => left == right,
         _ => false,
     }
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomePredicateBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_PREDICATE_SCHEMA;
 }

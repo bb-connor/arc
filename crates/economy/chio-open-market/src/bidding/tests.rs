@@ -266,7 +266,7 @@ fn bid_happy_path_mints_scoped_capability_token() {
             .units,
         1_000
     );
-    assert!(ask.verify_signature().test_expect("verify ask"));
+    assert!(ask.verify_signature(&ask.signer_key).test_expect("verify ask"));
     assert!(ask
         .body
         .token_offer
@@ -511,7 +511,7 @@ fn accept_records_receipt_and_verifies_ask_signature() {
     assert!(!accepted.body.ask_digest.is_empty());
     assert!(!accepted.body.bid_digest.is_empty());
     assert!(accepted
-        .verify_signature()
+        .verify_signature(&accepted.signer_key)
         .test_expect("verify accepted bid"));
 }
 

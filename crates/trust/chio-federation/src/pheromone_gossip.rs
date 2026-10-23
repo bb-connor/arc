@@ -7,6 +7,7 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::{Mutex, PoisonError};
 
+pub use chio_pheromone::PHEROMONE_DEPOSIT_SCHEMA;
 use chio_pheromone::PheromoneDeposit;
 use serde::{Deserialize, Serialize};
 

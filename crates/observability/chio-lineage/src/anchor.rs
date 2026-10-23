@@ -9,11 +9,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped_bytes, PublicKey, Signature};
 
 use crate::schema::{LineageEdge, LineageGraph, LineageNode};
 
-const FRONTIER_SIGNATURE_DOMAIN: &[u8] = b"chio.lineage.frontier-signature/v1\0";
+/// Signing-wrapper schema id of a lineage frontier signature.
+pub const LINEAGE_FRONTIER_SIGNATURE_SCHEMA: &str = "chio.lineage.frontier-signature.v1";
 
 /// SHA-256 of the canonical JSON of a frontier projection. The frontier
 /// is a deterministic sorted list of node ids and edge keys; canonical
@@ -115,12 +117,15 @@ pub fn frontier_digest(graph: &LineageGraph) -> FrontierDigest {
 /// This is domain-separated from the raw frontier digest so the same key
 /// cannot accidentally authenticate another Chio payload shape.
 #[must_use]
-pub fn frontier_signature_message(graph: &LineageGraph) -> Vec<u8> {
-    let frontier = frontier_bytes(graph);
-    let mut message = Vec::with_capacity(FRONTIER_SIGNATURE_DOMAIN.len() + frontier.len());
-    message.extend_from_slice(FRONTIER_SIGNATURE_DOMAIN);
-    message.extend_from_slice(&frontier);
-    message
+/// Canonical body the frontier signature wraps: the hex frontier bytes.
+pub fn frontier_signature_body(graph: &LineageGraph) -> Result<CanonicalBytes, AnchorError> {
+    use std::fmt::Write as _;
+    let mut frontier = String::new();
+    for byte in frontier_bytes(graph) {
+        let _ = write!(frontier, "{byte:02x}");
+    }
+    CanonicalBytes::from_value(&serde_json::json!({ "frontier": frontier }))
+        .map_err(|error| AnchorError::SignaturePayloadInvalid(error.to_string()))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -340,7 +345,14 @@ pub fn pin_frontier_signed(
     }
     let signature = Signature::from_hex(signature_hex)
         .map_err(|error| AnchorError::SignaturePayloadInvalid(error.to_string()))?;
-    if !trusted_signer.verify(&frontier_signature_message(graph), &signature) {
+    if verify_wrapped_bytes(
+        trusted_signer,
+        LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+        &frontier_signature_body(graph)?,
+        &signature,
+    )
+    .is_err()
+    {
         return Err(AnchorError::SignatureVerificationFailed);
     }
     let digest = frontier_digest(graph);
@@ -388,7 +400,14 @@ pub fn verify_frontier_signature(
     }
     let signature = Signature::from_hex(signature_hex)
         .map_err(|error| AnchorError::SignaturePayloadInvalid(error.to_string()))?;
-    if !trusted_signer.verify(&frontier_signature_message(graph), &signature) {
+    if verify_wrapped_bytes(
+        trusted_signer,
+        LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+        &frontier_signature_body(graph)?,
+        &signature,
+    )
+    .is_err()
+    {
         return Err(AnchorError::SignatureVerificationFailed);
     }
     Ok(())
@@ -581,7 +600,9 @@ mod tests {
     fn pin_signed_with_trusted_key_verifies() {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
-        let signature = keypair.sign(&frontier_signature_message(&g));
+        let signature = keypair
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .unwrap();
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
         assert!(!pinned.is_signed());
@@ -594,7 +615,9 @@ mod tests {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
         let wrong_keypair = Keypair::from_seed(&[8_u8; 32]);
-        let signature = keypair.sign(&frontier_signature_message(&g));
+        let signature = keypair
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .unwrap();
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
         let err = verify_frontier_signature(&pinned, &g, &wrong_keypair.public_key())
@@ -607,7 +630,9 @@ mod tests {
     fn verify_signed_frontier_rejects_noncanonical_algorithm_label() {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
-        let signature = keypair.sign(&frontier_signature_message(&g));
+        let signature = keypair
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &frontier_signature_body(&g).unwrap())
+            .unwrap();
         let signature_hex = signature.to_hex();
         let mut pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature_hex)
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));

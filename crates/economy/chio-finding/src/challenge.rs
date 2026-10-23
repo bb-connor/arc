@@ -700,3 +700,7 @@ pub fn verify_signed_challenge(
         }
     }
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingChallenge {
+    const SCHEMA_ID: &'static str = FINDING_CHALLENGE_SCHEMA_V1;
+}

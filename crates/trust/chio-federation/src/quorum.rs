@@ -86,6 +86,10 @@ pub struct FederationQuorumReport {
 
 pub type SignedFederationQuorumReport = SignedExportEnvelope<FederationQuorumReport>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for FederationQuorumReport {
+    const SCHEMA_ID: &'static str = CHIO_FEDERATION_QUORUM_REPORT_SCHEMA;
+}
+
 pub fn validate_federation_quorum_report(
     report: &FederationQuorumReport,
 ) -> Result<(), FederationContractError> {

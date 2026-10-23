@@ -1219,7 +1219,7 @@ fn refresh_bundle_signature(bundle_dir: &std::path::Path) {
         serde_json::Value::String(chio_core::sha256_hex(&manifest_bytes));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
     signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign(&signed_payload).to_hex());
+        serde_json::Value::String(keypair.sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload).to_hex());
     std::fs::write(signature_path, json_bytes(signature)).test_expect("write signature");
 }
 
@@ -1551,8 +1551,12 @@ fn sign_public_settlement_bundle_value(settlement_bundle: &mut serde_json::Value
         serde_json::from_value(settlement_bundle.clone())
             .test_expect("typed public settlement proof bundle");
     let keypair = Keypair::from_seed(&PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_SEED);
-    let (signature, _) = keypair
-        .sign_canonical(&typed_bundle)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.web3-settlement-proof-bundle.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&typed_bundle)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("sign public settlement proof bundle");
     settlement_bundle["bundle_signature"] = serde_json::json!({
         "algorithm": PUBLIC_SETTLEMENT_BUNDLE_SIGNATURE_ALGORITHM,
@@ -1744,9 +1748,12 @@ fn sign_agent_web_fixture_envelope(envelope: &mut serde_json::Value) {
     let public_key = keypair.public_key().to_hex();
     envelope["envelope_id"] = serde_json::Value::String(agent_web_envelope_id(envelope));
     let payload = agent_web_envelope_signature_payload(envelope);
-    let canonical =
-        chio_core_types::canonical_json_bytes(&payload).test_expect("canonical envelope payload");
-    let signature = keypair.sign(&canonical).to_hex();
+    let canonical = chio_core_types::CanonicalBytes::from_serializable(&payload)
+        .test_expect("canonical envelope payload");
+    let signature = keypair
+        .sign_wrapped("chio.agent-web-proof-envelope.v1", &canonical)
+        .test_expect("agent web envelope signs")
+        .to_hex();
     envelope["signature"] =
         serde_json::Value::String(format!("sig-ed25519:{public_key}:{signature}"));
 }
@@ -2224,8 +2231,12 @@ fn sign_commerce_payment_lifecycle(payment_lifecycle: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("payment lifecycle object")
         .remove("signature");
-    let (signature, _) = keypair
-        .sign_canonical(payment_lifecycle)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.commerce.payment-lifecycle.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(payment_lifecycle)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("sign payment lifecycle");
     payment_lifecycle["signature"] = serde_json::Value::String(signature.to_hex());
 }

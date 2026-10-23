@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use frost_ed25519::keys::VerifyingShare;
 use frost_ed25519::VerifyingKey;
@@ -16,9 +17,7 @@ pub const CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA: &str = "chio.frost.epoch-checkpoin
 pub const FROST_ED25519_SHA512_SUITE_ID: &str = "FROST-ED25519-SHA512-v1";
 const CHIO_FROST_ROSTER_ID_PREFIX: &[u8] = b"chio.frost.roster.id.v1\0";
 const CHIO_FROST_ROSTER_DIGEST_PREFIX: &[u8] = b"chio.frost.roster.digest.v1\0";
-const CHIO_FROST_ROSTER_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-ROSTER-V1\0";
 const CHIO_FROST_EPOCH_CHECKPOINT_DIGEST_PREFIX: &[u8] = b"chio.frost.epoch-checkpoint.digest.v1\0";
-const CHIO_FROST_EPOCH_CHECKPOINT_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-EPOCH-CHECKPOINT-V1\0";
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum FrostRosterError {
@@ -152,14 +151,12 @@ impl FrostRosterV1 {
         )
     }
 
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostRosterError> {
-        canonical_prefixed_bytes(
-            CHIO_FROST_ROSTER_SIGNING_PREFIX,
-            &FrostRosterSigningPreimage {
-                roster_id: &self.roster_id,
-                body: self.id_preimage(),
-            },
-        )
+    /// Canonical body the roster authority signs under `chio.frost.roster.v1`.
+    pub fn signing_body(&self) -> Result<CanonicalBytes, FrostRosterError> {
+        canonical_body(&FrostRosterSigningPreimage {
+            roster_id: &self.roster_id,
+            body: self.id_preimage(),
+        })
     }
 
     pub fn validate(&self) -> Result<(), FrostRosterError> {
@@ -389,11 +386,9 @@ struct FrostEpochCheckpointDigestPreimage<'a> {
 }
 
 impl FrostEpochCheckpointV1 {
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostRosterError> {
-        canonical_prefixed_bytes(
-            CHIO_FROST_EPOCH_CHECKPOINT_SIGNING_PREFIX,
-            &self.signing_preimage(),
-        )
+    /// Canonical body the epoch anchor signs under `chio.frost.epoch-checkpoint.v1`.
+    pub fn signing_body(&self) -> Result<CanonicalBytes, FrostRosterError> {
+        canonical_body(&self.signing_preimage())
     }
 
     pub fn recompute_checkpoint_digest(&self) -> Result<String, FrostRosterError> {
@@ -554,6 +549,11 @@ impl VerifiedActiveFrostRoster {
 
 fn canonical_digest<T: Serialize>(prefix: &[u8], value: &T) -> Result<String, FrostRosterError> {
     Ok(sha256_hex(&canonical_prefixed_bytes(prefix, value)?))
+}
+
+fn canonical_body<T: Serialize>(value: &T) -> Result<CanonicalBytes, FrostRosterError> {
+    CanonicalBytes::from_serializable(value)
+        .map_err(|error| FrostRosterError::Canonical(error.to_string()))
 }
 
 fn canonical_prefixed_bytes<T: Serialize>(

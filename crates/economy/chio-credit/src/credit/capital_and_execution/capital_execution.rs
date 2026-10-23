@@ -373,3 +373,7 @@ fn validate_positive_amount(amount: &MonetaryAmount, label: &str) -> Result<(), 
     }
     validate_non_empty_clean(&amount.currency, &format!("{label} currency"))
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalExecutionInstructionArtifact {
+    const SCHEMA_ID: &'static str = crate::CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA;
+}

@@ -76,7 +76,7 @@ pub(super) fn signed_token(keypair: &Keypair) -> String {
     });
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
     let signing_input = format!("{header}.{payload}");
-    let signature = URL_SAFE_NO_PAD.encode(keypair.sign(signing_input.as_bytes()).to_bytes());
+    let signature = URL_SAFE_NO_PAD.encode(keypair.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes()).to_bytes());
     format!("{signing_input}.{signature}")
 }
 

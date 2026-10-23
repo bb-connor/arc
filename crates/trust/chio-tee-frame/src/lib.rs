@@ -18,7 +18,8 @@ pub use frame::{
     UpstreamSystem, Verdict,
 };
 pub use schema::{
-    signing_payload, validate, validate_signed, verify_tenant_sig, SchemaError, SCHEMA_ID,
+    signing_body, signing_payload, validate, validate_signed, verify_tenant_sig, SchemaError,
+    SCHEMA_ID, TEE_CAPTURE_FRAME_SCHEMA,
     SCHEMA_VERSION,
 };
 

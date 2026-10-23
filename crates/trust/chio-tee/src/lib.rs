@@ -33,9 +33,9 @@ pub use config::{
     ENV_CONFIG_PATH, ENV_MODE,
 };
 pub use frame::{
-    canonicalize as canonicalize_frame, parse as parse_frame, signing_payload, validate_signed,
-    verify_tenant_sig, Frame, FrameError, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem,
-    Verdict, FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION,
+    canonicalize as canonicalize_frame, parse as parse_frame, signing_body, signing_payload,
+    validate_signed, verify_tenant_sig, Frame, FrameError, FrameInputs, Otel, Provenance, Upstream,
+    UpstreamSystem, Verdict, FRAME_VERSION, SCHEMA_ID, SCHEMA_VERSION, TEE_CAPTURE_FRAME_SCHEMA,
 };
 pub use mode::{
     Direction, Mode, ModeInputs, MoteState, ParseModeError, ResolvedMode, Source, TransitionError,

@@ -53,10 +53,16 @@ fn signed_envelope(
         },
     };
     envelope.credential_id = envelope.recompute_credential_id()?;
-    let signature = issuer.sign_canonical(&envelope.signing_body())?.0;
-    assert!(issuer
-        .public_key()
-        .verify_canonical(&envelope.signing_body(), &signature)?);
+    let signature = issuer.sign_wrapped(
+        envelope.family().schema(),
+        &chio_core::canonical::CanonicalBytes::from_serializable(&envelope.signing_body())?,
+    )?;
+    chio_core::crypto::verify_wrapped(
+        &issuer.public_key(),
+        envelope.family().schema(),
+        &envelope.signing_body(),
+        &signature,
+    )?;
     envelope.proof.proof_value = signature.to_hex();
     Ok(envelope)
 }

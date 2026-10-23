@@ -143,7 +143,8 @@ pub fn create_signed_cross_issuer_migration(
         expires_at,
     };
     verify_signed_cross_issuer_migration_body(&body)?;
-    let (signature, _) = signer.sign_canonical(&body)?;
+    let signature =
+        signer.sign_wrapped(CROSS_ISSUER_MIGRATION_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body)?)?;
     Ok(SignedCrossIssuerMigration { body, signature })
 }
 
@@ -166,10 +167,13 @@ pub fn verify_signed_cross_issuer_migration(
             )));
         }
     }
-    let signed = migration.body.signer_public_key.verify(
-        &canonical_json_bytes(&migration.body)?,
+    let signed = chio_core::crypto::verify_wrapped(
+        &migration.body.signer_public_key,
+        CROSS_ISSUER_MIGRATION_SCHEMA,
+        &migration.body,
         &migration.signature,
-    );
+    )
+    .is_ok();
     if !signed {
         return Err(CredentialError::InvalidCrossIssuerMigration(format!(
             "cross-issuer migration `{}` signature verification failed",

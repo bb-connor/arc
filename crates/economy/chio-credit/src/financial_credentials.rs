@@ -164,9 +164,8 @@ pub fn qualify_financial_source_checkpoint(
     {
         return Err(FinancialCredentialProjectionError::InvalidSourceAuthority);
     }
-    if !authority_pin
-        .checkpoint_authority_key
-        .verify_canonical(body, &checkpoint.signature)
+    if !checkpoint
+        .verify_signature(&authority_pin.checkpoint_authority_key)
         .map_err(|_| FinancialCredentialProjectionError::InvalidSourceAttestationSignature)?
     {
         return Err(FinancialCredentialProjectionError::InvalidSourceAttestationSignature);
@@ -291,7 +290,7 @@ pub fn prepare_credit_scorecard_financial_source(
     exposure_report: &SignedExposureLedgerReport,
     members: &[SignedFinancialSourceMemberV1],
 ) -> Result<FinancialSourceCompletenessAttestationRequestV1, FinancialCredentialProjectionError> {
-    inspect_source_signature(report.verify_signature())?;
+    inspect_source_signature(report.verify_signature(&report.signer_key))?;
     if report.body.schema != CREDIT_SCORECARD_SCHEMA {
         return Err(FinancialCredentialProjectionError::InvalidSourceSchema);
     }
@@ -354,7 +353,7 @@ pub fn prepare_exposure_history_financial_source(
     report: &SignedExposureLedgerReport,
     members: &[SignedFinancialSourceMemberV1],
 ) -> Result<FinancialSourceCompletenessAttestationRequestV1, FinancialCredentialProjectionError> {
-    inspect_source_signature(report.verify_signature())?;
+    inspect_source_signature(report.verify_signature(&report.signer_key))?;
     if report.body.schema != EXPOSURE_LEDGER_SCHEMA {
         return Err(FinancialCredentialProjectionError::InvalidSourceSchema);
     }
@@ -621,7 +620,7 @@ fn inspect_financial_source_member(
     expected_family: FinancialCredentialFamilyV1,
     expected_signer: &PublicKey,
 ) -> Result<FinancialSourceExpectedMemberV1, FinancialCredentialProjectionError> {
-    inspect_source_signature(member.verify_signature())?;
+    inspect_source_signature(member.verify_signature(&member.signer_key))?;
     if member.body.schema != FINANCIAL_SOURCE_MEMBER_SCHEMA_V1
         || member.body.query_key.source_family != expected_family
         || &member.signer_key != expected_signer
@@ -757,7 +756,7 @@ fn validate_scorecard_exposure_binding(
     scorecard: &SignedCreditScorecardReport,
     exposure: &SignedExposureLedgerReport,
 ) -> Result<(), FinancialCredentialProjectionError> {
-    inspect_source_signature(exposure.verify_signature())?;
+    inspect_source_signature(exposure.verify_signature(&exposure.signer_key))?;
     if exposure.body.schema != EXPOSURE_LEDGER_SCHEMA
         || exposure.signer_key != scorecard.signer_key
         || exposure.body.filters != scorecard.body.filters

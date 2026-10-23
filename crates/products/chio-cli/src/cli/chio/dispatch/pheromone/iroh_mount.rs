@@ -1361,7 +1361,12 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1662,7 +1667,12 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1722,7 +1732,12 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1780,7 +1795,12 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: expires_at,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -2089,7 +2109,12 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: expires_at,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -2507,7 +2532,12 @@ mod tests {
             issued_at_unix_ms,
             expires_at_unix_ms,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,

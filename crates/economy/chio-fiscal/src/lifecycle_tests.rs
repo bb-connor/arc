@@ -47,10 +47,15 @@ fn assert_fiscal_fixture<T: serde::Serialize>(name: &str, expected: &T) -> TestR
     Ok(())
 }
 
-fn verify_fiscal_fixture_signature(name: &str) -> TestResult {
+fn verify_fiscal_fixture_signature<T>(name: &str) -> TestResult
+where
+    T: chio_core_types::receipt::lineage::SignedExportPayload
+        + serde::de::DeserializeOwned
+        + Clone,
+{
     let mut fixture = fiscal_fixture(name)?;
-    let envelope: SignedExportEnvelope<Value> = serde_json::from_value(fixture.clone())?;
-    assert!(envelope.verify_signature()?, "{name} signature is invalid");
+    let envelope: SignedExportEnvelope<T> = serde_json::from_value(fixture.clone())?;
+    assert!(envelope.verify_signature(&envelope.signer_key)?, "{name} signature is invalid");
 
     let fixture = fixture
         .as_object_mut()
@@ -69,10 +74,10 @@ fn verify_fiscal_fixture_signature(name: &str) -> TestResult {
     signature.replace_range(last_index.., if last == b'0' { "1" } else { "0" });
     fixture.insert("signature".to_owned(), signature.into());
 
-    let envelope: SignedExportEnvelope<Value> =
+    let envelope: SignedExportEnvelope<T> =
         serde_json::from_value(Value::Object(fixture.clone()))?;
     assert!(
-        !envelope.verify_signature()?,
+        !envelope.verify_signature(&envelope.signer_key)?,
         "{name} accepted a tampered signature"
     );
     Ok(())
@@ -541,18 +546,14 @@ fn published_fiscal_fixtures_match_runtime_types_and_signatures() -> TestResult 
     assert_fiscal_fixture("consumer-readiness", fixture.readiness.signed())?;
     assert_fiscal_fixture("continuity-checkpoint", fixture.genesis.signed())?;
 
-    for name in [
-        "charter",
-        "schedule",
-        "proposal",
-        "proposal-admission",
-        "approval",
-        "activation",
-        "consumer-readiness",
-        "continuity-checkpoint",
-    ] {
-        verify_fiscal_fixture_signature(name)?;
-    }
+    verify_fiscal_fixture_signature::<FiscalCharter>("charter")?;
+    verify_fiscal_fixture_signature::<FiscalSchedule>("schedule")?;
+    verify_fiscal_fixture_signature::<FiscalProposal>("proposal")?;
+    verify_fiscal_fixture_signature::<FiscalProposalAdmission>("proposal-admission")?;
+    verify_fiscal_fixture_signature::<FiscalApproval>("approval")?;
+    verify_fiscal_fixture_signature::<FiscalActivation>("activation")?;
+    verify_fiscal_fixture_signature::<FiscalRuntimeReadiness>("consumer-readiness")?;
+    verify_fiscal_fixture_signature::<FiscalContinuityCheckpoint>("continuity-checkpoint")?;
 
     let mut policy = fixture.policy;
     let usd = policy

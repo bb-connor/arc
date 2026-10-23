@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{PublicKey, Signature};
+use crate::crypto::{verify_wrapped, PublicKey, Signature};
 use crate::error::Web3ContractError;
 use crate::validation::{ensure_non_empty, ensure_unique_copy_values, ensure_unique_strings};
 
@@ -68,12 +68,14 @@ pub fn verify_web3_identity_binding(
     binding: &SignedWeb3IdentityBinding,
 ) -> Result<(), Web3ContractError> {
     validate_web3_identity_binding(binding)?;
-    let verified = binding
-        .certificate
-        .chio_public_key
-        .verify_canonical(&binding.certificate, &binding.signature)
-        .map_err(|error| Web3ContractError::InvalidBinding(error.to_string()))?;
-    if !verified {
+    if verify_wrapped(
+        &binding.certificate.chio_public_key,
+        CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+        &binding.certificate,
+        &binding.signature,
+    )
+    .is_err()
+    {
         return Err(Web3ContractError::BindingSignatureInvalid(
             "identity binding signature verification failed".to_string(),
         ));

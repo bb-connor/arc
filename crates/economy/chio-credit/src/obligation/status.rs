@@ -745,7 +745,7 @@ pub fn verify_obligation_status_proof(
         || signed.body().authority_key_epoch != context.trust.authority_key_epoch
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| ObligationError::Canonicalization(error.to_string()))?
     {
         return Err(ObligationError::StatusProofAuthorityVerification);
@@ -1068,4 +1068,8 @@ impl ObligationDispositionRecordV1 {
             },
         )
     }
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ObligationStatusProofBodyV1 {
+    const SCHEMA_ID: &'static str = OBLIGATION_STATUS_PROOF_SCHEMA;
 }

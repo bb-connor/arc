@@ -42,11 +42,11 @@ pub fn verify_receipt_strict(receipt: &ChioReceipt) -> Result<(), ReceiptStrictE
     }
     let signing_body =
         ChioReceiptSigningBody::from_body_and_bbs(&body, receipt.bbs_signature.as_ref());
-    match receipt
-        .kernel_key
-        .verify_canonical_strict(&signing_body, &receipt.signature)
-    {
-        Ok(true) => Ok(()),
-        _ => Err(ReceiptStrictError::SignatureInvalid),
-    }
+    chio_core_types::crypto::verify_wrapped(
+        &receipt.kernel_key,
+        chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+        &signing_body,
+        &receipt.signature,
+    )
+    .map_err(|_| ReceiptStrictError::SignatureInvalid)
 }

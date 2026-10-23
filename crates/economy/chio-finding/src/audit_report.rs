@@ -175,3 +175,7 @@ pub fn verify_signed_audit_report(
     signed.body.validate()?;
     crate::envelope::verify_pinned_envelope(signed, pinned_audit_authority, "audit_report")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingAuditReport {
+    const SCHEMA_ID: &'static str = FINDING_AUDIT_REPORT_SCHEMA_V1;
+}

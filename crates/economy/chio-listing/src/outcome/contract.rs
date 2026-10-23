@@ -751,7 +751,7 @@ pub(super) fn authenticate_outcome_eligibility_at(
     if signed.0.signer_key != *context.trust.key()
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -777,14 +777,14 @@ fn verify_provider_envelope<T>(
     trusted_now_unix_ms: u64,
 ) -> Result<(), OutcomeError>
 where
-    T: Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
     if provider_id != trust.principal_id() {
         return Err(OutcomeError::BindingMismatch);
     }
     if envelope.signer_key != *trust.key()
         || !envelope
-            .verify_signature()
+            .verify_signature(&envelope.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -795,4 +795,16 @@ where
         trust.max_lifetime_ms(),
         trusted_now_unix_ms,
     )
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeEligibilityBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_ELIGIBILITY_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomePricingBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_PRICING_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeSlaBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_SLA_SCHEMA;
 }

@@ -53,7 +53,13 @@ fn verify_ed25519_jwt_signature(
     }
     let mut signature = [0u8; 64];
     signature.copy_from_slice(signature_bytes);
-    public_key.verify_strict(signed_input, &Ed25519Signature::from_bytes(&signature))
+    chio_core::crypto::verify_exempt(
+        public_key,
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        signed_input,
+        &Ed25519Signature::from_bytes(&signature),
+    )
+    .is_ok()
 }
 
 fn validate_identity_provider_url(url: &Url, field_name: &str) -> Result<(), CliError> {

@@ -141,9 +141,9 @@ fn verify_signed_artifact<T>(
     field_name: &str,
 ) -> Result<(), MarketError>
 where
-    T: Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
-    if artifact.verify_signature().map_err(|error| {
+    if artifact.verify_signature(&artifact.signer_key).map_err(|error| {
         MarketError::signature_invalid(format!(
             "{field_name} signature verification failed: {error}"
         ))

@@ -609,7 +609,7 @@ fn validate_current_listing(
             "current listing assertion is not signed by the pinned registry authority".to_owned(),
         ));
     }
-    match registry_key.verify_canonical_strict(&assertion.body, &assertion.signature) {
+    match assertion.verify_signature(registry_key) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(
@@ -678,7 +678,7 @@ fn validate_current_listing(
     }
     ensure_generic_listing_signed_by_namespace_owner(&listing.listing, "finding listing")
         .map_err(FindingPheromoneError::Listing)?;
-    match owner_key.verify_canonical_strict(&listing.listing.body, &listing.listing.signature) {
+    match listing.listing.verify_signature(owner_key) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(
@@ -704,7 +704,7 @@ fn validate_current_listing(
             "pricing hint is not bound to the current listing authority".to_string(),
         ));
     }
-    match owner_key.verify_canonical_strict(&listing.pricing.body, &listing.pricing.signature) {
+    match listing.pricing.verify_signature(owner_key) {
         Ok(true) => {}
         Ok(false) => {
             return Err(FindingPheromoneError::Listing(
@@ -811,4 +811,8 @@ fn is_bounded_printable_identifier(value: &str) -> bool {
             .bytes()
             .all(|byte| byte == b' ' || byte.is_ascii_graphic())
         && value.bytes().any(|byte| byte != b' ')
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingCurrentListingAssertion {
+    const SCHEMA_ID: &'static str = FINDING_CURRENT_LISTING_ASSERTION_SCHEMA_V1;
 }

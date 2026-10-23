@@ -111,7 +111,7 @@ pub fn verify_financial_cross_issuer_trust_pack(
         &pack.body.signer_key_id,
         pack.body.signer_key_epoch,
     )?;
-    if verifier.public_key != pack.signer_key || !pack.verify_signature()? {
+    if verifier.public_key != pack.signer_key || !pack.verify_signature(&pack.signer_key)? {
         return Err(authority_error(
             "cross-issuer trust pack signer does not match trusted verifier key",
         ));
@@ -179,7 +179,7 @@ pub fn verify_financial_cross_issuer_migration(
         &body.signer_key_id,
         body.signer_key_epoch,
     )?;
-    if attester.public_key != migration.signer_key || !migration.verify_signature()? {
+    if attester.public_key != migration.signer_key || !migration.verify_signature(&migration.signer_key)? {
         return Err(authority_error(
             "cross-issuer migration signer does not match local trust",
         ));
@@ -207,7 +207,7 @@ fn verify_activation_decision_signature(
         &decision.body.signer_key_id,
         decision.body.signer_key_epoch,
     )?;
-    if verifier.public_key != decision.signer_key || !decision.verify_signature()? {
+    if verifier.public_key != decision.signer_key || !decision.verify_signature(&decision.signer_key)? {
         return Err(authority_error(
             "entry activation signer does not match trusted verifier key",
         ));

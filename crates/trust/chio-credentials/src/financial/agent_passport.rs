@@ -199,7 +199,7 @@ pub fn inspect_financial_passport_source_manifest_signature(
     if recompute_source_passport_id(body)? != body.source_passport_id {
         return invalid_financial("source passport ID does not match its manifest");
     }
-    if manifest.verify_signature()? {
+    if manifest.verify_signature(&manifest.signer_key)? {
         Ok(())
     } else {
         Err(CredentialError::InvalidCredentialSignature)
@@ -530,7 +530,10 @@ pub fn respond_to_financial_passport_presentation_challenge(
         challenge,
         presentation: &presentation,
     };
-    let (signature, _) = holder_keypair.sign_canonical(&unsigned)?;
+    let signature = holder_keypair.sign_wrapped(
+        FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned)?,
+    )?;
     Ok(FinancialPassportPresentationResponse {
         schema: FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1.to_string(),
         challenge: challenge.clone(),
@@ -583,9 +586,13 @@ pub fn inspect_financial_passport_presentation_response(
         presentation: &response.presentation,
     };
     let signature = Signature::from_hex(&response.proof.proof_value)?;
-    if !holder
-        .public_key()
-        .verify(&canonical_json_bytes(&unsigned)?, &signature)
+    if chio_core::crypto::verify_wrapped(
+        &holder.public_key(),
+        FINANCIAL_PASSPORT_PRESENTATION_RESPONSE_SCHEMA_V1,
+        &unsigned,
+        &signature,
+    )
+    .is_err()
     {
         return Err(CredentialError::InvalidPresentationSignature);
     }
@@ -615,7 +622,7 @@ fn validate_financial_passport_presentation_challenge_contract(
     if verifier.public_key() != &challenge.signer_key {
         return Err(CredentialError::ChallengeVerifierKeyMismatch);
     }
-    if challenge.verify_signature()? {
+    if challenge.verify_signature(&challenge.signer_key)? {
         Ok(validity)
     } else {
         Err(CredentialError::InvalidChallengeSignature)

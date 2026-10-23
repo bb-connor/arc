@@ -776,9 +776,16 @@ fn verify_deposit_self_signature(
 ) -> Result<(), FanoutError> {
     let mut signed_body = frame.deposit.body.clone();
     signed_body.cost_commitment = None;
-    let canonical = canonical_json_bytes(&signed_body)
+    let canonical = chio_core_types::canonical::CanonicalBytes::from_serializable(&signed_body)
         .map_err(|error| FanoutError::Canonical(error.to_string()))?;
-    if origin_key.verify(&canonical, &frame.deposit.signature) {
+    if chio_core_types::crypto::verify_wrapped_bytes(
+        origin_key,
+        chio_federation::pheromone_gossip::PHEROMONE_DEPOSIT_SCHEMA,
+        &canonical,
+        &frame.deposit.signature,
+    )
+    .is_ok()
+    {
         Ok(())
     } else {
         Err(FanoutError::DepositSignatureInvalid)

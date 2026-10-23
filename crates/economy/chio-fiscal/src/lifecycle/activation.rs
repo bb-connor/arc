@@ -832,3 +832,11 @@ fn approval_set_digest(approvals: &[SignedFiscalApproval]) -> Result<String, Fis
     }
     lifecycle_digest(FISCAL_APPROVAL_SET_DIGEST_DOMAIN, &entries)
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalActivation {
+    const SCHEMA_ID: &'static str = FISCAL_ACTIVATION_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalApproval {
+    const SCHEMA_ID: &'static str = FISCAL_APPROVAL_SCHEMA;
+}

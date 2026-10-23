@@ -7,10 +7,10 @@ use std::sync::PoisonError;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core_types::hashing::Hash;
 use chio_core_types::merkle::MerkleProof;
-use chio_core_types::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -278,7 +278,6 @@ pub struct PheromoneObservationCostVerifierRootBody {
     pub verifier_id: String,
     pub verifier_key_id: String,
     pub public_key: PublicKey,
-    pub signature_algorithm: SigningAlgorithm,
     pub valid_from_unix_ms: u64,
     pub valid_until_unix_ms: u64,
     pub allowed_treaties: Vec<String>,
@@ -492,12 +491,12 @@ pub fn sign_deposit(
     body: PheromoneDepositBody,
     keypair: &Keypair,
 ) -> Result<PheromoneDeposit, PheromoneError> {
-    let canonical = canonical_json_bytes(&deposit_signature_body(&body))
+    let canonical = CanonicalBytes::from_serializable(&deposit_signature_body(&body))
         .map_err(|error| PheromoneError::CanonicalJson(error.to_string()))?;
-    Ok(PheromoneDeposit {
-        body,
-        signature: keypair.sign(&canonical),
-    })
+    let signature = keypair
+        .sign_wrapped(PHEROMONE_DEPOSIT_SCHEMA, &canonical)
+        .map_err(|error| PheromoneError::CanonicalJson(error.to_string()))?;
+    Ok(PheromoneDeposit { body, signature })
 }
 
 pub fn validate_deposit_for_admission(

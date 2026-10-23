@@ -121,7 +121,7 @@ impl LiabilityClaimPayoutInstructionArtifact {
         self.adjudication.body.validate()?;
         if !self
             .capital_instruction
-            .verify_signature()
+            .verify_signature(&self.capital_instruction.signer_key)
             .map_err(|error| MarketError::signature_invalid(error.to_string()))?
         {
             return Err(MarketError::signature_invalid(
@@ -325,7 +325,7 @@ impl LiabilityClaimSettlementInstructionArtifact {
         self.payout_receipt.body.validate()?;
         if !self
             .capital_book
-            .verify_signature()
+            .verify_signature(&self.capital_book.signer_key)
             .map_err(|error| MarketError::signature_invalid(error.to_string()))?
         {
             return Err(MarketError::signature_invalid(
@@ -723,4 +723,20 @@ pub struct LiabilityClaimWorkflowReport {
     pub query: LiabilityClaimWorkflowQuery,
     pub summary: LiabilityClaimWorkflowSummary,
     pub claims: Vec<LiabilityClaimWorkflowRow>,
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimPayoutInstructionArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimPayoutReceiptArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimSettlementInstructionArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimSettlementReceiptArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA;
 }

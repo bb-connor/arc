@@ -226,8 +226,7 @@ fn batched_primary_proof() -> AnchorInclusionProof {
     body.as_object_mut()
         .test_expect("checkpoint statement body is an object")
         .remove("signature");
-    let (signature, _) = operator_keypair()
-        .sign_canonical(&body)
+    let signature = chio_core::canonical::CanonicalBytes::from_serializable(&body).and_then(|canonical| operator_keypair().sign_wrapped(chio_core::web3::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical))
         .test_expect("checkpoint statement signs");
     proof.checkpoint_statement.signature = signature;
     proof
@@ -279,8 +278,7 @@ fn sample_binding_for_config(config: &SettlementChainConfig) -> SignedWeb3Identi
         expires_at: 1_774_828_800,
         nonce: "evm-unit-binding".to_string(),
     };
-    let (signature, _) = operator
-        .sign_canonical(&certificate)
+    let signature = chio_core::canonical::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| operator.sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical))
         .test_expect("binding signature");
     SignedWeb3IdentityBinding {
         certificate,
@@ -1224,10 +1222,8 @@ async fn prepare_web3_escrow_dispatch_rejects_binding_and_instruction_mismatches
     let config = sample_config();
     let mut binding = sample_binding_for_config(&config);
     binding.certificate.purpose = vec![Web3KeyBindingPurpose::Anchor];
-    binding.signature = operator_keypair()
-        .sign_canonical(&binding.certificate)
-        .test_expect("binding signature")
-        .0;
+    binding.signature = chio_core::canonical::CanonicalBytes::from_serializable(&binding.certificate).and_then(|canonical| operator_keypair().sign_wrapped(chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA, &canonical))
+        .test_expect("binding signature");
 
     let valid_request = EscrowDispatchRequest {
         dispatch_id: "dispatch-unit-2".to_string(),

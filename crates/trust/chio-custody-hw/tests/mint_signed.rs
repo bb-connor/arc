@@ -8,7 +8,7 @@
 //!    (modulo the `signature` slot) to the unsigned form.
 //! 2. The detached signature verifies under the backend's public key when
 //!    re-canonicalised against the envelope-with-empty-signature message
-//!    [`signing_message`] reconstructs.
+//!    [`signing_body`] reconstructs.
 //! 3. Tampering with any envelope field invalidates the signature
 //!    fail-closed.
 //!
@@ -22,7 +22,7 @@ use std::sync::Arc;
 use chio_core_types::crypto::{Ed25519Backend, Keypair, Signature, SigningBackend};
 use chio_custody_hw::capability::{PasskeyCapability, ScopeSet};
 use chio_custody_hw::issuer::{IssuerService, MintRequest};
-use chio_custody_hw::mint::signing_message;
+use chio_custody_hw::mint::signing_body;
 use chio_custody_hw::verifier::VerifiedAssertion;
 use chrono::{TimeZone, Utc};
 
@@ -73,7 +73,7 @@ fn signed_mint_yields_non_empty_signature_under_classical_floor() {
 fn signing_envelope_is_byte_identical_across_signers() {
     // Mint the same request under two different signers. The
     // canonical-JSON encoding of the envelope with the signature slot
-    // cleared (`signing_message`) must match byte-for-byte regardless of
+    // cleared (`signing_body`) must match byte-for-byte regardless of
     // which key signed it: only the `signature` field differs across
     // backends. This is the observable form of the byte-identity
     // invariant that `crypto_floor=allow_classical` relies on.
@@ -99,13 +99,13 @@ fn signing_envelope_is_byte_identical_across_signers() {
         "distinct signing keys must produce distinct signatures"
     );
 
-    let lhs = match signing_message(&signed_a.capability) {
+    let lhs = match signing_body(&signed_a.capability) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
-    let rhs = match signing_message(&signed_b.capability) {
+    let rhs = match signing_body(&signed_b.capability) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
     assert_eq!(
         lhs, rhs,
@@ -128,16 +128,16 @@ fn signature_verifies_against_backend_public_key() {
         Err(e) => panic!("signed mint must succeed: {e}"),
     };
 
-    let message = match signing_message(&resp.capability) {
+    let message = match signing_body(&resp.capability) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
     let signature = match Signature::from_hex(&resp.capability.signature) {
         Ok(s) => s,
         Err(e) => panic!("signed capability signature must decode: {e}"),
     };
     assert!(
-        public.verify(&message, &signature),
+        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
         "issuer signature must verify against backend public key"
     );
 }
@@ -160,16 +160,16 @@ fn tampering_with_audience_breaks_signature() {
     let mut tampered: PasskeyCapability = resp.capability.clone();
     tampered.audience = "urn:chio:audience:other".into();
 
-    let message = match signing_message(&tampered) {
+    let message = match signing_body(&tampered) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
     let signature = match Signature::from_hex(&tampered.signature) {
         Ok(s) => s,
         Err(e) => panic!("hex must decode: {e}"),
     };
     assert!(
-        !public.verify(&message, &signature),
+        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err(),
         "tampering with audience MUST invalidate the signature"
     );
 }
@@ -192,16 +192,16 @@ fn tampering_with_scope_set_breaks_signature() {
     let mut tampered: PasskeyCapability = resp.capability.clone();
     tampered.scope_set = ScopeSet::new(["tool:read", "tool:write", "tool:admin"]);
 
-    let message = match signing_message(&tampered) {
+    let message = match signing_body(&tampered) {
         Ok(b) => b,
-        Err(e) => panic!("signing_message must encode: {e}"),
+        Err(e) => panic!("signing_body must encode: {e}"),
     };
     let signature = match Signature::from_hex(&tampered.signature) {
         Ok(s) => s,
         Err(e) => panic!("hex must decode: {e}"),
     };
     assert!(
-        !public.verify(&message, &signature),
+        chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_err(),
         "tampering with scope set MUST invalidate the signature"
     );
 }
@@ -241,16 +241,16 @@ mod hybrid {
             Err(e) => panic!("hybrid signed mint must succeed: {e}"),
         };
         assert!(!resp.capability.signature.is_empty());
-        let message = match signing_message(&resp.capability) {
+        let message = match signing_body(&resp.capability) {
             Ok(b) => b,
-            Err(e) => panic!("signing_message must encode: {e}"),
+            Err(e) => panic!("signing_body must encode: {e}"),
         };
         let signature = match Signature::from_hex(&resp.capability.signature) {
             Ok(s) => s,
             Err(e) => panic!("hybrid signature hex must decode: {e}"),
         };
         assert!(
-            public.verify(&message, &signature),
+            chio_core_types::crypto::verify_wrapped_bytes(&public, chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA, &message, &signature).is_ok(),
             "hybrid signature must verify against hybrid public key"
         );
     }

@@ -43,7 +43,13 @@ pub(super) fn load_record(
         .ok_or(RecordLoadError::Unknown)?;
     let signed: SignedRecord = decode_json(serialized.as_bytes(), MAX_SESSION_JSON_BYTES)?;
     if signed.record.id != id
-        || !record_key.verify_canonical_strict(&signed.record, &signed.signature)?
+        || chio_core::crypto::verify_wrapped(
+            record_key,
+            RECORD_SCHEMA,
+            &signed.record,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(RecordLoadError::Integrity);
     }

@@ -621,7 +621,14 @@ pub fn verify_signed_oid4vp_request_object(
             "OID4VP request JWT typ must be `{OID4VP_REQUEST_OBJECT_TYP}`"
         )));
     }
-    if !verifier_public_key.verify(signing_input.as_bytes(), &signature) {
+    if chio_core::crypto::verify_exempt(
+        verifier_public_key,
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        signing_input.as_bytes(),
+        &signature,
+    )
+    .is_err()
+    {
         return Err(CredentialError::InvalidOid4vpRequest(
             "OID4VP request JWT signature verification failed".to_string(),
         ));
@@ -989,7 +996,14 @@ pub fn verify_oid4vp_direct_post_response(
         ));
     }
     let holder_public_key = credential_verification.holder_jwk.to_public_key()?;
-    if !holder_public_key.verify(signing_input.as_bytes(), &signature) {
+    if chio_core::crypto::verify_exempt(
+        &holder_public_key,
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        signing_input.as_bytes(),
+        &signature,
+    )
+    .is_err()
+    {
         return Err(CredentialError::InvalidOid4vpResponse(
             "OID4VP response JWT signature verification failed".to_string(),
         ));
@@ -1076,7 +1090,7 @@ fn sign_jwt_value(
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(serde_json::to_vec(payload).map_err(|error| CredentialError::Core(error.into()))?);
     let signing_input = format!("{header_b64}.{payload_b64}");
-    let signature = signing_key.sign(signing_input.as_bytes());
+    let signature = signing_key.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes());
     Ok(format!(
         "{signing_input}.{}",
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature.to_bytes())

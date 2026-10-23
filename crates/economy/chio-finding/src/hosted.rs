@@ -400,3 +400,23 @@ impl FindingLiability {
         }
     }
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingClaimAllocation {
+    const SCHEMA_ID: &'static str = FINDING_CLAIM_ALLOCATION_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingLiability {
+    const SCHEMA_ID: &'static str = FINDING_LIABILITY_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingPurchaseResult {
+    const SCHEMA_ID: &'static str = FINDING_PURCHASE_RESULT_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingVerifiedFixSubmission {
+    const SCHEMA_ID: &'static str = FINDING_VERIFIED_FIX_SUBMISSION_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingVoluntaryRetraction {
+    const SCHEMA_ID: &'static str = FINDING_VOLUNTARY_RETRACTION_SCHEMA_V1;
+}

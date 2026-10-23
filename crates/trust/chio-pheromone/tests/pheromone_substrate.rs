@@ -2,7 +2,7 @@
 
 use chio_core_types::crypto::sha256_hex;
 use chio_core_types::merkle::MerkleTree;
-use chio_core_types::{Keypair, SigningAlgorithm};
+use chio_core_types::{CanonicalBytes, Keypair};
 use chio_pheromone::{
     agent_passport_jwk_thumbprint, agent_passport_key_hash, scarcity_policy_sha256,
     scarcity_window_id, sign_deposit, CostCommitmentPolicy, DepositQuery,
@@ -196,7 +196,6 @@ fn verifier_root(
         verifier_id: "did:chio:cost-verifier".to_string(),
         verifier_key_id: "cost-root-key-1".to_string(),
         public_key: verifier_key.public_key(),
-        signature_algorithm: SigningAlgorithm::Ed25519,
         valid_from_unix_ms: 1_699_999_000_000,
         valid_until_unix_ms: 1_800_000_000_000,
         allowed_treaties: vec!["treaty:buyer-llamaworks:support-ops".to_string()],
@@ -205,8 +204,11 @@ fn verifier_root(
         runtime_policy_sha256: runtime_policy_sha256.to_string(),
         issuer_kernel_id: "did:chio:receiver-runtime".to_string(),
     };
-    let (issuer_signature, _) = issuer_key
-        .sign_canonical(&body)
+    let issuer_signature = issuer_key
+        .sign_wrapped(
+            chio_pheromone::PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body).expect("canonical"),
+        )
         .expect("sign verifier root");
     PheromoneObservationCostVerifierRoot {
         body,
@@ -301,8 +303,11 @@ fn signed_cost_commitment(
         inclusion_proof: tree.inclusion_proof(0).expect("proof"),
         leaf_preimage_sha256: sha256_hex(&leaf_bytes),
     };
-    let (signature, _) = verifier_key
-        .sign_canonical(&statement)
+    let signature = verifier_key
+        .sign_wrapped(
+            chio_pheromone::PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+            &CanonicalBytes::from_serializable(&statement).expect("canonical"),
+        )
         .expect("sign cost statement");
     PheromoneCostCommitment {
         schema: PHEROMONE_COST_COMMITMENT_SCHEMA.to_string(),
@@ -312,8 +317,11 @@ fn signed_cost_commitment(
 }
 
 fn resign_cost_commitment(commitment: &mut PheromoneCostCommitment, verifier_key: &Keypair) {
-    let (signature, _) = verifier_key
-        .sign_canonical(&commitment.statement)
+    let signature = verifier_key
+        .sign_wrapped(
+            chio_pheromone::PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+            &CanonicalBytes::from_serializable(&commitment.statement).expect("canonical"),
+        )
         .expect("resign cost statement");
     commitment.signature = signature;
 }
@@ -1032,8 +1040,11 @@ fn observation_cost_commitment_rejects_untrusted_invalid_and_revoked_roots() {
         .inclusion_proof
         .audit_path
         .push(chio_core_types::hashing::Hash::from_hex(&"a".repeat(64)).expect("hash"));
-    let (signature, _) = verifier_key
-        .sign_canonical(&commitment.statement)
+    let signature = verifier_key
+        .sign_wrapped(
+            chio_pheromone::PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA,
+            &CanonicalBytes::from_serializable(&commitment.statement).expect("canonical"),
+        )
         .expect("resign mutated proof");
     commitment.signature = signature;
     bad_merkle_deposit.body.cost_commitment = Some(commitment);

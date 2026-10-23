@@ -276,7 +276,7 @@ pub(super) fn require_anchor_publisher_lifecycle(
     let publication = evidence.signed_checkpoint_publication;
     if publication.signer_key != *evidence.status_authority
         || !publication
-            .verify_signature()
+            .verify_signature(&publication.signer_key)
             .map_err(|error| reject(format!("anchor checkpoint publication rejected: {error}")))?
     {
         return Err(reject(
@@ -564,4 +564,8 @@ pub fn plan_finding_impairment_for_reconciliation(
         anchor_publisher,
     )
     .map(|planned| PlannedFindingImpairmentReconciliation { planned })
+}
+
+impl chio_core::receipt::lineage::SignedExportPayload for FindingAnchorCheckpointPublication {
+    const SCHEMA_ID: &'static str = FINDING_ANCHOR_CHECKPOINT_PUBLICATION_SCHEMA_V1;
 }

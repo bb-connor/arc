@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 //! Remote signing implementations for hosted Chio deployments.
 //!
-//! Both backends pin an explicit public key and key version. A successful
-//! transport response is accepted only after local strict signature
-//! verification over the exact input bytes.
+//! Both backends pin an explicit public key and key version and sign only the
+//! 88-byte signing wrapper: an exempt-format message is refused locally before
+//! any request is sent. A successful transport response is accepted only after
+//! local strict verification over the exact wrapper bytes.
 
 use std::fmt;
 use std::io::Read;
@@ -14,8 +15,10 @@ use std::time::Duration;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 use chio_core::error::Result;
+use chio_core::crypto::verify_wrapper;
 use chio_core::{
     canonical_json_bytes, sha256, Error, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    SigningMessage, SigningWrapper,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
@@ -23,7 +26,7 @@ use url::Url;
 const HTTP_SIGN_REQUEST_SCHEMA: &str = "chio.signing.http-request.v1";
 const HTTP_SIGN_RESPONSE_SCHEMA: &str = "chio.signing.http-response.v1";
 const HTTP_KEY_RESPONSE_SCHEMA: &str = "chio.signing.http-key.v1";
-const MAX_SIGNING_MESSAGE_BYTES: usize = 1024 * 1024;
+const HTTP_SIGN_MESSAGE_KIND_WRAPPER: &str = "wrapper";
 const MAX_RESPONSE_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone)]
@@ -180,14 +183,15 @@ impl SigningBackend for HttpSigningBackend {
         Ok(self.key.public_key.clone())
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
-        validate_message(message)?;
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
+        let wrapper = wrapper_message(message)?;
         let binding = HttpSignBinding {
             key_handle: self.key.key_handle(),
             key_version: self.key.key_version(),
             algorithm: SigningAlgorithm::Ed25519,
-            message_sha256: sha256(message).to_hex(),
-            message_base64: BASE64_STANDARD.encode(message),
+            kind: HTTP_SIGN_MESSAGE_KIND_WRAPPER,
+            message: hex_encode(wrapper.as_bytes()),
+            message_sha256: sha256(wrapper.as_bytes()).to_hex(),
         };
         let request_id = binding_digest(&binding)?;
         let request = HttpSignRequest {
@@ -211,7 +215,7 @@ impl SigningBackend for HttpSigningBackend {
         {
             return Err(signing_error("remote signer response binding is invalid"));
         }
-        verified_signature(&self.key.public_key, message, &response.signature)
+        verified_signature(&self.key.public_key, &wrapper, &response.signature)
     }
 }
 
@@ -221,8 +225,9 @@ struct HttpSignBinding<'a> {
     key_handle: &'a str,
     key_version: u32,
     algorithm: SigningAlgorithm,
+    kind: &'static str,
+    message: String,
     message_sha256: String,
-    message_base64: String,
 }
 
 #[derive(Serialize)]
@@ -359,8 +364,8 @@ impl SigningBackend for VaultTransitSigningBackend {
         Ok(self.key.public_key.clone())
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
-        validate_message(message)?;
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
+        let wrapper = wrapper_message(message)?;
         let endpoint = format!(
             "{}/v1/{}/sign/{}",
             self.base_url,
@@ -368,7 +373,7 @@ impl SigningBackend for VaultTransitSigningBackend {
             self.key.key_handle()
         );
         let request = VaultSignRequest {
-            input: BASE64_STANDARD.encode(message),
+            input: BASE64_STANDARD.encode(wrapper.as_bytes()),
             key_version: self.key.key_version(),
             prehashed: false,
         };
@@ -387,7 +392,7 @@ impl SigningBackend for VaultTransitSigningBackend {
             .try_into()
             .map_err(|_| signing_error("Vault returned an invalid signature"))?;
         let signature = Signature::from_bytes(&bytes);
-        if !self.key.public_key.verify_strict(message, &signature) {
+        if verify_wrapper(&self.key.public_key, &wrapper, &signature).is_err() {
             return Err(signing_error("Vault signature failed local verification"));
         }
         Ok(signature)
@@ -459,19 +464,35 @@ fn validate_path_segment(value: &str, _label: &str) -> Result<String> {
     Ok(value.to_owned())
 }
 
-fn validate_message(message: &[u8]) -> Result<()> {
-    if message.is_empty() || message.len() > MAX_SIGNING_MESSAGE_BYTES {
-        return Err(signing_error("remote signing message size is invalid"));
+/// The only route a remote signer accepts: an 88-byte signing wrapper. An
+/// exempt-format message refuses before any request is built.
+fn wrapper_message(message: SigningMessage<'_>) -> Result<SigningWrapper> {
+    if message.exempt_format().is_some() {
+        return Err(signing_error(
+            "remote signer accepts only signing-wrapper messages",
+        ));
     }
-    Ok(())
+    SigningWrapper::from_bytes(message.as_bytes())
 }
 
-fn verified_signature(public_key: &PublicKey, message: &[u8], raw: &str) -> Result<Signature> {
+fn verified_signature(
+    public_key: &PublicKey,
+    wrapper: &SigningWrapper,
+    raw: &str,
+) -> Result<Signature> {
     let signature = Signature::from_hex(raw)?;
-    if !public_key.verify_strict(message, &signature) {
+    if verify_wrapper(public_key, wrapper, &signature).is_err() {
         return Err(signing_error("remote signature failed local verification"));
     }
     Ok(signature)
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
+    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut out, byte| {
+        let _ = write!(out, "{byte:02x}");
+        out
+    })
 }
 
 fn binding_digest<T: Serialize>(value: &T) -> Result<String> {
@@ -521,21 +542,42 @@ mod tests {
     use std::sync::mpsc;
     use std::thread;
 
-    use chio_core::{Keypair, SigningBackend};
+    use chio_core::{CanonicalBytes, ExemptFormat, Keypair, SigningBackend};
     use chio_test_support::prelude::*;
 
     use super::*;
 
+    fn fixture_body() -> CanonicalBytes {
+        CanonicalBytes::from_serializable(&serde_json::json!({"fixture": "remote-signer"}))
+            .test_unwrap()
+    }
+
+    fn fixture_wrapper() -> SigningWrapper {
+        SigningWrapper::new("chio.receipt.v1", &fixture_body()).test_unwrap()
+    }
+
+    fn unreachable_vault(keypair: &Keypair) -> VaultTransitSigningBackend {
+        VaultTransitSigningBackend::new(
+            "http://127.0.0.1:9",
+            "transit",
+            RemoteSigningKey::new("finding-status", 4, keypair.public_key()).test_unwrap(),
+            "vault-token",
+        )
+        .test_unwrap()
+    }
+
     #[test]
     fn generic_http_signer_verifies_exact_bytes_and_binding() {
         let keypair = Keypair::from_seed(&[31_u8; 32]);
-        let message = b"canonical finding bytes";
+        let wrapper = fixture_wrapper();
+        let message = wrapper.as_bytes();
         let binding = HttpSignBinding {
             key_handle: "finding-listing",
             key_version: 7,
             algorithm: SigningAlgorithm::Ed25519,
+            kind: HTTP_SIGN_MESSAGE_KIND_WRAPPER,
+            message: hex_encode(message),
             message_sha256: sha256(message).to_hex(),
-            message_base64: BASE64_STANDARD.encode(message),
         };
         let request_id = binding_digest(&binding).test_unwrap();
         let (base_url, request_rx, server) = spawn_json_server(serde_json::json!({
@@ -545,7 +587,7 @@ mod tests {
             "keyVersion": 7,
             "algorithm": "ed25519",
             "messageSha256": sha256(message).to_hex(),
-            "signature": keypair.sign(message).to_hex()
+            "signature": keypair.sign_wrapped("chio.receipt.v1", &fixture_body()).test_unwrap().to_hex()
         }));
         let backend = HttpSigningBackend::new(
             base_url,
@@ -554,12 +596,13 @@ mod tests {
         )
         .test_unwrap();
 
-        let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend
-            .public_key()
-            .test_unwrap()
-            .verify_strict(message, &signature));
+        let outcome = backend
+            .sign_wrapped("chio.receipt.v1", &fixture_body())
+            .test_unwrap();
+        verify_wrapper(&keypair.public_key(), &wrapper, &outcome.signature).test_unwrap();
         let request = request_rx.recv().test_unwrap();
+        assert!(request.contains("\"kind\":\"wrapper\""));
+        assert!(request.contains(&hex_encode(message)));
         assert!(request.starts_with("POST /v1/signing-keys/finding-listing/sign HTTP/1.1"));
         assert!(request.contains("Authorization: Bearer remote-secret"));
         assert!(request.contains(HTTP_SIGN_REQUEST_SCHEMA));
@@ -569,13 +612,15 @@ mod tests {
     #[test]
     fn generic_http_signer_rejects_response_substitution() {
         let keypair = Keypair::from_seed(&[32_u8; 32]);
-        let message = b"signed bytes";
+        let wrapper = fixture_wrapper();
+        let message = wrapper.as_bytes();
         let binding = HttpSignBinding {
             key_handle: "finding-venue",
             key_version: 2,
             algorithm: SigningAlgorithm::Ed25519,
+            kind: HTTP_SIGN_MESSAGE_KIND_WRAPPER,
+            message: hex_encode(message),
             message_sha256: sha256(message).to_hex(),
-            message_base64: BASE64_STANDARD.encode(message),
         };
         let request_id = binding_digest(&binding).test_unwrap();
         let (base_url, _request_rx, server) = spawn_json_server(serde_json::json!({
@@ -585,7 +630,7 @@ mod tests {
             "keyVersion": 3,
             "algorithm": "ed25519",
             "messageSha256": sha256(message).to_hex(),
-            "signature": keypair.sign(message).to_hex()
+            "signature": keypair.sign_wrapped("chio.receipt.v1", &fixture_body()).test_unwrap().to_hex()
         }));
         let backend = HttpSigningBackend::new(
             base_url,
@@ -594,7 +639,11 @@ mod tests {
         )
         .test_unwrap();
 
-        assert!(backend.sign_bytes(message).is_err());
+        assert!(matches!(
+            backend.sign_wrapped("chio.receipt.v1", &fixture_body()),
+            Err(Error::InvalidSignature(ref message))
+                if message == "remote signer response binding is invalid"
+        ));
         server.join().test_unwrap();
     }
 
@@ -646,8 +695,13 @@ mod tests {
     #[test]
     fn vault_signer_pins_version_and_verifies_signature() {
         let keypair = Keypair::from_seed(&[33_u8; 32]);
-        let message = b"vault canonical bytes";
-        let encoded_signature = BASE64_STANDARD.encode(keypair.sign(message).to_bytes());
+        let wrapper = fixture_wrapper();
+        let encoded_signature = BASE64_STANDARD.encode(
+            keypair
+                .sign_wrapped("chio.receipt.v1", &fixture_body())
+                .test_unwrap()
+                .to_bytes(),
+        );
         let (base_url, request_rx, server) = spawn_json_server(serde_json::json!({
             "request_id": "vault-request-4",
             "lease_id": "",
@@ -668,12 +722,12 @@ mod tests {
         )
         .test_unwrap();
 
-        let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend
-            .public_key()
-            .test_unwrap()
-            .verify_strict(message, &signature));
+        let outcome = backend
+            .sign_wrapped("chio.receipt.v1", &fixture_body())
+            .test_unwrap();
+        verify_wrapper(&keypair.public_key(), &wrapper, &outcome.signature).test_unwrap();
         let request = request_rx.recv().test_unwrap();
+        assert!(request.contains(&BASE64_STANDARD.encode(wrapper.as_bytes())));
         assert!(request.starts_with("POST /v1/transit/sign/finding-status HTTP/1.1"));
         assert!(request.contains("X-Vault-Token: vault-token"));
         assert!(request.contains("\"key_version\":4"));
@@ -724,6 +778,46 @@ mod tests {
 
         assert!(backend.verify_key().is_err());
         server.join().test_unwrap();
+    }
+
+    #[test]
+    fn remote_signers_refuse_exempt_messages_before_any_send() {
+        let keypair = Keypair::from_seed(&[38_u8; 32]);
+        let jws = b"eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhIn0";
+        let http = HttpSigningBackend::new(
+            "http://127.0.0.1:9",
+            RemoteSigningKey::new("finding-listing", 1, keypair.public_key()).test_unwrap(),
+            "token",
+        )
+        .test_unwrap();
+        let vault = unreachable_vault(&keypair);
+        for format in [ExemptFormat::JwsSigningInput, ExemptFormat::DssePae] {
+            let message = SigningMessage::exempt(format, jws);
+            assert!(matches!(
+                http.sign_bytes(message),
+                Err(Error::InvalidSignature(ref m))
+                    if m == "remote signer accepts only signing-wrapper messages"
+            ));
+            assert!(matches!(
+                vault.sign_bytes(message),
+                Err(Error::InvalidSignature(ref m))
+                    if m == "remote signer accepts only signing-wrapper messages"
+            ));
+        }
+    }
+
+    #[test]
+    fn remote_wrapper_route_refuses_bytes_that_are_not_a_wrapper() {
+        let mut forged = *fixture_wrapper().as_bytes();
+        forged[0] ^= 1;
+        assert!(matches!(
+            SigningWrapper::from_bytes(&forged),
+            Err(Error::InvalidSignature(ref m)) if m == "signing wrapper prefix mismatch"
+        ));
+        assert!(matches!(
+            SigningWrapper::from_bytes(&forged[..87]),
+            Err(Error::InvalidSignature(ref m)) if m == "signing wrapper must be 88 bytes"
+        ));
     }
 
     #[test]

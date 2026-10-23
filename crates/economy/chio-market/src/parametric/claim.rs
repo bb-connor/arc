@@ -654,7 +654,7 @@ impl VerifiedParametricContestV1 {
             return Err(ParametricClaimError::UntrustedContestant);
         }
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))?
         {
             return Err(ParametricClaimError::InvalidContestSignature);
@@ -1162,7 +1162,7 @@ impl ValidatedPreReservationParametricPayoutIntentV1 {
             return Err(ParametricClaimError::UntrustedPayoutIntentSigner);
         }
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|_| ParametricClaimError::InvalidPayoutIntentSignature)?
         {
             return Err(ParametricClaimError::InvalidPayoutIntentSignature);
@@ -1234,7 +1234,7 @@ fn validate_capital_instruction(
         .validate()
         .map_err(|_| ParametricClaimError::InvalidCapitalInstruction)?;
     if !instruction
-        .verify_signature()
+        .verify_signature(&instruction.signer_key)
         .map_err(|_| ParametricClaimError::InvalidCapitalInstructionSignature)?
     {
         return Err(ParametricClaimError::InvalidCapitalInstructionSignature);
@@ -1430,3 +1430,11 @@ pub fn parametric_payout_intent_id(claim_id: &str) -> Result<String, ParametricC
 
 #[cfg(test)]
 mod payout_tests;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ParametricContestV1 {
+    const SCHEMA_ID: &'static str = PARAMETRIC_CONTEST_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ParametricPayoutIntentV1 {
+    const SCHEMA_ID: &'static str = PARAMETRIC_PAYOUT_INTENT_SCHEMA;
+}

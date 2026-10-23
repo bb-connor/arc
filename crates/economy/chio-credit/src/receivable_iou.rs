@@ -1,7 +1,7 @@
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{
-    sha256_hex, sign_canonical_with_backend, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    sha256_hex, sign_wrapped, verify_wrapped, PublicKey, Signature, SigningAlgorithm, SigningBackend,
 };
 use chio_core_types::receipt::body::ChioReceipt;
 use chio_core_types::receipt::crypto_floor::ReceiptCryptoFloor;
@@ -439,7 +439,6 @@ impl ReceivableIouBody {
 pub struct SignedReceivableIou {
     body: ReceivableIouBody,
     signer_key: PublicKey,
-    algorithm: SigningAlgorithm,
     signature: Signature,
 }
 
@@ -452,13 +451,12 @@ impl SignedReceivableIou {
         let signer_key = backend
             .public_key()
             .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
-        let (signature, _) = sign_canonical_with_backend(backend, &body)
+        let (outcome, _) = sign_wrapped(backend, CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA, &body)
             .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
         Ok(Self {
             body,
-            algorithm: signer_key.algorithm(),
             signer_key,
-            signature,
+            signature: outcome.signature,
         })
     }
 
@@ -485,8 +483,8 @@ impl SignedReceivableIou {
     }
 
     #[must_use]
-    pub const fn algorithm(&self) -> SigningAlgorithm {
-        self.algorithm
+    pub fn algorithm(&self) -> SigningAlgorithm {
+        self.signer_key.algorithm()
     }
 
     #[must_use]
@@ -539,7 +537,7 @@ impl VerifiedReceivableIou {
     }
 
     #[must_use]
-    pub const fn algorithm(&self) -> SigningAlgorithm {
+    pub fn algorithm(&self) -> SigningAlgorithm {
         self.signed.algorithm()
     }
 
@@ -575,20 +573,21 @@ pub fn verify_receivable_iou<S: CreditAdmissionStore>(
     context: &ReceivableIouVerificationContext<'_>,
 ) -> Result<VerifiedReceivableIou, ReceivableIouError> {
     let signed = SignedReceivableIou::from_canonical_bytes(canonical_envelope)?;
-    let signature_algorithm = signed.signature.algorithm();
+    let pinned = &context.issuer_trust.issuer_key;
     if signed.body.issuer_id != context.issuer_trust.issuer_id
         || signed.body.issuer_key_epoch != context.issuer_trust.issuer_key_epoch
-        || signed.signer_key != context.issuer_trust.issuer_key
-        || signed.algorithm != signature_algorithm
-        || signed.signer_key.algorithm() != signature_algorithm
+        || &signed.signer_key != pinned
         || !context
             .issuer_trust
             .crypto_floor
-            .allows(signature_algorithm)
-        || !signed
-            .signer_key
-            .verify_canonical(&signed.body, &signed.signature)
-            .map_err(|error| ReceivableIouError::Canonicalization(error.to_string()))?
+            .allows(pinned.algorithm())
+        || verify_wrapped(
+            pinned,
+            CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
+            &signed.body,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(ReceivableIouError::IssuerVerification);
     }
@@ -845,7 +844,7 @@ fn verify_receipt(
         return Err(ReceivableIouError::ReceiptSignerUntrusted);
     }
     if !receipt
-        .verify_signature_with_floor(trust.crypto_floor)
+        .verify_signature_with_floor(&receipt.kernel_key, trust.crypto_floor)
         .map_err(|_| ReceivableIouError::ReceiptVerification)?
     {
         return Err(ReceivableIouError::ReceiptVerification);

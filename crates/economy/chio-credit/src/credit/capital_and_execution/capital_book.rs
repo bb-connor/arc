@@ -162,3 +162,7 @@ pub struct CapitalBookReport {
 }
 
 pub type SignedCapitalBookReport = SignedExportEnvelope<CapitalBookReport>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalBookReport {
+    const SCHEMA_ID: &'static str = crate::CAPITAL_BOOK_REPORT_SCHEMA;
+}

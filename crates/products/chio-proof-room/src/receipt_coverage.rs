@@ -11,6 +11,7 @@ use super::{
 
 const RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA: &str =
     "chio.runtime.terminal-receipt-signature.v1";
+const RECEIPT_PROJECTION_SIGNATURE_SCHEMA: &str = "chio.receipt.v1";
 
 pub(crate) fn verify(
     bundle_root: &Path,
@@ -174,14 +175,16 @@ fn verify_receipt_signature(
     let signature = Signature::from_hex(signature).map_err(|error| {
         format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}")
     })?;
-    let signed_body = receipt_signature_body(category, receipt)?;
-    let verified = public_key
-        .verify_canonical(&signed_body, &signature)
-        .map_err(|error| {
-            format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}")
-        })?;
-    if verified {
-        return Ok(());
+    let (schema_id, signed_body) = receipt_signature_body(category, receipt)?;
+    match chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &signed_body, &signature) {
+        Ok(()) => return Ok(()),
+        Err(chio_core_types::Error::SignatureRejected) => {}
+        Err(error) => {
+            return Err(
+                (format!("proof-room.receipt-coverage.signature-invalid: {category}: {error}"))
+                    .into(),
+            )
+        }
     }
     Err((format!("proof-room.receipt-coverage.signature-invalid: {category}: {receipt_id}")).into())
 }
@@ -189,7 +192,7 @@ fn verify_receipt_signature(
 fn receipt_signature_body(
     category: &str,
     receipt: &serde_json::Value,
-) -> Result<serde_json::Value, ProofRoomError> {
+) -> Result<(&'static str, serde_json::Value), ProofRoomError> {
     if receipt.get("schema").and_then(serde_json::Value::as_str)
         == Some(RUNTIME_TERMINAL_RECEIPT_SCHEMA)
     {
@@ -212,7 +215,7 @@ fn receipt_signature_body(
         {
             body["incidentRef"] = serde_json::Value::String(incident_ref.to_string());
         }
-        return Ok(body);
+        return Ok((RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA, body));
     }
 
     let mut signed_body = receipt.clone();
@@ -220,7 +223,7 @@ fn receipt_signature_body(
         return Err((format!("proof-room.receipt-coverage.invalid-json: {category}")).into());
     };
     signed_body_object.remove("signature");
-    Ok(signed_body)
+    Ok((RECEIPT_PROJECTION_SIGNATURE_SCHEMA, signed_body))
 }
 
 fn verify_excluded_category(

@@ -37,6 +37,10 @@ pub struct IssuerLifecycleCheckpoint {
 pub type SignedIssuerLifecycleCheckpoint =
     chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleCheckpoint>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for IssuerLifecycleCheckpoint {
+    const SCHEMA_ID: &'static str = FINANCIAL_ISSUER_LIFECYCLE_CHECKPOINT_SCHEMA_V1;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CrossIssuerLifecycleResult {
@@ -59,6 +63,10 @@ pub struct CrossIssuerLifecycleResult {
 
 pub type SignedCrossIssuerLifecycleResult =
     chio_core::receipt::lineage::SignedExportEnvelope<CrossIssuerLifecycleResult>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for CrossIssuerLifecycleResult {
+    const SCHEMA_ID: &'static str = FINANCIAL_CROSS_ISSUER_LIFECYCLE_RESULT_SCHEMA_V1;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SinglePassportLifecycleSnapshotInput {
@@ -103,6 +111,10 @@ pub struct IssuerLifecycleGenerationPin {
 pub type SignedIssuerLifecycleGenerationPin =
     chio_core::receipt::lineage::SignedExportEnvelope<IssuerLifecycleGenerationPin>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for IssuerLifecycleGenerationPin {
+    const SCHEMA_ID: &'static str = FINANCIAL_ISSUER_LIFECYCLE_GENERATION_PIN_SCHEMA_V1;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LifecycleCheckpointPinCandidate {
@@ -141,6 +153,10 @@ pub struct LifecycleCheckpointPin {
 
 pub type SignedLifecycleCheckpointPin =
     chio_core::receipt::lineage::SignedExportEnvelope<LifecycleCheckpointPin>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for LifecycleCheckpointPin {
+    const SCHEMA_ID: &'static str = FINANCIAL_LIFECYCLE_CHECKPOINT_PIN_SCHEMA_V1;
+}
 
 pub use chio_security_types::clock::Clock;
 
@@ -511,7 +527,7 @@ fn verify_lifecycle_checkpoint(
         &checkpoint.body.signer_key_id,
         checkpoint.body.signer_key_epoch,
     )?;
-    if key.public_key != checkpoint.signer_key || !checkpoint.verify_signature()? {
+    if key.public_key != checkpoint.signer_key || !checkpoint.verify_signature(&checkpoint.signer_key)? {
         return Err(authority_error(
             "lifecycle checkpoint signer does not match local trust",
         ));
@@ -539,7 +555,7 @@ fn verify_generation_pin(
         ));
     }
     let key = trust.generation_anchor_key(&pin.body.anchor_id, pin.body.signer_key_epoch)?;
-    if key.public_key != pin.signer_key || !pin.verify_signature()? {
+    if key.public_key != pin.signer_key || !pin.verify_signature(&pin.signer_key)? {
         return Err(authority_error(
             "lifecycle generation anchor signer does not match local trust",
         ));
@@ -588,7 +604,7 @@ fn verify_lifecycle_result(
         &result.body.signer_key_id,
         result.body.signer_key_epoch,
     )?;
-    if key.public_key != result.signer_key || !result.verify_signature()? {
+    if key.public_key != result.signer_key || !result.verify_signature(&result.signer_key)? {
         return Err(authority_error(
             "lifecycle result signer does not match local trust",
         ));
@@ -621,7 +637,7 @@ fn verify_checkpoint_pin(
         ));
     }
     let key = trust.high_water_key(&pin.body.store_id, pin.body.signer_key_epoch)?;
-    if key.public_key != pin.signer_key || !pin.verify_signature()? {
+    if key.public_key != pin.signer_key || !pin.verify_signature(&pin.signer_key)? {
         return Err(authority_error(
             "lifecycle high-water signer does not match local trust",
         ));

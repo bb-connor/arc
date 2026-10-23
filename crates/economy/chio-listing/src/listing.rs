@@ -333,3 +333,11 @@ pub struct GenericListingReport {
     pub summary: GenericListingSummary,
     pub listings: Vec<SignedGenericListing>,
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for GenericListingArtifact {
+    const SCHEMA_ID: &'static str = GENERIC_LISTING_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for GenericNamespaceArtifact {
+    const SCHEMA_ID: &'static str = GENERIC_NAMESPACE_ARTIFACT_SCHEMA;
+}

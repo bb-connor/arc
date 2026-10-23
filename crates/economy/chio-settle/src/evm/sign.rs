@@ -8,7 +8,7 @@ pub(super) fn ensure_instruction_ready(
     beneficiary_address: &str,
 ) -> Result<(), SettlementError> {
     let verified = instruction
-        .verify_signature()
+        .verify_signature(&instruction.signer_key)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(

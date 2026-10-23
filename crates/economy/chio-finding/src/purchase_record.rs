@@ -195,3 +195,7 @@ pub fn verify_signed_purchase_record(
     signed.body.validate()?;
     crate::envelope::verify_pinned_envelope(signed, pinned_purchase_authority, "purchase_record")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingPurchaseRecord {
+    const SCHEMA_ID: &'static str = FINDING_PURCHASE_RECORD_SCHEMA_V1;
+}

@@ -672,3 +672,11 @@ pub struct CreditProviderRiskPackage {
 }
 
 pub type SignedCreditProviderRiskPackage = SignedExportEnvelope<CreditProviderRiskPackage>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CreditLossLifecycleArtifact {
+    const SCHEMA_ID: &'static str = crate::CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CreditProviderRiskPackage {
+    const SCHEMA_ID: &'static str = crate::CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA;
+}

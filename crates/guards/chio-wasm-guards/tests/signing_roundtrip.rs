@@ -62,7 +62,8 @@ fn make_manifest(
 fn sign_bytes(sk: &SigningKey, bytes: &[u8], name: &str, version: &str) -> SignedWasmModule {
     let module_hash = sha256_hex(bytes);
     let signer_public_key = hex::encode(sk.verifying_key().to_bytes());
-    let message = signed_module_message(&module_hash, name, version, &signer_public_key);
+    let message = signed_module_message(&module_hash, name, version, &signer_public_key)
+        .unwrap_or_else(|error| panic!("signed module message: {error}"));
     let signature = sk.sign(&message);
     SignedWasmModule {
         module_hash,

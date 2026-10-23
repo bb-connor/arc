@@ -20,7 +20,9 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::canonical_json_bytes;
+use chio_core_types::crypto::{verify_wrapped, verify_wrapped_bytes, Keypair};
 use chio_core_types::sha256_hex;
 use chio_core_types::PublicKey;
 use chio_core_types::Signature;
@@ -37,67 +39,86 @@ use crate::lanes::revocation::VerifiedSignerDirectory;
 pub const TRANSPORT_DIRECTORY_BUNDLE_SCHEMA: &str =
     "chio.federation.transport.iroh.peer-directory-bundle.v1";
 
-/// Domain-separation context for the passport-over-transport endorsement. The
-/// passport signs [`transport_endorsement_preimage`] (this tag, the entry
-/// `kernel_id`, and the transport `EndpointId`, each length-prefixed), so an
-/// endorsement commits to WHICH operator owns WHICH endpoint. Distinct from
-/// [`REVOCATION_SIGNER_ENDORSEMENT_CONTEXT`] so the two endorsement kinds can
-/// NEVER cross-replay (a signature valid as one is rejected as the other).
-pub const TRANSPORT_ENDORSEMENT_CONTEXT: &[u8] = b"chio.iroh.transport-endorsement.v1";
+/// Signing-wrapper schema id of the passport-over-transport endorsement: the
+/// passport commits to WHICH operator owns WHICH transport endpoint.
+pub const TRANSPORT_ENDORSEMENT_SCHEMA: &str = "chio.iroh.transport-endorsement.v1";
 
-/// Domain-separation context for the passport-over-oracle (revocation signer)
-/// endorsement. The passport signs [`revocation_signer_endorsement_preimage`]
-/// (this tag, the entry `kernel_id`, the opaque `signer_id`, and the oracle root
-/// public key, each length-prefixed), so it commits to WHICH operator vouches for
-/// WHICH oracle key under a DISTINCT tag from the transport endorsement.
-pub const REVOCATION_SIGNER_ENDORSEMENT_CONTEXT: &[u8] =
-    b"chio.iroh.revocation-signer-endorsement.v1";
+/// Signing-wrapper schema id of the passport-over-oracle (revocation signer)
+/// endorsement. A distinct id from [`TRANSPORT_ENDORSEMENT_SCHEMA`], so neither
+/// endorsement verifies as the other.
+pub const REVOCATION_SIGNER_ENDORSEMENT_SCHEMA: &str = "chio.iroh.revocation-signer-endorsement.v1";
 
-/// Append `segment` to `buf` as an 8-byte big-endian length followed by the
-/// segment bytes. Every field of a preimage is length-delimited, so the
-/// concatenation is an injective (collision-free) encoding of the field tuple: no
-/// two distinct `(context, fields...)` tuples can serialize to the same bytes,
-/// which is what makes the two endorsement domains non-cross-replayable.
-fn push_length_prefixed(buf: &mut Vec<u8>, segment: &[u8]) {
-    buf.extend_from_slice(&(segment.len() as u64).to_be_bytes());
-    buf.extend_from_slice(segment);
+#[derive(Serialize)]
+struct TransportEndorsementBody<'a> {
+    kernel_id: &'a str,
+    transport_endpoint_id: String,
 }
 
-/// The exact bytes a passport signs (and [`TransportDirectoryBundleDocument::verify_bundle`]
-/// re-derives) for the passport-over-transport endorsement: the domain tag, the
-/// entry `kernel_id`, and the transport `EndpointId`, each length-prefixed. This
-/// is the single source of truth for the preimage; every construction site MUST
-/// sign these exact bytes.
-#[must_use]
-pub fn transport_endorsement_preimage(
+#[derive(Serialize)]
+struct RevocationSignerEndorsementBody<'a> {
+    kernel_id: &'a str,
+    signer_id: &'a str,
+    oracle_public_key: &'a PublicKey,
+}
+
+/// Canonical body a passport signs (and [`TransportDirectoryBundleDocument::verify_bundle`]
+/// re-derives) under [`TRANSPORT_ENDORSEMENT_SCHEMA`].
+pub fn transport_endorsement_body(
     kernel_id: &str,
     transport_endpoint_id: &EndpointId,
-) -> Vec<u8> {
-    let mut buf = Vec::new();
-    push_length_prefixed(&mut buf, TRANSPORT_ENDORSEMENT_CONTEXT);
-    push_length_prefixed(&mut buf, kernel_id.as_bytes());
-    push_length_prefixed(&mut buf, transport_endpoint_id.as_bytes());
-    buf
+) -> Result<CanonicalBytes, IdentityError> {
+    CanonicalBytes::from_serializable(&TransportEndorsementBody {
+        kernel_id,
+        transport_endpoint_id: transport_endpoint_id.to_string(),
+    })
+    .map_err(|error| IdentityError::CanonicalJson(error.to_string()))
 }
 
-/// The exact bytes a passport signs (and [`TransportDirectoryBundleDocument::verify_bundle`]
-/// re-derives) for the passport-over-oracle endorsement that anchors a revocation
-/// signer: the domain tag, the entry `kernel_id`, the opaque `signer_id`, and the
-/// canonical hex of the oracle root public key, each length-prefixed. The canonical
-/// hex encodes the key algorithm and bytes faithfully (it round-trips through
-/// [`PublicKey::from_hex`]), so the endorsement commits to the exact oracle key.
-#[must_use]
-pub fn revocation_signer_endorsement_preimage(
+/// Canonical body a passport signs (and [`TransportDirectoryBundleDocument::verify_bundle`]
+/// re-derives) under [`REVOCATION_SIGNER_ENDORSEMENT_SCHEMA`]. The oracle key
+/// keeps its self-describing encoding, so the endorsement commits to the exact
+/// oracle key and algorithm.
+pub fn revocation_signer_endorsement_body(
     kernel_id: &str,
     signer_id: &str,
     oracle_public_key: &PublicKey,
-) -> Vec<u8> {
-    let mut buf = Vec::new();
-    push_length_prefixed(&mut buf, REVOCATION_SIGNER_ENDORSEMENT_CONTEXT);
-    push_length_prefixed(&mut buf, kernel_id.as_bytes());
-    push_length_prefixed(&mut buf, signer_id.as_bytes());
-    push_length_prefixed(&mut buf, oracle_public_key.to_hex().as_bytes());
-    buf
+) -> Result<CanonicalBytes, IdentityError> {
+    CanonicalBytes::from_serializable(&RevocationSignerEndorsementBody {
+        kernel_id,
+        signer_id,
+        oracle_public_key,
+    })
+    .map_err(|error| IdentityError::CanonicalJson(error.to_string()))
+}
+
+/// Passport signature endorsing `transport_endpoint_id` for `kernel_id`.
+pub fn sign_transport_endorsement(
+    passport: &Keypair,
+    kernel_id: &str,
+    transport_endpoint_id: &EndpointId,
+) -> Result<Signature, IdentityError> {
+    passport
+        .sign_wrapped(
+            TRANSPORT_ENDORSEMENT_SCHEMA,
+            &transport_endorsement_body(kernel_id, transport_endpoint_id)?,
+        )
+        .map_err(|error| IdentityError::CanonicalJson(error.to_string()))
+}
+
+/// Passport signature endorsing `oracle_public_key` as revocation signer
+/// `signer_id` for `kernel_id`.
+pub fn sign_revocation_signer_endorsement(
+    passport: &Keypair,
+    kernel_id: &str,
+    signer_id: &str,
+    oracle_public_key: &PublicKey,
+) -> Result<Signature, IdentityError> {
+    passport
+        .sign_wrapped(
+            REVOCATION_SIGNER_ENDORSEMENT_SCHEMA,
+            &revocation_signer_endorsement_body(kernel_id, signer_id, oracle_public_key)?,
+        )
+        .map_err(|error| IdentityError::CanonicalJson(error.to_string()))
 }
 
 /// A single split-key binding: a long-term passport key cross-linked to a
@@ -118,7 +139,7 @@ pub struct TransportDirectoryEntry {
     pub passport_public_key: PublicKey,
     /// Rotatable ed25519 transport `EndpointId` that iroh dials and authenticates.
     pub transport_endpoint_id: EndpointId,
-    /// Passport signature over [`transport_endorsement_preimage`] (the domain tag,
+    /// Passport signature over [`transport_endorsement_body`] (the domain tag,
     /// the `kernel_id`, and the transport `EndpointId`): the passport-over-transport
     /// endorsement that keeps the transport key from floating free of the long-term
     /// identity, domain-separated so it can never be replayed as an oracle
@@ -152,7 +173,7 @@ pub struct RevocationSignerEntry {
     /// Verify-only oracle root key (the Ed25519 root the epoch-root signatures are
     /// checked against). Holds no private material, so it can never forge a root.
     pub oracle_public_key: PublicKey,
-    /// Passport signature over [`revocation_signer_endorsement_preimage`], binding
+    /// Passport signature over [`revocation_signer_endorsement_body`], binding
     /// the oracle key to the long-term operator identity under a DISTINCT domain
     /// tag from the transport endorsement. Verified against the entry's
     /// `passport_public_key` at load time.
@@ -625,11 +646,14 @@ impl TransportDirectoryBundleDocument {
             .ok_or_else(|| {
                 IdentityError::UnknownIssuer(format!("{}#{}", self.body.issuer, self.body.key_id))
             })?;
-        let signature_ok = issuer
-            .public_key
-            .verify_canonical(&self.body, &self.signature)
-            .map_err(|error| IdentityError::CanonicalJson(error.to_string()))?;
-        if !signature_ok {
+        if verify_wrapped(
+            &issuer.public_key,
+            TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+            &self.body,
+            &self.signature,
+        )
+        .is_err()
+        {
             return Err(IdentityError::SignatureInvalid);
         }
 
@@ -653,7 +677,7 @@ impl TransportDirectoryBundleDocument {
                 )));
             }
             // The endorsement binds the long-term passport to the transport key:
-            // the passport (any algorithm) must sign the DOMAIN-SEPARATED preimage
+            // the passport (any algorithm) must sign the endorsement body
             // committing to (context, kernel_id, transport endpoint).
             //
             // A removed entry is a tombstone (suppressed, not resolved): skip its
@@ -664,11 +688,13 @@ impl TransportDirectoryBundleDocument {
             // as removed and resolves to None (fail-closed) regardless, so skipping
             // the endorsement of a suppressed entry costs no authority.
             if !entry.removed {
-                let transport_preimage =
-                    transport_endorsement_preimage(&entry.kernel_id, &entry.transport_endpoint_id);
-                let endorsed = entry
-                    .passport_public_key
-                    .verify(&transport_preimage, &entry.passport_endorsement);
+                let endorsed = verify_wrapped_bytes(
+                    &entry.passport_public_key,
+                    TRANSPORT_ENDORSEMENT_SCHEMA,
+                    &transport_endorsement_body(&entry.kernel_id, &entry.transport_endpoint_id)?,
+                    &entry.passport_endorsement,
+                )
+                .is_ok();
                 if !endorsed {
                     return Err(IdentityError::EndorsementInvalid(entry.kernel_id.clone()));
                 }
@@ -694,14 +720,17 @@ impl TransportDirectoryBundleDocument {
                 if entry.removed {
                     continue;
                 }
-                let signer_preimage = revocation_signer_endorsement_preimage(
-                    &entry.kernel_id,
-                    &signer.signer_id,
-                    &signer.oracle_public_key,
-                );
-                let oracle_endorsed = entry
-                    .passport_public_key
-                    .verify(&signer_preimage, &signer.oracle_endorsement);
+                let oracle_endorsed = verify_wrapped_bytes(
+                    &entry.passport_public_key,
+                    REVOCATION_SIGNER_ENDORSEMENT_SCHEMA,
+                    &revocation_signer_endorsement_body(
+                        &entry.kernel_id,
+                        &signer.signer_id,
+                        &signer.oracle_public_key,
+                    )?,
+                    &signer.oracle_endorsement,
+                )
+                .is_ok();
                 if !oracle_endorsed {
                     return Err(IdentityError::OracleEndorsementInvalid {
                         kernel_id: entry.kernel_id.clone(),
@@ -865,11 +894,7 @@ mod tests {
         /// Attach a well-formed revocation-signer binding: the entry's own
         /// passport endorses `oracle_key` under the revocation-signer domain tag.
         fn with_signer(mut self, signer_id: &'static str, oracle_key: &PublicKey) -> Self {
-            let oracle_endorsement = self.passport.sign(&revocation_signer_endorsement_preimage(
-                self.kernel_id,
-                signer_id,
-                oracle_key,
-            ));
+            let oracle_endorsement = sign_revocation_signer_endorsement(&self.passport, self.kernel_id, signer_id, oracle_key, ).unwrap();
             self.revocation_signers.push(RevocationSignerEntry {
                 signer_id: signer_id.to_string(),
                 oracle_public_key: oracle_key.clone(),
@@ -886,10 +911,7 @@ mod tests {
     }
 
     fn build_entry(spec: &EntrySpec) -> TransportDirectoryEntry {
-        let endorsement = spec.passport.sign(&transport_endorsement_preimage(
-            spec.kernel_id,
-            &spec.endorsed_over,
-        ));
+        let endorsement = sign_transport_endorsement(&spec.passport, spec.kernel_id, &spec.endorsed_over, ).unwrap();
         TransportDirectoryEntry {
             kernel_id: spec.kernel_id.to_string(),
             passport_public_key: spec.passport.public_key(),
@@ -926,7 +948,11 @@ mod tests {
             issued_at_unix_ms: NOW - 1_000,
             expires_at_unix_ms: NOW + 1_000,
         };
-        let (signature, _) = issuer_keypair.sign_canonical(&body).unwrap();
+        let signature = issuer_keypair
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            ).unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -973,7 +999,11 @@ mod tests {
             issued_at_unix_ms: NOW - 1_000,
             expires_at_unix_ms: NOW + 1_000,
         };
-        let (signature, _) = issuer_keypair.sign_canonical(&body).unwrap();
+        let signature = issuer_keypair
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            ).unwrap();
         TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1180,7 +1210,11 @@ mod tests {
         let (mut bundle, trust) = signed_bundle(&[EntrySpec::admitted("did:chio:a", 1, 10)]);
         // Re-sign the body with a different key (a forged issuer).
         let forger = passport_from_seed(201);
-        let (forged, _) = forger.sign_canonical(&bundle.body).unwrap();
+        let forged = forger
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&bundle.body).unwrap(),
+            ).unwrap();
         bundle.signature = forged;
         assert_eq!(
             bundle.verify_bundle(&trust).unwrap_err(),
@@ -1260,10 +1294,7 @@ mod tests {
         let (mut bundle, trust) = signed_bundle(&[EntrySpec::admitted("did:chio:a", 1, 10)]);
         let wrong_signer = passport_from_seed(150);
         bundle.directory.peers[0].passport_endorsement =
-            wrong_signer.sign(&transport_endorsement_preimage(
-                &bundle.directory.peers[0].kernel_id,
-                &bundle.directory.peers[0].transport_endpoint_id,
-            ));
+            sign_transport_endorsement(&wrong_signer, &bundle.directory.peers[0].kernel_id, &bundle.directory.peers[0].transport_endpoint_id, ).unwrap();
         // Re-pin the directory hash + re-sign the body so ONLY the endorsement
         // check can fire (isolating check 6 from checks 4 and 5).
         repin_and_resign(&mut bundle);
@@ -1276,7 +1307,11 @@ mod tests {
     fn repin_and_resign(bundle: &mut TransportDirectoryBundleDocument) {
         let issuer_keypair = passport_from_seed(200);
         bundle.body.directory_sha256 = canonical_sha256(&bundle.directory).unwrap();
-        let (signature, _) = issuer_keypair.sign_canonical(&bundle.body).unwrap();
+        let signature = issuer_keypair
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&bundle.body).unwrap(),
+            ).unwrap();
         bundle.signature = signature;
     }
 
@@ -1398,7 +1433,7 @@ mod tests {
         );
         let attacker = passport_from_seed(151);
         wrong_passport.directory.peers[0].passport_endorsement =
-            attacker.sign(&transport_endorsement_preimage("did:chio:alice", &e_new));
+            sign_transport_endorsement(&attacker, "did:chio:alice", &e_new).unwrap();
         repin_and_resign(&mut wrong_passport);
         assert!(matches!(
             wrong_passport.verify_bundle(&rotation_trust(5, Some("prev".to_string()))),
@@ -1525,9 +1560,7 @@ mod tests {
         ]);
         // Re-endorse the oracle key with an ATTACKER passport, not alice's.
         let attacker = passport_from_seed(151);
-        bundle.directory.peers[0].revocation_signers[0].oracle_endorsement = attacker.sign(
-            &revocation_signer_endorsement_preimage("did:chio:alice", "oracle-a", &opk),
-        );
+        bundle.directory.peers[0].revocation_signers[0].oracle_endorsement = sign_revocation_signer_endorsement(&attacker, "did:chio:alice", "oracle-a", &opk).unwrap();
         repin_and_resign(&mut bundle);
         assert!(matches!(
             bundle.verify_bundle(&trust),
@@ -1580,9 +1613,7 @@ mod tests {
         let bad_signer = RevocationSignerEntry {
             signer_id: "oracle-a".to_string(),
             oracle_public_key: opk.clone(),
-            oracle_endorsement: passport_from_seed(3).sign(
-                &revocation_signer_endorsement_preimage("did:chio:ghost", "not-oracle-a", &opk),
-            ),
+            oracle_endorsement: sign_revocation_signer_endorsement(&passport_from_seed(3), "did:chio:ghost", "not-oracle-a", &opk).unwrap(),
         };
         let mut ghost =
             EntrySpec::admitted("did:chio:ghost", 3, 12).with_raw_signer(bad_signer.clone());
@@ -1618,7 +1649,7 @@ mod tests {
         let kernel = "did:chio:alice";
         let transport = endpoint_from_seed(10);
         let opk = oracle_key(60);
-        let cross = passport.sign(&transport_endorsement_preimage(kernel, &transport));
+        let cross = sign_transport_endorsement(&passport, kernel, &transport).unwrap();
         let replayed = RevocationSignerEntry {
             signer_id: "oracle-a".to_string(),
             oracle_public_key: opk,
@@ -1639,9 +1670,7 @@ mod tests {
         let passport = passport_from_seed(1);
         let kernel = "did:chio:alice";
         let opk = oracle_key(60);
-        let cross = passport.sign(&revocation_signer_endorsement_preimage(
-            kernel, "oracle-a", &opk,
-        ));
+        let cross = sign_revocation_signer_endorsement(&passport, kernel, "oracle-a", &opk, ).unwrap();
         let (mut bundle, trust) = signed_bundle(&[EntrySpec::admitted(kernel, 1, 10)]);
         bundle.directory.peers[0].passport_endorsement = cross;
         repin_and_resign(&mut bundle);

@@ -175,7 +175,10 @@ fn snapshot_body() -> FindingFinalizedBondSnapshot {
     snapshot
 }
 
-fn sign<T: Serialize + Clone>(body: T, keypair: &Keypair) -> SignedExportEnvelope<T> {
+fn sign<T: chio_core::receipt::lineage::SignedExportPayload + Clone>(
+    body: T,
+    keypair: &Keypair,
+) -> SignedExportEnvelope<T> {
     SignedExportEnvelope::sign(body, keypair).test_expect("envelope signs")
 }
 

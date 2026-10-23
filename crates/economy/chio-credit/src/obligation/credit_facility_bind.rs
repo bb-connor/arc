@@ -1,6 +1,6 @@
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{sha256_hex, verify_wrapped, Keypair, PublicKey, Signature};
 pub use chio_core_types::CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -404,8 +404,8 @@ impl CreditFacilityBindSignatureV1 {
             .map_err(|_| CreditFacilityBindError::InvalidField("signature_party_id"))?;
         validate_time("signature_party_key_epoch", party_key_epoch)
             .map_err(|_| CreditFacilityBindError::InvalidField("signature_party_key_epoch"))?;
-        let (signature, _) = signer
-            .sign_canonical(body)
+        let signature = CanonicalBytes::from_serializable(body)
+            .and_then(|canonical| signer.sign_wrapped(CREDIT_FACILITY_BIND_SCHEMA, &canonical))
             .map_err(|error| CreditFacilityBindError::Canonicalization(error.to_string()))?;
         Ok(Self {
             party_id,
@@ -416,9 +416,16 @@ impl CreditFacilityBindSignatureV1 {
     }
 
     fn verify(&self, body: &CreditFacilityBindBodyV1) -> Result<bool, CreditFacilityBindError> {
-        self.signer_key
-            .verify_canonical(body, &self.signature)
-            .map_err(|error| CreditFacilityBindError::Canonicalization(error.to_string()))
+        match verify_wrapped(
+            &self.signer_key,
+            CREDIT_FACILITY_BIND_SCHEMA,
+            body,
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core_types::Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(CreditFacilityBindError::Canonicalization(error.to_string())),
+        }
     }
 
     fn digest(&self) -> Result<String, CreditFacilityBindError> {

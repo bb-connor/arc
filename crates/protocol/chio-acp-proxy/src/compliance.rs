@@ -6,7 +6,6 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::Signature;
 use chio_core::receipt::body::chio_receipt_id;
 
@@ -510,8 +509,10 @@ pub fn generate_compliance_certificate_with_coverage(
         coverage,
     };
     compliance_bundle::preflight_body(&body)?;
-    let body_bytes = canonical_json_bytes(&body)?;
-    let signature = keypair.sign(&body_bytes);
+    let signature = keypair.sign_wrapped(
+        COMPLIANCE_CERTIFICATE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let certificate = ComplianceCertificate {
         body,
         signer_key: keypair.public_key(),
@@ -581,7 +582,7 @@ fn verify_compliance_certificate_at_time(
             summary: ComplianceBundleError::CapacityExceeded.reason().into(),
         };
     }
-    let body_bytes = match canonical_json_bytes(&cert.body) {
+    let body_bytes = match chio_core::canonical::CanonicalBytes::from_serializable(&cert.body) {
         Ok(bytes) => bytes,
         Err(_) => {
             return CertificateVerificationResult {
@@ -595,7 +596,13 @@ fn verify_compliance_certificate_at_time(
             }
         }
     };
-    let sig_valid = cert.signer_key.verify_strict(&body_bytes, &cert.signature);
+    let sig_valid = chio_core::crypto::verify_wrapped_bytes(
+        &cert.signer_key,
+        COMPLIANCE_CERTIFICATE_SCHEMA,
+        &body_bytes,
+        &cert.signature,
+    )
+    .is_ok();
     let signer_trusted = config
         .trusted_kernel_keys
         .contains(&cert.signer_key.to_hex());

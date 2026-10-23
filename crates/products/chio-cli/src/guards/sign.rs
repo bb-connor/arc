@@ -49,7 +49,8 @@ pub fn cmd_guard_sign(
     let signer_public_key = hex::encode(signing_key.verifying_key().to_bytes());
 
     let module_hash = hex::encode(Sha256::digest(&wasm_bytes));
-    let message = signed_module_message(&module_hash, name, version, &signer_public_key);
+    let message = signed_module_message(&module_hash, name, version, &signer_public_key)
+        .map_err(|e| CliError::cli_other_error(format!("failed to build module statement: {e}")))?;
     let signature = signing_key.sign(&message);
 
     let signed = SignedWasmModule {

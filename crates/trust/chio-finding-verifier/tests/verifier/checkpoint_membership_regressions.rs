@@ -5,7 +5,10 @@ fn checkpoint_equivocation_fails_before_membership() -> TestResult {
     let fx = fixture()?;
     let mut fork = fx.checkpoint.clone();
     fork.body.issued_at = fork.body.issued_at.saturating_add(1);
-    fork.signature = keypair(23).sign(&canonical_json_bytes(&fork.body)?);
+    fork.signature = keypair(23).sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&fork.body)?,
+    )?;
     let checkpoints = vec![fx.checkpoint.clone(), fork];
     let transparency = build_checkpoint_transparency(&checkpoints)?;
 

@@ -329,8 +329,10 @@ pub fn issue_financial_credential(
     envelope.credential_id = envelope.recompute_credential_id()?;
     envelope.validate_contract()?;
     envelope.proof.proof_value = issuer_keypair
-        .sign_canonical(&envelope.signing_body())?
-        .0
+        .sign_wrapped(
+            envelope.family().schema(),
+            &chio_core::canonical::CanonicalBytes::from_serializable(&envelope.signing_body())?,
+        )?
         .to_hex();
     Ok(envelope)
 }
@@ -350,15 +352,19 @@ pub fn inspect_financial_credential_signature(
     }
     let issuer = DidChio::from_str(&credential.issuer)?;
     let signature = Signature::from_hex(&credential.proof.proof_value)?;
-    if !issuer.public_key().verify(
-        &canonical_json_bytes(&credential.signing_body())?,
+    if chio_core::crypto::verify_wrapped(
+        &issuer.public_key(),
+        credential.family().schema(),
+        &credential.signing_body(),
         &signature,
-    ) {
+    )
+    .is_err()
+    {
         return Err(CredentialError::InvalidCredentialSignature);
     }
     for source_proof in &credential.evidence.source_completeness_attestations {
         if source_proof.body.checkpoint_authority_key != source_proof.signer_key
-            || !source_proof.verify_signature()?
+            || !source_proof.verify_signature(&source_proof.signer_key)?
         {
             return Err(CredentialError::InvalidCredentialSignature);
         }
@@ -449,6 +455,10 @@ pub struct FinancialPassportSourceManifest {
 pub type SignedFinancialPassportSourceManifest =
     chio_core::receipt::lineage::SignedExportEnvelope<FinancialPassportSourceManifest>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for FinancialPassportSourceManifest {
+    const SCHEMA_ID: &'static str = FINANCIAL_AGENT_PASSPORT_SOURCE_MANIFEST_SCHEMA_V1;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FinancialPassportMembershipProof {
@@ -525,6 +535,10 @@ pub struct FinancialPassportPresentationChallenge {
 
 pub type SignedFinancialPassportPresentationChallenge =
     chio_core::receipt::lineage::SignedExportEnvelope<FinancialPassportPresentationChallenge>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for FinancialPassportPresentationChallenge {
+    const SCHEMA_ID: &'static str = FINANCIAL_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V1;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

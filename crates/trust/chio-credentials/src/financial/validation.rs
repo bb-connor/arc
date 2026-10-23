@@ -315,7 +315,7 @@ pub(super) fn validate_financial_evidence(
                 "financial evidence contains duplicate source completeness attestations",
             );
         }
-        if !attestation.verify_signature()? {
+        if !attestation.verify_signature(&attestation.signer_key)? {
             return Err(CredentialError::InvalidCredentialSignature);
         }
     }
@@ -420,31 +420,41 @@ fn validate_bundled_source_signers(
         }
         let signature_valid = match artifact.artifact_schema.as_str() {
             chio_credit::CREDIT_SCORECARD_SCHEMA => {
-                serde_json::from_value::<chio_credit::SignedCreditScorecardReport>(value)
-                    .map_err(|error| invalid_financial_error(error.to_string()))?
-                    .verify_signature()?
+                {
+                let signed = serde_json::from_value::<chio_credit::SignedCreditScorecardReport>(value)
+                    .map_err(|error| invalid_financial_error(error.to_string()))?;
+                signed.verify_signature(&signed.signer_key)?
+            }
             }
             chio_credit::EXPOSURE_LEDGER_SCHEMA => {
-                serde_json::from_value::<chio_credit::SignedExposureLedgerReport>(value)
-                    .map_err(|error| invalid_financial_error(error.to_string()))?
-                    .verify_signature()?
+                {
+                let signed = serde_json::from_value::<chio_credit::SignedExposureLedgerReport>(value)
+                    .map_err(|error| invalid_financial_error(error.to_string()))?;
+                signed.verify_signature(&signed.signer_key)?
+            }
             }
             chio_credit::underwriting::UNDERWRITING_DECISION_ARTIFACT_SCHEMA => {
-                serde_json::from_value::<chio_credit::underwriting::SignedUnderwritingDecision>(
+                {
+                let signed = serde_json::from_value::<chio_credit::underwriting::SignedUnderwritingDecision>(
                     value,
                 )
-                .map_err(|error| invalid_financial_error(error.to_string()))?
-                .verify_signature()?
+                .map_err(|error| invalid_financial_error(error.to_string()))?;
+                signed.verify_signature(&signed.signer_key)?
+            }
             }
             chio_credit::CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA => {
-                serde_json::from_value::<chio_credit::SignedCreditLossLifecycle>(value)
-                    .map_err(|error| invalid_financial_error(error.to_string()))?
-                    .verify_signature()?
+                {
+                let signed = serde_json::from_value::<chio_credit::SignedCreditLossLifecycle>(value)
+                    .map_err(|error| invalid_financial_error(error.to_string()))?;
+                signed.verify_signature(&signed.signer_key)?
+            }
             }
             FINANCIAL_SOURCE_MEMBER_SCHEMA_V1 => {
-                serde_json::from_value::<SignedFinancialSourceMemberV1>(value)
-                    .map_err(|error| invalid_financial_error(error.to_string()))?
-                    .verify_signature()?
+                {
+                let signed = serde_json::from_value::<SignedFinancialSourceMemberV1>(value)
+                    .map_err(|error| invalid_financial_error(error.to_string()))?;
+                signed.verify_signature(&signed.signer_key)?
+            }
             }
             _ => return invalid_financial("bundled source artifact schema is unsupported"),
         };

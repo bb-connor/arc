@@ -613,7 +613,7 @@ fn verify_source_range(
     }
     if !proof
         .checkpoint
-        .verify_signature()
+        .verify_signature(&proof.checkpoint.signer_key)
         .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))?
     {
         return Err(ParametricContractError::InvalidSignature);
@@ -799,4 +799,8 @@ fn selected_member_root(
         .map(|proven| &proven.member)
         .collect::<Vec<_>>();
     domain_digest(EVIDENCE_SELECTED_MEMBER_ROOT_DOMAIN, &selected)
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for EvidenceSourceCheckpointV1 {
+    const SCHEMA_ID: &'static str = EVIDENCE_SOURCE_CHECKPOINT_SCHEMA;
 }

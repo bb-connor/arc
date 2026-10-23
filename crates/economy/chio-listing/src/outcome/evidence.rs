@@ -445,11 +445,11 @@ fn verify_evidence_envelope<T>(
     trusted_now_unix_ms: u64,
 ) -> Result<(), OutcomeError>
 where
-    T: Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
     if envelope.signer_key != *trust.key()
         || !envelope
-            .verify_signature()
+            .verify_signature(&envelope.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -460,4 +460,12 @@ where
         trust.max_lifetime_ms(),
         trusted_now_unix_ms,
     )
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeContractualZeroBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_CONTRACTUAL_ZERO_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeOutputProvenanceBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_OUTPUT_PROVENANCE_SCHEMA;
 }

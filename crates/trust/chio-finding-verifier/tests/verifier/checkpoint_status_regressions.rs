@@ -43,7 +43,10 @@ fn production_checkpoint_must_predate_the_finding() -> TestResult {
         .first_mut()
         .ok_or("production checkpoint missing")?;
     checkpoint.body.issued_at = finding.issued_at.saturating_add(1);
-    checkpoint.signature = keypair(23).sign(&canonical_json_bytes(&checkpoint.body)?);
+    checkpoint.signature = keypair(23).sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&checkpoint.body)?,
+    )?;
     evidence.checkpoint_transparency =
         build_checkpoint_transparency(std::slice::from_ref(checkpoint))?;
 
@@ -70,8 +73,10 @@ fn revoked_checkpoint_signer_cannot_backdate_new_evidence() -> TestResult {
         .ok_or("checkpoint signer status missing")?;
     signed_status.body.revoked_from = Some(signed_status.body.observed_at.saturating_sub(1));
     signed_status.signature = fx
-        .checkpoint_status_authority
-        .sign(&canonical_json_bytes(&signed_status.body)?);
+        .checkpoint_status_authority.sign_wrapped(
+        <chio_finding::FindingAuthorityStatus as chio_core_types::receipt::lineage::SignedExportPayload>::SCHEMA_ID,
+        &chio_core_types::CanonicalBytes::from_serializable(&signed_status.body)?,
+    )?;
 
     let draft =
         verify_finding_evidence(&fx.raw_finding, &trust, &bundle(&fx, clone_receipts(&fx)))?;
@@ -131,7 +136,10 @@ fn resolved_nonce_envelopes_change_the_bundle_commitment() -> TestResult {
         .first_mut()
         .ok_or("execution nonce evidence missing")?;
     changed.nonce.expires_at = changed.nonce.expires_at.saturating_add(1);
-    changed.signature = keypair(21).sign(&canonical_json_bytes(&changed.nonce)?);
+    changed.signature = keypair(21).sign_wrapped(
+        chio_core_types::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&changed.nonce)?,
+    )?;
     let changed_resolver = TestNonceResolver {
         nonces: changed_nonces,
     };

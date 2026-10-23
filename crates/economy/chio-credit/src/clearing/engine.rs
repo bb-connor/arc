@@ -197,7 +197,7 @@ fn verified_body<T>(
     expected_key: &PublicKey,
 ) -> Result<T, ClearingError>
 where
-    T: Serialize + Clone,
+    T: ClearingPayload + Clone,
 {
     if &envelope.signer_key != expected_key || !envelope.verify_signature()? {
         return Err(ClearingError::AuthorityVerification);

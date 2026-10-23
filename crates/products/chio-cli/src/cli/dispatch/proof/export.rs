@@ -521,9 +521,16 @@ fn sign_export_json_artifact(
         .as_object_mut()
         .ok_or_else(|| CliError::cli_other_error("proof archive artifact must be a JSON object"))?;
     object.remove("signature");
-    let (signature, _) = keypair.sign_canonical(value).map_err(|error| {
-        CliError::cli_other_error(format!("failed to sign proof archive artifact: {error}"))
-    })?;
+    let schema_id = object
+        .get("schema")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| CliError::cli_other_error("proof archive artifact must carry a schema"))?
+        .to_owned();
+    let signature = chio_core::canonical::CanonicalBytes::from_serializable(value)
+        .and_then(|canonical| keypair.sign_wrapped(&schema_id, &canonical))
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to sign proof archive artifact: {error}"))
+        })?;
     value["signature"] = serde_json::Value::String(signature.to_hex());
     Ok(())
 }
@@ -718,7 +725,9 @@ fn redact_public_bundle_signature(
         signatures.clear();
         signatures.push(serde_json::json!({
             "keyid": keypair.public_key().to_hex(),
-            "sig": keypair.sign(&signed_payload).to_hex()
+            "sig": keypair
+                .sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload)
+                .to_hex()
         }));
     }
     pretty_json_line(&signature)

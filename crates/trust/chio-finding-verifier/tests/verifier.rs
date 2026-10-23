@@ -85,7 +85,10 @@ fn checkpoint_at(
     signer: &Keypair,
 ) -> Result<KernelCheckpoint, Box<dyn Error>> {
     checkpoint.body.issued_at = issued_at;
-    checkpoint.signature = signer.sign(&canonical_json_bytes(&checkpoint.body)?);
+    checkpoint.signature = signer.sign_wrapped(
+        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&checkpoint.body)?,
+    )?;
     Ok(checkpoint)
 }
 
@@ -221,7 +224,10 @@ fn execution_nonce(
         reserved_hold_id: Some(budget.hold_id),
         reserving_request_id: None,
     };
-    let signature = kernel.sign(&canonical_json_bytes(&nonce)?);
+    let signature = kernel.sign_wrapped(
+        chio_core_types::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&nonce)?,
+    )?;
     Ok(SignedExecutionNonce { nonce, signature })
 }
 

@@ -29,7 +29,7 @@ fn web3_checkpoint_verification_requires_valid_first_chain_root() {
         chain_anchor.anchored_checkpoint_seq = 1;
     }
     let body = checkpoint_statement_body(&missing.checkpoint_statement);
-    let (signature, _) = operator_keypair().sign_canonical(&body).unwrap();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body).and_then(|canonical| operator_keypair().sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)).unwrap();
     missing.checkpoint_statement.signature = signature;
 
     assert!(matches!(
@@ -41,7 +41,7 @@ fn web3_checkpoint_verification_requires_valid_first_chain_root() {
     let mut incorrect = missing;
     incorrect.checkpoint_statement.chain_root = Some(Hash::zero());
     let body = checkpoint_statement_body(&incorrect.checkpoint_statement);
-    let (signature, _) = operator_keypair().sign_canonical(&body).unwrap();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body).and_then(|canonical| operator_keypair().sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)).unwrap();
     incorrect.checkpoint_statement.signature = signature;
 
     assert!(matches!(
@@ -57,7 +57,7 @@ fn web3_checkpoint_verification_rejects_tree_size_outside_signed_batch_range() {
     proof.checkpoint_statement.tree_size = 2;
     proof.receipt_inclusion.proof.tree_size = 2;
     let body = checkpoint_statement_body(&proof.checkpoint_statement);
-    let (signature, _) = operator_keypair().sign_canonical(&body).unwrap();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body).and_then(|canonical| operator_keypair().sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)).unwrap();
     proof.checkpoint_statement.signature = signature;
 
     assert!(matches!(
