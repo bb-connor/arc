@@ -1,5 +1,6 @@
-//! Every built-in guard declares whether its evidence `details` may appear in
-//! a committed receipt.
+//! Declared evidence disclosure of the default-constructible `chio-guards`
+//! guards and of the composite pipelines. `evidence_declaration` is a required
+//! trait method, so every other guard declares by compiling.
 
 use chio_guards::{
     AdvisoryPipeline, BrowserAutomationGuard, CodeExecutionGuard, ComputerUseGuard,
@@ -11,7 +12,7 @@ use chio_guards::{
 use chio_kernel::{Guard, GuardEvidenceDeclaration};
 
 #[test]
-fn every_builtin_guard_declares() {
+fn default_constructible_guards_declare_safe() {
     let safe: Vec<Box<dyn Guard>> = vec![
         Box::new(ForbiddenPathGuard::default()),
         Box::new(ShellCommandGuard::default()),

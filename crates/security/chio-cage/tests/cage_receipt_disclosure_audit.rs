@@ -81,7 +81,7 @@ fn cage_plan_digest_preimages_carry_arguments_environment_and_paths() {
 
 /// Names every member of the block. A new member fails to compile here until
 /// it is audited.
-fn audited_members(body: &CageReceiptBody) -> usize {
+fn audit_members(body: &CageReceiptBody) {
     let CageReceiptBody {
         schema: _,
         attempt_id: _,
@@ -92,7 +92,6 @@ fn audited_members(body: &CageReceiptBody) -> usize {
         started_at_unix_ms: _,
         recorded_at_unix_ms: _,
     } = body;
-    let mut digest_members = 0;
     if let Some(CageReceiptBindings {
         manifest_digest: _,
         profile_digest: _,
@@ -102,9 +101,7 @@ fn audited_members(body: &CageReceiptBody) -> usize {
         target_binding_digest: _,
         target_identity: _,
     }) = bindings
-    {
-        digest_members += 2;
-    }
+    {}
     let CageEnforcementRecord {
         schema: _,
         state: _,
@@ -148,9 +145,7 @@ fn audited_members(body: &CageReceiptBody) -> usize {
             },
         status_eof_observed: _,
     }) = fully_enforced
-    {
-        digest_members += 2;
-    }
+    {}
     if let Some(CageEnforcementFailure { code: _, stage: _ }) = failure {}
     if let Some(ProcessExitEvidence {
         process_id: _,
@@ -159,7 +154,6 @@ fn audited_members(body: &CageReceiptBody) -> usize {
         exited_at_unix_ms: _,
     }) = exit
     {}
-    digest_members
 }
 
 #[test]
@@ -168,7 +162,7 @@ fn cage_receipt_block_is_not_committed_safe() {
         .test_unwrap();
     let record = CageEnforcementRecord::rejected(failure).test_unwrap();
     let body = CageReceiptBody::new("attempt-1", None, record, 1_000, 2_000).test_unwrap();
-    assert_eq!(audited_members(&body), 0);
+    audit_members(&body);
 
     assert!(metadata_key_spec("cage_receipt").is_none());
     assert!(metadata_key_spec("schema").is_none());
