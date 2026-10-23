@@ -5,8 +5,8 @@
 //! These codecs do not reinterpret reservation nonces as dispatch permissions.
 //! Kernel start publication and executor-ledger integration are separate ports.
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{sha256_hex, verify_wrapped_bytes, Keypair, PublicKey, Signature};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::admission_operation::{
@@ -137,10 +137,15 @@ impl SignedCallerDispatchAuthorizationV1 {
             return Err(CallerDeliveryError::Binding);
         }
         validate_authorization(&body)?;
-        let bytes = bounded_canonical(&body, MAX_AUTHORIZATION_BYTES)?;
+        let signature = key
+            .sign_wrapped(
+                CALLER_DISPATCH_AUTHORIZATION_SCHEMA,
+                &bounded_body(&body, MAX_AUTHORIZATION_BYTES)?,
+            )
+            .map_err(|_| CallerDeliveryError::Signature)?;
         let signed = Self {
             authorization: body,
-            signature: key.sign(&bytes),
+            signature,
         };
         signed.canonical_bytes()?;
         Ok(signed)
@@ -172,10 +177,14 @@ impl SignedCallerDispatchAuthorizationV1 {
         {
             return Err(CallerDeliveryError::Binding);
         }
-        if !trusted_kernel.verify_strict(
-            &bounded_canonical(&self.authorization, MAX_AUTHORIZATION_BYTES)?,
+        if verify_wrapped_bytes(
+            trusted_kernel,
+            CALLER_DISPATCH_AUTHORIZATION_SCHEMA,
+            &bounded_body(&self.authorization, MAX_AUTHORIZATION_BYTES)?,
             &self.signature,
-        ) {
+        )
+        .is_err()
+        {
             return Err(CallerDeliveryError::Signature);
         }
         AdmissionDigest::try_new("caller_authorization_digest", sha256_hex(&bytes))
@@ -240,7 +249,12 @@ impl SignedCallerDeliveryReportV1 {
             return Err(CallerDeliveryError::Binding);
         }
         validate_report(&body)?;
-        let signature = key.sign(&bounded_canonical(&body, MAX_REPORT_BYTES)?);
+        let signature = key
+            .sign_wrapped(
+                CALLER_DELIVERY_REPORT_SCHEMA,
+                &bounded_body(&body, MAX_REPORT_BYTES)?,
+            )
+            .map_err(|_| CallerDeliveryError::Signature)?;
         let signed = Self {
             report: body,
             signature,
@@ -284,10 +298,14 @@ impl SignedCallerDeliveryReportV1 {
         {
             return Err(CallerDeliveryError::Binding);
         }
-        if !expected_executor.public_key.verify_strict(
-            &bounded_canonical(&self.report, MAX_REPORT_BYTES)?,
+        if verify_wrapped_bytes(
+            &expected_executor.public_key,
+            CALLER_DELIVERY_REPORT_SCHEMA,
+            &bounded_body(&self.report, MAX_REPORT_BYTES)?,
             &self.signature,
-        ) {
+        )
+        .is_err()
+        {
             return Err(CallerDeliveryError::Signature);
         }
         Ok(())
@@ -376,6 +394,13 @@ fn bounded_canonical<T: Serialize>(
     value: &T,
     maximum: usize,
 ) -> Result<Vec<u8>, CallerDeliveryError> {
+    bounded_body(value, maximum).map(CanonicalBytes::into_vec)
+}
+
+fn bounded_body<T: Serialize>(
+    value: &T,
+    maximum: usize,
+) -> Result<CanonicalBytes, CallerDeliveryError> {
     // Bound serialization before building a second value or canonical copy.
     // The same mechanism limits attacker-controlled nested report output.
     struct Writer {
@@ -401,7 +426,7 @@ fn bounded_canonical<T: Serialize>(
     serde_json::to_writer(&mut writer, value).map_err(|_| CallerDeliveryError::Shape)?;
     let value: serde_json::Value =
         serde_json::from_slice(&writer.bytes).map_err(|_| CallerDeliveryError::Shape)?;
-    let bytes = canonical_json_bytes(&value).map_err(|_| CallerDeliveryError::Shape)?;
+    let bytes = CanonicalBytes::from_value(&value).map_err(|_| CallerDeliveryError::Shape)?;
     if bytes.is_empty() || bytes.len() > maximum {
         return Err(CallerDeliveryError::Shape);
     }

@@ -9,7 +9,8 @@
 
 use std::collections::BTreeSet;
 
-use chio_core_types::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped_bytes, Keypair, PublicKey, Signature, SigningAlgorithm};
 use serde::{Deserialize, Serialize};
 
 use super::StopScope;
@@ -26,7 +27,6 @@ pub const STOP_QUORUM_MAX_LIMIT: u16 = 64;
 pub const MIN_SAME_PRINCIPAL_COOLDOWN_MS: u64 = 300_000;
 
 const PRINCIPAL_DOMAIN: &[u8] = b"chio.stop-principal.v1\0";
-const APPROVAL_DOMAIN: &[u8] = b"chio.stop-operator-config-approval.v1\0";
 
 /// A roster principal: SHA-256 over a domain tag and the subject key's hex
 /// encoding, as 64 lowercase hex characters.
@@ -145,15 +145,30 @@ pub struct StopConfigApprovalV1 {
     pub signature: Signature,
 }
 
+/// The approval object without its signature: the canonical body the
+/// wrapper binds to `chio.stop-operator-config-approval.v1`.
+#[derive(Serialize)]
+struct StopConfigApprovalBody<'a> {
+    schema: &'a str,
+    principal: &'a PrincipalId,
+    config_digest: &'a str,
+}
+
 impl StopConfigApprovalV1 {
-    #[must_use]
-    pub fn sign(principal: &Keypair, config_digest: &str) -> Self {
-        Self {
+    pub fn sign(principal: &Keypair, config_digest: &str) -> Result<Self, StopConfigError> {
+        let principal_id = PrincipalId::from_subject_key(&principal.public_key());
+        let signature = principal
+            .sign_wrapped(
+                STOP_OPERATOR_CONFIG_APPROVAL_SCHEMA,
+                &approval_body(&principal_id, config_digest)?,
+            )
+            .map_err(|error| StopConfigError::Canonical(error.to_string()))?;
+        Ok(Self {
             schema: STOP_OPERATOR_CONFIG_APPROVAL_SCHEMA.to_owned(),
-            principal: PrincipalId::from_subject_key(&principal.public_key()),
+            principal: principal_id,
             config_digest: config_digest.to_owned(),
-            signature: principal.sign(&approval_message(config_digest)),
-        }
+            signature,
+        })
     }
 }
 
@@ -279,12 +294,12 @@ pub enum StopConfigError {
 impl StopOperatorConfigV1 {
     /// Sign `body` with the configuration root.
     pub fn sign(body: StopOperatorConfigBodyV1, root: &Keypair) -> Result<Self, StopConfigError> {
-        let message = chio_core_types::canonical_json_bytes(&body)
+        let canonical = CanonicalBytes::from_serializable(&body)
             .map_err(|error| StopConfigError::Canonical(error.to_string()))?;
-        Ok(Self {
-            signature: root.sign(&message),
-            body,
-        })
+        let signature = root
+            .sign_wrapped(STOP_OPERATOR_CONFIG_SCHEMA, &canonical)
+            .map_err(|error| StopConfigError::Canonical(error.to_string()))?;
+        Ok(Self { signature, body })
     }
 
     /// Decode one bounded, canonical document.
@@ -317,9 +332,16 @@ impl StopOperatorConfigV1 {
         if body.config_authority_key != pins.config_root {
             return Err(StopConfigError::RootMismatch);
         }
-        let message = chio_core_types::canonical_json_bytes(body)
+        let canonical = CanonicalBytes::from_serializable(body)
             .map_err(|error| StopConfigError::Canonical(error.to_string()))?;
-        if !pins.config_root.verify_strict(&message, &self.signature) {
+        if verify_wrapped_bytes(
+            &pins.config_root,
+            STOP_OPERATOR_CONFIG_SCHEMA,
+            &canonical,
+            &self.signature,
+        )
+        .is_err()
+        {
             return Err(StopConfigError::Signature);
         }
         if body.authority_id != pins.authority_id {
@@ -438,7 +460,6 @@ fn verify_succession(
     if succession.approvals.len() > bound {
         return Err(StopConfigError::TooManyApprovals);
     }
-    let message = approval_message(digest);
     let mut approved = BTreeSet::new();
     for approval in succession.approvals {
         if approval.schema != STOP_OPERATOR_CONFIG_APPROVAL_SCHEMA
@@ -452,9 +473,13 @@ fn verify_succession(
         if !approved.insert(&approval.principal) {
             return Err(StopConfigError::ApprovalDuplicate);
         }
-        if !entry
-            .subject_key
-            .verify_strict(&message, &approval.signature)
+        if verify_wrapped_bytes(
+            &entry.subject_key,
+            STOP_OPERATOR_CONFIG_APPROVAL_SCHEMA,
+            &approval_body(&approval.principal, &approval.config_digest)?,
+            &approval.signature,
+        )
+        .is_err()
         {
             return Err(StopConfigError::ApprovalSignature);
         }
@@ -469,10 +494,16 @@ fn verify_succession(
     Ok(())
 }
 
-fn approval_message(config_digest: &str) -> Vec<u8> {
-    let mut message = APPROVAL_DOMAIN.to_vec();
-    message.extend_from_slice(config_digest.as_bytes());
-    message
+fn approval_body(
+    principal: &PrincipalId,
+    config_digest: &str,
+) -> Result<CanonicalBytes, StopConfigError> {
+    CanonicalBytes::from_serializable(&StopConfigApprovalBody {
+        schema: STOP_OPERATOR_CONFIG_APPROVAL_SCHEMA,
+        principal,
+        config_digest,
+    })
+    .map_err(|error| StopConfigError::Canonical(error.to_string()))
 }
 
 fn require_strong(key: &PublicKey) -> Result<(), StopConfigError> {

@@ -1,5 +1,6 @@
 //! Shared boot-selected authority for proposals and ordinary receipts.
 
+use chio_core::crypto::SigningMessage;
 use super::*;
 use chio_core::crypto::{SigningBackend, SigningOutcome};
 
@@ -153,26 +154,20 @@ impl SigningBackend for SharedSigningBackend {
         self.0.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<chio_core::Signature, chio_core::Error> {
         self.0.sign_bytes(message)
     }
 
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome, chio_core::Error> {
+    fn sign_bytes_with_identity(&self, message: SigningMessage<'_>) -> Result<SigningOutcome, chio_core::Error> {
         self.0.sign_bytes_with_identity(message)
     }
 
     fn sign_bytes_for_identity(
         &self,
         key: &chio_core::PublicKey,
-        message: &[u8],
+        message: SigningMessage<'_>,
     ) -> Result<SigningOutcome, chio_core::Error> {
         self.0.sign_bytes_for_identity(key, message)
     }
 
-    fn sign_canonical_bytes(
-        &self,
-        canonical: &chio_core::CanonicalBytes<chio_core::CanonicalJsonWitness>,
-    ) -> Result<chio_core::Signature, chio_core::Error> {
-        self.0.sign_canonical_bytes(canonical)
-    }
 }

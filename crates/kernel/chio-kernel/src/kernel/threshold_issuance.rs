@@ -65,17 +65,8 @@ impl ChioKernel {
     ) -> Result<chio_core::capability::governance::ThresholdApprovalProposal, KernelError> {
         use chio_core::capability::governance::ThresholdApprovalProposal;
 
-        let algorithm = self.ensure_threshold_proposal_signer_ready()?;
-        let mut proposal = ThresholdApprovalProposal::sign_with_backend(
-            body,
-            self.signing_authority.backend.as_ref(),
-        )
-        .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        // Ed25519's absent algorithm tag is the existing signed artifact wire
-        // form. Keep it byte-identical even when boot installed an Ed25519 backend.
-        if algorithm == SigningAlgorithm::Ed25519 {
-            proposal.algorithm = None;
-        }
-        Ok(proposal)
+        self.ensure_threshold_proposal_signer_ready()?;
+        ThresholdApprovalProposal::sign_with_backend(body, self.signing_authority.backend.as_ref())
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))
     }
 }

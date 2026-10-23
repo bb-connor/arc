@@ -36,8 +36,7 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use chio_core_types::canonical_json_bytes;
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 
 use crate::clock::Clock;
 
@@ -205,12 +204,13 @@ pub fn verify_parsed_passport(
         return Err(VerifyError::UntrustedIssuer);
     }
 
-    let body_bytes = canonical_json_bytes(&envelope.body)
-        .map_err(|error| VerifyError::Internal(error.to_string()))?;
-    if !envelope
-        .body
-        .issuer
-        .verify(&body_bytes, &envelope.signature)
+    if verify_wrapped(
+        &envelope.body.issuer,
+        PORTABLE_PASSPORT_SCHEMA,
+        &envelope.body,
+        &envelope.signature,
+    )
+    .is_err()
     {
         return Err(VerifyError::InvalidSignature);
     }
