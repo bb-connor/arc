@@ -82,7 +82,7 @@ fn permission_not_required_when_config_disabled() {
 }
 
 #[test]
-fn permission_with_capability_allows_matching_scope() {
+fn permission_preview_allows_trusted_issuer_matching_scope() {
     let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let config = test_kernel_config();
     let issuer = config.keypair.clone();
@@ -105,8 +105,62 @@ fn permission_with_capability_allows_matching_scope() {
     };
 
     assert_eq!(
-        edge.evaluate_permission(&request, &execution),
+        edge.evaluate_permission_with_kernel(&request, &ChioKernel::new(config), &execution),
         PermissionDecision::Allow
+    );
+}
+
+fn self_signed_read_file_execution(issuer: &Keypair) -> AcpKernelExecutionContext {
+    let subject = Keypair::generate();
+    AcpKernelExecutionContext {
+        capability: capability_for_tool(issuer, &subject, "test-srv", "read_file"),
+        agent_id: subject.public_key().to_hex(),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+    }
+}
+
+#[test]
+fn permission_preview_refuses_untrusted_self_signed_issuer() {
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let kernel = ChioKernel::new(test_kernel_config());
+    let issuer = Keypair::generate();
+    let execution = self_signed_read_file_execution(&issuer);
+    assert!(matches!(execution.capability.verify_integrity_embedded_key(), Ok(true)));
+    assert!(!kernel.capability_issuer_is_trusted(&issuer.public_key()));
+    let request = PermissionRequest {
+        capability_id: "read_file".to_string(),
+        arguments: json!({"path": "/tmp"}),
+    };
+
+    assert_eq!(
+        edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
+        PermissionDecision::Deny
+    );
+}
+
+#[test]
+fn permission_preview_without_trusted_issuers_never_allows() {
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let mut config = test_kernel_config();
+    let issuer = Keypair::generate();
+    config.ca_public_keys = Vec::new();
+    let kernel = ChioKernel::new(config);
+    let execution = self_signed_read_file_execution(&issuer);
+    let request = PermissionRequest {
+        capability_id: "read_file".to_string(),
+        arguments: json!({"path": "/tmp"}),
+    };
+
+    assert_eq!(
+        edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
+        PermissionDecision::Deny
     );
 }
 
@@ -140,7 +194,7 @@ fn permission_with_capability_denies_sender_bound_scope_without_dpop() {
     };
 
     assert_eq!(
-        edge.evaluate_permission(&request, &execution),
+        edge.evaluate_permission_with_kernel(&request, &ChioKernel::new(config), &execution),
         PermissionDecision::Deny
     );
 }
@@ -344,7 +398,7 @@ fn permission_with_capability_denies_out_of_scope_request() {
     };
 
     assert_eq!(
-        edge.evaluate_permission(&request, &execution),
+        edge.evaluate_permission_with_kernel(&request, &ChioKernel::new(config), &execution),
         PermissionDecision::Deny
     );
 }

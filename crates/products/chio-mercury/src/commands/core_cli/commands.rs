@@ -13,7 +13,7 @@ pub fn cmd_mercury_proof_export(
 ) -> Result<(), CliError> {
     let package = build_proof_package(input, bundle_manifest_paths, trusted_kernel_keys)?;
     package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     write_json_file(output, &package)?;
 
@@ -41,7 +41,7 @@ pub fn cmd_mercury_inquiry_export(
 ) -> Result<(), CliError> {
     let proof_package: MercuryProofPackage = read_json_file(input)?;
     proof_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let package = build_inquiry_package(
         proof_package,
@@ -50,7 +50,7 @@ pub fn cmd_mercury_inquiry_export(
         verifier_equivalent,
     )?;
     let report = package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     write_json_file(output, &package)?;
 
@@ -78,13 +78,13 @@ pub fn cmd_mercury_verify(input: &Path, json_output: bool, explain: bool) -> Res
         MERCURY_PROOF_PACKAGE_SCHEMA => {
             let package: MercuryProofPackage = serde_json::from_value(value)?;
             package
-                .verify(unix_now())
+                .verify_integrity_only(unix_now())
                 .map_err(|error| CliError::Other(error.to_string()))?
         }
         MERCURY_INQUIRY_PACKAGE_SCHEMA => {
             let package: MercuryInquiryPackage = serde_json::from_value(value)?;
             package
-                .verify(unix_now())
+                .verify_integrity_only(unix_now())
                 .map_err(|error| CliError::Other(error.to_string()))?
         }
         _ => {
@@ -101,7 +101,16 @@ pub fn cmd_mercury_verify(input: &Path, json_output: bool, explain: bool) -> Res
             MercuryPackageKind::Proof => "proof",
             MercuryPackageKind::Inquiry => "inquiry",
         };
-        println!("mercury {package_kind} package verified");
+        match report.scope {
+            MercuryVerificationScope::TrustedKernelAuthority => {
+                println!("mercury {package_kind} package verified");
+            }
+            MercuryVerificationScope::IntegrityOnly => {
+                println!(
+                    "mercury {package_kind} package integrity-only: kernel signer authority was not evaluated"
+                );
+            }
+        }
         println!("package_id:          {}", report.package_id);
         println!("workflow_id:         {}", report.workflow_id);
         println!("receipt_count:       {}", report.receipt_count);

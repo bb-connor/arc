@@ -11,7 +11,7 @@ pub(in crate::commands) fn export_assurance_suite(
         governance_dir.join("qualification/supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
 
     let reviewer_package_path = governance_dir.join("qualification/reviewer-package.json");
@@ -47,7 +47,7 @@ pub(in crate::commands) fn export_assurance_suite(
             config.verifier_equivalent,
         )?;
         let inquiry_report = inquiry_package
-            .verify(unix_now())
+            .verify_integrity_only(unix_now())
             .map_err(|error| CliError::Other(error.to_string()))?;
         let inquiry_package_path = population_dir.join("inquiry-package.json");
         let inquiry_verification_path = population_dir.join("inquiry-verification.json");

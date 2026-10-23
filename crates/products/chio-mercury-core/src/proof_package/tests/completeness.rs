@@ -120,7 +120,9 @@ fn tenant_time_scoped_context_uses_selected_receipt_coverage() {
         .iter()
         .all(|proof| proof.checkpoint_seq == 2));
 
-    let structural_report = package.verify(1_775_137_920).expect("structural report");
+    let structural_report = package
+        .verify_integrity_only(1_775_137_920)
+        .expect("structural report");
     assert!(!structural_report.verifier_equivalent);
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);
     let trusted_report = package
@@ -172,7 +174,7 @@ fn unsigned_query_mutation_cannot_elevate_selected_coverage() {
     package.refresh_package_id().expect("refresh package id");
     assert_ne!(package.package_id, selected_package_id);
     package
-        .verify(1_775_137_922)
+        .verify_integrity_only(1_775_137_922)
         .expect("mutated descriptor remains structurally checkable");
 
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);

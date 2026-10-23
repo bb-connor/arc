@@ -420,7 +420,11 @@ impl MercuryProofPackage {
         Ok(())
     }
 
-    pub fn verify(
+    /// Integrity-only check: package contract, receipt and checkpoint
+    /// self-signatures and inclusion proofs. No signer is checked against a
+    /// trusted kernel key, so the report scope is `integrity_only`; use
+    /// `verify_with_trusted_kernel_keys` for a verdict.
+    pub fn verify_integrity_only(
         &self,
         verified_at: u64,
     ) -> Result<MercuryVerificationReport, MercuryContractError> {
@@ -433,6 +437,7 @@ impl MercuryProofPackage {
         Ok(MercuryVerificationReport {
             schema: self.schema.clone(),
             package_kind: MercuryPackageKind::Proof,
+            scope: MercuryVerificationScope::IntegrityOnly,
             verified_at,
             package_id: self.package_id.clone(),
             workflow_id: self.workflow_id.clone(),
@@ -475,6 +480,7 @@ impl MercuryProofPackage {
         Ok(MercuryVerificationReport {
             schema: self.schema.clone(),
             package_kind: MercuryPackageKind::Proof,
+            scope: MercuryVerificationScope::TrustedKernelAuthority,
             verified_at,
             package_id: self.package_id.clone(),
             workflow_id: self.workflow_id.clone(),
@@ -644,15 +650,20 @@ impl MercuryInquiryPackage {
         Ok(())
     }
 
-    pub fn verify(
+    /// Integrity-only check: package contract, receipt and checkpoint
+    /// self-signatures and inclusion proofs. No signer is checked against a
+    /// trusted kernel key, so the report scope is `integrity_only`; use
+    /// `verify_with_trusted_kernel_keys` for a verdict.
+    pub fn verify_integrity_only(
         &self,
         verified_at: u64,
     ) -> Result<MercuryVerificationReport, MercuryContractError> {
         self.validate()?;
-        let proof_report = self.proof_package.verify(verified_at)?;
+        let proof_report = self.proof_package.verify_integrity_only(verified_at)?;
         Ok(MercuryVerificationReport {
             schema: self.schema.clone(),
             package_kind: MercuryPackageKind::Inquiry,
+            scope: MercuryVerificationScope::IntegrityOnly,
             verified_at,
             package_id: self.inquiry_id.clone(),
             workflow_id: self.proof_package.workflow_id.clone(),
@@ -683,6 +694,7 @@ impl MercuryInquiryPackage {
         Ok(MercuryVerificationReport {
             schema: self.schema.clone(),
             package_kind: MercuryPackageKind::Inquiry,
+            scope: MercuryVerificationScope::TrustedKernelAuthority,
             verified_at,
             package_id: self.inquiry_id.clone(),
             workflow_id: self.proof_package.workflow_id.clone(),
@@ -710,6 +722,17 @@ pub enum MercuryPackageKind {
     Inquiry,
 }
 
+/// What a verification report establishes.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MercuryVerificationScope {
+    /// Package contract and self-signatures only; signer authority was not
+    /// evaluated against trusted kernel keys.
+    IntegrityOnly,
+    /// Every receipt and checkpoint signer is a trusted Mercury kernel key.
+    TrustedKernelAuthority,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MercuryVerificationStep {
@@ -722,6 +745,7 @@ pub struct MercuryVerificationStep {
 pub struct MercuryVerificationReport {
     pub schema: String,
     pub package_kind: MercuryPackageKind,
+    pub scope: MercuryVerificationScope,
     pub verified_at: u64,
     pub package_id: String,
     pub workflow_id: String,

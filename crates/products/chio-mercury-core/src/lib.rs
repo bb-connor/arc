@@ -97,8 +97,8 @@ pub use program_family::{
 };
 pub use proof_package::{
     MercuryInquiryPackage, MercuryPackageKind, MercuryProofPackage, MercuryProofReceiptRecord,
-    MercuryPublicationProfile, MercuryVerificationReport, MercuryVerificationStep,
-    MERCURY_INQUIRY_PACKAGE_SCHEMA, MERCURY_PROOF_PACKAGE_SCHEMA,
+    MercuryPublicationProfile, MercuryVerificationReport, MercuryVerificationScope,
+    MercuryVerificationStep, MERCURY_INQUIRY_PACKAGE_SCHEMA, MERCURY_PROOF_PACKAGE_SCHEMA,
     MERCURY_PUBLICATION_PROFILE_SCHEMA,
 };
 pub use query::{MercuryReceiptIndexRecord, MercuryReceiptQuery};

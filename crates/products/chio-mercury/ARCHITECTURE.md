@@ -33,7 +33,7 @@ invocation. There is no long-running Mercury admission service in this crate.
 
 `build_proof_package` constructs an `EvidenceVerificationPolicy` from supplied
 kernel keys, loads a verified export summary, validates bundle manifests, and
-calls `MercuryProofPackage::build`. The export command invokes `verify` before
+calls `MercuryProofPackage::build`. The export command invokes `verify_integrity_only` before
 writing the resulting JSON. Current builds produce proof-package v2.
 
 `cmd_mercury_verify` decodes a package and dispatches on the current proof or

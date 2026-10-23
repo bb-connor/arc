@@ -138,7 +138,7 @@ pub(in crate::commands) fn export_trust_network(
         false,
     )?;
     let shared_inquiry_report = shared_inquiry_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let shared_inquiry_package_path = share_dir.join("inquiry-package.json");
     let shared_inquiry_verification_path = share_dir.join("inquiry-verification.json");

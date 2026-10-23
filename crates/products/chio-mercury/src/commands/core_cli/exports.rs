@@ -55,7 +55,7 @@ pub(super) fn export_downstream_review(
     let proof_package_path = qualification_dir.join("supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
@@ -74,7 +74,7 @@ pub(super) fn export_downstream_review(
         false,
     )?;
     let internal_inquiry_report = internal_inquiry
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let internal_inquiry_path = internal_dir.join("inquiry-package.json");
     let internal_inquiry_report_path = internal_dir.join("inquiry-verification.json");
@@ -101,7 +101,7 @@ pub(super) fn export_downstream_review(
         false,
     )?;
     let external_inquiry_report = external_inquiry
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let external_inquiry_path = external_dir.join("inquiry-package.json");
     let external_inquiry_report_path = external_dir.join("inquiry-verification.json");
@@ -281,7 +281,7 @@ pub(crate) fn export_governance_workbench(
     let proof_package_path = qualification_dir.join("supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
@@ -301,7 +301,7 @@ pub(crate) fn export_governance_workbench(
         false,
     )?;
     let workflow_owner_inquiry_report = workflow_owner_inquiry
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let workflow_owner_inquiry_path = workflow_owner_dir.join("inquiry-package.json");
     let workflow_owner_inquiry_report_path = workflow_owner_dir.join("inquiry-verification.json");
@@ -318,7 +318,7 @@ pub(crate) fn export_governance_workbench(
         false,
     )?;
     let control_team_inquiry_report = control_team_inquiry
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     let control_team_inquiry_path = control_team_dir.join("inquiry-package.json");
     let control_team_inquiry_report_path = control_team_dir.join("inquiry-verification.json");
@@ -462,7 +462,7 @@ pub(super) fn export_mercury_run(
         &[kernel.public_key().to_hex()],
     )?;
     let proof_report = proof_package
-        .verify(unix_now())
+        .verify_integrity_only(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;
     write_json_file(&proof_package_file, &proof_package)?;
     write_verification_report(&proof_verification_file, &proof_report)?;
@@ -475,7 +475,7 @@ pub(super) fn export_mercury_run(
             config.verifier_equivalent,
         )?;
         let inquiry_report = inquiry_package
-            .verify(unix_now())
+            .verify_integrity_only(unix_now())
             .map_err(|error| CliError::Other(error.to_string()))?;
         write_json_file(&inquiry_package_file, &inquiry_package)?;
         write_verification_report(&inquiry_verification_file, &inquiry_report)?;

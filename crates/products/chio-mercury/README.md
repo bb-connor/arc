@@ -28,7 +28,7 @@ has `verifierEquivalent: false`.
 | --- | --- |
 | `proof export` | Evidence directory, bundle manifests, and explicit trusted kernel keys; writes proof-package v2. |
 | `inquiry export` | Proof package and audience; writes inquiry-package v1 with a deterministic rendered projection. |
-| `verify` | Current proof or inquiry JSON; prints integrity checks, optionally with `--explain`. |
+| `verify` | Current proof or inquiry JSON; prints an integrity-only report (`scope: integrity_only`), optionally with `--explain`. |
 | `pilot export` | Built-in scenario; creates signed synthetic receipts and checkpoints. |
 | `supervised-live export` | Typed capture JSON; requires export-ready control state. |
 | `supervised-live qualify` | Built-in capture and pilot; writes fixture qualification artifacts. |
@@ -43,9 +43,10 @@ These records describe the fixture exercise.
 
 - `build_proof_package` loads evidence through
   `load_verified_evidence_package_summary` with an explicit verification policy.
-- `cmd_mercury_verify` calls the core package's `verify` method. This method
-  checks receipt signatures and package bindings without selecting an external
-  trusted kernel-key set. Authority-sensitive consumers should use the core
+- `cmd_mercury_verify` calls the core package's `verify_integrity_only` method.
+  It checks receipt self-signatures and package bindings without a trusted
+  kernel-key set, labels its output integrity-only, and never prints
+  "verified". Authority-sensitive consumers use the core
   `verify_with_trusted_kernel_keys` API.
 - `read_json_file` rejects duplicate keys through `decode_signed`; its file
   read itself is unbounded.

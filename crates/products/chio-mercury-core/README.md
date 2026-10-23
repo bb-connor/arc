@@ -46,10 +46,12 @@ workflow and action bindings, manifests, derived coverage, and package identity.
 Tool receipts must be mediated allow decisions with mediated trust targeting
 `mercury`; observation receipts fail this acceptance check.
 
-`verify` checks bundled signatures and inclusion evidence. Use
+`verify_integrity_only` checks bundled self-signatures and inclusion evidence
+and reports `scope: integrity_only`; it evaluates no signer authority. Use
 `verify_with_trusted_kernel_keys` to require trusted receipt and checkpoint
 signers, exact selected receipt proof coverage or bundled checkpoint-prefix
-coverage, and signed manifest references. Both methods return
+coverage, and signed manifest references; it reports
+`scope: trusted_kernel_authority`. Both methods return
 `verifier_equivalent: false`: portable exports do not authenticate the source
 query or current source-log boundary.
 

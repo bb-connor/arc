@@ -67,7 +67,7 @@ use chio_mercury_core::{
     MercuryThirdProgramProfile, MercuryThirdProgramSurface, MercuryTrustNetworkArtifact,
     MercuryTrustNetworkArtifactKind, MercuryTrustNetworkInteropSurface, MercuryTrustNetworkPackage,
     MercuryTrustNetworkProfile, MercuryTrustNetworkSponsorBoundary, MercuryTrustNetworkTrustAnchor,
-    MercuryTrustNetworkWitnessStep, MercuryVerificationReport,
+    MercuryTrustNetworkWitnessStep, MercuryVerificationReport, MercuryVerificationScope,
     MERCURY_ASSURANCE_DISCLOSURE_PROFILE_SCHEMA, MERCURY_ASSURANCE_INVESTIGATION_PACKAGE_SCHEMA,
     MERCURY_ASSURANCE_PACKAGE_SCHEMA, MERCURY_ASSURANCE_REVIEW_PACKAGE_SCHEMA,
     MERCURY_ASSURANCE_SUITE_PACKAGE_SCHEMA, MERCURY_BROADER_DISTRIBUTION_PACKAGE_SCHEMA,

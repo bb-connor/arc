@@ -44,8 +44,9 @@ coverage and publication material. It emits the v2 schema and hashes a
 deterministic package identity before structural validation.
 `validate` also recognizes legacy v1 identity derivation.
 
-`verify` validates the package and calls `verify_chio_bundle` to check receipt
-self-signatures, required checkpoint signatures, and Merkle inclusion evidence.
+`verify_integrity_only` validates the package and calls `verify_chio_bundle` to
+check receipt self-signatures, required checkpoint signatures, and Merkle
+inclusion evidence, and reports `scope: integrity_only`.
 `verify_with_trusted_kernel_keys` adds explicit signer membership, trusted
 checkpoint requirements, and exact signed bundle-manifest coverage.
 
