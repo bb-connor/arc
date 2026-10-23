@@ -434,8 +434,9 @@ no commutative interpretation: revocations of jointly-issued credentials,
 multi-party settlements, treaty-wide sanctions, passport invalidations
 that span issuing orgs.
 
-**Signature shape:** FROST-aggregated Ed25519 signature over
-`CHIO-FROST-AUTHORIZATION-V1\0 || RFC8785(FrostAuthorizationBodyV1)`. The
+**Signature shape:** FROST-aggregated Ed25519 signature over the signing
+wrapper (PROTOCOL 4.5) of `RFC8785(FrostAuthorizationBodyV1)` under
+`chio.frost.authorization.v1`. The
 authorization body's `action_digest` binds the exact canonical consumer action
 body; it also binds domain, action class, authority scope, resource id, resource
 version, lifecycle fence, roster digest and key epoch. It additionally signs the
