@@ -1,4 +1,5 @@
 use super::*;
+use crate::crypto::SigningMessage;
 use crate::crypto::{
     Ed25519Backend, PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningOutcome,
 };
@@ -16,17 +17,21 @@ impl SigningBackend for IdentityBackend {
     fn public_key(&self) -> crate::Result<PublicKey> {
         self.inner.public_key()
     }
-    fn sign_bytes(&self, _: &[u8]) -> Result<Signature> {
+    fn sign_bytes(&self, _: SigningMessage<'_>) -> Result<Signature> {
         Err(Error::InvalidSignature(
             "unbound signing is forbidden".into(),
         ))
     }
-    fn sign_bytes_with_identity(&self, _: &[u8]) -> Result<SigningOutcome> {
+    fn sign_bytes_with_identity(&self, _: SigningMessage<'_>) -> Result<SigningOutcome> {
         Err(Error::InvalidSignature(
             "generic signing is forbidden".into(),
         ))
     }
-    fn sign_bytes_for_identity(&self, key: &PublicKey, message: &[u8]) -> Result<SigningOutcome> {
+    fn sign_bytes_for_identity(
+        &self,
+        key: &PublicKey,
+        message: SigningMessage<'_>,
+    ) -> Result<SigningOutcome> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(key, &self.inner.public_key().unwrap());
         let mut outcome = self.inner.sign_bytes_for_identity(key, message)?;

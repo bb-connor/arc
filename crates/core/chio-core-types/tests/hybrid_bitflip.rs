@@ -1,5 +1,6 @@
 #![cfg(feature = "pq")]
 
+use chio_core_types::crypto::{verify_exempt, ExemptFormat, SigningMessage};
 use std::error::Error;
 use std::io::{Error as IoError, ErrorKind};
 
@@ -15,8 +16,17 @@ fn hybrid_fixture() -> Result<(PublicKey, Signature), Box<dyn Error>> {
     let pq = MlDsa65Backend::from_seed(&[7u8; 32]);
     let backend = HybridBackend::new(classical, pq)?;
     let public_key = backend.public_key()?;
-    let signature = backend.sign_bytes(MESSAGE)?;
-    assert!(public_key.verify(MESSAGE, &signature));
+    let signature = backend.sign_bytes(SigningMessage::exempt(
+        ExemptFormat::JwsSigningInput,
+        MESSAGE,
+    ))?;
+    assert!(verify_exempt(
+        &public_key,
+        ExemptFormat::JwsSigningInput,
+        MESSAGE,
+        &signature
+    )
+    .is_ok());
     Ok((public_key, signature))
 }
 
@@ -27,7 +37,13 @@ fn bit_flip_in_classical_half_rejects() -> Result<(), Box<dyn Error>> {
     parts.classical = flip_first_hex_digit(&parts.classical)?;
     let tampered = parse_signature(&parts)?;
 
-    assert!(!public_key.verify(MESSAGE, &tampered));
+    assert!(verify_exempt(
+        &public_key,
+        ExemptFormat::JwsSigningInput,
+        MESSAGE,
+        &tampered
+    )
+    .is_err());
     Ok(())
 }
 
@@ -38,7 +54,13 @@ fn bit_flip_in_pq_half_rejects() -> Result<(), Box<dyn Error>> {
     parts.pq = flip_first_hex_digit(&parts.pq)?;
     let tampered = parse_signature(&parts)?;
 
-    assert!(!public_key.verify(MESSAGE, &tampered));
+    assert!(verify_exempt(
+        &public_key,
+        ExemptFormat::JwsSigningInput,
+        MESSAGE,
+        &tampered
+    )
+    .is_err());
     Ok(())
 }
 
@@ -68,12 +90,18 @@ fn malformed_hybrid_lengths_reject() -> Result<(), Box<dyn Error>> {
     )
     .is_err());
     assert!(Signature::from_hybrid_parts(
-        Keypair::from_seed(&[3u8; 32]).sign(MESSAGE),
+        Keypair::from_seed(&[3u8; 32]).sign_exempt(ExemptFormat::JwsSigningInput, MESSAGE),
         &[0u8; ML_DSA_65_SIGNATURE_LEN - 1],
         HYBRID_ED25519_MLDSA65,
     )
     .is_err());
-    assert!(public_key.verify(MESSAGE, &signature));
+    assert!(verify_exempt(
+        &public_key,
+        ExemptFormat::JwsSigningInput,
+        MESSAGE,
+        &signature
+    )
+    .is_ok());
     Ok(())
 }
 

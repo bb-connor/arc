@@ -1,10 +1,6 @@
-//! Tool server manifests: signed declarations of available tools.
-//!
-//! Each tool server publishes a signed manifest at startup. The Kernel verifies
-//! the signature before accepting any tools from the server.
+//! Tool definitions shared by tool server manifests.
 
 use alloc::string::String;
-use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,9 +9,6 @@ pub use chio_security_types::flow::{
 };
 
 use crate::capability::scope::MonetaryAmount;
-use crate::crypto::{Keypair, PublicKey, Signature};
-use crate::error::Result;
-use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 fn deserialize_present_option<'de, D, T>(
     deserializer: D,
@@ -33,71 +26,6 @@ where
     T::deserialize(value)
         .map(Some)
         .map_err(serde::de::Error::custom)
-}
-
-/// A Chio tool server manifest. Signed by the server's Ed25519 key.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ToolManifest {
-    /// Unique identifier for this tool server.
-    pub server_id: String,
-    /// The server's Ed25519 public key.
-    pub server_key: PublicKey,
-    /// Tools offered by this server.
-    pub tools: Vec<ToolDefinition>,
-    /// Host capabilities the server requires (e.g. "fs_read", "network").
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub required_capabilities: Vec<String>,
-    /// Ed25519 signature over canonical JSON of all fields above.
-    pub signature: Signature,
-}
-
-/// The body of a manifest (everything except the signature), used for signing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ToolManifestBody {
-    pub server_id: String,
-    pub server_key: PublicKey,
-    pub tools: Vec<ToolDefinition>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub required_capabilities: Vec<String>,
-}
-
-impl ToolManifest {
-    /// Sign a manifest body with the server's keypair.
-    pub fn sign(body: ToolManifestBody, keypair: &Keypair) -> Result<Self> {
-        ensure_keypair_matches_embedded_key(
-            &body.server_key,
-            keypair,
-            "tool manifest",
-            "server_key",
-        )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
-        Ok(Self {
-            server_id: body.server_id,
-            server_key: body.server_key,
-            tools: body.tools,
-            required_capabilities: body.required_capabilities,
-            signature,
-        })
-    }
-
-    /// Extract the body for re-verification.
-    #[must_use]
-    pub fn body(&self) -> ToolManifestBody {
-        ToolManifestBody {
-            server_id: self.server_id.clone(),
-            server_key: self.server_key.clone(),
-            tools: self.tools.clone(),
-            required_capabilities: self.required_capabilities.clone(),
-        }
-    }
-
-    /// Verify the manifest signature against the server's public key.
-    pub fn verify_signature(&self) -> Result<bool> {
-        let body = self.body();
-        self.server_key.verify_canonical(&body, &self.signature)
-    }
 }
 
 /// A single tool offered by a server.
@@ -210,7 +138,6 @@ pub enum LatencyHint {
 )]
 mod tests {
     use super::*;
-    use crate::crypto::Keypair;
 
     fn sample_tool() -> ToolDefinition {
         ToolDefinition {
@@ -247,55 +174,6 @@ mod tests {
             latency_hint: Some(LatencyHint::Fast),
             flow: None,
         }
-    }
-
-    #[test]
-    fn manifest_sign_and_verify() {
-        let kp = Keypair::generate();
-        let body = ToolManifestBody {
-            server_id: "srv-files".to_string(),
-            server_key: kp.public_key(),
-            tools: vec![sample_tool()],
-            required_capabilities: vec!["fs_read".to_string()],
-        };
-        let manifest = ToolManifest::sign(body, &kp).unwrap();
-        assert!(manifest.verify_signature().unwrap());
-    }
-
-    #[test]
-    fn manifest_wrong_key_fails() {
-        let kp = Keypair::generate();
-        let other_kp = Keypair::generate();
-        let body = ToolManifestBody {
-            server_id: "srv-files".to_string(),
-            server_key: kp.public_key(),
-            tools: vec![sample_tool()],
-            required_capabilities: vec![],
-        };
-        let mut manifest = ToolManifest::sign(body, &kp).unwrap();
-        manifest.server_key = other_kp.public_key();
-        assert!(!manifest.verify_signature().unwrap());
-    }
-
-    #[test]
-    fn manifest_serde_roundtrip() {
-        let kp = Keypair::generate();
-        let body = ToolManifestBody {
-            server_id: "srv-test".to_string(),
-            server_key: kp.public_key(),
-            tools: vec![sample_tool()],
-            required_capabilities: vec!["network".to_string()],
-        };
-        let manifest = ToolManifest::sign(body, &kp).unwrap();
-
-        let json = serde_json::to_string_pretty(&manifest).unwrap();
-        let restored: ToolManifest = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(manifest.server_id, restored.server_id);
-        assert_eq!(manifest.server_key, restored.server_key);
-        assert_eq!(manifest.tools.len(), restored.tools.len());
-        assert_eq!(manifest.tools[0].name, restored.tools[0].name);
-        assert!(restored.verify_signature().unwrap());
     }
 
     #[test]

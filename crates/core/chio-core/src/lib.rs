@@ -167,10 +167,10 @@ pub use credit::{
     MAX_EXPOSURE_LEDGER_DECISION_LIMIT, MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT,
 };
 pub use crypto::{
-    canonical_json_shared_bytes, sha256_hex, sign_canonical_with_backend,
-    sign_canonical_with_backend_shared, sign_shared_canonical_with_backend, Ed25519Backend,
-    Keypair, PublicKey, SharedCanonicalBytes, Signature, SignedCanonicalPayload, SigningAlgorithm,
-    SigningBackend,
+    canonical_json_shared_bytes, sha256_hex, sign_shared_wrapped, sign_wrapped,
+    sign_wrapped_for_identity, verify_exempt, verify_wrapped, verify_wrapped_bytes, Ed25519Backend,
+    ExemptFormat, Keypair, PublicKey, SharedCanonicalBytes, Signature, SignedCanonicalPayload,
+    SigningAlgorithm, SigningBackend, SigningMessage, SigningWrapper,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
@@ -238,10 +238,7 @@ pub use listing::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
     MAX_GENERIC_LISTING_LIMIT,
 };
-pub use manifest::{
-    LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration, ToolManifest,
-    ToolManifestBody,
-};
+pub use manifest::{LatencyHint, ToolAnnotations, ToolDefinition, ToolFlowDeclaration};
 pub use market::{
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
     LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,

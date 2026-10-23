@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
-use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
+use crate::crypto::{sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey, Signature};
 use crate::error::{Error, Result};
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
@@ -110,6 +110,9 @@ pub struct DelegationLinkBody {
     pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
 }
 
+/// Signing-wrapper schema id of a delegation link.
+pub const CHIO_DELEGATION_LINK_SCHEMA: &str = "chio.delegation-link.v1";
+
 impl DelegationLink {
     /// Sign a delegation link body.
     pub fn sign(body: DelegationLinkBody, keypair: &Keypair) -> Result<Self> {
@@ -125,7 +128,10 @@ impl DelegationLink {
         if let Some(marker) = body.cumulative_approval.as_ref() {
             marker.validate()?;
         }
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_DELEGATION_LINK_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             capability_id: body.capability_id,
             delegator: body.delegator,
@@ -162,8 +168,12 @@ impl DelegationLink {
         if let Some(marker) = self.cumulative_approval.as_ref() {
             marker.validate()?;
         }
-        let body = self.body();
-        self.delegator.verify_canonical(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.delegator,
+            CHIO_DELEGATION_LINK_SCHEMA,
+            &self.body(),
+            &self.signature,
+        ))
     }
 }
 

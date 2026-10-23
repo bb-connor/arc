@@ -1,63 +1,71 @@
 //! Semantic signatures authenticate distinct roles and never replace admission.
 use super::authority::{invalid, signed_authority};
 use super::RecoveryDigestDomain;
-use crate::crypto::Ed25519Backend;
-use crate::{
-    canonical_json_bytes, CanonicalBytes, Keypair, PublicKey, Result, Signature, SigningAlgorithm,
-    SigningBackend,
-};
-use alloc::vec::Vec;
+use crate::{CanonicalBytes, Keypair, PublicKey, Result, Signature, SigningBackend};
 use chio_security_types::{recovery::*, semantic::*};
 use serde::{Deserialize, Serialize};
 
-pub const SEMANTIC_PACKAGE_SIGNATURE_DOMAIN: &str = "chio:semantic-package:v1";
-pub const SEMANTIC_DEPLOYMENT_SIGNATURE_DOMAIN: &str = "chio:semantic-deployment:v1";
-pub const SEMANTIC_AUDIENCE_SIGNATURE_DOMAIN: &str = "chio:semantic-audience:v1";
-pub const SCOPED_ENDORSEMENT_SIGNATURE_DOMAIN: &str = "chio:scoped-endorsement:v1";
-pub const SEMANTIC_ANNOTATION_SIGNATURE_DOMAIN: &str = "chio:semantic-annotation:v1";
-pub const SEMANTIC_TRANSFORMATION_SIGNATURE_DOMAIN: &str = "chio:semantic-transformation:v1";
-pub const SEMANTIC_PREREQUISITE_SIGNATURE_DOMAIN: &str = "chio:semantic-prerequisite:v1";
+/// Signing-wrapper schema id of a semantic package.
+pub const CHIO_RECOVERY_SEMANTIC_PACKAGE_SCHEMA: &str = "chio.recovery.signed-semantic-package.v1";
+/// Signing-wrapper schema id of a semantic deployment.
+pub const CHIO_RECOVERY_SEMANTIC_DEPLOYMENT_SCHEMA: &str =
+    "chio.recovery.signed-semantic-deployment.v1";
+/// Signing-wrapper schema id of a semantic audience observation.
+pub const CHIO_RECOVERY_SEMANTIC_AUDIENCE_SCHEMA: &str =
+    "chio.recovery.signed-semantic-audience.v1";
+/// Signing-wrapper schema id of a scoped endorsement.
+pub const CHIO_RECOVERY_SCOPED_ENDORSEMENT_SCHEMA: &str =
+    "chio.recovery.signed-scoped-endorsement.v1";
+/// Signing-wrapper schema id of a semantic annotation.
+pub const CHIO_RECOVERY_SEMANTIC_ANNOTATION_SCHEMA: &str =
+    "chio.recovery.signed-semantic-annotation.v1";
+/// Signing-wrapper schema id of a semantic transformation.
+pub const CHIO_RECOVERY_SEMANTIC_TRANSFORMATION_SCHEMA: &str =
+    "chio.recovery.signed-semantic-transformation.v1";
+/// Signing-wrapper schema id of a semantic prerequisite.
+pub const CHIO_RECOVERY_SEMANTIC_PREREQUISITE_SCHEMA: &str =
+    "chio.recovery.signed-semantic-prerequisite.v1";
 
 signed_authority!(
     SignedSemanticPackageV1,
     SemanticPackageV1,
-    SEMANTIC_PACKAGE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_PACKAGE_SCHEMA,
     |body: &SemanticPackageV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedSemanticDeploymentV1,
     SemanticDeploymentV1,
-    SEMANTIC_DEPLOYMENT_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_DEPLOYMENT_SCHEMA,
     |body: &SemanticDeploymentV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedSemanticAudienceV1,
     SemanticAudienceObservationV1,
-    SEMANTIC_AUDIENCE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_AUDIENCE_SCHEMA,
     |body: &SemanticAudienceObservationV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedScopedEndorsementV1,
     ScopedEndorsementV1,
-    SCOPED_ENDORSEMENT_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SCOPED_ENDORSEMENT_SCHEMA,
     |body: &ScopedEndorsementV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedSemanticAnnotationV1,
     SemanticAnnotationV1,
-    SEMANTIC_ANNOTATION_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_ANNOTATION_SCHEMA,
     |body: &SemanticAnnotationV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedSemanticTransformationV1,
     SemanticTransformationV1,
-    SEMANTIC_TRANSFORMATION_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_TRANSFORMATION_SCHEMA,
     |body: &SemanticTransformationV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedSemanticPrerequisiteV1,
     SemanticPrerequisiteV1,
-    SEMANTIC_PREREQUISITE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_SEMANTIC_PREREQUISITE_SCHEMA,
     |body: &SemanticPrerequisiteV1| body.validate().map_err(|_| invalid())
 );
 

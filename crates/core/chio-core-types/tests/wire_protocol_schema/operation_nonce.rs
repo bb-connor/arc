@@ -6,14 +6,16 @@ fn operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions()
     let mut nonce = make_execution_nonce(&key);
     assert_schema_accepts("kernel/execution_nonce.schema.json", &to_json(&nonce));
     nonce.nonce.schema = "chio.operation_execution_nonce.v1".into();
-    nonce.signature = key.sign(
-        &chio_core_types::canonical::canonical_json_bytes(&json!({
-            "schema": "chio.admission-execution-nonce-signature.v1",
-            "operation_id": "a".repeat(64),
-            "nonce": nonce.nonce,
-        }))
-        .expect("canonical signing context"),
-    );
+    nonce.signature = key
+        .sign_wrapped(
+            "chio.operation_execution_nonce.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(&json!({
+                "operation_id": "a".repeat(64),
+                "nonce": nonce.nonce,
+            }))
+            .expect("canonical signing context"),
+        )
+        .expect("wrapped nonce signature");
     let encoded = to_json(&nonce);
     assert_schema_accepts("kernel/execution_nonce.schema.json", &encoded);
     let decoded: SignedExecutionNonce =

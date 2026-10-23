@@ -1,6 +1,9 @@
 use alloc::format;
 
-use crate::crypto::{Keypair, PublicKey, SigningBackend, SigningOutcome};
+use crate::canonical::{CanonicalBytes, CanonicalJsonWitness};
+use crate::crypto::{
+    Keypair, PublicKey, SigningBackend, SigningMessage, SigningOutcome, SigningWrapper,
+};
 use crate::error::{Error, Result};
 
 pub(crate) fn ensure_keypair_matches_embedded_key(
@@ -24,12 +27,16 @@ pub(crate) fn ensure_backend_matches_embedded_key(
 
 /// Retain the artifact's selected identity across a rotating backend call.
 /// Validate overridden callbacks too before returning a signed artifact.
-pub(crate) fn sign_bytes_for_embedded_key(
+pub(crate) fn sign_wrapped_for_embedded_key(
     embedded_key: &PublicKey,
     backend: &dyn SigningBackend,
-    message: &[u8],
+    schema_id: &str,
+    canonical: &CanonicalBytes<CanonicalJsonWitness>,
 ) -> Result<SigningOutcome> {
-    let outcome = backend.sign_bytes_for_identity(embedded_key, message)?;
+    let wrapper = SigningWrapper::new(schema_id, canonical)?;
+    let message = wrapper.as_bytes();
+    let outcome =
+        backend.sign_bytes_for_identity(embedded_key, SigningMessage::wrapper(&wrapper))?;
     let algorithm = embedded_key.algorithm();
     if outcome.public_key != *embedded_key
         || outcome.algorithm != algorithm

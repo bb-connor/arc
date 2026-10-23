@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::CanonicalBytes;
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex,
-    sign_canonical_with_backend_for_identity, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    canonical_json_bytes, sha256_hex, verify_wrapped, verify_wrapped_bytes, wrapped_verdict,
+    Keypair, PublicKey, Signature, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::signer_binding::{
@@ -101,12 +101,8 @@ pub struct ChioReceipt {
     /// Optional BBS material for selective disclosure over this receipt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bbs_signature: Option<BbsReceiptSignature>,
-    /// Signing algorithm used for [`ChioReceipt::signature`]. Informational
-    /// only: verification dispatches off the self-describing encoding of the
-    /// signature itself.
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
-    /// Signature over canonical JSON of [`ChioReceiptSigningBody`].
+    /// Signature over the signing wrapper of the canonical
+    /// [`ChioReceiptSigningBody`] under `chio.receipt.v1`.
     pub signature: Signature,
 }
 
@@ -260,7 +256,6 @@ impl ChioReceipt {
     fn from_signed_body(
         body: ChioReceiptBody,
         bbs_signature: Option<BbsReceiptSignature>,
-        algorithm: Option<SigningAlgorithm>,
         signature: Signature,
     ) -> Self {
         Self {
@@ -286,7 +281,6 @@ impl ChioReceipt {
             bbs_projection_version: body.bbs_projection_version,
             kernel_key: body.kernel_key,
             bbs_signature,
-            algorithm,
             signature,
         }
     }
@@ -297,8 +291,11 @@ impl ChioReceipt {
         ensure_keypair_matches_embedded_key(&body.kernel_key, keypair, "receipt", "kernel_key")?;
         let body = prepare_receipt_body_for_signing(body)?;
         let signing_body = ChioReceiptSigningBody::from(&body);
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
-        Ok(Self::from_signed_body(body, None, None, signature))
+        let signature = keypair.sign_wrapped(
+            CHIO_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
+        Ok(Self::from_signed_body(body, None, signature))
     }
 
     /// Sign a receipt body with an arbitrary [`SigningBackend`].
@@ -310,24 +307,24 @@ impl ChioReceipt {
         ensure_backend_matches_embedded_key(&body.kernel_key, backend, "receipt", "kernel_key")?;
         let body = prepare_receipt_body_for_signing(body)?;
         let signing_body = ChioReceiptSigningBody::from(&body);
-        let (outcome, bytes) =
-            sign_canonical_with_backend_for_identity(backend, &body.kernel_key, &signing_body)?;
-        let expected_algorithm = body.kernel_key.algorithm();
+        let canonical = CanonicalBytes::from_serializable(&signing_body)?;
+        let outcome =
+            backend.sign_wrapped_for_identity(&body.kernel_key, CHIO_RECEIPT_SCHEMA, &canonical)?;
         if outcome.public_key != body.kernel_key
-            || outcome.algorithm != expected_algorithm
-            || outcome.signature.algorithm() != expected_algorithm
-            || !body.kernel_key.verify_strict(&bytes, &outcome.signature)
+            || outcome.algorithm != body.kernel_key.algorithm()
+            || verify_wrapped_bytes(
+                &body.kernel_key,
+                CHIO_RECEIPT_SCHEMA,
+                &canonical,
+                &outcome.signature,
+            )
+            .is_err()
         {
             return Err(Error::InvalidSignature(
                 "receipt backend returned a mismatched signing identity".to_string(),
             ));
         }
-        Ok(Self::from_signed_body(
-            body,
-            None,
-            Some(expected_algorithm),
-            outcome.signature,
-        ))
+        Ok(Self::from_signed_body(body, None, outcome.signature))
     }
 
     /// WYSIWYS receipt signing: recompute `content_hash` inside the trust
@@ -391,13 +388,11 @@ impl ChioReceipt {
         ensure_keypair_matches_embedded_key(&body.kernel_key, keypair, "receipt", "kernel_key")?;
         let body = prepare_receipt_body_for_signing(body)?;
         let signing_body = ChioReceiptSigningBody::from_body_and_bbs(&body, Some(&bbs_signature));
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
-        Ok(Self::from_signed_body(
-            body,
-            Some(bbs_signature),
-            None,
-            signature,
-        ))
+        let signature = keypair.sign_wrapped(
+            CHIO_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
+        Ok(Self::from_signed_body(body, Some(bbs_signature), signature))
     }
 
     /// Sign a body that has already had its nonce bound and receipt id
@@ -418,13 +413,11 @@ impl ChioReceipt {
             ));
         }
         let signing_body = ChioReceiptSigningBody::from_body_and_bbs(&body, Some(&bbs_signature));
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
-        Ok(Self::from_signed_body(
-            body,
-            Some(bbs_signature),
-            None,
-            signature,
-        ))
+        let signature = keypair.sign_wrapped(
+            CHIO_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
+        Ok(Self::from_signed_body(body, Some(bbs_signature), signature))
     }
 
     /// WYSIWYS BBS receipt signing: recompute `content_hash` inside the trust
@@ -494,6 +487,10 @@ impl ChioReceipt {
 
     /// Verify the receipt signature against the embedded kernel key.
     pub fn verify_signature(&self) -> Result<bool> {
+        self.verify_signature_against(&self.kernel_key)
+    }
+
+    fn verify_signature_against(&self, key: &PublicKey) -> Result<bool> {
         let body = self.body();
         if body.validate_signable_semantics().is_err() {
             return Ok(false);
@@ -506,19 +503,25 @@ impl ChioReceipt {
         }
         let signing_body =
             ChioReceiptSigningBody::from_body_and_bbs(&body, self.bbs_signature.as_ref());
-        self.kernel_key
-            .verify_canonical_strict(&signing_body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            key,
+            CHIO_RECEIPT_SCHEMA,
+            &signing_body,
+            &self.signature,
+        ))
     }
 
-    /// Verify the receipt signature and enforce the configured crypto floor.
+    /// Verify the receipt signature against `pinned` and enforce the
+    /// configured crypto floor.
     ///
-    /// Verification dispatches off `Signature::algorithm()`:
+    /// `pinned` is the kernel key the caller trusts; its algorithm alone
+    /// drives the floor:
     ///
-    /// - [`SigningAlgorithm::Hybrid`] receipts are accepted under
+    /// - `SigningAlgorithm::Hybrid` keys are accepted under
     ///   [`ReceiptCryptoFloor::AllowHybrid`] and
     ///   [`ReceiptCryptoFloor::PqRequired`] and rejected under
     ///   [`ReceiptCryptoFloor::AllowClassical`].
-    /// - Classical receipts (Ed25519 / P-256 / P-384) are accepted under
+    /// - Classical keys (Ed25519 / P-256 / P-384) are accepted under
     ///   [`ReceiptCryptoFloor::AllowClassical`] and
     ///   [`ReceiptCryptoFloor::AllowHybrid`] and rejected under
     ///   [`ReceiptCryptoFloor::PqRequired`].
@@ -530,19 +533,21 @@ impl ChioReceipt {
     /// # Errors
     ///
     /// Returns [`ReceiptFloorVerifyError::RejectedByCryptoFloor`] when the
-    /// signature algorithm violates the floor.
-    /// [`ReceiptFloorVerifyError::AlgorithmMismatch`] when the envelope field
-    /// disagrees with the signature material.
-    /// [`ReceiptFloorVerifyError::Crypto`] when canonical re-serialization or
-    /// signature verification returns an error.
+    /// pinned key's algorithm violates the floor, and
+    /// [`ReceiptFloorVerifyError::Crypto`] when the signature algorithm
+    /// differs from the pinned key's ([`Error::SignatureAlgorithmMismatch`])
+    /// or canonical re-serialization fails.
     pub fn verify_signature_with_floor(
         &self,
+        pinned: &PublicKey,
         floor: ReceiptCryptoFloor,
     ) -> core::result::Result<bool, ReceiptFloorVerifyError> {
-        let signature_algorithm = self.signature.algorithm();
-        ensure_receipt_signature_algorithm_allowed(self.algorithm, signature_algorithm, floor)?;
-
-        self.verify_signature()
+        ensure_receipt_signature_algorithm_allowed(
+            pinned.algorithm(),
+            self.signature.algorithm(),
+            floor,
+        )?;
+        self.verify_signature_against(pinned)
             .map_err(ReceiptFloorVerifyError::Crypto)
     }
 

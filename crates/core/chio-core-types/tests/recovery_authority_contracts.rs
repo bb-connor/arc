@@ -170,12 +170,15 @@ fn disclosure_grants_select_their_shape_by_kind() -> Result {
     let proof: SignedAuthorityCoverageAttestationV1 =
         serde_json::from_value(positive["coverage"][0].clone())?;
     assert!(proof.verify_signature()?);
-    assert!(signed
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-grant:v1\0"));
-    assert!(proof
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-authority-coverage:v1\0"));
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            proof.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_GRANT_SCHEMA,
+            proof.body(),
+            proof.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     assert!(!format!("{signed:?}").contains("private-canary"));
     Ok(())
 }

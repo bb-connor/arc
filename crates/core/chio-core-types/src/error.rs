@@ -77,6 +77,21 @@ pub enum Error {
         error("invalid proof: leaf index {index} out of bounds for tree with {leaves} leaves")
     )]
     InvalidProofIndex { index: usize, leaves: usize },
+
+    #[cfg_attr(feature = "std", error("unregistered signed-artifact schema id: {0}"))]
+    UnregisteredSchemaId(String),
+
+    #[cfg_attr(
+        feature = "std",
+        error("signature algorithm {signature:?} does not match the pinned key algorithm {key:?}")
+    )]
+    SignatureAlgorithmMismatch {
+        key: crate::crypto::SigningAlgorithm,
+        signature: crate::crypto::SigningAlgorithm,
+    },
+
+    #[cfg_attr(feature = "std", error("signature rejected"))]
+    SignatureRejected,
 }
 
 // `From<serde_json::Error>` is emitted by `#[from]` under the `std` feature.
@@ -126,6 +141,14 @@ impl core::fmt::Display for Error {
                 f,
                 "invalid proof: leaf index {index} out of bounds for tree with {leaves} leaves"
             ),
+            Error::UnregisteredSchemaId(id) => {
+                write!(f, "unregistered signed-artifact schema id: {id}")
+            }
+            Error::SignatureAlgorithmMismatch { key, signature } => write!(
+                f,
+                "signature algorithm {signature:?} does not match the pinned key algorithm {key:?}"
+            ),
+            Error::SignatureRejected => write!(f, "signature rejected"),
         }
     }
 }

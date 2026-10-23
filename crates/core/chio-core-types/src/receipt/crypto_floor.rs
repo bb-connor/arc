@@ -77,23 +77,6 @@ pub enum ReceiptFloorVerifyError {
         signature_algorithm: SigningAlgorithm,
     },
 
-    /// The optional receipt algorithm envelope field disagrees with the
-    /// algorithm carried by the signature material.
-    #[cfg_attr(
-        feature = "std",
-        error(
-            "receipt algorithm envelope field {} disagrees with signature {}",
-            receipt_signing_algorithm_label(*declared),
-            receipt_signing_algorithm_label(*actual)
-        )
-    )]
-    AlgorithmMismatch {
-        /// The algorithm declared in the envelope field.
-        declared: SigningAlgorithm,
-        /// The algorithm carried by the signature material.
-        actual: SigningAlgorithm,
-    },
-
     /// Forwarded from the underlying canonical-JSON or signature
     /// verification path.
     #[cfg_attr(
@@ -116,12 +99,6 @@ impl core::fmt::Display for ReceiptFloorVerifyError {
                 floor.as_str(),
                 receipt_signing_algorithm_label(*signature_algorithm)
             ),
-            Self::AlgorithmMismatch { declared, actual } => write!(
-                f,
-                "receipt algorithm envelope field {} disagrees with signature {}",
-                receipt_signing_algorithm_label(*declared),
-                receipt_signing_algorithm_label(*actual)
-            ),
             Self::Crypto(err) => write!(f, "receipt cryptographic verification failed: {err}"),
         }
     }
@@ -137,21 +114,23 @@ impl core::error::Error for ReceiptFloorVerifyError {
     }
 }
 
+/// Floor check over the pinned key's algorithm. A signature whose algorithm
+/// differs from the pinned key's is refused before the floor is consulted.
 pub(crate) fn ensure_receipt_signature_algorithm_allowed(
-    declared_algorithm: Option<SigningAlgorithm>,
-    signature_algorithm: SigningAlgorithm,
+    pinned: SigningAlgorithm,
+    signature: SigningAlgorithm,
     floor: ReceiptCryptoFloor,
 ) -> core::result::Result<(), ReceiptFloorVerifyError> {
-    if let Some(declared) = declared_algorithm {
-        if declared != signature_algorithm {
-            return Err(ReceiptFloorVerifyError::AlgorithmMismatch {
-                declared,
-                actual: signature_algorithm,
-            });
-        }
+    if pinned != signature {
+        return Err(ReceiptFloorVerifyError::Crypto(
+            Error::SignatureAlgorithmMismatch {
+                key: pinned,
+                signature,
+            },
+        ));
     }
 
-    let is_hybrid = matches!(signature_algorithm, SigningAlgorithm::Hybrid);
+    let is_hybrid = matches!(pinned, SigningAlgorithm::Hybrid);
     let allowed = if is_hybrid {
         floor.allows_hybrid()
     } else {
@@ -160,7 +139,7 @@ pub(crate) fn ensure_receipt_signature_algorithm_allowed(
     if !allowed {
         return Err(ReceiptFloorVerifyError::RejectedByCryptoFloor {
             floor,
-            signature_algorithm,
+            signature_algorithm: pinned,
         });
     }
 
