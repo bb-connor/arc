@@ -2,20 +2,24 @@
 """Refuse production raw JSON decodes of the strict receipt and lossless types.
 
 A raw `serde_json` decode keeps the last of two duplicate keys inside any
-`serde_json::Value` member, so production code decodes these types through
-`UntrustedJsonText::decode_signed` (or `decode_document`), and HTTP routes use
-the `SignedJson` extractor. A type that contains a strict type, at any depth,
-or a top-level `type` alias of one, is strict too.
+`serde_json::Value` member, and `decode_document` admits numeric spellings the
+signed contract refuses, so production code decodes these types through
+`UntrustedJsonText::decode_signed`, and HTTP routes use the `SignedJson`
+extractor. A type that contains a strict type, at any depth, or a `type`
+alias of one outside an `impl` or `trait`, is strict too.
 
 Source is scanned with comments, literals and `#[cfg(test)]` items masked, so
 multi-line calls and production items after a test module are both seen. A
-raw decode is a `serde_json::from_*` call, a direct `Deserialize::deserialize`
-call outside a `deserialize` function, or a call to a function of the same
-crate that is generic over a `Deserialize` parameter and raw decodes it. It is
-flagged when its target is strict by turbofish, by a `let` annotation, or by
-the strict return type of the function that holds it, either directly or
-through an unannotated `let` binding that the function returns. An extractor
-is flagged when its type argument is strict. Each exception in ALLOWED names
+raw decode is a `serde_json::from_*` call or stream, a `decode_document` call,
+a direct `Deserialize::deserialize` call outside a `Deserialize` or `Visitor`
+impl, or a call to a function of the same crate that is generic over a
+`Deserialize` parameter and raw decodes it, in a function body or a `static`
+or `const` initializer. It is flagged when its target is strict by turbofish,
+by a `let` annotation (including a declared-then-assigned binding), by the
+item's declared type, or by the strict return type of the function that holds
+it (with `Self` read as the implementing type), either directly or through an
+unannotated `let` binding that the function returns. An extractor is flagged
+when its type argument is strict. Each exception in ALLOWED names
 one exact call in one function that reads an already parsed `Value`, together
 with the duplicate-refusing reader that produced it. The script checks itself
 against fixture trees on every run before it scans the workspace.
@@ -285,7 +289,7 @@ RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?from_(?:str|
 EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
-TYPE_ALIAS = re.compile(r"^(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
+TYPE_ALIAS = re.compile(r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
 TRAIT_CALL = re.compile(
     r"(?<![\w:.])(?:::\s*)?(?:[a-z_]\w*\s*::\s*)*(?:Deserialize\b"
     r"|<\s*([\w:]+)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
@@ -300,6 +304,10 @@ INTO_ITER = re.compile(r"^\s*\.\s*into_iter\s*::\s*<")
 FROM_REQUEST = re.compile(r"\bfrom_request(?:_parts)?\s*\(")
 BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*(?:::\s*)?<")
 IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
+BLOCK_HEADER = re.compile(r"\b(?:impl|trait)\b[^{};]*\{")
+VARIANT_NAME = re.compile(r"([{,]\s*(?:#\[[^\]]*\]\s*)*)[A-Z]\w*(?=\s*(?:[,{(}]|=))")
+DOCUMENT_CALL = re.compile(r"\.\s*decode_document\s*(?=::|\()")
+STATIC_ITEM = re.compile(r"\b(?:static|const)\s+(?:mut\s+)?(\w+)\s*:\s*([^=;]+?)\s*=(?![=>])")
 LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
 
 
@@ -328,6 +336,41 @@ def production_files(root: Path) -> list[tuple[str, str]]:
     return files
 
 
+@functools.lru_cache(maxsize=64)
+def brace_pairs(code: str) -> dict[int, int]:
+    """Each `{` offset in noise-blanked `code` mapped to its closing `}`."""
+    pairs, stack = {}, []
+    for index, char in enumerate(code):
+        if char == "{":
+            stack.append(index)
+        elif char == "}" and stack:
+            pairs[stack.pop()] = index
+    return pairs
+
+
+@functools.lru_cache(maxsize=64)
+def block_spans(code: str) -> tuple[tuple[int, int, str], ...]:
+    """(start, end, header) for every `impl` and `trait` block in `code`."""
+    pairs = brace_pairs(code)
+    return tuple(
+        (match.start(), pairs.get(match.end() - 1, len(code)), match.group(0))
+        for match in BLOCK_HEADER.finditer(code)
+    )
+
+
+def implementing_type(code: str, offset: int) -> str:
+    """The type of the innermost `impl` block holding `offset`, or an empty string."""
+    found = ""
+    for start, end, header in block_spans(code):
+        if start < offset < end and header.startswith("impl"):
+            text = header[4:-1].strip()
+            if text.startswith("<"):
+                _, close = angle_argument(text, 0)
+                text = text[close:]
+            found = re.split(r"\bfor\b", text)[-1].split("where")[0].strip()
+    return found
+
+
 def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
     """Names whose every workspace definition holds a strict type at any depth.
 
@@ -340,10 +383,14 @@ def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
             opening = match.end(2) - 1
             right = ")" if code[opening] == "(" else "}"
             close = _contracts.closing(code, opening, code[opening], right)
+            body = code[opening:close]
+            if match.group(0).startswith("enum"):
+                body = VARIANT_NAME.sub(r"\1", body)
             if not match.group(1).endswith("Error"):
-                definitions.setdefault(match.group(1), []).append(code[opening:close])
+                definitions.setdefault(match.group(1), []).append(body)
         for match in TYPE_ALIAS.finditer(code):
-            definitions.setdefault(match.group(1), []).append(match.group(2))
+            if not any(start < match.start() < end for start, end, _ in block_spans(code)):
+                definitions.setdefault(match.group(1), []).append(match.group(2))
     strict = set(STRICT_TYPES)
     changed = True
     while changed:
@@ -395,6 +442,23 @@ def call_text(code: str, start: int) -> str:
     return normalized(code[start:_contracts.closing(code, paren)])
 
 
+def statement_end(code: str, index: int) -> int:
+    """The `;` that ends the expression starting at `index`, or the enclosing close."""
+    depth = 0
+    while index < len(code):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth < 0:
+                break
+        elif char == ";" and depth == 0:
+            break
+        index += 1
+    return index
+
+
 @functools.lru_cache(maxsize=4096)
 def let_spans(fn_code: str) -> tuple[tuple[int, int, str, str], ...]:
     """(initializer start, initializer end, pattern, annotation) for each `let`."""
@@ -402,18 +466,7 @@ def let_spans(fn_code: str) -> tuple[tuple[int, int, str, str], ...]:
     for match in LET.finditer(fn_code):
         if re.search(r"(?:\bif|\bwhile|&&)\s*$", fn_code[:match.start()]):
             continue
-        depth, index = 0, match.end()
-        while index < len(fn_code):
-            char = fn_code[index]
-            if char in "([{":
-                depth += 1
-            elif char in ")]}":
-                depth -= 1
-                if depth < 0:
-                    break
-            elif char == ";" and depth == 0:
-                break
-            index += 1
+        index = statement_end(fn_code, match.end())
         spans.append((match.end(), index, match.group(1).strip(), (match.group(2) or "").strip()))
     return tuple(spans)
 
@@ -485,6 +538,29 @@ def raw_aliases(code: str) -> tuple:
     return tuple(patterns)
 
 
+def receiver_start(code: str, index: int) -> int:
+    """Where the method-call receiver ending just before `index` begins."""
+    position = index - 1
+    while position >= 0:
+        char = code[position]
+        if char in ")]":
+            depth = 0
+            while position >= 0:
+                if code[position] in ")]":
+                    depth += 1
+                elif code[position] in "([":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                position -= 1
+            position -= 1
+        elif char.isalnum() or char in "_:.?" or char.isspace() and code[position - 1] in ".:":
+            position -= 1
+        else:
+            break
+    return position + 1
+
+
 def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases: tuple = ()):
     """Yield (offset, explicit target or None, input kind) for each raw decode in a body.
 
@@ -511,6 +587,14 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases
                 yield match.start(), None, kind
     for match in TRAIT_CALL.finditer(fn_code, body_start):
         yield match.start(), match.group(1) or match.group(2), "text"
+    for match in DOCUMENT_CALL.finditer(fn_code, body_start):
+        start = receiver_start(fn_code, match.start())
+        after = fn_code[match.end():].lstrip()
+        if after.startswith("::"):
+            target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
+            yield start, target, "text"
+        else:
+            yield start, None, "text"
     for match in STREAM_CALL.finditer(fn_code, body_start):
         end = _contracts.closing(fn_code, match.end() - 1)
         if INTO_ITER.match(fn_code[end:]):
@@ -530,11 +614,22 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases
                 yield match.start(), None, kind
 
 
+def assigned_annotation(fn_code: str, offset: int) -> str:
+    """The declared type of `name` when the call is the value of `name = ...`."""
+    statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
+    assignment = re.fullmatch(r"\s*(\w+)\s*=\s*", fn_code[statement_start:offset])
+    if not assignment:
+        return ""
+    name = re.escape(assignment.group(1))
+    declarations = re.findall(r"\blet\s+(?:mut\s+)?" + name + r"\s*:\s*([^=;]+?)\s*;", fn_code[:offset])
+    return declarations[-1] if declarations else ""
+
+
 def targets(fn_code: str, offset: int, explicit, returns: str) -> str:
     """The decode target text: explicit, annotated, or the function's value type."""
     if explicit is not None:
         return explicit
-    annotation = let_annotation(fn_code, offset)
+    annotation = let_annotation(fn_code, offset) or assigned_annotation(fn_code, offset)
     if annotation:
         return annotation
     if returned(fn_code, offset):
@@ -597,9 +692,9 @@ def custody_breaks(by_path: dict[str, str], custody) -> str:
 def deserialize_impls(code: str) -> tuple[tuple[int, int], ...]:
     """Extents of every `impl` of `Deserialize` or a serde `Visitor` in `code`."""
     return tuple(
-        (match.start(), _contracts.closing(code, match.end() - 1, "{", "}"))
-        for match in IMPL_HEADER.finditer(code)
-        if re.search(r"\b(?:Deserialize|Visitor)\b", match.group(0))
+        (start, end)
+        for start, end, header in block_spans(code)
+        if header.startswith("impl") and re.search(r"\b(?:Deserialize|Visitor)\b", header)
     )
 
 
@@ -636,9 +731,22 @@ def scan(root: Path) -> list[str]:
             if owner.split("#")[0] == "deserialize" and in_deserialize_impl(code, row[1]):
                 continue
             returns = return_type(fn_code)
+            self_type = implementing_type(code, row[1])
             for offset, explicit, kind in decode_sites(fn_code, body_start, helpers.get(crate_of(rel), {}), aliases[rel]):
-                if mentions_strict(targets(fn_code, offset, explicit, returns), strict):
+                target = targets(fn_code, offset, explicit, returns)
+                if self_type:
+                    target = re.sub(r"\bSelf\b", self_type, target)
+                if mentions_strict(target, strict):
                     findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
+        rows = _contracts.functions(code)
+        for item in STATIC_ITEM.finditer(code):
+            if any(row[1] < item.start() < row[3] for row in rows):
+                continue
+            initializer = code[item.start():statement_end(code, item.end())]
+            for offset, explicit, kind in decode_sites(initializer, item.end() - item.start(), helpers.get(crate_of(rel), {}), aliases[rel]):
+                target = explicit if explicit is not None else item.group(2)
+                if mentions_strict(target, strict):
+                    findings.append((rel, f"static {item.group(1)}", call_text(initializer, offset), "decode", kind))
     errors = []
     remaining = list(findings)
     by_path = dict(files)
@@ -707,6 +815,19 @@ FIXTURES = {
     "module-qualified type": ("fn f(d: D) { let r = chio_core::receipt::body::ChioReceipt::deserialize(d); }", 1),
     "absolute stream": ("fn f(raw: &str) { ::serde_json::Deserializer::from_str(raw).into_iter::<ChioReceipt>(); }", 1),
     "absolute extractor": ("async fn h(::axum::Json(r): ::axum::Json<ChioReceipt>) {}", 1),
+    "declared then assigned": ("fn f(raw: &str) -> Result<(), E> {\n    let receipt: ChioReceipt;\n    receipt = serde_json::from_str(raw)?;\n    consume(receipt);\n    Ok(())\n}", 1),
+    "assigned other type": ("fn f(raw: &str) { let body: Other; body = serde_json::from_str(raw).unwrap_or_default(); }", 0),
+    "Self in a strict impl": ("struct Wrapper { receipt: ChioReceipt }\nimpl Wrapper {\n    fn parse(raw: &str) -> Result<Self, E> { serde_json::from_str(raw) }\n}", 1),
+    "Self in a generic trait impl": ("impl<'a> FromStr for ChildRequestReceipt {\n    fn from_str(raw: &str) -> Result<Self, E> { serde_json::from_str(raw) }\n}", 1),
+    "Self in an unrelated impl": ("impl Other {\n    fn parse(raw: &str) -> Result<Self, E> { serde_json::from_str(raw) }\n}", 0),
+    "scoped type alias": ("mod wire {\n    type Receipt = ChioReceipt;\n    fn f(t: &str) { serde_json::from_str::<Receipt>(t); }\n}", 1),
+    "lazy static initializer": ("static RECEIPT: LazyLock<ChioReceipt> = LazyLock::new(|| serde_json::from_str(RAW).unwrap_or_default());", 1),
+    "const of another type": ("static OTHER: LazyLock<Other> = LazyLock::new(|| serde_json::from_str(RAW).unwrap_or_default());", 0),
+    "decode_document of a receipt": ("fn f(raw: &str) -> Result<ChioReceipt, E> { UntrustedJsonText::new(raw).decode_document() }", 1),
+    "decode_document turbofish": ("fn f(raw: &str) { let r = UntrustedJsonText::new(raw).decode_document::<ChildRequestReceipt>(); }", 1),
+    "decode_document of another type": ("fn f(raw: &str) -> Result<Other, E> { UntrustedJsonText::new(raw).decode_document() }", 0),
+    "enum variant named like a strict type": ("struct Published { r: ChioReceipt }\nenum State {\n    Intent,\n    Published,\n    Conflict { actual: String },\n}\nfn f(t: &str) { serde_json::from_str::<State>(t); }", 0),
+    "enum variant holding a strict type": ("enum State {\n    Intent,\n    Sealed(ChioReceipt),\n}\nfn f(t: &str) { serde_json::from_str::<State>(t); }", 1),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
