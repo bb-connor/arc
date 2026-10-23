@@ -199,6 +199,8 @@ The approval flow must be kernel-native because:
 pub trait Guard: Send + Sync {
     fn name(&self) -> &str;
 
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
+
     /// Evaluate the guard against a tool call request.
     ///
     /// Returns `Ok(Verdict::Allow)` to pass, `Ok(Verdict::Deny)` to block,
