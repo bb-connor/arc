@@ -1417,8 +1417,7 @@ Chio intentionally distinguishes evidence classes for these claims:
 - `scripts/check-aeneas-production.sh` extracts the production-linked pure
   core in `chio-kernel-core` through Charon/Aeneas into Lean, and
   `scripts/check-aeneas-equivalence.sh` hard-gates tracked Lean equivalence
-  for that extracted lane; the older pilot lane remains as compatibility
-  evidence
+  for that extracted lane
 - Creusot/Kani strict lanes are declared in `formal/rust-verification` for
   production implementation linkage, including public Kani harnesses for
   `verify_capability`, `NormalizedScope::is_subset_of`,
