@@ -749,7 +749,7 @@ fn validate_capability_artifact(
         || signed.attenuation_proof.is_some()
         || signed.budget_share_bps.is_some()
         || !signed
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| CreditAdmissionError::AuthorityVerification)?
     {
         return Err(CreditAdmissionError::AuthorityVerification);

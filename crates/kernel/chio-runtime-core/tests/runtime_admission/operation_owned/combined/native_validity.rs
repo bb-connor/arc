@@ -231,7 +231,7 @@ fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_p
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let (source, intent) = physical_input(&fixture.inner)?;
     assert_eq!(intent.resources().len(), 3);
     let context = revalidation_input(&fixture.inner, &response);

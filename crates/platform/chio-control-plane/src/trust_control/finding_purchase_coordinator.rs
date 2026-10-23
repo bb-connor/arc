@@ -779,7 +779,7 @@ impl FindingPurchaseCoordinator {
         {
             return Err(PurchaseCoordinatorError::AskEnvelope);
         }
-        if !matches!(ask.body.token_offer.verify_signature(), Ok(true)) {
+        if !matches!(ask.body.token_offer.verify_integrity_embedded_key(), Ok(true)) {
             return Err(PurchaseCoordinatorError::TokenOffer);
         }
         if ask.body.token_offer.issued_at > ask.body.issued_at
@@ -1245,7 +1245,7 @@ impl FindingPurchaseCoordinator {
         receipt: &ChioReceipt,
         expected: ExpectedPurchaseTerminal,
     ) -> Result<VerifiedPurchaseTerminal, PurchaseCoordinatorError> {
-        if !matches!(receipt.verify_signature(), Ok(true)) {
+        if !matches!(receipt.verify_integrity_embedded_key(), Ok(true)) {
             return Err(PurchaseCoordinatorError::TerminalEvidence(
                 "receipt signature or content-addressed id is invalid".to_owned(),
             ));

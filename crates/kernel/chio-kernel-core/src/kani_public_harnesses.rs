@@ -857,7 +857,7 @@ pub fn verify_delegation_chain_step() {
 }
 
 // Receipt sign/verify roundtrip integrity. The runtime path
-// `sign_receipt -> ChioReceipt::verify_signature` ultimately calls
+// `sign_receipt -> ChioReceipt::verify_integrity_embedded_key` ultimately calls
 // `verify_wrapped(key, schema_id, body, signature)`, which canonicalizes `body`
 // via RFC 8785 (serde_json) and then dispatches to ed25519-dalek (or ECDSA
 // on P-256/P-384). Both halves are intractable for symbolic execution: the

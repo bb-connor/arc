@@ -186,7 +186,7 @@ async fn full_signing_queue_increments_block_counter_without_dropping() -> Resul
         "inline-served request emits the same authoritative id as the queued path",
     );
     assert!(inline_signed
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| format!("inline-served signature check failed: {error}"))?);
 
     assert_eq!(

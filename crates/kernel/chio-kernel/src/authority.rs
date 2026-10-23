@@ -251,7 +251,7 @@ fn validate_issued_response_at(
     if &capability.issuer != current_issuer {
         return Err(KernelError::UntrustedIssuer);
     }
-    if !matches!(capability.verify_signature(), Ok(true)) {
+    if !matches!(capability.verify_integrity_embedded_key(), Ok(true)) {
         return Err(KernelError::InvalidSignature);
     }
     aggregate::validate_requested_aggregate(capability, current_issuer, aggregate_family_limit)?;
@@ -1191,7 +1191,7 @@ pub(crate) mod tests {
 
         assert_eq!(capability.issuer, public_key);
         assert_eq!(capability.issued_at, 1_700_000_000);
-        assert!(matches!(capability.verify_signature(), Ok(true)));
+        assert!(matches!(capability.verify_integrity_embedded_key(), Ok(true)));
     }
 
     /// A rotating backend whose current selector cannot be read.

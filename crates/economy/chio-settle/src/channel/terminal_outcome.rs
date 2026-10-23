@@ -175,7 +175,7 @@ pub fn verify_channel_terminal_outcome_commitment(
     if &artifact.kernel_key != trusted_kernel_key
         || &receipt.kernel_key != trusted_kernel_key
         || !receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ChannelError::AuthorityVerification)?
         || artifact.body.operation_id != reservation.body.operation_id
         || artifact.body.reservation_id != reservation.body.reservation_id

@@ -509,7 +509,7 @@ fn every_active_defense_body_field_tamper_fails_closed() {
             );
             if let Ok(receipt) = serde_json::from_value::<ChioReceipt>(tampered) {
                 assert!(
-                    !receipt.verify_signature().unwrap_or_else(|error| {
+                    !receipt.verify_integrity_embedded_key().unwrap_or_else(|error| {
                         panic!("verify tampered {kind:?} receipt at {path:?}: {error}")
                     }),
                     "{kind:?} field tamper retained a valid signature at {path:?}"

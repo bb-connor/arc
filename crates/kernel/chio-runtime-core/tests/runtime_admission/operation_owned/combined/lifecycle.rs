@@ -187,7 +187,7 @@ fn combined_owned_tool_error_and_postdispatch_drop_retain_every_claim_and_captur
                 Some(swarm_route_metadata()),
             )?;
             assert_eq!(response.verdict, Verdict::Deny, "{response:#?}");
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
         }
         assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
         let history = faults::history(&fixture.inner)?;

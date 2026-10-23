@@ -28,7 +28,7 @@ pub(super) fn verify_counts(
             .ok_or("receipt has no request identity")?
             .to_owned();
         let receipt: ChioReceipt = serde_json::from_value(value)?;
-        if !receipt.verify_signature()?
+        if !receipt.verify_integrity_embedded_key()?
             || receipt.capability_id != capability_id
             || receipt.tool_server != server_id
             || receipt.tool_name != "stat"

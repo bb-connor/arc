@@ -6,7 +6,7 @@
 //!    wire schema (the instance-conformance test the admission block lacks).
 //! 2. The schema rejects malformed instances (unknown field, wrong schema
 //!    const, non-canonical digest, unknown result token).
-//! 3. Mutating a signed receipt's `metadata` breaks `verify_signature`,
+//! 3. Mutating a signed receipt's `metadata` breaks `verify_integrity_embedded_key`,
 //!    because the block is authenticated only by the enclosing receipt.
 //! 4. The block survives receipt canonicalization / serde round-trip and is
 //!    read back through the typed accessor.
@@ -218,14 +218,14 @@ fn deny_unknown_fields_is_enforced_on_deserialization() {
     assert!(serde_json::from_value::<DeliveryContract>(with_unknown).is_err());
 }
 
-// 3. Authenticity: mutating receipt metadata breaks verify_signature.
+// 3. Authenticity: mutating receipt metadata breaks verify_integrity_embedded_key.
 
 #[test]
 fn mutating_delivery_contract_metadata_breaks_verify_signature() {
     let kp = Keypair::generate();
     let receipt = signed_receipt_with_metadata(&kp, Some(metadata_with(&matched_contract())));
     assert!(
-        receipt.verify_signature().unwrap(),
+        receipt.verify_integrity_embedded_key().unwrap(),
         "freshly signed receipt must verify"
     );
 
@@ -239,7 +239,7 @@ fn mutating_delivery_contract_metadata_breaks_verify_signature() {
     block["result"] = json!("mismatched");
 
     assert!(
-        !matches!(tampered.verify_signature(), Ok(true)),
+        !matches!(tampered.verify_integrity_embedded_key(), Ok(true)),
         "tampering with the delivery_contract block must invalidate the receipt signature"
     );
 }
@@ -254,7 +254,7 @@ fn removing_delivery_contract_metadata_breaks_verify_signature() {
         map.remove(DELIVERY_CONTRACT_METADATA_KEY);
     }
     assert!(
-        !matches!(tampered.verify_signature(), Ok(true)),
+        !matches!(tampered.verify_integrity_embedded_key(), Ok(true)),
         "stripping the delivery_contract block must invalidate the receipt signature"
     );
 }
@@ -275,7 +275,7 @@ fn delivery_contract_survives_receipt_round_trip() {
     let wire = serde_json::to_string(&receipt).expect("receipt serializes");
     let restored: ChioReceipt = serde_json::from_str(&wire).expect("receipt deserializes");
     assert!(
-        restored.verify_signature().unwrap(),
+        restored.verify_integrity_embedded_key().unwrap(),
         "signature must still verify after a serde round-trip"
     );
     assert_eq!(
@@ -292,5 +292,5 @@ fn accessor_absent_without_the_block() {
     let kp = Keypair::generate();
     let receipt = signed_receipt_with_metadata(&kp, None);
     assert!(receipt.delivery_contract().is_none());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }

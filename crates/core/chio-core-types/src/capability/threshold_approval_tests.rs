@@ -31,7 +31,7 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
     .unwrap();
 
     assert_eq!(proposal.body.proposal_deadline, 1_500);
-    assert!(proposal.verify_signature().unwrap());
+    assert!(proposal.verify_integrity_embedded_key().unwrap());
     let mut proposal_json = serde_json::to_value(&proposal).unwrap();
     proposal_json
         .as_object_mut()
@@ -60,7 +60,7 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
 
     let mut changed = proposal.clone();
     changed.body.proposal_deadline -= 1;
-    assert!(!changed.verify_signature().unwrap());
+    assert!(!changed.verify_integrity_embedded_key().unwrap());
     assert_ne!(
         proposal.artifact_digest().unwrap(),
         changed.artifact_digest().unwrap()

@@ -17,7 +17,7 @@ fn tool_receipt_rejects_identity_key_forgery() -> crate::error::Result<()> {
     let mut receipt = ChioReceipt::sign(make_receipt_body(&keypair), &keypair)?;
     (receipt.kernel_key, receipt.signature) = identity_forgery()?;
     receipt.id = chio_receipt_id(&receipt.body())?;
-    assert!(!receipt.verify_signature()?);
+    assert!(!receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -26,7 +26,7 @@ fn child_receipt_rejects_identity_key_forgery() -> crate::error::Result<()> {
     let keypair = Keypair::generate();
     let mut receipt = ChildRequestReceipt::sign(make_child_receipt_body(&keypair), &keypair)?;
     (receipt.kernel_key, receipt.signature) = identity_forgery()?;
-    assert!(!receipt.verify_signature()?);
+    assert!(!receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

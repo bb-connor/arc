@@ -307,7 +307,7 @@ pub fn verify_declassification(
     request: &DeclassificationVerificationRequest,
 ) -> Result<VerifiedDeclassification, DeclassificationError> {
     verify_common_declassification(grant.body(), request, grant.authority_key(), || {
-        grant.verify_signature()
+        grant.verify_integrity_embedded_key()
     })
 }
 
@@ -336,7 +336,7 @@ pub fn verify_recovery_declassification(
     }
     coverage.verify_grant_binding(grant.body(), request.now_unix_ms)?;
     verify_common_declassification(&grant.body().claims, request, grant.authority_key(), || {
-        grant.verify_signature()
+        grant.verify_integrity_embedded_key()
     })
 }
 

@@ -148,7 +148,7 @@ fn verify_chio_bilateral_invocation_inner(
             ))
         })?;
     let resolved_receipt_signature_valid = resolved_receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|e| VerifierError::SubjectDigestMismatch(format!("receipt signature: {e}")))?;
     if !resolved_receipt_signature_valid {
         return Err(VerifierError::SubjectDigestMismatch(
@@ -626,7 +626,7 @@ pub fn verify_bilateral_cosign_invocation(
             ))
         })?;
     let resolved_receipt_signature_valid = resolved_receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|e| VerifierError::SubjectDigestMismatch(format!("receipt signature: {e}")))?;
     if !resolved_receipt_signature_valid {
         return Err(VerifierError::SubjectDigestMismatch(

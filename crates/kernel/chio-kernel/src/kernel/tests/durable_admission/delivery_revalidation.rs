@@ -341,7 +341,7 @@ fn assert_delivery_revocation_denied(nested: bool) -> TestResult {
         "revoked capability reached the tool"
     );
     assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
@@ -449,7 +449,7 @@ fn suspended_delivery(nested: bool, outcome: SuspendedOutcome) -> TestResult {
         kernel.revoke_capability(&request.capability.id)?;
     }
     let response = block_on_async_tool_dispatch(evaluation)?;
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     if matches!(outcome, SuspendedOutcome::Allow) {
         assert_eq!(response.verdict, Verdict::Allow, "{response:?}");
         assert_eq!(invocations.load(Ordering::SeqCst), 1);
@@ -562,7 +562,7 @@ fn immediately_ready_delivery_still_revalidates_runtime_admission() -> TestResul
     assert_eq!(preparations.load(Ordering::SeqCst), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert!(response
         .reason
         .as_deref()

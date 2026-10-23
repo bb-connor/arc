@@ -43,7 +43,7 @@ fn signed_request(
     let proposal =
         ThresholdApprovalProposal::sign(proposal_body, &fixture.threshold_policy_authority)
             .test_unwrap();
-    assert!(proposal.verify_signature().test_unwrap());
+    assert!(proposal.verify_integrity_embedded_key().test_unwrap());
     let approver = Keypair::from_seed(&[0x86_u8; 32]);
     let tokens: Vec<_> = original
         .approval_tokens()
@@ -148,7 +148,7 @@ fn active_response_refuses_a_signed_capability_without_the_required_effect_grant
     capability.scope.grants[0].tool_name =
         GovernedResponseEffect::RestrictEgress.tool_name().into();
     let capability = CapabilityToken::sign(capability, &fixture.operator_authority).test_unwrap();
-    assert!(capability.verify_signature().test_unwrap());
+    assert!(capability.verify_integrity_embedded_key().test_unwrap());
     let request = signed_request(&fixture, capability, original.response_plan().clone(), None);
     assert_refused_without_mutation(
         &fixture,

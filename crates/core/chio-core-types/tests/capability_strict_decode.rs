@@ -80,9 +80,9 @@ fn refusal(value: Value) -> Option<String> {
 #[test]
 fn the_signed_token_decodes_and_verifies() -> TestResult {
     let token: CapabilityToken = serde_json::from_value(signed_token()?)?;
-    assert!(token.verify_signature()?);
+    assert!(token.verify_integrity_embedded_key()?);
     let link = token.delegation_chain.first().ok_or("delegation link")?;
-    assert!(link.verify_signature()?);
+    assert!(link.verify_integrity_embedded_key()?);
     Ok(())
 }
 

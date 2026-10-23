@@ -272,7 +272,7 @@ fn bid_happy_path_mints_scoped_capability_token() {
     assert!(ask
         .body
         .token_offer
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_expect("verify token"));
 }
 

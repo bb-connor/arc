@@ -117,7 +117,7 @@ fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
     body.issuer = issuer.public_key();
     body.subject = weak.clone();
     let cap = CapabilityToken::sign(body, &issuer).unwrap();
-    assert!(cap.verify_signature().unwrap());
+    assert!(cap.verify_integrity_embedded_key().unwrap());
     proof.body.agent_key = weak;
     let mut signature = [0_u8; 64];
     signature[0] = 1;

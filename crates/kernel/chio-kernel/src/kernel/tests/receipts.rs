@@ -306,7 +306,7 @@ fn all_calls_produce_verified_receipts() {
     assert_eq!(kernel.receipt_log().len(), 2);
 
     for r in kernel.receipt_log().receipts() {
-        assert!(r.verify_signature().unwrap());
+        assert!(r.verify_integrity_embedded_key().unwrap());
     }
 }
 
@@ -782,7 +782,7 @@ fn nested_admission_denied_while_rss_shedding() {
         })
         .expect("nested shed must persist a signed overload deny receipt");
     assert!(
-        shed_receipt.verify_signature().unwrap(),
+        shed_receipt.verify_integrity_embedded_key().unwrap(),
         "nested shed deny receipt must verify"
     );
     match shed_receipt.decision.clone() {
@@ -828,7 +828,7 @@ fn rss_shed_persists_signed_overload_deny_receipt() {
         "shed must persist exactly one deny receipt"
     );
     assert!(
-        receipts[0].verify_signature().unwrap(),
+        receipts[0].verify_integrity_embedded_key().unwrap(),
         "shed deny receipt must verify"
     );
     match receipts[0].decision.clone() {

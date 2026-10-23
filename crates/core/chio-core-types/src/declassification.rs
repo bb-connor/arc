@@ -52,7 +52,7 @@ impl SignedDeclassificationGrant {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.body
             .validate()
             .map_err(|error| Error::InvalidSignature(error.to_string()))?;
@@ -137,7 +137,7 @@ mod tests {
         let grant = SignedDeclassificationGrant::sign(body(), &Keypair::from_seed(&[7; 32]))
             .unwrap_or_else(|error| panic!("sign: {error}"));
         assert!(grant
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|error| panic!("verify: {error}")));
         let encoded =
             serde_json::to_vec(&grant).unwrap_or_else(|error| panic!("serialize grant: {error}"));
@@ -161,7 +161,7 @@ mod tests {
             )
             .unwrap_or_else(|error| panic!("sign other: {error}"));
         assert!(!second
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|error| panic!("verify: {error}")));
 
         for member in ["unknown", "algorithm"] {

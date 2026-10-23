@@ -484,7 +484,7 @@ async fn subprocess_child_worker() -> Result {
         response.reason.as_deref(),
         Some("dispatch outcome is unknown after recovery")
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(runtime.registry().child_work()?.len(), 1);
     assert_eq!(runtime.process("root")?.tree_calls, 1);
     assert_eq!(runtime.process("dyn_1")?.parent_id.as_deref(), Some("root"));

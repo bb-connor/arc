@@ -486,7 +486,7 @@ fn threshold_verifiers_enforce_replay_member_id_bounds() -> TestResult {
     ] {
         fixture.request.approval_tokens[0].id = id;
         fixture.rebind_vote_to_proposal()?;
-        assert!(fixture.request.approval_tokens[0].verify_signature()?);
+        assert!(fixture.request.approval_tokens[0].verify_integrity_embedded_key()?);
         assert_eq!(fixture.verify_tool().is_ok(), permitted);
         assert_eq!(
             fixture.verify_shared(&[SigningAlgorithm::Ed25519]).is_ok(),

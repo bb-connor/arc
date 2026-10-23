@@ -80,7 +80,7 @@ pub fn verify_artifact_certificate(
     let body = signed.body();
     body.validate().map_err(|_| invalid())?;
     if signed.authority_key() != root
-        || !signed.verify_signature()?
+        || !signed.verify_integrity_embedded_key()?
         || body.scope != metadata.scope
         || body.artifact != metadata.artifact
         || body.version != metadata.version
@@ -107,7 +107,7 @@ pub fn verify_artifact_archive(
 ) -> Result<()> {
     let body = signed.body();
     body.validate().map_err(|_| invalid())?;
-    if signed.authority_key() != root || !signed.verify_signature()? || &body.scope != scope {
+    if signed.authority_key() != root || !signed.verify_integrity_embedded_key()? || &body.scope != scope {
         return Err(invalid());
     }
     let references = body

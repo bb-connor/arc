@@ -47,7 +47,7 @@ their validity and supply JSON serialization separately.
   It does not read or hash the corpus manifest.
 - `verify_receipts` hashes each payload's exact bytes.
   `verify_chio_receipt_payload` rejects duplicate keys in embedded signed
-  JSON and calls `ChioReceipt::verify_signature`.
+  JSON and calls `ChioReceipt::verify_integrity_embedded_key`.
 - `is_authoritative_spend_receipt` separately checks admitted signer,
   mediated allow semantics, reconciled hold, profile, and nonce bindings.
   Call `receipt_meets_guarantee_floor` separately to enforce a store floor.

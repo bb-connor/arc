@@ -297,7 +297,7 @@ pub fn compile_semantic_registry(
         || exposed.len() > MAX_EXPOSED_TOOLS
         || deployment.authority_key() != operator_root
         || !deployment
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ContractError::Malformed)?
         || &deployment.body().scope != expected_scope
     {
@@ -321,7 +321,7 @@ pub fn compile_semantic_registry(
         if !publisher_roots.contains(package.authority_key())
             || package.authority_key() == operator_root
             || !package
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|_| ContractError::Malformed)?
         {
             return Err(ContractError::BindingMismatch);

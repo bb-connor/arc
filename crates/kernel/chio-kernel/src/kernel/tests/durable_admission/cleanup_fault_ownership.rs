@@ -118,7 +118,7 @@ async fn cleanup_fault_observation_preserves_the_original_terminal_owner() {
         "the cleanup fault must remain signed evidence"
     );
     let report = log.get(0).expect("cleanup report");
-    assert!(report.verify_signature().expect("report signature"));
+    assert!(report.verify_integrity_embedded_key().expect("report signature"));
     assert_eq!(report.receipt_kind, ReceiptKind::TraceObservation);
     assert_eq!(report.boundary_class, BoundaryClass::DetectOnly);
     assert_eq!(
@@ -190,7 +190,7 @@ async fn confirmed_cleanup_replays_its_original_cancellation_receipt() {
         .receipt
         .clone()
         .expect("committed cancellation receipt");
-    assert!(original.verify_signature().expect("cancellation signature"));
+    assert!(original.verify_integrity_embedded_key().expect("cancellation signature"));
     let replay = kernel
         .evaluate_tool_call(&request)
         .await

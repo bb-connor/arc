@@ -329,7 +329,7 @@ mod algorithm_member {
     #[test]
     fn capability_with_algorithm_member_fails_decoding() {
         let token = capability(&Keypair::from_seed(&[11; 32]));
-        assert!(token.verify_signature().unwrap());
+        assert!(token.verify_integrity_embedded_key().unwrap());
         for algorithm in ["ed25519", "p256"] {
             assert!(serde_json::from_value::<CapabilityToken>(with_member(&token, algorithm)).is_err());
         }
@@ -339,7 +339,7 @@ mod algorithm_member {
     fn receipt_with_algorithm_member_fails_decoding() {
         let key = Keypair::from_seed(&[11; 32]);
         let receipt = ChioReceipt::sign(receipt_body(&key, None), &key).unwrap();
-        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         for algorithm in ["ed25519", "p256"] {
             assert!(serde_json::from_value::<ChioReceipt>(with_member(&receipt, algorithm)).is_err());
         }
@@ -356,7 +356,7 @@ mod algorithm_member {
         token.issuer = p256;
         assert!(serde_json::from_value::<CapabilityToken>(with_member(&token, "ed25519")).is_err());
         assert!(matches!(
-            token.verify_signature(),
+            token.verify_integrity_embedded_key(),
             Err(Error::SignatureAlgorithmMismatch {
                 key: SigningAlgorithm::P256,
                 signature: SigningAlgorithm::Ed25519,

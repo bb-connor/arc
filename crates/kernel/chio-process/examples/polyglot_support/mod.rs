@@ -171,7 +171,7 @@ pub async fn run_phase(directory: &Path, first: bool) -> Result {
             assert_eq!(response["verdict"], "allow", "{response}");
             let receipt: ChioReceipt =
                 serde_json::from_str(response["receipt_json"].as_str().ok_or("missing receipt")?)?;
-            assert!(receipt.verify_signature()?);
+            assert!(receipt.verify_integrity_embedded_key()?);
             assert_eq!(response["terminal_state"]["state"], "completed");
         }
         assert_eq!(

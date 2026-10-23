@@ -266,7 +266,7 @@ fn verify_chio_receipt_payload(scenario_id: &str, payload: &str) -> Result<(), B
         .decode_signed()
         .map_err(|_| BundleError::InvalidReceiptPayload(scenario_id.to_owned()))?;
     let is_valid = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|_| BundleError::InvalidReceiptSignature(scenario_id.to_owned()))?;
     if is_valid {
         Ok(())

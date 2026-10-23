@@ -44,7 +44,7 @@ pub(crate) fn decode_verified_lineage_statement(
         ));
     }
     if !statement
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
     {
         return Err(ReceiptStoreError::Conflict(

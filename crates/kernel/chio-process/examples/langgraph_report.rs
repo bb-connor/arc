@@ -217,7 +217,7 @@ mod report {
                                 .as_str()
                                 .ok_or("missing receipt")?,
                         )?;
-                        assert!(receipt.verify_signature()?);
+                        assert!(receipt.verify_integrity_embedded_key()?);
                         assert_eq!(receipt.kernel_key, support::issuer().public_key());
                     }
                     assert_eq!(

@@ -89,7 +89,7 @@ fn sqlite_review_payment_prepaid_refusal_persists_confirmed_refund() -> Result<(
     request.request_id = "sqlite-review-prepaid-refusal".into();
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(calls.authorizations.load(Ordering::SeqCst), 1);
     assert_eq!(calls.refunds.load(Ordering::SeqCst), 1);
     assert_eq!(calls.releases.load(Ordering::SeqCst), 0);

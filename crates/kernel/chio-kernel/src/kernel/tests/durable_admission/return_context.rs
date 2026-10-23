@@ -106,7 +106,7 @@ fn oversized_request_is_refused_before_admission(nested: bool) -> TestResult {
     assert!(state.retained_request.is_none());
     assert!(state.raw_outcome.is_none());
     assert!(state.budget_authorization.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response
             .receipt

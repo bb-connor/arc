@@ -1,6 +1,6 @@
 //! Capability token signing/verification under `crypto_floor`.
 //!
-//! Pins the dispatch table for `CapabilityToken::verify_signature_with_floor`
+//! Pins the dispatch table for `CapabilityToken::verify_integrity_embedded_key_with_floor`
 //! across all combinations of (signature algorithm, configured floor).
 //! Threat model row `pq_signature_downgrade` is the surface this guards.
 
@@ -69,7 +69,7 @@ fn classical_token_under_allow_classical_verifies() {
     let cap = classical_token();
     assert_eq!(cap.signature.algorithm(), SigningAlgorithm::Ed25519);
     let ok = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowClassical)
         .unwrap();
     assert!(ok);
 }
@@ -78,7 +78,7 @@ fn classical_token_under_allow_classical_verifies() {
 fn classical_token_under_allow_hybrid_verifies() {
     let cap = classical_token();
     let ok = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowHybrid)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowHybrid)
         .unwrap();
     assert!(ok);
 }
@@ -87,7 +87,7 @@ fn classical_token_under_allow_hybrid_verifies() {
 fn classical_token_under_pq_required_rejects_at_floor() {
     let cap = classical_token();
     let err = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::PqRequired)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::PqRequired)
         .expect_err("classical token under pq_required must reject at floor");
     match err {
         CapabilityFloorVerifyError::RejectedByCryptoFloor {
@@ -106,7 +106,7 @@ fn hybrid_token_under_allow_classical_rejects_at_floor() {
     let cap = hybrid_token();
     assert_eq!(cap.signature.algorithm(), SigningAlgorithm::Hybrid);
     let err = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowClassical)
         .expect_err("hybrid token under allow_classical must reject at floor");
     match err {
         CapabilityFloorVerifyError::RejectedByCryptoFloor {
@@ -124,7 +124,7 @@ fn hybrid_token_under_allow_classical_rejects_at_floor() {
 fn hybrid_token_under_allow_hybrid_verifies() {
     let cap = hybrid_token();
     let ok = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowHybrid)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowHybrid)
         .unwrap();
     assert!(ok);
 }
@@ -133,7 +133,7 @@ fn hybrid_token_under_allow_hybrid_verifies() {
 fn hybrid_token_under_pq_required_verifies() {
     let cap = hybrid_token();
     let ok = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::PqRequired)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::PqRequired)
         .unwrap();
     assert!(ok);
 }
@@ -157,7 +157,7 @@ fn algorithm_envelope_field_absent_is_accepted() {
         .unwrap()
         .contains("\"algorithm\""));
     let ok = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowClassical)
         .unwrap();
     assert!(ok);
 }
@@ -172,7 +172,7 @@ fn floor_rejection_fires_before_crypto_check() {
     let mut cap = hybrid_token();
     cap.id = "tampered".to_string();
     let err = cap
-        .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+        .verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowClassical)
         .expect_err("tampered hybrid token under allow_classical must reject at floor");
     assert!(matches!(
         err,
@@ -185,7 +185,7 @@ fn classical_verify_signature_works_on_classical_token() {
     // Byte-equivalence regression: `verify_signature` continues to work on
     // a classical token without observing the floor.
     let cap = classical_token();
-    assert!(cap.verify_signature().unwrap());
+    assert!(cap.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn classical_verify_signature_works_on_hybrid_token() {
     // Sanity: verify_signature continues to dispatch correctly on a
     // hybrid token (no floor enforcement; pure cryptographic check).
     let cap = hybrid_token();
-    assert!(cap.verify_signature().unwrap());
+    assert!(cap.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]

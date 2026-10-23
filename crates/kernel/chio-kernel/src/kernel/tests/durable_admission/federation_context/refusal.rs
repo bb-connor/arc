@@ -320,7 +320,7 @@ fn startup_recovery_terminalizes_a_federated_admission_without_its_original_trea
         .receipt
         .clone()
         .ok_or("recovery refusal receipt")?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert!(kernel.federation_dsse_envelope(&receipt.id).is_none());
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
     let error = recover(&kernel, &fixture.request)

@@ -287,7 +287,7 @@ impl ChioKernel {
         // algorithm plumbing.
         for pk in &self.governed_approvers {
             if *pk == approval_token.approver {
-                return match approval_token.verify_signature() {
+                return match approval_token.verify_integrity_embedded_key() {
                     Ok(true) => Ok(()),
                     Ok(false) => Err("signature did not verify".to_string()),
                     Err(error) => Err(error.to_string()),
@@ -792,7 +792,7 @@ impl ChioKernel {
                 "governed call_chain continuation token is malformed: {error}"
             ))
         })? {
-            let signature_valid = continuation_token.verify_signature().map_err(|error| {
+            let signature_valid = continuation_token.verify_integrity_embedded_key().map_err(|error| {
                 KernelError::GovernedTransactionDenied(format!(
                     "governed call_chain continuation token failed signature verification: {error}"
                 ))
@@ -1007,7 +1007,7 @@ impl ChioKernel {
             return Ok(None);
         };
 
-        let signature_valid = upstream_proof.verify_signature().map_err(|error| {
+        let signature_valid = upstream_proof.verify_integrity_embedded_key().map_err(|error| {
             KernelError::GovernedTransactionDenied(format!(
                 "governed call_chain upstream proof failed signature verification: {error}"
             ))

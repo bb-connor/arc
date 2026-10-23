@@ -551,7 +551,7 @@ fn ffi_sign_receipt_recompute_accepts_matching_content() {
     chio_kernel_buffer_free(result.data);
 
     let receipt: ChioReceipt = serde_json::from_str(&signed).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -597,7 +597,7 @@ fn ffi_sign_receipt_relay_signs_without_preimage() {
     chio_kernel_buffer_free(result.data);
 
     let receipt: ChioReceipt = serde_json::from_str(&signed).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 

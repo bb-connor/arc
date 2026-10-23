@@ -137,7 +137,7 @@ fn retained_federation_context_recovers_without_live_peer_or_new_runtime_admissi
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let repeated = recover(&kernel, &fixture.request)?;
     assert_same_receipt(&response.receipt, &repeated.receipt);
     assert_eq!(admissions.load(Ordering::SeqCst), 0);

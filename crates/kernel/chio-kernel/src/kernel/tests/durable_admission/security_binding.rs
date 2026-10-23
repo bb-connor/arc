@@ -247,7 +247,7 @@ fn security_bound_oversized_request_is_refused_before_admission() -> TestResult 
         Some("durable admission failed: admission operation invariant failed: retained request exceeds its artifact bound")
     );
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response
             .receipt

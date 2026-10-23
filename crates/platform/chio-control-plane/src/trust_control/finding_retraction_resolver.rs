@@ -68,7 +68,7 @@ fn verify_retained_parent_receipt(
 ) -> Result<(), FindingRetractionResolveError> {
     if parent.id != expected_receipt_id
         || !parent
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| FindingRetractionResolveError::InvalidLineage(error.to_string()))?
     {
         return Err(FindingRetractionResolveError::InvalidLineage(
@@ -98,7 +98,7 @@ fn verify_retained_child_receipt(
         || child.capability_id != expected_capability_id
         || !matches!(child.action.verify_hash(), Ok(true))
         || !child
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| FindingRetractionResolveError::InvalidLineage(error.to_string()))?
     {
         return Err(FindingRetractionResolveError::InvalidLineage(
@@ -167,7 +167,7 @@ impl FindingDeliveryLineageResolver for ReceiptStoreFindingDeliveryLineageResolv
             || statement.evidence_class != ProvenanceEvidenceClass::Verified
             || statement.kernel_key != child.kernel_key
             || !statement
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|error| FindingRetractionResolveError::InvalidLineage(error.to_string()))?
         {
             return Err(FindingRetractionResolveError::InvalidLineage(

@@ -71,7 +71,7 @@ pub fn verify_receipt_with_trusted_signers(
     let decision = ReceiptDecisionKind::from(receipt.decision.as_ref());
     let receipt_kind = semantics.receipt_kind.as_str().to_string();
     let boundary_class = semantics.boundary_class.as_str().to_string();
-    let signature_valid = receipt.verify_signature()?;
+    let signature_valid = receipt.verify_integrity_embedded_key()?;
     let parameter_hash_valid = receipt.action.verify_hash()?;
     let signer_trusted = !trusted_signers.is_empty()
         && trusted_signers

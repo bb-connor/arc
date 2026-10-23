@@ -209,7 +209,7 @@ async fn mpsc_signing_path_signs_n_receipts_with_valid_signatures() {
     // (which equals the kernel's public key).
     for (expected_id, expected_timestamp, receipt) in &signed {
         assert!(
-            receipt.verify_signature().expect("signature verifiable"),
+            receipt.verify_integrity_embedded_key().expect("signature verifiable"),
             "receipt {} signature failed verification",
             receipt.id
         );
@@ -327,7 +327,7 @@ async fn mpsc_signing_path_applies_backpressure_at_capacity() {
     // out-of-order corruption.
     for receipt in &signed {
         assert!(
-            receipt.verify_signature().expect("signature verifiable"),
+            receipt.verify_integrity_embedded_key().expect("signature verifiable"),
             "post-backpressure receipt {} failed verification",
             receipt.id
         );
@@ -428,7 +428,7 @@ async fn shutdown_drains_in_flight_signing_requests() {
     }
     for receipt in &phase_a_signed {
         assert!(
-            receipt.verify_signature().expect("signature verifiable"),
+            receipt.verify_integrity_embedded_key().expect("signature verifiable"),
             "phase-A receipt {} failed verification",
             receipt.id
         );
@@ -463,7 +463,7 @@ async fn shutdown_drains_in_flight_signing_requests() {
             // Drain path: producer was in-flight at shutdown time.
             // Receipt must be properly signed.
             assert!(
-                receipt.verify_signature().expect("signature verifiable"),
+                receipt.verify_integrity_embedded_key().expect("signature verifiable"),
                 "racing receipt {} failed verification on drain path",
                 receipt.id
             );

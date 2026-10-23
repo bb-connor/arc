@@ -292,7 +292,7 @@ impl GovernedUpstreamCallChainProof {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         let body = self.body();
         wrapped_verdict(verify_wrapped(
             &self.signer,
@@ -306,15 +306,18 @@ impl GovernedUpstreamCallChainProof {
     ///
     /// Sanctioned entry point when freshness matters: fails closed on expiry /
     /// not-yet-valid proofs, which the bare
-    /// [`GovernedUpstreamCallChainProof::verify_signature`] does not check. A
+    /// [`GovernedUpstreamCallChainProof::verify_integrity_embedded_key`] does not check. A
     /// clock is threaded explicitly via `now` (unix seconds).
     ///
     /// Fail-closed ordering: the signature is checked FIRST. A proof with an
     /// invalid signature is rejected before the time window is consulted.
     /// Returns `Ok(true)` only when the signature verifies and `now` is within
     /// `[issued_at, expires_at)`.
-    pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_signature()? {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
+        if !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -493,7 +496,7 @@ impl CallChainContinuationToken {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         ensure_schema_matches(
             &self.schema,
             CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
@@ -512,15 +515,18 @@ impl CallChainContinuationToken {
     ///
     /// Sanctioned entry point when freshness matters: fails closed on expiry /
     /// not-yet-valid tokens, which the bare
-    /// [`CallChainContinuationToken::verify_signature`] does not check. A clock
+    /// [`CallChainContinuationToken::verify_integrity_embedded_key`] does not check. A clock
     /// is threaded explicitly via `now` (unix seconds).
     ///
     /// Fail-closed ordering: schema + signature are checked FIRST. A token with
     /// an invalid signature (or schema) is rejected before the time window is
     /// consulted. Returns `Ok(true)` only when the signature verifies and `now`
     /// is within `[issued_at, expires_at)`.
-    pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_signature()? {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
+        if !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -1432,7 +1438,7 @@ impl GovernedApprovalToken {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         let body = self.body();
         wrapped_verdict(verify_wrapped(
             &self.approver,
@@ -1457,15 +1463,18 @@ impl GovernedApprovalToken {
     /// Sanctioned entry point when freshness matters (settlement lanes that
     /// must assert approval expiry): fails closed
     /// on expiry / not-yet-valid approvals, which the bare
-    /// [`GovernedApprovalToken::verify_signature`] does not check. A clock is
+    /// [`GovernedApprovalToken::verify_integrity_embedded_key`] does not check. A clock is
     /// threaded explicitly via `now` (unix seconds).
     ///
     /// Fail-closed ordering: the signature is checked FIRST. An approval with an
     /// invalid signature is rejected before the time window is consulted.
     /// Returns `Ok(true)` only when the signature verifies and `now` is within
     /// `[issued_at, expires_at)`.
-    pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_signature()? {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
+        if !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -1716,7 +1725,7 @@ impl ThresholdApprovalProposal {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.body.validate()?;
         wrapped_verdict(verify_wrapped(
             &self.body.policy_authority,

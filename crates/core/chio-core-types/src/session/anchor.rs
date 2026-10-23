@@ -209,7 +209,7 @@ impl SessionAnchor {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         ensure_schema_matches(&self.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(

@@ -348,7 +348,7 @@ fn receipt_bound_bbs_signature_drives_selective_disclosure_proofs() {
     let receipt =
         sign_chio_receipt_with_bbs(receipt_fixture(&ed25519), &ed25519, &bbs_keypair, handle)
             .unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         receipt.body().bbs_projection_version.as_deref(),
         Some(PROJECTION_VERSION_RECEIPT_V1)
@@ -417,7 +417,7 @@ fn bbs_signing_accepts_matching_content_hash() {
 
     let receipt = sign_chio_receipt_with_bbs(body, &ed25519, &bbs_keypair, handle)
         .expect("matching content+hash is accepted");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.content_hash, sha256_hex(content));
 }
 

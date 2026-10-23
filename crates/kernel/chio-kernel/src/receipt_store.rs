@@ -1115,7 +1115,7 @@ impl ThresholdApprovalReplayReservationV1 {
                 )),
             );
         }
-        if !proposal.verify_signature().map_err(|error| {
+        if !proposal.verify_integrity_embedded_key().map_err(|error| {
             crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
         })? {
             return Err(
@@ -1152,7 +1152,7 @@ impl ThresholdApprovalReplayReservationV1 {
                     ),
                 );
             }
-            if !token.verify_signature().map_err(|error| {
+            if !token.verify_integrity_embedded_key().map_err(|error| {
                 crate::admission_operation::AdmissionOperationStoreError::Invariant(
                     error.to_string(),
                 )

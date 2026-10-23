@@ -32,7 +32,7 @@ fn kg2_receipt_key_cannot_issue_after_distinct_authority_configuration(
         .as_deref()
         .is_some_and(|reason| reason.contains("not found among trusted")
             || reason.contains("not a trusted CA")));
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -556,7 +556,7 @@ fn issue_and_use_capability() {
     // Receipt signature verifies.
     let receipt_log = kernel.receipt_log();
     let r = receipt_log.get(0).unwrap();
-    assert!(r.verify_signature().unwrap());
+    assert!(r.verify_integrity_embedded_key().unwrap());
 }
 
 struct FixedIssuanceAuthority {

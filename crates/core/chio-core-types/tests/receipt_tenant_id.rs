@@ -67,7 +67,7 @@ fn tenant_id_serde_roundtrip_present() {
     let restored: ChioReceipt = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.tenant_id.as_deref(), Some("tenant-a"));
     assert!(
-        restored.verify_signature().unwrap(),
+        restored.verify_integrity_embedded_key().unwrap(),
         "signature must still verify after tenant_id roundtrip"
     );
 }
@@ -89,7 +89,7 @@ fn tenant_id_absent_is_byte_identical_on_the_wire() {
     // Round-trip: absence stays absence.
     let restored: ChioReceipt = serde_json::from_str(&json).unwrap();
     assert!(restored.tenant_id.is_none());
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]

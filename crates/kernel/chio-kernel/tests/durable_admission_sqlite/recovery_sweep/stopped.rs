@@ -101,7 +101,7 @@ fn sqlite_restart_while_stopped_retains_finalizing_work_until_resume() -> TestRe
     let replay = kernel.evaluate_tool_call_blocking(&retained.request)?;
     assert_eq!(replay.verdict, Verdict::Allow);
     assert_eq!(replay.receipt.kernel_key, signer.public_key());
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }

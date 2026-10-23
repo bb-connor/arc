@@ -246,7 +246,7 @@ fn chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign(
         "runtime admission denial must not request federation cosign"
     );
     assert!(
-        response.receipt.verify_signature()?,
+        response.receipt.verify_integrity_embedded_key()?,
         "deny response receipt signature must verify"
     );
     assert!(response.receipt.is_denied());

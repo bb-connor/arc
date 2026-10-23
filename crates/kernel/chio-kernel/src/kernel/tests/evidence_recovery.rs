@@ -399,7 +399,7 @@ fn unavailable_clock_retains_unsigned_fault_until_idle_recovery() {
         .receipt_log()
         .get(0)
         .unwrap()
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap());
 }
 
@@ -452,7 +452,7 @@ fn unavailable_signer_retains_unsigned_fault_until_idle_recovery() {
         .receipt_log()
         .get(0)
         .unwrap()
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap());
 }
 
@@ -506,7 +506,7 @@ fn unsigned_child_survives_clock_outage_and_kernel_teardown() {
     assert_eq!(child.outcome_hash, body.outcome_hash);
     assert_eq!(child.terminal_state, OperationTerminalState::Completed);
     assert!(child.timestamp > 0);
-    assert!(child.verify_signature().unwrap());
+    assert!(child.verify_integrity_embedded_key().unwrap());
     assert_eq!(state.child_append_calls.load(Ordering::SeqCst), 1);
     assert!(state.receipts.lock().unwrap().is_empty());
 }

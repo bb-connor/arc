@@ -49,7 +49,7 @@ fn signed_authority_cannot_select_runtime_authority() -> TestResult {
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response
             .receipt

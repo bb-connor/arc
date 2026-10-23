@@ -324,7 +324,7 @@ fn receipt_backed_event_cannot_select_a_policy_pinned_to_an_internal_detector() 
     let receipt: ChioReceipt = serde_json::from_slice(off_policy.source_evidence.as_bytes())
         .unwrap_or_else(|error| panic!("decode off-policy receipt: {error}"));
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .unwrap_or_else(|error| panic!("off-policy receipt signature: {error}")));
     assert_eq!(receipt.kernel_key, receipt_key.public_key());
     let body: SecurityEventBody = serde_json::from_slice(off_policy.canonical_body.as_bytes())

@@ -171,8 +171,8 @@ async fn concurrent_receipts(anonymous_nested: bool) -> TestResult {
     assert_eq!(tenant.verdict, Verdict::Allow);
     assert_eq!(anonymous.receipt.tenant_id, None);
     assert_eq!(tenant.receipt.tenant_id.as_deref(), Some("tenant-B"));
-    assert!(anonymous.receipt.verify_signature()?);
-    assert!(tenant.receipt.verify_signature()?);
+    assert!(anonymous.receipt.verify_integrity_embedded_key()?);
+    assert!(tenant.receipt.verify_integrity_embedded_key()?);
     assert!(kernel.receipt_tenant_ids.is_empty());
     Ok(())
 }
@@ -506,7 +506,7 @@ fn concurrent_resource_denials(second_tenant: Option<&str>) -> TestResult {
             metadata["receipt_context"]["request_namespace_digest"],
             namespace.digest().as_str()
         );
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
     }
     assert!(kernel.receipt_tenant_ids.is_empty());
     Ok(())

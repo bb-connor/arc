@@ -340,7 +340,7 @@ impl ChioAcpEdge {
             return PermissionDecision::Deny;
         };
 
-        if !matches!(execution.capability.verify_signature(), Ok(true)) {
+        if !matches!(execution.capability.verify_integrity_embedded_key(), Ok(true)) {
             return PermissionDecision::Deny;
         }
         let reading = match kernel.map_or_else(

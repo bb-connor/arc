@@ -339,7 +339,7 @@ fn race(pause: Pause, revoke: bool) -> TestResult {
     } else {
         let response = result?;
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(operation.state(), AdmissionOperationState::Completed);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
         assert_eq!(

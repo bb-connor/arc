@@ -60,7 +60,7 @@ fn receipt_signature_body_excludes_signature_field() {
 
     assert!(!signed_body_text.contains("signature"));
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify signed receipt"));
 }
 
@@ -72,13 +72,13 @@ fn tampering_any_signed_receipt_field_fails_verification() {
     let mut tampered_tool = receipt.clone();
     tampered_tool.tool_name = "other".to_string();
     assert!(!tampered_tool
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify tampered tool receipt"));
 
     let mut tampered_policy = receipt.clone();
     tampered_policy.policy_hash = sha256_hex(b"other-policy");
     assert!(!tampered_policy
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify tampered policy receipt"));
 
     let mut tampered_decision = receipt.clone();
@@ -87,7 +87,7 @@ fn tampering_any_signed_receipt_field_fails_verification() {
         guard: "test".to_string(),
     });
     assert!(!tampered_decision
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify tampered decision receipt"));
 }
 
@@ -184,7 +184,7 @@ fn sign_with_handle_accepts_matching_content() {
     let receipt =
         ChioReceipt::sign_with_handle(body, &keypair, handle).test_unwrap("sign with handle");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify handle-signed receipt"));
     assert_eq!(receipt.content_hash, recomputed);
 }
@@ -219,7 +219,7 @@ fn sign_with_backend_using_handle_accepts_matching_content() {
     let receipt = ChioReceipt::sign_with_backend_using_handle(body, &backend, handle)
         .test_unwrap("backend sign with handle");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify backend handle-signed receipt"));
     assert_eq!(receipt.content_hash, recomputed);
 }
@@ -237,10 +237,10 @@ fn json_formatting_does_not_change_receipt_verification() {
         serde_json::from_str(&compact).test_unwrap("parse compact receipt");
 
     assert!(from_pretty
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify pretty receipt"));
     assert!(from_compact
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_unwrap("verify compact receipt"));
     assert_eq!(
         from_pretty.signature.to_hex(),

@@ -217,7 +217,7 @@ fn sqlite_replaced_signer_defers_its_operation_and_recovers_the_next() -> TestRe
     let replay = kernel.evaluate_tool_call_blocking(&healthy.request)?;
     assert_eq!(replay.verdict, Verdict::Allow);
     assert_eq!(replay.receipt.kernel_key, healthy.signer.public_key());
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
 
     assert_eq!(
         state(&serving, &replaced)?,
@@ -274,7 +274,7 @@ fn sqlite_replaced_signer_defers_its_operation_and_recovers_the_next() -> TestRe
     let replay = restored.evaluate_tool_call_blocking(&replaced.request)?;
     assert_eq!(replay.verdict, Verdict::Allow);
     assert_eq!(replay.receipt.kernel_key, replaced.signer.public_key());
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }

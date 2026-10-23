@@ -464,7 +464,7 @@ fn sign_receipt_roundtrip_and_verifies() {
     let signed_json =
         sign_receipt(body_json, hex::encode(&canonical_content), seed_hex).expect("sign receipt");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -484,7 +484,7 @@ fn sign_receipt_accepts_empty_preimage_stream_receipt() {
     let signed_json = sign_receipt(body_json, String::new(), keypair.seed_hex())
         .expect("empty-preimage stream receipt must sign");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -589,7 +589,7 @@ fn sign_receipt_relaying_trusted_body_signs_without_preimage() {
     let signed_json = sign_receipt_relaying_trusted_body(body_json, keypair.seed_hex())
         .expect("relay seam signs an upstream-trusted body");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 

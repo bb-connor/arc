@@ -680,7 +680,7 @@ fn receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary(
         let mut body = make_receipt_body(&key, Decision::Allow);
         body.tool_origin = origin;
         let receipt = ChioReceipt::sign(body, &key)?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert_schema_accepts("receipt/record.schema.json", &to_json(&receipt));
         let mut changed = receipt.clone();
         changed.tool_origin = if origin == ToolOrigin::ChioInternal {
@@ -688,7 +688,7 @@ fn receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary(
         } else {
             ToolOrigin::ChioInternal
         };
-        assert!(!changed.verify_signature()?);
+        assert!(!changed.verify_integrity_embedded_key()?);
     }
 
     let expected = to_json(&origins);

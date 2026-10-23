@@ -47,7 +47,7 @@ fn with_context(mut request: ToolCallRequest, context: serde_json::Value) -> Too
 fn assert_denied(kernel: &ChioKernel, request: &ToolCallRequest, code: &str) -> TestResult {
     let response = kernel.evaluate_tool_call_blocking(request)?;
     assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata

@@ -155,7 +155,7 @@ fn fixture(
         },
         &key,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let evidence = make_evidence(
         &request,
         prepared.authorization,
@@ -474,7 +474,7 @@ fn sign_terminal_executor_binding_body(
         },
         &key,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(receipt)
 }
 
@@ -567,7 +567,7 @@ fn assert_terminal_executor_original_predicates(
         operation.dispatch_state(),
         AdmissionDispatchState::EffectCompleted
     );
-    setup_check!("genuine signature", receipt.verify_signature()?, true);
+    setup_check!("genuine signature", receipt.verify_integrity_embedded_key()?, true);
     setup_check!(
         "identity vs operation authority",
         identity.authority_id().to_owned(),

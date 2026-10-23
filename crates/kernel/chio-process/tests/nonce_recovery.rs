@@ -75,7 +75,7 @@ async fn strict_nonce_call_completes_once_and_replays_after_reopening() -> Resul
             response.output.is_some(),
             "strict preflight was returned as a completed call"
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             std::fs::read_to_string(directory.path().join("external.log"))?,
             "external-effect\n"
@@ -150,7 +150,7 @@ async fn strict_nonce_subprocess() -> Result {
     assert!(!crash, "strict preflight failed to reach the real tool");
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata

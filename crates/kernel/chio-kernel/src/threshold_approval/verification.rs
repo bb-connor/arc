@@ -207,7 +207,7 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
             .allowed_signing_algorithms
             .contains(&token.approver.algorithm())
             || !eligible.contains(&token.approver.to_hex())
-            || !token.verify_signature().map_err(|error| {
+            || !token.verify_integrity_embedded_key().map_err(|error| {
                 threshold_denied(&format!("approval token signature failed: {error}"))
             })?
         {
@@ -267,7 +267,7 @@ pub(crate) fn verify_threshold_approval_proposal(
     if !input
         .trusted_policy_authorities
         .contains(&body.policy_authority)
-        || !proposal.verify_signature().map_err(|error| {
+        || !proposal.verify_integrity_embedded_key().map_err(|error| {
             threshold_denied(&format!("threshold proposal signature failed: {error}"))
         })?
     {

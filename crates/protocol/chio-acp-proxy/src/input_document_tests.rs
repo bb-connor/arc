@@ -105,7 +105,7 @@ fn original_capability_objects_keep_full_width_signed_integers() -> TestResult {
                     .decode_signed()?;
             assert_eq!(decoded.issued_at, 9_007_199_254_740_993);
             assert_eq!(decoded.expires_at, u64::MAX);
-            assert!(decoded.verify_signature()?);
+            assert!(decoded.verify_integrity_embedded_key()?);
         }
     }
     Ok(())

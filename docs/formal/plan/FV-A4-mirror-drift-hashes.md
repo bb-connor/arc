@@ -60,7 +60,7 @@ Nightly proof lanes remain the semantic backstop.
   abstraction anchor. Wrapper-only hashing would miss changes to the lazy
   token and ancestor lookup decision.
 - Seed Receipt against receipt bodies, signing, Merkle operations, and
-  checkpoints. `ChioReceipt::verify_signature` lives in `receipt/body.rs`, not
+  checkpoints. `ChioReceipt::verify_integrity_embedded_key` lives in `receipt/body.rs`, not
   the kernel-core signing wrapper named in the earlier example.
 - Generalize the schema to `model_file`, `model_kind`, and `relationship`.
   Lean entries require `lean` plus `transliteration`; TLA+ entries require

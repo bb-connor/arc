@@ -14,7 +14,7 @@
 //
 // The single-entry verifier (`verify_capability_full`, sibling of
 // `verify_capability_with_floor`, sharing the canonical-JSON pre-image
-// logic via `CapabilityToken::verify_signature_with_floor`) routes every
+// logic via `CapabilityToken::verify_integrity_embedded_key_with_floor`) routes every
 // kernel and verifier capability admission through one fail-closed
 // surface; this conformance test pins that surface.
 //
@@ -23,7 +23,7 @@
 // 1. ScopeSuperset. An attacker who obtained a
 //    signed token mutates `scope` to expand authority beyond what the
 //    issuer signed. The canonical-JSON signing pre-image now differs
-//    and `CapabilityToken::verify_signature_with_floor` fails the
+//    and `CapabilityToken::verify_integrity_embedded_key_with_floor` fails the
 //    Ed25519 signature check; production returns
 //    `CapabilityError::InvalidSignature`.
 //

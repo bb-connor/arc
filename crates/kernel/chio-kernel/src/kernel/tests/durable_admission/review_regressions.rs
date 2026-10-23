@@ -654,7 +654,7 @@ fn durable_terminal_receipt_uses_the_admitted_tenant() {
         response.receipt.tenant_id.as_deref(),
         Some("tenant-durable")
     );
-    assert!(response.receipt.verify_signature().expect("signed receipt"));
+    assert!(response.receipt.verify_integrity_embedded_key().expect("signed receipt"));
     assert_eq!(
         store
             .operation()
@@ -900,7 +900,7 @@ fn a_missing_nested_session_root_compensates_the_durable_admission() {
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
     );
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     let metadata = response.receipt.metadata.as_ref().unwrap();
     assert_eq!(
         metadata

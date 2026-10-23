@@ -168,7 +168,7 @@ pub fn issue_session_compliance_certificate(
 /// `crypto_floor`.
 ///
 /// Performs the same dispatch table as
-/// `CapabilityToken::verify_signature_with_floor`: floor rejection BEFORE
+/// `CapabilityToken::verify_integrity_embedded_key_with_floor`: floor rejection BEFORE
 /// cryptographic verification, fail-closed on a mismatch between the
 /// body's `crypto_floor` field and the verification floor, fail-closed on
 /// signature failures.

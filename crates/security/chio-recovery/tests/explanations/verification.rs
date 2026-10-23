@@ -48,7 +48,7 @@ fn recomputation_refuses_validly_resigned_semantic_substitutions() -> Result {
         value[field][0] = serde_json::json!(99);
         let changed: RecoveryExplanationReportV1 = serde_json::from_value(value)?;
         let resigned = SignedRecoveryExplanationReportV1::sign(changed, &f.key)?;
-        assert!(resigned.verify_signature()?);
+        assert!(resigned.verify_integrity_embedded_key()?);
         assert_eq!(
             f.verify(&resigned, &view, NOW).err(),
             Some(ContractError::BindingMismatch),
@@ -65,7 +65,7 @@ fn recomputation_refuses_validly_resigned_semantic_substitutions() -> Result {
         data[field] = serde_json::json!(value);
         let resigned =
             SignedRecoveryExplanationReportV1::sign(serde_json::from_value(data)?, &f.key)?;
-        assert!(resigned.verify_signature()?);
+        assert!(resigned.verify_integrity_embedded_key()?);
         assert_eq!(
             f.verify(&resigned, &view, NOW).err(),
             Some(ContractError::BindingMismatch),
@@ -327,7 +327,7 @@ fn projection_provenance_requires_expected_key_recipient_domain_issuer_and_time(
     let mut swapped = serde_json::to_value(&signed)?;
     swapped["signature"] = serde_json::to_value(report.signature())?;
     let swapped: SignedRecoveryExplanationViewV1 = serde_json::from_value(swapped)?;
-    assert!(!swapped.verify_signature()?);
+    assert!(!swapped.verify_integrity_embedded_key()?);
     assert_eq!(
         verify_explanation_view(&swapped, &key, &f.domain, &f.issuer, &f.recipient, at(NOW)?).err(),
         Some(ContractError::BindingMismatch)

@@ -164,7 +164,7 @@ impl DelegationLink {
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         if let Some(marker) = self.aggregate_budget.as_ref() {
             marker.validate()?;
         }
@@ -244,7 +244,7 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
     }
 
     for (i, link) in chain.iter().enumerate() {
-        let sig_valid = link.verify_signature()?;
+        let sig_valid = link.verify_integrity_embedded_key()?;
         if !sig_valid {
             return Err(Error::DelegationChainBroken {
                 reason: format!("signature invalid at link index {i}"),
@@ -1036,7 +1036,7 @@ pub fn delegate(
     signed_at: u64,
     nonce: [u8; 16],
 ) -> Result<crate::delegation_receipt::DelegationReceipt> {
-    if !parent.verify_signature()? {
+    if !parent.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     if signed_at < parent.issued_at {

@@ -18,7 +18,7 @@ fn jsonrpc_tool_call_cannot_omit_required_swarm_context() -> Result<(), Box<dyn 
     let receipt = receipts
         .last()
         .ok_or_else(|| std::io::Error::other("missing denial receipt"))?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let metadata = receipt
         .metadata
         .as_ref()

@@ -272,7 +272,7 @@ fn live_owned_runtime_dispatch_retains_claim_and_real_trust_floor() -> TestResul
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata

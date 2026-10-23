@@ -41,7 +41,7 @@ fn native_declassification_composes_nonce_runtime_approval_and_dpop_sync_and_asy
                 assert!(
                     matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
                 );
-                assert!(response.receipt.verify_signature()?);
+                assert!(response.receipt.verify_integrity_embedded_key()?);
                 assert_completed(&fixture, combined, nonce)?;
                 if let Some(legacy) = legacy {
                     assert_eq!(legacy.load(Ordering::SeqCst), 0);

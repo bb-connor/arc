@@ -182,7 +182,7 @@ pub fn project_revocation_trace(
                         observation.body.sequence
                     )));
                 }
-                if !receipt.verify_signature()? {
+                if !receipt.verify_integrity_embedded_key()? {
                     return Err(TraceError::InvalidInput(format!(
                         "evaluation event {} has an invalid receipt signature",
                         observation.body.sequence

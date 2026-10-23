@@ -27,7 +27,7 @@ fn governed_approval_token_stamps_the_signing_identity() -> Result<()> {
     )?;
     assert_eq!(token.approver, backend.keypair().public_key());
     assert_eq!(token.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(token.verify_signature()?);
+    assert!(token.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -52,7 +52,7 @@ fn threshold_approval_proposal_stamps_the_signing_identity() -> Result<()> {
         &backend,
     )?;
     assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -76,7 +76,7 @@ fn child_request_receipt_stamps_the_signing_identity() -> Result<()> {
         &backend,
     )?;
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

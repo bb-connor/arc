@@ -23,10 +23,12 @@ impl From<SignedRecoveryGrant> for SignedDisclosureGrant {
     }
 }
 impl SignedDisclosureGrant {
-    pub fn verify_signature(&self) -> crate::Result<bool> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> crate::Result<bool> {
         match self {
-            Self::Declassification(grant) => grant.verify_signature(),
-            Self::Recovery(grant) => grant.verify_signature(),
+            Self::Declassification(grant) => grant.verify_integrity_embedded_key(),
+            Self::Recovery(grant) => grant.verify_integrity_embedded_key(),
         }
     }
     pub fn authority_key(&self) -> &PublicKey {

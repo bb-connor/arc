@@ -391,7 +391,7 @@ impl HostedAuthenticator {
     ) -> Result<HostedAuthenticatedPrincipal, HostedEdgeError> {
         if !self.authority_keys.contains(&capability.issuer.to_hex())
             || !capability
-                .verify_signature_at(request.now_unix_secs)
+                .verify_integrity_embedded_key_at(request.now_unix_secs)
                 .map_err(|_| HostedEdgeError::AuthenticationFailed)?
             || capability
                 .expires_at

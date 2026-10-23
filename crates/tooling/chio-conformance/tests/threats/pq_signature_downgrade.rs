@@ -41,7 +41,7 @@
 //   `crates/kernel/chio-kernel-core/src/capability_verify.rs:147`
 //     (`verify_capability_with_floor`).
 //   `crates/core/chio-core-types/src/capability/token.rs:936`
-//     (`CapabilityToken::verify_signature_with_floor`).
+//     (`CapabilityToken::verify_integrity_embedded_key_with_floor`).
 
 use chio_core::capability::{
     crypto_floor::CapabilityCryptoFloor,

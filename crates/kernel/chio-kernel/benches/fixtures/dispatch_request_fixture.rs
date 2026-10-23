@@ -138,7 +138,7 @@ impl DispatchAllowFixture {
         );
         assert!(fixture.scope_matches(), "scope fixture must match request");
         assert!(
-            receipt.verify_signature().unwrap_or(false),
+            receipt.verify_integrity_embedded_key().unwrap_or(false),
             "receipt signing fixture must verify"
         );
         assert!(
@@ -160,7 +160,7 @@ impl DispatchAllowFixture {
         assert!(
             fixture
                 .receipt_sign_once()
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .unwrap_or(false),
             "newly signed receipt fixture must verify"
         );
@@ -218,7 +218,7 @@ impl DispatchAllowFixture {
     }
 
     pub fn capability_signature_valid(&self) -> bool {
-        match self.request.capability.verify_signature() {
+        match self.request.capability.verify_integrity_embedded_key() {
             Ok(valid) => valid,
             Err(error) => panic!("capability verification benchmark failed: {error}"),
         }
@@ -276,7 +276,7 @@ impl DispatchAllowFixture {
     }
 
     pub fn receipt_verify_once(&self) -> bool {
-        self.signed_receipt.verify_signature().unwrap_or(false)
+        self.signed_receipt.verify_integrity_embedded_key().unwrap_or(false)
     }
 
     pub fn signed_receipt_with_id(&self, id: String) -> ChioReceipt {

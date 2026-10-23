@@ -287,7 +287,7 @@ impl FindingPurchaseResult {
         {
             return Err("purchase result violates the price ceiling".to_owned());
         }
-        if !matches!(self.delivery_receipt.verify_signature(), Ok(true))
+        if !matches!(self.delivery_receipt.verify_integrity_embedded_key(), Ok(true))
             || !matches!(self.delivery_receipt.action.verify_hash(), Ok(true))
         {
             return Err("delivery receipt signature or action hash is invalid".to_owned());

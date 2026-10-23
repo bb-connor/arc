@@ -69,7 +69,7 @@ fn native_capture_policy_deadline_is_exclusive_with_shared_clock() -> TestResult
             .get_invocation_quota_usage(&BudgetQuotaKey::grant(&fixture.request.capability.id, 0))?
             .ok_or("original quota")?;
         assert_eq!(quota.captured_invocations, u32::from(captured));
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
     }
     Ok(())
 }

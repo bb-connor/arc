@@ -72,7 +72,7 @@ fn unfinished_return_cannot_be_signed_by_a_replacement_authority() -> TestResult
     )?;
     assert_eq!(recovered.verdict, Verdict::Allow);
     assert_eq!(recovered.receipt.kernel_key, original_key);
-    assert!(recovered.receipt.verify_signature()?);
+    assert!(recovered.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Completed
@@ -109,7 +109,7 @@ fn completed_replay_retains_signer(nested: bool) -> TestResult {
         kernel.evaluate_tool_call_blocking(&request)?
     };
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let original_key = response.receipt.kernel_key.clone();
     replace_receipt_authority(&mut kernel);
     assert_ne!(kernel.receipt_signing_public_key().unwrap(), original_key);

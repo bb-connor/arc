@@ -246,7 +246,7 @@ fn replacement_signed_proposal_cannot_take_over_session_wait() -> TestResult {
     let mut body = proposal.body.clone();
     body.proposal_id.push_str("-replacement");
     let replacement = ThresholdApprovalProposal::sign(body, &fixture.kernel.config.keypair)?;
-    assert!(replacement.verify_signature()?);
+    assert!(replacement.verify_integrity_embedded_key()?);
     fixture.approve(replacement)?;
     assert!(matches!(
         fixture

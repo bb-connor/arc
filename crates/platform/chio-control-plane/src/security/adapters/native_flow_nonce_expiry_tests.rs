@@ -109,7 +109,7 @@ fn native_nonce_completed_receipt_replay_survives_expiry_without_new_authority()
         chio_core::canonical_json_bytes(&response.receipt)?,
         chio_core::canonical_json_bytes(&replay.receipt)?
     );
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     Ok(())

@@ -555,7 +555,7 @@ mod tests {
             } => {
                 assert_eq!(id, "req-001");
                 assert!(matches!(result, ToolCallResult::Ok { .. }));
-                assert!(receipt.verify_signature().unwrap());
+                assert!(receipt.verify_integrity_embedded_key().unwrap());
                 assert!(execution_nonce.is_none());
             }
             _ => panic!("wrong variant"),

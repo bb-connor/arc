@@ -249,7 +249,7 @@ pub fn verify_explanation_report(
         || now < body.issued_at_unix_ms
         || now >= body.expires_at_unix_ms
         || !report
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ContractError::BindingMismatch)?
     {
         return Err(ContractError::BindingMismatch);
@@ -279,7 +279,7 @@ pub fn verify_explanation_view(
         || now < body.issued_at_unix_ms
         || now >= body.expires_at_unix_ms
         || !view
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ContractError::BindingMismatch)?
     {
         return Err(ContractError::BindingMismatch);

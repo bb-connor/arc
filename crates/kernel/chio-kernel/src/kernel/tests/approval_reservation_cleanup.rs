@@ -101,7 +101,7 @@ fn failed_approval_reservation_releases_runtime_custody_when_the_budget_reverse_
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
         let response = response?;
         assert_eq!(response.verdict, Verdict::Deny);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let reason = response.reason.as_deref().ok_or("denial reason")?;
         assert!(
             reason.contains("threshold approval requires a durable admission operation")

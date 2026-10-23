@@ -267,7 +267,7 @@ impl CapabilityToken {
                             .to_string(),
                     });
                 }
-                if !binding.verify_signature()? {
+                if !binding.verify_integrity_embedded_key()? {
                     return Err(Error::SignatureVerificationFailed);
                 }
                 let marker = binding.delegation_marker()?;
@@ -866,7 +866,7 @@ impl CapabilityToken {
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.validate_schema()?;
         wrapped_verdict(verify_wrapped(
             &self.issuer,
@@ -905,7 +905,7 @@ impl CapabilityToken {
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature_with_floor(
+    pub fn verify_integrity_embedded_key_with_floor(
         &self,
         floor: CapabilityCryptoFloor,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
@@ -947,7 +947,7 @@ impl CapabilityToken {
     ///
     /// This is the sanctioned entry point when a verifier also needs
     /// freshness: it fails closed on expiry / not-yet-valid tokens, which
-    /// the bare [`CapabilityToken::verify_signature`] does not check. A clock
+    /// the bare [`CapabilityToken::verify_integrity_embedded_key`] does not check. A clock
     /// is threaded explicitly via `now` (unix seconds) so there is no hidden
     /// wall-clock read in this pure check.
     ///
@@ -964,8 +964,8 @@ impl CapabilityToken {
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_signature()? {
+    pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
+        if !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -975,7 +975,7 @@ impl CapabilityToken {
     /// Verify the signature, enforce the `crypto_floor` posture, AND enforce
     /// the validity window in one pass.
     ///
-    /// Equivalent to [`CapabilityToken::verify_signature_with_floor`] followed
+    /// Equivalent to [`CapabilityToken::verify_integrity_embedded_key_with_floor`] followed
     /// by [`CapabilityToken::validate_time`], with the same fail-closed
     /// ordering: floor + signature are checked before the time window, so a
     /// floor violation or invalid signature is reported ahead of expiry. A
@@ -984,19 +984,19 @@ impl CapabilityToken {
     /// # Errors
     ///
     /// Propagates every error of
-    /// [`CapabilityToken::verify_signature_with_floor`]. When the signature
+    /// [`CapabilityToken::verify_integrity_embedded_key_with_floor`]. When the signature
     /// and floor pass but the token is outside its validity window, the time
     /// error is surfaced as [`CapabilityFloorVerifyError::Crypto`] wrapping
     /// [`Error::CapabilityNotYetValid`] / [`Error::CapabilityExpired`].
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature_with_floor_at(
+    pub fn verify_integrity_embedded_key_with_floor_at(
         &self,
         floor: CapabilityCryptoFloor,
         now: u64,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
-        if !self.verify_signature_with_floor(floor)? {
+        if !self.verify_integrity_embedded_key_with_floor(floor)? {
             return Ok(false);
         }
         self.validate_time(now)

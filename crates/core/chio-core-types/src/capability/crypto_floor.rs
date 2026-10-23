@@ -63,7 +63,7 @@ fn signing_algorithm_label(alg: SigningAlgorithm) -> &'static str {
     }
 }
 
-/// Errors raised by [`CapabilityToken::verify_signature_with_floor`].
+/// Errors raised by [`CapabilityToken::verify_integrity_embedded_key_with_floor`].
 ///
 /// Distinguishes floor-policy rejections from cryptographic verification
 /// failures so the kernel can surface a different audit-log row for each.

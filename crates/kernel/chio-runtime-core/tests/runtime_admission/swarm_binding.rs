@@ -125,7 +125,7 @@ fn swarm_binding_denies_same_id_same_scope_reissued_capability() -> TestResult {
     let mut body = request.capability.body();
     body.expires_at -= 1;
     request.capability = CapabilityToken::sign(body, &swarm_witness_keypair())?;
-    assert!(request.capability.verify_signature()?);
+    assert!(request.capability.verify_integrity_embedded_key()?);
     assert_eq!(request.capability.id, fixture.request.capability.id);
     assert_eq!(
         scope_hash(&request.capability.scope)?,
@@ -208,7 +208,7 @@ fn swarm_binding_denies_changed_subject_issuer_scope_and_signature() -> TestResu
                 )?,
             )?;
         } else {
-            assert!(request.capability.verify_signature()?);
+            assert!(request.capability.verify_integrity_embedded_key()?);
         }
         fixture.assert_denied_without_consuming(&request, "chio_swarm_authority_rejected")?;
     }

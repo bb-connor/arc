@@ -178,7 +178,7 @@ pub fn prepare_functions_batch_verification(
     let mut request_size_bytes = 0usize;
     for receipt in receipts {
         let verified = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| AnchorError::Verification(error.to_string()))?;
         if !verified {
             return Err(AnchorError::Verification(format!(

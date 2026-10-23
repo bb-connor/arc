@@ -11,7 +11,7 @@ pub(super) fn from_signed_response(
     request: &ToolCallRequest,
     response: &ToolCallResponse,
 ) -> Result<AdmissionOperationV1, Box<dyn Error>> {
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(response.request_id, request.request_id);
     assert_eq!(response.receipt.capability_id, request.capability.id);
     let value = response

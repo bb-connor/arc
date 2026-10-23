@@ -234,7 +234,7 @@ fn pre_dispatch_cleanup_runs_when_its_deny_timestamp_clock_sample_fails() -> Tes
         let denied = result?;
         assert_eq!(denied.verdict, Verdict::Deny);
         assert!(denied.output.is_none());
-        assert!(denied.receipt.verify_signature()?);
+        assert!(denied.receipt.verify_integrity_embedded_key()?);
         let journal = store.payment_journal().ok_or("payment journal")?;
         assert_eq!(journal.state, PaymentJournalState::Settled);
         assert_eq!(
@@ -307,7 +307,7 @@ fn pre_dispatch_compensation_runs_when_its_kernel_clock_sample_fails() -> TestRe
             denied.reason.as_deref(),
             Some("runtime admission refused the call")
         );
-        assert!(denied.receipt.verify_signature()?);
+        assert!(denied.receipt.verify_integrity_embedded_key()?);
     }
     Ok(())
 }

@@ -226,7 +226,7 @@ fn prepare_caller(
             },
             signer,
         )?;
-        assert!(capability.verify_signature()?);
+        assert!(capability.verify_integrity_embedded_key()?);
         assert_eq!(capability.delegation_chain.len(), 1);
         assert_eq!(
             capability
@@ -246,7 +246,7 @@ fn prepare_caller(
     original.request_id = format!("caller-recovery-{label}");
     let reserved = kernel.reserve_caller_execution_blocking(&original)?;
     assert_eq!(reserved.verdict, Verdict::Allow);
-    assert!(reserved.receipt.verify_signature()?);
+    assert!(reserved.receipt.verify_integrity_embedded_key()?);
     let nonce = reserved
         .execution_nonce
         .ok_or("original kernel reservation nonce")?;
@@ -651,7 +651,7 @@ impl PendingCallers {
             response.output,
             Some(chio_kernel::ToolCallOutput::Value(report.report.output))
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response.receipt.kernel_key,
             self.kernel.receipt_signing_public_key()?

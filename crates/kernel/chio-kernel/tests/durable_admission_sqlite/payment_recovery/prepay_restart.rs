@@ -48,7 +48,7 @@ fn sqlite_review_prepay_restart_retains_exact_debit_and_original_receipt_without
         attach_original_quote(&kernel, &mut request, &keypair, at / 1_000)?;
         let response = kernel.evaluate_tool_call_blocking(&request)?;
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let original = ordinary_operation::from_signed_response(
             operations.as_ref(),
             &fence,

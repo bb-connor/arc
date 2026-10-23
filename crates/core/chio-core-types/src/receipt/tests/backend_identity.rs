@@ -59,7 +59,7 @@ fn receipt_signing_uses_only_the_embedded_identity_entrypoint() -> Result<()> {
     let expected = ChioReceipt::sign_with_backend(body.clone(), &backend.inner)?;
     let receipt = ChioReceipt::sign_with_backend(body, &backend)?;
     assert_eq!(backend.calls.load(Ordering::SeqCst), 1);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         crate::canonical::canonical_json_bytes(&receipt)?,
         crate::canonical::canonical_json_bytes(&expected)?

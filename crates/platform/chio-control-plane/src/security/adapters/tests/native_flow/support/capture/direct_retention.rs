@@ -391,7 +391,7 @@ fn native_direct_retention_healthy_capture_executes_once() -> TestResult {
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(hook.outcomes()?, ["ok", "ok"]);
     assert_eq!(hook.committed_egress.load(Ordering::SeqCst), 1);

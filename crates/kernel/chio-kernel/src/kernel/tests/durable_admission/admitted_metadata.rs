@@ -72,7 +72,7 @@ fn recovery_refusal_signs_the_admitted_caller_metadata() -> TestResult {
         .receipt
         .clone()
         .ok_or("recovery refusal receipt")?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let metadata = receipt.metadata.as_ref().ok_or("receipt metadata")?;
     assert_eq!(metadata.get("chio_process"), admitted().get("chio_process"));
     assert_eq!(
@@ -209,7 +209,7 @@ fn a_relaunched_caller_replays_the_admission_named_by_its_admitting_launch() -> 
     drop(admission);
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);
     let receipt = stored_receipt(&store)?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let metadata = receipt.metadata.as_ref().ok_or("receipt metadata")?;
     assert_eq!(
         metadata.get("native_launch"),

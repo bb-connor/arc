@@ -310,7 +310,7 @@ fn run(nested: bool, asynchronous: bool, stream: bool, decision: Decision) -> Te
             let response = result?;
             assert_eq!(response.verdict, chio_kernel::Verdict::Allow);
             assert_eq!(response.output, Some(expected));
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
             assert_eq!(
                 response.receipt.content_hash,
                 chio_core::sha256_hex(&preimage)

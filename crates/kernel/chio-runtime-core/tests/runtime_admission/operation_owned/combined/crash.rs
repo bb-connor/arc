@@ -232,7 +232,7 @@ fn run_cut(cut: Cut, test: &str) -> TestResult {
     let fresh = fixture.competing_request("after-process-loss")?;
     let response =
         kernel.evaluate_tool_call_blocking_with_metadata(&fresh, Some(swarm_route_metadata()))?;
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     if cut.committed() {
         assert_eq!(response.verdict, Verdict::Deny, "{response:#?}");
         assert!(

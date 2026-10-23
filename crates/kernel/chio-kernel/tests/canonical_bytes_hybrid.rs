@@ -286,7 +286,7 @@ fn shared_bytes_round_trip_through_serde_after_signing() {
     let receipt_json = serde_json::to_vec(&signed.receipt).unwrap();
     let restored: chio_core::receipt::body::ChioReceipt =
         serde_json::from_slice(&receipt_json).unwrap();
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]

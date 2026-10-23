@@ -1395,7 +1395,7 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
         &keypair,
     );
     let anchor = session_anchor_from_body(anchor_body, anchor_signature);
-    assert!(anchor.verify_signature().is_err());
+    assert!(anchor.verify_integrity_embedded_key().is_err());
 
     let mut lineage_body = receipt_lineage_body(&keypair);
     lineage_body.schema = UNSUPPORTED_SCHEMA.to_string();
@@ -1405,7 +1405,7 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
         &keypair,
     );
     let lineage = receipt_lineage_from_body(lineage_body, lineage_signature);
-    assert!(lineage.verify_signature().is_err());
+    assert!(lineage.verify_integrity_embedded_key().is_err());
 
     let mut continuation_body = continuation_body(&keypair);
     continuation_body.schema = UNSUPPORTED_SCHEMA.to_string();
@@ -1415,7 +1415,7 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
         &keypair,
     );
     let continuation = continuation_from_body(continuation_body, continuation_signature);
-    assert!(continuation.verify_signature().is_err());
+    assert!(continuation.verify_integrity_embedded_key().is_err());
 }
 
 #[test]

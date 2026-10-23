@@ -248,7 +248,7 @@ async fn final_f11_repair_plain_seed_first_issue_uses_owner_startup_provisioning
             .test_unwrap()
             .public_key()
     );
-    assert!(issued.capability.verify_signature().test_unwrap());
+    assert!(issued.capability.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[tokio::test]
@@ -403,7 +403,7 @@ async fn assert_relays_preserve_admission(force_snapshot: bool) {
         issued.capability.issuer,
         custodian.status().test_unwrap().public_key
     );
-    assert!(issued.capability.verify_signature().test_unwrap());
+    assert!(issued.capability.verify_integrity_embedded_key().test_unwrap());
     // F now confirms the same elected source's admitted state.
     sync_peer(&state, &leader.url).test_unwrap();
     assert_eq!(
@@ -936,7 +936,7 @@ async fn final_f11_repair_peer_identity_distinct_node_establishes_signed_quorum(
         .issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60)
         .test_unwrap();
     assert_eq!(Some(issued.issuer.to_hex()), admitted.public_key);
-    assert!(issued.verify_signature().test_unwrap());
+    assert!(issued.verify_integrity_embedded_key().test_unwrap());
     follower
         .state
         .cluster
@@ -979,7 +979,7 @@ async fn final_f11_repair_peer_identity_distinct_node_establishes_signed_quorum(
         .issue_capability(&Keypair::generate().public_key(), ChioScope::default(), 60)
         .test_unwrap();
     assert_eq!(Some(issued.issuer.to_hex()), recovered.public_key);
-    assert!(issued.verify_signature().test_unwrap());
+    assert!(issued.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[tokio::test]

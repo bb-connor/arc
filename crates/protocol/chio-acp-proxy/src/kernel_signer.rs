@@ -211,7 +211,7 @@ impl KernelReceiptSigner {
             ));
         }
         if !authorization_receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(ReceiptSignError::Canonical)?
         {
             return Err(ReceiptSignError::Authorization(

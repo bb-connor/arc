@@ -6,7 +6,7 @@
 // Coverage strategy: import the production body-only signing primitive
 // `chio_kernel_core::sign_receipt_relaying_trusted_body` (the kernel-key
 // guard this threat exercises) and the
-// `chio_core::receipt::body::ChioReceipt::verify_signature` verifier
+// `chio_core::receipt::body::ChioReceipt::verify_integrity_embedded_key` verifier
 // directly. (The sibling WYSIWYS recompute gate that closes render-A/sign-B
 // lives in `chio_kernel_core::sign_receipt` and is covered by the
 // `chio-kernel-core` `tests/portable_build.rs` suite; this threat targets the
@@ -24,7 +24,7 @@
 //   2. Verify-side impersonation. Sign a receipt with the attacker
 //      keypair and then mutate the embedded `kernel_key` field on
 //      the resulting receipt to claim `K_kernel`. The production
-//      `ChioReceipt::verify_signature` MUST then return `Ok(false)`
+//      `ChioReceipt::verify_integrity_embedded_key` MUST then return `Ok(false)`
 //      because the canonical-JSON signature was produced over a body
 //      whose `kernel_key` field differs from the on-the-wire claim.
 //
@@ -32,7 +32,7 @@
 //   `crates/kernel/chio-kernel-core/src/receipts.rs`
 //     (`sign_receipt_relaying_trusted_body`).
 //   `crates/core/chio-core-types/src/receipt.rs:292`
-//     (`ChioReceipt::verify_signature`).
+//     (`ChioReceipt::verify_integrity_embedded_key`).
 
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_core::receipt::{body::ChioReceiptBody, decision::Decision, decision::ToolCallAction};
@@ -138,7 +138,7 @@ fn threat_kernel_impersonation_tampered_kernel_key_field_fails_verification() {
     };
     assert!(
         !result,
-        "production ChioReceipt::verify_signature MUST return false when the on-the-wire kernel_key has been swapped to impersonate the kernel"
+        "production ChioReceipt::verify_integrity_embedded_key MUST return false when the on-the-wire kernel_key has been swapped to impersonate the kernel"
     );
 }
 

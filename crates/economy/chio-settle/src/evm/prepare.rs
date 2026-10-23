@@ -1140,7 +1140,7 @@ pub async fn prepare_dual_sign_release(
         ));
     }
     let verified = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(

@@ -287,7 +287,7 @@ fn assert_refused(
             guard: "kernel".to_owned(),
         })
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(custody(fixture)?, (state, quota));
     assert_eq!(lines, &[fault_line(fixture, class)]);
@@ -353,7 +353,7 @@ fn native_dispatch_fault_is_absent_one_millisecond_before_each_deadline() -> Tes
             matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments),
             "{site:?}"
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1, "{site:?}");
         assert_eq!(
             custody(&fixture)?,

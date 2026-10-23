@@ -1411,7 +1411,7 @@ fn cognition_market_pool_reclaims_unclaimed_reservations_at_the_claim_deadline()
         let (kind, receipt_json, acknowledged_at) = row.test_expect("read receipt outbox row");
         let receipt: ChioReceipt =
             serde_json::from_str(&receipt_json).test_expect("decode signed pool receipt");
-        assert!(matches!(receipt.verify_signature(), Ok(true)));
+        assert!(matches!(receipt.verify_integrity_embedded_key(), Ok(true)));
         assert!(acknowledged_at.is_some());
         kinds.push(kind);
     }

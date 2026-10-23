@@ -186,7 +186,7 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
             let receipt =
                 receipt.ok_or_else(|| TestCaseError::fail("missing owned drop receipt"))?;
             prop_assert!(receipt
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|error| TestCaseError::fail(error.to_string()))?);
             prop_assert_eq!(
                 receipt

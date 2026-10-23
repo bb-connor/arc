@@ -66,9 +66,9 @@ fn plain_body_signature_is_refused() -> Result<()> {
         signature,
     };
 
-    assert!(!token.verify_signature()?);
+    assert!(!token.verify_integrity_embedded_key()?);
     assert!(matches!(
-        token.verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical),
+        token.verify_integrity_embedded_key_with_floor(CapabilityCryptoFloor::AllowClassical),
         Ok(false)
     ));
     Ok(())

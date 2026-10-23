@@ -91,7 +91,7 @@ fn otlp_trace_span_is_signed_and_appended_to_receipt_store() -> Result<(), Box<d
     assert_eq!(receipt.tool_server, "srv-otel");
     assert_eq!(receipt.tool_name, "search_web");
     assert_eq!(receipt.tenant_id.as_deref(), Some("tenant-authenticated"));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert!(!receipt.is_allowed());
 
     let semantics = receipt.semantic_fields();

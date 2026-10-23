@@ -98,7 +98,7 @@ fn classical_inline_and_channel_receipts_remain_identical() -> TestResult {
         kernel.sign_receipt_via_channel(original_signing_body(&inline)?, CONTENT.to_vec()),
     )?;
     assert!(canonical_json_bytes(&inline)? == canonical_json_bytes(&channel)?);
-    assert!(inline.verify_signature()?);
+    assert!(inline.verify_integrity_embedded_key()?);
     runtime.block_on(kernel.shutdown());
     Ok(())
 }
@@ -136,7 +136,7 @@ fn hybrid_channel_receipt_uses_boot_verified_authority() -> TestResult {
     let receipt = runtime.block_on(kernel.sign_receipt_via_channel(body, CONTENT.to_vec()))?;
     assert_eq!(receipt.kernel_key, backend.public_key()?);
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Hybrid));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     runtime.block_on(kernel.shutdown());
     Ok(())
 }
@@ -153,7 +153,7 @@ fn hybrid_durable_dispatch_and_replay_retain_original_receipt() -> TestResult {
         first.receipt.kernel_key == backend.public_key()?,
         "dispatch ignored boot authority"
     );
-    assert!(first.receipt.verify_signature()?);
+    assert!(first.receipt.verify_integrity_embedded_key()?);
     let second = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(second.verdict, Verdict::Allow, "{:?}", second.reason);
     assert_eq!(
@@ -266,7 +266,7 @@ fn hybrid_budget_fallback_preserves_authority_and_byte_identity() -> TestResult 
         "oversized preimage must use the bounded-memory fallback"
     );
     assert!(channel.kernel_key == backend.public_key()?);
-    assert!(channel.verify_signature()?);
+    assert!(channel.verify_integrity_embedded_key()?);
     // ML-DSA uses randomized signatures. Both paths must bind the same canonical
     // body, not manufacture an identical fresh signature.
     assert!(canonical_json_bytes(&inline.body())? == canonical_json_bytes(&channel.body())?);
@@ -324,7 +324,7 @@ fn dropped_boot_handle_preserves_receipt_authority_without_issuer_trust() -> Tes
     assert!(!kernel.capability_issuer_is_trusted(&key));
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
     assert!(receipt.kernel_key == key);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -389,7 +389,7 @@ fn hybrid_full_queue_fallback_uses_same_authority() -> TestResult {
         let queued = first.await?;
         assert!(fallback.kernel_key == backend.public_key().unwrap());
         assert!(queued.kernel_key == backend.public_key().unwrap());
-        assert!(fallback.verify_signature()? && queued.verify_signature()?);
+        assert!(fallback.verify_integrity_embedded_key()? && queued.verify_integrity_embedded_key()?);
         assert!(canonical_json_bytes(&fallback.body())? == canonical_json_bytes(&queued.body())?);
         kernel.shutdown().await;
         TestResult::Ok(())
@@ -432,7 +432,7 @@ fn failed_boot_quote_preserves_running_receipt_signer() -> TestResult {
     );
     let receipt = runtime.block_on(kernel.sign_receipt_via_channel(body, CONTENT.to_vec()))?;
     assert!(receipt.kernel_key == backend.public_key()?);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     runtime.block_on(kernel.shutdown());
     Ok(())
 }
@@ -496,13 +496,13 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
     assert!(observation.decision.is_none());
     assert!(observation.financial_budget_authority_metadata().is_none());
     assert!(observation.kernel_key == backend.public_key()?);
-    assert!(observation.verify_signature()?);
+    assert!(observation.verify_integrity_embedded_key()?);
     assert_eq!(store.operation().state(), outcome_state);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let recovered = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(recovered.verdict, Verdict::Allow, "{:?}", recovered.reason);
     assert!(recovered.receipt.kernel_key == backend.public_key()?);
-    assert!(recovered.receipt.verify_signature()?);
+    assert!(recovered.receipt.verify_integrity_embedded_key()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let replay = kernel.evaluate_tool_call_blocking(&request)?;
     assert!(canonical_json_bytes(&recovered.receipt)? == canonical_json_bytes(&replay.receipt)?);
@@ -521,7 +521,7 @@ fn capability_only_floor_setter_does_not_reconfigure_receipt_authority() -> Test
     kernel.set_capability_crypto_floor(KernelCryptoFloor::PqRequired);
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
     assert!(receipt.kernel_key == previous_key);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         kernel.signing_authority.floor,
         KernelCryptoFloor::AllowClassical
@@ -561,7 +561,7 @@ fn hybrid_boot_preserves_separate_pool_receipt_authority() -> TestResult {
     assert!(receipt.kernel_key == pool_key.public_key());
     assert!(receipt.kernel_key != backend.public_key()?);
     assert_eq!(receipt.tenant_id.as_deref(), Some("boot-receipt-tenant"));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

@@ -225,7 +225,7 @@ fn native_capture_store_diagnostic_success_preserves_output_and_replay() -> Test
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         chio_core::canonical_json_bytes(&response.receipt)?,
         chio_core::canonical_json_bytes(&replay.receipt)?

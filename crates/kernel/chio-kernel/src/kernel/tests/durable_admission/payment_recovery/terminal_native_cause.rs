@@ -139,7 +139,7 @@ fn check_terminal_projection_cause(denied: bool) -> TestResult {
             Verdict::Allow
         }
     );
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         if denied {

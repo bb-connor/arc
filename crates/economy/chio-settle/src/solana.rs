@@ -118,7 +118,7 @@ pub fn verify_solana_binding_and_receipt(
         .into_vec()
         .map_err(|error| SettlementError::InvalidBinding(error.to_string()))?;
     let verified = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(

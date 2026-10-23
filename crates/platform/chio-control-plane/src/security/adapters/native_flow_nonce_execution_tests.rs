@@ -50,7 +50,7 @@ pub(in crate::security::adapters::tests::native_flow::support) fn issue(
         .evaluate_tool_call_blocking_with_security_context(&fixture.request, &fixture.context)?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     fixture.request.execution_nonce = Some(*response.execution_nonce.ok_or("issued nonce")?);
     let store = fixture.authority.admission_operation_store();
@@ -108,7 +108,7 @@ fn native_nonce_executes_once_and_replays_its_receipt_for_local_and_egress() -> 
                 assert!(
                     matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
                 );
-                assert!(response.receipt.verify_signature()?);
+                assert!(response.receipt.verify_integrity_embedded_key()?);
                 assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
                 assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
                 let replay = fixture
@@ -202,7 +202,7 @@ fn native_nonce_mutations_and_missing_credentials_never_reach_the_connector() ->
                 response.reason
             );
             assert!(response.output.is_none());
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
         }
         assert_eq!(
             fixture.invocations.load(Ordering::SeqCst),
@@ -236,7 +236,7 @@ fn native_nonce_omission_cannot_reopen_an_issued_preflight_or_dispatch() -> Test
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert!(response.execution_nonce.is_none());
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     let (operation, _) = fixture

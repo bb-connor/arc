@@ -273,7 +273,7 @@ fn retained_capture(fault: Fault, egress: bool) -> CaptureResult {
         "{label}"
     );
     assert!(denied.output.is_none(), "{label}");
-    assert!(denied.receipt.verify_signature()?, "{label}");
+    assert!(denied.receipt.verify_integrity_embedded_key()?, "{label}");
     let compensated = Custody {
         state: AdmissionOperationState::CompensatedBeforeDispatch,
         hold: BudgetHoldDispositionView::Reversed,

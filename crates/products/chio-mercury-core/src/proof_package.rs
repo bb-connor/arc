@@ -1436,7 +1436,7 @@ fn verify_chio_bundle(
         }
         if !record
             .receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| MercuryContractError::Validation(error.to_string()))?
         {
             return Err(MercuryContractError::Validation(format!(
@@ -1467,7 +1467,7 @@ fn verify_chio_bundle(
         }
         if !record
             .receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| MercuryContractError::Validation(error.to_string()))?
         {
             return Err(MercuryContractError::Validation(format!(

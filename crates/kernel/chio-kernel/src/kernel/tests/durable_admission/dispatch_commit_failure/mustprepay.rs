@@ -66,7 +66,7 @@ fn no_charge_mustprepay_dispatch(nested: bool, unsafe_financial_dispatch: bool) 
         kernel.evaluate_tool_call_blocking(&request)?
     };
     assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert!(settlements
         .lock()

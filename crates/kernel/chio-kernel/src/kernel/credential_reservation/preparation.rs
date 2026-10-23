@@ -147,7 +147,7 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             // Issuer trust, policy and consumption remain the live flow
             // resolver's responsibility. A signature alone grants no release.
             if !grant
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|error| invalid(&error.to_string()))?
             {
                 return Err(invalid("declassification signature is invalid"));

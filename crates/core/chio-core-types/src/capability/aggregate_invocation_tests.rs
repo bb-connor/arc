@@ -786,7 +786,7 @@ fn aggregate_invocation_plain_body_signature_is_refused() -> TestResult {
         signature,
     };
 
-    assert!(!token.verify_signature()?);
+    assert!(!token.verify_integrity_embedded_key()?);
     Ok(())
 }
 

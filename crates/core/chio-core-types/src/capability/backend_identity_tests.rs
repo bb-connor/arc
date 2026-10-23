@@ -103,7 +103,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             };
             Ok((
                 crate::canonical_json_bytes(&token)?,
-                token.verify_signature()?,
+                token.verify_integrity_embedded_key()?,
             ))
         }
         2 => {
@@ -122,7 +122,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             )?;
             Ok((
                 crate::canonical_json_bytes(&root)?,
-                root.verify_signature()?,
+                root.verify_integrity_embedded_key()?,
             ))
         }
         _ => {
@@ -148,7 +148,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             )?;
             Ok((
                 crate::canonical_json_bytes(&root)?,
-                root.verify_signature()?,
+                root.verify_integrity_embedded_key()?,
             ))
         }
     }

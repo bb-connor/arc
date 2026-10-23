@@ -201,7 +201,7 @@ impl ChildRequestReceipt {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.verify_signature_against(&self.kernel_key)
     }
 
@@ -417,7 +417,7 @@ impl ReceiptLineageStatement {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         ensure_schema_matches(
             &self.schema,
             CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,

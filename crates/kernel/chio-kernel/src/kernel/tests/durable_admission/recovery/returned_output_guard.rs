@@ -155,7 +155,7 @@ fn accepted_output_completes(entry: Entry) -> TestResult {
     let parent = parent(&kernel, &request, entry)?;
     let response = evaluate(&kernel, &request, parent.as_ref())?;
     assert_eq!(response.verdict, Verdict::Allow, "{entry:?}: {response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Completed

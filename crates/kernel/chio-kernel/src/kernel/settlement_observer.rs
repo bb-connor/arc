@@ -81,7 +81,7 @@ pub fn build_observation(
     receipt: &ChioReceipt,
     trusted_kernel_keys: &[PublicKey],
 ) -> SettlementObservationBuild {
-    match receipt.verify_signature() {
+    match receipt.verify_integrity_embedded_key() {
         Ok(true) => {}
         Ok(false) => {
             return permanent(

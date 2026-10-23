@@ -489,7 +489,7 @@ impl ChioReceipt {
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.verify_signature_against(&self.kernel_key)
     }
 

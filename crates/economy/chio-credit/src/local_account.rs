@@ -119,7 +119,7 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
     fn evaluate(&self, receipt: &ChioReceipt) -> Result<Option<IouEnvelope>, CreditEvaluatorError> {
         // Fail-closed signature gate. An unsigned or tampered receipt
         // mints nothing.
-        let verified = receipt.verify_signature().map_err(|err| {
+        let verified = receipt.verify_integrity_embedded_key().map_err(|err| {
             CreditEvaluatorError::Canonical(format!("receipt signature verification raised: {err}"))
         })?;
         if !verified {

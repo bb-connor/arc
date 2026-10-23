@@ -199,7 +199,7 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let repeated = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(
         canonical_json_bytes(&repeated.receipt)?,

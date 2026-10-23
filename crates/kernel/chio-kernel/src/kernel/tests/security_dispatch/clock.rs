@@ -27,7 +27,7 @@ fn nonce_clock_failure_keeps_its_code_in_the_signed_denial() -> TestResult {
         );
         let response = evaluate(&kernel, &request, nested)?;
         assert_eq!(response.verdict, Verdict::Deny);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response
                 .receipt
@@ -78,7 +78,7 @@ fn governed_window_refusals_keep_their_code_in_root_and_nested_receipts() -> Tes
             )?);
             let response = evaluate(&fixture.kernel, &fixture.request, nested)?;
             assert_eq!(response.verdict, Verdict::Deny);
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
             assert_eq!(
                 response
                     .receipt
@@ -129,7 +129,7 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
             request.dpop_proof = (kind != 4).then_some(proof);
             let response = evaluate(&kernel, &request, nested)?;
             assert_eq!(response.verdict, Verdict::Deny);
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
             assert_eq!(
                 response
                     .receipt

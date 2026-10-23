@@ -322,7 +322,7 @@ pub fn verify_receipt_pure(
         )
     })?;
 
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         BindingError::new(
             "signature_check_failed",
             format!("signature verification could not run: {error}"),

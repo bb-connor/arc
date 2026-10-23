@@ -30,7 +30,7 @@
 //! 2. For each non-empty line, attempt `serde_json::from_slice::<ChioReceipt>`.
 //!    Errors are silently consumed (fail-closed: malformed lines are not part of the chain).
 //! 3. For each successfully decoded receipt, call
-//!    [`ChioReceipt::verify_signature`]. The result is intentionally
+//!    [`ChioReceipt::verify_integrity_embedded_key`]. The result is intentionally
 //!    discarded: the trust-boundary contract guarantees the only outcomes
 //!    are `Ok(true)` (signature verified), `Ok(false)` (signature mismatch),
 //!    `Err(_)` (decode error inside the canonical-JSON pipeline), or a panic
@@ -62,7 +62,7 @@ use chio_core_types::PublicKey;
 /// 1. As an NDJSON receipt log (one canonical-JSON [`ChioReceipt`] per line,
 ///    `\n`-terminated, matching `tests/replay/src/golden_writer.rs`). Each
 ///    line is decoded; for each successfully decoded receipt
-///    [`ChioReceipt::verify_signature`] is called and the result discarded.
+///    [`ChioReceipt::verify_integrity_embedded_key`] is called and the result discarded.
 ///    Cross-receipt chain invariants (timestamp monotonicity,
 ///    `kernel_key` consistency) are then checked over the verified sequence.
 /// 2. As a single canonical-JSON-encoded [`ChioReceipt`] (no NDJSON
@@ -95,7 +95,7 @@ fn drive_ndjson_log(data: &[u8]) {
         // Per-receipt signature verify. Errors / `Ok(false)` are both
         // dropped; the goal is to exercise the canonical-JSON canonicalization
         // plus signature-verify pipeline, not to assert a verdict.
-        let _ = receipt.verify_signature();
+        let _ = receipt.verify_integrity_embedded_key();
         verified.push(receipt);
     }
     check_chain_invariants(&verified);
@@ -109,7 +109,7 @@ fn drive_single_receipt(data: &[u8]) {
         Ok(receipt) => receipt,
         Err(_) => return,
     };
-    let _ = receipt.verify_signature();
+    let _ = receipt.verify_integrity_embedded_key();
 }
 
 /// Check cross-receipt chain invariants over a sequence of decoded

@@ -216,7 +216,7 @@ fn classical_receipt_byte_identical_under_allow_classical() {
             .verify(&wrapper_bytes, &receipt.signature),
         "signature must verify against the ChioReceiptSigningBody wrapper bytes"
     );
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt
         .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
         .unwrap());
@@ -247,7 +247,7 @@ fn hybrid_receipt_round_trip_signs_and_verifies() {
     assert!(receipt
         .kernel_key
         .verify(&wrapper_bytes, &receipt.signature));
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt
         .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
         .unwrap());

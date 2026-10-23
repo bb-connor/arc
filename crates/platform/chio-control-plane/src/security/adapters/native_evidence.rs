@@ -531,7 +531,7 @@ fn verify_native_security_receipt(
     receipt: &ChioReceipt,
     trusted_receipt_signers: &[PublicKey],
 ) -> Result<(), ActiveResponseFindingAuthorityError> {
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         ActiveResponseFindingAuthorityError::Integrity(format!(
             "indexed receipt signature verification failed: {error}"
         ))

@@ -54,7 +54,7 @@ fn live_swarm_without_future_results_uses_durable_continuation_custody() -> Test
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{response:#?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     let metadata = response
         .receipt

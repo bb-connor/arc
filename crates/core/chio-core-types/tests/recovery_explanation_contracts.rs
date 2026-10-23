@@ -31,9 +31,9 @@ fn accepts(kind: &str, bytes: &[u8]) -> bool {
         "report" => typed::<RecoveryExplanationReportV1>(bytes),
         "view" => typed::<RecoveryExplanationViewV1>(bytes),
         "signed_report" => decode_contract::<SignedRecoveryExplanationReportV1>(bytes)
-            .is_ok_and(|p| p.verify_signature().is_ok_and(|valid| valid)),
+            .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|valid| valid)),
         "signed_view" => decode_contract::<SignedRecoveryExplanationViewV1>(bytes)
-            .is_ok_and(|p| p.verify_signature().is_ok_and(|valid| valid)),
+            .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|valid| valid)),
         _ => false,
     }
 }

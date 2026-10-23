@@ -922,7 +922,7 @@ fn parse_authenticated_delivery(
             .map_err(|_| HostedMarketStoreError::Invalid("delivery receipt"))?
         || !artifact
             .receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| HostedMarketStoreError::Invalid("delivery receipt"))?
     {
         return Err(HostedMarketStoreError::Invalid("delivery receipt"));

@@ -638,7 +638,7 @@ pub fn verify_anchor_inclusion_proof(
     validate_anchor_inclusion_proof(proof)?;
     let receipt_verified = proof
         .receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| Web3ContractError::InvalidProof(error.to_string()))?;
     if !receipt_verified {
         return Err(Web3ContractError::ProofSignatureInvalid(

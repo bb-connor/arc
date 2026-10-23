@@ -125,7 +125,7 @@ proptest! {
         };
 
         let token = CapabilityToken::sign(body, &issuer).unwrap();
-        prop_assert!(token.verify_signature().unwrap());
+        prop_assert!(token.verify_integrity_embedded_key().unwrap());
 
         let encoded = serde_json::to_vec(&token).unwrap();
         let restored: CapabilityToken = serde_json::from_slice(&encoded).unwrap();
@@ -134,7 +134,7 @@ proptest! {
         prop_assert_eq!(&token.issuer, &restored.issuer);
         prop_assert_eq!(&token.subject, &restored.subject);
         prop_assert_eq!(token.signature.to_hex(), restored.signature.to_hex());
-        prop_assert!(restored.verify_signature().unwrap());
+        prop_assert!(restored.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]
@@ -171,8 +171,8 @@ proptest! {
         let mut tampered = token.clone();
         tampered.expires_at += 1;
 
-        prop_assert!(token.verify_signature().unwrap());
-        prop_assert!(!tampered.verify_signature().unwrap());
+        prop_assert!(token.verify_integrity_embedded_key().unwrap());
+        prop_assert!(!tampered.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

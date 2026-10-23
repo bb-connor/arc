@@ -268,7 +268,7 @@ impl Fixture {
             100,
             "unconfirmed prepaid capture retains its budget exposure"
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let receipts = self.kernel.receipt_log();
         assert_eq!(receipts.len(), 1);
         assert_eq!(
@@ -417,7 +417,7 @@ fn settled_prepayment_mints_one_nonce_without_tool_dispatch() -> TestResult {
     assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.exposure()?, 100);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -445,6 +445,6 @@ fn definite_authorization_decline_keeps_clean_pre_dispatch_denial() -> TestResul
     assert!(financial
         .and_then(|financial| financial.get("authorization_id"))
         .is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }

@@ -923,7 +923,7 @@ fn proof_package_rejects_signed_observation_as_mercury_authorization() {
     body.observation_outcome = Some(ObservationOutcome::Observed);
     body.trust_level = TrustLevel::Verified;
     let observation = ChioReceipt::sign(body, &keypair).expect("signed observation receipt");
-    assert!(observation.verify_signature().expect("verify observation"));
+    assert!(observation.verify_integrity_embedded_key().expect("verify observation"));
 
     let error = build_sample_proof_package(sample_bundle_with_receipt(observation))
         .expect_err("observation receipt cannot authorize Mercury action");

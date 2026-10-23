@@ -36,30 +36,30 @@ fn accepts(schema: &str, bytes: &[u8]) -> bool {
         "semantic-provider-request.schema.json" => typed::<SemanticProviderRequestV1>(bytes),
         "semantic-provider-response.schema.json" => typed::<SemanticProviderResponseV1>(bytes),
         "signed-semantic-package.schema.json" => decode_contract::<SignedSemanticPackageV1>(bytes)
-            .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v)),
+            .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v)),
         "signed-semantic-deployment.schema.json" => {
             decode_contract::<SignedSemanticDeploymentV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-semantic-audience.schema.json" => {
             decode_contract::<SignedSemanticAudienceV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-scoped-endorsement.schema.json" => {
             decode_contract::<SignedScopedEndorsementV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-semantic-annotation.schema.json" => {
             decode_contract::<SignedSemanticAnnotationV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-semantic-transformation.schema.json" => {
             decode_contract::<SignedSemanticTransformationV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-semantic-prerequisite.schema.json" => {
             decode_contract::<SignedSemanticPrerequisiteV1>(bytes)
-                .is_ok_and(|p| p.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|p| p.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         _ => false,
     }
@@ -152,7 +152,7 @@ fn ingress_bounds_and_private_diagnostics() -> Result {
         .find(|case| case["schema"] == "signed-scoped-endorsement.schema.json")
         .ok_or("endorsement")?;
     let signed: SignedScopedEndorsementV1 = serde_json::from_value(value["value"].clone())?;
-    assert!(signed.verify_signature()?);
+    assert!(signed.verify_integrity_embedded_key()?);
     assert!(matches!(
         chio_core_types::crypto::verify_wrapped(
             signed.authority_key(),

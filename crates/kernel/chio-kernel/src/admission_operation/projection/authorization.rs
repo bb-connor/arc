@@ -69,8 +69,8 @@ impl VerifiedAuthorizationReceiptConsumption {
         );
         if source.kernel_key != *expected_kernel
             || consumer.kernel_key != *expected_kernel
-            || !source.verify_signature().map_err(|_| mismatch())?
-            || !consumer.verify_signature().map_err(|_| mismatch())?
+            || !source.verify_integrity_embedded_key().map_err(|_| mismatch())?
+            || !consumer.verify_integrity_embedded_key().map_err(|_| mismatch())?
             || !source.action.verify_hash().map_err(|_| mismatch())?
             || !consumer.action.verify_hash().map_err(|_| mismatch())?
             || !source.is_allowed()

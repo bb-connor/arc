@@ -182,7 +182,7 @@ pub(super) fn claim_pending_mutation_receipts(
             ));
         }
         let signature_valid = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
         if !signature_valid {
             return Err(FindingPoolLedgerError::Receipt(

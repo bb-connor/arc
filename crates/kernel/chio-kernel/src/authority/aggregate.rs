@@ -201,14 +201,14 @@ mod tests {
             chio_core::canonical_json_bytes(&requested_scope)?
         );
         assert_eq!(issued.expires_at - issued.issued_at, 300);
-        assert!(issued.verify_signature()?);
+        assert!(issued.verify_integrity_embedded_key()?);
         let mut changed = issued;
         changed
             .aggregate_invocation_budget
             .as_mut()
             .ok_or("budget")?
             .max_invocations = 3;
-        assert!(!changed.verify_signature()?);
+        assert!(!changed.verify_integrity_embedded_key()?);
         Ok(())
     }
 }

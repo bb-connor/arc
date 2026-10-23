@@ -487,7 +487,7 @@ pub fn accept(
     if ask.body.token_offer.issuer != ask.signer_key {
         return Err(BiddingError::AuthorityMismatch);
     }
-    match ask.body.token_offer.verify_signature() {
+    match ask.body.token_offer.verify_integrity_embedded_key() {
         Ok(true) => {}
         _ => return Err(BiddingError::TokenSignatureInvalid),
     }

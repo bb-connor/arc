@@ -105,7 +105,7 @@ pub fn verify_dsse_envelope(
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
     let receipt_signature_valid = embedded_receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
     if !receipt_signature_valid {
         return Err(BilateralCoSigningError::ReceiptMismatch);

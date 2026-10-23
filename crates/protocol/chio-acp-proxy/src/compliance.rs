@@ -382,7 +382,7 @@ fn validate_compliance_receipt(
 ) -> Result<(), ComplianceCertificateError> {
     let receipt = &entry.receipt;
     let sig_ok = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(ComplianceCertificateError::Canonical)?;
     if !sig_ok {
         return Err(ComplianceCertificateError::InvalidReceiptSignature {

@@ -148,7 +148,7 @@ impl Fixture {
             AdmissionOperationState::ApprovalRequired
         );
         assert_eq!(self.store.operation().threshold_proposal(), Some(&proposal));
-        assert!(proposal.verify_signature()?);
+        assert!(proposal.verify_integrity_embedded_key()?);
         Ok(proposal)
     }
 }
@@ -242,7 +242,7 @@ fn expired_parked_approval_replays_one_canonical_terminal_refusal() -> TestResul
     );
     assert!(initial.output.is_none());
     assert!(initial.execution_nonce.is_none());
-    assert!(initial.receipt.verify_signature()?);
+    assert!(initial.receipt.verify_integrity_embedded_key()?);
     let terminal = fixture.store.operation();
     assert_eq!(
         terminal.state(),

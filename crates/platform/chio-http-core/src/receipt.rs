@@ -592,7 +592,7 @@ mod tests {
         assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
         let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert_eq!(chio_receipt.capability_id, "cap-xyz-789");
-        assert!(chio_receipt.verify_signature().test_unwrap());
+        assert!(chio_receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -607,7 +607,7 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert!(
-            chio_receipt.verify_signature().test_unwrap(),
+            chio_receipt.verify_integrity_embedded_key().test_unwrap(),
             "converted receipt signature must verify"
         );
         assert!(
@@ -663,7 +663,7 @@ mod tests {
         let projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         let original = &projected.metadata.as_ref().test_unwrap()["chio_http_receipt_v1"];
         assert_eq!(original, &serde_json::to_value(&receipt).test_unwrap());
-        assert!(projected.verify_signature().test_unwrap());
+        assert!(projected.verify_integrity_embedded_key().test_unwrap());
         assert!(projected.action.verify_hash().test_unwrap());
         assert!(receipt
             .verify_chio_receipt_projection(&projected)

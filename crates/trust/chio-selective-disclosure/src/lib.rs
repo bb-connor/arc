@@ -1119,7 +1119,7 @@ pub fn receipt_signed_projection(
     receipt: &ChioReceipt,
 ) -> Result<SignedProjection, SelectiveDisclosureError> {
     let signature_valid = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| SelectiveDisclosureError::CanonicalJson(error.to_string()))?;
     if !signature_valid {
         return Err(SelectiveDisclosureError::ReceiptSignatureInvalid);

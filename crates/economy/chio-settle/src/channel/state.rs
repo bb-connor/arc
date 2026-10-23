@@ -377,7 +377,7 @@ pub fn verify_channel_receipt_binding(
         || actual_charge.units > I_JSON_MAX_SAFE_INTEGER
         || &receipt.kernel_key != trusted_kernel_key
         || !receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| ChannelError::AuthorityVerification)?
         || reservation.body.receipt_authority_digest != receipt_authority_digest
         || reservation.body.channel_id != open_artifact.body.channel_id

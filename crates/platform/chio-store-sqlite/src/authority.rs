@@ -802,7 +802,7 @@ mod tests {
         assert_eq!(capability.subject, subject);
         assert_eq!(capability.issuer, authority.authority_public_key().unwrap());
         assert!(capability.id.starts_with("cap-"));
-        assert!(capability.verify_signature().unwrap());
+        assert!(capability.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]
@@ -875,7 +875,7 @@ mod tests {
 
         assert_ne!(first.issuer, second.issuer);
         assert_eq!(second.issuer, rotated.public_key);
-        assert!(second.verify_signature().unwrap());
+        assert!(second.verify_integrity_embedded_key().unwrap());
 
         let _ = fs::remove_file(path);
     }

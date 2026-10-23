@@ -212,7 +212,7 @@ fn kernel_receipt(db: &std::path::Path) -> ChioReceipt {
             .any(|e| e.guard_name.contains(CANARIES[6])),
         "kernel evidence must contain the guard canary"
     );
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     // Financial metadata is reserved at public invocation ingress. A trusted
     // test producer adds this adversarial signed financial shape to the real
     // guard denial; no production ingress bypass is introduced.
@@ -423,7 +423,7 @@ async fn manager_to_sink(sink: &str) {
         .unwrap();
     let retrieved: ChioReceipt = serde_json::from_str(&raw).unwrap();
     assert_eq!(serde_json::to_value(&retrieved).unwrap(), original);
-    assert!(retrieved.verify_signature().unwrap());
+    assert!(retrieved.verify_integrity_embedded_key().unwrap());
     assert!(retrieved.action.verify_hash().unwrap());
 }
 

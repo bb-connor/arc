@@ -425,7 +425,7 @@ fn verify_active_response_completion_receipt(
     evidence: &ActiveResponseExecutionEvidence,
 ) -> Result<ActiveDefenseReceiptBody, KernelError> {
     let receipt = evidence.completion_receipt();
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         active_response_internal(format!(
             "active-response completion receipt signature failed: {error}"
         ))
@@ -527,7 +527,7 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
             "executor receipt validation requires a completed governed operation",
         ));
     }
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         active_response_internal(format!(
             "active-response terminal executor signature failed: {error}"
         ))

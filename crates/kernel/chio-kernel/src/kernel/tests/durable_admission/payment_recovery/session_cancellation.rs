@@ -324,7 +324,7 @@ fn assert_signed(
     assert_eq!(response.reason.as_deref(), Some(reason));
     assert_eq!(response.terminal_state, terminal_state);
     assert_eq!(response.receipt.decision, Some(decision));
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

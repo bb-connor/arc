@@ -282,7 +282,7 @@ async fn invalid_process_lineage_produces_attributed_signed_denials_without_disp
         let response = runtime.invoke(process_id, "read", &request).await?;
         assert_eq!(response.verdict, Verdict::Deny, "{refusal}");
         assert!(response.output.is_none());
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response.receipt.metadata.as_ref().ok_or("metadata")?["chio_process"]["process_id"],
             process_id
@@ -334,7 +334,7 @@ async fn logical_call_replays_original_signed_receipt_after_kernel_restart() -> 
         )?;
         let first = runtime.invoke("root", "publish", &request).await?;
         assert_eq!(first.verdict, Verdict::Allow, "{:?}", first.reason);
-        assert!(first.receipt.verify_signature()?);
+        assert!(first.receipt.verify_integrity_embedded_key()?);
         runtime.checkpoint("root", 0, json!({"phase": "published"}))?;
         (request, serde_json::to_value(first.receipt)?)
     };
@@ -376,7 +376,7 @@ async fn children_share_a_durable_tree_ceiling_and_cannot_widen_scope() -> Resul
             runtime.tool_request(id, "research", "tools", "read", json!({"worker": id}))?;
         let response = runtime.invoke(id, "research", &request).await?;
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
     }
     let request = runtime.tool_request("root", "third", "tools", "append", json!({}))?;
     assert!(matches!(
@@ -408,7 +408,7 @@ async fn narrowed_child_is_denied_by_the_real_kernel() -> Result {
     let request = runtime.tool_request("reader", "write", "tools", "append", json!({}))?;
     let response = runtime.invoke("reader", "write", &request).await?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     Ok(())
 }

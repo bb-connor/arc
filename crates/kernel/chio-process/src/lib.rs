@@ -667,7 +667,7 @@ fn validate_id(id: &str) -> Result<(), ProcessError> {
 
 fn verify_capability(capability: &CapabilityToken) -> Result<(), ProcessError> {
     capability.validate_schema()?;
-    if !capability.verify_signature()? {
+    if !capability.verify_integrity_embedded_key()? {
         return Err(ProcessError::Invalid("invalid capability signature"));
     }
     Ok(())
@@ -697,7 +697,7 @@ fn validate_child(parent: &CapabilityToken, child: &CapabilityToken) -> Result<(
         || link.delegator != parent.subject
         || link.delegatee != child.subject
         || link.scope_hash.as_ref() != Some(&scope_hash(&parent.scope)?)
-        || !link.verify_signature()?
+        || !link.verify_integrity_embedded_key()?
     {
         return Err(ProcessError::Invalid(
             "child is not a signed direct delegation of this parent",

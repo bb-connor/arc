@@ -902,7 +902,7 @@ async fn hosted_governed_commit_false_after_authorization_is_signed_as_retention
             .load(std::sync::atomic::Ordering::SeqCst),
         0
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let runtime = &response
         .receipt
         .metadata
@@ -945,7 +945,7 @@ async fn nested_governed_commit_error_during_ambiguous_authorization_is_signed_u
     )
     .await?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let runtime = &response
         .receipt
         .metadata
@@ -1013,7 +1013,7 @@ async fn hosted_governed_commit_error_after_dispatch_records_terminal_receipt(
         .get(0)
         .ok_or_else(|| std::io::Error::other("terminal receipt missing"))?;
     assert!(receipt.is_cancelled());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -1055,7 +1055,7 @@ async fn nested_governed_commit_error_after_dispatch_records_terminal_receipt(
         .get(0)
         .ok_or_else(|| std::io::Error::other("terminal receipt missing"))?;
     assert!(receipt.is_cancelled());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -1069,7 +1069,7 @@ async fn hosted_clean_decline_with_governed_rollback_error_is_signed_retention_u
     );
     let response = fixture.kernel.evaluate_tool_call(&fixture.request).await?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let runtime = &response
         .receipt
         .metadata
@@ -1114,7 +1114,7 @@ fn assert_payment_ambiguity_retained(
             .load(std::sync::atomic::Ordering::SeqCst),
         0
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
 
     let usage = fixture
         .kernel

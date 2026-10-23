@@ -81,7 +81,7 @@ fn security_binding_vectors_match_native_verifier_and_published_schemas() {
     let token =
         CapabilityToken::sign_with_security_binding(token_body(&workload), binding, &workload)
             .expect("reference token signs");
-    assert!(token.verify_signature().expect("signature verifies"));
+    assert!(token.verify_integrity_embedded_key().expect("signature verifies"));
 
     let token_validator = validator_for_schema(
         &schema_root().join(TOKEN_SCHEMA),

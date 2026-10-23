@@ -164,7 +164,7 @@ impl From<&ChioReceiptBody> for ChioReceiptSigningBody {
 /// Validate the pairing between a receipt body's BBS projection version
 /// and the accompanying BBS signature. Public so external strict
 /// verifiers can keep this binding check when they reconstruct the
-/// signing body instead of calling the loose `verify_signature` path.
+/// signing body instead of calling the loose `verify_integrity_embedded_key` path.
 pub fn validate_bbs_receipt_binding(
     body: &ChioReceiptBody,
     bbs_signature: Option<&BbsReceiptSignature>,

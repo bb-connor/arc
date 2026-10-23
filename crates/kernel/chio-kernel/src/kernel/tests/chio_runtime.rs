@@ -677,7 +677,7 @@ fn assert_package_valid_allow_receipt(
     assert_eq!(response.receipt.tool_server, request.server_id);
     assert_eq!(response.receipt.tool_name, request.tool_name);
     assert!(
-        response.receipt.verify_signature()?,
+        response.receipt.verify_integrity_embedded_key()?,
         "response receipt signature must verify"
     );
 
@@ -685,7 +685,7 @@ fn assert_package_valid_allow_receipt(
     let unpacked: ChioReceipt = serde_json::from_slice(&package)?;
     assert_eq!(unpacked.id, response.receipt.id);
     assert!(
-        unpacked.verify_signature()?,
+        unpacked.verify_integrity_embedded_key()?,
         "serialized receipt package must verify"
     );
     Ok(())

@@ -526,7 +526,7 @@ mod tests {
 
         assert_eq!(summary.appended_receipts, 1);
         assert_eq!(receipt.canonical_bytes(), expected.as_bytes());
-        assert!(receipt.receipt().verify_signature()?);
+        assert!(receipt.receipt().verify_integrity_embedded_key()?);
 
         Ok(())
     }

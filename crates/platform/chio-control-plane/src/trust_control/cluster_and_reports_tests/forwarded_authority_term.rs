@@ -160,7 +160,7 @@ fn queued_mutation(operation: Operation, change_term: bool) {
                 Operation::Issue => {
                     let issued: IssueCapabilityResponse =
                         serde_json::from_value(body).test_unwrap();
-                    assert!(issued.capability.verify_signature().test_unwrap());
+                    assert!(issued.capability.verify_integrity_embedded_key().test_unwrap());
                     assert_eq!(issued.capability.issuer, before.public_key);
                     assert_eq!(after.generation, before.generation);
                 }

@@ -82,7 +82,7 @@ fn session_tenant_id_is_stamped_on_tool_call_receipt() {
         "receipt must carry the session-derived tenant tag"
     );
     // Signature must still verify with the tenant tag included in the body.
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn request_keyed_tenant_scope_survives_missing_thread_local_scope() {
         .unwrap();
 
     assert_eq!(receipt.tenant_id.as_deref(), Some("tenant-map"));
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -324,7 +324,7 @@ fn production_build_and_sign_accepts_matching_content_hash() {
 
     assert_eq!(receipt.content_hash, content_hash);
     assert!(
-        receipt.verify_signature().unwrap(),
+        receipt.verify_integrity_embedded_key().unwrap(),
         "production WYSIWYS-signed receipt must verify"
     );
 }

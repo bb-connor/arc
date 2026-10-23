@@ -178,7 +178,7 @@ fn capability_validation_pass(
     now: u64,
 ) -> bool {
     token
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .bench_unwrap("verify capability signature")
         && token.validate_time(now).is_ok()
         && validate_delegation_chain(delegation_chain, Some(8)).is_ok()

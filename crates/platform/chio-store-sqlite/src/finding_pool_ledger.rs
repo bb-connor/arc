@@ -1561,7 +1561,7 @@ fn record_mutation_receipt(
         .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
     let expected_content_hash = chio_core::crypto::sha256_hex(&expected_content);
     let signature_valid = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| FindingPoolLedgerError::Receipt(error.to_string()))?;
     if !signature_valid
         || receipt.capability_id != mutation.allocation_envelope_sha256

@@ -463,7 +463,7 @@ fn signed_token_with_monetary_grant_roundtrip() {
 
     // Verify signature before serialization
     assert!(
-        token.verify_signature().unwrap(),
+        token.verify_integrity_embedded_key().unwrap(),
         "token signature must be valid before serialization"
     );
 
@@ -473,7 +473,7 @@ fn signed_token_with_monetary_grant_roundtrip() {
 
     // Verify signature still holds after deserialization
     assert!(
-        restored.verify_signature().unwrap(),
+        restored.verify_integrity_embedded_key().unwrap(),
         "token signature must be valid after JSON round-trip"
     );
 

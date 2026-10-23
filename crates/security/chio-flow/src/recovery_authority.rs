@@ -436,7 +436,7 @@ fn verify_coverage(
         valid_from_unix_ms = valid_from_unix_ms.max(body.issued_at_unix_ms.get());
         expires_at_unix_ms = expires_at_unix_ms.min(body.expires_at_unix_ms.get());
         if !attestation
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| DeclassificationError::InvalidSignature)?
         {
             return Err(DeclassificationError::InvalidSignature);

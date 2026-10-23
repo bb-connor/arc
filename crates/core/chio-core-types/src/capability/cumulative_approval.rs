@@ -146,7 +146,7 @@ impl CumulativeApprovalRootBinding {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         if self.body.schema != CUMULATIVE_APPROVAL_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported cumulative approval root schema {}",
@@ -176,7 +176,7 @@ impl CumulativeApprovalRootBinding {
     }
 
     fn delegation_binding_marker(&self) -> Result<CumulativeApprovalBindingMarker> {
-        if !self.verify_signature()? {
+        if !self.verify_integrity_embedded_key()? {
             return Err(Error::SignatureVerificationFailed);
         }
         validate_amount(&self.body.threshold)?;
@@ -403,7 +403,7 @@ pub fn verify_cumulative_approval_constraints(
             "cumulative approval capability issuer is not trusted",
         ));
     }
-    if !token.verify_signature()? {
+    if !token.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     if token.delegation_chain.is_empty() {
@@ -449,7 +449,7 @@ fn validate_scope_shape(scope: &ChioScope, delegated: bool, expires_at: u64) -> 
                     ));
                 }
                 (_, Some(binding)) => {
-                    if !binding.verify_signature()? {
+                    if !binding.verify_integrity_embedded_key()? {
                         return Err(Error::SignatureVerificationFailed);
                     }
                     let root_threshold = &binding.body.threshold;
@@ -492,7 +492,7 @@ fn verified_descendant(
             "cumulative approval root evidence is not a direct token",
         ));
     }
-    if !root.verify_signature()? {
+    if !root.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let first = token
@@ -648,7 +648,7 @@ fn verify_binding_matches_root(
     approval_budget_id: &str,
     approval_budget_epoch: u64,
 ) -> Result<()> {
-    if !binding.verify_signature()? {
+    if !binding.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let expected_scope_hash = unbound_scope_hash(&root.scope)?;

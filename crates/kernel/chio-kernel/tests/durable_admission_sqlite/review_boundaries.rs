@@ -220,7 +220,7 @@ fn caller_start_and_report_select_original_operation_across_tenants() -> TestRes
     };
     let completed = fixture.finish(&authorization)?;
     assert_eq!(completed.verdict, Verdict::Allow, "{:?}", completed.reason);
-    assert!(completed.receipt.verify_signature()?);
+    assert!(completed.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         fixture
             .authority
@@ -260,7 +260,7 @@ fn reserve_for_caller_nonce_refusal_replays_one_canonical_compensation() -> Test
     );
     assert!(initial.output.is_none());
     assert!(initial.execution_nonce.is_none());
-    assert!(initial.receipt.verify_signature()?);
+    assert!(initial.receipt.verify_integrity_embedded_key()?);
     let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
         initial
             .receipt

@@ -1063,7 +1063,7 @@ fn evaluate_artifact_assertion(
         NativeAssertionKind::CapabilitySignatureValid => {
             let actual = fixture
                 .valid_capability()?
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
@@ -1078,13 +1078,13 @@ fn evaluate_artifact_assertion(
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::ReceiptSignatureValid => {
-            let actual = fixture.valid_receipt()?.verify_signature().unwrap_or(false);
+            let actual = fixture.valid_receipt()?.verify_integrity_embedded_key().unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::ReceiptTamperRejected => {
             let actual = !fixture
                 .tampered_receipt()?
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
@@ -1142,7 +1142,7 @@ fn evaluate_message_assertion(
                     scenario: assertion.name.clone(),
                 }
             })?;
-            let actual = receipt.verify_signature().unwrap_or(false);
+            let actual = receipt.verify_integrity_embedded_key().unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::GovernedReceiptPresent => {

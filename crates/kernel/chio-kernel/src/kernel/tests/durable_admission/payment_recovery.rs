@@ -133,7 +133,7 @@ fn assert_cost_terminal(
             serde_json::json!({"paid_output": true})
         ))
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Completed
@@ -315,7 +315,7 @@ fn review_payment_live_prepaid_refusal_signs_deny_after_confirmed_refund() -> Te
     kernel.add_post_invocation_hook(Box::new(PrepaymentRefusalHook(store.clone())));
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch

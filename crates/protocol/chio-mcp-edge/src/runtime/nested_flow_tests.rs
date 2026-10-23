@@ -283,7 +283,7 @@ fn exercise_replenished_poll(case: PollCase) {
     for (receipt, acknowledgement) in reopened.iter().zip(&acknowledgements) {
         let acknowledged = acknowledgement.try_recv().unwrap().unwrap();
         assert_eq!(receipt.id, acknowledged.id);
-        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         assert_eq!(receipt.kernel_key, signer.public_key());
         assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
         assert_eq!(receipt.boundary_class, BoundaryClass::DetectOnly);

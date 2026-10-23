@@ -137,7 +137,7 @@ impl ActiveDefenseReceiptIngest {
         receipt: &'receipt ChioReceipt,
     ) -> Result<VerifiedActiveDefenseReceipt<'receipt>, ActiveDefenseIngestError> {
         if !self.trusted_signers.contains(&receipt.kernel_key.to_hex())
-            || !matches!(receipt.verify_signature(), Ok(true))
+            || !matches!(receipt.verify_integrity_embedded_key(), Ok(true))
             || chio_receipt_id(&receipt.body()).ok().as_deref() != Some(receipt.id.as_str())
             || !matches!(receipt.action.verify_hash(), Ok(true))
         {

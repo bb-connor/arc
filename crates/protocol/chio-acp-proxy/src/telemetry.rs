@@ -173,7 +173,7 @@ impl ReceiptAuthorityFields {
         let receipt_id_valid = chio_receipt_id(&receipt.body())
             .map(|id| id == receipt.id)
             .unwrap_or(false);
-        let signature_valid = receipt.verify_signature().unwrap_or(false);
+        let signature_valid = receipt.verify_integrity_embedded_key().unwrap_or(false);
         let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
         let signer_trusted = trusted_kernel_keys
             .map(|trusted| trusted.contains(&receipt.kernel_key.to_hex()))

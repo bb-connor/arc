@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = stored.first().ok_or_else(|| std::io::Error::other("missing receipt"))?;
     assert!(!canonical.canonical_bytes().is_empty());
     let receipt = canonical.receipt();
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.receipt_kind.as_str(), "trace_observation");
     assert_eq!(receipt.boundary_class.as_str(), "detect_only");
     assert!(receipt.decision.is_none());

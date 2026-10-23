@@ -140,7 +140,7 @@ impl SourceVerification {
         let receipt_id_valid = chio_receipt_id(&receipt.body())
             .map(|expected| expected == receipt.id)
             .unwrap_or(false);
-        let signature_valid = receipt.verify_signature().unwrap_or(false);
+        let signature_valid = receipt.verify_integrity_embedded_key().unwrap_or(false);
         let parameter_hash_valid = receipt.action.verify_hash().unwrap_or(false);
         let authoritative = receipt_id_valid && signature_valid && parameter_hash_valid;
         let signer_trusted = trusted_pin == Some(&receipt.kernel_key);

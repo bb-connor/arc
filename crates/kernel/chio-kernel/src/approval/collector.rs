@@ -261,7 +261,7 @@ impl ThresholdApprovalProposalRegistration {
         }
         if !self
             .proposal
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
         {
             return Err(invalid(
@@ -534,7 +534,7 @@ impl ThresholdApprovalVoteRecord {
             ));
         }
         if !token
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| invalid(format!("approval token signature failed: {error}")))?
         {
             return Err(invalid(

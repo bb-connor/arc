@@ -143,7 +143,7 @@ impl AggregateBudgetRootBinding {
 
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
-    pub fn verify_signature(&self) -> Result<bool> {
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         if self.body.schema != AGGREGATE_BUDGET_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported aggregate budget root schema {}",
@@ -201,7 +201,7 @@ pub fn verify_aggregate_invocation_budget(
     if !trusted_issuers.contains(&token.issuer) {
         return Err(violation("aggregate capability issuer is not trusted"));
     }
-    if !token.verify_signature()? {
+    if !token.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     if token.delegation_chain.is_empty() {
@@ -315,7 +315,7 @@ fn verify_descendant(
             "aggregate budget root evidence is not a direct token",
         ));
     }
-    if !root.verify_signature()? {
+    if !root.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let first = token
@@ -434,7 +434,7 @@ fn verify_binding_matches_root(
     root: &CapabilityToken,
     max_invocations: u32,
 ) -> Result<()> {
-    if !binding.verify_signature()? {
+    if !binding.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let expected_scope_hash = scope_hash(&root.scope)?;

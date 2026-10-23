@@ -257,7 +257,7 @@ fn terminate_extra_unsigned_expired_vote_cannot_cancel_the_verified_approval_set
     let mut forged = tokens.first().test_unwrap().clone();
     forged.id = "unsigned-expired-extra-vote".to_owned();
     forged.expires_at = 0;
-    assert!(!forged.verify_signature().test_unwrap());
+    assert!(!forged.verify_integrity_embedded_key().test_unwrap());
     tokens.push(forged);
     let forged_request = request_with(
         request,
@@ -299,7 +299,7 @@ fn request_with_a_different_signed_approval_set(
     let approver = Keypair::from_seed(&[0x86_u8; 32]);
     assert_eq!(body.approver, approver.public_key());
     let different = GovernedApprovalToken::sign(body, &approver).test_unwrap();
-    assert!(different.verify_signature().test_unwrap());
+    assert!(different.verify_integrity_embedded_key().test_unwrap());
     assert_ne!(
         different.artifact_digest().test_unwrap(),
         original.artifact_digest().test_unwrap()

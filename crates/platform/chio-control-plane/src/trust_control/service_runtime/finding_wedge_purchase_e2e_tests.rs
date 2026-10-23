@@ -3300,7 +3300,7 @@ fn buyer_memory_write(
     let statement = store
         .load_receipt_lineage_statement(&write.receipt.id)?
         .ok_or_else(|| missing("kernel-persisted Finding memory lineage statement"))?;
-    assert!(statement.verify_signature()?);
+    assert!(statement.verify_integrity_embedded_key()?);
     let links = store.list_receipt_lineage_statement_links(&write.receipt.id)?;
     let link = links
         .first()

@@ -129,7 +129,7 @@ fn signing_callback(mode: Mode) -> TestResult {
         Mode::Reenter => {
             let response = result?;
             assert_eq!(response.verdict, Verdict::Allow);
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
             assert_eq!(
                 store.operation().state(),
                 AdmissionOperationState::Completed

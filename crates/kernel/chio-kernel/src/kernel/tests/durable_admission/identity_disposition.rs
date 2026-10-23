@@ -2,7 +2,7 @@ use super::*;
 
 fn assert_disposition(response: &ToolCallResponse, expected: &str) {
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         response
             .receipt

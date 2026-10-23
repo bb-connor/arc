@@ -373,7 +373,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
         .ok_or("walk count regressed")?;
     assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
     assert!(preflight.output.is_none());
-    assert!(preflight.receipt.verify_signature()?);
+    assert!(preflight.receipt.verify_integrity_embedded_key()?);
     fixture.request.execution_nonce = Some(*preflight.execution_nonce.ok_or("issued nonce")?);
     fixture.context = fixture
         .kernel
@@ -389,7 +389,7 @@ fn call(fixture: &mut Fixture, walks: &Walks, index: usize) -> TestResult<Cost> 
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), index);
 
     // Readback after measurement: every lifecycle stage ran for this call.

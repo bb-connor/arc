@@ -151,7 +151,7 @@ fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestRes
             .is_some_and(|reason| reason.contains("security pre-dispatch")),
         "{response:?}"
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(
         nonce_reserves.load(Ordering::SeqCst),
