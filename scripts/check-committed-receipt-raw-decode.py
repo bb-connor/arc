@@ -349,18 +349,17 @@ ALLOWED = (
     },
 )
 
-RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?from_(?:str|slice|reader|value)\s*(?=::|\()")
+RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*(?:(?:de|value)\s*::\s*)?)?from_(?:str|slice|reader|value)\s*(?=::|\()")
 EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
 TYPE_ALIAS = re.compile(r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
 TRAIT_CALL = re.compile(
     r"(?<![\w:.])(?:::\s*)?(?:[a-z_]\w*\s*::\s*)*(?:Deserialize\b"
-    r"|<\s*([\w:]+)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
+    r"|<\s*((?:[\w:&',\s]|<(?:[^<>]|<[^<>]*>)*>)+?)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
 )
 GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*(?:for\s*<[^<>]*>|[^,>{])*?\bDeserialize")
-CRATE_ALIAS = re.compile(r"\buse\s+serde_json\s+as\s+(\w+)\s*;")
-FUNCTION_ALIAS = re.compile(r"\bserde_json\s*::\s*(from_(?:str|slice|reader|value))\s+as\s+(\w+)")
+SERDE_JSON_USE = re.compile(r"use\s+(?:::\s*)?serde_json\b")
 STREAM_CALL = re.compile(
     r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?(?:de\s*::\s*)?Deserializer\s*::\s*from_(?:str|slice|reader)\s*\("
 )
@@ -610,14 +609,24 @@ def generic_parameters(fn_code: str) -> set[str]:
 
 
 def raw_aliases(code: str) -> tuple:
-    """Per-file patterns for `use serde_json as x` and `use serde_json::from_str as y`."""
+    """Per-file patterns for serde_json crate and function renames in `use` trees.
+
+    Covers `use serde_json as x`, `use serde_json::{self as x}` and
+    `use serde_json::{de::from_str as y, ..}`."""
+    crates, functions = [], []
+    for statement in USE_STATEMENT.finditer(code):
+        text = statement.group(0)
+        if not SERDE_JSON_USE.match(text):
+            continue
+        crates += re.findall(r"\b(?:serde_json|self)\s+as\s+(\w+)", text)
+        functions += re.findall(r"\b(from_(?:str|slice|reader|value))\s+as\s+(\w+)", text)
     patterns = []
-    crates = CRATE_ALIAS.findall(code)
     if crates:
         patterns.append(re.compile(
-            r"(?<![\w.:])(?:" + "|".join(map(re.escape, crates)) + r")\s*::\s*(from_(?:str|slice|reader|value))\s*(?=::|\()"
+            r"(?<![\w.:])(?:" + "|".join(map(re.escape, crates))
+            + r")\s*::\s*(?:(?:de|value)\s*::\s*)?(from_(?:str|slice|reader|value))\s*(?=::|\()"
         ))
-    for source, alias in FUNCTION_ALIAS.findall(code):
+    for source, alias in functions:
         patterns.append(re.compile(r"(?<![\w.:])" + re.escape(alias) + r"(?P<" + source + r">)\s*(?=::|\()"))
     return tuple(patterns)
 
@@ -919,6 +928,16 @@ FIXTURES = {
     "grouped renamed import": ("use chio_core::receipt::{body::ChioReceipt as Signed, lineage::ChildRequestReceipt};\nfn f(raw: &str) -> Result<Signed, E> { serde_json::from_str(raw) }", 1),
     "renamed import of another type": ("use other::Thing as Receipt;\nfn f(raw: &str) { serde_json::from_str::<Receipt>(raw); }", 0),
     "financial receipt metadata": ("fn f(raw: &str) { serde_json::from_str::<FinancialReceiptMetadata>(raw); }", 1),
+    "wrapped fully qualified target": ("fn f(d: D) -> Result<(), E> { let r = <Option<ChioReceipt> as Deserialize>::deserialize(d)?; Ok(()) }", 1),
+    "nested fully qualified target": ("fn f(d: D) { let r = <Vec<Option<ChildRequestReceipt>> as serde::Deserialize<'_>>::deserialize(d); }", 1),
+    "wrapped fully qualified other type": ("fn f(d: D) { let r = <Option<Other> as Deserialize>::deserialize(d); }", 0),
+    "grouped function alias": ("use serde_json::{from_str as decode, Value};\nfn f(raw: &str) { decode::<ChioReceipt>(raw); }", 1),
+    "grouped module function alias": ("use serde_json::{de::from_slice as read_bytes, Value};\nfn f(raw: &[u8]) -> Result<ChioReceipt, E> { read_bytes(raw) }", 1),
+    "grouped crate self alias": ("use serde_json::{self as json, Value};\nfn f(raw: &str) { json::from_str::<ChioReceipt>(raw); }", 1),
+    "alias outside serde_json": ("use other::{from_str as decode};\nfn f(raw: &str) { decode::<ChioReceipt>(raw); }", 0),
+    "de module path": ("fn f(raw: &str) { serde_json::de::from_str::<ChioReceipt>(raw); }", 1),
+    "value module path": ("fn f(value: Value) -> Result<ChioReceipt, E> { serde_json::value::from_value(value) }", 1),
+    "aliased crate module path": ("use serde_json as json;\nfn f(raw: &str) { json::de::from_str::<ChioReceipt>(raw); }", 1),
     "custom deserialize impl": ("impl<'de> Deserialize<'de> for Wrapper { fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> { ChioReceipt::deserialize(d).map(Wrapper) } }", 0),
 }
 
