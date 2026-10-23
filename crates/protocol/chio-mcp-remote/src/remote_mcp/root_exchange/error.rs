@@ -41,7 +41,11 @@ pub enum RootExchangeError {
     UnsupportedSubjectTokenType,
     #[error("unsupported requested_token_type")]
     UnsupportedRequestedTokenType,
+    #[error("requested scope is not a space-delimited list of scope tokens")]
+    RequestedScopeMalformed,
 
+    #[error("client authenticates with more than one method")]
+    ClientAuthenticationAmbiguous,
     #[error("client authentication is missing")]
     ClientAssertionMissing,
     #[error("client_assertion_type is not jwt-bearer")]
@@ -115,6 +119,8 @@ pub enum RootExchangeError {
     PolicyOutOfForce,
     #[error("{matched} root policy rules match; exactly one is required")]
     RuleMatchCount { matched: usize },
+    #[error("requested scope exceeds the assertion scope")]
+    RequestedScopeExceedsAssertion,
     #[error("scope value is absent from the rule projection")]
     ScopeNotProjected,
     #[error("idp_scope_projection target is not one server/tool pair")]
@@ -151,7 +157,8 @@ impl RootExchangeError {
         match self {
             Self::MalformedRequest(_)
             | Self::UnsupportedSubjectTokenType
-            | Self::UnsupportedRequestedTokenType => OAuthErrorCode::InvalidRequest,
+            | Self::UnsupportedRequestedTokenType
+            | Self::ClientAuthenticationAmbiguous => OAuthErrorCode::InvalidRequest,
             Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
             Self::ClientAssertionMissing
             | Self::ClientAssertionTypeUnsupported
@@ -184,7 +191,10 @@ impl RootExchangeError {
             | Self::ProofRequiredGrantForEdgeSession
             | Self::RecordedClaimMissing(_)
             | Self::RootLifetimeEmpty => OAuthErrorCode::InvalidGrant,
-            Self::ScopeNotProjected | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
+            Self::RequestedScopeMalformed
+            | Self::RequestedScopeExceedsAssertion
+            | Self::ScopeNotProjected
+            | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
             Self::ProjectionTargetMalformed | Self::ExchangeKeyNotListed => {
                 OAuthErrorCode::ServerError
             }

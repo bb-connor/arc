@@ -375,7 +375,7 @@ impl Harness {
         sender_key: Option<&PublicKey>,
         now: u64,
     ) -> Result<PreparedAnchoredRoot, RootExchangeError> {
-        let grant = IdJagGrant::parse(body)?;
+        let grant = IdJagGrant::parse(body, None)?;
         self.exchange
             .exchange_id_jag(
                 &grant,
@@ -507,21 +507,25 @@ fn capability_requested_token_type_is_accepted_on_token_exchange() {
         }
         form(&pairs)
     };
-    let capability = IdJagGrant::parse(&body(Some(
-        "urn:chio:params:oauth:token-type:capability-v1",
-    )))
+    let capability = IdJagGrant::parse(
+        &body(Some("urn:chio:params:oauth:token-type:capability-v1")),
+        None,
+    )
     .unwrap();
     assert_eq!(
         capability.requested_token_type(),
         RequestedTokenType::ChioCapability
     );
-    let access =
-        IdJagGrant::parse(&body(Some("urn:ietf:params:oauth:token-type:access_token"))).unwrap();
+    let access = IdJagGrant::parse(
+        &body(Some("urn:ietf:params:oauth:token-type:access_token")),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         access.requested_token_type(),
         RequestedTokenType::AccessToken
     );
-    let absent = IdJagGrant::parse(&body(None)).unwrap();
+    let absent = IdJagGrant::parse(&body(None), None).unwrap();
     assert_eq!(
         absent.requested_token_type(),
         RequestedTokenType::AccessToken
@@ -540,13 +544,16 @@ fn request_digest_excludes_client_authentication() {
             ("client_assertion", assertion),
         ])
     };
-    let first = IdJagGrant::parse(&body("first-assertion")).unwrap();
-    let retry = IdJagGrant::parse(&body("fresh-assertion")).unwrap();
+    let first = IdJagGrant::parse(&body("first-assertion"), None).unwrap();
+    let retry = IdJagGrant::parse(&body("fresh-assertion"), None).unwrap();
     assert_eq!(first.request_digest(), retry.request_digest());
-    let other = IdJagGrant::parse(&form(&[
-        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-        ("assertion", "other-id-jag"),
-    ]))
+    let other = IdJagGrant::parse(
+        &form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", "other-id-jag"),
+        ]),
+        None,
+    )
     .unwrap();
     assert_ne!(first.request_digest(), other.request_digest());
 }
@@ -555,7 +562,7 @@ fn request_digest_excludes_client_authentication() {
 fn token_requests_outside_the_id_jag_grants_are_refused() {
     let unsupported = form(&[("grant_type", "client_credentials")]);
     assert_eq!(
-        IdJagGrant::parse(&unsupported).unwrap_err(),
+        IdJagGrant::parse(&unsupported, None).unwrap_err(),
         RootExchangeError::UnsupportedGrantType
     );
     let other_subject = form(&[
@@ -567,7 +574,7 @@ fn token_requests_outside_the_id_jag_grants_are_refused() {
         ("subject_token_type", "urn:ietf:params:oauth:token-type:jwt"),
     ]);
     assert_eq!(
-        IdJagGrant::parse(&other_subject).unwrap_err(),
+        IdJagGrant::parse(&other_subject, None).unwrap_err(),
         RootExchangeError::UnsupportedSubjectTokenType
     );
     let other_requested = form(&[
@@ -586,7 +593,7 @@ fn token_requests_outside_the_id_jag_grants_are_refused() {
         ),
     ]);
     assert_eq!(
-        IdJagGrant::parse(&other_requested).unwrap_err(),
+        IdJagGrant::parse(&other_requested, None).unwrap_err(),
         RootExchangeError::UnsupportedRequestedTokenType
     );
     let repeated = form(&[
@@ -595,7 +602,7 @@ fn token_requests_outside_the_id_jag_grants_are_refused() {
         ("assertion", "b"),
     ]);
     assert_eq!(
-        IdJagGrant::parse(&repeated).unwrap_err(),
+        IdJagGrant::parse(&repeated, None).unwrap_err(),
         RootExchangeError::MalformedRequest("repeated parameter")
     );
     let unknown = form(&[
@@ -604,30 +611,189 @@ fn token_requests_outside_the_id_jag_grants_are_refused() {
         ("scope", "crm.read"),
         ("resource", "https://mcp.provider.example/mcp"),
     ]);
-    assert_eq!(IdJagGrant::parse(&unknown).unwrap().id_jag(), "a");
-    let empty_known = form(&[
-        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-        ("assertion", "a"),
-        ("client_id", ""),
-        ("client_id", ""),
-    ]);
-    assert_eq!(
-        IdJagGrant::parse(&empty_known)
-            .unwrap()
-            .client_credentials()
-            .client_id,
-        None
-    );
+    assert_eq!(IdJagGrant::parse(&unknown, None).unwrap().id_jag(), "a");
     let not_utf8 =
         b"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=%FF".to_vec();
     assert_eq!(
-        IdJagGrant::parse(&not_utf8).unwrap_err(),
+        IdJagGrant::parse(&not_utf8, None).unwrap_err(),
         RootExchangeError::MalformedRequest("parameter is not valid UTF-8")
     );
     let not_utf8_unknown =
         b"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=a&extra=%FF"
             .to_vec();
-    assert!(IdJagGrant::parse(&not_utf8_unknown).is_ok());
+    assert!(IdJagGrant::parse(&not_utf8_unknown, None).is_ok());
+}
+
+#[test]
+fn single_empty_parameter_is_omitted() {
+    let empty_known = form(&[
+        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+        ("assertion", "a"),
+        ("client_id", ""),
+        ("scope", ""),
+    ]);
+    let grant = IdJagGrant::parse(&empty_known, None).unwrap();
+    assert_eq!(grant.client_credentials().client_id, None);
+    assert_eq!(grant.requested_scope(), None);
+}
+
+#[test]
+fn empty_duplicate_parameter_refuses() {
+    for pair in [["", "a"], ["a", ""], ["", ""]] {
+        let body = form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", pair[0]),
+            ("assertion", pair[1]),
+        ]);
+        let error = IdJagGrant::parse(&body, None).unwrap_err();
+        assert_eq!(
+            error,
+            RootExchangeError::MalformedRequest("repeated parameter")
+        );
+        assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidRequest);
+    }
+}
+
+#[tokio::test]
+async fn client_secret_with_client_assertion_refuses() {
+    let harness = Harness::new();
+    let assertion = client_assertion(&client_assertion_claims());
+    let mut with_secret = jwt_bearer_body(&id_jag(), &assertion);
+    with_secret.extend_from_slice(b"&client_secret=s3cret");
+    let error = IdJagGrant::parse(&with_secret, None).unwrap_err();
+    assert_eq!(error, RootExchangeError::ClientAuthenticationAmbiguous);
+    assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidRequest);
+
+    let body = jwt_bearer_body(&id_jag(), &assertion);
+    for authorization in [&b"Basic bWNwOnMzY3JldA=="[..], b"basic bWNwOnMzY3JldA=="] {
+        let error = IdJagGrant::parse(&body, Some(authorization)).unwrap_err();
+        assert_eq!(error, RootExchangeError::ClientAuthenticationAmbiguous);
+        assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidRequest);
+    }
+    assert!(harness.replay.bound.lock().unwrap().is_empty());
+    harness.run_body(&body, None, NOW).await.unwrap();
+}
+
+#[tokio::test]
+async fn client_secret_alone_is_not_client_authentication() {
+    let body = form(&[
+        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+        ("assertion", &id_jag()),
+        ("client_id", CLIENT_ID),
+        ("client_secret", "s3cret"),
+    ]);
+    assert_eq!(
+        client_refusal(body).await,
+        RootExchangeError::ClientAssertionMissing
+    );
+}
+
+#[test]
+fn requested_scope_outside_the_rfc6749_syntax_refuses() {
+    for scope in [
+        "crm.read  crm.write",
+        " crm.read",
+        "crm.read ",
+        "crm\"read",
+        "crm\\read",
+        "crm.read\tcrm.write",
+        "cr\u{e9}m.read",
+    ] {
+        let body = form(&[
+            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+            ("assertion", "a"),
+            ("scope", scope),
+        ]);
+        let error = IdJagGrant::parse(&body, None).unwrap_err();
+        assert_eq!(error, RootExchangeError::RequestedScopeMalformed);
+        assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidScope);
+    }
+}
+
+#[tokio::test]
+async fn token_response_carries_scope_when_it_differs_from_the_request() {
+    let cases = [
+        (None, Some("crm.read")),
+        (Some("crm.read"), None),
+        (Some("crm.read crm.read"), None),
+    ];
+    for (requested, expected) in cases {
+        let mut body = jwt_bearer_body(&id_jag(), &client_assertion(&client_assertion_claims()));
+        if let Some(requested) = requested {
+            body.extend_from_slice(b"&");
+            body.extend_from_slice(&form(&[("scope", requested)]));
+        }
+        let prepared = Harness::new().run_body(&body, None, NOW).await.unwrap();
+        assert_eq!(
+            prepared.response_scope(),
+            expected,
+            "requested {requested:?}"
+        );
+    }
+}
+
+fn read_write_body(requested: Option<&str>) -> Vec<u8> {
+    let claims = edit(id_jag_claims(), |claims| {
+        claims.insert("scope".into(), json!("crm.read crm.write"));
+    });
+    let id_jag = compact(&id_jag_header(), &claims, idp_sign);
+    let mut body = jwt_bearer_body(&id_jag, &client_assertion(&client_assertion_claims()));
+    if let Some(requested) = requested {
+        body.extend_from_slice(b"&");
+        body.extend_from_slice(&form(&[("scope", requested)]));
+    }
+    body
+}
+
+#[tokio::test]
+async fn requested_scope_narrows_the_root() {
+    let cases = [
+        (None, vec!["search", "get", "update"]),
+        (Some("crm.read"), vec!["search", "get"]),
+        (Some("crm.write"), vec!["update"]),
+        (Some("crm.read crm.write"), vec!["search", "get", "update"]),
+    ];
+    for (requested, tools) in cases {
+        let harness = Harness::new();
+        let prepared = harness
+            .run_body(&read_write_body(requested), None, NOW)
+            .await
+            .unwrap();
+        let granted: Vec<_> = prepared
+            .scope()
+            .grants
+            .iter()
+            .map(|grant| grant.tool_name.as_str())
+            .collect();
+        assert_eq!(granted, tools, "requested {requested:?}");
+        let expected_scope = requested.is_none().then_some("crm.read crm.write");
+        assert_eq!(prepared.response_scope(), expected_scope);
+        let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
+        check_root_consistency(RootConsistencyInput {
+            root: &root,
+            anchor: prepared.anchor(),
+            context: prepared.context(),
+            policy: &harness.exchange.policy,
+            sender_key: None,
+        })
+        .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn requested_scope_beyond_the_assertion_refuses() {
+    for requested in ["crm.export", "crm.read crm.export", "crm.admin"] {
+        let harness = Harness::new();
+        let error = harness
+            .run_body(&read_write_body(Some(requested)), None, NOW)
+            .await
+            .unwrap_err();
+        assert_eq!(error, RootExchangeError::RequestedScopeExceedsAssertion);
+        assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidScope);
+        let bound = harness.replay.bound.lock().unwrap();
+        assert_eq!(bound.len(), 1);
+        assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+    }
 }
 
 async fn client_refusal(body: Vec<u8>) -> RootExchangeError {
@@ -1071,6 +1237,57 @@ async fn exchange_key_outside_the_policy_refuses_before_any_replay_is_spent() {
     );
     harness.exchange.exchange_key = exchange_keypair().public_key();
     harness.run_body(&body, None, NOW).await.unwrap();
+}
+
+#[tokio::test]
+async fn response_scope_omits_scope_values_the_ceiling_removes() {
+    let cases = [
+        (None, Some("crm.read")),
+        (Some("crm.read"), None),
+        (Some("crm.read crm.admin"), Some("crm.read")),
+    ];
+    for (requested, expected) in cases {
+        let harness = Harness::new();
+        let claims = edit(id_jag_claims(), |claims| {
+            claims.insert("scope".into(), json!("crm.read crm.admin"));
+        });
+        let id_jag = compact(&id_jag_header(), &claims, idp_sign);
+        let mut body = jwt_bearer_body(&id_jag, &client_assertion(&client_assertion_claims()));
+        if let Some(requested) = requested {
+            body.extend_from_slice(b"&");
+            body.extend_from_slice(&form(&[("scope", requested)]));
+        }
+        let prepared = harness.run_body(&body, None, NOW).await.unwrap();
+        let tools: Vec<_> = prepared
+            .scope()
+            .grants
+            .iter()
+            .map(|grant| grant.tool_name.as_str())
+            .collect();
+        assert_eq!(tools, ["search", "get"]);
+        assert_eq!(
+            prepared.response_scope(),
+            expected,
+            "requested {requested:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn id_jag_scope_outside_the_rfc6749_syntax_refuses() {
+    for scope in [
+        "crm.read caf\u{e9}",
+        "crm.read crm\"write",
+        "crm.read crm\\write",
+        "crm.read\tcrm.write",
+    ] {
+        let claims = edit(id_jag_claims(), |claims| {
+            claims.insert("scope".into(), json!(scope));
+        });
+        let error = refusal(id_jag_header(), claims).await;
+        assert_eq!(error, RootExchangeError::ClaimInvalid("scope"));
+        assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidGrant);
+    }
 }
 
 #[tokio::test]

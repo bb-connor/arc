@@ -88,6 +88,7 @@ pub struct PreparedAnchoredRoot {
     openings: Vec<ContextOpening>,
     replay_key: ReplayKey,
     holder: HolderClass,
+    response_scope: Option<String>,
 }
 
 impl PreparedAnchoredRoot {
@@ -134,6 +135,13 @@ impl PreparedAnchoredRoot {
     #[must_use]
     pub fn holder(&self) -> HolderClass {
         self.holder
+    }
+    /// The `scope` the token response carries (RFC 6749 section 5.1): the
+    /// identity-provider scope values that contribute a grant to the root,
+    /// present when they differ from the requested scope.
+    #[must_use]
+    pub fn response_scope(&self) -> Option<&str> {
+        self.response_scope.as_deref()
     }
 }
 
@@ -190,23 +198,25 @@ fn claims_match(
     strings_hold && scope_holds
 }
 
-/// `ceiling_scope` restricted to the tools the IdP scope values project to.
-/// A projection target is one `server/tool` pair; a ceiling grant covers it
+/// `ceiling_scope` restricted to the tools the IdP scope values project to,
+/// and the scope values that contribute at least one of its grants. A
+/// projection target is one `server/tool` pair; a ceiling grant covers it
 /// when each side is equal or `*`, and is issued narrowed to that pair.
-fn effective_scope(
+fn effective_scope<'a>(
     rule: &RootPolicyRule,
-    scope_values: &[String],
-) -> Result<ChioScope, RootExchangeError> {
+    scope_values: &'a [String],
+) -> Result<(ChioScope, Vec<&'a str>), RootExchangeError> {
     let projection = rule
         .idp_scope_projection
         .as_ref()
         .ok_or(RootExchangeError::ScopeNotProjected)?;
-    let mut tools: BTreeSet<(&str, &str)> = BTreeSet::new();
+    let mut projected: Vec<(&str, BTreeSet<(&str, &str)>)> = Vec::new();
     for value in scope_values {
-        let projected = projection
+        let targets = projection
             .get(value)
             .ok_or(RootExchangeError::ScopeNotProjected)?;
-        for target in projected {
+        let mut pairs = BTreeSet::new();
+        for target in targets {
             let pair = target
                 .as_str()
                 .split_once('/')
@@ -214,14 +224,22 @@ fn effective_scope(
                     !server.is_empty() && !tool.is_empty() && !tool.contains('/')
                 })
                 .ok_or(RootExchangeError::ProjectionTargetMalformed)?;
-            tools.insert(pair);
+            pairs.insert(pair);
         }
+        projected.push((value.as_str(), pairs));
     }
     let covers = |pattern: &str, value: &str| pattern == "*" || pattern == value;
+    let covered = |grant: &ToolGrant, (server, tool): (&str, &str)| {
+        covers(&grant.server_id, server) && covers(&grant.tool_name, tool)
+    };
+    let tools: BTreeSet<(&str, &str)> = projected
+        .iter()
+        .flat_map(|(_, pairs)| pairs.iter().copied())
+        .collect();
     let mut grants: Vec<ToolGrant> = Vec::new();
     for grant in &rule.ceiling_scope.grants {
         for &(server, tool) in &tools {
-            if covers(&grant.server_id, server) && covers(&grant.tool_name, tool) {
+            if covered(grant, (server, tool)) {
                 let mut narrowed = grant.clone();
                 narrowed.server_id = server.to_owned();
                 narrowed.tool_name = tool.to_owned();
@@ -232,10 +250,46 @@ fn effective_scope(
     if grants.is_empty() {
         return Err(RootExchangeError::EmptyEffectiveScope);
     }
-    Ok(ChioScope {
-        grants,
-        ..ChioScope::default()
-    })
+    let granted_values = projected
+        .iter()
+        .filter(|(_, pairs)| {
+            pairs.iter().any(|pair| {
+                rule.ceiling_scope
+                    .grants
+                    .iter()
+                    .any(|grant| covered(grant, *pair))
+            })
+        })
+        .map(|(value, _)| *value)
+        .collect();
+    Ok((
+        ChioScope {
+            grants,
+            ..ChioScope::default()
+        },
+        granted_values,
+    ))
+}
+
+/// The assertion scope values the root is built from: all of them, or the
+/// requested ones. A requested value the assertion does not carry refuses.
+fn selected_scope_values(
+    assertion: &[String],
+    requested: Option<&[String]>,
+) -> Result<Vec<String>, RootExchangeError> {
+    let Some(requested) = requested else {
+        return Ok(assertion.to_vec());
+    };
+    let mut selected: Vec<String> = Vec::new();
+    for value in requested {
+        if !assertion.contains(value) {
+            return Err(RootExchangeError::RequestedScopeExceedsAssertion);
+        }
+        if !selected.contains(value) {
+            selected.push(value.clone());
+        }
+    }
+    Ok(selected)
 }
 
 fn recorded_claim_value(
@@ -445,7 +499,8 @@ impl RootExchange {
         if !rule.holder_classes.contains(&holder) {
             return Err(RootExchangeError::HolderClassNotAllowed(holder));
         }
-        let scope = effective_scope(rule, &verified.scope_values)?;
+        let scope_values = selected_scope_values(&verified.scope_values, grant.requested_scope())?;
+        let (scope, granted_values) = effective_scope(rule, &scope_values)?;
         if holder == HolderClass::EdgeSession
             && rule
                 .ceiling_scope
@@ -543,6 +598,12 @@ impl RootExchange {
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         };
+        let granted: BTreeSet<&str> = granted_values.iter().copied().collect();
+        let requested: Option<BTreeSet<&str>> = grant
+            .requested_scope()
+            .map(|values| values.iter().map(String::as_str).collect());
+        let response_scope =
+            (requested.as_ref() != Some(&granted)).then(|| granted_values.join(" "));
         match services
             .replay
             .bind(&replay_key, verified.exp.saturating_add(skew), now)
@@ -558,6 +619,7 @@ impl RootExchange {
             openings,
             replay_key,
             holder,
+            response_scope,
         })
     }
 
