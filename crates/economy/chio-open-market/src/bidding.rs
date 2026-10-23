@@ -49,6 +49,8 @@ pub enum BiddingError {
     InvalidRequest(String),
     #[error("bid request signature is not verifiable")]
     BidSignatureInvalid,
+    #[error("bid request is not signed by the agent subject the grant binds to")]
+    BidSignerNotAgentSubject,
     #[error("listing signature is not verifiable")]
     ListingSignatureInvalid,
     #[error("listing pricing hint signature is not verifiable")]
@@ -329,7 +331,10 @@ pub fn bid(
     context: BidMintContext<'_>,
 ) -> Result<SignedAskResponse, BiddingError> {
     request.body.validate()?;
-    match request.verify_signature(&request.signer_key) {
+    if request.signer_key != context.agent_subject {
+        return Err(BiddingError::BidSignerNotAgentSubject);
+    }
+    match request.verify_signature(&context.agent_subject) {
         Ok(true) => {}
         _ => return Err(BiddingError::BidSignatureInvalid),
     }
