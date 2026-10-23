@@ -311,7 +311,13 @@ pub fn verify_purchase_context_pure(
         return Err(PurchaseVerificationError::UnauthorizedIssuer);
     }
     let bid: SignedBidRequest = parse_member(&context.bid_request_envelope_json, "bid_request")?;
-    if !matches!(bid.verify_signature(&bid.signer_key), Ok(true)) {
+    if bid.signer_key != ask.body.token_offer.subject {
+        return Err(PurchaseVerificationError::HandshakeBinding("bid_signer"));
+    }
+    if !matches!(
+        bid.verify_signature(&ask.body.token_offer.subject),
+        Ok(true)
+    ) {
         return Err(PurchaseVerificationError::EnvelopeSignature("bid_request"));
     }
     let bid_request_envelope_sha256 =
