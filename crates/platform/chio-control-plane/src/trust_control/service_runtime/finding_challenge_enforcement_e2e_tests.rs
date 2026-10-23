@@ -133,9 +133,9 @@ use chio_settle::{
     FindingAnchorCheckpointPublication, FindingBondObservationRecheck, FindingImpairmentAttempt,
     FindingImpairmentOutcome, FindingImpairmentPublishError, FindingImpairmentPublisher,
     FindingImpairmentQuarantine, FindingVaultRejection, PreparedEvmCall, SettlementChainConfig,
-    SettlementEvidenceConfig, SettlementFinalityStatus, SettlementOracleConfig,
-    SettlementPolicyConfig, SignedFindingAnchorCheckpointPublication, StoredImpairmentTransaction,
-    FINDING_ANCHOR_CHECKPOINT_PUBLICATION_SCHEMA_V1,
+    SettlementEvidenceConfig, SettlementFinalityStatus, SettlementKernelAuthority,
+    SettlementOracleConfig, SettlementPolicyConfig, SignedFindingAnchorCheckpointPublication,
+    StoredImpairmentTransaction, FINDING_ANCHOR_CHECKPOINT_PUBLICATION_SCHEMA_V1,
 };
 use chio_store_sqlite::finding_market_store::{FindingRecordInput, SqliteFindingMarketStore};
 use chio_store_sqlite::{
@@ -6769,6 +6769,9 @@ fn settlement_config() -> Result<SettlementChainConfig, AnyError> {
         oracle: SettlementOracleConfig::default(),
         evidence_substrate: SettlementEvidenceConfig::default(),
         policy,
+        kernel_authority: SettlementKernelAuthority {
+            trusted_keys: vec![keypair(7).public_key()],
+        },
     })
 }
 
