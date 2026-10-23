@@ -324,170 +324,170 @@ pub enum ModelSafetyTier {
     Restricted,
 }
 
-/// A constraint on tool parameters.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(
-    tag = "type",
-    content = "value",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum Constraint {
-    /// File path parameter must start with this prefix.
-    PathPrefix(String),
-    /// Network domain must match exactly.
-    DomainExact(String),
-    /// Network domain must match a glob pattern.
-    DomainGlob(String),
-    /// Parameter must match a regular expression.
-    RegexMatch(String),
-    /// String parameter must not exceed this length.
-    MaxLength(usize),
-    /// Serialized argument payload must not exceed this many bytes.
-    MaxArgsSize(usize),
-    /// Requests must carry a governed transaction intent.
-    GovernedIntentRequired,
-    /// Requests at or above this threshold require a valid approval token.
-    RequireApprovalAbove { threshold_units: u64 },
-    /// Cumulative authorized spend at or above this threshold requires approval.
-    RequireCumulativeApprovalAbove {
-        threshold: MonetaryAmount,
-        approval_budget_id: String,
-        approval_budget_epoch: u64,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        cumulative_approval_root_binding: Option<Box<CumulativeApprovalRootBinding>>,
-    },
-    /// Requests must carry commerce approval context for this exact seller.
-    SellerExact(String),
-    /// Governed requests must carry valid runtime attestation at or above this tier.
-    MinimumRuntimeAssurance(RuntimeAssuranceTier),
-    /// Governed requests at or above this autonomy tier must carry autonomy context and pass bond gating.
-    MinimumAutonomyTier(GovernedAutonomyTier),
-    /// Extensibility: arbitrary key-value constraint.
-    Custom(String, String),
+chio_security_types::lossless_serde! {
+    /// A constraint on tool parameters.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    #[serde(
+        tag = "type",
+        content = "value",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum Constraint {
+        /// File path parameter must start with this prefix.
+        PathPrefix(String),
+        /// Network domain must match exactly.
+        DomainExact(String),
+        /// Network domain must match a glob pattern.
+        DomainGlob(String),
+        /// Parameter must match a regular expression.
+        RegexMatch(String),
+        /// String parameter must not exceed this length.
+        MaxLength(usize),
+        /// Serialized argument payload must not exceed this many bytes.
+        MaxArgsSize(usize),
+        /// Requests must carry a governed transaction intent.
+        GovernedIntentRequired,
+        /// Requests at or above this threshold require a valid approval token.
+        RequireApprovalAbove { threshold_units: u64 },
+        /// Cumulative authorized spend at or above this threshold requires approval.
+        RequireCumulativeApprovalAbove {
+            threshold: MonetaryAmount,
+            approval_budget_id: String,
+            approval_budget_epoch: u64,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            cumulative_approval_root_binding: Option<Box<CumulativeApprovalRootBinding>>,
+        },
+        /// Requests must carry commerce approval context for this exact seller.
+        SellerExact(String),
+        /// Governed requests must carry valid runtime attestation at or above this tier.
+        MinimumRuntimeAssurance(RuntimeAssuranceTier),
+        /// Governed requests at or above this autonomy tier must carry autonomy context and pass bond gating.
+        MinimumAutonomyTier(GovernedAutonomyTier),
+        /// Extensibility: arbitrary key-value constraint.
+        Custom(String, String),
 
-    // The variants below carry data-layer, communication, financial,
-    // model-routing, and memory-governance policy. They serialize through
-    // the same tagged serde envelope as the variants above
-    // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
-    /// Data layer: database tables the grant may reference.
-    ///
-    /// Kernel issuance and admission currently reject this variant until
-    /// grant-specific SQL enforcement is available. A global SQL guard's
-    /// table allowlist does not establish enforcement of this constraint.
-    TableAllowlist(Vec<String>),
-    /// Data layer: forbidden columns, formatted as `"table.column"`.
-    ///
-    /// Kernel issuance and admission currently reject this variant until
-    /// grant-specific column enforcement is available.
-    ColumnDenylist(Vec<String>),
-    /// Data layer: maximum number of rows a query may return.
-    ///
-    /// Kernel issuance and admission currently reject this variant until
-    /// grant-specific result enforcement is available.
-    MaxRowsReturned(u64),
-    /// Data layer: operation class the grant authorises.
-    ///
-    /// Kernel issuance and admission currently reject this variant until
-    /// grant-specific SQL operation enforcement is available.
-    OperationClass(SqlOperationClass),
-    /// Communication: allowed recipient channels or IDs.
-    AudienceAllowlist(Vec<String>),
-    /// Communication: content review tier demanded of downstream guards.
-    ///
-    /// Kernel issuance and admission currently reject this variant until
-    /// grant-specific content-review enforcement is available.
-    ContentReviewTier(ContentReviewTier),
-    /// Financial: maximum transaction amount in USD.
-    ///
-    /// The value is a decimal string (e.g. `"100.00"`) because
-    /// `rust_decimal` is not in the workspace.
-    /// Kernel issuance and admission currently reject this variant; use the
-    /// supported governed monetary constraints for enforced authorization.
-    MaxTransactionAmountUsd(String),
-    /// Financial: whether the grant requires dual approval before execution.
-    ///
-    /// Kernel issuance and admission currently reject this variant; use the
-    /// policy-owned threshold-approval path for enforced quorum requirements.
-    RequireDualApproval(bool),
-    /// Model routing: constrain the models this grant may execute under.
-    ModelConstraint {
-        /// Explicit allowlist of model identifiers. Empty means no allowlist.
-        allowed_model_ids: Vec<String>,
-        /// Minimum acceptable model safety tier, if any.
-        min_safety_tier: Option<ModelSafetyTier>,
-    },
-    /// Memory governance: memory stores the grant may write to.
-    MemoryStoreAllowlist(Vec<String>),
-    /// Memory governance: regex patterns that block writes.
-    ///
-    /// Patterns are compiled lazily during kernel evaluation so invalid
-    /// regexes do not break construction or round-trip serialization.
-    MemoryWriteDenyPatterns(Vec<String>),
-    /// Delivery: an Allow for this grant is valid only if the final
-    /// post-transform output content hash equals this expected digest,
-    /// otherwise the request is denied before any irreversible money
-    /// movement.
-    ///
-    /// The value is a canonical lowercase 64-character hex SHA-256 digest.
-    /// Unlike the argument-side constraints above, this is enforced at the
-    /// output-aware durable terminal, not at request matching; the request
-    /// matcher only admits the carrier. Every surface that cannot prove
-    /// the output-aware terminal ordering rejects the constraint before it
-    /// mutates budget or payment.
-    OutputDigestSha256(String),
-    /// Delivery: this grant authorizes exactly one purchased finding
-    /// reveal. The provider-signed marker names the exact finding and
-    /// listing being sold and closes over the settlement rail, so omitted
-    /// purchase context can never downgrade into a generic
-    /// digest-constrained call.
-    ///
-    /// Admission requires the request to name the same finding, a verified
-    /// purchase context, and the settlement profile the selector admits.
-    /// Surfaces without purchase-aware admission reject the marker before
-    /// any budget or payment mutation.
-    RequireFindingPurchase(Box<FindingPurchaseMarkerV1>),
-    /// Delivery: this grant authorizes a bounded no-charge redelivery of a
-    /// finding whose paid delivery was already settled. Recovery is a
-    /// distinct authorization profile: it never satisfies a purchase marker
-    /// and never enters a payment path.
-    ///
-    /// Admission requires the dedicated recovery carrier named by this
-    /// marker and an exact top-level `finding_id` argument. Surfaces without
-    /// recovery-aware admission reject the marker before dispatch.
-    RequireFindingRecovery(Box<FindingRecoveryMarkerV1>),
+        // The variants below carry data-layer, communication, financial,
+        // model-routing, and memory-governance policy. They serialize through
+        // the same tagged serde envelope as the variants above
+        // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
+        /// Data layer: database tables the grant may reference.
+        ///
+        /// Kernel issuance and admission currently reject this variant until
+        /// grant-specific SQL enforcement is available. A global SQL guard's
+        /// table allowlist does not establish enforcement of this constraint.
+        TableAllowlist(Vec<String>),
+        /// Data layer: forbidden columns, formatted as `"table.column"`.
+        ///
+        /// Kernel issuance and admission currently reject this variant until
+        /// grant-specific column enforcement is available.
+        ColumnDenylist(Vec<String>),
+        /// Data layer: maximum number of rows a query may return.
+        ///
+        /// Kernel issuance and admission currently reject this variant until
+        /// grant-specific result enforcement is available.
+        MaxRowsReturned(u64),
+        /// Data layer: operation class the grant authorises.
+        ///
+        /// Kernel issuance and admission currently reject this variant until
+        /// grant-specific SQL operation enforcement is available.
+        OperationClass(SqlOperationClass),
+        /// Communication: allowed recipient channels or IDs.
+        AudienceAllowlist(Vec<String>),
+        /// Communication: content review tier demanded of downstream guards.
+        ///
+        /// Kernel issuance and admission currently reject this variant until
+        /// grant-specific content-review enforcement is available.
+        ContentReviewTier(ContentReviewTier),
+        /// Financial: maximum transaction amount in USD.
+        ///
+        /// The value is a decimal string (e.g. `"100.00"`) because
+        /// `rust_decimal` is not in the workspace.
+        /// Kernel issuance and admission currently reject this variant; use the
+        /// supported governed monetary constraints for enforced authorization.
+        MaxTransactionAmountUsd(String),
+        /// Financial: whether the grant requires dual approval before execution.
+        ///
+        /// Kernel issuance and admission currently reject this variant; use the
+        /// policy-owned threshold-approval path for enforced quorum requirements.
+        RequireDualApproval(bool),
+        /// Model routing: constrain the models this grant may execute under.
+        ModelConstraint {
+            /// Explicit allowlist of model identifiers. Empty means no allowlist.
+            allowed_model_ids: Vec<String>,
+            /// Minimum acceptable model safety tier, if any.
+            min_safety_tier: Option<ModelSafetyTier>,
+        },
+        /// Memory governance: memory stores the grant may write to.
+        MemoryStoreAllowlist(Vec<String>),
+        /// Memory governance: regex patterns that block writes.
+        ///
+        /// Patterns are compiled lazily during kernel evaluation so invalid
+        /// regexes do not break construction or round-trip serialization.
+        MemoryWriteDenyPatterns(Vec<String>),
+        /// Delivery: an Allow for this grant is valid only if the final
+        /// post-transform output content hash equals this expected digest,
+        /// otherwise the request is denied before any irreversible money
+        /// movement.
+        ///
+        /// The value is a canonical lowercase 64-character hex SHA-256 digest.
+        /// Unlike the argument-side constraints above, this is enforced at the
+        /// output-aware durable terminal, not at request matching; the request
+        /// matcher only admits the carrier. Every surface that cannot prove
+        /// the output-aware terminal ordering rejects the constraint before it
+        /// mutates budget or payment.
+        OutputDigestSha256(String),
+        /// Delivery: this grant authorizes exactly one purchased finding
+        /// reveal. The provider-signed marker names the exact finding and
+        /// listing being sold and closes over the settlement rail, so omitted
+        /// purchase context can never downgrade into a generic
+        /// digest-constrained call.
+        ///
+        /// Admission requires the request to name the same finding, a verified
+        /// purchase context, and the settlement profile the selector admits.
+        /// Surfaces without purchase-aware admission reject the marker before
+        /// any budget or payment mutation.
+        RequireFindingPurchase(Box<FindingPurchaseMarkerV1>),
+        /// Delivery: this grant authorizes a bounded no-charge redelivery of a
+        /// finding whose paid delivery was already settled. Recovery is a
+        /// distinct authorization profile: it never satisfies a purchase marker
+        /// and never enters a payment path.
+        ///
+        /// Admission requires the dedicated recovery carrier named by this
+        /// marker and an exact top-level `finding_id` argument. Surfaces without
+        /// recovery-aware admission reject the marker before dispatch.
+        RequireFindingRecovery(Box<FindingRecoveryMarkerV1>),
+    }
 }
-chio_security_types::lossless_serde!(Constraint);
 
-/// Closed settlement selector for a purchased finding reveal.
-///
-/// The selector is signed into the grant by the provider, so a purchase
-/// admitted for one rail cannot be replayed against another by omitting
-/// its companion evidence.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(
-    tag = "mode",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum FindingSettlementSelector {
-    /// Single-operator settlement over a local reversible hold: authorize
-    /// before dispatch, capture only after the delivered output passes the
-    /// digest and media checks, release on any failure.
-    LocalReversibleHold,
-    /// Cross-organization escrow settlement. The digest pins the exact
-    /// settlement-profile envelope the escrow witness must satisfy.
-    /// Registered for wire compatibility; admission rejects it until an
-    /// escrow witness lane exists.
-    CrossOrgEscrow {
-        /// Canonical lowercase 64-hex SHA-256 digest of the signed
-        /// settlement-profile envelope.
-        settlement_profile_sha256: String,
-    },
+chio_security_types::lossless_serde! {
+    /// Closed settlement selector for a purchased finding reveal.
+    ///
+    /// The selector is signed into the grant by the provider, so a purchase
+    /// admitted for one rail cannot be replayed against another by omitting
+    /// its companion evidence.
+    #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+    #[serde(
+        tag = "mode",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum FindingSettlementSelector {
+        /// Single-operator settlement over a local reversible hold: authorize
+        /// before dispatch, capture only after the delivered output passes the
+        /// digest and media checks, release on any failure.
+        LocalReversibleHold,
+        /// Cross-organization escrow settlement. The digest pins the exact
+        /// settlement-profile envelope the escrow witness must satisfy.
+        /// Registered for wire compatibility; admission rejects it until an
+        /// escrow witness lane exists.
+        CrossOrgEscrow {
+            /// Canonical lowercase 64-hex SHA-256 digest of the signed
+            /// settlement-profile envelope.
+            settlement_profile_sha256: String,
+        },
+    }
 }
-chio_security_types::lossless_serde!(FindingSettlementSelector);
 
 /// Provider-signed purchase binding carried by
 /// [`Constraint::RequireFindingPurchase`].
