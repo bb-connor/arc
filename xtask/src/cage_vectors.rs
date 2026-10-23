@@ -49,8 +49,8 @@ pub fn run(check_only: bool) -> Result<(), XtaskError> {
     })?;
     body_object.insert("signed_manifest".to_owned(), signed_manifest);
     let signer = Keypair::from_seed(&POLICY_SIGNER_SEED);
-    let (signature, _) = signer
-        .sign_canonical(&body)
+    let signature = chio_core_types::CanonicalBytes::from_value(&body)
+        .and_then(|canonical| signer.sign_wrapped("chio.mcp.cage-launch-policy.v1", &canonical))
         .map_err(|err| XtaskError::Drift(format!("cage policy signing failed: {err}")))?;
     let signed_policy = serde_json::json!({
         "body": body,
