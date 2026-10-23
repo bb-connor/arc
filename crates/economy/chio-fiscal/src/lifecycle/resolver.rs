@@ -10,6 +10,7 @@ use super::continuity::{
 use super::proposal::FiscalGenesisPolicy;
 use super::readiness::VerifiedFiscalRuntimeReadiness;
 use super::support::{signed_envelope_digest, verify_envelope};
+use crate::fiscal::verify_schedule_issuer;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FiscalContinuitySnapshot<'a> {
@@ -284,6 +285,7 @@ fn verify_schedule_chain(
         }
         let charter = charters.resolve(&current.body.charter_id, &current.body.charter_digest)?;
         current.body.validate_against(&charter)?;
+        verify_schedule_issuer(current, &charter)?;
         verify_envelope(current)?;
         match (current.body.sequence, &current.body.supersedes_schedule_id) {
             (1, None) => return Ok(()),

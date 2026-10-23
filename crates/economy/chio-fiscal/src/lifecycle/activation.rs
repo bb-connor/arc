@@ -9,6 +9,8 @@ use crate::{
     VerifiedFiscalSchedule,
 };
 
+use crate::fiscal::verify_schedule_issuer;
+
 use super::continuity::{FiscalStagedTransition, VerifiedFiscalActivationAuthority};
 use super::proposal::{
     FiscalAdmissionTrustRegistry, FiscalProposalAdmissionState, FiscalProposalAdmissionStatus,
@@ -760,6 +762,7 @@ fn verify_rotation_replacement(
     predecessor: &VerifiedFiscalSchedule,
 ) -> Result<(), FiscalError> {
     signed.body.validate_against(successor_charter)?;
+    verify_schedule_issuer(signed, successor_charter)?;
     verify_envelope(signed)?;
     let expected_sequence = predecessor
         .body()
