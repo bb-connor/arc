@@ -260,56 +260,10 @@ impl GuardEvidenceDeclaration {
     }
 }
 
-// Reserved top-level keys in the `ChioReceipt::metadata` object.
-//
-// ADR-0018 item 7 makes this registry normative: the kernel merges its typed
-// blocks under these keys last and rejects a pre-existing collision from caller
-// or hook metadata, so a downstream reader can trust that a block found under a
-// reserved key was written by the kernel and is covered by the receipt
-// signature. These consts are the `chio-core-types` reader-side source of
-// truth; the human-readable table lives in `spec/PROTOCOL.md` 6.4.
-
-/// Every top-level receipt-metadata key that only a Chio signer writes: the
-/// kernel, the receipt signing path, or the HTTP receipt projection. The
-/// kernel refuses caller metadata naming any of them before any effect, and a
-/// runtime-admission hook may name only `chio_runtime`.
-pub const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
-    "admission_operation",
-    "attribution",
-    "chio_manifest_security_v1",
-    "protocol_admission",
-    BUDGET_AUTHORITY_METADATA_KEY,
-    "budget_denial_authority",
-    FINANCIAL_METADATA_KEY,
-    GOVERNED_TRANSACTION_METADATA_KEY,
-    "caller_delivery",
-    "protocol_refusal",
-    "chio_runtime",
-    "receipt_context",
-    "governed_transaction_diagnostics",
-    "model_metadata",
-    CHANNEL_METADATA_KEY,
-    DELIVERY_CONTRACT_METADATA_KEY,
-    FINDING_DELIVERY_METADATA_KEY,
-    FINDING_RECOVERY_METADATA_KEY,
-    "finding_purchase_replay_snapshot",
-    "finding_recovery_replay_snapshot",
-    "findingDenial",
-    "stream",
-    "threshold_approval",
-    "memory_provenance",
-    "post_invocation",
-    "execution_nonce",
-    "chio_kernel",
-    "runtime_admission",
-    "active_response_terminal_evidence",
-    "chio_http_receipt_v1",
-    super::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
-    super::signing::CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
-    "finding_pool_mutation",
-    "session_report",
-    "prior_metadata",
-];
+// Named top-level keys of the `ChioReceipt::metadata` object. Every key is
+// registered once in `RECEIPT_METADATA_KEYS`, which records its origin and
+// committed disclosure and from which the reserved set is derived;
+// `spec/PROTOCOL.md` 6.4 renders that registry.
 
 /// Financial attribution and settlement metadata block key.
 pub const FINANCIAL_METADATA_KEY: &str = "financial";
@@ -665,8 +619,8 @@ pub struct ReceiptAttributionMetadata {
 mod key_registry;
 
 pub use key_registry::{
-    check_internal_receipt_metadata, metadata_key_spec, MetadataDisclosure, MetadataKeyOrigin,
-    MetadataKeySpec, RECEIPT_METADATA_KEYS,
+    check_internal_receipt_metadata, metadata_key_spec, reserved_receipt_metadata_keys,
+    MetadataDisclosure, MetadataKeyOrigin, MetadataKeySpec, RECEIPT_METADATA_KEYS,
 };
 
 #[cfg(test)]
