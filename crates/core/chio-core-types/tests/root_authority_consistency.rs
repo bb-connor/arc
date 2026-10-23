@@ -4,14 +4,14 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core_types::capability::anchor::{AnchorKind, RootAnchor};
-use chio_core_types::capability::attenuation::{DelegationLink, DelegationLinkBody};
+use chio_core_types::capability::attenuation::{Attenuation, DelegationLink, DelegationLinkBody};
 use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core_types::crypto::{Keypair, PublicKey};
 use chio_core_types::root_authority::{
     check_root_consistency, DelegationContext, HolderClass, IdpKeySnapshot,
-    IdpKeySnapshotSignatureError, LoadedRootPolicy, RootAuthorityShapeError, RootConsistencyError,
-    RootConsistencyInput, RootPolicy, RootPolicyLoadError, Sha256Digest,
+    IdpKeySnapshotSignatureError, KeySnapshotSource, LoadedRootPolicy, RootAuthorityShapeError,
+    RootConsistencyError, RootConsistencyInput, RootPolicy, RootPolicyLoadError, Sha256Digest,
 };
 use chio_core_types::{canonical_json_bytes, sha256};
 use serde_json::{json, Value};
@@ -748,6 +748,136 @@ fn snapshot_signed_by(exchange_key: &PublicKey, signer: &Keypair) -> IdpKeySnaps
     IdpKeySnapshot::new(fields).unwrap()
 }
 
+fn static_bearer_policy(ceiling_tools: &[&str]) -> impl FnOnce(&mut Value) {
+    let ceiling = scope(ceiling_tools.iter().map(|tool| grant(tool)).collect());
+    move |policy| {
+        let mut rule = static_bearer_rule_json("dev-static");
+        rule["ceiling_scope"] = serde_json::to_value(&ceiling).unwrap();
+        rule["ceiling_scope_hash"] = serde_json::to_value(scope_digest(&ceiling)).unwrap();
+        policy["rules"].as_array_mut().unwrap().push(rule);
+    }
+}
+
+fn static_bearer_context(token_exp: u64) -> impl FnOnce(&mut Value) {
+    move |context| {
+        context["anchor"] = json!({
+            "kind": "operator_static_bearer",
+            "issuer": "urn:chio:operator",
+            "artifact_retained": false,
+            "replay_key_digest": format!("sha256:{}", "a8".repeat(32)),
+            "token_iat": ISSUED_AT,
+            "token_exp": token_exp,
+            "subject": { "commit": format!("sha256:{}", "55".repeat(32)), "salt_ref": "anchor.sub" },
+            "tenant": { "commit": format!("sha256:{}", "69".repeat(32)), "salt_ref": "anchor.tenant" },
+            "claims": {}
+        });
+        context["root_policy_rule_id"] = json!("dev-static");
+    }
+}
+
+#[test]
+fn static_bearer_root_scoped_to_its_ceiling_agrees() {
+    let fixture = Fixture::with(
+        static_bearer_policy(&["search"]),
+        static_bearer_context(EXPIRES_AT),
+        &exchange_keypair(),
+        vec![grant("search")],
+    );
+    assert_eq!(fixture.check(), Ok(()));
+}
+
+#[test]
+fn static_bearer_assertion_exp_must_equal_the_root_expiry() {
+    let error = Fixture::with(
+        static_bearer_policy(&["search"]),
+        static_bearer_context(EXPIRES_AT + 10),
+        &exchange_keypair(),
+        vec![grant("search")],
+    )
+    .check()
+    .unwrap_err();
+    assert_eq!(
+        error,
+        RootConsistencyError::StaticBearerExpiryMismatch {
+            expires_at: EXPIRES_AT,
+            assertion_exp: EXPIRES_AT + 10,
+        }
+    );
+}
+
+#[test]
+fn static_bearer_root_narrower_than_its_ceiling_denies() {
+    let error = Fixture::with(
+        static_bearer_policy(&["search", "get"]),
+        static_bearer_context(EXPIRES_AT),
+        &exchange_keypair(),
+        vec![grant("search")],
+    )
+    .check()
+    .unwrap_err();
+    assert_eq!(error, RootConsistencyError::StaticBearerScopeNotCeiling);
+}
+
+#[test]
+fn inverted_assertion_window_denies() {
+    let error = consistency_error(
+        |_| {},
+        |context| context["anchor"]["token_iat"] = json!(EXPIRES_AT + 1),
+    );
+    assert_eq!(
+        error,
+        RootConsistencyError::InvertedAssertionWindow {
+            token_iat: EXPIRES_AT + 1,
+            token_exp: EXPIRES_AT,
+        }
+    );
+}
+
+#[test]
+fn anchor_algorithm_outside_the_rule_denies() {
+    let error = consistency_error(|_| {}, |context| context["anchor"]["alg"] = json!("ES256"));
+    assert_eq!(error, RootConsistencyError::AlgorithmNotAllowed);
+}
+
+#[test]
+fn budget_share_marker_is_not_a_root() {
+    let mut fixture = Fixture::new();
+    fixture.root.budget_share_bps = Some(5_000);
+    assert_eq!(fixture.check(), Err(RootConsistencyError::NotARoot));
+}
+
+#[test]
+fn scope_attenuation_marker_is_not_a_root() {
+    let mut fixture = Fixture::new();
+    fixture.root.scope_attenuations = Some(vec![Attenuation::RemoveTool {
+        server_id: "crm".into(),
+        tool_name: "get".into(),
+    }]);
+    assert_eq!(fixture.check(), Err(RootConsistencyError::NotARoot));
+}
+
+#[test]
+fn policy_load_refuses_a_weak_exchange_key() {
+    let weak = "0100000000000000000000000000000000000000000000000000000000000000";
+    let error = load(signed_policy(|policy| {
+        policy["exchange_keys"] = json!([exchange_keypair().public_key(), weak]);
+    }))
+    .unwrap_err();
+    assert_eq!(error, RootPolicyLoadError::WeakExchangeKey);
+}
+
+#[test]
+fn policy_load_refuses_the_policy_key_as_an_exchange_key() {
+    let error = load(signed_policy(|policy| {
+        policy["exchange_keys"] = json!([
+            exchange_keypair().public_key(),
+            policy_keypair().public_key()
+        ]);
+    }))
+    .unwrap_err();
+    assert_eq!(error, RootPolicyLoadError::PolicyKeyIsExchangeKey);
+}
+
 #[test]
 fn key_snapshot_verifies_under_the_pinned_exchange_key() {
     let pinned = exchange_keypair().public_key();
@@ -791,4 +921,16 @@ fn key_snapshot_digest_vector() {
         snapshot.digest().unwrap().to_string(),
         "sha256:01d8735e11a090cb4dba74f1c62ab185d6eaa9efb97a69b580e209a69e5805f7"
     );
+}
+
+#[test]
+fn registry_snapshot_source_refuses_a_byte_order_mark() {
+    assert_eq!(
+        KeySnapshotSource::parse("registry:acme\u{feff}okta").unwrap_err(),
+        RootAuthorityShapeError::Pattern {
+            field: "source",
+            expected: "registry:<1 to 128 characters without NUL or whitespace>",
+        }
+    );
+    assert!(KeySnapshotSource::parse("registry:acme-okta").is_ok());
 }

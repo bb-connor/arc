@@ -35,9 +35,9 @@ impl KeySnapshotSource {
             let length = provider_id.chars().count();
             if length == 0
                 || length > 128
-                || provider_id
-                    .chars()
-                    .any(|character| character == '\0' || character.is_whitespace())
+                || provider_id.chars().any(|character| {
+                    character == '\0' || character.is_whitespace() || character == '\u{feff}'
+                })
             {
                 return Err(RootAuthorityShapeError::Pattern {
                     field: "source",

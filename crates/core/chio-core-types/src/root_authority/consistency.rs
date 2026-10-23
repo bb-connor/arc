@@ -39,6 +39,10 @@ pub enum RootConsistencyError {
     AssertionExpMismatch,
     AnchoredAtMismatch,
     ExpiresAfterAssertion { expires_at: u64, assertion_exp: u64 },
+    StaticBearerExpiryMismatch { expires_at: u64, assertion_exp: u64 },
+    InvertedAssertionWindow { token_iat: u64, token_exp: u64 },
+    AlgorithmNotAllowed,
+    StaticBearerScopeNotCeiling,
     ExchangeKeyMismatch,
     ExchangeKeyNotListed,
     ScopeHashMismatch,
@@ -85,6 +89,25 @@ impl fmt::Display for RootConsistencyError {
                 formatter,
                 "root expires_at {expires_at} exceeds assertion_exp {assertion_exp}"
             ),
+            Self::StaticBearerExpiryMismatch {
+                expires_at,
+                assertion_exp,
+            } => write!(
+                formatter,
+                "operator_static_bearer root expires_at {expires_at} differs from assertion_exp {assertion_exp}"
+            ),
+            Self::InvertedAssertionWindow {
+                token_iat,
+                token_exp,
+            } => write!(
+                formatter,
+                "anchor token_iat {token_iat} is after token_exp {token_exp}"
+            ),
+            Self::AlgorithmNotAllowed => {
+                formatter.write_str("anchor alg is not in the root policy rule allowed_algs")
+            }
+            Self::StaticBearerScopeNotCeiling => formatter
+                .write_str("operator_static_bearer root scope differs from the rule ceiling_scope"),
             Self::ExchangeKeyMismatch => {
                 formatter.write_str("root issuer differs from exchange.exchange_key")
             }
@@ -172,7 +195,7 @@ pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), Roo
         |error: crate::Error| RootConsistencyError::Canonicalization(error.to_string());
 
     require(
-        root.delegation_chain.is_empty() && root.attenuation_proof.is_none(),
+        root.delegation_chain.is_empty() && !root.requires_chain_binding(),
         RootConsistencyError::NotARoot,
     )?;
     require(
@@ -202,6 +225,22 @@ pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), Roo
             assertion_exp: anchor.assertion_exp,
         },
     )?;
+    if anchor.kind == AnchorKind::OperatorStaticBearer {
+        require(
+            root.expires_at == anchor.assertion_exp,
+            RootConsistencyError::StaticBearerExpiryMismatch {
+                expires_at: root.expires_at,
+                assertion_exp: anchor.assertion_exp,
+            },
+        )?;
+    }
+    require(
+        context.anchor.token_iat <= context.anchor.token_exp,
+        RootConsistencyError::InvertedAssertionWindow {
+            token_iat: context.anchor.token_iat,
+            token_exp: context.anchor.token_exp,
+        },
+    )?;
     require(
         root.issuer == context.exchange.exchange_key,
         RootConsistencyError::ExchangeKeyMismatch,
@@ -223,6 +262,15 @@ pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), Roo
         rule.match_.anchor_kind == anchor.kind,
         RootConsistencyError::RuleKindMismatch,
     )?;
+    if let Some(alg) = context.anchor.alg {
+        require(
+            rule.match_
+                .allowed_algs
+                .as_ref()
+                .is_some_and(|allowed| allowed.contains(&alg)),
+            RootConsistencyError::AlgorithmNotAllowed,
+        )?;
+    }
     check_holder(root, context.exchange.holder, rule, sender_key)?;
     require(
         context.anchor.provider_record_id == rule.match_.provider_record_id
@@ -233,6 +281,12 @@ pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), Roo
         root.scope.is_subset_of(&rule.ceiling_scope),
         RootConsistencyError::ScopeExceedsCeiling,
     )?;
+    if anchor.kind == AnchorKind::OperatorStaticBearer {
+        require(
+            scope_digest == rule.ceiling_scope_hash,
+            RootConsistencyError::StaticBearerScopeNotCeiling,
+        )?;
+    }
     let lifetime = root.expires_at.saturating_sub(root.issued_at);
     require(
         lifetime <= rule.capability_ttl(),

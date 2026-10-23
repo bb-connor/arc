@@ -425,6 +425,12 @@ impl RootPolicy {
         if self.valid_from >= self.valid_until {
             return Err(RootPolicyLoadError::EmptyValidityWindow);
         }
+        if self.exchange_keys.iter().any(PublicKey::is_weak_ed25519) {
+            return Err(RootPolicyLoadError::WeakExchangeKey);
+        }
+        if self.exchange_keys.contains(&self.policy_key) {
+            return Err(RootPolicyLoadError::PolicyKeyIsExchangeKey);
+        }
         if self.disclosure.has_tool_entries() {
             return Err(RootPolicyLoadError::InlineDisclosureUnsupported);
         }
@@ -537,6 +543,8 @@ pub enum RootPolicyLoadError {
     UnsupportedAnchorKind { rule_id: String, kind: AnchorKind },
     ArtifactRetentionUnsupported { rule_id: String },
     CeilingScopeHashMismatch { rule_id: String },
+    WeakExchangeKey,
+    PolicyKeyIsExchangeKey,
     Canonicalization(String),
 }
 
@@ -578,6 +586,12 @@ impl fmt::Display for RootPolicyLoadError {
                 formatter,
                 "root policy rule `{rule_id}` ceiling_scope_hash does not match ceiling_scope"
             ),
+            Self::WeakExchangeKey => {
+                formatter.write_str("root policy lists a weak Ed25519 exchange key")
+            }
+            Self::PolicyKeyIsExchangeKey => {
+                formatter.write_str("root policy key is also listed as an exchange key")
+            }
             Self::Canonicalization(error) => {
                 write!(formatter, "root policy canonicalization failed: {error}")
             }
