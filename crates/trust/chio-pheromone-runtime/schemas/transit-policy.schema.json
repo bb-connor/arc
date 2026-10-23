@@ -251,7 +251,6 @@
         "verifierId",
         "verifierKeyId",
         "publicKey",
-        "signatureAlgorithm",
         "validFromUnixMs",
         "validUntilUnixMs",
         "allowedTreaties",
@@ -266,7 +265,6 @@
         "verifierId": { "type": "string", "minLength": 1 },
         "verifierKeyId": { "type": "string", "minLength": 1 },
         "publicKey": { "$ref": "#/$defs/publicKey" },
-        "signatureAlgorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
         "validFromUnixMs": { "type": "integer", "minimum": 0 },
         "validUntilUnixMs": { "type": "integer", "minimum": 0 },
         "allowedTreaties": {
