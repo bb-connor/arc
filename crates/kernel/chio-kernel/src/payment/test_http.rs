@@ -1,0 +1,105 @@
+//! Loopback HTTP stub that answers a fixed sequence of JSON responses, one
+//! connection each, and hands every captured request back to the test.
+
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+pub(crate) fn spawn_once_json_server(
+    status_code: u16,
+    body: serde_json::Value,
+) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+    spawn_json_server(vec![(status_code, body)])
+}
+
+pub(crate) fn spawn_json_server(
+    responses: Vec<(u16, serde_json::Value)>,
+) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
+    let address = listener
+        .local_addr()
+        .expect("listener should expose local address");
+    let (request_tx, request_rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        for (status_code, body) in responses {
+            let (mut stream, _) = listener.accept().expect("server should accept request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("server should configure read timeout");
+            let request = read_request(&mut stream);
+            request_tx
+                .send(request)
+                .expect("request should be sent to test");
+            let body_text = body.to_string();
+            let response = format!(
+                "HTTP/1.1 {status_code} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                status_text(status_code),
+                body_text.len(),
+                body_text
+            );
+            stream
+                .write_all(response.as_bytes())
+                .expect("server should write response");
+        }
+    });
+    (format!("http://{address}"), request_rx, handle)
+}
+
+fn read_request(stream: &mut std::net::TcpStream) -> String {
+    let mut request = Vec::new();
+    let mut chunk = [0_u8; 1024];
+    let mut header_end = None;
+    let mut content_length = 0_usize;
+    loop {
+        let read = stream
+            .read(&mut chunk)
+            .expect("server should read request bytes");
+        if read == 0 {
+            break;
+        }
+        request.extend_from_slice(&chunk[..read]);
+        if header_end.is_none() {
+            header_end = find_header_end(&request);
+            if let Some(end) = header_end {
+                content_length = parse_content_length(&request[..end]);
+            }
+        }
+        if let Some(end) = header_end {
+            if request.len() >= end + content_length {
+                break;
+            }
+        }
+    }
+    String::from_utf8_lossy(&request).into_owned()
+}
+
+fn find_header_end(request: &[u8]) -> Option<usize> {
+    request
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|position| position + 4)
+}
+
+fn parse_content_length(headers: &[u8]) -> usize {
+    let text = String::from_utf8_lossy(headers);
+    text.lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            if name.eq_ignore_ascii_case("content-length") {
+                value.trim().parse::<usize>().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0)
+}
+
+fn status_text(status_code: u16) -> &'static str {
+    match status_code {
+        200 => "OK",
+        402 => "Payment Required",
+        _ => "Error",
+    }
+}
