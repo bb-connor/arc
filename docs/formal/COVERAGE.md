@@ -1383,6 +1383,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/receipt/authoritative_spend.rs`: `b9a78d4d49f00679eb6bf9950b6ebee3c7ae163441145660429db9c885fdf2ee`
 - `crates/core/chio-core-types/src/receipt/body.rs`: `7c50ec7332fd031990e6a96e2a1e7356cf7b61236b0b51c6f108e6e0e4ff16cf`
 - `crates/core/chio-core-types/src/receipt/checkpoint.rs`: `a2e251b696aeea565970dfcf51016fc636c117f6765b49641a42505369f8882d`
+- `crates/core/chio-core-types/src/receipt/commitment.rs`: `aead51e91673cb89720f1e52b417eaecfdec0509e57ad8d6ebfb520a86506da6`
 - `crates/core/chio-core-types/src/receipt/crypto_floor.rs`: `e81e8154fee4913a55a26a828670c2bd81d3361a1a2b28823ef102464bbc3ed9`
 - `crates/core/chio-core-types/src/receipt/decision.rs`: `5dca4908badbc0cb1400c36ff5ef83689f0659cae9bfeb8b0a749d9128484d28`
 - `crates/core/chio-core-types/src/receipt/economics.rs`: `1a3290837b0410c56a4817aace836f8528d6c968c6cf0beea27b45d3894877d0`
@@ -1391,7 +1392,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/receipt/kinds.rs`: `daa42fc42b98268c905f5fb12f8f72cbaa15f2f0a64bf52e5a43f16339c184b4`
 - `crates/core/chio-core-types/src/receipt/lineage.rs`: `9249bb20914655123a0c40945fc63d107ad7cdbf59925667b3ff81c63990ecd7`
 - `crates/core/chio-core-types/src/receipt/metadata.rs`: `d028e67b05656d73ca3364914b1fd7870e19ae4128a8392f1109b74163a9ef94`
-- `crates/core/chio-core-types/src/receipt/mod.rs`: `beb3a451691ec36cc034a92370492fd1ad41a5084e974a4b5774f904855001b4`
+- `crates/core/chio-core-types/src/receipt/mod.rs`: `fb12943c576d2f831cdac78fa73ac46d19ae589b9a1dbc1f5a866263c30f19df`
 - `crates/core/chio-core-types/src/receipt/security.rs`: `ffbdd30d0b86603e620398ccf974e5124020b51ec594f36531c02e68f347f45e`
 - `crates/core/chio-core-types/src/receipt/security_parts/scheduler_fence_tests.rs`: `04ebe900b96c5124787ad64cbf3a87b89ce507d971c23d0a0f60148f7fa1a630`
 - `crates/core/chio-core-types/src/receipt/signing.rs`: `c07e76344a1252aee13c5f071fb19a696888bacd32562fe141ce02e9002dba4f`
@@ -1442,6 +1443,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/signer_binding.rs`: `b51b6c84b79ed81d8744022f8f7336e091f0ae51bd25bf3b1cf463f22ad34bf1`
 - `crates/core/chio-core-types/src/signer_binding_tests.rs`: `ddb50263803c9204824a8bf5afeff8db53d7dcb58546a2db38b251f0e7c9f3a5`
 - `crates/core/chio-core-types/src/store_fence.rs`: `642a8b51a3674b0146d4522e42bf1776534af7cede7a7ee8d0cce33d05863c82`
+- `crates/core/chio-core-types/src/tenant_index/load.rs`: `e218eb9f251886dcbf453bd510c4ded38e9e9afe105735212c95a80a3a06fd00`
+- `crates/core/chio-core-types/src/tenant_index/mod.rs`: `6236d53a223aa5b495382b39787563f349d50a7756cd2c8e62476a22ddfbfc47`
+- `crates/core/chio-core-types/src/tenant_index/tests.rs`: `cbaf4ddf440a46ccc127ec46aa1c7948fd4d8120a5d9c5e8f5a49783c1a1673d`
 - `crates/core/chio-core-types/src/wire_text.rs`: `053c6b60bf760efcc526f96b4a5c2652900242c973ee62e9d14b2f1857200954`
 - `crates/economy/chio-credit/src/formal_economy.rs`: `0e659e620f921da7e51f17f3bcd6d3b40a902fa52dd4f3e2836101c712da23f6`
 - `crates/economy/chio-credit/src/kani_public_harnesses.rs`: `1cc7f5c38ca1ba5d420b21c005932014232e44e35a568aead55bdfe8181e8275`
