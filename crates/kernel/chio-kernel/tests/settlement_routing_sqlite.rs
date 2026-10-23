@@ -300,6 +300,15 @@ fn kernel(
     hook: Arc<dyn SettlementHook>,
     authority: &SqliteAuthorityStore,
 ) -> Result<(ChioKernel, CapabilityToken), KernelError> {
+    let (mut kernel, capability) = unsettled_kernel(receipts, authority)?;
+    kernel.set_settlement_observer_runtime(hook, outcomes, RetryPolicy::default())?;
+    Ok((kernel, capability))
+}
+
+fn unsettled_kernel(
+    receipts: &Arc<SqliteReceiptStore>,
+    authority: &SqliteAuthorityStore,
+) -> Result<(ChioKernel, CapabilityToken), KernelError> {
     let mut kernel = ChioKernel::new_with_clock(kernel_config(), chio_test_support::clock::clock());
     kernel
         .configure_durable_admission(DurableAdmissionMode::Monetary, false)
@@ -315,7 +324,6 @@ fn kernel(
     let capability = kernel.issue_capability(&Keypair::generate().public_key(), scope(), 300)?;
     let receipt_store: Arc<dyn ReceiptStore> = receipts.clone();
     kernel.set_receipt_store_handle(receipt_store)?;
-    kernel.set_settlement_observer_runtime(hook, outcomes, RetryPolicy::default())?;
     Ok((kernel, capability))
 }
 
@@ -523,5 +531,182 @@ fn settlement_routing_sqlite_recovery_reclaims_work_and_rejects_stale_claims(
     drop(authority);
     drop(outcomes);
     drop(receipts);
+    Ok(())
+}
+
+struct SqliteFixture {
+    _root: tempfile::TempDir,
+    authority: SqliteAuthorityStore,
+    receipts: Arc<SqliteReceiptStore>,
+    outcomes: Arc<SqliteSettlementOutcomeStore>,
+}
+
+fn sqlite_fixture() -> Result<SqliteFixture, Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    let lock_root = root.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+    }
+    let authority_path = root.path().join("authority.sqlite3");
+    SqliteAuthorityStore::provision(&authority_path, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &authority_path,
+        &lock_root,
+        chio_test_support::clock::clock(),
+    )?;
+    let receipts = Arc::new(SqliteReceiptStore::open(
+        root.path().join("receipts.sqlite3"),
+    )?);
+    let outcomes = Arc::new(SqliteSettlementOutcomeStore::open_alongside(&receipts)?);
+    Ok(SqliteFixture {
+        _root: root,
+        authority,
+        receipts,
+        outcomes,
+    })
+}
+
+fn pending_attempts(outcomes: &SqliteSettlementOutcomeStore) -> Result<usize, Box<dyn Error>> {
+    Ok(outcomes
+        .claim_due("pending-probe", PENDING_PROBE_UNIX_MS, 1_000, 16)?
+        .len())
+}
+
+const LEDGER_FIXTURE_UNIX_SECS: u64 = 1_900_000_000;
+const PENDING_PROBE_UNIX_MS: u64 = (LEDGER_FIXTURE_UNIX_SECS + 86_400) * 1_000;
+
+#[test]
+fn settlement_ledger_records_one_reconciliation_for_a_settled_durable_receipt(
+) -> Result<(), Box<dyn Error>> {
+    let _clock = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS);
+    let fixture = sqlite_fixture()?;
+    let (mut kernel, capability) = unsettled_kernel(&fixture.receipts, &fixture.authority)?;
+    let outcomes: Arc<dyn SettlementOutcomeStore> = fixture.outcomes.clone();
+    kernel.install_settlement_ledger(outcomes, RetryPolicy::default())?;
+
+    let receipt = execute(&kernel, &capability, "ledger-settled")?;
+
+    let financial = receipt
+        .financial_metadata()
+        .ok_or("settled receipt carries no financial metadata")?;
+    assert_eq!(
+        financial.settlement_status,
+        chio_core::receipt::economics::SettlementStatus::Settled
+    );
+    let payment_reference = financial
+        .payment_reference
+        .ok_or("settled receipt carries no payment reference")?;
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
+    assert_eq!(pending_attempts(&fixture.outcomes)?, 0);
+    assert!(!ReceiptStore::record_settlement_reconciliation(
+        fixture.receipts.as_ref(),
+        &receipt.id,
+        chio_kernel::SettlementReconciliationState::Reconciled,
+        Some(&payment_reference),
+    )?);
+    let stored = fixture
+        .receipts
+        .load_chio_receipt(&receipt.id)?
+        .ok_or("settled receipt is not stored")?;
+    assert_eq!(
+        chio_core::canonical::canonical_json_bytes(&stored)?,
+        chio_core::canonical::canonical_json_bytes(&receipt)?
+    );
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
+    Ok(())
+}
+
+struct RetryOnceHook {
+    calls: AtomicUsize,
+}
+
+impl SettlementHook for RetryOnceHook {
+    fn observe(
+        &self,
+        _observation: &SettlementObservation,
+        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+    ) -> Result<SettlementOutcome, SettlementHookError> {
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            return Ok(SettlementOutcome::retryable(
+                chio_settle::SettlementFailureReason::from_detail(
+                    chio_settle::SettlementFailureCode::Rpc,
+                    "rail unavailable",
+                ),
+            ));
+        }
+        Ok(SettlementOutcome::accepted("accepted-after-retry"))
+    }
+}
+
+#[test]
+fn settlement_drain_reruns_a_retryable_attempt_once_it_is_due() -> Result<(), Box<dyn Error>> {
+    let _clock = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS);
+    let fixture = sqlite_fixture()?;
+    let hook = Arc::new(RetryOnceHook {
+        calls: AtomicUsize::new(0),
+    });
+    let hook_handle: Arc<dyn SettlementHook> = hook.clone();
+    let outcomes: Arc<dyn SettlementOutcomeStore> = fixture.outcomes.clone();
+    let (kernel, capability) =
+        kernel(&fixture.receipts, outcomes, hook_handle, &fixture.authority)?;
+
+    execute(&kernel, &capability, "drain-retry")?;
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
+
+    let _due = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS + 5);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(pending_attempts(&fixture.outcomes)?, 0);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
+    Ok(())
+}
+
+#[test]
+fn settlement_drain_fails_on_a_completion_write_and_keeps_the_row_for_reclaim(
+) -> Result<(), Box<dyn Error>> {
+    let _clock = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS);
+    let fixture = sqlite_fixture()?;
+    let failing = CrashOutcomeStore::new(Arc::clone(&fixture.outcomes), CrashMode::AfterHook);
+    let hook = Arc::new(AcceptingHook::default());
+    let outcome_handle: Arc<dyn SettlementOutcomeStore> = failing.clone();
+    let hook_handle: Arc<dyn SettlementHook> = hook.clone();
+    let (kernel, capability) = kernel(
+        &fixture.receipts,
+        outcome_handle,
+        hook_handle,
+        &fixture.authority,
+    )?;
+    let receipt = execute(&kernel, &capability, "drain-completion-failure")?;
+
+    let drained = kernel.drain_settlement_attempts(16);
+
+    assert!(
+        matches!(
+            &drained,
+            Err(KernelError::SettlementDrain(SettlementRouteError::Backend { detail }))
+                if detail == "simulated crash after hook"
+        ),
+        "{drained:?}"
+    );
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
+    let fixture_now_ms = LEDGER_FIXTURE_UNIX_SECS * 1_000;
+    assert!(fixture
+        .outcomes
+        .claim_due("reclaim", fixture_now_ms, 1_000, 16)?
+        .is_empty());
+    let reclaimed = fixture
+        .outcomes
+        .claim_due("reclaim", fixture_now_ms + 30_000, 1_000, 16)?;
+    assert_eq!(reclaimed.len(), 1);
+    assert_eq!(reclaimed[0].receipt_id, receipt.id);
+    assert_eq!(reclaimed[0].attempts, 0);
     Ok(())
 }

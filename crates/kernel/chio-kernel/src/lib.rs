@@ -144,6 +144,10 @@ pub mod runtime;
 mod runtime_trace;
 pub mod session;
 #[cfg(not(loom))]
+mod settlement_ledger;
+#[cfg(not(loom))]
+pub use settlement_ledger::KernelSettlementLedgerHook;
+#[cfg(not(loom))]
 mod settlement_routing;
 #[cfg(not(loom))]
 pub mod stop;
@@ -714,6 +718,8 @@ pub use kernel::NativeSecurityDispatchCaptureAuthority;
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
+#[cfg(not(loom))]
+pub use kernel::SettlementDrainReport;
 #[cfg(not(loom))]
 pub use kernel::VerifiedNativeDispatchCredentials;
 #[cfg(all(not(loom), feature = "admission-test-support"))]

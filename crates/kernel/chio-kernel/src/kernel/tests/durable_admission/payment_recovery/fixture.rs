@@ -173,6 +173,26 @@ pub(super) fn payment_fixture(
     Arc<AtomicU64>,
     Arc<RailCalls>,
 ) {
+    let calls = Arc::new(RailCalls::default());
+    let (kernel, request, store, invocations) = payment_fixture_with_adapter(
+        name,
+        Box::new(RecoveryRail {
+            prepaid,
+            calls: calls.clone(),
+        }),
+    );
+    (kernel, request, store, invocations, calls)
+}
+
+pub(super) fn payment_fixture_with_adapter(
+    name: &str,
+    adapter: Box<dyn PaymentAdapter>,
+) -> (
+    ChioKernel,
+    ToolCallRequest,
+    Arc<TestAdmissionOperationStore>,
+    Arc<AtomicU64>,
+) {
     let mut grant = make_grant("durable-server", "mutate");
     grant.max_cost_per_invocation = Some(MonetaryAmount {
         units: 10,
@@ -184,12 +204,8 @@ pub(super) fn payment_fixture(
     });
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture_with_grants(name, vec![grant]);
-    let calls = Arc::new(RailCalls::default());
-    kernel.set_payment_adapter(Box::new(RecoveryRail {
-        prepaid,
-        calls: calls.clone(),
-    }));
-    (kernel, request, store, invocations, calls)
+    kernel.set_payment_adapter(adapter);
+    (kernel, request, store, invocations)
 }
 
 pub(super) fn authorize_without_dispatch(
