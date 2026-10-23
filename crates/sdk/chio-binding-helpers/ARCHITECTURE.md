@@ -19,7 +19,7 @@ between calls. Applications supply time and trusted receipt signers explicitly.
 | --- | --- |
 | `canonical` | Parse raw JSON into a value and emit RFC 8785 canonical JSON. |
 | `hashing` | SHA-256 lowercase hex for byte slices and UTF-8 strings. |
-| `signing` | Seed-based Ed25519 signing, signature verification, and hex helpers. |
+| `signing` | Seed-based Ed25519 signing-wrapper signing and verification under a registered schema id, and hex helpers. |
 | `capability` | Token parsing, body canonicalization, signature/chain-shape/time report. |
 | `receipt` | Strict signed-wire parsing, body canonicalization, identity/hash/trust report. |
 | `manifest` | Signed-manifest parsing, body canonicalization, structure and key report. |
@@ -28,10 +28,11 @@ between calls. Applications supply time and trusted receipt signers explicitly.
 ## Data and control flow
 
 JSON signing parses a `serde_json::Value`, constructs a `Keypair` from the seed,
-and invokes `sign_canonical`. The returned `CanonicalJsonSignature` carries the
-canonical bytes as UTF-8, the public key, and the hex signature. Verification
-reconstructs the value and key/signature objects before `verify_canonical`.
-UTF-8 signing and verification pass the input's bytes directly to the key APIs.
+and invokes `sign_wrapped` under the caller's schema id. The returned
+`WrappedJsonSignature` carries the schema id, the canonical bytes as UTF-8, the
+public key, and the hex signature. Verification reconstructs the value and
+key/signature objects before `verify_wrapped`, which returns an error on any
+refusal.
 
 Capability verification calls `validate_time(now)` and converts its expiry or
 not-yet-valid outcome to `CapabilityTimeStatus`. Signature verification remains

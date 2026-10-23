@@ -15,8 +15,31 @@ type CapabilityVerification struct {
 	TimeValid                 bool                 `json:"time_valid"`
 }
 
-// CapabilitySchema is the only accepted capability token schema.
+// CapabilitySchema is the only accepted capability token schema and its wrapper id.
 const CapabilitySchema = "chio.capability.v1"
+
+// DelegationLinkSchema is the wrapper id of a delegation link signature.
+const DelegationLinkSchema = "chio.delegation-link.v1"
+
+var capabilityMembers = map[string]struct{}{
+	"schema": {}, "id": {}, "issuer": {}, "subject": {}, "scope": {}, "issued_at": {},
+	"expires_at": {}, "delegation_chain": {}, "aggregate_invocation_budget": {}, "caveats": {},
+	"scope_attenuations": {}, "attenuation_proof": {}, "budget_share_bps": {}, "signature": {},
+}
+
+var delegationLinkMembers = map[string]struct{}{
+	"capability_id": {}, "delegator": {}, "delegatee": {}, "attenuations": {}, "timestamp": {},
+	"scope_hash": {}, "aggregate_budget": {}, "cumulative_approval": {}, "signature": {},
+}
+
+func rejectUnknownMembers(value map[string]any, allowed map[string]struct{}, kind string) error {
+	for key := range value {
+		if _, ok := allowed[key]; !ok {
+			return newInvariantError("json", kind+" has unknown member "+key)
+		}
+	}
+	return nil
+}
 
 func ParseCapabilityJSON(input string) (map[string]any, error) {
 	value, err := ParseJSONText(input)
@@ -37,12 +60,11 @@ func validateCapabilitySchema(capability map[string]any) error {
 	if schema, ok := capability["schema"].(string); !ok || schema != CapabilitySchema {
 		return newInvariantError("json", `capability schema must be "chio.capability.v1"`)
 	}
-	return nil
+	return rejectUnknownMembers(capability, capabilityMembers, "capability")
 }
 
 func capabilityBody(capability map[string]any) map[string]any {
 	omitted := map[string]struct{}{
-		"algorithm":          {},
 		"attenuation_proof":  {},
 		"budget_share_bps":   {},
 		"caveats":            {},
@@ -136,7 +158,7 @@ func verifyCapability(capability map[string]any, now int64, maxDelegationDepth *
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
-	signatureValid, err := VerifyUTF8MessageEd25519(body, issuer, signature)
+	signatureValid, err := wrappedSignatureValid(CapabilitySchema, body, issuer, signature)
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
@@ -186,6 +208,9 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 		if !ok {
 			return false, newInvariantError("json", "delegation_chain entries must be objects")
 		}
+		if err := rejectUnknownMembers(current, delegationLinkMembers, "delegation link"); err != nil {
+			return false, err
+		}
 		body, err := CanonicalizeJSON(copyWithoutKey(current, "signature"))
 		if err != nil {
 			return false, err
@@ -198,7 +223,7 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		signatureValid, err := VerifyUTF8MessageEd25519(body, delegator, signature)
+		signatureValid, err := wrappedSignatureValid(DelegationLinkSchema, body, delegator, signature)
 		if err != nil {
 			return false, err
 		}

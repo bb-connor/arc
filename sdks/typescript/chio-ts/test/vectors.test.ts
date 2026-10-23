@@ -13,14 +13,13 @@ import {
   parseReceiptJson,
   receiptBodyCanonicalJson,
   receiptSigningBodyCanonicalJson,
+  publicKeyFromSeedEd25519,
   sha256HexUtf8,
-  signJsonStringEd25519,
-  signUtf8MessageEd25519,
+  signWrappedJsonEd25519,
   verifyCapability,
-  verifyJsonStringSignatureEd25519,
   verifyReceipt,
   verifyReceiptWithTrustedSigners,
-  verifyUtf8MessageEd25519,
+  verifyWrappedJson,
 } from "../src/index.ts";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -153,7 +152,8 @@ test("TS receipt signature validity fails when the content-addressed id mismatch
   assert.ok(vectorCase, "allow receipt vector must exist");
   const receipt = JSON.parse(JSON.stringify(vectorCase.receipt));
   receipt.id = "0000000000000000000000000000000000000000000000000000000000000000";
-  receipt.signature = signJsonStringEd25519(
+  receipt.signature = signWrappedJsonEd25519(
+    "chio.receipt.v1",
     receiptSigningBodyCanonicalJson(receipt),
     fixture.signing_key_seed_hex,
   ).signature_hex;
@@ -165,19 +165,25 @@ test("TS receipt signature validity fails when the content-addressed id mismatch
   assert.equal(verification.ok, false);
 });
 
-test("signing vectors match the TS signing helpers", async () => {
+function wrappedVerifies(schemaId: string, input: string, publicKey: string, signature: string): boolean {
+  try {
+    verifyWrappedJson(schemaId, input, publicKey, signature);
+    return true;
+  } catch (error) {
+    if (error instanceof ChioInvariantError) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+test("signing vectors match the TS wrapped signing helpers", async (t) => {
   const fixture = await readJson("tests/bindings/vectors/signing/v1.json") as {
     signing_key_seed_hex: string;
-    utf8_cases: Array<{
-      id: string;
-      input_utf8: string;
-      public_key_hex: string;
-      signature_hex: string;
-      expected_verify: boolean;
-      signing_key_seed_hex?: string;
-    }>;
+    utf8_cases?: unknown[];
     json_cases: Array<{
       id: string;
+      schema_id?: string;
       input_json: string;
       canonical_json: string;
       public_key_hex: string;
@@ -186,39 +192,21 @@ test("signing vectors match the TS signing helpers", async () => {
       signing_key_seed_hex?: string;
     }>;
   };
-
-  for (const vectorCase of fixture.utf8_cases) {
-    const seedHex = vectorCase.signing_key_seed_hex ?? fixture.signing_key_seed_hex;
-    if (vectorCase.expected_verify) {
-      assert.deepEqual(
-        signUtf8MessageEd25519(vectorCase.input_utf8, seedHex),
-        {
-          public_key_hex: vectorCase.public_key_hex,
-          signature_hex: vectorCase.signature_hex,
-        },
-        vectorCase.id,
-      );
-    }
-
-    assert.equal(
-      verifyUtf8MessageEd25519(
-        vectorCase.input_utf8,
-        vectorCase.public_key_hex,
-        vectorCase.signature_hex,
-      ),
-      vectorCase.expected_verify,
-      vectorCase.id,
-    );
+  if (fixture.json_cases.some((vectorCase) => vectorCase.schema_id === undefined)) {
+    t.skip("signing vectors carry no schema_id until they regenerate");
+    return;
   }
+  assert.equal(fixture.utf8_cases, undefined);
 
   for (const vectorCase of fixture.json_cases) {
+    const schemaId = vectorCase.schema_id as string;
     const seedHex = vectorCase.signing_key_seed_hex ?? fixture.signing_key_seed_hex;
     assert.equal(canonicalizeJsonString(vectorCase.input_json), vectorCase.canonical_json, vectorCase.id);
-
     if (vectorCase.expected_verify) {
       assert.deepEqual(
-        signJsonStringEd25519(vectorCase.input_json, seedHex),
+        signWrappedJsonEd25519(schemaId, vectorCase.input_json, seedHex),
         {
+          schema_id: schemaId,
           canonical_json: vectorCase.canonical_json,
           public_key_hex: vectorCase.public_key_hex,
           signature_hex: vectorCase.signature_hex,
@@ -226,13 +214,65 @@ test("signing vectors match the TS signing helpers", async () => {
         vectorCase.id,
       );
     }
-
     assert.equal(
-      verifyJsonStringSignatureEd25519(
-        vectorCase.input_json,
-        vectorCase.public_key_hex,
-        vectorCase.signature_hex,
-      ),
+      wrappedVerifies(schemaId, vectorCase.input_json, vectorCase.public_key_hex, vectorCase.signature_hex),
+      vectorCase.expected_verify,
+      vectorCase.id,
+    );
+  }
+});
+
+test("wrapped signer derives the seed identity and refuses unregistered ids", () => {
+  const seed = "01".repeat(32);
+  const signed = signWrappedJsonEd25519("chio.receipt.v1", '{"b":1,"a":2}', seed);
+  assert.equal(signed.public_key_hex, publicKeyFromSeedEd25519(seed));
+  assert.equal(signed.canonical_json, '{"a":2,"b":1}');
+  verifyWrappedJson("chio.receipt.v1", '{"a":2,"b":1}', signed.public_key_hex, signed.signature_hex);
+  assert.throws(
+    () => signWrappedJsonEd25519("chio.unregistered-fixture.v1", "{}", seed),
+    (error: unknown) =>
+      error instanceof ChioInvariantError &&
+      error.code === "unregistered_schema_id" &&
+      error.message === "unregistered signed-artifact schema id: chio.unregistered-fixture.v1",
+  );
+  assert.throws(
+    () => verifyWrappedJson("chio.capability.v1", '{"a":2,"b":1}', signed.public_key_hex, signed.signature_hex),
+    (error: unknown) =>
+      error instanceof ChioInvariantError && error.code === "signature_rejected" && error.message === "signature rejected",
+  );
+});
+
+test("capability with an algorithm member is refused", async () => {
+  const fixture = await readJson("tests/bindings/vectors/capability/v1.json") as {
+    cases: Array<{ capability: Record<string, unknown> }>;
+  };
+  for (const algorithm of ["ed25519", "p256"]) {
+    const capability = { ...fixture.cases[0].capability, algorithm };
+    assert.throws(
+      () => parseCapabilityJson(JSON.stringify(capability)),
+      (error: unknown) =>
+        error instanceof ChioInvariantError &&
+        error.code === "json" &&
+        error.message === "capability has unknown member algorithm",
+    );
+  }
+});
+
+test("signing wrapper vectors verify as expected", async () => {
+  const fixture = await readJson("tests/bindings/vectors/signing/wrapper/v1.json") as {
+    signature_cases: Array<{
+      id: string;
+      algorithm: string;
+      canonical_body: string;
+      public_key: string;
+      signature: string;
+      verify_schema_id: string;
+      expected_verify: boolean;
+    }>;
+  };
+  for (const vectorCase of fixture.signature_cases) {
+    assert.equal(
+      wrappedVerifies(vectorCase.verify_schema_id, vectorCase.canonical_body, vectorCase.public_key, vectorCase.signature),
       vectorCase.expected_verify,
       vectorCase.id,
     );

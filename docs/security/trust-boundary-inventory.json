@@ -7408,8 +7408,8 @@
       "parse_signed_manifest_json::from_str"
     ],
     "crates/sdk/chio-binding-helpers/src/signing.rs": [
-      "sign_json_str_ed25519::from_str",
-      "verify_json_str_signature_ed25519::from_str"
+      "sign_wrapped_json_ed25519::from_str",
+      "verify_wrapped_json::from_str"
     ],
     "crates/sdk/chio-bindings-ffi/src/lib.rs": [
       "chio_verify_receipt_json_with_trusted_signers::from_str"
@@ -22863,12 +22863,12 @@
     ],
     "crates/sdk/chio-bindings-ffi/src/lib.rs": [
       "chio_canonicalize_json::shared-reader::crates/sdk/chio-binding-helpers/src/canonical.rs::canonicalize_json_str",
-      "chio_sign_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::sign_json_str_ed25519",
+      "chio_sign_wrapped_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::sign_wrapped_json_ed25519",
       "chio_verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::verify_capability_json",
-      "chio_verify_json_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::verify_json_str_signature_ed25519",
       "chio_verify_manifest_json::shared-reader::crates/sdk/chio-binding-helpers/src/manifest.rs::verify_signed_manifest_json",
       "chio_verify_receipt_json::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json",
-      "chio_verify_receipt_json_with_trusted_signers::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json_with_trusted_signer_hex"
+      "chio_verify_receipt_json_with_trusted_signers::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json_with_trusted_signer_hex",
+      "chio_verify_wrapped_json::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::verify_wrapped_json"
     ],
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": [
       "chio_kernel_evaluate_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str",

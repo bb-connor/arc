@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { signDpopProof, DPOP_SCHEMA, type SignDpopProofParams } from "../src/dpop.ts";
 import { DpopSignError } from "../src/errors.ts";
-import { sha256Hex, verifyEd25519Signature } from "../src/invariants/crypto.ts";
+import { sha256Hex, wrappedSignatureValid } from "../src/invariants/crypto.ts";
 import { canonicalizeJson } from "../src/invariants/json.ts";
 
 const domain = {
@@ -29,7 +29,7 @@ test("v1 signs the complete independently configured replay authority", () => {
   assert.equal(proof.body.schema, DPOP_SCHEMA);
   assert.equal(Object.keys(proof.body).length, 9);
   assert.deepEqual(proof.body.replay_authority, domain);
-  assert.ok(verifyEd25519Signature(canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
+  assert.ok(wrappedSignatureValid(DPOP_SCHEMA, canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
 });
 
 test("missing, null, partial and non-object authorities are rejected", () => {
@@ -50,7 +50,7 @@ test("signed authority is detached from mutable caller configuration", () => {
   const proof = signDpopProof({ ...params, replayAuthority: input });
   input.proof_ttl_secs = 301;
   assert.deepEqual(proof.body.replay_authority, domain);
-  assert.ok(verifyEd25519Signature(canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
+  assert.ok(wrappedSignatureValid(DPOP_SCHEMA, canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
 });
 
 test("every signed domain field detects tampering", () => {
@@ -61,7 +61,7 @@ test("every signed domain field detects tampering", () => {
     { proof_ttl_secs: 301 }, { max_clock_skew_secs: 31 },
   ]) {
     const body = { ...proof.body, replay_authority: { ...domain, ...change } };
-    assert.equal(verifyEd25519Signature(canonicalizeJson(body), body.agent_key, proof.signature), false);
+    assert.equal(wrappedSignatureValid(DPOP_SCHEMA, canonicalizeJson(body), body.agent_key, proof.signature), false);
   }
 });
 
@@ -86,7 +86,7 @@ test("authority padding follows Unicode White_Space without normalizing names", 
   for (const name of ["\ufeffauthority", "authority\ufeff", "authority\u2000name"]) {
     const proof = signDpopProof({ ...params, replayAuthority: { ...domain, dpop_authority_id: name } });
     assert.equal(proof.body.replay_authority.dpop_authority_id, name);
-    assert.ok(verifyEd25519Signature(canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
+    assert.ok(wrappedSignatureValid(DPOP_SCHEMA, canonicalizeJson(proof.body), proof.body.agent_key, proof.signature));
   }
   for (const padding of [" ", "\u0085", "\u00a0", "\u1680", "\u2000", "\u2001",
     "\u2002", "\u2003", "\u2004", "\u2005", "\u2006", "\u2007", "\u2008", "\u2009",

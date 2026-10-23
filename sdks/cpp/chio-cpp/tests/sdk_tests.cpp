@@ -3,6 +3,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -207,14 +208,52 @@ void test_invariants_from_shared_vectors() {
              "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
              "sha256 hello");
 
-  const auto signing_vectors = read_file("tests/bindings/vectors/signing/v1.json");
-  require_contains(signing_vectors, "valid_utf8_message", "signing vectors");
-  const auto verified = chio::invariants::verify_utf8_message_ed25519(
-      "hello chio",
-      "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
-      "4b134ccad3c684ef462bf085ea2e87c416557980e01da869703d18016f3811a0f0310f38075e2019480f8c1abc06c7d823ef1776eb95687785e5eacdbe57250c");
+  const auto seed = std::string("0101010101010101010101010101010101010101010101010101010101010101");
+  const auto public_key = chio::invariants::public_key_from_seed_ed25519(seed);
+  require(public_key.ok(), public_key.error().message);
+  const auto wrapped = chio::invariants::sign_wrapped_json_ed25519("chio.receipt.v1", "{\"b\":1,\"a\":2}", seed);
+  require(wrapped.ok(), wrapped.error().message);
+  const auto wrapped_value = chio::detail::parse_json(wrapped.value());
+  require(wrapped_value && wrapped_value->is_object(), "expected wrapped signature object");
+  require_eq(wrapped_value->string_field("schema_id"), "chio.receipt.v1", "wrapped schema id");
+  require_eq(wrapped_value->string_field("canonical_json"), "{\"a\":2,\"b\":1}", "wrapped canonical json");
+  require_eq(wrapped_value->string_field("public_key_hex"), public_key.value(), "wrapped public key");
+  const auto verified = chio::invariants::verify_wrapped_json(
+      "chio.receipt.v1", "{\"a\":2,\"b\":1}", public_key.value(),
+      wrapped_value->string_field("signature_hex"));
   require(verified.ok(), verified.error().message);
-  require(verified.value(), "expected vector signature to verify");
+  require(verified.value(), "expected wrapped signature to verify");
+  const auto substituted = chio::invariants::verify_wrapped_json(
+      "chio.capability.v1", "{\"a\":2,\"b\":1}", public_key.value(),
+      wrapped_value->string_field("signature_hex"));
+  require(!substituted.ok(), "schema id substitution must fail");
+  require(substituted.error().code == chio::ErrorCode::SignatureRejected,
+          "schema id substitution must be signature_rejected");
+  const auto unregistered =
+      chio::invariants::sign_wrapped_json_ed25519("chio.unregistered-fixture.v1", "{}", seed);
+  require(!unregistered.ok(), "unregistered schema id must fail");
+  require(unregistered.error().code == chio::ErrorCode::UnregisteredSchemaId,
+          "unregistered schema id must be unregistered_schema_id");
+
+  const auto wrapper_vectors = chio::detail::parse_json(read_file("tests/bindings/vectors/signing/wrapper/v1.json"));
+  require(wrapper_vectors && wrapper_vectors->is_object(), "expected wrapper vectors");
+  const auto* signature_cases = wrapper_vectors->get("signature_cases");
+  require(signature_cases && signature_cases->is_array(), "expected wrapper signature cases");
+  std::set<std::string> skipped_algorithms;
+  for (const auto& vector_case : signature_cases->as_array()) {
+    const auto algorithm = vector_case.string_field("algorithm");
+    if (algorithm != "ed25519") {
+      skipped_algorithms.insert(algorithm);
+      continue;
+    }
+    const auto result = chio::invariants::verify_wrapped_json(
+        vector_case.string_field("verify_schema_id"), vector_case.string_field("canonical_body"),
+        vector_case.string_field("public_key"), vector_case.string_field("signature"));
+    const bool expected = vector_case.get("expected_verify") && vector_case.get("expected_verify")->as_bool();
+    require((result.ok() && result.value()) == expected, "wrapper vector " + vector_case.string_field("id"));
+  }
+  require(skipped_algorithms == std::set<std::string>{"p256", "p384"},
+          "skipped wrapper algorithms must be exactly p256 and p384");
 
   const auto receipt_vectors = read_file("tests/bindings/vectors/receipt/v1.json");
   require_contains(receipt_vectors, "allow_receipt", "receipt vectors");

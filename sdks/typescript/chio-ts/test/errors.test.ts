@@ -5,8 +5,8 @@ import {
   canonicalizeJson,
   canonicalizeJsonString,
   ChioInvariantError,
-  signUtf8MessageEd25519,
-  verifyUtf8MessageEd25519,
+  signWrappedJsonEd25519,
+  verifyWrappedJson,
 } from "../src/index.ts";
 
 import {
@@ -49,7 +49,7 @@ test("undefined object fields are rejected instead of silently dropped", () => {
 
 test("invalid signing seed surfaces a stable code", () => {
   assert.throws(
-    () => signUtf8MessageEd25519("hello", "zz"),
+    () => signWrappedJsonEd25519("chio.receipt.v1", "{}", "zz"),
     (error: unknown) =>
       error instanceof ChioInvariantError &&
       error.code === "invalid_hex",
@@ -58,7 +58,7 @@ test("invalid signing seed surfaces a stable code", () => {
 
 test("malformed public keys are errors, not false verifications", () => {
   assert.throws(
-    () => verifyUtf8MessageEd25519("hello", "abcd", "00".repeat(64)),
+    () => verifyWrappedJson("chio.receipt.v1", "{}", "abcd", "00".repeat(64)),
     (error: unknown) =>
       error instanceof ChioInvariantError &&
       error.code === "invalid_public_key",

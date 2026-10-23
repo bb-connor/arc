@@ -33,8 +33,10 @@ The byte-hashing entrypoint copies the supplied range into a `Vec<u8>` before
 hashing. A zero length yields an empty vector without dereferencing the pointer.
 
 Wrapped operations call `chio_binding_helpers`, then return either raw text or
-serialized report JSON. Hashes and canonical JSON are raw UTF-8; signature
-verification emits `true` or `false`. Signing returns public-key/signature JSON.
+serialized report JSON. Hashes and canonical JSON are raw UTF-8; wrapped
+signature verification emits `true` only on success and an error result for any
+refusal. Signing takes a registered schema id and returns
+schema/canonical/public-key/signature JSON.
 Receipt, capability, and manifest verification return their report objects.
 
 Capability depth `CHIO_FFI_NO_MAX_DELEGATION_DEPTH` (`u32::MAX`) becomes `None`.
@@ -68,7 +70,11 @@ buffer. No handle registry or lock mediates foreign memory access.
 
 Statuses are OK 0, ERROR 1, PANIC 2, and NULL_ARGUMENT 3. Helper errors map to
 named `CHIO_FFI_ERROR_*` integers; strict receipt JSON rejection maps to
-`CHIO_FFI_ERROR_UNTRUSTED_INPUT` (29). Boundary UTF-8/null/panic failures use
+`CHIO_FFI_ERROR_UNTRUSTED_INPUT` (29); an unregistered schema id, a signature
+algorithm that differs from the key's, and a rejected signature map to
+`CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID` (30),
+`CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH` (31) and
+`CHIO_FFI_ERROR_SIGNATURE_REJECTED` (32). Boundary UTF-8/null/panic failures use
 INTERNAL (255). Error messages are allocated data with the same release rule.
 
 `run_ffi` wraps fallible helper execution and serialization. Input reads precede

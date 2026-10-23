@@ -100,12 +100,11 @@ Result<DpopProof> sign_dpop_proof(const DpopSignParams& params,
     return Result<DpopProof>::failure(action_hash.error());
   }
 
-  auto key_signature =
-      invariants::sign_utf8_message_ed25519("derive_key", params.agent_seed_hex);
-  if (!key_signature) {
-    return Result<DpopProof>::failure(key_signature.error());
+  auto derived_key = invariants::public_key_from_seed_ed25519(params.agent_seed_hex);
+  if (!derived_key) {
+    return Result<DpopProof>::failure(derived_key.error());
   }
-  const auto agent_key = parsed_string_field(key_signature.value(), "public_key_hex");
+  const auto agent_key = derived_key.value();
   if (agent_key.empty()) {
     return Result<DpopProof>::failure(
         Error{ErrorCode::Protocol, "failed to derive DPoP agent public key"});
@@ -135,7 +134,8 @@ Result<DpopProof> sign_dpop_proof(const DpopSignParams& params,
        << "\"tool_name\":" << detail::quote(params.tool_name) << ","
        << "\"tool_server\":" << detail::quote(params.tool_server) << "}";
 
-  auto signed_body = invariants::sign_json_ed25519(body.str(), params.agent_seed_hex);
+  auto signed_body = invariants::sign_wrapped_json_ed25519(
+      "chio.dpop_proof.v1", body.str(), params.agent_seed_hex);
   if (!signed_body) {
     return Result<DpopProof>::failure(signed_body.error());
   }
