@@ -148,26 +148,5 @@ impl<'a> SigningMessage<'a> {
 /// Test-run capture of wrapped bodies for schema example generation. Off by
 /// default; no production build enables `wrapper-capture`.
 #[cfg(feature = "wrapper-capture")]
-mod capture {
-    use std::io::Write;
-
-    /// Appends one `{"schema_id", "body"}` line to
-    /// `$CHIO_WRAPPER_CAPTURE_DIR/<schema_id>.ndjson` when the variable is set.
-    pub(super) fn record(schema_id: &str, body: &[u8]) {
-        let Some(dir) = std::env::var_os("CHIO_WRAPPER_CAPTURE_DIR") else {
-            return;
-        };
-        let Ok(body) = core::str::from_utf8(body) else {
-            return;
-        };
-        let line = serde_json::json!({ "schema_id": schema_id, "body": body });
-        let path = std::path::Path::new(&dir).join(format!("{schema_id}.ndjson"));
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = writeln!(file, "{line}");
-        }
-    }
-}
+#[path = "wrapper_capture.rs"]
+mod capture;

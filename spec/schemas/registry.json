@@ -2903,59 +2903,59 @@
       "introducedBy": "recovery-semantic"
     },
     {
-      "schema": "chio.signed.semantic.package.v1",
-      "artifactKind": "signed_semantic_package",
+      "schema": "chio.recovery.signed-semantic-package.v1",
+      "artifactKind": "recovery_semantic_package",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-package.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-package.schema.json"
     },
     {
-      "schema": "chio.signed.semantic.deployment.v1",
-      "artifactKind": "signed_semantic_deployment",
+      "schema": "chio.recovery.signed-semantic-deployment.v1",
+      "artifactKind": "recovery_semantic_deployment",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-deployment.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-deployment.schema.json"
     },
     {
-      "schema": "chio.signed.semantic.audience.v1",
-      "artifactKind": "signed_semantic_audience",
+      "schema": "chio.recovery.signed-semantic-audience.v1",
+      "artifactKind": "recovery_semantic_audience",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-audience.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-audience.schema.json"
     },
     {
-      "schema": "chio.signed.scoped.endorsement.v1",
-      "artifactKind": "signed_scoped_endorsement",
+      "schema": "chio.recovery.signed-scoped-endorsement.v1",
+      "artifactKind": "recovery_scoped_endorsement",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-scoped-endorsement.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/scoped-endorsement.schema.json"
     },
     {
-      "schema": "chio.signed.semantic.annotation.v1",
-      "artifactKind": "signed_semantic_annotation",
+      "schema": "chio.recovery.signed-semantic-annotation.v1",
+      "artifactKind": "recovery_semantic_annotation",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-annotation.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-annotation.schema.json"
     },
     {
-      "schema": "chio.signed.semantic.transformation.v1",
-      "artifactKind": "signed_semantic_transformation",
+      "schema": "chio.recovery.signed-semantic-transformation.v1",
+      "artifactKind": "recovery_semantic_transformation",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-transformation.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-transformation.schema.json"
     },
     {
-      "schema": "chio.signed.semantic.prerequisite.v1",
-      "artifactKind": "signed_semantic_prerequisite",
+      "schema": "chio.recovery.signed-semantic-prerequisite.v1",
+      "artifactKind": "recovery_semantic_prerequisite",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-semantic-prerequisite.schema.json",
-      "introducedBy": "recovery-semantic",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/semantic-prerequisite.schema.json"
     },
     {
@@ -3057,19 +3057,19 @@
       "introducedBy": "recovery-knowledge"
     },
     {
-      "schema": "chio.signed.artifact.certificate.v1",
-      "artifactKind": "signed_artifact_certificate",
+      "schema": "chio.recovery.signed-artifact-certificate.v1",
+      "artifactKind": "recovery_artifact_certificate",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-artifact-certificate.schema.json",
-      "introducedBy": "recovery-knowledge",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-certificate.schema.json"
     },
     {
-      "schema": "chio.signed.artifact.archive.manifest.v1",
-      "artifactKind": "signed_artifact_archive_manifest",
+      "schema": "chio.recovery.signed-archive-manifest.v1",
+      "artifactKind": "recovery_artifact_archive_manifest",
       "version": 1,
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-artifact-archive-manifest.schema.json",
-      "introducedBy": "recovery-knowledge",
+      "introducedBy": "signing-wrapper-v1",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/recovery/artifact-archive-manifest.schema.json"
     },
     {
@@ -3109,15 +3109,15 @@
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/return-contract.schema.json"
     },
     {
-      "schema": "chio.signed-confined-disclosure.v1",
-      "artifactKind": "signed_confined_disclosure",
-      "introducedBy": "recovery-confinement",
+      "schema": "chio.recovery.signed-confined-disclosure.v1",
+      "artifactKind": "recovery_confined_disclosure",
+      "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-confined-disclosure.schema.json"
     },
     {
-      "schema": "chio.signed-confined-endorsement.v1",
-      "artifactKind": "signed_confined_endorsement",
-      "introducedBy": "recovery-confinement",
+      "schema": "chio.recovery.signed-confined-endorsement.v1",
+      "artifactKind": "recovery_confined_endorsement",
+      "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-confined-endorsement.schema.json"
     },
     {
@@ -3157,9 +3157,9 @@
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/recovery-setup-report.schema.json"
     },
     {
-      "schema": "chio.signed-policy-deployment-change.v1",
-      "artifactKind": "signed_policy_deployment_change",
-      "introducedBy": "recovery-product",
+      "schema": "chio.recovery.signed-policy-deployment-change.v1",
+      "artifactKind": "recovery_policy_deployment_change",
+      "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/signed-policy-deployment-change.schema.json"
     },
     {

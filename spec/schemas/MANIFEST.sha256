@@ -1,4 +1,4 @@
-8d6f859da94296818a41538f23eeb680eff8890986fca66b0a1ed035dbb0504c  spec/schemas/MANIFEST.sha256
+9b713abbf35d22cc6cacc50360cbe0351b750ddb559a4e75c63ef1a59adc75b9  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -145,7 +145,7 @@ a4bc54088b6aef5d000ad717275342a966cd55fd0391e6c555aaa93bcc111395  spec/schemas/c
 33a770b2bab56638c1160abd2afe8fba9d0b76c678fc0d0fc9c4ff5dbcf9a91d  spec/schemas/chio-finding/v1/replay-observation.schema.json
 1eb8be0325dd7762a919df4a563f166f8c0ec7c94c0fd1d219eb29541074e0bc  spec/schemas/chio-finding/v1/replay-recipe-input.schema.json
 63c46a632c4ccc94a15dc1bd56f550a6e062fb008200344d68ad09390df2a0c5  spec/schemas/chio-finding/v1/seller-authorization.schema.json
-4498e5306e60b5c38b0b903e8cce7b38e3e6b898523474d4fe6132eb6ef59d86  spec/schemas/chio-finding/v1/status-epoch.schema.json
+b990577fe6834d4c7427b89c121447431bc516c3a8d5020ae03b9aa25350365b  spec/schemas/chio-finding/v1/status-epoch.schema.json
 70f47c86ccbcc7eae777073a04c9d753116dddc0c2e56193f050eeaa1738ddca  spec/schemas/chio-finding/v1/status-proof-input.schema.json
 b2162b3a4434948e46415b710a8fa3a458fa33e739c3a86a484ca16275a6d7e5  spec/schemas/chio-finding/v1/verified-fix-submission.schema.json
 037132137c0f1caeceb1e603abeb08d2f834125efefdd535db6b7e3d88a63048  spec/schemas/chio-finding/v1/verifier-report.schema.json
@@ -547,9 +547,9 @@ f3efc49dfa2ec48b027e12b8d98794bdbb6a2582e6fb4299c24c492513dbaf0c  spec/schemas/c
 9328005d490d59c94bbeb4a25d5af77af562d3489f926453cd9f5c79d5f340c6  spec/schemas/chio-wire/v1/security/broker-audit-comparison-envelope-v1.schema.json
 8f64112326061976b99e02172f3d2aae8ded7183a5f35bdf7ffa0931e7d693b7  spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-body-v1.schema.json
 8ebe63fa0fb36afad8ba0ef50e11173b2a6b2ee450f604920698a88b3246a0bd  spec/schemas/chio-wire/v1/security/broker-audit-runner-authorization-envelope-v1.schema.json
-9de0c5d2dde87d110181497ed90ff8816572c17abd13b6993df2cd401a3a0d67  spec/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json
+7090df9482c628d16731a247fe81217f2117b6c811c74160c15f910aa406aff8  spec/schemas/chio-wire/v1/security/broker-authority-request-body-v1.schema.json
 6d0b3b60671514dca313e5c47325369abe7e599400fc96477f27d64cff798a1d  spec/schemas/chio-wire/v1/security/broker-authority-request-envelope-v1.schema.json
-a4bae54ba2aeefe8b6c0cc479ed9652f99229a1472f767f7457c47bfac1e3f01  spec/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json
+00b1284caeb77a21f99d476105a543ac119c77c4500eca30fea25d3ae132e00b  spec/schemas/chio-wire/v1/security/broker-authority-response-body-v1.schema.json
 fe33c2657089d43723d899b7aba24edd2ab0f8cd8b0da1085c38dd4f0bf710a3  spec/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json
 537ae5b745115964253b74a121ba23bb37fe473c673d74995b4c0b4716140c2e  spec/schemas/chio-wire/v1/security/broker-capability-body-v1.schema.json
 0bc4fc5f0f17f2a842fae3fa56a5113aa1b34ee3e8ea765cf678cf6f9cbf5f6c  spec/schemas/chio-wire/v1/security/broker-capability-envelope-v1.schema.json
@@ -634,4 +634,4 @@ e870e486f90b3a4a163f060b656538523bf731570dbb64eb0212d65486da8b2d  spec/schemas/c
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json
 aee326a25691ea8dde9219a97a1acc5a4521acb24e44ed2a5b0c7126fb06de09  spec/schemas/fiscal-defs.v1.schema.json
 216ca7d9c174f728a1931f84791858702bb365cb5f5acba24c5e936bc923955e  spec/schemas/policy/analysis-report.schema.json
-e414ba44bfe13bfa1ae258e7fe712268078febc2ae3e20dd48e979f205673c5b  spec/schemas/registry.json
+3ff526773558cca771382c3507b77c2255b8d5032afecdab15be7f5318b58c40  spec/schemas/registry.json
