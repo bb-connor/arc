@@ -42,9 +42,12 @@ pub fn verify_signed_runtime_attestation_record(
     if &envelope.signer_key != trusted_authority {
         return Err(RuntimeAttestationVerificationError::UntrustedSigner);
     }
-    if !envelope.verify_signature(&envelope.signer_key).map_err(|error| {
-        RuntimeAttestationVerificationError::SignatureVerification(std::sync::Arc::new(error))
-    })? {
+    if !envelope
+        .verify_signature(&envelope.signer_key)
+        .map_err(|error| {
+            RuntimeAttestationVerificationError::SignatureVerification(std::sync::Arc::new(error))
+        })?
+    {
         return Err(RuntimeAttestationVerificationError::InvalidSignature);
     }
     build_runtime_attestation_record(&envelope.body, trust_policy, now)

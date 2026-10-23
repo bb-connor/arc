@@ -49,13 +49,14 @@ fn assert_fiscal_fixture<T: serde::Serialize>(name: &str, expected: &T) -> TestR
 
 fn verify_fiscal_fixture_signature<T>(name: &str) -> TestResult
 where
-    T: chio_core_types::receipt::lineage::SignedExportPayload
-        + serde::de::DeserializeOwned
-        + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + serde::de::DeserializeOwned + Clone,
 {
     let mut fixture = fiscal_fixture(name)?;
     let envelope: SignedExportEnvelope<T> = serde_json::from_value(fixture.clone())?;
-    assert!(envelope.verify_signature(&envelope.signer_key)?, "{name} signature is invalid");
+    assert!(
+        envelope.verify_signature(&envelope.signer_key)?,
+        "{name} signature is invalid"
+    );
 
     let fixture = fixture
         .as_object_mut()
@@ -74,8 +75,7 @@ where
     signature.replace_range(last_index.., if last == b'0' { "1" } else { "0" });
     fixture.insert("signature".to_owned(), signature.into());
 
-    let envelope: SignedExportEnvelope<T> =
-        serde_json::from_value(Value::Object(fixture.clone()))?;
+    let envelope: SignedExportEnvelope<T> = serde_json::from_value(Value::Object(fixture.clone()))?;
     assert!(
         !envelope.verify_signature(&envelope.signer_key)?,
         "{name} accepted a tampered signature"
@@ -627,6 +627,30 @@ fn committed_activation_authority_is_not_clone() {
     impl<T: Clone> AmbiguousIfClone<CloneMarker> for T {}
 
     let _ = <VerifiedFiscalActivationAuthority as AmbiguousIfClone<_>>::check;
+}
+
+#[test]
+fn a_proposal_signed_outside_the_current_charter_signer_set_rejects() -> TestResult {
+    let charter = charter()?;
+    let schedule = schedule(&charter, None)?;
+    let outsider = key(8);
+    let signed = FiscalProposalBuilder {
+        target: FiscalProposalTarget::Schedule {
+            candidate: Box::new(schedule.signed().clone()),
+        },
+        rationale_digest: digest("tier rationale"),
+        proposed_at: 50,
+    }
+    .sign(&outsider)?;
+    assert!(matches!(
+        signed.verify_signature(&outsider.public_key()),
+        Ok(true)
+    ));
+    assert!(matches!(
+        VerifiedFiscalProposal::verify(signed, &charter, None),
+        Err(FiscalError::InvalidField("proposal.proposer"))
+    ));
+    Ok(())
 }
 
 #[test]

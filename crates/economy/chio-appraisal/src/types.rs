@@ -575,14 +575,20 @@ impl chio_core_types::receipt::lineage::SignedExportPayload for RuntimeAttestati
     const SCHEMA_ID: &'static str = RUNTIME_ATTESTATION_APPRAISAL_RESULT_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for RuntimeAttestationReferenceValueSet {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for RuntimeAttestationReferenceValueSet
+{
     const SCHEMA_ID: &'static str = RUNTIME_ATTESTATION_REFERENCE_VALUE_SET_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for RuntimeAttestationTrustBundleDocument {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for RuntimeAttestationTrustBundleDocument
+{
     const SCHEMA_ID: &'static str = RUNTIME_ATTESTATION_TRUST_BUNDLE_SCHEMA;
 }
 
-impl chio_core_types::receipt::lineage::SignedExportPayload for RuntimeAttestationVerifierDescriptorDocument {
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for RuntimeAttestationVerifierDescriptorDocument
+{
     const SCHEMA_ID: &'static str = RUNTIME_ATTESTATION_VERIFIER_DESCRIPTOR_SCHEMA;
 }

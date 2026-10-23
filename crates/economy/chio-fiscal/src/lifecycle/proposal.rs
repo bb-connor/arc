@@ -249,6 +249,14 @@ impl VerifiedFiscalProposal {
         {
             return Err(FiscalError::InvalidSelfId);
         }
+        let signer_set = &current_charter.body().signer_set;
+        let proposer = signer_set
+            .binary_search_by(|candidate| candidate.key_id.cmp(&signed.body.proposed_by))
+            .ok()
+            .and_then(|index| signer_set.get(index));
+        if proposer.map(|member| &member.public_key) != Some(&signed.signer_key) {
+            return Err(FiscalError::InvalidField("proposal.proposer"));
+        }
         verify_envelope(&signed)?;
         match &signed.body.target {
             FiscalProposalTarget::Schedule { candidate } => {
