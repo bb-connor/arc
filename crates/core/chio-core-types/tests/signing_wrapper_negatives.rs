@@ -258,3 +258,127 @@ mod pq {
         ));
     }
 }
+
+mod algorithm_member {
+    use super::*;
+    use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
+    use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
+    use chio_core_types::receipt::body::{chio_receipt_id, ChioReceipt, ChioReceiptBody};
+    use chio_core_types::receipt::decision::{Decision, ToolCallAction};
+    use chio_core_types::receipt::kinds::TrustLevel;
+
+    fn capability(key: &Keypair) -> CapabilityToken {
+        let body = CapabilityTokenBody {
+            id: "cap-algorithm-member".to_string(),
+            issuer: key.public_key(),
+            subject: Keypair::from_seed(&[12; 32]).public_key(),
+            scope: ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "echo".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: Vec::new(),
+                prompt_grants: Vec::new(),
+            },
+            issued_at: 1_792_234_800,
+            expires_at: 1_792_238_400,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        };
+        CapabilityToken::sign(body, key).unwrap()
+    }
+
+    fn receipt_body(key: &Keypair, metadata: Option<serde_json::Value>) -> ChioReceiptBody {
+        ChioReceiptBody {
+            id: String::new(),
+            timestamp: 1_792_234_800,
+            capability_id: "cap-algorithm-member".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "echo".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({"a": 1})).unwrap(),
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: chio_core_types::sha256_hex(br#"{"ok":true}"#),
+            policy_hash: "policy".to_string(),
+            evidence: Vec::new(),
+            metadata,
+            trust_level: TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: key.public_key(),
+            bbs_projection_version: None,
+        }
+    }
+
+    fn with_member(value: &impl serde::Serialize, algorithm: &str) -> serde_json::Value {
+        let mut value = serde_json::to_value(value).unwrap();
+        value["algorithm"] = serde_json::json!(algorithm);
+        value
+    }
+
+    #[test]
+    fn capability_with_algorithm_member_fails_decoding() {
+        let token = capability(&Keypair::from_seed(&[11; 32]));
+        assert!(token.verify_signature().unwrap());
+        for algorithm in ["ed25519", "p256"] {
+            assert!(serde_json::from_value::<CapabilityToken>(with_member(&token, algorithm)).is_err());
+        }
+    }
+
+    #[test]
+    fn receipt_with_algorithm_member_fails_decoding() {
+        let key = Keypair::from_seed(&[11; 32]);
+        let receipt = ChioReceipt::sign(receipt_body(&key, None), &key).unwrap();
+        assert!(receipt.verify_signature().unwrap());
+        for algorithm in ["ed25519", "p256"] {
+            assert!(serde_json::from_value::<ChioReceipt>(with_member(&receipt, algorithm)).is_err());
+        }
+    }
+
+    #[test]
+    fn verifier_choice_ignores_algorithm_member() {
+        let ed25519 = Keypair::from_seed(&[11; 32]);
+        let mut token = capability(&ed25519);
+        let p256 = PublicKey::from_hex(
+            "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+        )
+        .unwrap();
+        token.issuer = p256;
+        assert!(serde_json::from_value::<CapabilityToken>(with_member(&token, "ed25519")).is_err());
+        assert!(matches!(
+            token.verify_signature(),
+            Err(Error::SignatureAlgorithmMismatch {
+                key: SigningAlgorithm::P256,
+                signature: SigningAlgorithm::Ed25519,
+            })
+        ));
+    }
+
+    #[test]
+    fn receipt_id_survives_outer_signature_change() {
+        let key = Keypair::from_seed(&[11; 32]);
+        let mut receipt = ChioReceipt::sign(receipt_body(&key, None), &key).unwrap();
+        let id = receipt.id.clone();
+        receipt.signature = Keypair::from_seed(&[13; 32]).sign_exempt(ExemptFormat::JwsSigningInput, b"other");
+        assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), id);
+    }
+
+    #[test]
+    fn receipt_id_follows_nested_signature_change() {
+        let key = Keypair::from_seed(&[11; 32]);
+        let nested = |signature: &str| Some(serde_json::json!({"child_receipt_signature": signature}));
+        let first = ChioReceipt::sign(receipt_body(&key, nested("aa")), &key).unwrap();
+        let second = ChioReceipt::sign(receipt_body(&key, nested("bb")), &key).unwrap();
+        assert_ne!(first.id, second.id);
+    }
+}
