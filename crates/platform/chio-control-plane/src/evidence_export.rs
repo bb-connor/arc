@@ -1080,6 +1080,7 @@ pub fn cmd_evidence_export(
         policy_file,
         response.federation_policy.as_ref(),
         signing_key,
+        unix_now()?,
     )
 }
 

@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from chio_temporal import CallerExecutor
-from chio_temporal.executor import canonical_json_bytes
+from chio_temporal.executor import canonical_json_bytes, signing_wrapper
 from chio_temporal.interceptor import _kernel_receipt_signing_bytes
 
 GOLDEN = json.loads(
@@ -107,9 +107,14 @@ def test_authorization_canonical_bytes_and_digest_match_the_kernel() -> None:
 
 def test_kernel_authorization_signature_verifies(executor: Ed25519Executor) -> None:
     authorization = GOLDEN["authorization"]
-    message = canonical_json_bytes(authorization["authorization"])
+    body = canonical_json_bytes(authorization["authorization"])
+    message = signing_wrapper("chio.caller-dispatch-authorization.v1", body)
     assert executor.verify_kernel_signature(message, authorization["signature"])
-    assert not executor.verify_kernel_signature(message + b" ", authorization["signature"])
+    assert not executor.verify_kernel_signature(
+        signing_wrapper("chio.caller-dispatch-authorization.v1", body + b" "),
+        authorization["signature"],
+    )
+    assert not executor.verify_kernel_signature(body, authorization["signature"])
 
 
 def test_report_bytes_and_signature_reproduce_the_kernel_report(
@@ -120,7 +125,8 @@ def test_report_bytes_and_signature_reproduce_the_kernel_report(
     assert body_bytes == GOLDEN["report_body_canonical"].encode("utf-8")
     assert report["report"]["authorization_digest"] == GOLDEN["authorization_digest"]
     # Ed25519 is deterministic: the Python signer must emit the kernel's bytes.
-    assert executor.sign(body_bytes) == report["signature"]
+    wrapper = signing_wrapper("chio.caller-delivery-report.v1", body_bytes)
+    assert executor.sign(wrapper) == report["signature"]
 
 
 def test_receipt_signing_body_and_id_match_the_kernel(executor: Ed25519Executor) -> None:
@@ -132,3 +138,12 @@ def test_receipt_signing_body_and_id_match_the_kernel(executor: Ed25519Executor)
     forged_signing, forged_id = _kernel_receipt_signing_bytes(forged)
     assert hashlib.sha256(forged_id).hexdigest() != receipt["id"]
     assert not executor.verify_kernel_signature(forged_signing, receipt["signature"])
+
+
+def test_receipt_with_an_algorithm_member_is_not_the_kernel_receipt(
+    executor: Ed25519Executor,
+) -> None:
+    receipt = dict(GOLDEN["receipt"], algorithm="ed25519")
+    signing, id_input = _kernel_receipt_signing_bytes(receipt)
+    assert hashlib.sha256(id_input).hexdigest() != receipt["id"]
+    assert not executor.verify_kernel_signature(signing, receipt["signature"])

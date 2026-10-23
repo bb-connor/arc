@@ -351,6 +351,7 @@ mod tests {
 
     use chio_test_support::prelude::*;
 
+    mod reference_artifacts;
     mod versioning;
 
     fn sample_primary_proof() -> AnchorInclusionProof {

@@ -3,7 +3,7 @@
   "primary_proof": {
     "schema": "chio.anchor-inclusion-proof.v1",
     "receipt": {
-      "id": "rcpt-web3-1",
+      "id": "9efc43ad289d55120be289a3b2509f68094afb618cddbaa7419797a08dda7504",
       "timestamp": 1743292800,
       "capability_id": "cap-web3-1",
       "tool_server": "chio-settle",
@@ -19,9 +19,14 @@
       "decision": {
         "verdict": "allow"
       },
-      "content_hash": "1ff0dfe4513af263d73d4cc9dedae5aeb7ecc223cb42529f23c436601403afe5",
+      "receipt_kind": "mediated_decision",
+      "boundary_class": "prevent",
+      "tool_origin": "caller_executed",
+      "redaction_mode": "none",
+      "content_hash": "5e74c65ed50fb26585825e1bca068b65bff562e9d781605efa46c1fb4fbffae1",
       "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
       "metadata": {
+        "chio_receipt_signing_nonce": "rcpt-web3-1",
         "financial": {
           "budget_remaining": 850,
           "budget_total": 1000,
@@ -37,12 +42,14 @@
             "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
             "grant_currency": "USD",
             "max_age_seconds": 3600,
-            "original_cost_units": 100000000000000,
+            "oracle_public_key": "d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c",
+            "original_cost_units": 1000000000000000,
             "original_currency": "ETH",
             "quote": "USD",
             "rate_denominator": 100,
             "rate_numerator": 300000,
             "schema": "chio.oracle-conversion-evidence.v1",
+            "signature": "8a7b0cc235e29ef48c84219ba098bea8c1a7c572939f77c54b034819246e1decb5d0fa31349811c09890e3f9a52381b3e214a5ffe7224c4971ddc6442bc2df0d",
             "source": "chainlink",
             "updated_at": 1743292740
           },
@@ -51,12 +58,13 @@
           "settlement_status": "pending"
         }
       },
+      "trust_level": "mediated",
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "signature": "8eb9e2aa3290e69362a270ce61ea9ab1269705bb62732746560c992b649ee5f3df400e9c4856644c73dbd021b9bbaf49fc57933deda3ef8d0280fa5a2484a600"
+      "signature": "17ea8549ecaf4f689f4d083fcaf35a8675068dd08156fb59c0fa111eb0c12ded32cbc4c21a62ac17278d3400d196e303c90c6120860d313cd18c7954acfab003"
     },
     "receipt_inclusion": {
       "checkpoint_seq": 1042,
-      "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+      "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
       "proof": {
         "tree_size": 1,
         "leaf_index": 0,
@@ -69,10 +77,10 @@
       "batch_start_seq": 104101,
       "batch_end_seq": 104101,
       "tree_size": 1,
-      "merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+      "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
       "issued_at": 1743292800,
       "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "signature": "6af7db0b0d1d19def7b087cd1b9113ce5dced5cba501bf23a1c0058646089d558730885c0ab21dcf756cc60c05c15266091419d1c632d5c9e6e3098a2b6d6003"
+      "signature": "d1e9ef54183509d3d73f0ac079c8055cc42394f6ba38b6884e7fb4ba0be68da4f71d1e387cfe91853052c137581f0d2f2f1e04e22a04f0d21d4c9d5c22fe0603"
     },
     "chain_anchor": {
       "chain_id": "eip155:8453",
@@ -83,17 +91,17 @@
       "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "operator_key_hash": "0x0791868d8f29ea735f26a17a9aea038cd4255baac26eac5a74e58a07ed2f1975",
       "operator_epoch": 1,
-      "anchored_merkle_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+      "anchored_merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
       "anchored_checkpoint_seq": 1042
     },
     "bitcoin_anchor": {
       "method": "opentimestamps",
-      "ots_proof_b64": "AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIzYALijEc8h4ZkccyoZoJ0M+ka8x5d6T5wzpXgTLQtcIABYiWDXPXGQEDoPc2",
+      "ots_proof_b64": "AE9wZW5UaW1lc3RhbXBzAABQcm9vZgC/ieLohOiSlAEIF8vO6BDvFFrC8U7Bz9W2UY5fZJAeHUMQQR2PuBOu/KsABYiWDXPXGQEDoPc2",
       "bitcoin_block_height": 900000,
       "bitcoin_block_hash": "0000000000000000000abc"
     },
     "super_root_inclusion": {
-      "super_root": "0x2485929637d87c02824ba6ba507637b16b71ed85a5a76b19d889790559b71d67",
+      "super_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
       "proof": {
         "tree_size": 1,
         "leaf_index": 0,
@@ -120,7 +128,7 @@
         "expires_at": 1774828800,
         "nonce": "0123456789abcdef0123456789abcdef"
       },
-      "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
+      "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
     }
   },
   "secondary_lanes": [

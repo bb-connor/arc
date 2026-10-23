@@ -31,7 +31,7 @@ from temporalio import activity
 from temporalio.converter import DataConverter, PayloadConverter
 
 from chio_temporal import ChioActivityInterceptor
-from chio_temporal.executor import canonical_json_bytes
+from chio_temporal.executor import canonical_json_bytes, signing_wrapper
 
 CONTROL_TOKEN = "sidecar-control-test-token"
 FIXED_NOW_MS = 1_700_000_000_000
@@ -380,7 +380,10 @@ class MediatedContractClient:
         body.update(self.authorization_overrides)
         authorization = {
             "authorization": body,
-            "signature": _role_signature("kernel", canonical_json_bytes(body)),
+            "signature": _role_signature(
+                "kernel",
+                signing_wrapper("chio.caller-dispatch-authorization.v1", canonical_json_bytes(body)),
+            ),
         }
         started = {
             "status": "dispatch_committed",
@@ -404,7 +407,8 @@ class MediatedContractClient:
         body = report["report"]
         executor_id = self.executor.identity["executor_id"]
         expected_signature = _role_signature(
-            f"executor:{executor_id}", canonical_json_bytes(body)
+            f"executor:{executor_id}",
+            signing_wrapper("chio.caller-delivery-report.v1", canonical_json_bytes(body)),
         )
         window = authorization["authorization"]
         if (
@@ -490,7 +494,9 @@ class MediatedContractClient:
             "kernel_key": KERNEL_PUBLIC_KEY,
         }
         receipt_id = hashlib.sha256(canonical_json_bytes(body)).hexdigest()
-        signing = canonical_json_bytes({"id": receipt_id, "body": body})
+        signing = signing_wrapper(
+            "chio.receipt.v1", canonical_json_bytes({"id": receipt_id, "body": body})
+        )
         receipt = {"id": receipt_id, **body, "signature": _role_signature("kernel", signing)}
         if self.receipt_tamper is not None:
             self.receipt_tamper(receipt)

@@ -63,7 +63,8 @@ use chio_governance::authorization::{GovernanceReceiptCaseKind, SignedGovernance
 use chio_governance::lease::{CapabilityLeaseActionClass, SignedCapabilityLease};
 use chio_selective_disclosure::{
     derive_selective_disclosure_proof, generate_bbs_keypair, project_workflow_receipt_body,
-    sign_projection, DisclosureSet, SelectiveDisclosureProof,
+    sign_projection, verify_selective_disclosure_proof, DisclosureSet, InMemoryIssuerRegistry,
+    SelectiveDisclosureProof,
 };
 use chio_workflow::receipt::{
     StepOutcome, StepRecord, WorkflowOutcome, WorkflowReceipt, WorkflowReceiptBody,
@@ -656,6 +657,28 @@ pub fn fresh_proof_package() -> Result<ChioProofPackage, ChioPackageError> {
     package.selective_disclosure_proof =
         disclosure_proof_for_workflow(&package.workflow_receipt.body(), &context)?;
     ensure_disclosure_subject_matches_workflow(&package)?;
+    Ok(package)
+}
+
+/// [`fresh_proof_package`] that carries `committed` as its disclosure proof
+/// when `committed` verifies and proves exactly the derived disclosure. BBS
+/// proof generation draws fresh blinding scalars, so only a kept proof makes
+/// the package bytes reproducible.
+pub fn fresh_proof_package_keeping_disclosure(
+    committed: &SelectiveDisclosureProof,
+) -> Result<ChioProofPackage, ChioPackageError> {
+    let mut package = fresh_proof_package()?;
+    let derived = &package.selective_disclosure_proof;
+    let mut comparable = committed.clone();
+    comparable.proof_bytes_hex.clone_from(&derived.proof_bytes_hex);
+    let mut registry = InMemoryIssuerRegistry::default();
+    registry.insert(
+        derived.issuer_fingerprint.clone(),
+        derived.issuer_public_key_hex.clone(),
+    );
+    if comparable == *derived && verify_selective_disclosure_proof(committed, &registry).is_ok() {
+        package.selective_disclosure_proof = committed.clone();
+    }
     Ok(package)
 }
 

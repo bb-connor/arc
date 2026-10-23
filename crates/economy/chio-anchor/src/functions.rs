@@ -2,19 +2,28 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::hashing::{sha256, Hash};
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::signing::ChioReceiptSigningBody;
 use serde::{Deserialize, Serialize};
 
 use crate::AnchorError;
 
+/// Off-chain Functions verifier. Each receipt signature covers the
+/// `chio.receipt.v1` signing wrapper of `signing_body_hex`, which the script
+/// rebuilds from those bytes before verifying against `public_key_hex`.
 pub const CHIO_FUNCTIONS_ED25519_SOURCE: &str = r#"import * as ed from "https://esm.sh/@noble/ed25519";
+
+const encoder = new TextEncoder();
+const prefix = encoder.encode("chio.signing-wrapper.v1\0");
+const sha256 = async (bytes) => new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+const schemaDigest = await sha256(encoder.encode("chio.receipt.v1"));
 
 const receipts = JSON.parse(args[0]);
 for (const item of receipts) {
-  const valid = await ed.verifyAsync(
-    item.signature,
-    item.body,
-    item.publicKey,
-  );
+  const wrapper = new Uint8Array(88);
+  wrapper.set(prefix, 0);
+  wrapper.set(schemaDigest, 24);
+  wrapper.set(await sha256(ed.etc.hexToBytes(item.signing_body_hex)), 56);
+  const valid = await ed.verifyAsync(item.signature_hex, wrapper, item.public_key_hex);
   if (!valid) {
     return Functions.encodeUint256(0);
   }
@@ -84,6 +93,9 @@ pub struct FunctionsBatchItem {
     pub receipt_body_hex: String,
     pub receipt_body_sha256: Hash,
     pub receipt_leaf_hash: Hash,
+    /// Canonical `ChioReceiptSigningBody` bytes whose `chio.receipt.v1`
+    /// signing wrapper `signature_hex` covers.
+    pub signing_body_hex: String,
     pub signature_hex: String,
     pub public_key_hex: String,
 }
@@ -196,6 +208,11 @@ pub fn prepare_functions_batch_verification(
                 AnchorError::Serialization("functions request size overflowed".to_string())
             })?;
 
+        let signing_body_bytes = canonical_json_bytes(&ChioReceiptSigningBody::from_body_and_bbs(
+            &receipt.body(),
+            receipt.bbs_signature.as_ref(),
+        ))
+        .map_err(|error| AnchorError::Serialization(error.to_string()))?;
         let receipt_body_sha256 = sha256(&body_bytes);
         let receipt_leaf_hash = chio_core::merkle::leaf_hash(&body_bytes);
         leaf_hashes.push(receipt_leaf_hash);
@@ -204,6 +221,7 @@ pub fn prepare_functions_batch_verification(
             receipt_body_hex: body_hex,
             receipt_body_sha256,
             receipt_leaf_hash,
+            signing_body_hex: hex::encode(&signing_body_bytes),
             signature_hex: receipt.signature.to_hex(),
             public_key_hex: receipt.kernel_key.to_hex(),
         });
@@ -402,6 +420,50 @@ mod tests {
         assert!(request
             .request_id
             .starts_with("chio.functions.eip155-8453."));
+    }
+
+    #[test]
+    fn functions_items_carry_the_receipt_signing_wrapper_inputs() {
+        let receipts = vec![
+            sample_receipt("rcpt-001", 1_744_000_000),
+            sample_receipt("rcpt-002", 1_744_000_030),
+        ];
+        let request = prepare_functions_batch_verification(
+            sample_target(),
+            FunctionsVerificationPurpose::AnchorAuditBatch,
+            &receipts,
+            50_000,
+            FunctionsVerificationPolicy::default(),
+            None,
+        )
+        .test_unwrap();
+
+        for (item, receipt) in request.batch_items.iter().zip(&receipts) {
+            let signing_body = hex::decode(&item.signing_body_hex).test_unwrap();
+            let canonical = chio_core::canonical::CanonicalBytes::from_serializable(
+                &ChioReceiptSigningBody::from_body_and_bbs(
+                    &receipt.body(),
+                    receipt.bbs_signature.as_ref(),
+                ),
+            )
+            .test_unwrap();
+            assert_eq!(canonical.as_bytes(), signing_body.as_slice());
+            let mut script_wrapper = b"chio.signing-wrapper.v1\0".to_vec();
+            script_wrapper.extend_from_slice(sha256(b"chio.receipt.v1").as_bytes());
+            script_wrapper.extend_from_slice(sha256(&signing_body).as_bytes());
+            let wrapper = chio_core::crypto::SigningWrapper::new("chio.receipt.v1", &canonical)
+                .test_unwrap();
+            assert_eq!(script_wrapper.as_slice(), wrapper.as_bytes().as_slice());
+            chio_core::crypto::verify_wrapped_bytes(
+                &receipt.kernel_key,
+                "chio.receipt.v1",
+                &canonical,
+                &receipt.signature,
+            )
+            .test_unwrap();
+            assert_eq!(item.signature_hex, receipt.signature.to_hex());
+        }
+        assert!(CHIO_FUNCTIONS_ED25519_SOURCE.contains("item.signing_body_hex"));
     }
 
     #[test]

@@ -1,8 +1,7 @@
 # Market terms fixture
 
-`terms.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The seller, who both authors the terms and
+`terms.json` is generated deterministically by
+`chio proof fixture regenerate`. The seller, who both authors the terms and
 signs the envelope, uses the test-only seed `[2_u8; 32]`.
 
 The fixture proves JSON Schema conformance, strict canonical parsing,

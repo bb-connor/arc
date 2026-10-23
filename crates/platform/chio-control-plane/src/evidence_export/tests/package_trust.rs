@@ -23,7 +23,16 @@ fn package_rejects_unsigned_manifest() {
     let mut bundle = sample_bundle();
     bundle.query.read_boundary = Some(ReceiptReadBoundary::AdminAll);
     bundle.child_receipt_scope = EvidenceChildReceiptScope::FullQueryWindow;
-    write_evidence_package(&output, bundle, None, None, None, &package_keypair()).test_unwrap();
+    write_evidence_package(
+        &output,
+        bundle,
+        None,
+        None,
+        None,
+        &package_keypair(),
+        PACKAGE_EXPORTED_AT,
+    )
+    .test_unwrap();
     fs::remove_file(output.join("export-envelope.json")).test_unwrap();
     let error = load_verified_evidence_package(&output, &package_policy()).test_unwrap_err();
     assert!(error.to_string().contains("envelope"), "{error}");
@@ -41,6 +50,7 @@ fn fixture() -> (tempfile::TempDir, EvidenceImportPackage) {
         None,
         None,
         &package_keypair(),
+        PACKAGE_EXPORTED_AT,
     )
     .test_unwrap();
     let package = load_verified_evidence_package(directory.path(), &package_policy()).test_unwrap();
@@ -137,7 +147,16 @@ fn package_accepts_explicit_rotation_keys_and_preserves_uncheckpointed_observati
         seq: 1,
         receipt_id: bundle.tool_receipts[0].receipt.id.clone(),
     }];
-    write_evidence_package(directory.path(), bundle, None, None, None, &signer).test_unwrap();
+    write_evidence_package(
+        directory.path(),
+        bundle,
+        None,
+        None,
+        None,
+        &signer,
+        PACKAGE_EXPORTED_AT,
+    )
+    .test_unwrap();
     let policy = EvidenceVerificationPolicy::new(
         vec![signer.public_key(), package_keypair().public_key()],
         None,

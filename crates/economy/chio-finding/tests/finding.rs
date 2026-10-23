@@ -4,14 +4,12 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use chio_core_types::capability::runtime_attestation::RuntimeAssuranceTier;
-use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::{canonical_json_bytes, canonical_json_bytes_from_str};
 use chio_finding::{
     compute_finding_id,
     crypto::{Ed25519Backend, Keypair, PublicKey},
-    Finding, FindingDescriptor, FindingError, FindingEvidenceClass, FindingGuaranteeClass,
-    FindingOutcomeClass, FINDING_SCHEMA_V1, MAX_FINDING_EVIDENCE_RECEIPTS,
-    MAX_FINDING_IDENTIFIER_BYTES, MAX_FINDING_TEXT_BYTES,
+    Finding, FindingError, FindingEvidenceClass, FindingGuaranteeClass,
+    MAX_FINDING_EVIDENCE_RECEIPTS, MAX_FINDING_IDENTIFIER_BYTES, MAX_FINDING_TEXT_BYTES,
 };
 use chio_finding::{
     sign_finding, sign_finding_with_backend, verify_finding, verify_finding_signature,
@@ -51,10 +49,6 @@ fn assert_finding_schema_rejects(value: &Value, case: &str) -> TestResult {
     }
 }
 
-fn hex64(fill: char) -> String {
-    std::iter::repeat_n(fill, 64).collect()
-}
-
 fn recompute_finding_id(finding: &mut Finding) {
     finding.finding_id = match compute_finding_id(finding) {
         Ok(finding_id) => finding_id,
@@ -62,38 +56,17 @@ fn recompute_finding_id(finding: &mut Finding) {
     };
 }
 
-/// Draft with an EMPTY finding_id; not yet valid.
+/// The committed golden finding re-issued under `issuer`, with an empty
+/// `finding_id` and signature; not yet valid.
 fn draft_finding_with_issuer(issuer: PublicKey) -> Finding {
-    Finding {
-        schema: FINDING_SCHEMA_V1.to_string(),
-        finding_id: String::new(),
-        descriptor: FindingDescriptor {
-            topic: "repo:backbay/chio#test-failure".to_string(),
-            context_sha256: hex64('a'),
-            outcome_class: FindingOutcomeClass::VerifiedFix,
-        },
-        guarantee_class: FindingGuaranteeClass::DeterministicReplay,
-        payload_sha256: hex64('b'),
-        payload_media_type: "text/x-diff".to_string(),
-        evidence_receipt_ids: vec!["r-1".to_string()],
-        evidence_checkpoint_ref: "ckpt-1".to_string(),
-        evidence_cost: MonetaryAmount {
-            units: 4_200,
-            currency: "USD".to_string(),
-        },
-        runtime_assurance_tier: None,
-        evidence_class: FindingEvidenceClass::Verified,
-        replay_recipe_sha256: Some(hex64('c')),
-        intent_commitment_receipt_id: None,
-        bond_ref: "bond-req-1".to_string(),
-        status_feed_ref: "finding-status/test".to_string(),
-        license_ref: None,
-        price_hint_ref: None,
-        issuer,
-        issued_at: 1_784_880_000,
-        expires_at: 1_792_656_000,
-        signature: String::new(),
-    }
+    let mut finding: Finding = match serde_json::from_str(GOLDEN_FIXTURE_RAW) {
+        Ok(finding) => finding,
+        Err(err) => panic!("golden finding fixture parses: {err}"),
+    };
+    finding.issuer = issuer;
+    finding.finding_id = String::new();
+    finding.signature = String::new();
+    finding
 }
 
 /// Fully constructed finding: draft plus its content-addressed id.
@@ -660,22 +633,5 @@ fn schema_accepts_fully_asserted_finding_without_receipts() -> TestResult {
     assert!(finding.evidence_receipt_ids.is_empty());
     validate_finding_schema(&serde_json::to_value(&finding)?)?;
     verify_finding(&finding)?;
-    Ok(())
-}
-
-#[test]
-#[ignore = "regenerates the deterministic golden fixture; run manually"]
-fn regenerate_golden_fixture() -> TestResult {
-    let issuer = Keypair::from_seed(&[9_u8; 32]);
-    let mut finding = draft_finding_with_issuer(issuer.public_key());
-    finding.finding_id = compute_finding_id(&finding)?;
-    let finding = sign_finding(finding, &issuer)?;
-    let json = serde_json::to_string_pretty(&finding)?;
-    let path = fixture_path();
-    let parent = path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("golden fixture path has no parent"))?;
-    std::fs::create_dir_all(parent)?;
-    std::fs::write(path, format!("{json}\n"))?;
     Ok(())
 }

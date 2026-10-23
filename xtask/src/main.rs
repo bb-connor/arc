@@ -103,6 +103,7 @@ mod eval_receipt_regen;
 mod fixtures;
 mod formal;
 mod formal_mirrors;
+mod hash_pinned;
 mod launch_acceptance;
 mod proof_coverage;
 mod qualify;
@@ -112,6 +113,7 @@ mod scenarios;
 mod signed_fixtures;
 mod snippets_subcommand;
 mod support;
+mod vector_seeds;
 mod vectors;
 
 pub(crate) use codegen::{errors_regen, run_codegen};

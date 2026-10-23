@@ -60,6 +60,7 @@ fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
         None,
         None,
         &package_keypair(),
+        PACKAGE_EXPORTED_AT,
     )
     .test_unwrap();
     directory

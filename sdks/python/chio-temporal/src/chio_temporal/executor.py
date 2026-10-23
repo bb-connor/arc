@@ -13,8 +13,11 @@ committed hold for the kernel to expire or recover.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any, Protocol, runtime_checkable
+
+SIGNING_WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 
 
 @runtime_checkable
@@ -35,7 +38,7 @@ class CallerExecutor(Protocol):
         ...
 
     def sign(self, message: bytes) -> str:
-        """Sign canonical report bytes with the executor key; return the wire signature."""
+        """Sign the report's signing-wrapper bytes with the executor key; return the wire signature."""
         ...
 
     def verify_kernel_signature(self, message: bytes, signature: str) -> bool:
@@ -73,4 +76,17 @@ def _reject_floats(value: Any) -> None:
             _reject_floats(item)
 
 
-__all__ = ["CallerExecutor", "canonical_json_bytes"]
+def signing_wrapper(schema_id: str, canonical: bytes) -> bytes:
+    """The 88 bytes every Chio signature covers.
+
+    ``SIGNING_WRAPPER_PREFIX || SHA-256(schema_id) || SHA-256(canonical)``,
+    where ``canonical`` is the RFC 8785 body signed under ``schema_id``.
+    """
+    return (
+        SIGNING_WRAPPER_PREFIX
+        + hashlib.sha256(schema_id.encode("utf-8")).digest()
+        + hashlib.sha256(canonical).digest()
+    )
+
+
+__all__ = ["CallerExecutor", "canonical_json_bytes", "signing_wrapper"]

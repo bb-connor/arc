@@ -9,8 +9,8 @@ pub(super) fn write_evidence_package(
     policy_file: Option<&Path>,
     federation_policy: Option<&FederationPolicyDocument>,
     signing_key: &chio_core::Keypair,
+    exported_at: u64,
 ) -> Result<(), CliError> {
-    let clock_now = unix_now()?;
     ensure_clean_output_dir(output)?;
     let transparency = match transparency {
         Some(summary) => {
@@ -153,7 +153,7 @@ pub(super) fn write_evidence_package(
     let receipt_semantics = evidence_receipt_semantic_summary(&bundle.tool_receipts);
     let manifest = EvidenceExportManifest {
         schema: EVIDENCE_EXPORT_MANIFEST_SCHEMA.to_string(),
-        exported_at: clock_now,
+        exported_at,
         query: bundle.query.clone(),
         counts,
         proof_coverage,

@@ -1,5 +1,5 @@
 use chio_eval_receipt::{
-    export_scenario_run, EvalRunMeta, EvalRunMetaParts, ExportError, Receipt, ReceiptParts,
+    export_scenario_run, verify_bundle, BundleError, EvalRunMeta, EvalRunMetaParts, ExportError, Receipt, ReceiptParts,
     VERDICT_MATRIX_CORPUS_SHA256, VERDICT_MATRIX_SCENARIO_COUNT,
 };
 
@@ -77,4 +77,24 @@ fn sample_meta() -> Result<EvalRunMeta, ExportError> {
         scorer_name: "tool-use-rubric",
         scorer_version: "v1",
     })
+}
+
+#[test]
+fn production_verifier_rejects_the_committed_placeholder_bundles() {
+    for (label, bundle) in [
+        (
+            "metr sample",
+            include_str!("../../../../examples/eval-receipt-ingest/metr/out/metr-sample-bundle.json"),
+        ),
+        (
+            "fuzz seed",
+            include_str!("../../../../fuzz/corpus/eval_receipt_bundle/valid-bundle.json"),
+        ),
+    ] {
+        let result = verify_bundle(bundle);
+        assert!(
+            matches!(result, Err(BundleError::InvalidReceiptPayload(_))),
+            "{label}: placeholder receipt signatures must fail closed, got {result:?}"
+        );
+    }
 }

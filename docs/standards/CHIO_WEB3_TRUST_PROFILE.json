@@ -24,7 +24,7 @@
       "expires_at": 1774828800,
       "nonce": "0123456789abcdef0123456789abcdef"
     },
-    "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
+    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
   },
   "proof_bundle_required": true,
   "dispute_windows": [

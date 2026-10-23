@@ -2,16 +2,11 @@ use super::*;
 use chio_finding::{FindingEvidenceClass, FindingGuaranteeClass};
 
 pub(super) fn finding_fixture_bytes() -> TestResult<Vec<u8>> {
-    let mut finding: chio_finding::Finding = serde_json::from_slice(include_bytes!(
-        "../../../../../fixtures/proof-room/finding/verified-fix-basic/finding.json"
-    ))?;
+    let bytes = golden_bytes("finding.json")?;
+    let finding: chio_finding::Finding = serde_json::from_slice(&bytes)?;
     chio_finding::verify_finding(&finding)?;
-    finding.replay_recipe_sha256 = Some(sha256_hex(&recipe_bytes("bb")?));
-    finding.signature.clear();
-    finding.finding_id = compute_finding_id(&finding)?;
-    finding = sign_finding(finding, &Keypair::from_seed(&[9_u8; 32]))?;
     assert_eq!(finding.finding_id, FINDING_ID);
-    Ok(canonical_json_bytes(&finding)?)
+    Ok(bytes)
 }
 
 pub(super) fn rebind_recipe_and_finding(

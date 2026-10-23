@@ -396,3 +396,83 @@ fn codecs_reject_unknown_fields_noncanonical_bytes_unsafe_numbers_and_size_overf
     assert!(SignedCallerDispatchAuthorizationV1::sign(body, &fixture.kernel).is_err());
     Ok(())
 }
+
+const TEMPORAL_GOLDEN: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../sdks/python/chio-temporal/tests/fixtures/caller_delivery_golden_v1.json"
+);
+
+/// The chio-temporal interceptor's golden vector: the authorization, an
+/// executor report over it and a mediated receipt, each from its signer.
+fn temporal_golden() -> TestResult<String> {
+    let fixture = fixture()?;
+    let authorization = &fixture.authorization;
+    let digest = verify(&fixture, authorization, 1_100)?.digest().clone();
+    let report = SignedCallerDeliveryReportV1::sign(
+        CallerDeliveryReportBodyV1 {
+            schema: CALLER_DELIVERY_REPORT_SCHEMA.into(),
+            authorization_digest: digest.clone(),
+            executor: authorization.authorization.executor.clone(),
+            claim_id: identifier("temporal:claim")?,
+            execution_started_at_unix_ms: 1_100,
+            completed_at_unix_ms: 1_200,
+            output: serde_json::json!({
+                "outcome": "completed",
+                "result_sha256": sha256_hex(b"result"),
+            }),
+            realized_cost: None,
+        },
+        &fixture.executor,
+    )?;
+    let parameters = serde_json::json!({"args": ["x", 1]});
+    let body: chio_core::receipt::body::ChioReceiptBody =
+        serde_json::from_value(serde_json::json!({
+            "id": "temporal-golden",
+            "timestamp": 1_700_000_000_u64,
+            "capability_id": "capability",
+            "tool_server": "server",
+            "tool_name": "mutate",
+            "action": {
+                "parameters": parameters,
+                "parameter_hash": sha256_hex(&canonical_json_bytes(&parameters)?),
+            },
+            "decision": {"verdict": "allow"},
+            "receipt_kind": "mediated_decision",
+            "boundary_class": "prevent",
+            "tool_origin": "caller_executed",
+            "redaction_mode": "none",
+            "content_hash": sha256_hex(b"content"),
+            "policy_hash": sha256_hex(b"policy"),
+            "trust_level": "mediated",
+            "kernel_key": fixture.kernel.public_key(),
+        }))?;
+    let receipt = chio_core::receipt::body::ChioReceipt::sign(body, &fixture.kernel)?;
+    let golden = serde_json::json!({
+        "authorization": authorization,
+        "authorization_body_canonical":
+            String::from_utf8(canonical_json_bytes(&authorization.authorization)?)?,
+        "authorization_canonical": String::from_utf8(authorization.canonical_bytes()?)?,
+        "authorization_digest": digest.as_str(),
+        "executor_seed_byte": 42,
+        "generator": "chio-kernel caller_delivery fixture (seeds 0x29 kernel, 0x2a executor): \
+            SignedCallerDispatchAuthorizationV1::sign, SignedCallerDeliveryReportV1::sign, \
+            ChioReceipt::sign",
+        "kernel_seed_byte": 41,
+        "receipt": receipt,
+        "report": report,
+        "report_body_canonical": String::from_utf8(canonical_json_bytes(&report.report)?)?,
+    });
+    Ok(format!("{}\n", serde_json::to_string_pretty(&golden)?))
+}
+
+/// Set `CHIO_WRITE_TEMPORAL_GOLDEN=1` to rewrite the committed chio-temporal
+/// golden vector from this generator.
+#[test]
+fn temporal_golden_is_the_generator_output() -> TestResult {
+    let generated = temporal_golden()?;
+    if std::env::var_os("CHIO_WRITE_TEMPORAL_GOLDEN").is_some() {
+        std::fs::write(TEMPORAL_GOLDEN, &generated)?;
+    }
+    assert_eq!(std::fs::read_to_string(TEMPORAL_GOLDEN)?, generated);
+    Ok(())
+}
