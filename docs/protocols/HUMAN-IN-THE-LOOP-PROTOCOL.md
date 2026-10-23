@@ -437,7 +437,7 @@ pub struct ChannelHandle {
 ```rust
 pub struct WebhookChannel {
     endpoint: Url,
-    signing_key: Keypair,
+    auth_token: String,
     http_client: reqwest::Client,
 }
 
@@ -452,14 +452,11 @@ impl ApprovalChannel for WebhookChannel {
             callback_url: format!("/approvals/{}/respond", request.id),
         };
 
-        // Sign the payload so the receiver can verify it came from Chio.
-        let signature = self
-            .signing_key
-            .sign_wrapped(APPROVAL_WEBHOOK_SCHEMA, &CanonicalBytes::from_serializable(&payload)?)?;
-
+        // The receiver authenticates the sender through the configured
+        // transport credential; the payload carries no Chio signature.
         let response = self.http_client
             .post(self.endpoint.clone())
-            .header("X-Chio-Signature", signature.to_hex())
+            .bearer_auth(&self.auth_token)
             .json(&payload)
             .send()
             .await?;
