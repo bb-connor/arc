@@ -158,49 +158,9 @@ const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
 const FINANCIAL_METADATA_KEY: &str = "financial";
 const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
 const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
-const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-/// Top-level receipt-metadata keys that only a Chio signer writes: the kernel,
-/// the receipt signing path, or the HTTP receipt projection. Caller metadata
-/// that names one is refused before any effect.
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
-    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
-    "attribution",
-    MANIFEST_SECURITY_METADATA_KEY,
-    PROTOCOL_ADMISSION_METADATA_KEY,
-    BUDGET_AUTHORITY_METADATA_KEY,
-    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
-    FINANCIAL_METADATA_KEY,
-    GOVERNED_TRANSACTION_METADATA_KEY,
-    CALLER_DELIVERY_METADATA_KEY,
-    PROTOCOL_REFUSAL_METADATA_KEY,
-    RUNTIME_ADMISSION_METADATA_KEY,
-    "receipt_context",
-    "governed_transaction_diagnostics",
-    "model_metadata",
-    chio_core::receipt::metadata::CHANNEL_METADATA_KEY,
-    chio_core::receipt::metadata::DELIVERY_CONTRACT_METADATA_KEY,
-    chio_core::receipt::metadata::FINDING_DELIVERY_METADATA_KEY,
-    chio_core::receipt::metadata::FINDING_RECOVERY_METADATA_KEY,
-    crate::finding_purchase::FINDING_PURCHASE_REPLAY_SNAPSHOT_METADATA_KEY,
-    crate::finding_recovery::FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY,
-    crate::finding_denial::FINDING_DENIAL_METADATA_KEY,
-    "stream",
-    "threshold_approval",
-    "memory_provenance",
-    "post_invocation",
-    "execution_nonce",
-    "chio_kernel",
-    "runtime_admission",
-    "active_response_terminal_evidence",
-    "chio_http_receipt_v1",
-    chio_core::receipt::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
-    chio_core::receipt::signing::CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
-    "finding_pool_mutation",
-    "session_report",
-    "prior_metadata",
-];
+use chio_core::receipt::metadata::RESERVED_RECEIPT_METADATA_KEYS;
 
 /// Refusal reason for runtime-admission hook metadata that is present but not
 /// a JSON object; such metadata would displace every later kernel block.

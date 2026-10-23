@@ -1521,10 +1521,14 @@ Nested flows such as sampling, elicitation, and resource reads use
 ### 6.4 Receipt Metadata
 
 The shipped metadata surface is extensible JSON. The top-level keys below are
-reserved: the kernel writes its typed blocks under them, merges them last, and
-rejects a pre-existing collision from caller or hook metadata, so a verifier can
-treat a block found under a reserved key as kernel-authored and covered by the
+reserved: a Chio signer writes its typed blocks under them and merges them last.
+Caller metadata that names a reserved key is refused before any effect. A
+runtime-admission hook may name only `chio_runtime`; a hook decision naming any
+other reserved key becomes a runtime-admission denial. A verifier can therefore
+treat a block found under a reserved key as signer-authored and covered by the
 receipt signature. Unknown fields and unsupported schema versions fail closed.
+The reader-side source of truth is
+`chio_core_types::receipt::metadata::RESERVED_RECEIPT_METADATA_KEYS`.
 
 | Key | Written by | Contents |
 |-----|------------|----------|
@@ -1538,9 +1542,33 @@ receipt signature. Unknown fields and unsupported schema versions fail closed.
 | `delivery_contract` | kernel | Output-digest delivery evidence, schema `chio.delivery-contract.v1` (see below). |
 | `caller_delivery` | kernel | Authenticated historical caller observation digests, executor/claim identity and times, schema `chio.authenticated-caller-observation.v1`. No raw output. |
 | `finding_delivery` | kernel | Purchased-finding delivery overlay, schema `chio.finding.delivery.v1` (see below). |
+| `finding_recovery` | kernel | Finding-recovery binding for a recovery-marked grant. |
+| `finding_purchase_replay_snapshot` | kernel | Admission-verified purchase binding used by terminal replay. |
+| `finding_recovery_replay_snapshot` | kernel | Durable recovery binding and the live-status floor admitted before dispatch. |
+| `findingDenial` | kernel | Finding-market denial family code. |
+| `finding_pool_mutation` | kernel | Finding-pool ledger mutation evidence. |
+| `attribution` | kernel | Subject key, issuer key, delegation depth and matched grant of the capability. |
+| `receipt_context` | kernel | Request id, request namespace digest and evaluation id bound into the receipt. |
+| `model_metadata` | kernel | Model metadata the request declared. |
+| `stream` | kernel | Streamed-output chunk counts and byte totals. |
+| `chio_manifest_security_v1` | kernel | Registry-validated entrypoint evidence. |
+| `protocol_admission` | kernel | Security admission operation id and state. |
+| `active_response_terminal_evidence` | kernel | Executor receipt id, hash and key behind an active-response terminal receipt. |
+| `protocol_refusal` | kernel | Session protocol refusal event. |
+| `session_report` | kernel | Session report event. |
+| `budget_denial_authority` | kernel | Budget-authority lineage for a budget denial. |
+| `governed_transaction_diagnostics` | kernel | Governed-transaction diagnostics. |
+| `threshold_approval` | kernel | Threshold approval state for a pending call. |
+| `memory_provenance` | kernel | Memory write provenance. |
+| `post_invocation` | kernel | Post-invocation guard results. |
+| `execution_nonce` | kernel | Execution-nonce stage and cleanup state on a preflight denial. |
+| `chio_runtime` | kernel, runtime-admission hook | Runtime admission reservations and federation runtime evidence. |
+| `runtime_admission` | kernel | The kernel's runtime-admission refusal record. Never accepted from a hook. |
+| `chio_kernel` | kernel | Kernel rejection code on a refusal receipt. |
+| `prior_metadata` | kernel | A non-object metadata value displaced by a kernel rejection record. |
+| `chio_http_receipt_v1` | HTTP receipt projection | Embedded HTTP receipt. |
 
-Subject and issuer attribution, streamed-output chunk metadata, and
-portable-trust and federation provenance are additive extensions layered over
+Portable-trust and federation provenance are additive extensions layered over
 the same object.
 
 A tool call dispatched to a tool server launched under the Linux cage carries

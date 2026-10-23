@@ -278,6 +278,31 @@ fn caller_cannot_set_prior_metadata() {
     );
 }
 
+/// Every key the kernel crate names for a block it writes is in the shared
+/// reserved set.
+#[test]
+fn kernel_written_metadata_key_consts_are_reserved() {
+    for key in [
+        crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
+        crate::kernel::MANIFEST_SECURITY_METADATA_KEY,
+        crate::kernel::PROTOCOL_ADMISSION_METADATA_KEY,
+        crate::kernel::BUDGET_AUTHORITY_METADATA_KEY,
+        crate::kernel::BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
+        crate::kernel::FINANCIAL_METADATA_KEY,
+        crate::kernel::GOVERNED_TRANSACTION_METADATA_KEY,
+        crate::kernel::CALLER_DELIVERY_METADATA_KEY,
+        crate::kernel::RUNTIME_ADMISSION_METADATA_KEY,
+        crate::finding_purchase::FINDING_PURCHASE_REPLAY_SNAPSHOT_METADATA_KEY,
+        crate::finding_recovery::FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY,
+        crate::finding_denial::FINDING_DENIAL_METADATA_KEY,
+    ] {
+        assert!(
+            crate::kernel::RESERVED_RECEIPT_METADATA_KEYS.contains(&key),
+            "{key}"
+        );
+    }
+}
+
 /// Pins the reserved set exactly, so a key added to or removed from the const
 /// fails here until its own refusal test exists, and pins each key's exact
 /// refusal reason.
