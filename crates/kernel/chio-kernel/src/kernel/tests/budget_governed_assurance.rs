@@ -1078,25 +1078,23 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
 }
 
 #[test]
-fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadata() {
-    let (url, request_rx, handle) = spawn_payment_test_server(
-        200,
-        serde_json::json!({
-            "authorizationId": "x402_txn_governed",
-            "settled": true,
-            "metadata": {
-                "network": "base",
-                "merchant": "pay-per-api"
-            }
-        }),
-    );
-
+fn governed_x402_without_a_presented_payment_denies_before_any_rail_call() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_payment_adapter(Box::new(
-        X402PaymentAdapter::new(url)
-            .with_bearer_token("bridge-token")
-            .with_timeout(Duration::from_secs(2)),
+        X402PaymentAdapter::new(
+            "http://127.0.0.1:1",
+            "http://127.0.0.1:1",
+            crate::payment::X402RailConfig::new(
+                crate::payment::X402Network::allowlisted("eip155:84532")
+                    .expect("allowlisted network"),
+                "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+                "USD",
+                "0x2000000000000000000000000000000000000002",
+            )
+            .expect("valid rail"),
+        )
+        .with_timeout(Duration::from_millis(50)),
     ));
     kernel.register_tool_server(Box::new(CountingMonetaryServer {
         id: "cost-srv".to_string(),
@@ -1109,134 +1107,9 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    let request_id = "req-governed-x402";
+    let request_id = "req-governed-x402-unpaid";
     let mut intent = make_governed_intent(
-        "intent-governed-x402",
-        "cost-srv",
-        "compute",
-        "purchase premium API result",
-        100,
-        "USD",
-    );
-    bind_test_tool_approval(
-        &mut kernel,
-        &cap,
-        &serde_json::json!({ "sku": "dataset-pro" }),
-        request_id,
-        &mut intent,
-    );
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent_kp.public_key(),
-        &intent,
-        request_id,
-    );
-    let expected_approval_digest = approval_token
-        .artifact_digest()
-        .expect("approval token should hash");
-
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: request_id.to_string(),
-            capability: cap,
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({ "sku": "dataset-pro" }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: Some(intent.clone()),
-            approval_token: Some(approval_token.clone()),
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
-        })
-        .unwrap();
-
-    assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(
-        invocations.load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "tool should run after x402 authorization succeeds"
-    );
-
-    let request = request_rx.recv().expect("request should be captured");
-    assert!(request.starts_with("POST /authorize HTTP/1.1"));
-    assert!(request.contains("Authorization: Bearer bridge-token"));
-    assert!(request.contains("\"amountUnits\":100"));
-    assert!(request.contains("\"reference\":\"req-governed-x402\""));
-    assert!(request.contains("\"governed\":{"));
-    assert!(request.contains("\"intentId\":\"intent-governed-x402\""));
-    assert!(request.contains("\"approvalTokenId\":\"approval-req-governed-x402\""));
-
-    let metadata = response
-        .receipt
-        .metadata
-        .as_ref()
-        .expect("allow receipt should carry metadata");
-    let financial = metadata
-        .get("financial")
-        .expect("allow receipt should carry financial metadata");
-    assert_eq!(financial["payment_reference"], "x402_txn_governed");
-    assert_eq!(financial["settlement_status"], "settled");
-    assert_eq!(financial["cost_charged"].as_u64(), Some(100));
-    assert_eq!(
-        financial["cost_breakdown"]["payment"]["authorization_id"],
-        "x402_txn_governed"
-    );
-    assert_eq!(
-        financial["cost_breakdown"]["payment"]["adapter_metadata"]["adapter"],
-        "x402"
-    );
-    assert_eq!(
-        financial["cost_breakdown"]["payment"]["adapter_metadata"]["merchant"],
-        "pay-per-api"
-    );
-
-    let governed = metadata
-        .get("governed_transaction")
-        .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
-    assert_eq!(governed["approval"]["token_id"], approval_token.id);
-    assert_eq!(
-        governed["approval"]["approval_artifact_digest"],
-        expected_approval_digest
-    );
-
-    handle.join().expect("server thread should exit cleanly");
-}
-
-#[test]
-fn governed_x402_authorization_failure_denies_before_tool_execution() {
-    let (url, request_rx, handle) = spawn_payment_test_server(
-        402,
-        serde_json::json!({
-            "error": "insufficient funds"
-        }),
-    );
-
-    let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(
-        X402PaymentAdapter::new(url).with_timeout(Duration::from_secs(2)),
-    ));
-    kernel.register_tool_server(Box::new(CountingMonetaryServer {
-        id: "cost-srv".to_string(),
-        invocations: invocations.clone(),
-    }));
-
-    let agent_kp = Keypair::generate();
-    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-
-    let request_id = "req-governed-x402-deny";
-    let mut intent = make_governed_intent(
-        "intent-governed-x402-deny",
+        "intent-governed-x402-unpaid",
         "cost-srv",
         "compute",
         "purchase premium API result",
@@ -1279,21 +1152,11 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("payment authorization failed")),
-        "denial should explain the x402 authorization failure"
-    );
     assert_eq!(
-        invocations.load(std::sync::atomic::Ordering::SeqCst),
-        0,
-        "tool should not run when x402 authorization fails"
+        response.reason.as_deref(),
+        Some("payment authorization failed: declined")
     );
-
-    let request = request_rx.recv().expect("request should be captured");
-    assert!(request.contains("\"intentId\":\"intent-governed-x402-deny\""));
+    assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
     let metadata = response
         .receipt
@@ -1308,16 +1171,81 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     assert_eq!(financial["settlement_status"], "not_applicable");
 
-    let governed = metadata
-        .get("governed_transaction")
-        .expect("deny receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
-
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
+}
 
-    handle.join().expect("server thread should exit cleanly");
+#[test]
+fn payment_authority_expiry_is_the_earliest_capability_or_approval_expiry() {
+    let kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request_id = "req-authority-expiry";
+    let intent = make_governed_intent(
+        "intent-authority-expiry",
+        "cost-srv",
+        "compute",
+        "purchase premium API result",
+        100,
+        "USD",
+    );
+    let approval = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+    let mut request = ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+
+    request.capability.expires_at = 1_744_000_600;
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        1_744_000_600
+    );
+
+    let mut single = approval.clone();
+    single.expires_at = 1_744_000_300;
+    request.approval_token = Some(single);
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        1_744_000_300
+    );
+
+    request.capability.expires_at = 1_744_000_200;
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        1_744_000_200
+    );
+
+    let mut threshold = approval;
+    threshold.expires_at = 1_744_000_100;
+    request.approval_token = None;
+    request.approval_tokens = vec![threshold];
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        1_744_000_100
+    );
 }
 
 #[test]

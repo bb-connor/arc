@@ -166,6 +166,32 @@ pub struct PaymentAuthorizeRequest {
     pub governed: Option<GovernedPaymentContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commerce: Option<CommercePaymentContext>,
+    /// x402 payment presented for this request. Kernel-internal: never
+    /// forwarded to other rails.
+    #[serde(skip)]
+    pub x402: Option<super::X402PaymentContext>,
+    /// Earliest expiry, in Unix seconds, of the capability and approvals that
+    /// authorize this spend. A rail authorization must not outlive it.
+    #[serde(skip)]
+    pub authority_expires_at: Option<u64>,
+}
+
+/// Rail references for one settled x402 prepayment, carried in
+/// [`PaymentAuthorization::metadata`] under `x402`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct X402SettlementRef {
+    pub x402_version: u8,
+    pub scheme: String,
+    /// CAIP-2 network the transfer settled on.
+    pub network: String,
+    /// Settlement transaction hash.
+    pub transaction: String,
+    /// EIP-3009 authorizer.
+    pub payer: String,
+    /// SHA-256 of the canonical JSON `paymentPayload`.
+    pub payment_payload_digest: String,
+    /// SHA-256 of the canonical JSON facilitator settlement response.
+    pub settlement_response_digest: String,
 }
 
 impl ReceiptSettlement {

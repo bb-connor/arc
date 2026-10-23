@@ -562,7 +562,9 @@ pub use payment::{
     PaymentJournalState, PaymentJournalTransition, PaymentRailMode, PaymentReleaseAuthorityBinding,
     PaymentReleaseAuthorityKind, PaymentResult, PaymentSettleAction,
     PreDispatchPaymentUnwindEvidence, PreDispatchPaymentUnwindStatus, RailSettlementState,
-    RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
+    RailSettlementStatus, ReceiptSettlement, X402Eip3009Authorization, X402ExactEvmPayload,
+    X402Network, X402PaymentAdapter, X402PaymentContext, X402PaymentPayload,
+    X402PaymentRequirements, X402RailConfig, X402Refusal, X402SettlementRef,
 };
 #[cfg(not(loom))]
 pub use post_invocation::{

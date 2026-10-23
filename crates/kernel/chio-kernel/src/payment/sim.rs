@@ -117,6 +117,8 @@ mod tests {
             reference: reference.to_string(),
             governed: None,
             commerce: None,
+            x402: None,
+            authority_expires_at: None,
         }
     }
 
