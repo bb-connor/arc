@@ -30,6 +30,9 @@ rand_core = { version = "0.6", default-features = false, features = ["getrandom"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ryu = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
+hkdf = { version = "0.12", default-features = false }
+hmac = { version = "0.12", default-features = false }
+subtle = { version = "2", default-features = false }
 percent-encoding = { version = "2", default-features = false, features = ["alloc"] }
 url = { version = "2", default-features = false }
 chio-security-types = { workspace = true }
@@ -48,6 +51,10 @@ fips204 = { workspace = true, optional = true }
 # compile (it has no default source of randomness). Declaring `getrandom`
 # directly here with `features = ["js"]` folds into Cargo's feature unification
 # so both the hosted and browser/edge WASM targets link successfully.
+# Owner checks on tenant index key files compare against the effective uid.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1", default-features = false, features = ["std", "process"], optional = true }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
 version = "0.2"
 features = ["js"]
@@ -71,6 +78,10 @@ std = [
     "url/std",
     "chio-security-types/std",
     "dep:thiserror",
+    "dep:rustix",
+    "hkdf/std",
+    "hmac/std",
+    "subtle/std",
 ]
 # Enables the P-256 and P-384 SigningBackend implementations backed by
 # aws-lc-rs. See `crate::crypto` for details. Requires `std` today because

@@ -6,6 +6,7 @@
 pub mod authoritative_spend;
 pub mod body;
 pub mod checkpoint;
+pub mod commitment;
 pub mod crypto_floor;
 pub mod decision;
 pub mod economics;
