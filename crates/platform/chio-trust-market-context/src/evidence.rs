@@ -148,7 +148,10 @@ pub(super) fn bundle_contains_verified_receipt_node_id(
     {
         return Ok(false);
     }
-    Ok(validate_artifact_signature(node, &value, CHIO_RECEIPT_SCHEMA, trusted_authority_keys).is_ok())
+    Ok(
+        validate_artifact_signature(node, &value, CHIO_RECEIPT_SCHEMA, trusted_authority_keys)
+            .is_ok(),
+    )
 }
 
 pub(super) fn bundle_contains_risk_evidence_kind(

@@ -1422,9 +1422,7 @@ mod roster_enforcement {
     const ADJUDICATION_ID_GOLDEN_ANCHOR_A: &str =
         "lca-96d5df5192950bcfbd3d140286c79347d800dce8d945dffd4da9752530e9a038";
 
-    fn sign_export<
-        T: serde::Serialize + Clone + chio_core::receipt::lineage::SignedExportPayload,
-    >(
+    fn sign_export<T: chio_core::receipt::lineage::SignedExportPayload + Clone>(
         body: T,
     ) -> SignedExportEnvelope<T> {
         let kp = Keypair::generate();

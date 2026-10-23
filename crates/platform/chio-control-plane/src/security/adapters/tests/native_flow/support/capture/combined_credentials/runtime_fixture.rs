@@ -116,7 +116,7 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
             verifier_id: verifier_id.into(), key_id: key_id.into(), public_key: verifier.public_key(),
             valid_from_unix_ms: now, valid_until_unix_ms: expires, status: "active".into(),
         }])
-        .with_pheromone_query_report(SignedExportEnvelope::sign(chio_runtime_core::RuntimePheromoneQueryReport(serde_json::json!({
+        .with_pheromone_query_report(SignedExportEnvelope::sign(RuntimePheromoneQueryReport(serde_json::json!({
             "schema": "chio.pheromone.query-report.v1", "accepted": true,
             "concentration": { "subjectClass": "native-execution", "subjectClassNamespace": "chio.runtime",
                 "totalStrength": 0.1, "distinctOriginPairs": 1, "reputationEpoch": 1, "evaluatedAtUnixMs": now },

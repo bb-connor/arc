@@ -607,10 +607,12 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
     )
     .test_unwrap();
     second.body.previous_checkpoint_sha256 = Some("00".repeat(32));
-    second.signature = kp.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
-        &chio_core::CanonicalBytes::from_serializable(&second.body).test_unwrap(),
-    ).test_unwrap();
+    second.signature = kp
+        .sign_wrapped(
+            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&second.body).test_unwrap(),
+        )
+        .test_unwrap();
     let error = ReceiptStore::store_checkpoint(&store, &second).test_unwrap_err();
     assert!(error
         .to_string()

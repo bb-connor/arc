@@ -193,8 +193,10 @@ impl HttpReceipt {
     pub fn sign(mut body: HttpReceiptBody, keypair: &Keypair) -> chio_core_types::Result<Self> {
         body.id = compute_http_receipt_id(&body)?;
         body.validate_authority_semantics()?;
-        let signature =
-            keypair.sign_wrapped(CHIO_HTTP_RECEIPT_SCHEMA, &CanonicalBytes::from_serializable(&body)?)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             request_id: body.request_id,
@@ -260,7 +262,12 @@ impl HttpReceipt {
         if compute_http_receipt_id(&body)? != self.id {
             return Ok(false);
         }
-        match verify_wrapped(&self.kernel_key, CHIO_HTTP_RECEIPT_SCHEMA, &body, &self.signature) {
+        match verify_wrapped(
+            &self.kernel_key,
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &body,
+            &self.signature,
+        ) {
             Ok(()) => Ok(true),
             Err(Error::SignatureRejected) => Ok(false),
             Err(error) => Err(error),
@@ -693,7 +700,8 @@ mod tests {
         let kp = test_keypair();
         let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
         let mut projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
-        projected.signature = Signature::from_p256_der(&[0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01]);
+        projected.signature =
+            Signature::from_p256_der(&[0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01]);
         let error = receipt
             .verify_chio_receipt_projection(&projected)
             .test_unwrap_err();

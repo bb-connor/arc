@@ -492,7 +492,9 @@ mod tests {
             })
             .await?;
         assert_eq!(issued.secret.expose().len(), 43);
-        assert!(issued.receipt.verify_signature(&issued.receipt.signer_key)?);
+        assert!(issued
+            .receipt
+            .verify_signature(&issued.receipt.signer_key)?);
         verify_signed_hosted_api_key_lifecycle_event(&issued.receipt, &issued.receipt.signer_key)?;
         let serialized = canonical_json_bytes(&issued.receipt)?;
         assert!(!serialized

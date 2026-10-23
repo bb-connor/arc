@@ -9,10 +9,12 @@ fn operation_nonce_body(
     operation: &AdmissionOperationV1,
     nonce: &SignedExecutionNonce,
 ) -> TestResult<chio_core::CanonicalBytes> {
-    Ok(chio_core::CanonicalBytes::from_serializable(&serde_json::json!({
-        "operation_id": operation.binding().operation_id(),
-        "nonce": nonce.nonce,
-    }))?)
+    Ok(chio_core::CanonicalBytes::from_serializable(
+        &serde_json::json!({
+            "operation_id": operation.binding().operation_id(),
+            "nonce": nonce.nonce,
+        }),
+    )?)
 }
 
 pub(super) fn sign_for(

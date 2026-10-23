@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{canonical_json_bytes, sha256_hex, PublicKey, SigningBackend};
 use serde::{Deserialize, Serialize};
 
@@ -82,6 +82,10 @@ pub struct FindingWorkerCapabilityBody {
 }
 
 pub type SignedFindingWorkerCapability = SignedExportEnvelope<FindingWorkerCapabilityBody>;
+
+impl SignedExportPayload for FindingWorkerCapabilityBody {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_CAPABILITY_SCHEMA;
+}
 
 impl FindingWorkerCapabilityBody {
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -676,6 +680,10 @@ pub struct FindingWorkerAttestedResult {
 }
 
 pub type SignedFindingWorkerResult = SignedExportEnvelope<FindingWorkerAttestedResult>;
+
+impl SignedExportPayload for FindingWorkerAttestedResult {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_ATTESTED_RESULT_SCHEMA;
+}
 
 impl FindingWorkerAttestedResult {
     #[allow(clippy::too_many_arguments)]

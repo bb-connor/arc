@@ -23,7 +23,7 @@ fn corrupt_tripwire_signature_cannot_enter_verified_persistence_or_correlation()
             &chio_core_types::canonical::CanonicalBytes::from_serializable(signed.body())
                 .unwrap_or_else(|error| panic!("security event signing body: {error}")),
         )
-        .unwrap_or_else(|error| panic!("sign security event: {error}"));
+        .unwrap_or_else(|error| panic!("wrapped security event signature: {error}"));
     let mut envelope = serde_json::to_value(&signed)
         .unwrap_or_else(|error| panic!("encode signed event: {error}"));
     envelope["signature"] = serde_json::to_value(wrong_signature)

@@ -284,7 +284,7 @@ pub(super) fn sign_runtime_execution_lease(value: &Value, signing_key: &Keypair)
     if value.get("max_invocations").is_some() {
         body["maxInvocations"] = value["max_invocations"].clone();
     }
-    sign_wrapped_hex(&signing_key, &body, "execution lease signs")
+    sign_wrapped_hex(signing_key, &body, "execution lease signs")
 }
 
 pub(super) fn sign_runtime_route_plan_with_fixture_authority(value: &mut Value) {
@@ -311,7 +311,7 @@ fn sign_runtime_route_plan(value: &Value, signing_key: &Keypair) -> String {
         "expiresAtUnixMs": value["expiresAtUnixMs"],
         "issuer": value["issuer"],
     });
-    sign_wrapped_hex(&signing_key, &body, "runtime route plan signs")
+    sign_wrapped_hex(signing_key, &body, "runtime route plan signs")
 }
 
 pub(super) fn sign_runtime_join_receipt_with_fixture_authority(value: &mut Value) {
@@ -325,7 +325,7 @@ pub(super) fn sign_runtime_join_receipt(value: &Value, signing_key: &Keypair) ->
     body.as_object_mut()
         .test_expect("runtime join receipt is object")
         .remove("signature");
-    sign_wrapped_hex(&signing_key, &body, "runtime join receipt signs")
+    sign_wrapped_hex(signing_key, &body, "runtime join receipt signs")
 }
 
 pub(super) fn sign_runtime_trusted_time_with_fixture_authority(value: &mut Value) {
@@ -345,7 +345,7 @@ pub(super) fn sign_runtime_trusted_time(value: &Value, signing_key: &Keypair) ->
         "timeSourceId": value["time_source_id"],
         "issuer": value["issuer"],
     });
-    sign_wrapped_hex(&signing_key, &body, "runtime trusted time proof signs")
+    sign_wrapped_hex(signing_key, &body, "runtime trusted time proof signs")
 }
 
 pub(super) fn sign_runtime_revocation_freshness_with_fixture_oracle(value: &mut Value) {
@@ -369,7 +369,7 @@ fn sign_runtime_revocation_freshness(value: &Value, signing_key: &Keypair) -> St
         "revokedLeafResult": value["revoked_leaf_result"],
         "revokedAncestorResult": value["revoked_ancestor_result"],
     });
-    sign_wrapped_hex(&signing_key, &body, "revocation freshness proof signs")
+    sign_wrapped_hex(signing_key, &body, "revocation freshness proof signs")
 }
 
 pub(super) fn sign_runtime_terminal_receipt_with_fixture_kernel(value: &mut Value) {
@@ -392,7 +392,7 @@ fn sign_runtime_terminal_receipt(value: &Value, signing_key: &Keypair) -> String
     if value.get("incident_ref").is_some() {
         body["incidentRef"] = value["incident_ref"].clone();
     }
-    sign_wrapped_hex(&signing_key, &body, "terminal receipt signs")
+    sign_wrapped_hex(signing_key, &body, "terminal receipt signs")
 }
 
 pub(super) fn sign_runtime_trust_root(value: &Value, signing_key: &Keypair) -> String {
@@ -400,7 +400,7 @@ pub(super) fn sign_runtime_trust_root(value: &Value, signing_key: &Keypair) -> S
     body.as_object_mut()
         .test_expect("runtime trust root is an object")
         .remove("signature");
-    sign_wrapped_hex(&signing_key, &body, "runtime trust root signs")
+    sign_wrapped_hex(signing_key, &body, "runtime trust root signs")
 }
 
 pub(super) fn runtime_trusted_root_keys() -> Vec<chio_core_types::PublicKey> {

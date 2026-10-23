@@ -172,11 +172,13 @@ fn sign_roster(mut roster: FrostRosterV1) -> FrostRosterV1 {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("compute roster id: {error}"));
     roster.roster_authority_signature = roster_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("canonicalize roster: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -253,11 +255,13 @@ fn ceremony_roster(
 
 fn sign_checkpoint(mut checkpoint: FrostEpochCheckpointV1) -> FrostEpochCheckpointV1 {
     checkpoint.anchor_signature = epoch_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("canonicalize checkpoint: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -592,11 +596,13 @@ fn verified_rotation_authorization(
         anchor_signature: String::new(),
     };
     slot.anchor_signature = slot_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &slot
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("slot bytes: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     slot.checkpoint_digest = slot
         .recompute_checkpoint_digest()

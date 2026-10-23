@@ -1198,8 +1198,11 @@ fn replace_agent_web_json_value(
 fn sign_agent_web_envelope_value(envelope: &mut Value, keypair: &Keypair, public_key: &str) {
     envelope["envelope_id"] = Value::String(agent_web_envelope_id(envelope));
     let payload = agent_web_envelope_signature_payload(envelope);
-    let canonical = chio_core_types::canonical_json_bytes(&payload)
+    let canonical = chio_core_types::canonical::CanonicalBytes::from_serializable(&payload)
         .test_expect("Agent Web envelope canonicalizes");
-    let signature = keypair.sign(&canonical).to_hex();
+    let signature = keypair
+        .sign_wrapped("chio.agent-web-proof-envelope.v1", &canonical)
+        .test_expect("Agent Web envelope signs")
+        .to_hex();
     envelope["signature"] = Value::String(format!("sig-ed25519:{public_key}:{signature}"));
 }

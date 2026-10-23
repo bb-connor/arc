@@ -212,11 +212,13 @@ fn crypto_fixture() -> CryptoFixture {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("roster id: {error}"));
     roster.roster_authority_signature = roster_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("roster bytes: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -261,11 +263,13 @@ fn signed_epoch(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
         anchor_signature: String::new(),
     };
     checkpoint.anchor_signature = epoch_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("epoch bytes: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -393,11 +397,13 @@ impl MutableSlotAnchor {
         mut checkpoint: FrostAuthorizationSlotCheckpointV1,
     ) -> FrostAuthorizationSlotCheckpointV1 {
         checkpoint.anchor_signature = slot_authority()
-            .sign(
+            .sign_wrapped(
+                chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
                 &checkpoint
-                    .signing_bytes()
+                    .signing_body()
                     .unwrap_or_else(|error| panic!("slot bytes: {error}")),
             )
+            .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
             .to_hex();
         checkpoint.checkpoint_digest = checkpoint
             .recompute_checkpoint_digest()

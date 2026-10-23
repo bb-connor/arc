@@ -161,9 +161,17 @@ fn unsigned_substituted_stale_conflicting_and_unpinned_state_leave_every_table_u
             match fault {
                 "stream" => proof.stream_id = "other-stream".into(),
                 "root" => proof.anchor_digest = "00".repeat(32),
-                "signature" => proof.signature = attacker.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"substitution"),
+                "signature" => {
+                    proof.signature = attacker.sign_exempt(
+                        chio_core::crypto::ExemptFormat::JwsSigningInput,
+                        b"substitution",
+                    )
+                }
                 "rotation-signature" => {
-                    proof.transitions[0].signature = attacker.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"substitution")
+                    proof.transitions[0].signature = attacker.sign_exempt(
+                        chio_core::crypto::ExemptFormat::JwsSigningInput,
+                        b"substitution",
+                    )
                 }
                 "predecessor" => proof.transitions[0].body.previous_commitment = "00".repeat(32),
                 "generation" => proof.transitions[0].body.generation = 3,
