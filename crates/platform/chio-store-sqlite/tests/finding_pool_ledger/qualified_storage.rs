@@ -143,3 +143,72 @@ fn cognition_market_qualified_pool_refuses_in_memory_storage() {
         );
     }
 }
+
+#[test]
+fn qualified_pool_stamps_and_reopens_the_v1_schema_unchanged() {
+    let directory = tempfile::tempdir().test_expect("create ledger directory");
+    let database = directory.path().join("pool.sqlite3");
+    drop(open_qualified(&database, ledger_domain()).test_expect("create v1 pool ledger"));
+    let catalog = |connection: &rusqlite::Connection| {
+        let mut statement = connection
+            .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")
+            .test_expect("prepare schema catalog");
+        statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })
+            .test_expect("query schema catalog")
+            .collect::<Result<Vec<_>, _>>()
+            .test_expect("collect schema catalog")
+    };
+    let connection = rusqlite::Connection::open(&database).test_expect("inspect v1 pool ledger");
+    let version: i64 = connection
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'finding_pool_ledger'",
+            [],
+            |row| row.get(0),
+        )
+        .test_expect("read the pool ledger schema version");
+    assert_eq!(version, 1);
+    let created = catalog(&connection);
+    drop(connection);
+
+    drop(open_qualified(&database, ledger_domain()).test_expect("reopen v1 pool ledger"));
+    let connection = rusqlite::Connection::open(&database).test_expect("inspect reopened ledger");
+    assert_eq!(catalog(&connection), created);
+}
+
+#[test]
+fn qualified_pool_refuses_a_schema_missing_a_v1_column() {
+    let directory = tempfile::tempdir().test_expect("create ledger directory");
+    let database = directory.path().join("pool.sqlite3");
+    drop(open_qualified(&database, ledger_domain()).test_expect("create v1 pool ledger"));
+    let connection = rusqlite::Connection::open(&database).test_expect("open pool ledger file");
+    connection
+        .execute_batch(
+            "ALTER TABLE finding_pool_ledger_metadata DROP COLUMN trusted_time_high_water_unix_ms",
+        )
+        .test_expect("drop a v1 metadata column");
+    drop(connection);
+
+    assert_eq!(
+        open_qualified(&database, ledger_domain()).err(),
+        Some(FindingPoolLedgerError::Storage(
+            "finding pool ledger schema differs from the canonical v1 definition".to_owned()
+        ))
+    );
+    let connection = rusqlite::Connection::open(&database).test_expect("inspect refused ledger");
+    let restored: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('finding_pool_ledger_metadata') \
+             WHERE name = 'trusted_time_high_water_unix_ms')",
+            [],
+            |row| row.get(0),
+        )
+        .test_expect("inspect metadata columns");
+    assert!(!restored);
+}

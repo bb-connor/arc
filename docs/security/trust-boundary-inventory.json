@@ -3091,7 +3091,7 @@
       "crates/platform/chio-store-sqlite/src/finding_payload_store.rs"
     ],
     "finding_pool_debits": [
-      "crates/platform/chio-store-sqlite/src/finding_pool_ledger.rs"
+      "crates/platform/chio-store-sqlite/src/finding_pool_ledger/schema.rs"
     ],
     "iou_envelope": [
       "crates/platform/chio-store-sqlite/src/iou_store.rs"
@@ -3853,28 +3853,6 @@
         "finding_pool_debits"
       ],
       "sql": "SELECT EXISTS(SELECT 1 FROM finding_pool_allocations LIMIT 1) OR EXISTS(SELECT 1 FROM finding_pool_debits LIMIT 1) OR EXISTS(SELECT 1 FROM finding_pool_receipt_outbox LIMIT 1)",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/schema.rs",
-      "owner": "ensure_lifecycle_columns",
-      "sha256": "0746bb760db082a9e540fed8394704caefdef992cf307274caff737e07ac6f5f",
-      "tables": [
-        "finding_pool_debits"
-      ],
-      "sql": "UPDATE finding_pool_debits SET claimed_at_unix_ms = '0' WHERE state = 'reserved' AND claim_deadline_unix_ms = '0' AND claimed_at_unix_ms IS NULL",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/finding_pool_ledger/schema.rs",
-      "owner": "ensure_lifecycle_columns",
-      "sha256": "acc0edc3f39597da5ddeb764217cf910684cfbc2f34a085b8b0a3fd3e7793a07",
-      "tables": [
-        "finding_pool_debits"
-      ],
-      "sql": "SELECT COUNT(*) FROM finding_pool_debits WHERE state = 'reserved' AND claimed_at_unix_ms IS NOT NULL AND durable_admission_operation_id IS NULL",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
