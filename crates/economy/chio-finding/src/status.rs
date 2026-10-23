@@ -31,6 +31,11 @@ use crate::validate::{
 pub const FINDING_STATUS_EPOCH_SCHEMA_V1: &str =
     chio_core_types::signed_artifact::CHIO_FINDING_STATUS_EPOCH_V1_SCHEMA;
 
+/// Signing-wrapper schema id of the governance-signed status operator
+/// authorization.
+pub const FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1: &str =
+    "chio.finding-status-operator-authorization.v1";
+
 /// Registered unsigned portable proof-input schema.
 pub const FINDING_STATUS_PROOF_INPUT_SCHEMA_V1: &str = "chio.finding.status-proof-input.v1";
 
@@ -687,4 +692,8 @@ fn decode_hex_32(value: &str, field: &'static str) -> Result<[u8; 32], FindingEr
 
 impl chio_core_types::receipt::lineage::SignedExportPayload for FindingStatusEpoch {
     const SCHEMA_ID: &'static str = FINDING_STATUS_EPOCH_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingStatusOperatorAuthorization {
+    const SCHEMA_ID: &'static str = FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1;
 }
