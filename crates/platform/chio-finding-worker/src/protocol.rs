@@ -1227,11 +1227,3 @@ mod tests {
         }
     }
 }
-
-impl chio_core_types::receipt::lineage::SignedExportPayload for FindingWorkerCapabilityBody {
-    const SCHEMA_ID: &'static str = FINDING_WORKER_CAPABILITY_SCHEMA;
-}
-
-impl chio_core_types::receipt::lineage::SignedExportPayload for FindingWorkerAttestedResult {
-    const SCHEMA_ID: &'static str = FINDING_WORKER_ATTESTED_RESULT_SCHEMA;
-}
