@@ -11,9 +11,12 @@ use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
 use super::super::caller_credentials::tests::{
-    config, credential, peer, signed_peer_headers, signed_peer_headers_for, DEPLOYMENT,
+    config, credential, fresh_nonce, peer, signed_peer_headers, signed_peer_headers_for,
+    DEPLOYMENT, SELF_NODE,
 };
-use super::super::caller_credentials::{TrustAccess, TrustAccessConfig};
+use super::super::caller_credentials::{
+    sign_cluster_peer_request, PeerAddressing, TrustAccess, TrustAccessConfig,
+};
 use super::*;
 
 const NOW: u64 = 1_792_234_800;
@@ -904,6 +907,47 @@ async fn peer_authorization_for_another_receiver_refused() {
         i64::try_from(NOW).test_unwrap(),
         Some(4),
     );
+    let (status, response) = send(&fixture.internal, "POST", rule, "", headers, body).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        response.contains("cluster peer signature does not verify under a pinned key"),
+        "{response}"
+    );
+}
+
+#[tokio::test]
+async fn peer_authorization_for_another_deployment_refused() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/partition");
+    let body = br#"{"blocked":[]}"#.to_vec();
+    let path = concrete(rule.path);
+    let target = PeerRequestTarget {
+        method: "POST",
+        path: &path,
+        query: "",
+        body: &body,
+    };
+    let issued_at = i64::try_from(NOW).test_unwrap();
+    let other_deployment = sign_cluster_peer_request(
+        &fixture.node_b,
+        &PeerAddressing {
+            deployment: "dep-b",
+            sender: NODE_B,
+            recipient: SELF_NODE,
+        },
+        &target,
+        &fresh_nonce(),
+        issued_at,
+        Some(4),
+    )
+    .test_unwrap();
+    let mut headers = signed_peer_headers(&fixture.node_b, NODE_B, &target, issued_at, Some(4));
+    for (name, value) in [
+        (CLUSTER_AUTH_SIGNATURE_HEADER, other_deployment.signature),
+        (CLUSTER_AUTH_NONCE_HEADER, other_deployment.nonce),
+    ] {
+        headers.insert(name, HeaderValue::from_str(&value).test_unwrap());
+    }
     let (status, response) = send(&fixture.internal, "POST", rule, "", headers, body).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(
