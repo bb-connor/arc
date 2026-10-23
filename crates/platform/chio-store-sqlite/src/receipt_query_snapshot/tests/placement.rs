@@ -3,20 +3,19 @@ use std::fs::File;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
-use chio_kernel::ReceiptStoreError;
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use rustix::fs::{flock, FlockOperation};
 
 use super::super::db::{SnapshotDb, SnapshotDbError};
+use super::super::pass::build_snapshot;
 use super::super::service::{ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
-use super::super::walk::WalkError;
+use super::super::walk::{WalkError, WalkLimits};
 use super::service::{config, ready, wait_for};
-use super::support::Fixture;
+use super::support::{context, limits, target, Fixture};
 use crate::receipt_store::test_hooks::FAIL_SEED_PATH_MARKER;
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -215,8 +214,11 @@ fn wait_until(what: &str, mut done: impl FnMut() -> bool) {
     }
 }
 
+const CONTENDED: &str =
+    "receipt query snapshot location is unusable: another process holds the snapshot parent lock";
+
 #[test]
-fn parent_lock_contention_is_a_retried_unavailable_outcome() {
+fn parent_lock_contention_is_a_busy_outcome() {
     let fixture = Fixture::new(0);
     let parent = data_directory(&fixture).join(PARENT_NAME);
     private_directory(&parent);
@@ -226,17 +228,209 @@ fn parent_lock_contention_is_a_retried_unavailable_outcome() {
         Err(error) => error,
     };
     assert!(
-        matches!(
-            &error,
-            SnapshotDbError::Store(ReceiptStoreError::QuerySnapshot(
-                ReceiptQuerySnapshotError::Unavailable(_)
-            ))
-        ),
+        matches!(&error, SnapshotDbError::Contended(message) if message == CONTENDED),
         "{error:?}"
     );
-    assert!(matches!(WalkError::from(error), WalkError::Unavailable(_)));
+    assert_eq!(WalkError::from(error), WalkError::Busy(CONTENDED.into()));
     flock(&holder, FlockOperation::Unlock).unwrap();
     assert!(SnapshotDb::open_private(&fixture.store, 1 << 24).is_ok());
+}
+
+/// A store in a private directory whose clock moves only when stepped.
+fn stepped_store() -> (tempfile::TempDir, Arc<SteppedClock>, SqliteReceiptStore) {
+    let directory = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let clock = Arc::new(SteppedClock(AtomicU64::new(1_760_000_000_000)));
+    let store =
+        SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
+            .unwrap();
+    private_directory(&directory.path().join(PARENT_NAME));
+    (directory, clock, store)
+}
+
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[test]
+fn a_build_waits_out_parent_lock_contention_until_cancelled() {
+    let (directory, _clock, store) = stepped_store();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
+    let contended = target(&ctx);
+    let holder = hold_lock(&directory.path().join(PARENT_NAME));
+    let outcome = std::thread::scope(|scope| {
+        let builder =
+            scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
+        cancel.store(true, Ordering::SeqCst);
+        builder.join().unwrap()
+    });
+    assert_eq!(outcome, Err(WalkError::Cancelled));
+    assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
+    flock(&holder, FlockOperation::Unlock).unwrap();
+    cancel.store(false, Ordering::SeqCst);
+    let (db, _) = build_snapshot(&ctx, target(&ctx), 1 << 24, &mut |_, _| {}).unwrap();
+    assert_eq!(snapshot_databases(directory.path()).len(), 1);
+    drop(db);
+}
+
+/// Time scripted for the builder thread as (wall, monotonic) milliseconds:
+/// its first read is `script[0]`, its second releases `holder` and reads
+/// `script[1]`, and later ones read `script[2]`. Every other thread reads
+/// `script[0]`.
+struct ScriptedClock {
+    builder: std::sync::Mutex<Option<std::thread::ThreadId>>,
+    reads: std::sync::atomic::AtomicUsize,
+    script: [(u64, u64); 3],
+    holder: std::sync::Mutex<Option<File>>,
+}
+
+impl Clock for ScriptedClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let builder = *self.builder.lock().unwrap() == Some(std::thread::current().id());
+        let (wall, monotonic) = if builder {
+            let read = self.reads.fetch_add(1, Ordering::SeqCst);
+            if read == 1 {
+                drop(self.holder.lock().unwrap().take());
+            }
+            self.script[read.min(2)]
+        } else {
+            self.script[0]
+        };
+        Ok(ClockReading::new(
+            UnixMillis::new(wall),
+            MonotonicInstant::from_nanos(monotonic.saturating_mul(1_000_000)),
+        ))
+    }
+}
+
+/// Build while the snapshot parent is locked; the lock is released at the
+/// builder's second clock read. The outcome carries the number of snapshot
+/// databases the built snapshot left in place.
+fn build_released_by_the_clock(script: [(u64, u64); 3]) -> Result<usize, WalkError> {
+    let directory = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let clock = Arc::new(ScriptedClock {
+        builder: std::sync::Mutex::new(None),
+        reads: std::sync::atomic::AtomicUsize::new(0),
+        script,
+        holder: std::sync::Mutex::new(None),
+    });
+    let store =
+        SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
+            .unwrap();
+    let parent = directory.path().join(PARENT_NAME);
+    private_directory(&parent);
+    *clock.holder.lock().unwrap() = Some(hold_lock(&parent));
+    let cancel = Arc::new(AtomicBool::new(false));
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
+    let contended = target(&ctx);
+    let outcome = std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                *clock.builder.lock().unwrap() = Some(std::thread::current().id());
+                build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {})
+                    .map(|_| snapshot_databases(directory.path()).len())
+            })
+            .join()
+            .unwrap()
+    });
+    assert!(
+        clock.holder.lock().unwrap().is_none(),
+        "the lock was never released"
+    );
+    if outcome.is_err() {
+        assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
+    }
+    outcome
+}
+
+const START_MS: u64 = 1_760_000_000_000;
+const HOUR_MS: u64 = 3_600_000;
+
+/// Wall and monotonic time `elapsed` milliseconds after the start.
+const fn after(elapsed: u64) -> (u64, u64) {
+    (START_MS + elapsed, START_MS + elapsed)
+}
+
+fn budget_ms() -> u64 {
+    u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap()
+}
+
+#[test]
+fn a_parent_lock_released_after_the_deadline_is_not_retried() {
+    let budget = budget_ms();
+    // Within budget before the backoff, past the deadline after it.
+    let outcome = build_released_by_the_clock([after(0), after(budget - 1), after(budget + 1)]);
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
+}
+
+#[test]
+fn a_parent_lock_released_within_the_budget_is_provisioned() {
+    let outcome = build_released_by_the_clock([after(0), after(1_000), after(2_000)]);
+    assert_eq!(outcome, Ok(1));
+}
+
+#[test]
+fn a_wall_clock_step_forward_does_not_spend_the_budget() {
+    // Wall time jumps an hour ahead while monotonic time stays within budget.
+    let outcome = build_released_by_the_clock([
+        after(0),
+        (START_MS + HOUR_MS, START_MS + 1_000),
+        (START_MS + HOUR_MS, START_MS + 2_000),
+    ]);
+    assert_eq!(outcome, Ok(1));
+}
+
+#[test]
+fn a_frozen_wall_clock_does_not_extend_the_budget() {
+    let budget = budget_ms();
+    // Wall time stands still while monotonic time passes the deadline.
+    let outcome = build_released_by_the_clock([
+        after(0),
+        (START_MS, START_MS + budget - 1),
+        (START_MS, START_MS + budget + 1),
+    ]);
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
+}
+
+#[test]
+fn a_parent_lock_held_past_the_busy_timeout_is_unavailable() {
+    let (directory, clock, store) = stepped_store();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
+    let contended = target(&ctx);
+    let _holder = hold_lock(&directory.path().join(PARENT_NAME));
+    let step_ms = u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap();
+    let outcome = std::thread::scope(|scope| {
+        let builder =
+            scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
+        // Past the diagnostic bound the build is cancelled, so a build
+        // without a deadline ends as Cancelled.
+        let bound = Instant::now() + Duration::from_secs(60);
+        while !builder.is_finished() && Instant::now() < bound {
+            clock.0.fetch_add(step_ms, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        cancel.store(true, Ordering::SeqCst);
+        builder.join().unwrap()
+    });
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
+    assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
 }
 
 #[test]

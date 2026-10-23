@@ -408,7 +408,7 @@ pub(super) fn build_snapshot(
     quota_bytes: u64,
     on_progress: &mut dyn FnMut(u64, u64),
 ) -> Result<(SnapshotDb, PassResult), WalkError> {
-    let mut db = SnapshotDb::open_private(ctx.store, quota_bytes)?;
+    let mut db = provision(ctx, quota_bytes)?;
     let mut pass = Pass::new(PassMode::Build, target);
     loop {
         let progress = retry_busy(ctx, || pass.step(ctx, &mut db))?;
@@ -417,6 +417,42 @@ pub(super) fn build_snapshot(
         if let PassProgress::Done(result) = progress {
             return Ok((db, *result));
         }
+    }
+}
+
+/// Provision the private snapshot. Contention for the snapshot location is
+/// retried until the walker busy timeout has passed on the store clock's
+/// monotonic time, so wall clock steps neither shorten nor extend the wait:
+/// no retry starts at or after that deadline, and a location still contended
+/// then is unavailable with the last contention reason.
+fn provision(ctx: &WalkContext<'_>, quota_bytes: u64) -> Result<SnapshotDb, WalkError> {
+    let now = || {
+        ctx.store
+            .query_snapshot_monotonic()
+            .map_err(|error| WalkError::Unavailable(error.to_string()))
+    };
+    let deadline = now()?
+        .checked_add(ctx.limits.busy_timeout)
+        .map_err(|error| WalkError::Unavailable(error.to_string()))?;
+    // The remaining budget, or the unavailable outcome once it is spent.
+    let remaining = |reason: &str| -> Result<std::time::Duration, WalkError> {
+        ctx.check_cancel()?;
+        match deadline.duration_since(now()?) {
+            Ok(left) if !left.is_zero() => Ok(left),
+            _ => Err(WalkError::Unavailable(reason.to_owned())),
+        }
+    };
+    let mut delay = std::time::Duration::from_millis(10);
+    let mut attempt = SnapshotDb::open_private(ctx.store, quota_bytes).map_err(WalkError::from);
+    loop {
+        let reason = match attempt {
+            Err(WalkError::Busy(reason)) => reason,
+            other => return other,
+        };
+        std::thread::sleep(delay.min(remaining(&reason)?));
+        delay = (delay * 2).min(std::time::Duration::from_secs(1));
+        remaining(&reason)?;
+        attempt = SnapshotDb::open_private(ctx.store, quota_bytes).map_err(WalkError::from);
     }
 }
 
