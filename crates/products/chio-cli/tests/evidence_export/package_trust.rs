@@ -148,6 +148,36 @@ fn package_cli_pins_signer_and_rejects_omission_with_rewritten_manifest() {
 }
 
 #[test]
+fn package_cli_import_exits_with_the_verify_classes() {
+    let fixture = Fixture::new();
+    require_success(&fixture.export());
+    let import = |key: &str| {
+        let trust = trust_file(&[key.to_owned()], None);
+        let db = fixture._directory.path().join("imported.sqlite3");
+        Command::new(env!("CARGO_BIN_EXE_chio"))
+            .arg("--json")
+            .arg("--receipt-db")
+            .arg(&db)
+            .args(["evidence", "import", "--input"])
+            .arg(&fixture.package)
+            .arg("--trust")
+            .arg(trust)
+            .output()
+            .test_unwrap()
+    };
+    let wrong = import(&Keypair::generate().public_key().to_hex());
+    assert_eq!(wrong.status.code(), Some(50));
+
+    let manifest_path = fixture.package.join("manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).test_unwrap()).test_unwrap();
+    manifest["exportedAt"] = (manifest["exportedAt"].as_u64().test_unwrap() + 1).into();
+    fs::write(&manifest_path, serde_json::to_vec(&manifest).test_unwrap()).test_unwrap();
+    let tampered = import(&fixture.signer.public_key().to_hex());
+    assert_eq!(tampered.status.code(), Some(20));
+}
+
+#[test]
 fn package_cli_requires_exact_external_anchor_binding() {
     use chio_core::receipt::checkpoint::*;
     let fixture = Fixture::new();
@@ -258,8 +288,11 @@ pub(super) fn verify_remote_import_boundary(
         response.text().test_unwrap()
     );
 
+    const TRUST_INVALID: &str = "urn:chio:error:attest:bundle-trust-invalid [attest:error]";
+    const TRUST_INVALID_HELP: &str =
+        "Fix the trust file: schema const, key bounds, unique keys, no weak keys, no key in two roles.";
     let store = SqliteReceiptStore::open(db).test_unwrap();
-    let refused = |body: String, status: reqwest::StatusCode, needle: &str| {
+    let refused = |body: String, status: reqwest::StatusCode, error: &str| {
         let response = client
             .post(&endpoint)
             .bearer_auth(token)
@@ -268,8 +301,8 @@ pub(super) fn verify_remote_import_boundary(
             .send()
             .test_unwrap();
         assert_eq!(response.status(), status);
-        let text = response.text().test_unwrap();
-        assert!(text.contains(needle), "{text}");
+        let body: serde_json::Value = response.json().test_unwrap();
+        assert_eq!(body, json!({ "error": error }));
         assert!(store
             .get_federated_share_for_capability("cap-remote-federated")
             .test_unwrap()
@@ -280,7 +313,9 @@ pub(super) fn verify_remote_import_boundary(
     refused(
         json!({"package": request["package"]}).to_string(),
         reqwest::StatusCode::UNPROCESSABLE_ENTITY,
-        "evidence import request carries no trust file",
+        &format!(
+            "{TRUST_INVALID}: evidence import request carries no trust file ({TRUST_INVALID_HELP})"
+        ),
     );
 
     let mut anchored = request.clone();
@@ -295,7 +330,10 @@ pub(super) fn verify_remote_import_boundary(
     refused(
         anchored.to_string(),
         reqwest::StatusCode::UNPROCESSABLE_ENTITY,
-        "verifier trust file: decoded value drops input fields",
+        &format!(
+            "{TRUST_INVALID}: verifier trust file: decoded value drops input fields \
+             ({TRUST_INVALID_HELP})"
+        ),
     );
 
     let duplicate_top = format!("{{\"trust\":{{}},{}", &encoded[1..]);
@@ -319,7 +357,7 @@ pub(super) fn verify_remote_import_boundary(
     refused(
         " ".repeat(64 * 1024 * 1024 + 1),
         reqwest::StatusCode::PAYLOAD_TOO_LARGE,
-        "",
+        "JSON request body exceeds its limit",
     );
 
     let mut forged = request.clone();
@@ -331,7 +369,16 @@ pub(super) fn verify_remote_import_boundary(
         .send()
         .test_unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(response.text().test_unwrap().contains("payload"));
+    let body: serde_json::Value = response.json().test_unwrap();
+    assert_eq!(
+        body,
+        json!({
+            "error": "urn:chio:error:attest:bundle-envelope-invalid [attest:error]: evidence \
+                      payload does not match its signed envelope commitment (Re-export the \
+                      bundle from the provider and verify it against the kernel key pinned in \
+                      the trust file.)"
+        })
+    );
 
     let mut wrong_trust = request.clone();
     wrong_trust["trust"]["kernel_keys"] = json!([Keypair::generate().public_key().to_hex()]);
@@ -342,7 +389,15 @@ pub(super) fn verify_remote_import_boundary(
         .send()
         .test_unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(response.text().test_unwrap().contains("trusted kernel key"));
+    let body: serde_json::Value = response.json().test_unwrap();
+    assert_eq!(
+        body,
+        json!({
+            "error": "urn:chio:error:attest:bundle-trust-missing [attest:error]: evidence signer \
+                      is outside the trusted kernel key set (Pin the kernel key that signed the \
+                      bundle in the trust file, obtained independently of the bundle.)"
+        })
+    );
 
     assert!(store
         .get_federated_share_for_capability("cap-remote-federated")

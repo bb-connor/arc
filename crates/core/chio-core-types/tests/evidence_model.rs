@@ -1,20 +1,15 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "Test fixtures deliberately fail on violated setup invariants."
-)]
-
 use chio_core_types::receipt::evidence::{
     CapabilitySnapshot, CapabilitySnapshotProvenance, EvidenceChildReceiptScope,
     EvidenceExportQuery, EvidenceLineageReferences, EvidenceReadBoundaryError, ReceiptReadBoundary,
 };
+use chio_test_support::prelude::*;
 
 #[test]
 fn evidence_lineage_references_detect_when_empty() {
     let references = EvidenceLineageReferences::default();
     assert!(references.is_empty());
     assert_eq!(
-        serde_json::to_value(references).unwrap(),
+        serde_json::to_value(references).test_unwrap(),
         serde_json::json!({})
     );
 }
@@ -48,14 +43,14 @@ fn evidence_export_query_allows_admin_all_with_tenant_filter() {
         ..EvidenceExportQuery::default()
     }
     .validate_read_boundary()
-    .expect("admin-all evidence export may narrow to a tenant filter");
+    .test_unwrap();
 }
 
 #[test]
 fn evidence_export_query_requires_explicit_read_boundary() {
     let err = EvidenceExportQuery::default()
         .validate_read_boundary()
-        .expect_err("missing read boundary must fail closed");
+        .test_unwrap_err();
 
     assert_eq!(
         err,
@@ -77,7 +72,7 @@ fn evidence_export_query_rejects_empty_admin_tenant_filter() {
         ..EvidenceExportQuery::default()
     }
     .validate_read_boundary()
-    .expect_err("blank admin tenant filter must fail closed");
+    .test_unwrap_err();
 
     assert_eq!(
         err.0,
@@ -89,7 +84,7 @@ fn evidence_export_query_rejects_empty_admin_tenant_filter() {
 fn evidence_export_query_rejects_empty_tenant_scoped_boundary() {
     let err = EvidenceExportQuery::tenant_scoped("   ")
         .validate_read_boundary()
-        .expect_err("blank tenant-scoped boundary must fail closed");
+        .test_unwrap_err();
 
     assert_eq!(
         err.0,
@@ -107,7 +102,7 @@ fn evidence_export_query_rejects_tenant_scoped_boundary_mismatch() {
         ..EvidenceExportQuery::default()
     }
     .validate_read_boundary()
-    .expect_err("tenant-scoped boundary must match query tenant");
+    .test_unwrap_err();
 
     assert_eq!(
         err.0,
