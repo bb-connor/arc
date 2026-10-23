@@ -784,6 +784,102 @@ fn timelock_approval_expiry_and_untrusted_admission_reject() -> TestResult {
     Ok(())
 }
 
+fn rotation_activation(
+    replacement_signer: &Keypair,
+) -> TestResult<Result<VerifiedFiscalActivation, FiscalError>> {
+    let fixture = amendment_fixture()?;
+    let current = &fixture.charter;
+    let successor = VerifiedFiscalCharter::verify(
+        FiscalCharterBuilder {
+            governing_operator_id: "operator.example".to_owned(),
+            governed_domains: current.body().governed_domains.clone(),
+            signer_keys: vec![key(3).public_key(), key(4).public_key()],
+            approval_threshold: 2,
+            timelock_seconds: 10,
+            proposal_ttl_seconds: 100,
+            approval_ttl_seconds: 50,
+            issued_at: 70,
+            expires_at: 900,
+            issued_by: "operator.example".to_owned(),
+            sequence: 2,
+            predecessor_charter_digest: Some(current.digest().to_owned()),
+        }
+        .sign(&key(10))?,
+    )?;
+    let replacement = FiscalScheduleBuilder {
+        domain: FiscalDomain::TierLimits,
+        params: tier_params(),
+        valid_from: 70,
+        valid_until: 900,
+        issued_at: 70,
+        issued_by: "operator.example".to_owned(),
+    }
+    .sign_rotation_replacement(&successor, &fixture.schedule, replacement_signer)?;
+    let proposal = VerifiedFiscalProposal::verify(
+        FiscalProposalBuilder {
+            target: FiscalProposalTarget::CharterRotation {
+                successor: Box::new(successor.signed().clone()),
+            },
+            rationale_digest: digest("rotation rationale"),
+            proposed_at: 71,
+        }
+        .sign(&key(1))?,
+        current,
+        None,
+    )?;
+    let admission = VerifiedFiscalProposalAdmission::verify(
+        FiscalProposalAdmissionBuilder {
+            admission_sequence: 2,
+            admitted_at: 72,
+            admission_authority_id: "local-admission".to_owned(),
+            signer_key_epoch: 1,
+        }
+        .sign(&proposal, current, &key(7))?,
+        &proposal,
+        current,
+        &fixture.trust,
+        72,
+    )?;
+    let admission_state = FiscalProposalAdmissionState::admitted(&admission);
+    let approvals = [key(1), key(2)]
+        .into_iter()
+        .map(|signer| {
+            FiscalApprovalBuilder { approved_at: 73 }.sign(&proposal, &admission, current, &signer)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let signed_activation = FiscalActivationBuilder {
+        target: FiscalActivationTarget::CharterRotation {
+            successor_charter_digest: successor.digest().to_owned(),
+            predecessor_charter_digest: current.digest().to_owned(),
+            successor_schedules: vec![replacement],
+        },
+        approvals,
+        activated_at: 82,
+    }
+    .sign(&proposal, &admission, current, &key(1))?;
+    Ok(VerifiedFiscalActivation::verify(
+        signed_activation,
+        &proposal,
+        &admission,
+        &admission_state,
+        current,
+        &fixture.trust,
+        None,
+        std::slice::from_ref(&fixture.schedule),
+        82,
+    ))
+}
+
+#[test]
+fn rotation_replacement_signed_by_the_previous_charter_issuer_refuses() -> TestResult {
+    assert!(matches!(
+        rotation_activation(&key(9))?,
+        Err(FiscalError::InvalidField("schedule.issuer_key"))
+    ));
+    assert!(rotation_activation(&key(10))?.is_ok());
+    Ok(())
+}
+
 #[test]
 fn successor_charter_cannot_self_authorize_rotation() -> TestResult {
     let current = charter()?;
@@ -960,11 +1056,8 @@ fn resolver_selects_activated_predecessor_digest_from_duplicate_schedule_ids() -
         &successor_checkpoint,
         FiscalBootstrapState::CharterPinned,
     )?;
-    let duplicate_predecessor = VerifiedFiscalSchedule::verify(
-        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?,
-        &fixture.amendment.charter,
-        None,
-    )?;
+    let duplicate_predecessor =
+        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?;
 
     let resolution = resolve_fiscal_schedule::<FiscalParams>(
         FiscalContinuitySnapshot::Verified(&successor_checkpoint),
@@ -975,7 +1068,7 @@ fn resolver_selects_activated_predecessor_digest_from_duplicate_schedule_ids() -
         &fixture.charters,
         &[
             successor.signed().clone(),
-            duplicate_predecessor.signed().clone(),
+            duplicate_predecessor,
             fixture.amendment.schedule.signed().clone(),
         ],
         FiscalDomain::TierLimits,
@@ -1280,12 +1373,17 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
 fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> TestResult {
     let fixture = continuity_fixture()?;
     let exact_head = FiscalScheduleHead::from_signed(fixture.amendment.schedule.signed())?;
-    let alternate_schedule = VerifiedFiscalSchedule::verify(
-        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?,
-        &fixture.amendment.charter,
-        None,
-    )?;
-    let alternate_head = FiscalScheduleHead::from_signed(alternate_schedule.signed())?;
+    let alternate_schedule =
+        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?;
+    assert!(matches!(
+        VerifiedFiscalSchedule::verify(
+            alternate_schedule.clone(),
+            &fixture.amendment.charter,
+            None
+        ),
+        Err(FiscalError::InvalidField("schedule.issuer_key"))
+    ));
+    let alternate_head = FiscalScheduleHead::from_signed(&alternate_schedule)?;
     let transition = fixture.activated.body().staged_transition.clone();
 
     let alternate_next = FiscalContinuityCheckpointBuilder {
@@ -1310,7 +1408,7 @@ fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> T
                 activation: Box::new(fixture.amendment.activation.clone()),
                 readiness: Box::new(fixture.readiness.clone()),
                 domain: FiscalDomain::TierLimits,
-                schedule: Box::new(alternate_schedule),
+                schedule: Box::new(fixture.amendment.schedule.clone()),
             },
         ),
         Err(FiscalError::InvalidLineage)
