@@ -1,6 +1,10 @@
 use super::*;
 use std::{collections::BTreeSet, fs, io::Write, path::Path};
 
+#[cfg(test)]
+#[path = "collect/receipt_schema_tests.rs"]
+mod receipt_schema_tests;
+
 const PROOF_ROOM_BUNDLE_SCHEMA: &str = "chio.proof-room.bundle.v1";
 const PROOF_ROOM_VERIFIER_REPORT_SCHEMA: &str = "chio.proof-room.verifier-report.v1";
 const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str = "application/vnd.chio.proof-room.bundle.v1+json";
@@ -1027,13 +1031,14 @@ fn artifact_declares_schema(path: &Path, expected_schema: &str) -> Result<bool, 
     Ok(artifact_schema_from_file(path).is_ok_and(|schema| schema == expected_schema))
 }
 
-/// The schema an artifact declares: its `schema` member, or `chio.receipt.v1`
-/// for a document that decodes as a closed `ChioReceipt`, which has no such
-/// member.
 fn artifact_schema_from_file(path: &Path) -> Result<String, CliError> {
     let bytes = crate::input::read(path)?;
     let value: serde_json::Value = crate::input::json(&bytes)?;
-    if let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) {
+    if let Some(schema) = value
+        .get("schema")
+        .and_then(serde_json::Value::as_str)
+        .filter(|schema| *schema != CHIO_RECEIPT_SCHEMA)
+    {
         return Ok(schema.to_string());
     }
     let is_receipt =

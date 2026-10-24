@@ -21,5 +21,6 @@ use super::{
 
 mod catalog;
 mod core;
+mod receipt_schema_tests;
 mod source;
 mod support;
