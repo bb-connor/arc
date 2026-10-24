@@ -35,11 +35,12 @@ invocation. There is no long-running Mercury admission service in this crate.
 the `--trust` file, validates bundle manifests, and
 calls `MercuryProofPackage::build`. The export command invokes
 `verify_with_trusted_kernel_keys` against the trust file's kernel keys before
-writing the resulting JSON. Current builds produce proof-package v2.
+writing the resulting `chio.mercury.proof_package.v1` JSON. The trust file may
+pin only roles Mercury enforces: `trusted_kernel_key_set` refuses
+`checkpoint_keys`, `checkpoint_trust_anchor` and `required_columns`.
 
-`cmd_mercury_verify` decodes a package and dispatches on the current proof or
-inquiry schema. Core validation accepts legacy proof identities, but this
-command only dispatches the current proof schema and inquiry v1 schema.
+`cmd_mercury_verify` decodes a package and dispatches on the
+`chio.mercury.proof_package.v1` or `chio.mercury.inquiry_package.v1` schema.
 It verifies with `verify_with_trusted_kernel_keys` against the kernel keys
 pinned in the required `--trust` file, as `inquiry export` does for its input
 proof package and the derived inquiry package.
@@ -50,8 +51,9 @@ checkpoint. It exports the store through the control plane, then writes proof
 and optional inquiry packages alongside verification reports. Both packages are
 verified against the run's own kernel key, which the same process generated and
 signed every receipt with; the run paths record it as `kernelPublicKey`, and the
-downstream review, governance, assurance, and trust-network exports pin that
-recorded key. It is never read from an externally supplied package.
+downstream review, governance, assurance, OEM and trust-network exports carry
+that key in memory through their summaries and pin it. It is never read from a
+package or from a file in the output tree.
 
 `export_pilot_scenario` generates primary and rollback runs.
 `export_supervised_live_capture` validates the caller's capture and invokes
@@ -70,8 +72,8 @@ are validated declarations supplied in the input.
 Each synthetic receipt signs a reference to every bundle manifest packaged for
 its run, so the trusted verify finds signed coverage for each packaged manifest.
 
-`read_json_file` uses duplicate-aware signed decoding on the original input.
-It first calls `fs::read`, so this helper places no size bound on allocation.
+`read_json_file` uses duplicate-aware signed decoding on the original input
+and reads at most one byte past `MAX_JSON_INPUT_BYTES` (16 MiB) before refusing.
 `bundle_manifest_file_name` rejects separators, colons, control characters,
 padded IDs, and dot segments before creating filenames for multiple manifests.
 

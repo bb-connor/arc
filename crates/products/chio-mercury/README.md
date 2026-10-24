@@ -31,8 +31,8 @@ has `verifierEquivalent: false`.
 
 | Command | Inputs and result |
 | --- | --- |
-| `proof export` | Evidence directory, bundle manifests, and a `chio.verifier-trust.v1` trust file (`--trust`); writes proof-package v2. |
-| `inquiry export` | Proof package, audience, and a trust file (`--trust`); writes inquiry-package v1 with a deterministic rendered projection. |
+| `proof export` | Evidence directory, bundle manifests, and a `chio.verifier-trust.v1` trust file (`--trust`); writes a `chio.mercury.proof_package.v1` package. Every `--bundle-manifest` must match a bundle reference signed into the receipts and every signed reference must have its manifest, and every packaged receipt needs exactly one checkpoint inclusion proof. |
+| `inquiry export` | Proof package, audience, and a trust file (`--trust`); writes a `chio.mercury.inquiry_package.v1` package with a deterministic rendered projection. |
 | `verify` | Current proof or inquiry JSON and a trust file (`--trust`); prints the verification steps with `--explain`. |
 | `pilot export` | Built-in scenario; creates signed synthetic receipts and checkpoints. |
 | `supervised-live export` | Typed capture JSON; requires export-ready control state. |
@@ -53,8 +53,16 @@ These records describe the fixture exercise.
   and the pipeline exports against the kernel key their own run generated and
   signed with (`kernelPublicKey` in the run paths). The core `verify` method is a
   library-only integrity check that selects no trusted kernel-key set.
-- `read_json_file` rejects duplicate keys through `decode_signed`; its file
-  read itself is unbounded.
+- Mercury enforces the trust file's `kernel_keys`. A trust file that sets
+  `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns` is refused
+  with `bundle-feature-unsupported`, so a Mercury verdict never accepts a trust
+  file `chio-verify` would refuse. An unpinned signer is refused with
+  `bundle-trust-missing`, as in `chio-verify`.
+- `proof export` refuses a bundle manifest without a signed receipt reference,
+  a signed reference without its manifest, and a receipt without exactly one
+  checkpoint inclusion proof; no output is written.
+- `read_json_file` rejects duplicate keys through `decode_signed` and refuses
+  input larger than `MAX_JSON_INPUT_BYTES` (16 MiB).
 - `ensure_empty_directory` rejects nonempty export directories.
   `write_json_file` creates parent directories and can overwrite an individual
   file selected by the caller.

@@ -218,6 +218,7 @@ pub(crate) struct MercuryAssuranceInvestigationInputs {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MercuryAssuranceSuiteExportSummary {
     pub(crate) workflow_id: String,
+    pub(crate) kernel_public_key: String,
     pub(crate) reviewer_owner: String,
     pub(crate) support_owner: String,
     pub(crate) reviewer_populations: Vec<String>,
@@ -297,6 +298,7 @@ pub(crate) struct MercuryEmbeddedDeliveryAcknowledgement {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MercuryEmbeddedOemExportSummary {
     pub(crate) workflow_id: String,
+    pub(crate) kernel_public_key: String,
     pub(crate) partner_surface: String,
     pub(crate) sdk_surface: String,
     pub(crate) reviewer_population: String,

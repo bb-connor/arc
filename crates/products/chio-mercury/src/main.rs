@@ -159,6 +159,8 @@ enum Commands {
 
         /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
         /// keys the package must be signed by.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
         #[arg(long)]
         trust: PathBuf,
 
@@ -178,6 +180,8 @@ enum ProofCommands {
 
         /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
         /// keys of the input evidence package.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
         #[arg(long)]
         trust: PathBuf,
 
@@ -201,6 +205,8 @@ enum InquiryCommands {
 
         /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
         /// keys the package must be signed by.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
         #[arg(long)]
         trust: PathBuf,
 

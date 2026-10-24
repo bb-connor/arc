@@ -166,6 +166,7 @@ pub(in crate::commands) fn export_embedded_oem(
 
     let summary = MercuryEmbeddedOemExportSummary {
         workflow_id,
+        kernel_public_key: assurance_summary.kernel_public_key,
         partner_surface: MercuryEmbeddedPartnerSurface::ReviewerWorkbenchEmbed
             .as_str()
             .to_string(),
