@@ -87,19 +87,50 @@ log_cases = [
     ("peer_cursor_refuses_negative", False, f"INSERT INTO receipt_openings_peer_cursors VALUES ({M}, -1);"),
     ("peer_cursor_refuses_text", False, f"INSERT INTO receipt_openings_peer_cursors VALUES ({M}, 'x');"),
 ]
+PRESERVED = (
+    "SELECT CASE WHEN (SELECT count(*) FROM receipt_store_identity) = 1"
+    f" AND (SELECT store_id FROM receipt_store_identity) = {S}"
+    " AND (SELECT count(*) FROM receipt_openings_watermarks) = 2"
+    f" AND (SELECT applied_through FROM receipt_openings_watermarks WHERE origin_store_id = {S}) = 0"
+    f" AND (SELECT applied_through FROM receipt_openings_watermarks WHERE origin_store_id = {S2}) = 4"
+    " THEN 'state-preserved' ELSE 'state-changed' END;"
+)
+replace_cases = []
+for mode, flag in (("off", "OFF"), ("on", "ON")):
+    seed_identity = (
+        f"PRAGMA recursive_triggers = {flag};\n"
+        f"{I}(1, {S});\n"
+        f"INSERT INTO receipt_openings_watermarks VALUES ({S}, 0, 0);\n"
+        f"INSERT INTO receipt_openings_watermarks VALUES ({S2}, 4, 0);\n"
+    )
+    marker = "recursive_triggers=" + ("0" if flag == "OFF" else "1")
+    show = "SELECT 'recursive_triggers=' || recursive_triggers FROM pragma_recursive_triggers;\n"
+    for name, stmt in (
+        ("store_identity_insert_or_replace_refuses", f"INSERT OR REPLACE INTO receipt_store_identity VALUES (1, {S2});"),
+        ("store_identity_replace_refuses", f"REPLACE INTO receipt_store_identity VALUES (1, {S2});"),
+        ("store_identity_second_insert_refuses", f"{I}(1, {S2});"),
+    ):
+        replace_cases.append((f"{name}_recursive_triggers_{mode}", seed_identity + show + stmt + "\n" + PRESERVED, (marker, "state-preserved")))
 version = subprocess.run([cli, "--version"], capture_output=True, text=True).stdout.strip()
 results, ok = [], True
-def run(name, expect, sql):
+def run(name, expect, sql, must_print=()):
     global ok
     p = subprocess.run([cli, ":memory:"], input=ddl + sql, capture_output=True, text=True)
     accepted = p.returncode == 0 and "constraint failed" not in p.stderr
-    results.append({"case": name, "expected_accept": expect, "accepted": accepted, "error": p.stderr.strip() or None})
-    ok = ok and accepted == expect
+    printed = [m for m in must_print if m in p.stdout]
+    result = {"case": name, "expected_accept": expect, "accepted": accepted, "error": p.stderr.strip() or None}
+    if must_print:
+        result["must_print"] = list(must_print)
+        result["printed"] = printed
+    results.append(result)
+    ok = ok and accepted == expect and len(printed) == len(must_print)
 for name, expect, values in inserts:
     run(name, expect, f"\nINSERT INTO receipt_openings VALUES ({values});\n")
 for name, expect, stmt in updates:
     run(name, expect, "\n" + seed + stmt + "\n")
 for name, expect, stmt in log_cases:
     run(name, expect, "\n" + stmt + "\n")
+for name, stmt, marks in replace_cases:
+    run(name, False, "\n" + stmt + "\n", marks)
 print(json.dumps({"sqlite": version, "ddl": ddl, "all_as_expected": ok, "results": results}, indent=1))
 sys.exit(0 if ok else 1)

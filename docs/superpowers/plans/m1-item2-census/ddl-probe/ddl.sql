@@ -11,6 +11,7 @@ CREATE TABLE receipt_store_identity (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
   store_id TEXT NOT NULL CHECK (typeof(store_id) = 'text' AND instr(store_id, char(0)) = 0 AND length(CAST(store_id AS BLOB)) = 32 AND store_id NOT GLOB '*[^0-9a-f]*')
 );
+CREATE TRIGGER receipt_store_identity_no_replace BEFORE INSERT ON receipt_store_identity WHEN EXISTS (SELECT 1 FROM receipt_store_identity) BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TRIGGER receipt_store_identity_no_update BEFORE UPDATE ON receipt_store_identity BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TRIGGER receipt_store_identity_no_delete BEFORE DELETE ON receipt_store_identity BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TABLE receipt_opening_erasures (

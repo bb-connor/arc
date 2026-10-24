@@ -12,8 +12,9 @@ Collects, at a commit, every non-test line of three kinds:
           (`shared_payment_token_id`, `purpose`, `call_chain`, `authorization_resource`,
           `escalations`, `breakdown`, `principal`, `subject_key`, `user_name`, `user_id`,
           `provider_record_id`, `entitlements`).
-A line is a test line when its path is a test path or it lies inside an item gated by
-#[cfg(test)]; the cfg ranges come from metadata_blocks.cfg_test_lines in this directory.
+A line is a test line when its path is a test path or it lies inside an item gated by a
+test-only cfg (`test`, or `all(..)` with `test` as a top-level argument); the ranges come from
+metadata_blocks.cfg_test_lines in this directory.
 Each line must match a rule (kind, path regex, line regex) that states the preimage, whether it
 holds a committed field, and the decision. It exits 2 on a git failure other than an empty grep,
 and 1 on a non-commit revision, a kind with no lines, or any unclassified line.

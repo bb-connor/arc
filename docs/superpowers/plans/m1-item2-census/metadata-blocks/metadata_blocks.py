@@ -12,8 +12,10 @@ failure, exit 1 when the revision is not a commit, when any block has no lines, 
 reader or writer line has no rule. A rule's role is writer, reader or any. A reader line takes
 only a reader or any rule and a writer line only a writer or any rule, so a writer catch-all
 never classifies a new reader and that reader stays unclassified. A line is a test line when its path is a test
-path or it lies inside an item gated by #[cfg(test)] (a module, function or impl), including
-an item whose cfg attribute is followed by further attributes that span several lines.
+path or it lies inside an item gated by a test-only cfg, `#[cfg(test)]` or `#[cfg(all(...))]`
+with `test` as one of its top-level arguments (a module, function, impl or field), including an
+item whose cfg attribute is followed by further attributes that span several lines. A cfg that
+also compiles outside tests (`any(test, ..)`, `not(test)`, a feature) never marks a test line.
 """
 import csv, os, re, subprocess, sys
 
@@ -44,7 +46,53 @@ def run_git(repo, args, allow_no_match=False):
     sys.stderr.write(f"git {' '.join(args[:3])} failed ({proc.returncode}): {proc.stderr.strip()}\n")
     raise SystemExit(2)
 
-CFG_TEST = re.compile(r"\s*#\[cfg\((test|all\(test.*|any\(test.*)\)\]")
+CFG_OPEN = re.compile(r"\s*#\[cfg\(")
+
+def split_top_level(text):
+    """Split a cfg argument list on commas outside parentheses and string literals."""
+    parts, depth, quoted, start = [], 0, False, 0
+    for index, char in enumerate(text):
+        if char == '"':
+            quoted = not quoted
+        elif not quoted and char == "(":
+            depth += 1
+        elif not quoted and char == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and char == ",":
+            parts.append(text[start:index].strip())
+            start = index + 1
+    parts.append(text[start:].strip())
+    return [part for part in parts if part]
+
+def test_only_cfg(text):
+    """End offset of a leading test-only cfg attribute on this line, else None. Test-only means
+    the predicate is `test`, or `all(..)` with `test` as a top-level argument; `any(test, ..)`,
+    `not(test)` and every other predicate also compile outside tests. An attribute that does
+    not close on its line is not treated as test-only, so its item stays counted."""
+    opened = CFG_OPEN.match(text)
+    if not opened:
+        return None
+    depth, quoted = 1, False
+    for index in range(opened.end(), len(text)):
+        char = text[index]
+        if char == '"':
+            quoted = not quoted
+        elif not quoted and char == "(":
+            depth += 1
+        elif not quoted and char == ")":
+            depth -= 1
+            if depth == 0:
+                predicate = text[opened.end():index].strip()
+                rest = text[index + 1:].lstrip()
+                if not rest.startswith("]"):
+                    return None
+                end = len(text) - len(rest) + 1
+                if predicate == "test":
+                    return end
+                if predicate.startswith("all(") and predicate.endswith(")") and "test" in split_top_level(predicate[4:-1]):
+                    return end
+                return None
+    return None
 
 def item_ends(text, depth, parens, opened):
     """A braced item ends when its braces close. Any other item (a statement, field or match
@@ -69,9 +117,9 @@ def cfg_test_lines(src):
         if attr_depth > 0:
             attr_depth += text.count("[") - text.count("]")
             continue
-        cfg = CFG_TEST.match(text)
-        if cfg:
-            pending, text = True, text[cfg.end():]
+        cfg_end = test_only_cfg(text)
+        if cfg_end is not None:
+            pending, text = True, text[cfg_end:]
         if not pending:
             continue
         stripped = text.strip()
@@ -178,10 +226,24 @@ def self_check(repo, rev, workdir):
     ])
     gated_ok = gated == {6, 7, 8, 11, 12, 13, 14, 17}
     print(f"self-check multiline-attribute: {'excluded' if gated_ok else 'MISSED'} {sorted(gated)}")
+    cfg_cases = [
+        ('#[cfg(all(test, feature = "live"))]', True),
+        ('#[cfg(all(feature = "live", test))]', True),
+        ('#[cfg(any(test, feature = "live"))]', False),
+        ("#[cfg(not(test))]", False),
+        ('#[cfg(feature = "test")]', False),
+        ("#[cfg(all(not(test), unix))]", False),
+    ]
+    cfg_ok = True
+    for attribute, stripped in cfg_cases:
+        lines = cfg_test_lines([attribute, "fn read_metadata() {", '    receipt.metadata.get("financial");', "}"])
+        ok = lines == ({2, 3, 4} if stripped else set())
+        cfg_ok = cfg_ok and ok
+        print(f"self-check {attribute}: {'stripped' if lines else 'counted'}{'' if ok else ' WRONG'}")
     writer_only = [("financial", re.compile("."), re.compile("."), "writer", "writer", "")]
     reader_ok = match_rule(writer_only, "financial", "crates/x/new.rs", 'metadata.get("financial")', "reader") is None
     print(f"self-check reader-vs-writer-rule: {'unclassified' if reader_ok else 'ACCEPTED'}")
-    failed = not (gated_ok and reader_ok)
+    failed = not (gated_ok and reader_ok and cfg_ok)
     for name, rev_arg, rules_text in [
         ("bad-revision", "metadata-blocks-self-check-nonexistent-ref", ""),
         ("no-rules", rev, "# no rules\n"),
