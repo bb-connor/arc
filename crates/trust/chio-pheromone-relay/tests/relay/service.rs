@@ -1113,3 +1113,41 @@ async fn relay_unauthenticated_refusals_answer_fixed_details() {
     assert_body_hides(&body, &["<peer-supplied>"]);
     server.abort();
 }
+
+#[tokio::test]
+async fn relay_event_store_failure_still_writes_the_operator_report_file() {
+    let sender = key(1);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
+    let store_dir = tempfile::tempdir().unwrap();
+    let store_path = store_dir.path().canonicalize().unwrap().join("relay.db");
+    let store = Arc::new(SqlitePheromoneRelayStore::open(&store_path).unwrap());
+    rusqlite::Connection::open(&store_path)
+        .unwrap()
+        .execute_batch(
+            "DROP TABLE chio_pheromone_relay_inbox; DROP TABLE chio_pheromone_relay_events;",
+        )
+        .unwrap();
+    let receiver_directory =
+        PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
+    let service = PheromoneRelayService::new(
+        rejection_config(reports.path()),
+        receiver_directory,
+        Arc::new(AcceptingReceiver),
+        store,
+    );
+    let server = tokio::spawn(service.serve(listener));
+
+    let (status, _body) = post_signed_batch(
+        address,
+        "did:chio:buyer-kernel",
+        "relay-nonce-event-store-failure",
+        &sender,
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(rejected_event_detail(reports.path()).contains("no such table"));
+    server.abort();
+}

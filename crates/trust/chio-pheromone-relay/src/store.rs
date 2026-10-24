@@ -410,7 +410,7 @@ impl SqlitePheromoneRelayStore {
                 attempts: u64::try_from(attempts).map_err(|_| {
                     PheromoneRelayError::Sqlite("attempt count is negative".to_string())
                 })?,
-                batch: batch_json?,
+                batch: crate::input::persisted(batch_json, "outbox")?,
             });
         }
         drop(stmt);
@@ -532,7 +532,7 @@ impl SqlitePheromoneRelayStore {
         let mut next_cursor = after_rowid;
         for row in rows {
             let (rowid, batch_json) = row?;
-            let batch_json = batch_json?;
+            let batch_json = crate::input::persisted(batch_json, "outbox")?;
             let batch_bytes = batch_json.len();
             if bytes.saturating_add(batch_bytes) > max_bytes {
                 if frames.is_empty() {
@@ -542,7 +542,8 @@ impl SqlitePheromoneRelayStore {
                 }
                 break;
             }
-            let batch: PheromoneGossipBatch = crate::input::decode(batch_json.as_bytes())?;
+            let batch: PheromoneGossipBatch =
+                crate::input::persisted(crate::input::decode(batch_json.as_bytes()), "outbox")?;
             let batch_frame_count = batch.frames.len();
             if served_frame_count.saturating_add(batch_frame_count) > limit {
                 if frames.is_empty() {
@@ -922,7 +923,7 @@ impl SqlitePheromoneRelayStore {
             )
             .optional()?;
         match report_json {
-            Some(report) => Ok(Some(report?)),
+            Some(report) => Ok(Some(crate::input::persisted(report, "inbox")?)),
             None => Ok(None),
         }
     }
@@ -1303,7 +1304,8 @@ mod inbox_lookup_tests {
             .unwrap();
         assert!(matches!(
             store.lookup_inbox_report("did:chio:sender", "nonce-bad"),
-            Err(PheromoneRelayError::Input(_))
+            Err(PheromoneRelayError::Sqlite(ref text))
+                if text.starts_with("persisted inbox document is unreadable: ")
         ));
         store
             .conn
@@ -1316,9 +1318,44 @@ mod inbox_lookup_tests {
             .unwrap();
         assert!(matches!(
             store.lookup_inbox_report("did:chio:sender", "nonce-bad"),
-            Err(PheromoneRelayError::Input(
-                chio_core_types::canonical::UntrustedJsonError::TooLarge { .. }
-            ))
+            Err(PheromoneRelayError::Sqlite(ref text))
+                if text.starts_with("persisted inbox document is unreadable: ")
+        ));
+    }
+
+    #[test]
+    fn corrupt_outbox_rows_are_store_faults_not_peer_input() {
+        let store = SqlitePheromoneRelayStore::open_in_memory().unwrap();
+        store
+            .enqueue_batch(
+                "did:chio:sender",
+                "did:chio:recipient",
+                "treaty:inbox-lookup",
+                &sample_batch(),
+                4_000_000,
+            )
+            .unwrap();
+        store
+            .conn
+            .lock()
+            .unwrap()
+            .execute(
+                "UPDATE chio_pheromone_relay_outbox SET batch_json = \"{\"",
+                [],
+            )
+            .unwrap();
+        let catchup =
+            store.catchup_batches("did:chio:recipient", "treaty:inbox-lookup", "0", 10, 1024);
+        assert!(matches!(
+            catchup,
+            Err(PheromoneRelayError::Sqlite(ref text))
+                if text.starts_with("persisted outbox document is unreadable: ")
+        ));
+        let leased = store.lease_due_batches(5_000_000, 10);
+        assert!(matches!(
+            leased,
+            Err(PheromoneRelayError::Sqlite(ref text))
+                if text.starts_with("persisted outbox document is unreadable: ")
         ));
     }
 }

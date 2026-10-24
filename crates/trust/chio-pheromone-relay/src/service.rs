@@ -344,23 +344,37 @@ impl PheromoneRelayService {
                 Some(code.to_string())
             },
         };
-        self.store.record_event_report(&report)?;
-        if let Some(report_dir) = &self.config.report_dir {
-            std::fs::create_dir_all(report_dir)?;
-            let report_hash = canonical_sha256(&report)?;
-            let suffix = report_hash.chars().take(12).collect::<String>();
-            let filename = format!(
-                "{}-{}-{}.json",
-                generated_at_unix_ms,
-                sanitize_event_part(event_kind),
-                suffix
-            );
-            let path = report_dir.join(filename);
-            let json = serde_json::to_string_pretty(&report)?;
-            std::fs::write(path, format!("{json}\n"))?;
-        }
+        let stored = self.store.record_event_report(&report);
+        let written = match &self.config.report_dir {
+            Some(report_dir) => {
+                write_report_file(report_dir, &report, event_kind, generated_at_unix_ms)
+            }
+            None => Ok(()),
+        };
+        stored?;
+        written?;
         Ok(())
     }
+}
+
+fn write_report_file(
+    report_dir: &std::path::Path,
+    report: &RelayEventReport,
+    event_kind: &str,
+    generated_at_unix_ms: u64,
+) -> Result<(), PheromoneRelayError> {
+    std::fs::create_dir_all(report_dir)?;
+    let report_hash = canonical_sha256(report)?;
+    let suffix = report_hash.chars().take(12).collect::<String>();
+    let filename = format!(
+        "{}-{}-{}.json",
+        generated_at_unix_ms,
+        sanitize_event_part(event_kind),
+        suffix
+    );
+    let json = serde_json::to_string_pretty(report)?;
+    std::fs::write(report_dir.join(filename), format!("{json}\n"))?;
+    Ok(())
 }
 
 async fn handle_health(
@@ -695,13 +709,20 @@ pub(crate) fn relay_http_error(
 ) -> (StatusCode, Json<RelayOperatorReport>) {
     let now = service.request_now_unix_ms();
     let response = relay_error_response(&error);
-    let _ = service.emit_event_report(
+    if let Err(report_error) = service.emit_event_report(
         "request_rejected",
         false,
         error.code(),
         &error.to_string(),
         now,
-    );
+    ) {
+        tracing::error!(
+            code = error.code(),
+            rejection = %error,
+            %report_error,
+            "relay rejection event report failed"
+        );
+    }
     (
         response.status,
         Json(RelayOperatorReport {
@@ -794,9 +815,8 @@ fn runtime_error_response(error: &PheromoneRuntimeError) -> RelayErrorResponse {
         | E::WorkflowContextMismatch(_)
         | E::WorkflowVerification(_)
         | E::Json(_)
-        | E::SchemaInvalid(_)
         | E::InvalidField(_) => refused,
-        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) => RELAY_INTERNAL_ERROR,
+        E::SchemaInvalid(_) | E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) => RELAY_INTERNAL_ERROR,
         E::StorePoisoned => RELAY_STORE_UNAVAILABLE,
     }
 }
@@ -1055,6 +1075,12 @@ mod tests {
                 internal,
             ),
             (PheromoneRelayError::StorePoisoned, unavailable),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::SchemaInvalid(
+                    INTERNAL_TEXT.to_string(),
+                )),
+                internal,
+            ),
             (
                 PheromoneRelayError::Runtime(PheromoneRuntimeError::Sqlite(
                     INTERNAL_TEXT.to_string(),

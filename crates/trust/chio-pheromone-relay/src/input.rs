@@ -32,6 +32,18 @@ pub(crate) fn row_text(
     Ok(UntrustedJsonText::from_wire(text.as_bytes(), MAX_DOCUMENT_BYTES).map(|_| text.to_owned()))
 }
 
+/// A stored document that fails the input policy is local corruption, not peer input.
+pub(crate) fn persisted<T>(
+    decoded: Result<T, UntrustedJsonError>,
+    table: &str,
+) -> Result<T, crate::PheromoneRelayError> {
+    decoded.map_err(|error| {
+        crate::PheromoneRelayError::Sqlite(format!(
+            "persisted {table} document is unreadable: {error}"
+        ))
+    })
+}
+
 pub(crate) fn encode<T: serde::Serialize + ?Sized>(
     value: &T,
 ) -> Result<String, UntrustedJsonError> {
