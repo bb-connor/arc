@@ -774,6 +774,7 @@ fn relay_error_response(error: &PheromoneRelayError) -> RelayErrorResponse {
         | E::AlertDeliveryInvalid(_)
         | E::AlertAssuranceInvalid(_)
         | E::ArchivePackageInvalid(_)
+        | E::StoredInput(_)
         | E::CanonicalJson(_)
         | E::Sqlite(_)
         | E::Http(_)
@@ -808,9 +809,8 @@ fn runtime_error_response(error: &PheromoneRuntimeError) -> RelayErrorResponse {
         | E::WorkflowContextMismatch(_)
         | E::WorkflowVerification(_)
         | E::Json(_)
-        | E::SchemaInvalid(_)
         | E::InvalidField(_) => refused,
-        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) => RELAY_INTERNAL_ERROR,
+        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) | E::SchemaInvalid(_) => RELAY_INTERNAL_ERROR,
         E::StorePoisoned => RELAY_STORE_UNAVAILABLE,
     }
 }
@@ -1014,6 +1014,7 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     mod event_reports;
+    mod local_failures;
 
     use super::{
         relay_error_response, PheromoneReceiveReport, PheromoneRuntimeError, RelayBatchReceiver,

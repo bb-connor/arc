@@ -6,6 +6,8 @@ pub enum PheromoneRelayError {
     Runtime(#[from] chio_pheromone_runtime::PheromoneRuntimeError),
     #[error(transparent)]
     Input(#[from] chio_core_types::canonical::UntrustedJsonError),
+    #[error("stored_input: {0}")]
+    StoredInput(#[source] chio_core_types::canonical::UntrustedJsonError),
     #[error("unsupported_schema: {0}")]
     UnsupportedSchema(String),
     #[error("duplicate_peer: {0}")]
@@ -112,6 +114,7 @@ impl PheromoneRelayError {
             Self::MethodMismatch(_) => "method_mismatch",
             Self::PathMismatch(_) => "path_mismatch",
             Self::Input(error) => error.code(),
+            Self::StoredInput(_) => "stored_input",
             Self::Runtime(error) => error.code(),
             Self::Json(_) => "json",
             Self::CanonicalJson(_) => "canonical_json",
