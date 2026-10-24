@@ -11,10 +11,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 4096,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "AUTHORITY_KEY_LOG_SYNC_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `authority:admin` with deployment tenant authority. The handler repeats validate_caller with `authority:admin` after typed extraction.",
       "semantics": "Signed authority key-log records update the local authority trust state after log-chain and signer validation."
     },
     {
@@ -25,10 +25,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FEDERATION_POLICY_EVALUATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `federation:write` with deployment tenant authority. The handler repeats validate_caller with `federation:write` after typed extraction.",
       "semantics": "Federation admission policy evaluation consumes identity and authorization inputs and returns the owning policy decision."
     },
     {
@@ -39,10 +39,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "ISSUE_CAPABILITY_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate calls validate_authority_issue_auth for the service/workload bearer or authenticated forwarded cluster-peer contract. The handler repeats this check after typed extraction, then performs leader forwarding and enforce_authority_mutation_fence before issuance.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `capabilities:issue` with deployment tenant authority. After typed extraction, validate_authority_issue_auth repeats validate_caller with `capabilities:issue` and checks any x-chio-forwarded-authority-term against the live authority lease; the handler then forwards to the leader, or applies validate_authority_mutation_term and enforce_authority_mutation_fence before issuance.",
       "semantics": "Capability issuance requests select subject, scope, grants and attestation inputs; the capability authority applies issuance policy before signing."
     },
     {
@@ -53,10 +53,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "REVOCATIONS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `revocations:write` with deployment tenant authority. The handler repeats validate_caller with `revocations:write` after typed extraction.",
       "semantics": "Authenticated revocation updates capability authority state and cluster propagation; identifiers and revision numbers are authoritative."
     },
     {
@@ -67,10 +67,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "SCIM_USERS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `scim:write` with deployment tenant authority. The handler repeats validate_caller with `scim:write` after typed extraction.",
       "semantics": "Authenticated SCIM identity provisioning writes the lifecycle registry after provider and identity validation; its fields are not an arbitrary numeric document."
     },
     {
@@ -81,10 +81,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "PUT",
       "route": "FEDERATION_PROVIDER_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `federation:write` with deployment tenant authority. The handler repeats validate_caller with `federation:write` after typed extraction.",
       "semantics": "Authenticated provider configuration replaces identity trust endpoints and subject mapping after provider validation."
     },
     {
@@ -95,10 +95,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "PUT",
       "route": "FEDERATION_POLICY_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `federation:write` with deployment tenant authority. The handler repeats validate_caller with `federation:write` after typed extraction.",
       "semantics": "The record embeds a signed federation admission policy; path identity and policy signature must validate before the registry write."
     },
     {
@@ -109,10 +109,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "BUDGET_CAPTURE_INVOCATION_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -123,10 +123,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "BUDGET_RECONCILE_SPEND_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -137,10 +137,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "BUDGET_RELEASE_EXPOSURE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -151,10 +151,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "BUDGET_AUTHORIZE_EXPOSURE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -165,10 +165,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "BUDGET_INCREMENT_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -179,10 +179,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_AUTHORIZE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -193,10 +193,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -207,10 +207,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -221,10 +221,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -235,10 +235,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CAPTURE_SPEND_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -249,10 +249,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -263,10 +263,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_RECONCILE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -277,10 +277,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_RELEASE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -291,10 +291,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_FENCED_REVERSE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `budgets:write` with deployment tenant authority. The handler repeats validate_caller with `budgets:write` after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -305,10 +305,10 @@
       "disposition": "bounded-document-json",
       "reader": "document",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CERTIFICATION_DISCOVERY_CONSUME_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `certifications:write` with deployment tenant authority. The handler repeats validate_caller with `certifications:write` after typed extraction.",
       "semantics": "Unsigned discovery selection lists constrain informational certification consumption; the request contains identifiers and profile names, not signed artifacts."
     },
     {
@@ -319,10 +319,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CERTIFICATION_DISPUTE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `certifications:write` with deployment tenant authority. The handler repeats validate_caller with `certifications:write` after typed extraction.",
       "semantics": "Authenticated dispute state and timestamps update a stored certification entry."
     },
     {
@@ -333,10 +333,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CASE_EVALUATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -347,10 +347,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "GENERIC_TRUST_ACTIVATION_EVALUATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -361,10 +361,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "OPEN_MARKET_PENALTY_EVALUATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -375,10 +375,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CASE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -389,10 +389,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -403,10 +403,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "GENERIC_TRUST_ACTIVATION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -417,10 +417,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -431,10 +431,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "OPEN_MARKET_PENALTY_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `registry:write` with deployment tenant authority. The handler repeats validate_caller with `registry:write` after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -445,10 +445,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CERTIFICATIONS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `certifications:write` with deployment tenant authority. The handler repeats validate_caller with `certifications:write` after typed extraction.",
       "semantics": "Signed certification bodies are verified before registry insertion, supersession and durable save."
     },
     {
@@ -459,10 +459,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CERTIFICATION_DISCOVERY_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `certifications:write` with deployment tenant authority. The handler repeats validate_caller with `certifications:write` after typed extraction.",
       "semantics": "The unsigned request wrapper embeds a signed certification; the signature is verified before peer publish fan-out."
     },
     {
@@ -473,10 +473,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CERTIFICATION_REVOKE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `certifications:write` with deployment tenant authority. The handler repeats validate_caller with `certifications:write` after typed extraction.",
       "semantics": "Authenticated reason and revocation time update a stored certification entry."
     },
     {
@@ -487,10 +487,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_internal_router",
       "method": "POST",
       "route": "INTERNAL_CLUSTER_PARTITION_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate calls validate_cluster_peer_auth for the partition route. The handler repeats peer authentication after typed extraction before changing cluster peer state.",
+      "authentication": "On the internal listener, authorize_route enforces the peer row before json_ingress::validate reads the body: it buffers at most 64 KiB, verifies an Ed25519 signature under the pinned key of the claimed node id over chio.cluster.peer-signature.v1 (deployment, recipient node id, sender node id, method, path, query, body SHA-256, single-use nonce, issue time and term) and requires `cluster:replicate`. The handler requires the peer grant with `cluster:replicate` (require_peer_grant) before changing cluster peer state.",
       "semantics": "An authenticated administrative cluster-partition request changes peer reachability controls used by authority replication."
     },
     {
@@ -501,10 +501,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FINDING_ACTIVATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `findings:write` with deployment tenant authority. The handler repeats validate_caller with `findings:write` after typed extraction.",
       "semantics": "Finding activation validates signed lease and activation evidence before committing activation state."
     },
     {
@@ -515,10 +515,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FINDING_PARTICIPATION_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `findings:write` with deployment tenant authority. The handler repeats validate_caller with `findings:write` after typed extraction.",
       "semantics": "Signed participation evidence and authority status constrain the retained finding participation decision."
     },
     {
@@ -529,10 +529,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FINDINGS_COLLATERAL_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `findings:write` with deployment tenant authority. The handler repeats validate_caller with `findings:write` after typed extraction.",
       "semantics": "Authenticated collateral registration validates the retained account, amounts and evidence bindings before changing market state."
     },
     {
@@ -543,10 +543,10 @@
       "disposition": "bounded-document-json",
       "reader": "document",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FINDINGS_SEARCH_PATH",
-      "authentication": "Public read-only finding search; no service-token requirement is added by the parser.",
+      "authentication": "The ROUTE_TABLE row is anonymous and authorize_route passes it unchanged; the public read-only finding search adds no credential requirement.",
       "semantics": "Unsigned public finding-search selectors filter retained results; they cannot publish a finding or mint authority."
     },
     {
@@ -557,10 +557,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_ACTIVATIONS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -571,10 +571,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_APPROVALS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -585,10 +585,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate resolves the configured admin-service or tenant-read bearer. After typed extraction, resolve_control_read_principal and matching request tenant identity constrain credit-authority queries.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment or tenant authority. After typed extraction, resolve_control_read_principal repeats validate_caller with `reports:read`, and a tenant credential is refused for any tenant_id other than its own.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -599,10 +599,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_MARKETPLACE_PRICE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -613,10 +613,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_PROPOSAL_ADMIT_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -627,10 +627,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_PROPOSALS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -641,10 +641,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_PROPOSAL_PREVIEW_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -655,10 +655,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FISCAL_RESOLVE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `fiscal:write` with deployment tenant authority. The handler repeats validate_caller with `fiscal:write` after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -669,7 +669,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_CANCEL_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -683,7 +683,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_CLAIM_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -697,7 +697,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_COMMITMENT_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -711,7 +711,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_COMPLETE_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -725,7 +725,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_PACKAGE_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -739,7 +739,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_RENEW_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -753,7 +753,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router",
       "method": "POST",
       "route": "FROST_COORDINATOR_SHARE_PATH",
       "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
@@ -767,10 +767,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_OID4VP_REQUESTS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "OID4VP request issuance signs and retains nonce, verifier policy and presentation constraints."
     },
     {
@@ -781,10 +781,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_CHALLENGES_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "Challenge creation retains verifier policy, issuer restrictions and expiry that constrain later presentation admission."
     },
     {
@@ -795,10 +795,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_ISSUANCE_OFFERS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "A signed agent passport and issuance settings create a one-time credential offer after passport verification."
     },
     {
@@ -809,10 +809,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "FEDERATED_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `federation:write` with deployment tenant authority. The handler repeats validate_caller with `federation:write` after typed extraction.",
       "semantics": "Federated issuance combines identity evidence and requested grants; federation and authority validation remain mandatory before minting a capability."
     },
     {
@@ -833,7 +833,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH",
       "authentication": "Public holder submission requires an active retained challenge and cryptographically verified presentation before consumption.",
@@ -847,10 +847,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_STATUSES_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "A signed passport and lifecycle metadata update the authenticated passport-status registry."
     },
     {
@@ -861,7 +861,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_ISSUANCE_CREDENTIAL_PATH",
       "authentication": "Before body reads, json_ingress::authenticate_wallet_credential validates the opaque bearer against the verified issuance registry without mutation: issued state, current offer/token expiry and normalized configured issuer. After upload, the handler reloads the registry and repeats validate_credential_entitlement before issuer metadata or signing seed/DB resolution; redeem_credential retains its later entitlement and request configuration/subject/format checks before signing, consumption and save.",
@@ -875,7 +875,7 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_ISSUANCE_TOKEN_PATH",
       "authentication": "Public token exchange requires a valid one-time pre-authorized issuance grant.",
@@ -889,10 +889,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_STATUS_REVOKE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "Authenticated passport lifecycle revocation mutates a retained status record."
     },
     {
@@ -903,10 +903,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "PUT",
       "route": "PASSPORT_VERIFIER_POLICY_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "Signed verifier policy, including numeric trust thresholds, is verified before upsert and durable save."
     },
     {
@@ -917,10 +917,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PASSPORT_CHALLENGE_VERIFY_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `passport:write` with deployment tenant authority. The handler repeats validate_caller with `passport:write` after typed extraction.",
       "semantics": "A nested signed passport presentation is checked against the retained challenge and verifier policy before challenge consumption."
     },
     {
@@ -931,10 +931,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 134217728,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CHILD_RECEIPTS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after SignedJson extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `receipts:append` with deployment tenant authority. The handler repeats validate_caller with `receipts:append` after typed extraction.",
       "semantics": "A signed child receipt is validated before retained lineage append and cluster propagation."
     },
     {
@@ -945,10 +945,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 134217728,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "TOOL_RECEIPTS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after SignedJson extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `receipts:append` with deployment tenant authority. The handler repeats validate_caller with `receipts:append` after typed extraction.",
       "semantics": "A signed Chio receipt is verified before durable append; original JSON must preserve nested signed metadata and native integer widths."
     },
     {
@@ -959,10 +959,10 @@
       "disposition": "bounded-document-json",
       "reader": "document",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "EVIDENCE_EXPORT_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate resolves the configured admin-service or tenant-read bearer. After typed extraction, resolve_control_read_principal and principal.authorize_evidence_export_query constrain exported tenant evidence.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `evidence:read` with deployment or tenant authority. After typed extraction, resolve_control_read_principal repeats validate_caller with `evidence:read`, and principal.authorize_evidence_export_query holds a tenant credential to its own tenant's evidence.",
       "semantics": "Unsigned export selection and filters choose existing evidence; no incoming signed record is interpreted by this request."
     },
     {
@@ -973,10 +973,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 67108864,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "EVIDENCE_IMPORT_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after SignedJson extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `evidence:write` with deployment tenant authority. The handler repeats validate_caller with `evidence:write` after typed extraction.",
       "semantics": "Authenticated service administrators provide an explicit independent verification policy. The common verifier authenticates the envelope, manifest and complete decoded payload, pins every signer, binds receipt/checkpoint keys, and checks any externally supplied anchor before forwarding or store import. No trust is inferred from the package."
     },
     {
@@ -987,10 +987,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LINEAGE_RECORD_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `lineage:write` with deployment tenant authority. The handler repeats validate_caller with `lineage:write` after typed extraction.",
       "semantics": "Capability and lineage snapshots affect retained authority provenance and must preserve authoritative identifiers and numbers."
     },
     {
@@ -1001,10 +1001,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "METERED_BILLING_RECONCILE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `settlement:write` with deployment tenant authority. The handler repeats validate_caller with `settlement:write` after typed extraction.",
       "semantics": "Metered billing reconciliation writes authoritative observations and financial state after the existing billing checks."
     },
     {
@@ -1015,10 +1015,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "SETTLEMENT_RECONCILE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `settlement:write` with deployment tenant authority. The handler repeats validate_caller with `settlement:write` after typed extraction.",
       "semantics": "Settlement reconciliation writes authoritative observations and financial state after the existing settlement checks."
     },
     {
@@ -1029,10 +1029,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment tenant authority. The handler repeats validate_caller with `reports:read` after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1043,10 +1043,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment tenant authority. The handler repeats validate_caller with `reports:read` after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1057,10 +1057,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment tenant authority. The handler repeats validate_caller with `reports:read` after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1071,10 +1071,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CAPITAL_ALLOCATION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Capital allocation or execution instruction issuance consumes financial authority inputs and signs a result only after the existing book and policy validation."
     },
     {
@@ -1085,10 +1085,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CAPITAL_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Capital allocation or execution instruction issuance consumes financial authority inputs and signs a result only after the existing book and policy validation."
     },
     {
@@ -1099,10 +1099,10 @@
       "disposition": "bounded-document-json",
       "reader": "document",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CREDIT_BONDED_EXECUTION_SIMULATION_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate calls resolve_admin_report_read_context, requiring admin-service receipt-read authority. The handler repeats the same report authorization after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment tenant authority. After typed extraction, resolve_admin_report_read_context repeats validate_caller with `reports:read` and refuses a tenant credential.",
       "semantics": "Unsigned hypothetical bonded-execution policy and query produce a report without changing the bond or issuing execution authority."
     },
     {
@@ -1113,10 +1113,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CREDIT_BOND_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1127,10 +1127,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CREDIT_FACILITY_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1141,10 +1141,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "CREDIT_LOSS_LIFECYCLE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1155,10 +1155,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1169,10 +1169,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_BOUND_COVERAGE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1183,10 +1183,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1197,10 +1197,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_DISPUTE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1211,10 +1211,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PACKAGE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1225,10 +1225,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1239,10 +1239,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1253,10 +1253,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_RESPONSE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1267,10 +1267,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1281,10 +1281,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1295,10 +1295,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_PLACEMENT_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1309,10 +1309,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_PRICING_AUTHORITY_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1323,10 +1323,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_PROVIDER_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1337,10 +1337,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_QUOTE_REQUEST_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1351,10 +1351,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "LIABILITY_QUOTE_RESPONSE_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1365,10 +1365,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PORTABLE_REPUTATION_EVALUATE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reputation:write` with deployment tenant authority. The handler repeats validate_caller with `reputation:write` after typed extraction.",
       "semantics": "The evaluation request embeds signed portable reputation evidence; owning validation determines its admissibility."
     },
     {
@@ -1379,10 +1379,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PORTABLE_NEGATIVE_EVENT_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reputation:write` with deployment tenant authority. The handler repeats validate_caller with `reputation:write` after typed extraction.",
       "semantics": "Portable reputation issuance consumes signed passport or attestation evidence and signs an authoritative reputation artifact after its existing validation."
     },
     {
@@ -1393,10 +1393,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reputation:write` with deployment tenant authority. The handler repeats validate_caller with `reputation:write` after typed extraction.",
       "semantics": "Portable reputation issuance consumes signed passport or attestation evidence and signs an authoritative reputation artifact after its existing validation."
     },
     {
@@ -1407,10 +1407,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "REPUTATION_COMPARE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reputation:write` with deployment tenant authority. The handler repeats validate_caller with `reputation:write` after typed extraction.",
       "semantics": "The comparison request embeds a signed passport and an optional verifier policy; passport verification still determines the interpretation."
     },
     {
@@ -1421,10 +1421,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "UNDERWRITING_APPEALS_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1435,10 +1435,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "UNDERWRITING_DECISION_ISSUE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1449,10 +1449,10 @@
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "UNDERWRITING_APPEAL_RESOLVE_PATH",
-      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `credit:write` with deployment tenant authority. The handler repeats validate_caller with `credit:write` after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1463,10 +1463,10 @@
       "disposition": "bounded-document-json",
       "reader": "document",
       "max_bytes": 1048576,
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "UNDERWRITING_SIMULATION_PATH",
-      "authentication": "Before body reads, json_ingress::authenticate calls resolve_admin_report_read_context, requiring admin-service receipt-read authority. The handler repeats the same report authorization after typed extraction.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reports:read` with deployment tenant authority. After typed extraction, resolve_admin_report_read_context repeats validate_caller with `reports:read` and refuses a tenant credential.",
       "semantics": "Unsigned hypothetical underwriting policy and query produce a report; ordinary decimal spellings are allowed and no decision is signed or persisted."
     },
     {
@@ -1490,7 +1490,7 @@
       "remaining_risk": "Form decoding has its own duplicate/encoding semantics. This census records the boundary but does not qualify URL-encoded ambiguity or OAuth protocol behavior."
     },
     {
-      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction before any quota or retry change. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `receipts:admin` with deployment tenant authority. The handler repeats validate_caller with `receipts:admin` after typed extraction before any quota or retry change. Missing, forged, non-Bearer and tenant credentials are refused before the body is polled.",
       "disposition": "bounded-signed-json",
       "format": "json",
       "max_bytes": 256,
@@ -1499,12 +1499,12 @@
       "reader": "signed",
       "request_type": "ReceiptQuerySnapshotRecoveryRequest",
       "route": "RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH",
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
-      "semantics": "A node-local service-token request optionally raises the runtime snapshot quota without lowering it and schedules recovery. It is never forwarded. A quota increase is lost on restart and can wake either backoff; a retry without an increase wakes only resource backoff. Every rebuilt snapshot still authenticates its contents.",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
+      "semantics": "A node-local `receipts:admin` request optionally raises the runtime snapshot quota without lowering it and schedules recovery. It is never forwarded. A quota increase is lost on restart and can wake either backoff; a retry without an increase wakes only resource backoff. Every rebuilt snapshot still authenticates its contents.",
       "source": "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs"
     },
     {
-      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `admin:emergency` with deployment tenant authority. The handler repeats validate_caller with `admin:emergency` after typed extraction. Missing, forged, non-Bearer and tenant credentials are refused before the body is polled.",
       "disposition": "bounded-signed-json",
       "format": "json",
       "max_bytes": 16384,
@@ -1513,12 +1513,12 @@
       "reader": "signed",
       "request_type": "ResumeRequestBody",
       "route": "EMERGENCY_RESUME_PATH",
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
-      "semantics": "A node-local service-token request resumes the kernel scope of this node's admission authority, naming the stopped head it expects. A moved head is refused with 409 and nothing changes; with a durable authority the resume is an appended chio.stop-epoch.v1 record.",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
+      "semantics": "A node-local `admin:emergency` request resumes the kernel scope of this node's admission authority, naming the stopped head it expects. A moved head is refused with 409 and nothing changes; with a durable authority the resume is an appended chio.stop-epoch.v1 record.",
       "source": "crates/platform/chio-control-plane/src/trust_control/stop_routes.rs"
     },
     {
-      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `admin:emergency` with deployment tenant authority. The handler repeats validate_caller with `admin:emergency` after typed extraction. Missing, forged, non-Bearer and tenant credentials are refused before the body is polled.",
       "disposition": "bounded-signed-json",
       "format": "json",
       "max_bytes": 16384,
@@ -1527,8 +1527,8 @@
       "reader": "signed",
       "request_type": "StopRequestBody",
       "route": "EMERGENCY_STOP_PATH",
-      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
-      "semantics": "A node-local service-token request stops the kernel scope of this node's admission authority. With a durable authority the stop is an appended chio.stop-epoch.v1 record and the admission authority RPC refuses Begin until resume; the reason is bounded and validated by the stop control.",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
+      "semantics": "A node-local `admin:emergency` request stops the kernel scope of this node's admission authority. With a durable authority the stop is an appended chio.stop-epoch.v1 record and the admission authority RPC refuses Begin until resume; the reason is bounded and validated by the stop control.",
       "source": "crates/platform/chio-control-plane/src/trust_control/stop_routes.rs"
     }
   ],
@@ -1685,12 +1685,18 @@
     "Runtime router cases cover certification, verifier-policy, nested certification fan-out input, unsigned simulation, body limits and HTTP rejection composition; other route owners retain their existing semantic tests."
   ],
   "router_compositions": {
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs": {
-      "owner": "build_router",
-      "sha256": "5bb8d31fc3020e6f0fd5321f33fa80c70991e1882513c17950294833df37db5d"
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router": {
+      "sha256": "ee8b188ba8cecc937fd85a0fb35aa6b793b410db1e29240d5ca70bd7501fb10e",
+      "merges": {
+        "finding_market_routes": "802d9fd0e181fe667edacb380510d4b99f95f27629fa2471c2dc6a978e999b7b"
+      },
+      "route_table": true
     },
-    "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs": {
-      "owner": "frost_coordinator_router",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_internal_router": {
+      "sha256": "2e9690e8cffa6929dcb6012bfa67de1eb802edc782c970e25de95fd0ed298bb9",
+      "route_table": true
+    },
+    "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs::frost_coordinator_router": {
       "sha256": "d3769f52a1d86dd68a9afe535470c7b3ec2dc08e6b10373205425a1159429b45"
     }
   },

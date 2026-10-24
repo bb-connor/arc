@@ -27,6 +27,11 @@ MIDDLEWARE = re.compile(
     r"\.route_layer\(\s*axum::middleware::from_fn\(\s*"
     r"super::super::json_ingress::validate\s*,?\s*\)\s*,?\s*\)"
 )
+AUTHORIZER = re.compile(
+    r"\.route_layer\(\s*axum::middleware::from_fn_with_state\(\s*\w+\s*,\s*"
+    r"authorize_route\s*,?\s*\)\s*,?\s*\)"
+)
+REGISTRATION = re.compile(r"\.(?:route|merge|nest)\s*\(")
 
 
 def imports(code):
@@ -116,16 +121,92 @@ def control_contracts(source):
     return sorted(rows)
 
 
+def composition_key(key):
+    """A router composition is named `<source path>::<builder function>`."""
+    path, separator, owner = (key or "").rpartition("::")
+    return (path, owner) if separator and path and owner else (None, None)
+
+
+def function_code(source, owner, contracts):
+    rows = [row for row in contracts.functions(source) if row[0] == owner]
+    if len(rows) != 1:
+        return None
+    return contracts.owner_code(source, rows[0])
+
+
 def router_digest(source, owner, contracts):
     """Pin the reviewed builder, including ordering, merges and literal paths.
 
     Method/path membership alone cannot establish which earlier routes an Axum
     route_layer wraps. Keep this a review tripwire, not a claim of Rust dataflow.
     """
-    rows = [row for row in contracts.functions(source) if row[0] == owner]
-    if len(rows) != 1:
-        return None
-    return hashlib.sha256(contracts.owner_code(source, rows[0]).encode()).hexdigest()
+    code = function_code(source, owner, contracts)
+    return None if code is None else hashlib.sha256(code.encode()).hexdigest()
+
+
+def outer_layer(pattern, code):
+    """The last matching route_layer, only if it follows every route, merge and nest."""
+    last = max((match.start() for match in REGISTRATION.finditer(code)), default=-1)
+    layers = [match for match in pattern.finditer(code) if match.start() > last]
+    return layers[-1] if layers else None
+
+
+def compositions(inventory, files, contracts, blank_noise):
+    """Check each reviewed builder and return the bindings it serves.
+
+    Every builder installs the original-byte middleware after all of its
+    routes. A builder marked `route_table` also installs `authorize_route`
+    outside it, so authorization runs before any body is buffered. Each
+    same-file helper a builder merges is pinned with its own digest.
+    """
+    errors, served = [], {}
+    for key, review in inventory.get("router_compositions", {}).items():
+        path, owner = composition_key(key)
+        source = files.get(path, "") if path else ""
+        root = function_code(source, owner, contracts) if path else None
+        if root is None:
+            errors.append(f"framework router builder is missing: {key}")
+            continue
+        if hashlib.sha256(root.encode()).hexdigest() != review.get("sha256"):
+            errors.append(f"framework router composition changed: {key}")
+        code = blank_noise(root)
+        bindings = list(route_bindings(code, contracts))
+        for helper, digest in sorted(review.get("merges", {}).items()):
+            merged = function_code(source, helper, contracts)
+            if merged is None or hashlib.sha256(merged.encode()).hexdigest() != digest:
+                errors.append(f"framework router composition changed: {key} merges {helper}")
+                continue
+            if not re.search(r"\.merge\(\s*" + re.escape(helper) + r"\s*\(\s*\)\s*\)", code):
+                errors.append(f"framework router merge is not installed: {key} merges {helper}")
+            bindings.extend(route_bindings(blank_noise(merged), contracts))
+        served[key] = sorted(bindings)
+        validate = outer_layer(MIDDLEWARE, code)
+        if validate is None:
+            errors.append(f"framework original-byte middleware is not installed: {key}")
+        if review.get("route_table"):
+            authorizer = outer_layer(AUTHORIZER, code)
+            if authorizer is None or validate is None or authorizer.start() < validate.start():
+                errors.append(f"framework route table authorization does not precede original-byte buffering: {key}")
+    return errors, served
+
+
+def refreshed_digests(inventory, files, contracts, blank_noise):
+    """Recompute only the pinned digests of already reviewed builders and the
+    control reader; routes, dispositions and composition keys are unchanged."""
+    updated = json.loads(json.dumps(inventory))
+    for key, review in updated.get("router_compositions", {}).items():
+        path, owner = composition_key(key)
+        source = files.get(path, "") if path else ""
+        digest = router_digest(source, owner, contracts)
+        if digest is not None:
+            review["sha256"] = digest
+        for helper in review.get("merges", {}):
+            digest = router_digest(source, helper, contracts)
+            if digest is not None:
+                review["merges"][helper] = digest
+    control = files.get(CONTROL_INPUT, "")
+    updated["control_reader_sha256"] = hashlib.sha256(blank_noise(control).encode()).hexdigest()
+    return updated
 
 
 def check(root, census, files, contracts, blank_noise):
@@ -144,6 +225,8 @@ def check(root, census, files, contracts, blank_noise):
     source = files.get(CONTROL_INPUT, "")
     actual = control_contracts(source)
     expected = []
+    composition_errors, served = compositions(inventory, files, contracts, blank_noise)
+    errors.extend(composition_errors)
     for entry in inventory.get("requests", []):
         kind = entry.get("disposition")
         if not entry.get("semantics") or not entry.get("authentication"):
@@ -152,12 +235,9 @@ def check(root, census, files, contracts, blank_noise):
             expected.append((entry["method"], entry["route"], entry["reader"], entry["max_bytes"]))
             if entry["reader"] != ("signed" if kind == "bounded-signed-json" else "document"):
                 errors.append(f"framework disposition and reader disagree: {entry['owner']}")
-            router = files.get(entry.get("router"), "")
             route = (entry["method"], entry["route"], entry["owner"])
-            if route not in route_bindings(blank_noise(router), contracts):
+            if route not in served.get(entry.get("router"), []):
                 errors.append(f"framework method/path/handler binding changed: {entry['owner']}")
-            if not MIDDLEWARE.search(blank_noise(router)):
-                errors.append(f"framework original-byte middleware is not installed: {entry['router']}")
         elif kind in {"format-specific-review", "remaining-json-gap"}:
             if not entry.get("remaining_risk"):
                 errors.append(f"framework remaining risk lacks a disposition: {entry['owner']}")
@@ -167,13 +247,8 @@ def check(root, census, files, contracts, blank_noise):
         errors.append("framework original-reader mode or body limit changed")
     routers = {entry["router"] for entry in inventory.get("requests", [])
                if entry.get("disposition") in {"bounded-signed-json", "bounded-document-json"}}
-    reviewed_routers = inventory.get("router_compositions", {})
-    if routers != set(reviewed_routers):
+    if routers != set(inventory.get("router_compositions", {})):
         errors.append("framework router composition coverage changed")
-    for path, review in reviewed_routers.items():
-        digest = router_digest(files.get(path, ""), review.get("owner"), contracts)
-        if digest is None or digest != review.get("sha256"):
-            errors.append(f"framework router composition changed: {path}")
     implementation = hashlib.sha256(blank_noise(source).encode()).hexdigest()
     if implementation != inventory.get("control_reader_sha256"):
         errors.append("framework original-reader implementation changed")

@@ -415,7 +415,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--scan", action="store_true", help="print observations for manual review; never rewrites the approved catalog")
+    parser.add_argument(
+        "--refresh-ingress-digests",
+        action="store_true",
+        help="rewrite only the pinned digests of reviewed router builders and the control reader",
+    )
     args = parser.parse_args()
+    if args.refresh_ingress_digests:
+        inventory_path = args.root / _ingress.INVENTORY
+        inventory = json.loads(inventory_path.read_text())
+        paths = {_ingress.composition_key(key)[0] for key in inventory.get("router_compositions", {})}
+        paths.add(_ingress.CONTROL_INPUT)
+        files = {path: without_test_items((args.root / path).read_text())
+                 for path in paths if path and (args.root / path).is_file()}
+        updated = _ingress.refreshed_digests(inventory, files, _contracts, _lexer.blank_rust_noise)
+        inventory_path.write_text(json.dumps(updated, indent=2) + "\n")
+        return 0
     catalog = json.loads((args.root / CATALOG).read_text())
     if args.scan:
         print(json.dumps(scan(args.root, catalog)[0], indent=2))

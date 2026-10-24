@@ -188,7 +188,8 @@ class IngressContractCalibration(unittest.TestCase):
         cls.inventory = json.loads((ROOT / gate._ingress.INVENTORY).read_text())
         cls.census = json.loads((ROOT / gate.CATALOG).read_text())["ingress_census"]
         paths = {row["source"] for row in cls.inventory["requests"]}
-        paths.update(row["router"] for row in cls.inventory["requests"] if "router" in row)
+        paths.update(gate._ingress.composition_key(row["router"])[0]
+                     for row in cls.inventory["requests"] if "router" in row)
         paths.add(gate._ingress.CONTROL_INPUT)
         cls.files = {path: (ROOT / path).read_text() for path in paths}
 
@@ -200,6 +201,67 @@ class IngressContractCalibration(unittest.TestCase):
 
     def test_registered_routes_and_modes_match_production(self):
         self.assertEqual(self.errors(), [])
+
+    ROUTER = "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs"
+    PUBLIC = ROUTER + "::build_router"
+    INTERNAL = ROUTER + "::build_internal_router"
+
+    def in_builder(self, owner, edit):
+        """Apply `edit` to one builder's source text only."""
+        def apply(text):
+            row = next(row for row in gate._contracts.functions(text) if row[0] == owner)
+            start, end = row[1], row[3]
+            changed = edit(text[start:end])
+            self.assertNotEqual(changed, text[start:end])
+            return text[:start] + changed + text[end:]
+        return apply
+
+    def test_compositions_are_keyed_by_builder_function(self):
+        compositions = self.inventory["router_compositions"]
+        self.assertIn(self.PUBLIC, compositions)
+        self.assertIn(self.INTERNAL, compositions)
+        self.assertTrue(compositions[self.INTERNAL]["route_table"])
+        partition = next(row for row in self.inventory["requests"]
+                         if row["route"] == "INTERNAL_CLUSTER_PARTITION_PATH")
+        self.assertEqual(partition["router"], self.INTERNAL)
+
+    def test_internal_router_without_original_byte_middleware_fails(self):
+        def drop(code):
+            return gate._ingress.MIDDLEWARE.sub("", code)
+        errors = self.errors(self.ROUTER, self.in_builder("build_internal_router", drop))
+        self.assertIn(f"framework original-byte middleware is not installed: {self.INTERNAL}", errors)
+        self.assertIn(f"framework router composition changed: {self.INTERNAL}", errors)
+        self.assertFalse(any(self.PUBLIC in error for error in errors), errors)
+
+    def test_internal_router_without_route_table_authorization_fails(self):
+        def drop(code):
+            return gate._ingress.AUTHORIZER.sub("", code)
+        errors = self.errors(self.ROUTER, self.in_builder("build_internal_router", drop))
+        self.assertIn(
+            f"framework route table authorization does not precede original-byte buffering: {self.INTERNAL}", errors)
+        self.assertIn(f"framework router composition changed: {self.INTERNAL}", errors)
+
+    def test_route_table_authorization_inside_original_byte_buffering_fails(self):
+        def swap(code):
+            validate = gate._ingress.MIDDLEWARE.search(code).group()
+            authorizer = gate._ingress.AUTHORIZER.search(code).group()
+            return code.replace(validate, "\0").replace(authorizer, validate).replace("\0", authorizer)
+        errors = self.errors(self.ROUTER, self.in_builder("build_internal_router", swap))
+        self.assertIn(
+            f"framework route table authorization does not precede original-byte buffering: {self.INTERNAL}", errors)
+
+    def test_public_router_without_merged_finding_routes_fails(self):
+        def drop(code):
+            return code.replace(".merge(finding_market_routes())", "")
+        errors = self.errors(self.ROUTER, self.in_builder("build_router", drop))
+        self.assertIn(
+            f"framework router merge is not installed: {self.PUBLIC} merges finding_market_routes", errors)
+
+    def test_partition_route_missing_from_the_internal_builder_is_unbound(self):
+        def drop(code):
+            return code.replace("INTERNAL_CLUSTER_PARTITION_PATH", "INTERNAL_CLUSTER_PARTITION_MOVED")
+        errors = self.errors(self.ROUTER, self.in_builder("build_internal_router", drop))
+        self.assertIn("framework method/path/handler binding changed: handle_internal_cluster_partition", errors)
 
     def test_handler_method_change_is_not_hidden_by_same_extractor_count(self):
         path = "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs"
