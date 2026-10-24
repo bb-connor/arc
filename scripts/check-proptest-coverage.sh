@@ -43,7 +43,7 @@ INVARIANTS=(
 
 declare -a registered=()
 for entry in "${INVARIANTS[@]}"; do
-    for prior in "${registered[@]}"; do
+    for prior in "${registered[@]+${registered[@]}}"; do
         if [[ "$entry" == "$prior" ]]; then
             err "FAIL: duplicate invariant registration: $entry"
             exit 2
