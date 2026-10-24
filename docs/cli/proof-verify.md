@@ -29,4 +29,6 @@ Every `transaction:*` code maps to exactly one of 10, 20, 30, 40 or 50. Usage
 errors exit 2.
 
 `scripts/check-chio-transaction-passport.sh` requires every negative fixture in
-`fixtures/proof-room/catalog.json` to exit with 10, 20, 30 or 50.
+`fixtures/proof-room/catalog.json` to exit with the reported registry code's exact
+class, restricted to 10, 20, 30 or 50. Unknown or missing registry codes fail the
+gate. The fixture's declared semantic failure reason must also match.
