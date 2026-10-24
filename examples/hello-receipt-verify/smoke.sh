@@ -27,9 +27,11 @@ import sys
 Path(sys.argv[1]).write_text('{"tampered":true}\n', encoding="utf-8")
 PY
 
-if "${CHIO_BIN}" evidence verify --input "${TAMPERED_DIR}" --trust "${EXAMPLE_ROOT}/verifier-trust.json" --json \
-  > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json"; then
-  echo "expected tampered package verification to fail" >&2
+tamper_status=0
+"${CHIO_BIN}" evidence verify --input "${TAMPERED_DIR}" --trust "${EXAMPLE_ROOT}/verifier-trust.json" --json \
+  > "${ARTIFACT_ROOT}/tamper-out.json" 2> "${ARTIFACT_ROOT}/tamper-err.json" || tamper_status=$?
+if [[ "${tamper_status}" -ne 20 ]]; then
+  echo "expected tampered package verification to exit 20 (integrity), got ${tamper_status}" >&2
   exit 1
 fi
 
