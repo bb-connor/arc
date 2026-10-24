@@ -90,10 +90,10 @@ pub use finding_enforcement::{
     FINDING_IMPAIRMENT_PUBLISHER_REQUEST_SCHEMA, FINDING_IMPAIRMENT_PUBLISHER_RESPONSE_SCHEMA,
 };
 pub use hook::{
-    SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
-    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
-    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
-    SETTLEMENT_OUTCOME_SCHEMA,
+    ObservedSettlement, SettlementFailureClass, SettlementFailureCode,
+    SettlementFailureCodeParseError, SettlementFailureReason, SettlementHook, SettlementHookError,
+    SettlementIdempotencyKey, SettlementObservation, SettlementOutcome, SettlementSkipReason,
+    SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,
