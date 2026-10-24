@@ -475,11 +475,15 @@ pub(super) fn check_record(
 }
 
 impl RootExchange {
-    /// Build the exchange. Every rule whose provider record is present must
-    /// agree with it: an `oidc_jwt` rule never names a Microsoft Entra
-    /// issuer, and an `entra_jwt` rule names a tenant-specific one. A rule
-    /// whose record is missing refuses only the exchanges it would match.
+    /// Build the exchange. The exchange key must be listed in the policy.
+    /// Every rule whose provider record is present must agree with it: an
+    /// `oidc_jwt` rule never names a Microsoft Entra issuer, and an
+    /// `entra_jwt` rule names a tenant-specific one. A rule whose record is
+    /// missing refuses only the exchanges it would match.
     pub fn new(config: RootExchangeConfig) -> Result<Self, RootExchangeConfigError> {
+        if !config.policy.lists_exchange_key(&config.exchange_key) {
+            return Err(RootExchangeConfigError::ExchangeKeyNotListed);
+        }
         for rule in &config.policy.policy().rules {
             let Some(record) = rule
                 .match_
@@ -532,9 +536,6 @@ impl RootExchange {
         self.policy
             .check_valid_at(now)
             .map_err(|_| RootExchangeError::PolicyOutOfForce)?;
-        if !self.policy.lists_exchange_key(&self.exchange_key) {
-            return Err(RootExchangeError::ExchangeKeyNotListed);
-        }
         if grant
             .resource()
             .is_some_and(|resource| resource != self.protected_resource)

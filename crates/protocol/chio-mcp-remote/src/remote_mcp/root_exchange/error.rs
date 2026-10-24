@@ -66,6 +66,8 @@ pub enum RootExchangeConfigError {
         "rule `{rule_id}` is an entra_jwt rule whose provider record issuer is not tenant-specific"
     )]
     IssuerNotTenantSpecific { rule_id: String },
+    #[error("the exchange key is not listed in the loaded root policy")]
+    ExchangeKeyNotListed,
 }
 
 /// Why a token request yields no anchored root.
@@ -202,8 +204,6 @@ pub enum RootExchangeError {
 
     #[error("entropy source failed")]
     EntropyUnavailable,
-    #[error("the exchange key is not listed in the loaded root policy")]
-    ExchangeKeyNotListed,
     #[error("replay store is unavailable: {0}")]
     ReplayStoreUnavailable(String),
     #[error("canonicalization failed: {0}")]
@@ -266,9 +266,7 @@ impl RootExchangeError {
             | Self::ReExchangeWidens
             | Self::ScopeNotProjected
             | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
-            Self::ProjectionTargetMalformed | Self::ExchangeKeyNotListed => {
-                OAuthErrorCode::ServerError
-            }
+            Self::ProjectionTargetMalformed => OAuthErrorCode::ServerError,
             Self::KeysUnavailable(_)
             | Self::ReplayStoreUnavailable(_)
             | Self::IntrospectionUnavailable(_) => OAuthErrorCode::TemporarilyUnavailable,
