@@ -54,6 +54,7 @@ assert_not_prepared_evm_submission!(PreparedBondImpair);
 assert_not_prepared_evm_submission!(PreparedBondExpiry);
 
 mod dual_sign;
+mod merkle_trust;
 
 fn sample_config() -> SettlementChainConfig {
     sample_config_with_rpc_url("http://127.0.0.1:8545".to_string())
