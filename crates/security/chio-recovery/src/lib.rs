@@ -1,4 +1,4 @@
-//! Pure recovery explanations. Inputs remain untrusted claims until the owning
+//! Pure recovery explanations and bounded graph planning. Inputs remain untrusted claims until the owning
 //! authority verifies them, and no explanation can execute, close, settle,
 //! sign or release.
 //!
@@ -43,11 +43,20 @@
 
 extern crate alloc;
 
+mod decision;
 mod evaluation;
+mod planning;
 mod projection;
 mod report;
+mod work;
 
+pub use decision::PlanDecision;
 pub use evaluation::evaluate_explanation;
+pub use planning::{
+    plan, CandidatePlanV1, PlannerLimitsV1, PlannerSearchLimit, RecoveryPlanningRegistryV1,
+    RegisteredCandidatePlanV1, MAX_PLAN_DEPTH, MAX_PLAN_NODES, MAX_PLAN_OFFERS,
+    MAX_PLAN_TOP_LEVEL_STEPS,
+};
 pub use projection::project_explanation;
 pub use report::{
     explanation_report_payload, explanation_view_payload, prepare_explanation_report,

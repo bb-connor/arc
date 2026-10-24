@@ -4913,6 +4913,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-security-types",
+ "chio-semantic-contracts",
  "serde",
  "serde_json",
 ]
