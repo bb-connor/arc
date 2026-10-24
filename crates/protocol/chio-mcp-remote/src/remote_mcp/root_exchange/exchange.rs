@@ -55,8 +55,8 @@ pub struct ExchangeServices<'a> {
     pub keys: &'a dyn IdpKeyLookup,
     pub replay: &'a dyn ExchangeReplayStore,
     /// Randomness for salts, edge-session subject keys and capability
-    /// identifiers. Every draw happens before the replay bind, so a failed
-    /// draw denies the exchange with the assertion unbound.
+    /// identifiers. Every draw happens before the ID-JAG replay bind, so a
+    /// failed draw denies the exchange with the ID-JAG unbound.
     pub entropy: &'a (dyn Rng + Send + Sync),
 }
 

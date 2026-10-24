@@ -263,18 +263,18 @@ impl ExchangeReplayStore for MemoryReplay {
     }
 }
 
-/// Deterministic bytes per draw. Draw `n` (0-based) and every later draw
-/// fail once `n >= fail_from`.
+/// Deterministic bytes per draw. Only draw `fail_at` (0-based), when set,
+/// fails; every other draw succeeds.
 struct CountingRng {
     draws: AtomicU64,
-    fail_from: AtomicU64,
+    fail_at: Option<u64>,
 }
 
 impl CountingRng {
     fn new() -> Self {
         Self {
             draws: AtomicU64::new(0),
-            fail_from: AtomicU64::new(u64::MAX),
+            fail_at: None,
         }
     }
 }
@@ -282,7 +282,7 @@ impl CountingRng {
 impl Rng for CountingRng {
     fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
         let draw = self.draws.fetch_add(1, Ordering::SeqCst);
-        if draw >= self.fail_from.load(Ordering::SeqCst) {
+        if self.fail_at == Some(draw) {
             return Err(RngError("fixture source offline"));
         }
         let seed = draw + 1;
@@ -1628,32 +1628,65 @@ fn assert_entropy_denied_before_the_bind(harness: &Harness, error: RootExchangeE
     assert_eq!(ids, vec!["client-assertion-1"]);
 }
 
-#[tokio::test]
-async fn failing_rng_denies_before_the_replay_bind_and_root_insert() {
-    let harness = Harness::new();
-    harness.entropy.fail_from.store(0, Ordering::SeqCst);
-    let error = harness
-        .run(id_jag_header(), id_jag_claims())
-        .await
-        .unwrap_err();
-    assert_entropy_denied_before_the_bind(&harness, error);
+/// Counts the draws of a successful run of `harness()`, then fails exactly
+/// one draw per run for every draw index. Each run must refuse before the
+/// ID-JAG replay bind and stop at the failed draw. Returns the draw count.
+async fn each_failed_draw_denies_before_the_bind(harness: impl Fn() -> Harness) -> u64 {
+    let counted = harness();
+    counted.run(id_jag_header(), id_jag_claims()).await.unwrap();
+    let draws = counted.entropy.draws.load(Ordering::SeqCst);
+    for k in 0..draws {
+        let mut failing = harness();
+        failing.entropy.fail_at = Some(k);
+        let error = failing
+            .run(id_jag_header(), id_jag_claims())
+            .await
+            .expect_err("a failed draw must deny the exchange");
+        assert_entropy_denied_before_the_bind(&failing, error);
+        assert_eq!(
+            failing.entropy.draws.load(Ordering::SeqCst),
+            k + 1,
+            "failed draw {k}"
+        );
+    }
+    draws
 }
 
 #[tokio::test]
-async fn failing_last_draw_still_denies_before_the_replay_bind() {
-    let counted = Harness::new();
-    counted.run(id_jag_header(), id_jag_claims()).await.unwrap();
-    let draws = counted.entropy.draws.load(Ordering::SeqCst);
-    assert!(draws >= 2);
-
-    let harness = Harness::new();
-    harness.entropy.fail_from.store(draws - 1, Ordering::SeqCst);
+async fn failing_rng_denies_before_the_replay_bind_and_root_insert() {
+    let mut harness = Harness::new();
+    harness.entropy.fail_at = Some(0);
     let error = harness
         .run(id_jag_header(), id_jag_claims())
         .await
         .unwrap_err();
     assert_entropy_denied_before_the_bind(&harness, error);
-    assert_eq!(harness.entropy.draws.load(Ordering::SeqCst), draws);
+    assert_eq!(harness.entropy.draws.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn every_single_failed_draw_denies_before_the_replay_bind() {
+    // Edge-session subject seed, anchor.sub salt, anchor.tenant salt,
+    // capability id.
+    assert_eq!(
+        each_failed_draw_denies_before_the_bind(Harness::new).await,
+        4
+    );
+}
+
+#[tokio::test]
+async fn every_single_failed_draw_with_a_committed_claim_denies_before_the_replay_bind() {
+    // Committed scope claim salt, then the four draws of the default run.
+    let committed = || {
+        Harness::with(
+            |_| {},
+            |policy| {
+                policy["rules"][0]["recorded_claims"] =
+                    json!({ "client_id": "plain", "scope": "committed" })
+            },
+        )
+    };
+    assert_eq!(each_failed_draw_denies_before_the_bind(committed).await, 5);
 }
 
 #[tokio::test]
