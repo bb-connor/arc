@@ -58,11 +58,8 @@ fn decode_intent_error(value: Value) -> String {
         .to_string()
 }
 
-fn assert_refused(message: &str, fragment: &str) {
-    assert!(
-        message.contains(fragment),
-        "expected `{fragment}` in `{message}`"
-    );
+fn assert_refused(message: &str, expected: &str) {
+    assert_eq!(message, expected);
 }
 
 fn hash_error(body: &Value) -> String {
@@ -108,7 +105,10 @@ fn active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_bo
 fn response_plan_rejects_unknown_fields_and_partial_variant_markers() {
     let mut body = response_plan_json();
     body["unknown_field"] = json!(true);
-    assert_refused(&decode_plan_error(body), "unknown field `unknown_field`");
+    assert_refused(
+        &decode_plan_error(body),
+        "unknown field `unknown_field`, expected one of `plan_schema`, `plan_id`, `operator_capability_id`, `operator_capability_hash`, `operator_capability_expires_at`, `executor_subject`, `canonical_plan_body`, `plan_body_hash`, `target_binding`, `ordered_effects`, `expires_at`, `rollback_binding`",
+    );
 
     let mut partial = serde_json::to_value(GovernedTransactionIntent::active_response_plan(
         valid_response_plan_body(),
@@ -124,7 +124,7 @@ fn response_plan_rejects_unknown_fields_and_partial_variant_markers() {
     wrong_kind["body"]["kind"] = json!("delete_account");
     assert_refused(
         &decode_intent_error(wrong_kind),
-        "unknown variant `delete_account`",
+        "unknown variant `delete_account`, expected one of `tool_invocation`, `bound_tool_invocation`, `active_response_plan`",
     );
 }
 
@@ -135,14 +135,14 @@ fn response_plan_rejects_raw_hash_substitution_and_body_hash_mismatch() {
     raw_hash["plan_body_hash"] = json!("a".repeat(64));
     assert_refused(
         &decode_plan_error(raw_hash),
-        "governed response plan body must be an object",
+        "canonical JSON error: governed response plan body must be an object",
     );
 
     let mut mismatched = response_plan_json();
     mismatched["canonical_plan_body"]["tenant"] = json!("tenant-2");
     assert_refused(
         &decode_plan_error(mismatched),
-        "governed response plan body hash does not match its canonical body",
+        "canonical JSON error: governed response plan body hash does not match its canonical body",
     );
 
     let mut embedded_raw_hash = response_plan_json();
@@ -150,7 +150,7 @@ fn response_plan_rejects_raw_hash_substitution_and_body_hash_mismatch() {
     embedded_raw_hash["plan_body_hash"] = json!("a".repeat(64));
     assert_refused(
         &decode_plan_error(embedded_raw_hash),
-        "governed response plan body is empty or recursively hashed",
+        "canonical JSON error: governed response plan body is empty or recursively hashed",
     );
 }
 
@@ -160,21 +160,21 @@ fn response_plan_rejects_empty_duplicate_and_unsupported_effects() {
     empty["ordered_effects"] = json!([]);
     assert_refused(
         &decode_plan_error(empty),
-        "governed response plan must contain between 1 and 5 effects",
+        "canonical JSON error: governed response plan must contain between 1 and 5 effects",
     );
 
     let mut duplicate = response_plan_json();
     duplicate["ordered_effects"] = json!(["suspend_session", "suspend_session"]);
     assert_refused(
         &decode_plan_error(duplicate),
-        "governed response plan effects must be unique",
+        "canonical JSON error: governed response plan effects must be unique",
     );
 
     let mut unsupported = response_plan_json();
     unsupported["ordered_effects"] = json!(["delete_account"]);
     assert_refused(
         &decode_plan_error(unsupported),
-        "unknown variant `delete_account`",
+        "unknown variant `delete_account`, expected one of `throttle_session`, `restrict_egress`, `suspend_session`, `suspend_capability_set`, `freeze_issuance`",
     );
 }
 
@@ -185,7 +185,7 @@ fn response_plan_rejects_invalid_digests_and_expiry_bounds() {
         body["operator_capability_hash"] = json!(invalid_digest);
         assert_refused(
             &decode_plan_error(body),
-            "governed response plan operator capability hash must be lowercase SHA-256 hex",
+            "canonical JSON error: governed response plan operator capability hash must be lowercase SHA-256 hex",
         );
     }
 
@@ -193,14 +193,14 @@ fn response_plan_rejects_invalid_digests_and_expiry_bounds() {
     expires_after_capability["expires_at"] = json!(1_301);
     assert_refused(
         &decode_plan_error(expires_after_capability),
-        "governed response plan expiry exceeds operator capability expiry",
+        "canonical JSON error: governed response plan expiry exceeds operator capability expiry",
     );
 
     let mut zero_expiry = response_plan_json();
     zero_expiry["expires_at"] = json!(0);
     assert_refused(
         &decode_plan_error(zero_expiry),
-        "governed response plan expiry exceeds operator capability expiry",
+        "canonical JSON error: governed response plan expiry exceeds operator capability expiry",
     );
 }
 
@@ -210,19 +210,19 @@ fn response_plan_rejects_unbounded_identifiers_and_canonical_bodies() {
     identifier["plan_id"] = json!("x".repeat(257));
     assert_refused(
         &decode_plan_error(identifier),
-        "governed response plan plan id is not canonical bounded text",
+        "canonical JSON error: governed response plan plan id is not canonical bounded text",
     );
 
     let mut huge_body = response_plan_json();
     huge_body["canonical_plan_body"] = json!({"payload": "x".repeat(65_536)});
     assert_refused(
         &hash_error(&huge_body["canonical_plan_body"]),
-        "governed response plan canonical plan body exceeds the byte ceiling",
+        "canonical JSON error: governed response plan canonical plan body exceeds the byte ceiling",
     );
     huge_body["plan_body_hash"] = json!("a".repeat(64));
     assert_refused(
         &decode_plan_error(huge_body),
-        "governed response plan canonical plan body exceeds the byte ceiling",
+        "canonical JSON error: governed response plan canonical plan body exceeds the byte ceiling",
     );
 }
 
@@ -232,7 +232,7 @@ fn response_plan_hashing_rejects_bodies_above_the_governance_node_ceiling() {
 
     assert_refused(
         &hash_error(&oversized),
-        "governed response plan canonical plan body exceeds the JSON shape ceiling",
+        "canonical JSON error: governed response plan canonical plan body exceeds the JSON shape ceiling",
     );
 }
 
@@ -248,6 +248,6 @@ fn response_plan_hashing_enforces_the_exact_canonical_byte_ceiling() {
     assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&at_limit).is_ok());
     assert_refused(
         &hash_error(&above_limit),
-        "governed response plan canonical plan body exceeds the byte ceiling",
+        "canonical JSON error: governed response plan canonical plan body exceeds the byte ceiling",
     );
 }

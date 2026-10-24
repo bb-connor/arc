@@ -99,8 +99,61 @@ fn check_secs(
     }
 }
 
+fn validate_ceiling_scope(scope: &ChioScope) -> Result<(), RootAuthorityShapeError> {
+    let check = |field, empty, expected| {
+        if empty {
+            Err(RootAuthorityShapeError::Pattern { field, expected })
+        } else {
+            Ok(())
+        }
+    };
+    for grant in &scope.grants {
+        check(
+            "ceiling_scope.grants.server_id",
+            grant.server_id.is_empty(),
+            "a non-empty string",
+        )?;
+        check(
+            "ceiling_scope.grants.tool_name",
+            grant.tool_name.is_empty(),
+            "a non-empty string",
+        )?;
+        check(
+            "ceiling_scope.grants.operations",
+            grant.operations.is_empty(),
+            "a non-empty operation list",
+        )?;
+    }
+    for grant in &scope.resource_grants {
+        check(
+            "ceiling_scope.resource_grants.uri_pattern",
+            grant.uri_pattern.is_empty(),
+            "a non-empty string",
+        )?;
+        check(
+            "ceiling_scope.resource_grants.operations",
+            grant.operations.is_empty(),
+            "a non-empty operation list",
+        )?;
+    }
+    for grant in &scope.prompt_grants {
+        check(
+            "ceiling_scope.prompt_grants.prompt_name",
+            grant.prompt_name.is_empty(),
+            "a non-empty string",
+        )?;
+        check(
+            "ceiling_scope.prompt_grants.operations",
+            grant.operations.is_empty(),
+            "a non-empty operation list",
+        )?;
+    }
+    Ok(())
+}
+
 impl RootPolicyRuleFields {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {
+        validate_ceiling_scope(&self.ceiling_scope)?;
         let kind_value = self.match_.anchor_kind;
         let kind = kind_value.as_str();
         let presence = |field: &'static str, present: bool, wanted: bool| match (present, wanted) {
