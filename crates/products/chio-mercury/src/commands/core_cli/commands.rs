@@ -12,10 +12,11 @@ pub fn cmd_mercury_proof_export(
     json_output: bool,
 ) -> Result<(), CliError> {
     let trust = chio_bundle_verify::read_trust_file(trust)?;
+    let keys = trusted_kernel_key_set(&trust)?;
     let package = build_proof_package(input, bundle_manifest_paths, &trust)?;
     package
-        .verify_with_trusted_kernel_keys(unix_now(), &trusted_kernel_key_set(&trust))
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
+        .map_err(mercury_verify_error)?;
     write_json_file(output, &package)?;
 
     if json_output {
@@ -41,11 +42,11 @@ pub fn cmd_mercury_inquiry_export(
     verifier_equivalent: bool,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?);
+    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?)?;
     let proof_package: MercuryProofPackage = read_json_file(input)?;
     proof_package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let package = build_inquiry_package(
         proof_package,
         audience,
@@ -54,7 +55,7 @@ pub fn cmd_mercury_inquiry_export(
     )?;
     let report = package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     write_json_file(output, &package)?;
 
     if json_output {
@@ -77,7 +78,7 @@ pub fn cmd_mercury_verify(
     json_output: bool,
     explain: bool,
 ) -> Result<(), CliError> {
-    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?);
+    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?)?;
     let value: serde_json::Value = read_json_file(input)?;
     let schema = value
         .get("schema")
@@ -88,13 +89,13 @@ pub fn cmd_mercury_verify(
             let package: MercuryProofPackage = serde_json::from_value(value)?;
             package
                 .verify_with_trusted_kernel_keys(unix_now(), &keys)
-                .map_err(|error| CliError::Other(error.to_string()))?
+                .map_err(mercury_verify_error)?
         }
         MERCURY_INQUIRY_PACKAGE_SCHEMA => {
             let package: MercuryInquiryPackage = serde_json::from_value(value)?;
             package
                 .verify_with_trusted_kernel_keys(unix_now(), &keys)
-                .map_err(|error| CliError::Other(error.to_string()))?
+                .map_err(mercury_verify_error)?
         }
         _ => {
             return Err(CliError::Other(format!(

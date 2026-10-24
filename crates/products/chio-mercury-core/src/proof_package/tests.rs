@@ -1069,7 +1069,10 @@ fn proof_package_requires_explicitly_trusted_mercury_signers() {
         .verify_with_trusted_kernel_keys(1_775_137_901, &untrusted_keys)
         .expect_err("self-signed untrusted receipt");
     assert!(
-        error.to_string().contains("untrusted Mercury kernel key"),
+        matches!(
+            &error,
+            MercuryContractError::UntrustedKernelKey(subject) if subject.starts_with("tool receipt ")
+        ),
         "unexpected error: {error}"
     );
 

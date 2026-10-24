@@ -62,7 +62,7 @@ pub(super) fn export_downstream_review(
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
     let qualification_report_path = qualification_dir.join("qualification-report.json");
@@ -81,7 +81,7 @@ pub(super) fn export_downstream_review(
     )?;
     let internal_inquiry_report = internal_inquiry
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let internal_inquiry_path = internal_dir.join("inquiry-package.json");
     let internal_inquiry_report_path = internal_dir.join("inquiry-verification.json");
     write_json_file(&internal_inquiry_path, &internal_inquiry)?;
@@ -108,7 +108,7 @@ pub(super) fn export_downstream_review(
     )?;
     let external_inquiry_report = external_inquiry
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let external_inquiry_path = external_dir.join("inquiry-package.json");
     let external_inquiry_report_path = external_dir.join("inquiry-verification.json");
     write_json_file(&external_inquiry_path, &external_inquiry)?;
@@ -294,7 +294,7 @@ pub(crate) fn export_governance_workbench(
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
 
     let reviewer_package_path = qualification_dir.join("reviewer-package.json");
     let qualification_report_path = qualification_dir.join("qualification-report.json");
@@ -314,7 +314,7 @@ pub(crate) fn export_governance_workbench(
     )?;
     let workflow_owner_inquiry_report = workflow_owner_inquiry
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let workflow_owner_inquiry_path = workflow_owner_dir.join("inquiry-package.json");
     let workflow_owner_inquiry_report_path = workflow_owner_dir.join("inquiry-verification.json");
     write_json_file(&workflow_owner_inquiry_path, &workflow_owner_inquiry)?;
@@ -331,7 +331,7 @@ pub(crate) fn export_governance_workbench(
     )?;
     let control_team_inquiry_report = control_team_inquiry
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let control_team_inquiry_path = control_team_dir.join("inquiry-package.json");
     let control_team_inquiry_report_path = control_team_dir.join("inquiry-verification.json");
     write_json_file(&control_team_inquiry_path, &control_team_inquiry)?;
@@ -484,11 +484,11 @@ pub(super) fn export_mercury_run(
         checkpoint_trust_anchor: None,
         required_columns: Vec::new(),
     };
-    let keys = trusted_kernel_key_set(&trust);
+    let keys = trusted_kernel_key_set(&trust)?;
     let proof_package = build_proof_package(&evidence_dir, &bundle_manifest_paths, &trust)?;
     let proof_report = proof_package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     write_json_file(&proof_package_file, &proof_package)?;
     write_verification_report(&proof_verification_file, &proof_report)?;
 
@@ -501,7 +501,7 @@ pub(super) fn export_mercury_run(
         )?;
         let inquiry_report = inquiry_package
             .verify_with_trusted_kernel_keys(unix_now(), &keys)
-            .map_err(|error| CliError::Other(error.to_string()))?;
+            .map_err(mercury_verify_error)?;
         write_json_file(&inquiry_package_file, &inquiry_package)?;
         write_verification_report(&inquiry_verification_file, &inquiry_report)?;
         (

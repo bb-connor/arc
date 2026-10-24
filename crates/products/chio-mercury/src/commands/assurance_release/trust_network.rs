@@ -137,10 +137,10 @@ pub(in crate::commands) fn export_trust_network(
         Some("shared-proof-exchange"),
         false,
     )?;
-    let keys = run_kernel_key_set(&qualification_report_kernel_key(&qualification_report_src)?);
+    let keys = run_kernel_key_set(&embedded_summary.kernel_public_key);
     let shared_inquiry_report = shared_inquiry_package
         .verify_with_trusted_kernel_keys(unix_now(), &keys)
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .map_err(mercury_verify_error)?;
     let shared_inquiry_package_path = share_dir.join("inquiry-package.json");
     let shared_inquiry_verification_path = share_dir.join("inquiry-verification.json");
     write_json_file(&shared_inquiry_package_path, &shared_inquiry_package)?;
@@ -280,17 +280,4 @@ pub(in crate::commands) fn export_trust_network(
     write_json_file(&output.join("trust-network-summary.json"), &summary)?;
 
     Ok(summary)
-}
-
-fn qualification_report_kernel_key(path: &Path) -> Result<String, CliError> {
-    let report: serde_json::Value = read_json_file(path)?;
-    report["supervisedLive"]["export"]["kernelPublicKey"]
-        .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| {
-            CliError::Other(format!(
-                "qualification report {} carries no supervised-live kernel public key",
-                path.display()
-            ))
-        })
 }

@@ -22,14 +22,44 @@ pub(crate) fn build_proof_package(
     .map_err(|error| CliError::Other(error.to_string()))
 }
 
+/// The kernel keys a Mercury verdict pins. Mercury enforces `kernel_keys`
+/// only, so a trust file that sets a member the bundle verifier would also
+/// enforce (`checkpoint_keys`, `checkpoint_trust_anchor`, `required_columns`)
+/// is refused: a Mercury verdict never accepts what `chio-verify` refuses
+/// with the same file.
 pub(crate) fn trusted_kernel_key_set(
     trust: &chio_core::root_authority::VerifierTrust,
-) -> BTreeSet<String> {
-    trust
+) -> Result<BTreeSet<String>, CliError> {
+    let unenforced = [
+        ("checkpoint_keys", !trust.checkpoint_keys.is_empty()),
+        (
+            "checkpoint_trust_anchor",
+            trust.checkpoint_trust_anchor.is_some(),
+        ),
+        ("required_columns", !trust.required_columns.is_empty()),
+    ];
+    if let Some((member, _)) = unenforced.into_iter().find(|(_, set)| *set) {
+        return Err(chio_bundle_verify::BundleVerifyError::unsupported(format!(
+            "Mercury enforces only `kernel_keys`; the trust file sets `{member}`"
+        ))
+        .into());
+    }
+    Ok(trust
         .kernel_keys
         .iter()
         .map(chio_core::crypto::PublicKey::to_hex)
-        .collect()
+        .collect())
+}
+
+/// A failed trusted Mercury verification. An unpinned signer carries the
+/// bundle verifier's `bundle-trust-missing` code.
+pub(crate) fn mercury_verify_error(error: chio_mercury_core::MercuryContractError) -> CliError {
+    match error {
+        chio_mercury_core::MercuryContractError::UntrustedKernelKey(_) => {
+            chio_bundle_verify::BundleVerifyError::trust_missing(error.to_string()).into()
+        }
+        error => CliError::Other(error.to_string()),
+    }
 }
 
 /// The single kernel key a pipeline run generated and signed every receipt with.
