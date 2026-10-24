@@ -14,7 +14,8 @@ use crate::root_exchange::{
     jws::{CompactJws, VerifyingKey},
     ClientRegistry, ExchangeReplayStore, ExchangeServices, IdJagGrant, IdpKey, IdpKeyLookup,
     PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey, RequestedTokenType,
-    RootExchange, RootExchangeConfig, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    RootExchange, RootExchangeConfig, RootExchangeConfigError, RootExchangeError,
+    CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -351,38 +352,43 @@ struct Harness {
     entropy: CountingRng,
 }
 
+fn exchange_config(
+    edit_record: impl FnOnce(&mut Value),
+    edit_policy: impl FnOnce(&mut Value),
+) -> RootExchangeConfig {
+    let pinned = ProviderRecord::from_record(&provider_record(|_| {})).unwrap();
+    let record = ProviderRecord::from_record(&provider_record(edit_record)).unwrap();
+    let policy = loaded_policy(*pinned.identity_digest(), edit_policy);
+    let mut providers = BTreeMap::new();
+    providers.insert("acme-okta".to_owned(), record);
+    let clients = ClientRegistry::new(&[crate::OAuthClientRegistration {
+        client_id: CLIENT_ID.to_owned(),
+        redirect_uri: "https://client.example/callback".to_owned(),
+        token_endpoint_auth: crate::TokenEndpointAuth::PrivateKeyJwt(Box::new(
+            serde_json::from_value(client_jwk()).unwrap(),
+        )),
+    }])
+    .unwrap();
+    RootExchangeConfig {
+        policy,
+        providers,
+        clients,
+        exchange_key: exchange_keypair().public_key(),
+        authorization_server: AS_ISSUER.to_owned(),
+        token_endpoint: TOKEN_ENDPOINT.to_owned(),
+        protected_resource: RESOURCE.to_owned(),
+        client_assertion_skew_secs: 5,
+    }
+}
+
 impl Harness {
     fn new() -> Self {
         Self::with(|_| {}, |_| {})
     }
 
     fn with(edit_record: impl FnOnce(&mut Value), edit_policy: impl FnOnce(&mut Value)) -> Self {
-        let pinned = ProviderRecord::from_record(&provider_record(|_| {})).unwrap();
-        let record = ProviderRecord::from_record(&provider_record(edit_record)).unwrap();
-        let policy = loaded_policy(*pinned.identity_digest(), edit_policy);
-        let mut providers = BTreeMap::new();
-        providers.insert("acme-okta".to_owned(), record);
-        let clients = ClientRegistry::new(&[crate::OAuthClientRegistration {
-            client_id: CLIENT_ID.to_owned(),
-            redirect_uri: "https://client.example/callback".to_owned(),
-            token_endpoint_auth: crate::TokenEndpointAuth::PrivateKeyJwt(Box::new(
-                serde_json::from_value(client_jwk()).unwrap(),
-            )),
-        }])
-        .unwrap();
-        let exchange = RootExchange::new(RootExchangeConfig {
-            policy,
-            providers,
-            clients,
-            exchange_key: exchange_keypair().public_key(),
-            authorization_server: AS_ISSUER.to_owned(),
-            token_endpoint: TOKEN_ENDPOINT.to_owned(),
-            protected_resource: RESOURCE.to_owned(),
-            client_assertion_skew_secs: 5,
-        })
-        .unwrap();
         Self {
-            exchange,
+            exchange: RootExchange::new(exchange_config(edit_record, edit_policy)).unwrap(),
             keys: StubKeys::serving(&[idp_jwk(IDP_KID)]),
             replay: MemoryReplay::default(),
             entropy: CountingRng::new(),
@@ -1246,17 +1252,15 @@ async fn resource_parameter_must_name_the_protected_resource() {
     harness.run_body(&body(RESOURCE), None, NOW).await.unwrap();
 }
 
-#[tokio::test]
-async fn exchange_key_outside_the_policy_refuses_before_any_replay_is_spent() {
-    let mut harness = Harness::new();
-    harness.exchange.exchange_key = policy_keypair().public_key();
-    let body = jwt_bearer_body(&id_jag(), &client_assertion(&client_assertion_claims()));
+#[test]
+fn exchange_key_outside_the_policy_refuses_when_the_exchange_is_built() {
+    let mut config = exchange_config(|_| {}, |_| {});
+    config.exchange_key = policy_keypair().public_key();
     assert_eq!(
-        harness.run_body(&body, None, NOW).await.unwrap_err(),
-        RootExchangeError::ExchangeKeyNotListed
+        RootExchange::new(config).err(),
+        Some(RootExchangeConfigError::ExchangeKeyNotListed)
     );
-    harness.exchange.exchange_key = exchange_keypair().public_key();
-    harness.run_body(&body, None, NOW).await.unwrap();
+    assert!(RootExchange::new(exchange_config(|_| {}, |_| {})).is_ok());
 }
 
 #[tokio::test]
