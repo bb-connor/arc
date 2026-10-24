@@ -7,9 +7,13 @@ Usage:
 For each block key in BLOCKS, finds every non-test line under crates and sdks that names the
 key as a string literal, or names a constant whose value is that key, classifies the line's
 role (writer, reader, constant, other), applies the first matching rule of <rules.tsv>
-(key, path regex, line regex, needs_plaintext, note) and fails closed: exit 2 on a git
+(key, path regex, line regex, role, needs_plaintext, note) and fails closed: exit 2 on a git
 failure, exit 1 when the revision is not a commit, when any block has no lines, or when any
-reader or writer line has no rule.
+reader or writer line has no rule. A rule's role is writer, reader or any. A reader line takes
+only a reader or any rule and a writer line only a writer or any rule, so a writer catch-all
+never classifies a new reader and that reader stays unclassified. A line is a test line when its path is a test
+path or it lies inside an item gated by #[cfg(test)] (a module, function or impl), including
+an item whose cfg attribute is followed by further attributes that span several lines.
 """
 import csv, os, re, subprocess, sys
 
@@ -19,7 +23,8 @@ BLOCKS = [
     "protocol_admission", "finding_pool_mutation", "otel", "active_defense_backfill_v1",
     "scimLifecycle", "mercury", "authorizationContext", "guardOutcome", "deniedAccessRecord",
     "acp", "batch_witness", "chio_http_receipt_v1", "delivery_contract", "cage_receipt",
-    "active_defense_evidence_id", "protocol_refusal", "admission_operation",
+    "active_defense_evidence_id", "protocol_refusal", "admission_operation", "policySnapshot",
+    "keyEnterpriseReceipt", "submission_kind", "job_name", "job_uid",
 ]
 # Typed accessors on ChioReceiptBody that read a block by key.
 ACCESSORS = {
@@ -39,27 +44,54 @@ def run_git(repo, args, allow_no_match=False):
     sys.stderr.write(f"git {' '.join(args[:3])} failed ({proc.returncode}): {proc.stderr.strip()}\n")
     raise SystemExit(2)
 
-def test_lines(repo, rev, path, cache={}):
-    if path in cache:
-        return cache[path]
+CFG_TEST = re.compile(r"\s*#\[cfg\((test|all\(test.*|any\(test.*)\)\]")
+
+def item_ends(text, depth, parens, opened):
+    """A braced item ends when its braces close. Any other item (a statement, field or match
+    arm) ends at its first line outside parentheses that ends in `;` or `,`, or when an
+    enclosing brace closes."""
+    if opened:
+        return depth <= 0
+    return depth < 0 or (parens <= 0 and text.rstrip().endswith((";", ",")))
+
+def cfg_test_lines(src):
+    """Line numbers inside items gated by #[cfg(test)]."""
     lines = set()
-    if path.endswith((".rs", ".inc")):
-        src = run_git(repo, ["show", f"{rev}:{path}"]).splitlines()
-        start, depth, pending = None, 0, False
-        for number, text in enumerate(src, 1):
-            if start is None and re.match(r"\s*#\[cfg\((test|all\(test.*|any\(test.*)\)\]", text):
-                pending = True
-                continue
-            if pending and start is None and re.match(r"\s*(pub(\(crate\))? )?mod \w+\s*\{", text):
-                start, depth = number, 0
-            pending = pending and start is None and text.strip().startswith("#")
-            if start is not None:
-                depth += text.count("{") - text.count("}")
-                lines.add(number)
-                if depth <= 0 and number > start:
-                    start = None
-    cache[path] = lines
+    pending, attr_depth, item, depth, parens, opened = False, 0, False, 0, 0, False
+    for number, text in enumerate(src, 1):
+        if item:
+            lines.add(number)
+            depth += text.count("{") - text.count("}")
+            parens += text.count("(") - text.count(")")
+            opened = opened or depth > 0
+            item = not item_ends(text, depth, parens, opened)
+            continue
+        if attr_depth > 0:
+            attr_depth += text.count("[") - text.count("]")
+            continue
+        cfg = CFG_TEST.match(text)
+        if cfg:
+            pending, text = True, text[cfg.end():]
+        if not pending:
+            continue
+        stripped = text.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        if stripped.startswith("#["):
+            attr_depth = stripped.count("[") - stripped.count("]")
+            continue
+        pending, item = False, True
+        lines.add(number)
+        depth = text.count("{") - text.count("}")
+        parens = text.count("(") - text.count(")")
+        opened = depth > 0
+        item = not ("{" in text and depth <= 0) and not item_ends(text, depth, parens, opened)
     return lines
+
+def test_lines(repo, rev, path, cache={}):
+    if path not in cache:
+        cache[path] = cfg_test_lines(run_git(repo, ["show", f"{rev}:{path}"]).splitlines()) if path.endswith((".rs", ".inc")) else set()
+    return cache[path]
 
 def role(text, key, names):
     if re.search(r"const [A-Z0-9_]+: &str\s*=", text):
@@ -75,13 +107,31 @@ def role(text, key, names):
         return "writer"
     return "other"
 
-def census(repo, rev, rules_path, out_path):
-    run_git(repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"])
+ROLES = ("writer", "reader", "any")
+
+def load_rules(rules_path):
     rules = []
     with open(rules_path) as handle:
         for row in csv.reader(handle, delimiter="\t"):
             if row and not row[0].startswith("#"):
-                rules.append((row[0], re.compile(row[1]), re.compile(row[2]), row[3], row[4]))
+                if len(row) != 6 or row[3] not in ROLES:
+                    sys.stderr.write(f"malformed rule (want key, path, line, role in {ROLES}, needs, note): {row}\n")
+                    raise SystemExit(1)
+                rules.append((row[0], re.compile(row[1]), re.compile(row[2]), row[3], row[4], row[5]))
+    return rules
+
+def match_rule(rules, key, path, text, line_role):
+    """First rule for the key whose path and line match. A reader or writer line takes only a
+    rule of its own role or `any`; a constant or other line takes any rule."""
+    strict = line_role in ("reader", "writer")
+    for rkey, path_re, line_re, rule_role, needs, note in rules:
+        if rkey == key and (not strict or rule_role in ("any", line_role)) and path_re.search(path) and line_re.search(text):
+            return (needs, note)
+    return None
+
+def census(repo, rev, rules_path, out_path):
+    run_git(repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"])
+    rules = load_rules(rules_path)
     rows, missing, empty = [], 0, []
     for key in BLOCKS:
         consts = set()
@@ -103,11 +153,7 @@ def census(repo, rev, rules_path, out_path):
             text = text.strip()
             count += 1
             line_role = role(text, key, [n.strip('"') for n in names] + names)
-            decision = None
-            for rkey, path_re, line_re, needs, note in rules:
-                if rkey == key and path_re.search(path) and line_re.search(text):
-                    decision = (needs, note)
-                    break
+            decision = match_rule(rules, key, path, text, line_role)
             if decision is None:
                 if line_role in ("reader", "writer"):
                     missing += 1
@@ -125,6 +171,17 @@ def census(repo, rev, rules_path, out_path):
 
 def self_check(repo, rev, workdir):
     failed = False
+    gated = cfg_test_lines([
+        "fn live() {}", "#[cfg(test)]", "#[allow(", "    clippy::unwrap_used,", ")]", "mod tests {",
+        "    fn fixture() {}", "}", "fn live_again() {}", "#[cfg(test)]", "fn helper(", "    x: u8,", ") {", "}",
+        "struct S {", "    #[cfg(test)]", "    hook: u8,", "    live: u8,", "}",
+    ])
+    gated_ok = gated == {6, 7, 8, 11, 12, 13, 14, 17}
+    print(f"self-check multiline-attribute: {'excluded' if gated_ok else 'MISSED'} {sorted(gated)}")
+    writer_only = [("financial", re.compile("."), re.compile("."), "writer", "writer", "")]
+    reader_ok = match_rule(writer_only, "financial", "crates/x/new.rs", 'metadata.get("financial")', "reader") is None
+    print(f"self-check reader-vs-writer-rule: {'unclassified' if reader_ok else 'ACCEPTED'}")
+    failed = not (gated_ok and reader_ok)
     for name, rev_arg, rules_text in [
         ("bad-revision", "metadata-blocks-self-check-nonexistent-ref", ""),
         ("no-rules", rev, "# no rules\n"),

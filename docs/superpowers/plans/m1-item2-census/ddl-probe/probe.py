@@ -1,4 +1,4 @@
-"""Probe the receipt_openings DDL with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
+"""Probe the receipt_openings DDL, the store identity and the erasure log with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
 import json, subprocess, sys
 cli, ddl_path = sys.argv[1], sys.argv[2]
 ddl = open(ddl_path).read()
@@ -44,6 +44,49 @@ updates = [
     ("update_state_embedded_nul", False, f"UPDATE receipt_openings SET state = 'present' || {NUL};"),
     ("update_salt_to_text32", False, f"UPDATE receipt_openings SET salt = '{'x' * 32}';"),
 ]
+S = "'" + "0123456789abcdef" * 2 + "'"
+S2 = "'" + "fedcba9876543210" * 2 + "'"
+M = "'https://node-b.example'"
+I = "INSERT INTO receipt_store_identity VALUES "
+E = "INSERT INTO receipt_opening_erasures (receipt_id, origin_store_id, origin_openings_seq, erased_at) VALUES "
+OVERFLOW = "abs(-9223372036854775808)"
+log_cases = [
+    ("store_identity_accepts", True, f"{I}(1, {S});"),
+    ("store_identity_refuses_second_row", False, f"{I}(1, {S});\n{I}(2, {S2});"),
+    ("store_identity_refuses_duplicate_singleton", False, f"{I}(1, {S});\n{I}(1, {S2});"),
+    ("store_identity_refuses_uppercase", False, f"{I}(1, '{'A' * 32}');"),
+    ("store_identity_refuses_31_chars", False, f"{I}(1, '{'a' * 31}');"),
+    ("store_identity_refuses_33_chars", False, f"{I}(1, '{'a' * 33}');"),
+    ("store_identity_refuses_embedded_nul", False, f"{I}(1, '{'a' * 31}' || {NUL});"),
+    ("store_identity_refuses_url", False, f"{I}(1, {M});"),
+    ("store_identity_update_refuses", False, f"{I}(1, {S});\nUPDATE receipt_store_identity SET store_id = {S2};"),
+    ("store_identity_delete_refuses", False, f"{I}(1, {S});\nDELETE FROM receipt_store_identity;"),
+    ("erasure_row_accepts", True, f"{E}({R}, {S}, 1, {T});"),
+    ("erasure_row_accepts_same_receipt_two_origins", True, f"{E}({R}, {S}, 1, {T});\n{E}({R}, {S2}, 1, {T});"),
+    ("erasure_row_refuses_duplicate_origin_pair", False, f"{E}({R}, {S}, 1, {T});\n{E}({R}, {S}, 1, {T});"),
+    ("erasure_row_refuses_origin_seq_zero", False, f"{E}({R}, {S}, 0, {T});"),
+    ("erasure_row_refuses_origin_seq_text", False, f"{E}({R}, {S}, 'x', {T});"),
+    ("erasure_row_refuses_empty_origin", False, f"{E}({R}, '', 1, {T});"),
+    ("erasure_row_refuses_origin_with_nul", False, f"{E}({R}, '{'a' * 31}' || {NUL}, 1, {T});"),
+    ("erasure_row_refuses_origin_node_url", False, f"{E}({R}, {M}, 1, {T});"),
+    ("erasure_row_refuses_origin_uppercase", False, f"{E}({R}, '{'A' * 32}', 1, {T});"),
+    ("erasure_row_refuses_receipt_id_uppercase", False, f"{E}('{'A' * 64}', {S}, 1, {T});"),
+    ("erasure_row_refuses_negative_erased_at", False, f"{E}({R}, {S}, 1, -1);"),
+    ("erasure_row_refuses_text_openings_seq", False, f"INSERT INTO receipt_opening_erasures VALUES ('x', {R}, {S}, 1, {T});"),
+    ("erasure_seq_never_reused_after_delete", True, f"{E}({R}, {S}, 1, {T});\n{E}({R}, {S}, 2, {T});\nDELETE FROM receipt_opening_erasures WHERE openings_seq = 2;\n{E}({R}, {S}, 3, {T});\nSELECT CASE WHEN max(openings_seq) = 3 THEN 1 ELSE {OVERFLOW} END FROM receipt_opening_erasures;"),
+    ("watermark_accepts", True, f"INSERT INTO receipt_openings_watermarks VALUES ({S}, 5, 3);"),
+    ("watermark_refuses_horizon_above_applied", False, f"INSERT INTO receipt_openings_watermarks VALUES ({S}, 3, 5);"),
+    ("watermark_refuses_negative_applied", False, f"INSERT INTO receipt_openings_watermarks VALUES ({S}, -1, 0);"),
+    ("watermark_refuses_text_horizon", False, f"INSERT INTO receipt_openings_watermarks VALUES ({S}, 5, 'x');"),
+    ("watermark_refuses_origin_node_url", False, f"INSERT INTO receipt_openings_watermarks VALUES ({M}, 5, 3);"),
+    ("watermark_update_refuses_horizon_past_applied", False, f"INSERT INTO receipt_openings_watermarks VALUES ({S}, 5, 3);\nUPDATE receipt_openings_watermarks SET gc_horizon = 6;"),
+    ("member_watermark_accepts", True, f"INSERT INTO receipt_openings_member_watermarks VALUES ({M}, {S}, 4);"),
+    ("member_watermark_refuses_negative", False, f"INSERT INTO receipt_openings_member_watermarks VALUES ({M}, {S}, -1);"),
+    ("member_watermark_refuses_origin_node_url", False, f"INSERT INTO receipt_openings_member_watermarks VALUES ({M}, {M}, 4);"),
+    ("peer_cursor_accepts", True, f"INSERT INTO receipt_openings_peer_cursors VALUES ({M}, 0);"),
+    ("peer_cursor_refuses_negative", False, f"INSERT INTO receipt_openings_peer_cursors VALUES ({M}, -1);"),
+    ("peer_cursor_refuses_text", False, f"INSERT INTO receipt_openings_peer_cursors VALUES ({M}, 'x');"),
+]
 version = subprocess.run([cli, "--version"], capture_output=True, text=True).stdout.strip()
 results, ok = [], True
 def run(name, expect, sql):
@@ -56,5 +99,7 @@ for name, expect, values in inserts:
     run(name, expect, f"\nINSERT INTO receipt_openings VALUES ({values});\n")
 for name, expect, stmt in updates:
     run(name, expect, "\n" + seed + stmt + "\n")
+for name, expect, stmt in log_cases:
+    run(name, expect, "\n" + stmt + "\n")
 print(json.dumps({"sqlite": version, "ddl": ddl, "all_as_expected": ok, "results": results}, indent=1))
 sys.exit(0 if ok else 1)
