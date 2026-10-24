@@ -47,12 +47,13 @@ PATTERNS = {
     "hash_key": r"\"content_hash\"|\"parameter_hash\"",
     "params": r"action\.parameters\b",
 }
-SCOPE = ["crates", "sdks", "xtask"]
+SCOPE = ["crates", "sdks", "xtask", "bench", "examples", "formal", "integrations", "tests", "scripts"]
+RUST_SCOPE = ["crates", "xtask", "bench", "examples", "formal", "integrations", "tests", "scripts"]
 # Patterns over whole file text, for chains rustfmt splits across lines and for JSON indexing.
 MULTILINE = {
-    "params_split": (r"\baction\s*\n\s*\.(parameters|parameter_hash)\b", ["crates", "xtask"], "*.rs"),
-    "tenant": (r"\b\w*(receipt|body|signed|launch|terminal)\s*(\(\))?\s*\.\s*tenant_id\b", ["crates"], "*.rs"),
-    "params_json": (r"(\[\s*[\"']action[\"']\s*\]|\baction)\s*(\[\s*[\"'](parameters|parameter_hash)[\"']\s*\]|\.get\(\s*[\"'](parameters|parameter_hash)[\"'])", ["sdks", "crates"], None),
+    "params_split": (r"\baction\s*\n\s*\.(parameters|parameter_hash)\b", RUST_SCOPE, "*.rs"),
+    "tenant": (r"\b\w*(receipt|body|signed|launch|terminal)\s*(\(\))?\s*\.\s*tenant_id\b", RUST_SCOPE, "*.rs"),
+    "params_json": (r"(\[\s*[\"']action[\"']\s*\]|\baction)\s*(\[\s*[\"'](parameters|parameter_hash)[\"']\s*\]|\.get\(\s*[\"'](parameters|parameter_hash)[\"'])", SCOPE, None),
 }
 TEST_PATH = re.compile(r"(^|/)(tests?|benches|examples|fixtures)/|(_tests?|/tests)\.rs$|_tests/|test_support|test_hooks|\.test\.(ts|tsx)$|/test_[^/]*\.py$|_test\.go$|Test\.(kt|cs)$|Tests\.cs$|e2e_tests")
 
