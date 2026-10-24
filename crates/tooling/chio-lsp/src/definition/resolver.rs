@@ -127,16 +127,11 @@ fn locate_in_file(doc_uri: &Url, manifest_path: &Path, urn: &str) -> Option<Loca
 }
 
 /// Read a regular file of at most [`MAX_MANIFEST_BYTES`] as UTF-8.
-/// The path is checked before it is opened so a FIFO cannot block the
-/// open, and the opened handle is checked again.
+/// The file is opened without following a final symlink or waiting on a
+/// FIFO writer, and the opened handle must be the object the scoped path
+/// names before any byte is read.
 fn read_bounded_manifest(path: &Path) -> Option<String> {
-    if !std::fs::metadata(path).ok()?.is_file() {
-        return None;
-    }
-    let file = File::open(path).ok()?;
-    if !file.metadata().ok()?.is_file() {
-        return None;
-    }
+    let file = open_scoped_manifest(path)?;
     let mut bytes = Vec::new();
     file.take(MAX_MANIFEST_BYTES + 1)
         .read_to_end(&mut bytes)
@@ -145,6 +140,35 @@ fn read_bounded_manifest(path: &Path) -> Option<String> {
         return None;
     }
     String::from_utf8(bytes).ok()
+}
+
+#[cfg(unix)]
+fn open_scoped_manifest(path: &Path) -> Option<File> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .ok()?;
+    let opened = file.metadata().ok()?;
+    let named = std::fs::metadata(path).ok()?;
+    if !opened.is_file() || opened.dev() != named.dev() || opened.ino() != named.ino() {
+        return None;
+    }
+    Some(file)
+}
+
+#[cfg(not(unix))]
+fn open_scoped_manifest(path: &Path) -> Option<File> {
+    if !std::fs::metadata(path).ok()?.is_file() {
+        return None;
+    }
+    let file = File::open(path).ok()?;
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    Some(file)
 }
 
 /// Resolve `manifest_path` against `doc_dir`, rejecting absolute paths
@@ -399,6 +423,32 @@ mod tests {
             locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN),
             None
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_bounded_manifest_refuses_a_symlink_swapped_in_after_scoping() {
+        let (_tmp, dir) = canonical_tmp();
+        let (_outside_tmp, outside) = canonical_tmp();
+        let target = outside.join("real.chio-manifest.yaml");
+        std::fs::write(&target, format!("{URN}\n")).unwrap();
+        let link = dir.join("a.chio-manifest.yaml");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert_eq!(read_bounded_manifest(&link), None);
+        assert_eq!(read_bounded_manifest(&target), Some(format!("{URN}\n")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_bounded_manifest_refuses_a_fifo_swapped_in_after_scoping() {
+        let (_tmp, dir) = canonical_tmp();
+        let fifo = dir.join("a.chio-manifest.yaml");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(read_bounded_manifest(&fifo), None);
     }
 
     #[cfg(unix)]
