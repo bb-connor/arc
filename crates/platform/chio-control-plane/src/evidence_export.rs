@@ -595,9 +595,9 @@ pub fn load_verified_evidence_package(
     Ok(verify_package(input, trust, Some(&HttpReceiptProjection))?)
 }
 
-/// Decode a remote import request. The route's ingress middleware has
-/// already read the original bounded bytes through the signed-JSON reader,
-/// which refuses duplicate keys at every depth. Here the trust section loads
+/// Decode a remote import request. `value` comes from the route's
+/// `SignedJson` extractor, which read the original bounded bytes through
+/// `decode_signed` and refused duplicate keys at every depth. The trust section loads
 /// through `VerifierTrust::load` exactly as a trust file does, and the whole
 /// request must reserialize to its input, so no member is dropped.
 pub(crate) fn decode_remote_import_request(

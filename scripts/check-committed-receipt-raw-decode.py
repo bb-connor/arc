@@ -192,6 +192,16 @@ ALLOWED = (
         ),
     },
     {
+        "path": "crates/platform/chio-control-plane/src/evidence_export.rs",
+        "owner": "decode_remote_import_request",
+        "call": "serde_json::from_value::<RemoteEvidenceImportRequest>, |typed: &RemoteEvidenceImportRequest| serde_json::to_value(typed)",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs", "handle_evidence_import", "SignedJson(body): SignedJson<serde_json::Value>"),
+            ("crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs", "handle_evidence_import", "evidence_export::decode_remote_import_request(body)"),
+            ("crates/platform/chio-control-plane/src/trust_control/json_ingress.rs", "from_request", "decode_signed("),
+        ),
+    },
+    {
         "path": "crates/kernel/chio-runtime-core/src/buyer/proof_package.rs",
         "owner": "proof_package_contains_signed_receipt",
         "call": "serde_json::from_value(value.clone())",
