@@ -57,8 +57,8 @@ separate fixture path; that path establishes only fixture behavior.
 `inspect_mobile_receipt_envelopes` performs non-authoritative shape inspection.
 The app must acquire evidence and manage replay/counter state separately.
 
-`MobileRng` zeroes its buffer on entropy failure because the core RNG trait
-has no error channel. Signing with caller seeds independently rejects all-zero
+`MobileRng` returns `RngError` when the OS entropy call fails and never
+zero-fills. Signing with caller seeds independently rejects all-zero
 seeds. `MobileClock` retains the shared clock's fallible reading contract.
 
 ## Dependencies

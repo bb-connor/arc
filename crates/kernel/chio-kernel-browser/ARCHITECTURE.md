@@ -49,8 +49,8 @@ An empty issuer set permits inspection but never a trusted `ok` result.
 readings. The native adapter returns `ClockError::Unavailable`.
 `WebCryptoRng::try_new` requires `globalThis.crypto.getRandomValues`; native
 construction fails. Fills are chunked to the 65 536-byte Web Crypto quota. A
-getRandomValues failure zeroes the destination because `Rng` has no error
-return; `mint_signing_seed_hex` rejects an all-zero seed.
+getRandomValues failure returns `RngError`, and `mint_signing_seed_hex`
+reports it as `entropy_unavailable` without returning a seed.
 
 A wasm host that provides no `globalThis.crypto` (for example WASI) cannot
 mint seeds through this API.

@@ -16,7 +16,7 @@
 # passport_verify.rs, guard.rs, normalized.rs (all real `mod` declarations).
 #
 # exclude_globs mirrors workspace test/build/fuzz scaffolding plus the
-# chio-kernel-core platform/formal exclusions (clock.rs, rng.rs,
+# chio-kernel-core platform/formal exclusions (clock.rs,
 # formal_aeneas.rs, formal_core.rs, kani_harnesses.rs,
 # kani_public_harnesses.rs).
 
@@ -43,7 +43,6 @@ exclude_globs = [
     "**/build.rs",
     "**/fuzz.rs",
     "crates/kernel/chio-kernel-core/src/clock.rs",
-    "crates/kernel/chio-kernel-core/src/rng.rs",
     "crates/kernel/chio-kernel-core/src/formal_aeneas.rs",
     "crates/kernel/chio-kernel-core/src/formal_core.rs",
     "crates/kernel/chio-kernel-core/src/kani_harnesses.rs",

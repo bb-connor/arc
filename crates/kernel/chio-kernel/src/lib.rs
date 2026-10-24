@@ -139,6 +139,8 @@ pub mod revocation_runtime;
 #[cfg(not(loom))]
 pub mod revocation_store;
 #[cfg(not(loom))]
+pub mod rng;
+#[cfg(not(loom))]
 pub mod runtime;
 #[cfg(not(loom))]
 mod runtime_trace;
