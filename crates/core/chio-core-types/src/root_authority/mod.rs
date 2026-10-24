@@ -25,7 +25,7 @@ pub use claims::{
 pub use consistency::{check_root_consistency, RootConsistencyError, RootConsistencyInput};
 pub use delegation_context::{
     DelegationAnchor, DelegationAnchorFields, DelegationContext, DelegationContextFields,
-    DelegationExchange, HolderClass, CHIO_DELEGATION_CONTEXT_SCHEMA,
+    DelegationExchange, HolderClass, CHIO_DELEGATION_CONTEXT_SCHEMA, OPERATOR_ISSUER,
 };
 pub use idp_key_snapshot::{
     IdpKeySnapshot, IdpKeySnapshotFields, IdpKeySnapshotSignatureError, KeySnapshotSource,

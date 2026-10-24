@@ -7749,6 +7749,10 @@
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
       "parse::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": [
+      "confirmation::from_value",
+      "local_key::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -13070,6 +13074,32 @@
       "readers": [
         {
           "reader": "parse",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts the cnf member of a local access token whose signature already verified against the pinned local authorization server key into the closed confirmation profile, and the pinned Ed25519 key into a JWK. Neither conversion grants authority; the sender constraint is enforced on the result.",
+      "readers": [
+        {
+          "reader": "confirmation",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "local_key",
           "decoders": [
             "from_value"
           ],
@@ -23906,6 +23936,12 @@
       "decode_part::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode",
       "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part",
       "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/oauth_introspection.rs": [
+      "verify::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
     ]
   },
   "retired_direct_readers": {
