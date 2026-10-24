@@ -515,7 +515,7 @@ operates with an unverified policy.
 
 ## 8. Key Gaps Chio Fills
 
-### 8.1 Identity, capability delegation, economic limits and receipts in one token
+### 8.1 Identity, capability delegation, economic limits and receipts in one protocol
 
 The competitive landscape splits into three silos:
 

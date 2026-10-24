@@ -73,9 +73,8 @@ accounting is silently broken in five distinct places.
 - F72 (medium): `BudgetTree` skips the spend cap on currency mismatch, contradicting
   the module's own fail-closed claim. A EUR-denominated draft walks through USD caps
   with no deny and no warning.
-- F73 (low): the durable EIP-3009 nonce store the docs reference does not exist; the
-  in-memory store loses replay state on crash and wedges at capacity with no
-  scheduled GC.
+- F73 (closed by deletion, #1769): the unused off-chain EIP-3009 lane and its
+  in-memory nonce store were removed from `chio-settle`.
 - F74 (low): `chio-metering::BudgetEnforcer` counters are process-local and reset to
   zero on restart, silently re-opening every tenant's full budget after each restart.
 
