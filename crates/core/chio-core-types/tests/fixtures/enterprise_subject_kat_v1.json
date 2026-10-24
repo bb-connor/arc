@@ -1,0 +1,201 @@
+{
+  "generations": [
+    {
+      "key_id_hex": "2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8",
+      "scim_capabilities": [
+        {
+          "capability_id": "scim-user:esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.0b6be5c70e559b8eb8317ef3a79946ed45e00a968d4b6e3ab0e4da325dcc0fc5",
+          "provider_id": "scim-provider",
+          "user_id": "scim-0123456789abcdef0123456789abcdef"
+        },
+        {
+          "capability_id": "scim-user:esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.e2da5eeac093c370c21dc1fee8f5d43344b24dc23835af702596e7dc40fcc9ed",
+          "provider_id": "scim-provider",
+          "user_id": "user-1"
+        },
+        {
+          "capability_id": "scim-user:esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.9c0c626dbbde87c5df5a9a9dc2c4457f6d69dca8f180bac4158edb65f20cc9f9",
+          "provider_id": "scim-provider-2",
+          "user_id": "user-1"
+        }
+      ],
+      "set_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "subjects": [
+        {
+          "principal": "alice",
+          "provider_scope": "scope-a",
+          "scim_policy_hash_hex": "532303087355dcb29846d89b8d4c7d28eede0f05f2e3d0a191b70dd353623303",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.64720d7f5546f0ec33dfb9d660a2e510689095b23cdb6c6b854ddbb470944319"
+        },
+        {
+          "principal": "oidc:https://idp.example#sub:user-1",
+          "provider_scope": "https://idp.example",
+          "scim_policy_hash_hex": "6f3958b80eab5d4d4e02bc59cd243adfb811866314950528fc864ea9093ec769",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.d4e44cc189335662192936700dc9381914f2ff0004e2b0a8c27167e536e74981"
+        },
+        {
+          "principal": "c",
+          "provider_scope": "ab",
+          "scim_policy_hash_hex": "6289a1bc1e1c6af6d75de0c1badcffa39050a0bdacc3ae293ad19ca82a248062",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.eb283344d32c4989346920b23de7a7a99813cbab3ca8a33667ac666b43218118"
+        },
+        {
+          "principal": "bc",
+          "provider_scope": "a",
+          "scim_policy_hash_hex": "cd53a22d67f153bd719eda4a9b20f08cd6377a611290d55b37dd06bd127bd92d",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.40a000ea62b506002a412eda43d93427f709cae2abb8aa3fa212c720d0ee6849"
+        },
+        {
+          "principal": "",
+          "provider_scope": "",
+          "scim_policy_hash_hex": "4652abbc1a23fa3c00ca609d10c04bff67618ffb61d4f7e45225c0f45b74e80a",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.b5366e933b797258150055ece620d0e25671ad5b918f3fa9e27b91e8969f7a50"
+        },
+        {
+          "principal": "\u00fcser@\u4f8b\u3048.jp",
+          "provider_scope": "scim-provider",
+          "scim_policy_hash_hex": "e430095a1b6f71f4dc94f547869fcd9698991169c78af68533ebea9652d733fb",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.85a648cecdb4ac8e4aca321e1ca289d44e327924a2577b24b6ad77c24b73452c"
+        }
+      ]
+    },
+    {
+      "key_id_hex": "ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3",
+      "scim_capabilities": [
+        {
+          "capability_id": "scim-user:esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.31d11704bfccb3a755e9c2f9182af90db4b6aa24b3d624b1c98f93c7b230d2f6",
+          "provider_id": "scim-provider",
+          "user_id": "scim-0123456789abcdef0123456789abcdef"
+        },
+        {
+          "capability_id": "scim-user:esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.9b9c4ddf7328fd78b63b9b1f9b5ce36b20e337022f2f854467c5104c330d248e",
+          "provider_id": "scim-provider",
+          "user_id": "user-1"
+        },
+        {
+          "capability_id": "scim-user:esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.265edfe7dbcd39e5110536c436b53159ea148b1317d21753a37355f9c9de1572",
+          "provider_id": "scim-provider-2",
+          "user_id": "user-1"
+        }
+      ],
+      "set_key_hex": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "subjects": [
+        {
+          "principal": "alice",
+          "provider_scope": "scope-a",
+          "scim_policy_hash_hex": "302cf329cf450b08f4faf2b0092862b0f88993c005e394b733187a2d7c74fe45",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.812dd431b285665b7c87490677a6bb25cb3ac23644c3434dc3ebc1219250076d"
+        },
+        {
+          "principal": "oidc:https://idp.example#sub:user-1",
+          "provider_scope": "https://idp.example",
+          "scim_policy_hash_hex": "93d4e993070ba68ad3782a9f03700c77854dc1a558566538cbcc650bcac35779",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.cdf16a9b553950e79c90df117be4ed5cf5435cd1582461db6056c5cd7b7c6b7e"
+        },
+        {
+          "principal": "c",
+          "provider_scope": "ab",
+          "scim_policy_hash_hex": "1077ea21eccc0b24b0b77344d084e7c3522398983d598c979e365cacdcd6d4b7",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.6334cb04076f3df985234b517d00d93183de693bbc42a26ebaf340290390a2f3"
+        },
+        {
+          "principal": "bc",
+          "provider_scope": "a",
+          "scim_policy_hash_hex": "3db7cce5b8f89ac2f9740b1a5fe57619a9c5dd359979592292f86d4126b161dd",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.a47cc850c1c0d5c8af32e68e3e9bafa9c6ea0a666cf0466869a0185a7b22c410"
+        },
+        {
+          "principal": "",
+          "provider_scope": "",
+          "scim_policy_hash_hex": "40f3d12d7734e0fe9a9acc50848c341760f6f9766463cf1392d0e80102dfe247",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.74cea9b600b5c2bf413ea8961010f5e732dad7fcbfe0b0a3b61f6874716b16c2"
+        },
+        {
+          "principal": "\u00fcser@\u4f8b\u3048.jp",
+          "provider_scope": "scim-provider",
+          "scim_policy_hash_hex": "7ae15914093cb5d73d1bb3df0050744324b3645a62e37908248eb0c8a729ebc4",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.597401d0095536a3b40f8c5198dd293ffa8f0ea7857f2a8344431353e5b84885"
+        }
+      ]
+    },
+    {
+      "key_id_hex": "3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1",
+      "scim_capabilities": [
+        {
+          "capability_id": "scim-user:esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.2270abd2b8cc8295bf913e4ddf0e0097229bf3cb8b41bec2201fd39cc6f57536",
+          "provider_id": "scim-provider",
+          "user_id": "scim-0123456789abcdef0123456789abcdef"
+        },
+        {
+          "capability_id": "scim-user:esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.aff55dcda1419deb0d63846009466174e8699b9f9bbd707b449b269343e4e068",
+          "provider_id": "scim-provider",
+          "user_id": "user-1"
+        },
+        {
+          "capability_id": "scim-user:esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.18908f19718d19ba45d93ac77e06fb43ac513631e25b2439dfef458b0fe23600",
+          "provider_id": "scim-provider-2",
+          "user_id": "user-1"
+        }
+      ],
+      "set_key_hex": "3446cc3276e2f18c7a21f74fd1c449de719b8a032f3029f0e4d297619d1ceb66",
+      "subjects": [
+        {
+          "principal": "alice",
+          "provider_scope": "scope-a",
+          "scim_policy_hash_hex": "05381e37e2d91dd24de2fb79f07f4d872cb692c0ef1553817c06193d66c6c18d",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.e1b13a3ed5bc222659812c8c9cbece1212ae3c4df6bb3ce476946c411176b175"
+        },
+        {
+          "principal": "oidc:https://idp.example#sub:user-1",
+          "provider_scope": "https://idp.example",
+          "scim_policy_hash_hex": "29b0a0d0ed0419d7e0c6f1bef3214baaf827ff439b11a1817162c516a4fe6b19",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.e4004b12949fd4ae631ef5a70d97c0c2ffa6c48a7349bafc9cb6ff61eeb350b4"
+        },
+        {
+          "principal": "c",
+          "provider_scope": "ab",
+          "scim_policy_hash_hex": "c5b9d33eafa1c246bddb604fd292ec96a86d5c3a9dba359515337391e9246440",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.599d09c8d7cf42fffbd0ba90815fa833d36bd4ad91adbd74c54331efe25bd549"
+        },
+        {
+          "principal": "bc",
+          "provider_scope": "a",
+          "scim_policy_hash_hex": "c6091477ebf95c03ed62bec25ac367759b9f116d4347bbf65be28dac63a6d833",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.b663817199ba663eb6a50fbb99dfc6ea9a5c7b1f3a446d78cfce2dea64dce028"
+        },
+        {
+          "principal": "",
+          "provider_scope": "",
+          "scim_policy_hash_hex": "f79e482e70b24cbc3fe5d180cadf222cb8284f87cc77ea206546a60525520f1c",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.5894cc416e8830bea14b0d83d507e8cda76099b4b896c8355994b9930f8a4672"
+        },
+        {
+          "principal": "\u00fcser@\u4f8b\u3048.jp",
+          "provider_scope": "scim-provider",
+          "scim_policy_hash_hex": "ac20b043ddc3d0dcf8b1e26357186a1dc9c0bfd4a925bb894cfecc84e3fe67f6",
+          "scim_policy_provider_id": "scim-provider",
+          "subject": "esk1.3d880459ba4ac156dc8c1d2ca80bc696069a2e49475157146e3eb2664cacede1.73cf30a8424ed27f86358a13410547ff5496332d5dc14d4723f8d1aafe694017"
+        }
+      ]
+    }
+  ],
+  "generator": "python3 -I scripts/gen-enterprise-subject-kat.py write",
+  "schema": "chio.enterprise-subject-kat.v1"
+}
