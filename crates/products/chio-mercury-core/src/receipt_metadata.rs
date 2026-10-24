@@ -22,6 +22,10 @@ pub enum MercuryContractError {
     ReceiptMetadataNotObject,
     #[error("validation error: {0}")]
     Validation(String),
+    /// A tool receipt, child receipt or checkpoint whose signer is outside
+    /// the trusted Mercury kernel-key set; the payload names the record.
+    #[error("{0} was signed by an untrusted Mercury kernel key")]
+    UntrustedKernelKey(String),
     #[error("json error: {0}")]
     Json(String),
 }
