@@ -13,20 +13,22 @@ pub(super) fn parse_mapping(input: &str) -> MappingParse {
             headers = None;
             continue;
         }
-        if !(line.starts_with('|') && line.ends_with('|')) {
-            if !line.is_empty() {
-                headers = None;
-            }
+        if !line.contains('|') {
+            headers = None;
             continue;
         }
         let cells = markdown_cells(line);
         if headers.is_none() {
-            let looks_like_property_header = cells.iter().any(|cell| {
-                cell == "Property"
-                    || cell == "Source"
-                    || cell.starts_with("Source ")
-                    || cell == "Rust path constrained"
-            });
+            let property = cells.iter().any(|cell| cell == "Property");
+            let source = cells
+                .iter()
+                .any(|cell| cell == "Source" || cell.starts_with("Source "));
+            let rust = cells.iter().any(|cell| cell == "Rust path constrained");
+            let looks_like_property_header = [property, source, rust]
+                .into_iter()
+                .filter(|present| *present)
+                .count()
+                >= 2;
             if looks_like_property_header {
                 let mut missing = Vec::new();
                 if !cells.iter().any(|cell| cell == "Property") {
