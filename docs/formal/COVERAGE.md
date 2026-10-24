@@ -1298,7 +1298,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `d5c4394ae6956ae6b810e50172ae756cb861336189b72242e5830b6714cc4c1b`
+- Input digest: `ddea4efff20b8b8ea1a9390e1e952553262151bd7c56377274c6a7dc7b94f5a6`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1622,12 +1622,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `xtask/src/proof_coverage/build.rs`: `9e274ebb8305b280cccdae7c9202527a721bfdf17dc99a4288cb378de65c0c99`
 - `xtask/src/proof_coverage/common.rs`: `19da9d7c01cfc80fbafe2acf83706c866fb15f960583e66f251c0d6e15621553`
 - `xtask/src/proof_coverage/evidence.rs`: `ec8751942935652675bb1f1d28521a9608ee03971d561675b6af56a6e33bb7f8`
-- `xtask/src/proof_coverage/mapping.rs`: `c0275d3b057074d8e870dc87d32c399a95f1283df755c0acad6b3e0486a4a5e5`
+- `xtask/src/proof_coverage/mapping.rs`: `cf72384d07577da7523b64cef8683ec3ba0741eece022bfb78c7929d4133fd52`
 - `xtask/src/proof_coverage/mutation_inputs.rs`: `72d9da42443b427139d7f5e5e8ea5ed8eb5539eb47dd050da870fede40dad2cf`
 - `xtask/src/proof_coverage/mutation_reports.rs`: `92dc5724bd98f97ffca22e8db0d0df61ef02ad504df654b308ab18af8cab412b`
 - `xtask/src/proof_coverage/refinement.rs`: `8b697fb04195e69b722d90598b6510a440d0da6b58f6a6fb3c3b609ba4b4d49d`
-- `xtask/src/proof_coverage/render.rs`: `db783b87a0a52d96d4d620ea4a0dabb1daaefa3b2ec5ffa8bd6e2076090c4578`
+- `xtask/src/proof_coverage/render.rs`: `5a9645aec5942b919f0aeb1ea8229b69a533e36506b6a17d4627525a13709a50`
 - `xtask/src/proof_coverage/tests/aeneas.rs`: `9f3d115d348aabc61bc09e4b0babd4236fcd73d4668f7d6f2689e91fafeeafb8`
-- `xtask/src/proof_coverage/tests/mod.rs`: `bc3f0bfa255bfe7624aac62558b51e6c2cb3f2e19fcb1608705d184bd9c74cf3`
+- `xtask/src/proof_coverage/tests/mod.rs`: `1c559e52e7e53a582413629490f42c09b310573404dbd4553c99448d8d9db35f`
 - `xtask/src/proof_coverage/tests/mutation.rs`: `ded4477041bff9ed81da3ba346e96f48b0a8728d2f4d6bf5211cb4d535c113f3`
 - `xtask/src/proof_coverage/tests/open_residual.rs`: `988b690f761b340ce9962d49d57564b64ee4437a40682e7379cbab64634975c1`
