@@ -180,13 +180,13 @@ fn validate_settlement_dispatch_receipt(
         )));
     }
     let action_hash_valid = receipt.action.verify_hash().map_err(|error| {
-        CommerceOrderError::SettlementFailed(format!(
+        CommerceOrderError::SettlementDigestMismatch(format!(
             "settlement dispatch receipt action hash invalid: {}: {error}",
             settlement.dispatch_receipt_ref
         ))
     })?;
     if !action_hash_valid {
-        return Err(CommerceOrderError::SettlementFailed(format!(
+        return Err(CommerceOrderError::SettlementDigestMismatch(format!(
             "settlement dispatch receipt action hash invalid: {}",
             settlement.dispatch_receipt_ref
         )));

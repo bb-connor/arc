@@ -317,12 +317,12 @@ fn validate_event_authority_receipt(
         )));
     }
     if !receipt.action.verify_hash().map_err(|error| {
-        CommerceOrderError::ReplayFailed(format!(
+        CommerceOrderError::ReplayDigestMismatch(format!(
             "authority receipt action hash invalid: {}: {error}",
             event.authority_receipt_ref
         ))
     })? {
-        return Err(CommerceOrderError::ReplayFailed(format!(
+        return Err(CommerceOrderError::ReplayDigestMismatch(format!(
             "authority receipt action hash invalid: {}",
             event.authority_receipt_ref
         )));
