@@ -977,3 +977,43 @@ fn open_existing_refuses_missing_projection_guards_without_repair() {
 
     let _ = fs::remove_file(path);
 }
+
+/// Two first opens of one receipt database serialize on its creation lock,
+/// and both stores then write to it.
+#[test]
+fn concurrent_first_opens_of_one_receipt_database_both_succeed(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for round in 0..8u64 {
+        let (_directory, path) = temp_db("concurrent-first-open")?;
+        let barrier = Arc::new(Barrier::new(2));
+        let openers: Vec<_> = (0..2)
+            .map(|_| {
+                let barrier = Arc::clone(&barrier);
+                let path = path.clone();
+                thread::spawn(move || {
+                    barrier.wait();
+                    SqliteReceiptStore::open(&path)
+                })
+            })
+            .collect();
+        let mut stores = Vec::new();
+        for opener in openers {
+            stores.push(
+                opener
+                    .join()
+                    .map_err(|_| "receipt store opener panicked")??,
+            );
+        }
+        for (index, store) in (0u64..).zip(&stores) {
+            let receipt = sample_receipt_with_id_and_timestamp(
+                &format!("concurrent-first-open-{round}-{index}"),
+                1_000 + round * 2 + index,
+            );
+            store.append_chio_receipt_returning_seq(&receipt)?;
+            store.flush_receipt_writes()?;
+        }
+        drop(stores);
+        assert_eq!(SqliteReceiptStore::open(&path)?.tool_receipt_count()?, 2);
+    }
+    Ok(())
+}

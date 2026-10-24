@@ -37,11 +37,12 @@ fn inspect_declared(
     connection: &Connection,
     namespaces: &BTreeSet<String>,
 ) -> Result<SchemaState, SchemaVersionError> {
-    let app_id: i32 = connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-    let empty: bool = connection.query_row(
-        "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema)",
+    // One statement reads both values from one snapshot, so a concurrent
+    // creator's commit is seen whole or not at all.
+    let (app_id, empty): (i32, bool) = connection.query_row(
+        "SELECT application_id, NOT EXISTS(SELECT 1 FROM sqlite_schema) FROM pragma_application_id",
         [],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
     if app_id == 0 && empty {
         return Ok(SchemaState::Empty);
