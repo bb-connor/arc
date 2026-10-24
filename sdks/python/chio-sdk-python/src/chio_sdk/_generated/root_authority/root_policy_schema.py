@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a2e478710c7df7c8aa19631f97c0ee5f72fd435e2d6c0963be6f0ab8122ed548
+# Schema sha256: 762578c96088419938225c2c4b88fbd19c43eb893686e68295264db18417432d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -18,6 +18,17 @@ from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from ..capability import token_schema
 from . import root_anchor_schema
+
+
+class IdpScopeProjectionItem(
+    RootModel[constr(pattern=r"^[^\u0000/]+/[^\u0000]+$", min_length=3, max_length=128)]
+):
+    root: constr(pattern=r"^[^\u0000/]+/[^\u0000]+$", min_length=3, max_length=128) = (
+        Field(
+            ...,
+            description="A `server/tool` name: a non-empty server and a non-empty tool name around the first `/`, without NUL.",
+        )
+    )
 
 
 class InlineField(RootModel[constr(pattern=r"^(/([^~/]|~[01])*)+$", max_length=256)]):
@@ -129,7 +140,7 @@ class RootPolicyRule(BaseModel):
     )
     rule_id: root_anchor_schema.Identifier
     match: RootPolicyMatch
-    idp_scope_projection: dict[str, list[root_anchor_schema.Identifier]] | None = Field(
+    idp_scope_projection: dict[str, list[IdpScopeProjectionItem]] | None = Field(
         None,
         description="Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.",
     )

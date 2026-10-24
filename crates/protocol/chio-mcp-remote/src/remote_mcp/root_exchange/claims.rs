@@ -60,9 +60,21 @@ pub(super) fn scope_values(claims: &Map<String, Value>) -> Result<Vec<String>, R
     };
     let mut values: Vec<String> = Vec::new();
     for value in scope.split(' ').filter(|value| !value.is_empty()) {
+        if !is_scope_token(value) {
+            return Err(RootExchangeError::ClaimInvalid("scope"));
+        }
         if !values.iter().any(|seen| seen == value) {
             values.push(value.to_owned());
         }
     }
     Ok(values)
+}
+
+/// Whether `token` is an RFC 6749 section 3.3 `scope-token`: one or more of
+/// `%x21 / %x23-5B / %x5D-7E`.
+pub(super) fn is_scope_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.bytes().all(|byte| {
+            byte == 0x21 || (0x23..=0x5b).contains(&byte) || (0x5d..=0x7e).contains(&byte)
+        })
 }

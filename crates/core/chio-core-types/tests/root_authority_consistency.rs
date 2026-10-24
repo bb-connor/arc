@@ -11,7 +11,8 @@ use chio_core_types::crypto::{Keypair, PublicKey};
 use chio_core_types::root_authority::{
     check_root_consistency, DelegationContext, HolderClass, IdpKeySnapshot,
     IdpKeySnapshotSignatureError, KeySnapshotSource, LoadedRootPolicy, RootAuthorityShapeError,
-    RootConsistencyError, RootConsistencyInput, RootPolicy, RootPolicyLoadError, Sha256Digest,
+    RootConsistencyError, RootConsistencyInput, RootPolicy, RootPolicyLoadError, RootPolicyRule,
+    RootPolicyRuleFields, Sha256Digest,
 };
 use chio_core_types::{canonical_json_bytes, sha256};
 use serde_json::{json, Value};
@@ -386,6 +387,29 @@ fn policy_load_refuses_a_ceiling_hash_that_does_not_recompute() {
             rule_id: RULE_ID.into()
         }
     );
+}
+
+#[test]
+fn projection_value_without_slash_rejects_at_load() {
+    let pattern = RootAuthorityShapeError::Pattern {
+        field: "idp_scope_projection",
+        expected: "server/tool",
+    };
+    for tool in ["crm", "/search", "crm/"] {
+        let mut rule = rule_json();
+        rule["idp_scope_projection"] = json!({ "crm.read": ["crm/search", tool] });
+        let fields: RootPolicyRuleFields = serde_json::from_value(rule).unwrap();
+        assert_eq!(RootPolicyRule::new(fields).unwrap_err(), pattern);
+
+        let mut policy = policy_json();
+        policy["rules"][0]["idp_scope_projection"] = json!({ "crm.read": [tool] });
+        assert_eq!(
+            serde_json::from_value::<RootPolicy>(policy)
+                .unwrap_err()
+                .to_string(),
+            pattern.to_string()
+        );
+    }
 }
 
 #[test]
