@@ -1027,14 +1027,22 @@ fn artifact_declares_schema(path: &Path, expected_schema: &str) -> Result<bool, 
     Ok(artifact_schema_from_file(path).is_ok_and(|schema| schema == expected_schema))
 }
 
+/// The schema an artifact declares: its `schema` member, or `chio.receipt.v1`
+/// for a document that decodes as a closed `ChioReceipt`, which has no such
+/// member.
 fn artifact_schema_from_file(path: &Path) -> Result<String, CliError> {
     let bytes = crate::input::read(path)?;
     let value: serde_json::Value = crate::input::json(&bytes)?;
-    Ok(value
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_string())
+    if let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) {
+        return Ok(schema.to_string());
+    }
+    let is_receipt =
+        crate::input::project::<chio_core::receipt::body::ChioReceipt>(value).is_ok();
+    Ok(if is_receipt {
+        CHIO_RECEIPT_SCHEMA.to_string()
+    } else {
+        String::new()
+    })
 }
 
 fn artifact(
