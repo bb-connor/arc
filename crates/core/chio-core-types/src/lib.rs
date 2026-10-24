@@ -71,6 +71,7 @@ pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
+pub mod tenant_index;
 mod wire_text;
 
 #[cfg(test)]
