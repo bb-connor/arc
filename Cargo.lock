@@ -4414,6 +4414,7 @@ dependencies = [
  "chio-errors",
  "criterion",
  "dashmap 6.1.0",
+ "libc",
  "notify",
  "tempfile",
  "tokio",
@@ -4743,6 +4744,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "url",
 ]
 

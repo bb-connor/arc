@@ -22,6 +22,9 @@ yaml_serde = { workspace = true }
 tokio = { workspace = true }
 tower-lsp = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 criterion = { workspace = true }
 notify = { workspace = true }
