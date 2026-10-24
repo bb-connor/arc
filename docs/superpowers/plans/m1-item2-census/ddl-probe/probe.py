@@ -1,4 +1,4 @@
-"""Probe the receipt_openings DDL, the store identity, the erasure log and the erasure facts with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
+"""Probe the receipt_openings DDL, the store identity, the erasure log, the erasure facts and the erasure conflicts with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
 import json, subprocess, sys
 cli, ddl_path = sys.argv[1], sys.argv[2]
 ddl = open(ddl_path).read()
@@ -140,6 +140,36 @@ fact_cases = [
     ("erasure_fact_update_changes_erased_at_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nUPDATE receipt_erasure_facts SET erased_at = 1;\n{FACT_PRESERVED}", ("fact-preserved",)),
     ("erasure_fact_delete_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nDELETE FROM receipt_erasure_facts;\n{FACT_PRESERVED}", ("fact-preserved",)),
 ]
+R2 = "'" + "b" * 64 + "'"
+Q = "INSERT INTO replication_quarantine_erasures (origin_store_id, origin_openings_seq, reason, hold, stored_receipt_id, stored_erased_at, incoming_receipt_id, incoming_erased_at, source_node_id, recorded_at, resolved_at) VALUES "
+QROW = f"({S}, 7, 'erasure_event_conflict', 'origin_frozen', {R}, {T}, {R2}, {T}, {M}, {T}, NULL)"
+CONFLICT_PRESERVED = (
+    "SELECT CASE WHEN (SELECT count(*) FROM replication_quarantine_erasures) = 1"
+    " AND (SELECT hold FROM replication_quarantine_erasures) = 'origin_frozen'"
+    " AND (SELECT resolved_at FROM replication_quarantine_erasures) IS NULL"
+    f" AND (SELECT incoming_receipt_id FROM replication_quarantine_erasures) = {R2}"
+    " THEN 'conflict-preserved' ELSE 'conflict-changed' END;"
+)
+conflict_cases = [
+    ("conflict_row_accepts_below_watermark", True, f"{Q}({S}, 9, 'erasure_event_conflict', 'below_watermark', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_accepts_frozen_after_gc", True, f"{Q}({S}, 7, 'erasure_event_conflict', 'origin_frozen', NULL, NULL, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_accepts_own_origin", True, f"{Q}({S}, 7, 'erasure_event_conflict_own_origin', 'own_origin', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_unknown_hold", False, f"{Q}({S}, 7, 'erasure_event_conflict', 'frozen', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_own_origin_hold_with_plain_reason", False, f"{Q}({S}, 7, 'erasure_event_conflict', 'own_origin', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_plain_hold_with_own_origin_reason", False, f"{Q}({S}, 7, 'erasure_event_conflict_own_origin', 'origin_frozen', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_stored_receipt_without_erased_at", False, f"{Q}({S}, 7, 'erasure_event_conflict', 'origin_frozen', {R}, NULL, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_origin_node_url", False, f"{Q}({M}, 7, 'erasure_event_conflict', 'origin_frozen', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_incoming_receipt_uppercase", False, f"{Q}({S}, 7, 'erasure_event_conflict', 'origin_frozen', {R}, {T}, '{'B' * 64}', {T}, {M}, {T}, NULL);", ()),
+    ("conflict_row_refuses_resolved_before_recorded", False, f"{Q}({S}, 7, 'erasure_event_conflict', 'origin_frozen', {R}, {T}, {R2}, {T}, {M}, {T}, 1);", ()),
+    ("conflict_row_refuses_duplicate_event", False, f"{Q}{QROW};\n{Q}({S}, 7, 'erasure_event_conflict', 'below_watermark', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
+    ("conflict_row_insert_or_replace_refuses_recursive_triggers_off", False, f"PRAGMA recursive_triggers = OFF;\n{Q}{QROW};\nINSERT OR REPLACE INTO replication_quarantine_erasures VALUES (1, {S}, 7, 'erasure_event_conflict', 'below_watermark', {R}, {T}, {R2}, {T}, {M}, {T}, {T});\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
+    ("conflict_row_insert_or_replace_refuses_recursive_triggers_on", False, f"PRAGMA recursive_triggers = ON;\n{Q}{QROW};\nINSERT OR REPLACE INTO replication_quarantine_erasures VALUES (1, {S}, 7, 'erasure_event_conflict', 'below_watermark', {R}, {T}, {R2}, {T}, {M}, {T}, {T});\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
+    ("conflict_row_resolve_accepts", True, f"{Q}{QROW};\nUPDATE replication_quarantine_erasures SET resolved_at = {T};", ()),
+    ("conflict_row_unresolve_refuses", False, f"{Q}{QROW};\nUPDATE replication_quarantine_erasures SET resolved_at = {T};\nUPDATE replication_quarantine_erasures SET resolved_at = NULL;", ()),
+    ("conflict_row_second_resolve_refuses", False, f"{Q}{QROW};\nUPDATE replication_quarantine_erasures SET resolved_at = {T};\nUPDATE replication_quarantine_erasures SET resolved_at = {T} + 1;", ()),
+    ("conflict_row_update_hold_refuses", False, f"{Q}{QROW};\nUPDATE replication_quarantine_erasures SET hold = 'below_watermark';\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
+    ("conflict_row_delete_refuses", False, f"{Q}{QROW};\nDELETE FROM replication_quarantine_erasures;\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
+]
 version = subprocess.run([cli, "--version"], capture_output=True, text=True).stdout.strip()
 results, ok = [], True
 def run(name, expect, sql, must_print=()):
@@ -162,6 +192,8 @@ for name, expect, stmt in log_cases:
 for name, stmt, marks in replace_cases:
     run(name, False, "\n" + stmt + "\n", marks)
 for name, expect, stmt, marks in fact_cases:
+    run(name, expect, "\n" + stmt + "\n", marks)
+for name, expect, stmt, marks in conflict_cases:
     run(name, expect, "\n" + stmt + "\n", marks)
 print(json.dumps({"sqlite": version, "ddl": ddl, "all_as_expected": ok, "results": results}, indent=1))
 sys.exit(0 if ok else 1)

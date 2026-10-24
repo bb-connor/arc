@@ -35,6 +35,27 @@ CREATE TABLE receipt_erasure_facts (
 CREATE TRIGGER receipt_erasure_facts_no_replace BEFORE INSERT ON receipt_erasure_facts WHEN EXISTS (SELECT 1 FROM receipt_erasure_facts WHERE receipt_id = NEW.receipt_id) BEGIN SELECT RAISE(ABORT, 'receipt erasure fact is permanent'); END;
 CREATE TRIGGER receipt_erasure_facts_only_marks_conflict BEFORE UPDATE ON receipt_erasure_facts WHEN NEW.receipt_id IS NOT OLD.receipt_id OR NEW.origin_store_id IS NOT OLD.origin_store_id OR NEW.origin_openings_seq IS NOT OLD.origin_openings_seq OR NEW.erased_at IS NOT OLD.erased_at OR NEW.recorded_at IS NOT OLD.recorded_at OR NEW.conflicted < OLD.conflicted BEGIN SELECT RAISE(ABORT, 'receipt erasure fact is permanent'); END;
 CREATE TRIGGER receipt_erasure_facts_no_delete BEFORE DELETE ON receipt_erasure_facts BEGIN SELECT RAISE(ABORT, 'receipt erasure fact is permanent'); END;
+CREATE TABLE replication_quarantine_erasures (
+  quarantine_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  origin_openings_seq INTEGER NOT NULL CHECK (typeof(origin_openings_seq) = 'integer' AND origin_openings_seq >= 1),
+  reason TEXT NOT NULL CHECK (typeof(reason) = 'text' AND reason IN ('erasure_event_conflict', 'erasure_event_conflict_own_origin')),
+  hold TEXT NOT NULL CHECK (typeof(hold) = 'text' AND hold IN ('below_watermark', 'origin_frozen', 'own_origin')),
+  stored_receipt_id TEXT CHECK (stored_receipt_id IS NULL OR (typeof(stored_receipt_id) = 'text' AND instr(stored_receipt_id, char(0)) = 0 AND length(CAST(stored_receipt_id AS BLOB)) = 64 AND stored_receipt_id NOT GLOB '*[^0-9a-f]*')),
+  stored_erased_at INTEGER CHECK (stored_erased_at IS NULL OR (typeof(stored_erased_at) = 'integer' AND stored_erased_at >= 0)),
+  incoming_receipt_id TEXT NOT NULL CHECK (typeof(incoming_receipt_id) = 'text' AND instr(incoming_receipt_id, char(0)) = 0 AND length(CAST(incoming_receipt_id AS BLOB)) = 64 AND incoming_receipt_id NOT GLOB '*[^0-9a-f]*'),
+  incoming_erased_at INTEGER NOT NULL CHECK (typeof(incoming_erased_at) = 'integer' AND incoming_erased_at >= 0),
+  source_node_id TEXT NOT NULL CHECK (typeof(source_node_id) = 'text' AND instr(source_node_id, char(0)) = 0 AND length(CAST(source_node_id AS BLOB)) BETWEEN 1 AND 2048),
+  recorded_at INTEGER NOT NULL CHECK (typeof(recorded_at) = 'integer' AND recorded_at >= 0),
+  resolved_at INTEGER CHECK (resolved_at IS NULL OR (typeof(resolved_at) = 'integer' AND resolved_at >= recorded_at)),
+  CHECK ((hold = 'own_origin') = (reason = 'erasure_event_conflict_own_origin')),
+  CHECK ((stored_receipt_id IS NULL) = (stored_erased_at IS NULL)),
+  UNIQUE (origin_store_id, origin_openings_seq, incoming_receipt_id, incoming_erased_at)
+);
+CREATE INDEX replication_quarantine_erasures_unresolved ON replication_quarantine_erasures (origin_store_id, hold) WHERE resolved_at IS NULL;
+CREATE TRIGGER replication_quarantine_erasures_no_replace BEFORE INSERT ON replication_quarantine_erasures WHEN EXISTS (SELECT 1 FROM replication_quarantine_erasures WHERE quarantine_id = NEW.quarantine_id OR (origin_store_id = NEW.origin_store_id AND origin_openings_seq = NEW.origin_openings_seq AND incoming_receipt_id = NEW.incoming_receipt_id AND incoming_erased_at = NEW.incoming_erased_at)) BEGIN SELECT RAISE(ABORT, 'erasure conflict record is permanent'); END;
+CREATE TRIGGER replication_quarantine_erasures_only_resolves BEFORE UPDATE ON replication_quarantine_erasures WHEN OLD.resolved_at IS NOT NULL OR NEW.resolved_at IS NULL OR NEW.quarantine_id IS NOT OLD.quarantine_id OR NEW.origin_store_id IS NOT OLD.origin_store_id OR NEW.origin_openings_seq IS NOT OLD.origin_openings_seq OR NEW.reason IS NOT OLD.reason OR NEW.hold IS NOT OLD.hold OR NEW.stored_receipt_id IS NOT OLD.stored_receipt_id OR NEW.stored_erased_at IS NOT OLD.stored_erased_at OR NEW.incoming_receipt_id IS NOT OLD.incoming_receipt_id OR NEW.incoming_erased_at IS NOT OLD.incoming_erased_at OR NEW.source_node_id IS NOT OLD.source_node_id OR NEW.recorded_at IS NOT OLD.recorded_at BEGIN SELECT RAISE(ABORT, 'erasure conflict record is permanent'); END;
+CREATE TRIGGER replication_quarantine_erasures_no_delete BEFORE DELETE ON replication_quarantine_erasures BEGIN SELECT RAISE(ABORT, 'erasure conflict record is permanent'); END;
 CREATE TABLE receipt_openings_watermarks (
   origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   applied_through INTEGER NOT NULL CHECK (typeof(applied_through) = 'integer' AND applied_through >= 0),
