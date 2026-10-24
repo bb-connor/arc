@@ -487,10 +487,14 @@ mod tests {
     fn read_bounded_rejects_directory() -> Result<(), String> {
         let dir = std::env::temp_dir();
         let dir = path_str(&dir)?;
+        let result = read_bounded(dir, 16);
+        #[cfg(unix)]
         assert_eq!(
-            read_bounded(dir, 16).err(),
+            result.err(),
             Some(format!("failed to read {dir}: not a regular file"))
         );
+        #[cfg(not(unix))]
+        assert!(result.is_err());
         Ok(())
     }
 }
