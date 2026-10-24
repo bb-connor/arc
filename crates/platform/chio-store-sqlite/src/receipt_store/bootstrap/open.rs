@@ -16,6 +16,10 @@ struct QualifiedReceiptSink {
     receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
 }
 
+/// Every receipt store connection, the bootstrap connection included, waits
+/// this long for a lock another connection or process holds.
+const RECEIPT_STORE_BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
+
 fn configure_sqlite_connection(
     connection: &mut Connection,
     max_page_count: Option<u32>,
@@ -24,11 +28,11 @@ fn configure_sqlite_connection(
         r#"
         PRAGMA journal_mode = WAL;
         PRAGMA synchronous = FULL;
-        PRAGMA busy_timeout = 5000;
         PRAGMA foreign_keys = ON;
         PRAGMA auto_vacuum = INCREMENTAL;
         "#,
     )?;
+    connection.busy_timeout(RECEIPT_STORE_BUSY_TIMEOUT)?;
     assert_sqlite_durability_pragmas(connection)?;
     // Operational growth bound (see `SqlitePoolConfig::max_page_count`): cap the
     // logical page count of the MAIN database file. A write that would push the
@@ -558,6 +562,7 @@ impl SqliteReceiptStore {
             })?,
             None => Connection::open(path)?,
         };
+        connection.busy_timeout(RECEIPT_STORE_BUSY_TIMEOUT)?;
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
             let snapshot =
@@ -794,12 +799,17 @@ fn begin_receipt_creation<'a>(
         .map_err(ReceiptStoreError::from)?
         == crate::SchemaState::Empty
     {
-        connection.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
         let lock =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)?;
         let fresh = crate::schema_version::inspect_schema(&lock, namespaces)
             .map_err(ReceiptStoreError::from)?
             == crate::SchemaState::Empty;
+        // Only the creator keeps the lock until its bootstrap connection
+        // closes. The mode starts once the lock is held: a connection waiting
+        // in exclusive mode keeps its shared lock and deadlocks the creator.
+        if fresh {
+            lock.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
+        }
         lock.commit()?;
         if fresh {
             connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
