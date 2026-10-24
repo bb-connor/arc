@@ -532,7 +532,7 @@ impl SqlitePheromoneRelayStore {
         let mut next_cursor = after_rowid;
         for row in rows {
             let (rowid, batch_json) = row?;
-            let batch_json = batch_json?;
+            let batch_json = batch_json.map_err(PheromoneRelayError::StoredInput)?;
             let batch_bytes = batch_json.len();
             if bytes.saturating_add(batch_bytes) > max_bytes {
                 if frames.is_empty() {
@@ -542,7 +542,8 @@ impl SqlitePheromoneRelayStore {
                 }
                 break;
             }
-            let batch: PheromoneGossipBatch = crate::input::decode(batch_json.as_bytes())?;
+            let batch: PheromoneGossipBatch = crate::input::decode(batch_json.as_bytes())
+                .map_err(PheromoneRelayError::StoredInput)?;
             let batch_frame_count = batch.frames.len();
             if served_frame_count.saturating_add(batch_frame_count) > limit {
                 if frames.is_empty() {
