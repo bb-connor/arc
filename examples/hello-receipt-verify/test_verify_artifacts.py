@@ -60,6 +60,14 @@ def write_valid_verify_output(root: Path) -> None:
                 "publicationState": "transparency_preview",
                 "audit": {"capabilityLineageRecords": 1},
             },
+            "requiredColumns": [],
+            "columns": [
+                {
+                    "receipt_id": "fixture-receipt",
+                    "seq": 1,
+                    "columns": {"decision": {"class": "verified"}},
+                }
+            ],
         },
     )
 
@@ -69,17 +77,16 @@ def write_valid_tamper_error(root: Path) -> None:
     write_json(
         root / "tamper-err.json",
         {
-            "code": "urn:chio:error:attest:provenance-missing",
+            "code": "urn:chio:error:attest:bundle-file-hash-mismatch",
             "message": "evidence package file hash mismatch for query.json",
             "context": {
                 "domain": "attest",
                 "severity": "error",
-                "stability": "unstable",
-                "string_code": "CHIO-ATTEST-PROVENANCE-MISSING",
+                "stability": "stable",
+                "string_code": "CHIO-ATTEST-BUNDLE-FILE-HASH-MISMATCH",
             },
             "suggested_fix": (
-                "Regenerate the evidence bundle and include provenance before "
-                "submitting the operation."
+                "Obtain an unmodified copy of the bundle; do not edit files after export."
             ),
         },
     )
@@ -135,16 +142,27 @@ class ReceiptVerifyArtifactTests(unittest.TestCase):
             with self.assertRaisesRegex(ArtifactError, "lineage capability_id"):
                 verify_artifact_tree(root, write_summary=True)
 
-    def test_rejects_old_tamper_error_shape(self) -> None:
+    def test_rejects_a_tamper_error_without_the_integrity_code(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write_valid_artifact_root(root)
             payload = json.loads((root / "tamper-err.json").read_text(encoding="utf-8"))
-            payload["context"].pop("string_code")
-            payload["context"]["legacy_string_code"] = "CHIO-ATTEST-PROVENANCE-MISSING"
+            payload["code"] = "urn:chio:error:attest:bundle-trust-missing"
             write_json(root / "tamper-err.json", payload)
 
-            with self.assertRaisesRegex(ArtifactError, "string_code"):
+            with self.assertRaisesRegex(ArtifactError, "tamper error code"):
+                verify_artifact_tree(root, write_summary=True)
+
+    def test_rejects_an_envelope_signer_outside_the_trust_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_valid_artifact_root(root)
+            envelope_path = root / "input-package" / "export-envelope.json"
+            envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+            envelope["signerKey"] = "00" * 32
+            write_json(envelope_path, envelope)
+
+            with self.assertRaisesRegex(ArtifactError, "export envelope signer"):
                 verify_artifact_tree(root, write_summary=True)
 
     def test_rejects_summary_drift(self) -> None:
