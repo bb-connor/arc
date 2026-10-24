@@ -817,7 +817,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
 
     let receipt_key = Keypair::from_seed(&[86_u8; 32]);
     let receipt_body = json!({
-        "schema": "chio.receipt.v1",
+        "schema": "chio.proof-room.receipt-evidence.v1",
         "receipt_id": "receipt-cognition-market-anchor",
         "capability_id": "cap-cognition-market-verify",
         "guard_decision_id": "guard-cognition-market-verify",
@@ -844,7 +844,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
         .push(node(
             "anchor-receipt.json",
             "receipt",
-            "chio.receipt.v1",
+            "chio.proof-room.receipt-evidence.v1",
             &receipt_bytes,
         ));
     bundle.evidence_graph["edges"]

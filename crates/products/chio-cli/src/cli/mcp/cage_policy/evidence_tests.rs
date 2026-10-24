@@ -287,11 +287,26 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
     let mut changed = serde_json::to_value(&evidence.enforcement)?;
     changed["invented_field"] = json!(true);
     std::fs::write(&receipt_path, serde_json::to_vec(&changed)?)?;
-    refusal(
-        verify("cage-policy-test", &pin, &evidence.enforcement.id, target),
-        "start-invented-field",
-        "receipt fields differ from the supported signed schema",
-    )?;
+    // ChioReceipt is closed: decoding the original receipt refuses the member.
+    let error = verify("cage-policy-test", &pin, &evidence.enforcement.id, target)
+        .err()
+        .ok_or("start-invented-field: accepted")?;
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
+    assert_eq!(
+        error.report().code,
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
+    assert!(
+        matches!(
+            &error,
+            CliError::SignedJson(chio_core::canonical::UntrustedJsonError::Decode(source))
+                if source.to_string().starts_with("unknown field `invented_field`")
+        ),
+        "start-invented-field: {error:?}"
+    );
     Ok(())
 }
 

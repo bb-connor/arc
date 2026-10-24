@@ -4406,7 +4406,7 @@ first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.proof-room.receipt-evidence.v1"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs", "crates/products/chio-proof-room/src/lib.rs"]
+files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/products/chio-cli/src/cli/dispatch/proof/collect.rs", "crates/products/chio-cli/src/cli/dispatch/proof/doctor.rs", "crates/products/chio-cli/src/cli/dispatch/proof/fixture_receipt_evidence.rs", "crates/products/chio-proof-room/src/lib.rs"]
 first_seen = "1b9620751d"
 
 [[schema]]

@@ -4,7 +4,7 @@ use std::{collections::BTreeSet, path::Path};
 use chio_core_types::{PublicKey, Signature};
 
 use super::{
-    verify_manifest_ref, ProofRoomArtifactRef, ProofRoomReceiptCoverage, CHIO_RECEIPT_SCHEMA,
+    verify_manifest_ref, ProofRoomArtifactRef, ProofRoomReceiptCoverage,
     PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA, REQUIRED_RECEIPT_COVERAGE_CATEGORIES,
     RUNTIME_TERMINAL_RECEIPT_SCHEMA,
 };
@@ -137,9 +137,7 @@ fn verify_covered_category(
 }
 
 fn is_receipt_coverage_schema(schema: &str) -> bool {
-    schema == PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA
-        || schema == CHIO_RECEIPT_SCHEMA
-        || schema == RUNTIME_TERMINAL_RECEIPT_SCHEMA
+    schema == PROOF_ROOM_RECEIPT_EVIDENCE_SCHEMA || schema == RUNTIME_TERMINAL_RECEIPT_SCHEMA
 }
 
 fn required_receipt_field<'a>(

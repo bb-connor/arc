@@ -1125,7 +1125,7 @@ fn proof_collect_derives_receipt_coverage_for_each_terminal_status() {
         let sha256 = sha256_file(&artifact_path.join(path));
         nodes.push(serde_json::json!({
             "id": sha256,
-            "schema": "chio.receipt.v1",
+            "schema": "chio.proof-room.receipt-evidence.v1",
             "path": path,
             "sha256": sha256,
             "role": "receipt"
@@ -1236,7 +1236,7 @@ fn proof_collect_rejects_unsafe_receipt_coverage_node_path() {
         .test_expect("graph nodes array")
         .push(serde_json::json!({
             "id": unsafe_receipt_sha256,
-            "schema": "chio.receipt.v1",
+            "schema": "chio.proof-room.receipt-evidence.v1",
             "path": "receipt%2fescape.json",
             "sha256": unsafe_receipt_sha256,
             "role": "receipt"
@@ -1302,7 +1302,7 @@ fn proof_collect_records_receipt_coverage_exclusions_for_missing_terminal_status
         .test_expect("graph nodes array")
         .push(serde_json::json!({
             "id": denial_receipt_sha256,
-            "schema": "chio.receipt.v1",
+            "schema": "chio.proof-room.receipt-evidence.v1",
             "path": "denial-receipt.json",
             "sha256": denial_receipt_sha256,
             "role": "receipt"
