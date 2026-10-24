@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import re
+import shlex
 import sys
 import tomllib
 
@@ -30,13 +31,11 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def workflow_job(source: str, name: str, next_name: str | None) -> str:
+def workflow_job(source: str, name: str) -> str:
     start_marker = f"\n  {name}:\n"
-    start = source.index(start_marker) + 1
-    if next_name is None:
-        return source[start:]
-    end = source.index(f"\n  {next_name}:\n", start)
-    return source[start:end]
+    start = source.index(start_marker) + len(start_marker)
+    end = re.search(r"(?m)^  [^#\s][^:\n]*:", source[start:])
+    return source[start:start + end.start()] if end else source[start:]
 
 
 def check_receipt_before_allow() -> None:
@@ -527,9 +526,8 @@ def check_temporal_workflow() -> None:
     propagation_job = workflow_job(
         text,
         "revocation_eventually_seen",
-        "distributed_revocation_temporal",
     )
-    verdict_job = workflow_job(text, "temporal_verdict", None)
+    verdict_job = workflow_job(text, "temporal_verdict")
 
     propagation_gate = read("scripts/check-revocation-propagation.py")
     quotient = read("formal/tla/RevocationPropagationEpochQuotient.tla")
@@ -591,9 +589,27 @@ def check_temporal_workflow() -> None:
         "--config formal/tla/MCDistributedRevocationTemporalWitness.cfg",
         "--temporal RevocationEventuallyObservedDistributed",
         "--config formal/tla/MCDistributedRevocationTemporal.cfg",
-        "--no-deadlock",
     ):
         require(marker in temporal_gate, f"distributed temporal gate is missing {marker}")
+    commands = [
+        shlex.split(line, comments=True)
+        for line in temporal_gate.replace("\\\n", " ").splitlines()
+        if line.lstrip().startswith("./scripts/check-apalache-positive.sh ")
+    ]
+    require(len(commands) == 3, "distributed temporal gate must run exactly three positive commands")
+    for config in (
+        "formal/tla/MCDistributedRevocationTemporalRefinement.cfg",
+        "formal/tla/MCDistributedRevocationTemporalWitness.cfg",
+        "formal/tla/MCDistributedRevocationTemporal.cfg",
+    ):
+        matching = [
+            command for command in commands
+            if any(left == "--config" and right == config for left, right in zip(command, command[1:]))
+        ]
+        require(
+            len(matching) == 1 and matching[0].count("--no-deadlock") == 1,
+            f"distributed temporal command for {config} must set --no-deadlock",
+        )
     for marker in (
         '[[ "${version}" != "0.50.1" ]]',
         "scripts/lib/apalache_evidence.py positive",
@@ -656,7 +672,6 @@ def check_safety_workflow_wiring() -> None:
     ci_job = workflow_job(
         ci,
         "apalache-full-contract",
-        "threat-model-coverage-contract",
     )
     require(
         "uses: ./.github/workflows/apalache-safety.yml" in ci_job
@@ -760,8 +775,9 @@ def check_safety_workflow_wiring() -> None:
         and "./scripts/tests/check-apalache-negative.test.sh" in text,
         "apalache-safety must keep the negative suite as a separate checked job",
     )
+    negative_job = workflow_job(text, "apalache-negative")
     require(
-        "fetch-depth: 0" in text,
+        re.search(r"(?m)^\s+fetch-depth:\s*0\s*$", negative_job) is not None,
         "apalache-negative must fetch commit objects named by its registry",
     )
     require(

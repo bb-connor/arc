@@ -63,6 +63,15 @@ class ApalacheFormalSliceTests(unittest.TestCase):
         self.assertIn(old, text, f"{rel} no longer contains the marker {old!r}")
         path.write_text(text.replace(old, new), encoding="utf-8")
 
+    def mutate_occurrence(self, rel: str, old: str, new: str, occurrence: int) -> None:
+        path = self.root / rel
+        text = path.read_text(encoding="utf-8")
+        start = -len(old)
+        for _ in range(occurrence + 1):
+            start = text.find(old, start + len(old))
+            self.assertGreaterEqual(start, 0)
+        path.write_text(text[:start] + new + text[start + len(old):], encoding="utf-8")
+
     def run_check(self) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, "-I", "scripts/check-apalache-formal-slice.py"],
@@ -142,18 +151,49 @@ class ApalacheFormalSliceTests(unittest.TestCase):
         )
 
     def test_red_temporal_gate_loses_strict_marker(self) -> None:
-        self.mutate("scripts/check-distributed-revocation-temporal.sh", "--no-deadlock", "")
-        self.assert_red(
-            "check_temporal_workflow",
-            "distributed temporal gate is missing --no-deadlock",
-        )
+        rel = "scripts/check-distributed-revocation-temporal.sh"
+        original = (self.root / rel).read_text(encoding="utf-8")
+        for occurrence, config in enumerate((
+            "formal/tla/MCDistributedRevocationTemporalRefinement.cfg",
+            "formal/tla/MCDistributedRevocationTemporalWitness.cfg",
+            "formal/tla/MCDistributedRevocationTemporal.cfg",
+        )):
+            with self.subTest(config=config):
+                (self.root / rel).write_text(original, encoding="utf-8")
+                self.mutate_occurrence(rel, "--no-deadlock", "", occurrence)
+                self.assert_red(
+                    "check_temporal_workflow",
+                    f"distributed temporal command for {config} must set --no-deadlock",
+                )
 
     def test_red_safety_workflow_loses_fetch_depth(self) -> None:
-        self.mutate(SAFETY, "fetch-depth: 0", "fetch-depth: 1")
+        self.mutate_occurrence(SAFETY, "fetch-depth: 0", "fetch-depth: 1", 0)
         self.assert_red(
             "check_safety_workflow_wiring",
             "apalache-negative must fetch commit objects named by its registry",
         )
+
+    def test_green_spec_mutants_fetch_depth_is_not_governed(self) -> None:
+        self.mutate_occurrence(SAFETY, "fetch-depth: 0", "fetch-depth: 1", 1)
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "check-apalache-formal-slice: OK")
+
+    def test_red_inserted_job_cannot_supply_negative_job_history(self) -> None:
+        self.mutate_occurrence(SAFETY, "fetch-depth: 0", "fetch-depth: 1", 0)
+        original = (self.root / SAFETY).read_text(encoding="utf-8")
+        for key in ("history-helper", '\"history-helper\"', "'history-helper'"):
+            with self.subTest(key=key):
+                (self.root / SAFETY).write_text(original, encoding="utf-8")
+                self.mutate(
+                    SAFETY,
+                    "  spec-mutants:\n",
+                    f"  {key}:\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n\n  spec-mutants:\n",
+                )
+                self.assert_red(
+                    "check_safety_workflow_wiring",
+                    "apalache-negative must fetch commit objects named by its registry",
+                )
 
     def test_red_safety_matrix_row_changes_timeout(self) -> None:
         self.mutate(SAFETY, "timeout_seconds: 1800", "timeout_seconds: 60")

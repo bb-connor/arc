@@ -41,6 +41,17 @@ INVARIANTS=(
     "crates/guards/chio-policy/tests/property_evaluate.rs::empty_extends_chain_is_identity_under_merge"
 )
 
+declare -a registered=()
+for entry in "${INVARIANTS[@]}"; do
+    for prior in ${registered[@]+"${registered[@]}"}; do
+        if [[ "$entry" == "$prior" ]]; then
+            err "FAIL: duplicate invariant registration: $entry"
+            exit 2
+        fi
+    done
+    registered+=("$entry")
+done
+
 for entry in "${INVARIANTS[@]}"; do
     file="${entry%%::*}"
     name="${entry#*::}"

@@ -9,6 +9,7 @@
 # Exit codes:
 #   0 - no occurrences (gate green)
 #   1 - one or more occurrences (gate red)
+#   2 - missing scan root or scan failure
 
 set -euo pipefail
 
@@ -17,16 +18,23 @@ cd "$(dirname "$0")/.."
 needle='implementation_backed'
 roots=(spec/registries formal)
 
-# `grep -r` returns 1 when no match is found, which is the success case for
-# this gate. `|| true` keeps `set -e` from aborting on the no-match path; the
-# captured output is inspected directly.
+for root in "${roots[@]}"; do
+  if [ ! -d "$root" ]; then
+    echo "::error::registry status gate: required scan root missing: $root" >&2
+    exit 2
+  fi
+done
+
 hits=""
 for root in "${roots[@]}"; do
-  if [ -d "$root" ]; then
-    found=$(grep -RInF -- "$needle" "$root" 2>/dev/null || true)
-    if [ -n "$found" ]; then
-      hits+="${found}"$'\n'
-    fi
+  status=0
+  found=$(grep -RInF -- "$needle" "$root" 2>/dev/null) || status=$?
+  if [ "$status" -gt 1 ]; then
+    echo "::error::registry status gate: cannot scan $root" >&2
+    exit 2
+  fi
+  if [ -n "$found" ]; then
+    hits+="${found}"$'\n'
   fi
 done
 
