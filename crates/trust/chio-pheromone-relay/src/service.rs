@@ -999,6 +999,8 @@ pub(crate) fn sanitize_event_part(value: &str) -> String {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+    mod event_reports;
+
     use super::{
         relay_error_response, PheromoneReceiveReport, PheromoneRuntimeError, RelayBatchReceiver,
         RelayErrorResponse, RELAY_INTERNAL_ERROR_CODE, RELAY_INTERNAL_ERROR_DETAIL,
