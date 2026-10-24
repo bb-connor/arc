@@ -111,3 +111,81 @@ fn root_policy_decode_bounds_exchange_keys() {
         "`exchange_keys` has 17 items, outside 1..=16"
     );
 }
+
+#[test]
+fn root_policy_rule_refuses_empty_ceiling_grant_members() {
+    let policy = example("valid", "root-policy.spec-5-6-4.json");
+    for (scope, field, expected) in [
+        (
+            json!({"grants": [{"server_id": "", "tool_name": "read", "operations": ["invoke"]}]}),
+            "ceiling_scope.grants.server_id",
+            "a non-empty string",
+        ),
+        (
+            json!({"grants": [{"server_id": "server", "tool_name": "", "operations": ["invoke"]}]}),
+            "ceiling_scope.grants.tool_name",
+            "a non-empty string",
+        ),
+        (
+            json!({"grants": [{"server_id": "server", "tool_name": "read", "operations": []}]}),
+            "ceiling_scope.grants.operations",
+            "a non-empty operation list",
+        ),
+        (
+            json!({"resource_grants": [{"uri_pattern": "", "operations": ["read"]}]}),
+            "ceiling_scope.resource_grants.uri_pattern",
+            "a non-empty string",
+        ),
+        (
+            json!({"resource_grants": [{"uri_pattern": "file:///*", "operations": []}]}),
+            "ceiling_scope.resource_grants.operations",
+            "a non-empty operation list",
+        ),
+        (
+            json!({"prompt_grants": [{"prompt_name": "", "operations": ["read"]}]}),
+            "ceiling_scope.prompt_grants.prompt_name",
+            "a non-empty string",
+        ),
+        (
+            json!({"prompt_grants": [{"prompt_name": "prompt", "operations": []}]}),
+            "ceiling_scope.prompt_grants.operations",
+            "a non-empty operation list",
+        ),
+    ] {
+        let mut rule = policy["rules"][0].clone();
+        rule["ceiling_scope"] = scope;
+        let fields = serde_json::from_value(rule.clone()).unwrap();
+        assert_eq!(
+            RootPolicyRule::new(fields).unwrap_err(),
+            chio_core_types::root_authority::RootAuthorityShapeError::Pattern { field, expected }
+        );
+        assert_eq!(
+            refused!(RootPolicyRule, rule.clone()),
+            format!("`{field}` is not {expected}")
+        );
+        let mut invalid_policy = policy.clone();
+        invalid_policy["rules"][0] = rule;
+        assert_eq!(
+            refused!(RootPolicy, invalid_policy),
+            format!("`{field}` is not {expected}")
+        );
+    }
+}
+
+#[test]
+fn root_policy_rule_accepts_empty_scope_and_nonempty_grant_members() {
+    let policy = example("valid", "root-policy.spec-5-6-4.json");
+    for scope in [
+        json!({}),
+        json!({
+            "grants": [{"server_id": "*", "tool_name": "*", "operations": ["invoke"]}],
+            "resource_grants": [{"uri_pattern": "file:///*", "operations": ["read"]}],
+            "prompt_grants": [{"prompt_name": "*", "operations": ["read"]}]
+        }),
+    ] {
+        let mut rule = policy["rules"][0].clone();
+        rule["ceiling_scope"] = scope.clone();
+        let decoded = RootPolicyRule::deserialize(rule).unwrap();
+        assert_eq!(serde_json::to_value(&decoded.ceiling_scope).unwrap(), scope);
+    }
+}

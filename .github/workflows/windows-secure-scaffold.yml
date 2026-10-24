@@ -9,6 +9,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
+      - "crates/kernel/chio-runtime-core/**"
       - "crates/kernel/chio-runtime-harness/**"
       - "crates/platform/chio-store-sqlite/**"
       - "crates/platform/chio-control-plane/**"
@@ -22,6 +23,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
+      - "crates/kernel/chio-runtime-core/**"
       - "crates/kernel/chio-runtime-harness/**"
       - "crates/platform/chio-store-sqlite/**"
       - "crates/platform/chio-control-plane/**"
@@ -38,6 +40,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
 
 jobs:
   windows-secure-scaffold:
@@ -74,6 +77,9 @@ jobs:
 
       - name: Test Windows trust service startup guard
         run: "cargo test --locked -p chio-control-plane --lib trust_control::service_runtime::init::windows_authority_tests:: -- --nocapture"
+
+      - name: Test Windows bounded file reads
+        run: "cargo test --locked -p chio-runtime-core --lib bounded_read::tests:: -- --nocapture"
 
       - name: Test Windows runtime harness startup guard
         run: "cargo test --locked -p chio-runtime-harness --lib windows_authority_tests:: -- --nocapture"
