@@ -72,6 +72,14 @@ pub fn run_sustained(
     harness: &StackHarness,
     config: &LoadgenConfig,
 ) -> Result<LoadReport, LoadgenError> {
+    run_sustained_with_completion(harness, config, &|| {})
+}
+
+fn run_sustained_with_completion(
+    harness: &StackHarness,
+    config: &LoadgenConfig,
+    on_completion: &(impl Fn() + Sync),
+) -> Result<LoadReport, LoadgenError> {
     // Fail closed on a zero arrival rate: interval 0 would pace nothing and drive
     // an unbounded max-rate loop, which is not what "idle" means. An uncapped run
     // is spelled as a large rate, never 0.
@@ -169,6 +177,7 @@ pub fn run_sustained(
                             let outcome = harness.dispatch_allow_once();
                             if let Some(run_start) = run_start {
                                 worker_progress.record_completion(run_start.elapsed());
+                                on_completion();
                             }
                             let _ = sender.send(outcome);
                         }
@@ -736,3 +745,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod progress_tests;
