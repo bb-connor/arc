@@ -1,7 +1,7 @@
 use super::*;
 
 struct Fixture {
-    _directory: tempfile::TempDir,
+    directory: tempfile::TempDir,
     db: PathBuf,
     seed: PathBuf,
     package: PathBuf,
@@ -41,7 +41,7 @@ impl Fixture {
         .test_unwrap();
         store.store_checkpoint(&checkpoint).test_unwrap();
         Self {
-            _directory: directory,
+            directory,
             db,
             seed,
             package,
@@ -153,7 +153,7 @@ fn package_cli_import_exits_with_the_verify_classes() {
     require_success(&fixture.export());
     let import = |key: &str| {
         let trust = trust_file(&[key.to_owned()], None);
-        let db = fixture._directory.path().join("imported.sqlite3");
+        let db = fixture.directory.path().join("imported.sqlite3");
         Command::new(env!("CARGO_BIN_EXE_chio"))
             .arg("--json")
             .arg("--receipt-db")
@@ -175,6 +175,15 @@ fn package_cli_import_exits_with_the_verify_classes() {
     fs::write(&manifest_path, serde_json::to_vec(&manifest).test_unwrap()).test_unwrap();
     let tampered = import(&fixture.signer.public_key().to_hex());
     assert_eq!(tampered.status.code(), Some(20));
+
+    let imported = fixture.directory.path().join("imported.sqlite3");
+    let share = imported.exists().then(|| {
+        SqliteReceiptStore::open(&imported)
+            .test_unwrap()
+            .get_federated_share_for_capability("cap-package-trust")
+            .test_unwrap()
+    });
+    assert!(share.flatten().is_none());
 }
 
 #[test]
