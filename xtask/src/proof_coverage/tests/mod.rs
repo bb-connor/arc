@@ -107,6 +107,112 @@ fn committed_markdown_drift_is_rejected() {
 }
 
 #[test]
+fn mapping_ignores_unrelated_tables_with_a_source_column() {
+    let parsed = parse_mapping("| Artifact | Source |\n| --- | --- |\n| guide | docs/guide.md |\n");
+    assert_eq!(parsed.rows, Vec::new());
+    assert_eq!(parsed.warnings, Vec::<String>::new());
+}
+
+#[test]
+fn mapping_accepts_optional_outer_pipes_without_dropping_following_rows() {
+    for row in [
+        "| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs`",
+        "`P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` |",
+        "`P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs`",
+    ] {
+        let parsed = parse_mapping(&format!("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n{row}\n| `Q` | `formal/Q.tla` | `crates/core/chio-core/src/lib.rs` |\n"));
+        assert_eq!(parsed.warnings, Vec::<String>::new());
+        assert_eq!(
+            parsed
+                .rows
+                .iter()
+                .map(|row| row.property.as_str())
+                .collect::<Vec<_>>(),
+            vec!["P", "Q"]
+        );
+    }
+}
+
+#[test]
+fn mapping_warns_on_malformed_rows_with_optional_outer_pipes() {
+    let parsed = parse_mapping("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| `Broken` | only two cells\n");
+    assert_eq!(parsed.rows, Vec::new());
+    assert_eq!(parsed.warnings, vec!["line 3: expected 3 cells, found 2"]);
+}
+
+#[test]
+fn mapping_keeps_escaped_pipes_within_their_cell() {
+    let parsed = parse_mapping(
+        r"| Property | Source | Rust path constrained | Description |
+| --- | --- | --- | --- |
+| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` | a \| b |
+",
+    );
+    assert_eq!(parsed.warnings, Vec::<String>::new());
+    assert_eq!(parsed.rows.len(), 1);
+    assert_eq!(parsed.rows[0].property, "P");
+    assert_eq!(markdown_cells(r"| a \| b | c |"), vec![r"a \| b", "c"]);
+    assert_eq!(markdown_cells(r"| a \\| b | c |"), vec![r"a \\", "b", "c"]);
+}
+
+#[test]
+fn mapping_blank_line_ends_the_property_table() {
+    let parsed = parse_mapping("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` |\n\n| Artifact | Source |\n| --- | --- |\n| guide | docs/guide.md |\n");
+    assert_eq!(parsed.warnings, Vec::<String>::new());
+    assert_eq!(parsed.rows.len(), 1);
+    assert_eq!(parsed.rows[0].property, "P");
+}
+
+#[test]
+fn mapping_refuses_property_headers_with_two_renamed_columns() {
+    for (header, missing) in [
+        (
+            "| Property | Spec | Rust path |",
+            "Source, Rust path constrained",
+        ),
+        (
+            "| Invariant | Spec | Rust path constrained |",
+            "Property, Source",
+        ),
+    ] {
+        let parsed = parse_mapping(&format!("{header}\n| --- | --- | --- |\n| P | formal/P.tla | crates/core/chio-core/src/lib.rs |\n"));
+        assert_eq!(parsed.rows, Vec::new());
+        assert_eq!(
+            parsed.warnings,
+            vec![format!(
+                "line 1: property table missing required columns: {missing}"
+            )]
+        );
+        assert_eq!(reject_mapping_warnings("formal/MAPPING.md", &parsed.warnings), Err(format!("formal/MAPPING.md has 1 malformed property table row(s):\n  formal/MAPPING.md line 1: property table missing required columns: {missing}")));
+    }
+}
+
+#[test]
+fn mapping_warns_on_orphaned_rows_after_a_blank_line() {
+    for row in [
+        "| Q | formal/Q.tla | crates/core/chio-core/src/lib.rs |",
+        "Q | formal/Q.tla | crates/core/chio-core/src/lib.rs",
+    ] {
+        let parsed = parse_mapping(&format!("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| P | formal/P.tla | crates/core/chio-core/src/lib.rs |\n\n{row}\n"));
+        assert_eq!(parsed.rows.len(), 1);
+        assert_eq!(parsed.rows[0].property, "P");
+        assert_eq!(
+            parsed.warnings,
+            vec!["line 5: orphaned property table row after table boundary"]
+        );
+        assert_eq!(reject_mapping_warnings("formal/MAPPING.md", &parsed.warnings), Err("formal/MAPPING.md has 1 malformed property table row(s):\n  formal/MAPPING.md line 5: orphaned property table row after table boundary".to_string()));
+    }
+}
+
+#[test]
+fn mapping_blank_line_does_not_ingest_a_same_width_unrelated_table() {
+    let parsed = parse_mapping("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| P | formal/P.tla | crates/core/chio-core/src/lib.rs |\n\n| Artifact | Source | Notes |\n| --- | --- | --- |\n| guide | docs/guide.md | reference |\n");
+    assert_eq!(parsed.warnings, Vec::<String>::new());
+    assert_eq!(parsed.rows.len(), 1);
+    assert_eq!(parsed.rows[0].property, "P");
+}
+
+#[test]
 fn mapping_source_and_rust_path_validation_fail_closed() {
     let root = std::env::temp_dir().join(format!(
         "chio-proof-coverage-mapping-{}",
@@ -900,60 +1006,3 @@ mod aeneas;
 mod mutation;
 
 mod open_residual;
-
-#[test]
-fn mapping_ignores_unrelated_tables_with_a_source_column() {
-    let parsed = parse_mapping("| Artifact | Source |\n| --- | --- |\n| guide | docs/guide.md |\n");
-    assert_eq!(parsed.rows, Vec::new());
-    assert_eq!(parsed.warnings, Vec::<String>::new());
-}
-
-#[test]
-fn mapping_accepts_optional_outer_pipes_without_dropping_following_rows() {
-    for row in [
-        "| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs`",
-        "`P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` |",
-        "`P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs`",
-    ] {
-        let parsed = parse_mapping(&format!("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n{row}\n| `Q` | `formal/Q.tla` | `crates/core/chio-core/src/lib.rs` |\n"));
-        assert_eq!(parsed.warnings, Vec::<String>::new());
-        assert_eq!(
-            parsed
-                .rows
-                .iter()
-                .map(|row| row.property.as_str())
-                .collect::<Vec<_>>(),
-            vec!["P", "Q"]
-        );
-    }
-}
-
-#[test]
-fn mapping_warns_on_malformed_rows_with_optional_outer_pipes() {
-    let parsed = parse_mapping("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| `Broken` | only two cells\n");
-    assert_eq!(parsed.rows, Vec::new());
-    assert_eq!(parsed.warnings, vec!["line 3: expected 3 cells, found 2"]);
-}
-
-#[test]
-fn mapping_keeps_escaped_pipes_within_their_cell() {
-    let parsed = parse_mapping(
-        r"| Property | Source | Rust path constrained | Description |
-| --- | --- | --- | --- |
-| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` | a \| b |
-",
-    );
-    assert_eq!(parsed.warnings, Vec::<String>::new());
-    assert_eq!(parsed.rows.len(), 1);
-    assert_eq!(parsed.rows[0].property, "P");
-    assert_eq!(markdown_cells(r"| a \| b | c |"), vec![r"a \| b", "c"]);
-    assert_eq!(markdown_cells(r"| a \\| b | c |"), vec![r"a \\", "b", "c"]);
-}
-
-#[test]
-fn mapping_blank_line_ends_the_property_table() {
-    let parsed = parse_mapping("| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| `P` | `formal/P.tla` | `crates/core/chio-core/src/lib.rs` |\n\n| Artifact | Source |\n| --- | --- |\n| guide | docs/guide.md |\n");
-    assert_eq!(parsed.warnings, Vec::<String>::new());
-    assert_eq!(parsed.rows.len(), 1);
-    assert_eq!(parsed.rows[0].property, "P");
-}

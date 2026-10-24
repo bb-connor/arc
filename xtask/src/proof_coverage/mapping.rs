@@ -5,31 +5,28 @@ pub(super) fn parse_mapping(input: &str) -> MappingParse {
     let mut section = String::new();
     let mut headers: Option<Vec<String>> = None;
 
-    for (index, raw_line) in input.lines().enumerate() {
+    let mut property_table_ended = false;
+    let mut lines = input.lines().enumerate().peekable();
+    while let Some((index, raw_line)) = lines.next() {
         let line_number = index + 1;
         let line = raw_line.trim();
         if let Some(heading) = line.strip_prefix("## ") {
             section = heading.trim().to_string();
+            property_table_ended = false;
             headers = None;
             continue;
         }
         if !line.contains('|') {
+            property_table_ended = line.is_empty() && (property_table_ended || headers.is_some());
             headers = None;
             continue;
         }
         let cells = markdown_cells(line);
         if headers.is_none() {
             let property = cells.iter().any(|cell| cell == "Property");
-            let source = cells
-                .iter()
-                .any(|cell| cell == "Source" || cell.starts_with("Source "));
             let rust = cells.iter().any(|cell| cell == "Rust path constrained");
-            let looks_like_property_header = [property, source, rust]
-                .into_iter()
-                .filter(|present| *present)
-                .count()
-                >= 2;
-            if looks_like_property_header {
+            if property || rust {
+                property_table_ended = false;
                 let mut missing = Vec::new();
                 if !cells.iter().any(|cell| cell == "Property") {
                     missing.push("Property");
@@ -51,6 +48,18 @@ pub(super) fn parse_mapping(input: &str) -> MappingParse {
                     continue;
                 }
                 headers = Some(cells);
+            } else if property_table_ended {
+                let starts_table = lines.peek().is_some_and(|(_, next)| {
+                    let next_cells = markdown_cells(next.trim());
+                    next_cells.len() == cells.len() && separator_cells(&next_cells)
+                });
+                if starts_table {
+                    property_table_ended = false;
+                } else {
+                    parsed.warnings.push(format!(
+                        "line {line_number}: orphaned property table row after table boundary"
+                    ));
+                }
             }
             continue;
         }
