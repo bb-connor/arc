@@ -20,6 +20,8 @@ class RegistryStatusGateTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         (self.root / "scripts").mkdir()
+        (self.root / "spec/registries").mkdir(parents=True)
+        (self.root / "formal").mkdir()
         shutil.copyfile(SCRIPT, self.root / "scripts" / SCRIPT.name)
 
     def write(self, rel: str, text: str) -> None:
@@ -46,8 +48,27 @@ class RegistryStatusGateTests(unittest.TestCase):
             f"registry status gate: no '{NEEDLE}' occurrences under spec/registries formal",
         )
 
-    def test_green_missing_roots(self) -> None:
-        self.assertEqual(self.run_check().returncode, 0)
+    def test_red_missing_roots(self) -> None:
+        (self.root / "spec/registries").rmdir()
+        (self.root / "formal").rmdir()
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: required scan root missing: spec/registries\n")
+
+    def test_red_missing_one_root(self) -> None:
+        (self.root / "formal").rmdir()
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: required scan root missing: formal\n")
+
+    def test_red_scan_error(self) -> None:
+        (self.root / "formal/broken-link").symlink_to("missing-source")
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: cannot scan formal\n")
 
     def test_green_other_directories_are_not_scanned(self) -> None:
         self.write("docs/notes.md", f"status: {NEEDLE}\n")

@@ -130,6 +130,56 @@ class RetirementCalibration(unittest.TestCase):
             errors = gate.check(ROOT, changed)[0]
         self.assertIn("retired direct-reader signed helper changed: " + MERCURY, errors)
 
+    def test_bound_constant_cannot_change_without_review(self):
+        files = self.files.copy()
+        before = "const MAX_JSON_INPUT_BYTES: usize = 16 * 1024 * 1024;"
+        self.assertEqual(files[MERCURY].count(before), 1)
+        files[MERCURY] = files[MERCURY].replace(before, "const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024 * 1024;", 1)
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader bound constant changed: " + MERCURY],
+        )
+
+    def test_bound_constant_must_resolve_uniquely(self):
+        declaration = "const MAX_JSON_INPUT_BYTES: usize = 16 * 1024 * 1024;"
+        for replacement in ("", declaration + "\n" + declaration):
+            with self.subTest(replacement=replacement):
+                files = self.files.copy()
+                files[MERCURY] = files[MERCURY].replace(declaration, replacement, 1)
+                self.assertEqual(
+                    gate.retired_direct_contracts(self.catalog, self.found, files),
+                    ["retired direct-reader bound constant changed: " + MERCURY],
+                )
+
+    def test_bounded_reader_reference_noise_is_ignored(self):
+        files = self.files.copy()
+        files[MERCURY] += (
+            '\n// read_json_file_bounded\n'
+            'const READER_NOTE: &str = "read_json_file_bounded";\n'
+            '#[cfg(test)] mod reference_test {\n'
+            '    use super::read_json_file_bounded as indirect_reader;\n'
+            '}\n'
+        )
+        self.assertEqual(gate.retired_direct_contracts(self.catalog, self.found, files), [])
+
+    def test_bounded_reader_function_item_reference_requires_review(self):
+        files = self.files.copy()
+        files[MERCURY] += ("\nfn indirect_reader(path: &Path) { "
+                           "let reader = read_json_file_bounded::<serde_json::Value>; "
+                           "reader(path, usize::MAX); }\n")
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader signed helper changed: " + MERCURY],
+        )
+
+    def test_bounded_reader_module_alias_requires_review(self):
+        files = self.files.copy()
+        files[MERCURY] += "\nuse self::read_json_file_bounded as indirect_reader;\n"
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader signed helper changed: " + MERCURY],
+        )
+
     def test_helper_consumer_cannot_be_silently_dropped(self):
         changed = copy.deepcopy(self.catalog)
         changed["retired_direct_readers"][BINDING]["consumers"] = []

@@ -25,6 +25,7 @@ class ProptestCoverageTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         shutil.copyfile(SCRIPT, self.root / "scripts" / SCRIPT.name)
         self.assertEqual(TOTAL, 16)
+        self.assertEqual(len(set(INVARIANTS)), TOTAL)
         for file in {file for file, _ in INVARIANTS}:
             (self.root / file).parent.mkdir(parents=True, exist_ok=True)
             (self.root / file).write_text("", encoding="utf-8")
@@ -67,6 +68,18 @@ class ProptestCoverageTests(unittest.TestCase):
         result = self.run_check()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), f"check-proptest-coverage: {TOTAL} of {TOTAL} named invariants present")
+
+    def test_red_duplicate_invariant_registration(self) -> None:
+        script = self.root / "scripts" / SCRIPT.name
+        text = script.read_text(encoding="utf-8")
+        first = "::".join(INVARIANTS[0])
+        second = "::".join(INVARIANTS[1])
+        self.assertEqual(text.count(f'"{second}"'), 1)
+        script.write_text(text.replace(f'"{second}"', f'"{first}"', 1), encoding="utf-8")
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, f"FAIL: duplicate invariant registration: {first}\n")
 
     def test_green_name_inside_proptest_block(self) -> None:
         self.rewrite(FIRST_FILE, f"proptest! {{\n    {FIRST_NAME}(x in 0..1) {{}}\n}}\n")

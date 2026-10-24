@@ -124,15 +124,18 @@ class ReceiptTraceNegativeRegistryTests(unittest.TestCase):
         self.assert_red(f"{name} lacks an Apalache witness")
 
     def test_red_missing_calibration_symbol(self) -> None:
-        cases = {
-            NATIVE: ("BlindRevocationStore", "BlindRevocationStore"),
-            NATIVE_TESTS: ("runtime_trace_refuses_a_dropped_admission_callback", "runtime_trace_refuses_a_dropped_admission_callback"),
-            CAPTURE: ("DepthAboveLimit", "DepthAboveLimit"),
-        }
-        for rel, (symbol, expected) in cases.items():
+        cases = [
+            (NATIVE, "BlindRevocationStore"),
+            (NATIVE_TESTS, "runtime_trace_refuses_a_dropped_admission_callback"),
+            (NATIVE, "AdmissionDroppingObserver"),
+            (CAPTURE, "DuplicateReceiptTime"),
+            (CAPTURE, "DepthAboveLimit"),
+            (CAPTURE, "FutureRevocationEpoch"),
+        ]
+        for rel, symbol in cases:
             with self.subTest(symbol):
                 self.write(rel, SOURCES[rel].replace(symbol, "Renamed"))
-                self.assert_red(f"missing calibration symbol {expected}")
+                self.assert_red(f"missing calibration symbol {symbol}")
                 self.write(rel, SOURCES[rel])
 
     def test_red_bad_report_argument(self) -> None:

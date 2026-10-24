@@ -23893,6 +23893,8 @@
       "helper_source_sha256": "04a67b38d23597da5e255283332686b3457faf8c85cef63cf9dfe7655380a8a5",
       "reader": "read_json_file_bounded",
       "reader_source_sha256": "f9b549eb1fd29faac859e9c234fa7f869988058e677a6c8d1d8b4af3585058bc",
+      "bound_constant": "MAX_JSON_INPUT_BYTES",
+      "bound_source_sha256": "be1ade618fcf5f4def87991c6f2e282fd46e3c467fde642ecd413b80101db67d",
       "constructor_contract": "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire#1::decode_signed",
       "ingress": [
         "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file",
