@@ -5,7 +5,7 @@ pub(crate) async fn handle_internal_cluster_partition(
     grant: Option<axum::Extension<RouteGrant>>,
     Json(payload): Json<ClusterPartitionRequest>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let Some(cluster) = state.cluster.as_ref() else {

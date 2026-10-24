@@ -1,8 +1,9 @@
 //! Operator stop routes over the kernel scope of this node's admission authority.
 //!
-//! The routes authenticate with the service token. With a joint admission
-//! authority the stop is durable on its store, and the admission authority RPC
-//! refuses to begin admissions while it holds, so remote edges observe it.
+//! The routes require a credential with deployment tenant authority holding
+//! `admin:emergency`. With a joint admission authority the stop is durable on
+//! its store, and the admission authority RPC refuses to begin admissions
+//! while it holds, so remote edges observe it.
 use chio_kernel::stop::{
     ResumeCommand, ResumeRequestBody, StopAuthorizer, StopCommand, StopControl, StopControlError,
     StopRequestBody, StopRequestPath,

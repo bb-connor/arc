@@ -139,14 +139,20 @@ mod cluster_and_reports_tests {
         public: axum::Router<TrustServiceState>,
         internal: axum::Router<TrustServiceState>,
     ) -> axum::Router {
+        use crate::trust_control::caller_credentials::PeerNonceCache;
         use crate::trust_control::route_authorization::{
             authorize_route, Listener, RouteAuthorizer,
         };
+        // A served test peer is a receiver whose nonce cache predates every
+        // request of the scenario, so only the freshness window applies even
+        // when its clock is set ahead of the signers'.
         let authorizer = |listener| {
-            Arc::new(RouteAuthorizer::new(
+            let pinned_peers = state.config.access.peers().iter().count();
+            Arc::new(RouteAuthorizer::with_nonce_cache(
                 listener,
                 Arc::clone(&state.config.access),
                 Arc::clone(&state.finding_challenge_clock),
+                PeerNonceCache::new(Some(0), pinned_peers),
             ))
         };
         public

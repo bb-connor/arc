@@ -125,7 +125,9 @@ impl ServedPeer {
                 let unavailable = served_authority_snapshot_unavailable.clone();
                 let snapshot_override = served_authority_snapshot_override.clone();
                 async move {
-                    if let Err(response) = require_peer_grant(grant.as_ref()) {
+                    if let Err(response) =
+                        require_peer_grant(grant.as_ref(), Scope::ClusterReplicate)
+                    {
                         return response;
                     }
                     if unavailable.load(Ordering::SeqCst) {

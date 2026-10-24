@@ -10,7 +10,7 @@ pub(crate) async fn handle_internal_cluster_snapshot(
     State(state): State<TrustServiceState>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterOpeningsReplicate) {
         return response;
     }
     if state.cluster.is_none() {
@@ -31,7 +31,7 @@ pub(crate) async fn handle_internal_authority_status(
     State(state): State<TrustServiceState>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     match super::super::report_validation::inspect_authority_state(
@@ -49,7 +49,7 @@ pub(crate) async fn handle_internal_authority_snapshot(
     State(state): State<TrustServiceState>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {

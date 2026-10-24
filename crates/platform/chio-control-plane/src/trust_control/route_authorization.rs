@@ -343,13 +343,18 @@ pub enum RouteGrant {
     Peer(AuthenticatedPeer),
 }
 
-/// The verified peer of a peer route. A handler reached without the route
-/// table middleware's peer grant refuses.
+/// The verified peer of a peer route, holding `scope`. A handler reached
+/// without the route table middleware's peer grant, or with a grant whose
+/// peer lacks `scope`, refuses.
 pub(crate) fn require_peer_grant(
     grant: Option<&axum::Extension<RouteGrant>>,
+    scope: Scope,
 ) -> Result<&AuthenticatedPeer, Response> {
     match grant {
-        Some(axum::Extension(RouteGrant::Peer(peer))) => Ok(peer),
+        Some(axum::Extension(RouteGrant::Peer(peer))) if peer.scopes.contains(&scope) => Ok(peer),
+        Some(axum::Extension(RouteGrant::Peer(_))) => {
+            Err(PeerAuthError::MissingScope(scope).into_response())
+        }
         _ => Err(PeerAuthError::Unauthenticated.into_response()),
     }
 }
@@ -375,8 +380,22 @@ impl std::fmt::Debug for RouteAuthorizer {
 }
 
 impl RouteAuthorizer {
+    /// The peer nonce cache starts at the receiver time read here, so a peer
+    /// request issued before this authorizer existed refuses as stale.
     #[must_use]
     pub fn new(listener: Listener, access: Arc<TrustAccess>, clock: Arc<dyn Clock>) -> Self {
+        let nonces = PeerNonceCache::new(unix_secs(clock.as_ref()), access.peers().iter().count());
+        Self::with_nonce_cache(listener, access, clock, nonces)
+    }
+
+    /// As [`RouteAuthorizer::new`], with the given peer nonce cache.
+    #[must_use]
+    pub fn with_nonce_cache(
+        listener: Listener,
+        access: Arc<TrustAccess>,
+        clock: Arc<dyn Clock>,
+        nonces: PeerNonceCache,
+    ) -> Self {
         let rules = ROUTE_TABLE
             .iter()
             .map(|rule| ((rule.method, rule.path), rule))
@@ -385,7 +404,7 @@ impl RouteAuthorizer {
             listener,
             access,
             clock,
-            nonces: PeerNonceCache::default(),
+            nonces,
             rules,
         }
     }
@@ -487,16 +506,9 @@ impl RouteAuthorizer {
         headers: &HeaderMap,
         body: &[u8],
     ) -> Result<AuthenticatedPeer, PeerAuthError> {
-        if headers.contains_key(AUTHORIZATION) {
-            return Err(PeerAuthError::CallerCredentialOnPeerRoute);
-        }
+        self.precheck_peer(headers)?;
         let scope = rule.scope.ok_or(PeerAuthError::Unauthenticated)?;
-        let now = self
-            .clock
-            .unix_millis()
-            .ok()
-            .and_then(|now| i64::try_from(now.as_secs()).ok())
-            .ok_or(PeerAuthError::Unauthenticated)?;
+        let now = unix_secs(self.clock.as_ref()).ok_or(PeerAuthError::ClockUnavailable)?;
         let target = PeerRequestTarget {
             method: method.as_str(),
             path,
@@ -507,6 +519,22 @@ impl RouteAuthorizer {
             .peers()
             .verify(headers, &target, now, scope, &self.nonces)
     }
+
+    /// The checks a peer row runs before its body is read: no bearer
+    /// credential, well-formed authentication headers and a pinned node id.
+    fn precheck_peer(&self, headers: &HeaderMap) -> Result<(), PeerAuthError> {
+        if headers.contains_key(AUTHORIZATION) {
+            return Err(PeerAuthError::CallerCredentialOnPeerRoute);
+        }
+        self.access.peers().precheck(headers)
+    }
+}
+
+fn unix_secs(clock: &dyn Clock) -> Option<i64> {
+    clock
+        .unix_millis()
+        .ok()
+        .and_then(|now| i64::try_from(now.as_secs()).ok())
 }
 
 fn carries_peer_authentication(headers: &HeaderMap) -> bool {
@@ -536,6 +564,18 @@ fn route_absent() -> Response {
     )
 }
 
+/// Middleware for a listener's whole router (`Router::layer`): a `/v1`
+/// request that matched no route refuses as an absent route, so no fallback
+/// (such as the dashboard files) answers an API path.
+pub async fn refuse_unrouted_api_path(request: Request, next: Next) -> Response {
+    let path = request.uri().path();
+    let api_path = path == "/v1" || path.starts_with("/v1/");
+    if api_path && request.extensions().get::<MatchedPath>().is_none() {
+        return route_absent();
+    }
+    next.run(request).await
+}
+
 /// The matched route pattern relative to any outer nest. Axum includes every
 /// outer nest prefix in `MatchedPath`; `NestedPath` is framework-owned route
 /// context, so the prefix is removed without trusting request URI text.
@@ -559,6 +599,7 @@ pub const PEER_ROUTE_MAX_BODY_BYTES: usize = 64 * 1024;
 
 /// Middleware enforcing the route table. Mount it with `route_layer` so the
 /// matched route is known; the grant is inserted into the request extensions.
+/// A peer row reads its body only after the header precheck passes.
 pub async fn authorize_route(
     State(authorizer): State<Arc<RouteAuthorizer>>,
     request: Request,
@@ -573,6 +614,9 @@ pub async fn authorize_route(
         .rule(&parts.method, matched.as_deref())
         .is_some_and(|rule| rule.credential == RouteCredential::Peer);
     let (body, signed_body) = if peer_route {
+        if let Err(error) = authorizer.precheck_peer(&parts.headers) {
+            return error.into_response();
+        }
         match axum::body::to_bytes(body, PEER_ROUTE_MAX_BODY_BYTES).await {
             Ok(bytes) => (Body::from(bytes.clone()), bytes),
             Err(_) => {

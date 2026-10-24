@@ -31,8 +31,8 @@ pub(crate) async fn handle_list_tool_receipts(
     // Point-load by receipt id: resolve exactly one receipt from the durable
     // store (bounded to one row) so a bounded in-memory mirror eviction on the
     // kernel does not cause a false denial of a governed call-chain
-    // continuation. This endpoint retains its admin service contract and
-    // passes that authenticated context to the store. Tenant read tokens use
+    // continuation. A point load requires deployment tenant authority and
+    // passes that authenticated context to the store. Tenant credentials use
     // the tenant-filtered list surface.
     if let Some(receipt_id) = query.receipt_id.clone() {
         if !matches!(principal, ResolvedControlReadPrincipal::AdminService) {
@@ -189,10 +189,10 @@ pub(crate) async fn handle_list_child_receipts(
         Ok(store) => store,
         Err(response) => return response,
     };
-    // Point-load by receipt id (admin service only: tenant read tokens are
-    // already rejected above). Resolves exactly one child receipt from the
-    // durable store so bounded-mirror eviction on the kernel does not falsely
-    // deny a governed call-chain continuation.
+    // Point-load by receipt id (deployment tenant authority only: tenant
+    // credentials are already rejected above). Resolves exactly one child
+    // receipt from the durable store so bounded-mirror eviction on the kernel
+    // does not falsely deny a governed call-chain continuation.
     if let Some(receipt_id) = query.receipt_id.as_deref() {
         let receipts = match store.load_child_receipt(receipt_id) {
             Ok(Some(receipt)) => match serde_json::to_value(receipt) {

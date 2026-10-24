@@ -15,7 +15,8 @@ use super::super::caller_credentials::tests::{
     DEPLOYMENT, SELF_NODE,
 };
 use super::super::caller_credentials::{
-    sign_cluster_peer_request, PeerAddressing, TrustAccess, TrustAccessConfig,
+    sign_cluster_peer_request, AuthenticatedPeer, PeerAddressing, TrustAccess, TrustAccessConfig,
+    CLUSTER_PEER_SIGNATURE_SCHEME,
 };
 use super::*;
 
@@ -435,6 +436,30 @@ fn router_for<'a>(fixture: &'a Fixture, rule: &RouteRule) -> &'a Router {
 const CREDENTIAL_ROUTES: [RouteCredential; 2] =
     [RouteCredential::Caller, RouteCredential::Deployment];
 
+const UNKNOWN_CREDENTIAL: &str = "missing or invalid trust-control credential";
+const UNAUTHENTICATED_PEER: &str = "missing or invalid cluster peer authentication";
+
+/// A `HEAD` request's status and `WWW-Authenticate` challenge.
+async fn head(
+    router: &Router,
+    rule: &RouteRule,
+    headers: HeaderMap,
+) -> (StatusCode, Option<String>) {
+    let mut request = HttpRequest::builder()
+        .method("HEAD")
+        .uri(concrete(rule.path))
+        .body(Body::empty())
+        .test_unwrap();
+    *request.headers_mut() = headers;
+    let response = router.clone().oneshot(request).await.test_unwrap();
+    let challenge = response
+        .headers()
+        .get(axum::http::header::WWW_AUTHENTICATE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    (response.status(), challenge)
+}
+
 #[tokio::test]
 async fn unknown_route_refuses() {
     let fixture = fixture();
@@ -499,8 +524,20 @@ async fn read_scope_cannot_write() {
         let (status, body) = call(router, rule, "", bearer("readers-secret")).await;
         if scope.as_str().ends_with(":read") && rule.credential == RouteCredential::Caller {
             assert_eq!(status, StatusCode::OK, "{} {body}", rule.path);
+        } else if scope.as_str().ends_with(":read") {
+            assert_eq!(status, StatusCode::FORBIDDEN, "{} {body}", rule.path);
+            assert!(
+                body.contains("route requires a deployment credential"),
+                "{} {body}",
+                rule.path
+            );
         } else {
             assert_eq!(status, StatusCode::FORBIDDEN, "{} {body}", rule.path);
+            assert!(
+                body.contains(&format!("trust-control credential lacks scope {scope}")),
+                "{} {body}",
+                rule.path
+            );
         }
     }
 }
@@ -612,8 +649,13 @@ async fn peer_credential_refused_on_public_routes() {
             AUTHORIZATION,
             HeaderValue::from_static("Bearer operator-secret"),
         );
-        let (status, _) = call(&fixture.public, rule, "", both).await;
+        let (status, body) = call(&fixture.public, rule, "", both).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(
+            body.contains("cluster peer authentication is refused on a caller route"),
+            "{} {body}",
+            rule.path
+        );
     }
 }
 
@@ -631,8 +673,13 @@ async fn caller_credential_refused_on_peer_routes() {
             AUTHORIZATION,
             HeaderValue::from_static("Bearer kernel-secret"),
         );
-        let (status, _) = call(&fixture.internal, rule, "", both).await;
+        let (status, body) = call(&fixture.internal, rule, "", both).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(
+            body.contains("caller credentials are refused on a cluster peer route"),
+            "{} {body}",
+            rule.path
+        );
     }
 }
 
@@ -681,11 +728,12 @@ async fn deployment_credential_of_other_deployment_refused() {
             Listener::Public => &other_public,
             Listener::Internal => &other_internal,
         };
-        let (status, _) = call(router, rule, "", bearer("kernel-secret")).await;
+        let (status, body) = call(router, rule, "", bearer("kernel-secret")).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(body.contains(UNKNOWN_CREDENTIAL), "{} {body}", rule.path);
         let (status, _) = call(router, rule, "", bearer("dep-b-kernel-secret")).await;
         assert_eq!(status, StatusCode::OK, "{}", rule.path);
-        let (status, _) = call(
+        let (status, body) = call(
             router_for(&fixture, rule),
             rule,
             "",
@@ -693,6 +741,7 @@ async fn deployment_credential_of_other_deployment_refused() {
         )
         .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(body.contains(UNKNOWN_CREDENTIAL), "{} {body}", rule.path);
     }
 }
 
@@ -705,8 +754,13 @@ async fn internal_listener_refuses_without_credential() {
         .collect();
     assert_eq!(internal.len(), 11);
     for rule in internal {
-        let (status, _) = call(&fixture.internal, rule, "", HeaderMap::new()).await;
+        let (status, body) = call(&fixture.internal, rule, "", HeaderMap::new()).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        let expected = match rule.credential {
+            RouteCredential::Peer => UNAUTHENTICATED_PEER,
+            _ => UNKNOWN_CREDENTIAL,
+        };
+        assert!(body.contains(expected), "{} {body}", rule.path);
     }
 }
 
@@ -755,11 +809,12 @@ async fn service_token_secret_no_longer_authenticates_cluster_routes() {
             CLUSTER_AUTH_SIGNATURE_HEADER,
             HeaderValue::from_str(&hmac).test_unwrap(),
         );
-        let (status, _) = call(&fixture.internal, rule, "", headers).await;
+        let (status, body) = call(&fixture.internal, rule, "", headers).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(body.contains(UNAUTHENTICATED_PEER), "{} {body}", rule.path);
     }
     for rule in rows(&CREDENTIAL_ROUTES) {
-        let (status, _) = call(
+        let (status, body) = call(
             router_for(&fixture, rule),
             rule,
             "",
@@ -767,6 +822,7 @@ async fn service_token_secret_no_longer_authenticates_cluster_routes() {
         )
         .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+        assert!(body.contains(UNKNOWN_CREDENTIAL), "{} {body}", rule.path);
     }
 }
 
@@ -881,8 +937,13 @@ async fn head_follows_get_rows() {
             rule.credential,
             RouteCredential::Peer | RouteCredential::Deployment | RouteCredential::Caller
         ) {
-            let (status, _) = send(router, "HEAD", rule, "", refused, Vec::new()).await;
+            let (status, challenge) = head(router, rule, refused).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED, "HEAD {}", rule.path);
+            let expected = match rule.credential {
+                RouteCredential::Peer => CLUSTER_PEER_SIGNATURE_SCHEME,
+                _ => "Bearer",
+            };
+            assert_eq!(challenge.as_deref(), Some(expected), "HEAD {}", rule.path);
         }
     }
 }
@@ -993,4 +1054,166 @@ async fn finding_buyer_routes_hold_caller_credentials_to_caller_rules() {
         let (status, _) = call(&fixture.public, rule, "", signed).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
     }
+}
+
+fn mounted_with_nonce_capacity(listener: Listener, text: &str, capacity: usize) -> Router {
+    let config = TrustAccessConfig::from_toml_str(text).test_unwrap();
+    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let nonces = PeerNonceCache::with_capacity(
+        Some(i64::try_from(NOW).test_unwrap()),
+        access.peers().iter().count(),
+        capacity,
+    );
+    mounted_router(RouteAuthorizer::with_nonce_cache(
+        listener,
+        Arc::new(access),
+        Arc::new(FixedClock::new(NOW)),
+        nonces,
+    ))
+}
+
+#[tokio::test]
+async fn peer_nonce_quota_and_full_cache_refuse_with_503() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let internal =
+        mounted_with_nonce_capacity(Listener::Internal, &fixture_config(&node_b, &node_c), 2);
+    let rule = peer_row("/v1/internal/cluster/status");
+    let (status, _) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(
+        body.contains("cluster peer has no nonce capacity left in the replay cache"),
+        "{body}"
+    );
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_c, NODE_C, rule, "")).await;
+    assert_eq!((status, body), (StatusCode::OK, format!("peer:{NODE_C}")));
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_c, NODE_C, rule, "")).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(
+        body.contains("cluster peer replay cache cannot admit another request"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn peer_headers_are_checked_before_the_body_is_read() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/partition");
+    let oversized = vec![b'x'; PEER_ROUTE_MAX_BODY_BYTES + 1];
+    let impostor = Keypair::generate();
+    let unpinned = signed_request_headers(
+        &impostor,
+        "https://node-x.example:9101",
+        "POST",
+        rule,
+        "",
+        &oversized,
+    );
+    let (status, body) = send(
+        &fixture.internal,
+        "POST",
+        rule,
+        "",
+        unpinned,
+        oversized.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        body.contains("cluster peer signature does not verify under a pinned key"),
+        "{body}"
+    );
+    let (status, body) = send(
+        &fixture.internal,
+        "POST",
+        rule,
+        "",
+        HeaderMap::new(),
+        oversized,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(body.contains(UNAUTHENTICATED_PEER), "{body}");
+}
+
+#[tokio::test]
+async fn peer_route_refuses_with_503_when_the_receiver_clock_is_unavailable() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let config = TrustAccessConfig::from_toml_str(&fixture_config(&node_b, &node_c)).test_unwrap();
+    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let internal = mounted_router(RouteAuthorizer::new(
+        Listener::Internal,
+        Arc::new(access),
+        Arc::new(FixedClock::new(u64::MAX)),
+    ));
+    let rule = peer_row("/v1/internal/cluster/status");
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(
+        body.contains("receiver clock is unavailable for cluster peer authentication"),
+        "{body}"
+    );
+}
+
+async fn refusal_text(response: Response) -> (StatusCode, String) {
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .test_unwrap();
+    (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
+#[tokio::test]
+async fn peer_handlers_recheck_their_row_scope() {
+    let peer = AuthenticatedPeer {
+        node_id: NODE_C.to_string(),
+        issued_at: i64::try_from(NOW).test_unwrap(),
+        term: None,
+        scopes: [Scope::ClusterReplicate].into_iter().collect(),
+    };
+    let grant = Extension(RouteGrant::Peer(peer));
+    assert_eq!(
+        require_peer_grant(Some(&grant), Scope::ClusterReplicate)
+            .test_unwrap()
+            .node_id,
+        NODE_C
+    );
+    let refused = require_peer_grant(Some(&grant), Scope::ClusterOpeningsReplicate)
+        .map(|_| ())
+        .test_unwrap_err();
+    let (status, body) = refusal_text(refused).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(
+        body.contains("cluster peer lacks scope cluster-openings:replicate"),
+        "{body}"
+    );
+    let caller = Extension(RouteGrant::Unchanged);
+    for grant in [Some(&caller), None] {
+        let refused = require_peer_grant(grant, Scope::ClusterReplicate)
+            .map(|_| ())
+            .test_unwrap_err();
+        let (status, body) = refusal_text(refused).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(body.contains(UNAUTHENTICATED_PEER), "{body}");
+    }
+}
+
+#[test]
+fn root_exchange_sign_loads_but_no_route_accepts_it() {
+    assert!(ROUTE_TABLE
+        .iter()
+        .all(|rule| rule.scope != Some(Scope::RootExchangeSign)));
+    TrustAccessConfig::from_toml_str(&config(&credential(
+        "root-exchange",
+        "deployment",
+        "root-exchange-secret",
+        &["root-exchange:sign"],
+        None,
+    )))
+    .test_unwrap();
 }

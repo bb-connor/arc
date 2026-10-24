@@ -1,3 +1,4 @@
+use super::caller_credentials::Scope;
 use super::report_rendering::{
     budget_cursor_view, json_response_with_leader_visibility,
     json_response_with_leader_visibility_and_budget_commit, revocation_cursor_view,

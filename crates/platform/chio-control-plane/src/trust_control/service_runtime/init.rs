@@ -6,7 +6,6 @@ use chio_http_serve::{
     apply_server_hygiene, run_until_drained, MaxConnListener, ServeHygieneConfig,
     ShutdownController,
 };
-use std::future::IntoFuture;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
@@ -283,7 +282,7 @@ async fn serve_async_inner(
         finding_authority_status_resolver,
         finding_challenge_executor,
     };
-    let controller = ShutdownController::install();
+    let controller = Arc::new(ShutdownController::install());
     let cluster_sync_task = state
         .cluster
         .is_some()
@@ -333,11 +332,17 @@ async fn serve_async_inner(
         internal_listener,
         hygiene.max_connections.unwrap_or(usize::MAX),
     );
-    let internal_server = tokio::spawn(
-        axum::serve(internal_listener, internal_router)
-            .with_graceful_shutdown(controller.signalled())
-            .into_future(),
-    );
+    // The public listener never outlives the internal one: cluster
+    // replication and the admission authority are served only there, so its
+    // exit, for any reason, drains the whole service.
+    let internal_controller = Arc::clone(&controller);
+    let internal_server = tokio::spawn(async move {
+        let served = axum::serve(internal_listener, internal_router)
+            .with_graceful_shutdown(internal_controller.signalled())
+            .await;
+        internal_controller.trigger();
+        served
+    });
     let listener = MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
     let server = axum::serve(listener, router).with_graceful_shutdown(controller.signalled());
 
@@ -364,12 +369,17 @@ async fn serve_async_inner(
     let internal_budget = shutdown_at.get().map_or(hygiene.drain_timeout, |observed| {
         cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
     });
-    match tokio::time::timeout(internal_budget, internal_server).await {
-        Ok(Ok(Ok(()))) => {}
-        Ok(Ok(Err(error))) => warn!(%error, "trust-control internal listener failed"),
-        Ok(Err(error)) => warn!(%error, "trust-control internal listener task failed"),
-        Err(_) => warn!("trust-control internal listener did not drain within the budget"),
-    }
+    let internal_result = match tokio::time::timeout(internal_budget, internal_server).await {
+        Ok(Ok(Ok(()))) => Ok(()),
+        Ok(Ok(Err(error))) => Err(format!("trust-control internal listener failed: {error}")),
+        Ok(Err(error)) => Err(format!(
+            "trust-control internal listener task failed: {error}"
+        )),
+        Err(_) => {
+            warn!("trust-control internal listener did not drain within the budget");
+            Ok(())
+        }
+    };
     if let Some(task) = cluster_sync_task {
         let join_budget = shutdown_at.get().map_or(hygiene.drain_timeout, |observed| {
             cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
@@ -414,7 +424,8 @@ async fn serve_async_inner(
 
     serve_result.map(|_outcome| ()).map_err(|error| {
         CliError::cli_other_error(format!("trust control service failed: {error}"))
-    })
+    })?;
+    internal_result.map_err(CliError::cli_other_error)
 }
 
 /// How long one startup readiness probe waits before it reports a writer that

@@ -34,7 +34,7 @@ pub(crate) async fn handle_internal_revocations_delta(
     Query(query): Query<RevocationDeltaQuery>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let store = match state.revocation_store() {
@@ -91,7 +91,7 @@ pub(crate) async fn handle_internal_tool_receipts_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterOpeningsReplicate) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -123,7 +123,7 @@ pub(crate) async fn handle_internal_child_receipts_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -155,7 +155,7 @@ pub(crate) async fn handle_internal_budgets_delta(
     Query(query): Query<BudgetDeltaQuery>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let store = match state.budget_store() {
@@ -233,7 +233,7 @@ pub(crate) async fn handle_internal_lineage_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let store = match state.receipt_store() {

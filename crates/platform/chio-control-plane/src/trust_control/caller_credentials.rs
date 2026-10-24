@@ -5,7 +5,7 @@
 //! in constant time. A cluster peer authenticates with an Ed25519 signature
 //! from the key pinned for its node id; no shared secret authenticates a peer.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Mutex;
 
@@ -31,7 +31,8 @@ use super::{
 /// recipient node id.
 pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-signature.v1";
 
-/// A peer request is fresh only within this many seconds of the receiver's clock.
+/// A peer request is fresh only within this many seconds of the highest
+/// receiver time its nonce cache has observed.
 pub const CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS: i64 = 60;
 
 /// Header carrying the lowercase hex SHA-256 of the request body (of the
@@ -43,7 +44,8 @@ pub const CLUSTER_AUTH_BODY_SHA256_HEADER: &str = "x-chio-cluster-auth-body-sha2
 pub const CLUSTER_AUTH_NONCE_HEADER: &str = "x-chio-cluster-auth-nonce";
 
 /// Upper bound on remembered peer nonces. A full cache refuses new peer
-/// requests rather than forgetting a nonce inside its freshness window.
+/// requests rather than forgetting a nonce inside its freshness window. Each
+/// pinned peer may hold at most an equal share of it.
 pub const CLUSTER_PEER_NONCE_CACHE_CAPACITY: usize = 65_536;
 
 const MAX_CREDENTIAL_ID_BYTES: usize = 128;
@@ -117,6 +119,7 @@ scopes! {
     ReputationRead => "reputation:read",
     ReputationWrite => "reputation:write",
     RevocationsRead => "revocations:read",
+    RootExchangeSign => "root-exchange:sign",
     RevocationsWrite => "revocations:write",
     ScimWrite => "scim:write",
     SettlementWrite => "settlement:write",
@@ -174,6 +177,8 @@ pub enum TrustAccessError {
     DuplicateCredentialId(String),
     #[error("credential \"{0}\" secret_sha256 must be 64 lowercase hex characters")]
     InvalidSecretDigest(String),
+    #[error("credential \"{0}\" secret must be non-empty, without surrounding whitespace or control characters")]
+    InvalidSecret(String),
     #[error("credentials \"{0}\" and \"{1}\" share one secret")]
     DuplicateSecret(String, String),
     #[error("credential \"{0}\" declares no scopes")]
@@ -218,6 +223,8 @@ pub enum TrustAccessError {
     ClusterIdentityWithoutPeers,
     #[error("cluster peer \"{0}\" is this node; a node never pins itself")]
     SelfPinned(String),
+    #[error("cluster peer \"{0}\" pins this node's own public key")]
+    PeerSharesNodeKey(String),
     #[error("internal_listen {0} must differ from the public listen address")]
     InternalListenerShared(SocketAddr),
     #[error("cluster peer signature payload could not be encoded: {0}")]
@@ -384,8 +391,9 @@ impl TrustAccess {
     }
 
     /// Access for a single, unclustered process whose one client holds
-    /// `secret`: one deployment credential with every caller scope and
-    /// deployment tenant authority, and a loopback ephemeral internal listener.
+    /// `secret`: one deployment credential with deployment tenant authority
+    /// holding every caller scope except `receipt-openings:*` and
+    /// `root-exchange:sign`, and a loopback ephemeral internal listener.
     pub fn single_client(
         deployment: &str,
         credential_id: &str,
@@ -397,10 +405,8 @@ impl TrustAccess {
                 credential_id.to_string(),
             ));
         }
-        if secret.is_empty() {
-            return Err(TrustAccessError::InvalidSecretDigest(
-                credential_id.to_string(),
-            ));
+        if secret.is_empty() || secret.trim() != secret || secret.chars().any(char::is_control) {
+            return Err(TrustAccessError::InvalidSecret(credential_id.to_string()));
         }
         let record = CredentialRecord {
             id: credential_id.to_string(),
@@ -409,7 +415,15 @@ impl TrustAccess {
             scopes: Scope::ALL
                 .iter()
                 .copied()
-                .filter(|scope| !scope.is_cluster())
+                .filter(|scope| {
+                    !scope.is_cluster()
+                        && !matches!(
+                            scope,
+                            Scope::ReceiptOpeningsRead
+                                | Scope::ReceiptOpeningsErase
+                                | Scope::RootExchangeSign
+                        )
+                })
                 .collect(),
             tenant_authority: TenantAuthority::Deployment,
         };
@@ -429,13 +443,20 @@ impl TrustAccess {
         Self::from_parts(config, None)
     }
 
-    /// Pair a validated configuration with its node key.
+    /// Pair a validated configuration with its node key. No pinned peer may
+    /// hold this node's own public key.
     pub fn from_parts(
         config: TrustAccessConfig,
         node_keypair: Option<Keypair>,
     ) -> Result<Self, TrustAccessError> {
         if config.peers.identity().is_some() != node_keypair.is_some() {
             return Err(TrustAccessError::ClusterIdentityRequired);
+        }
+        if let Some(keypair) = &node_keypair {
+            let own_key = keypair.public_key();
+            if let Some(peer) = config.peers.iter().find(|peer| peer.public_key == own_key) {
+                return Err(TrustAccessError::PeerSharesNodeKey(peer.node_id.clone()));
+            }
         }
         Ok(Self {
             config,
@@ -937,6 +958,17 @@ impl ClusterPeerPins {
         self.peers.values()
     }
 
+    /// Refuse a peer request whose authentication headers are malformed or
+    /// whose claimed node id is not pinned, before its body is read. An
+    /// unpinned node id refuses exactly as a bad signature does.
+    pub fn precheck(&self, headers: &HeaderMap) -> Result<(), PeerAuthError> {
+        let parsed = PeerHeaders::parse(headers)?;
+        if self.identity.is_none() || !self.peers.contains_key(&parsed.node_id) {
+            return Err(PeerAuthError::BadSignature);
+        }
+        Ok(())
+    }
+
     /// Verify a peer request against the pinned key of its claimed node id
     /// and require `required_scope`. `now_secs` is the receiver's clock.
     ///
@@ -949,7 +981,8 @@ impl ClusterPeerPins {
     ///    a bad signature does (`BadSignature`);
     /// 3. the signed body digest equals the SHA-256 of the received body
     ///    (`BodyMismatch`);
-    /// 4. the issue time is within the freshness window (`Stale`);
+    /// 4. the issue time is inside the nonce cache's acceptance window
+    ///    (`Stale`);
     /// 5. the peer holds `required_scope` (`MissingScope`);
     /// 6. the nonce has not been used by this node inside the window
     ///    (`ReplayedNonce`), and is then remembered until the window closes.
@@ -961,29 +994,14 @@ impl ClusterPeerPins {
         required_scope: Scope,
         nonces: &PeerNonceCache,
     ) -> Result<AuthenticatedPeer, PeerAuthError> {
-        let node_id = single_header(headers, CLUSTER_NODE_ID_HEADER)
-            .and_then(|value| normalize_cluster_url(value).ok())
-            .ok_or(PeerAuthError::Unauthenticated)?;
-        let issued_at = single_header(headers, CLUSTER_AUTH_ISSUED_AT_HEADER)
-            .and_then(|value| value.parse::<i64>().ok())
-            .ok_or(PeerAuthError::Unauthenticated)?;
-        let signature = single_header(headers, CLUSTER_AUTH_SIGNATURE_HEADER)
-            .and_then(|value| Signature::from_hex(value).ok())
-            .ok_or(PeerAuthError::Unauthenticated)?;
-        let nonce = single_header(headers, CLUSTER_AUTH_NONCE_HEADER)
-            .filter(|value| is_lowercase_hex_32(value))
-            .ok_or(PeerAuthError::Unauthenticated)?;
-        let claimed_body_sha256 = single_header(headers, CLUSTER_AUTH_BODY_SHA256_HEADER)
-            .filter(|value| is_lowercase_hex_32(value))
-            .ok_or(PeerAuthError::Unauthenticated)?;
-        let term = match headers.get(CLUSTER_AUTH_TERM_HEADER) {
-            None => None,
-            Some(_) => Some(
-                single_header(headers, CLUSTER_AUTH_TERM_HEADER)
-                    .and_then(|value| value.parse::<u64>().ok())
-                    .ok_or(PeerAuthError::Unauthenticated)?,
-            ),
-        };
+        let PeerHeaders {
+            node_id,
+            issued_at,
+            signature,
+            nonce,
+            body_sha256: claimed_body_sha256,
+            term,
+        } = PeerHeaders::parse(headers)?;
         let recipient = self
             .identity
             .as_ref()
@@ -1015,11 +1033,7 @@ impl ClusterPeerPins {
         ) {
             return Err(PeerAuthError::BodyMismatch);
         }
-        if issued_at > now_secs.saturating_add(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS)
-            || issued_at < now_secs.saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS)
-        {
-            return Err(PeerAuthError::Stale);
-        }
+        nonces.check_fresh(issued_at, now_secs)?;
         if !peer.scopes.contains(&required_scope) {
             return Err(PeerAuthError::MissingScope(required_scope));
         }
@@ -1033,6 +1047,53 @@ impl ClusterPeerPins {
     }
 }
 
+/// The authentication headers of one peer request, each present,
+/// single-valued and well formed.
+struct PeerHeaders<'a> {
+    node_id: String,
+    issued_at: i64,
+    signature: Signature,
+    nonce: &'a str,
+    body_sha256: &'a str,
+    term: Option<u64>,
+}
+
+impl<'a> PeerHeaders<'a> {
+    fn parse(headers: &'a HeaderMap) -> Result<Self, PeerAuthError> {
+        let node_id = single_header(headers, CLUSTER_NODE_ID_HEADER)
+            .and_then(|value| normalize_cluster_url(value).ok())
+            .ok_or(PeerAuthError::Unauthenticated)?;
+        let issued_at = single_header(headers, CLUSTER_AUTH_ISSUED_AT_HEADER)
+            .and_then(|value| value.parse::<i64>().ok())
+            .ok_or(PeerAuthError::Unauthenticated)?;
+        let signature = single_header(headers, CLUSTER_AUTH_SIGNATURE_HEADER)
+            .and_then(|value| Signature::from_hex(value).ok())
+            .ok_or(PeerAuthError::Unauthenticated)?;
+        let nonce = single_header(headers, CLUSTER_AUTH_NONCE_HEADER)
+            .filter(|value| is_lowercase_hex_32(value))
+            .ok_or(PeerAuthError::Unauthenticated)?;
+        let body_sha256 = single_header(headers, CLUSTER_AUTH_BODY_SHA256_HEADER)
+            .filter(|value| is_lowercase_hex_32(value))
+            .ok_or(PeerAuthError::Unauthenticated)?;
+        let term = match headers.get(CLUSTER_AUTH_TERM_HEADER) {
+            None => None,
+            Some(_) => Some(
+                single_header(headers, CLUSTER_AUTH_TERM_HEADER)
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .ok_or(PeerAuthError::Unauthenticated)?,
+            ),
+        };
+        Ok(Self {
+            node_id,
+            issued_at,
+            signature,
+            nonce,
+            body_sha256,
+            term,
+        })
+    }
+}
+
 fn is_lowercase_hex_32(value: &str) -> bool {
     value.len() == 64
         && value
@@ -1040,21 +1101,105 @@ fn is_lowercase_hex_32(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-/// Remembers each `(node id, nonce)` a peer request used until its issue time
-/// leaves the freshness window. Bounded by `CLUSTER_PEER_NONCE_CACHE_CAPACITY`;
-/// expired entries are pruned in expiry order.
-#[derive(Debug, Default)]
+/// Remembers each `(node id, nonce)` an accepted peer request used, and
+/// decides which issue times are fresh.
+///
+/// The acceptance window is `[earliest, high_water + MAX_SKEW]`, where
+/// `high_water` is the highest receiver time the cache has observed and
+/// `earliest = max(start, high_water - MAX_SKEW)`. `start` is the receiver
+/// time at which the cache began remembering nonces. An entry is pruned only
+/// once its issue time is below `earliest`, so every request the window
+/// admits is checked against every nonce that request could reuse: a backward
+/// clock step never reopens a pruned nonce, and a request issued before this
+/// cache existed (a nonce a previous process held) is refused as stale.
+///
+/// The cache holds at most `CLUSTER_PEER_NONCE_CACHE_CAPACITY` entries and
+/// each pinned peer at most an equal share of them. A full cache or a full
+/// share refuses the request; a live entry is never evicted.
+#[derive(Debug)]
 pub struct PeerNonceCache {
     state: Mutex<NonceState>,
+    capacity: usize,
+    per_peer_capacity: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct NonceState {
+    start: Option<i64>,
+    high_water: i64,
     seen: HashSet<(String, String)>,
     by_expiry: BTreeSet<(i64, String, String)>,
+    per_peer: HashMap<String, usize>,
+}
+
+impl NonceState {
+    /// Fold `now_secs` into the high-water time and return the inclusive
+    /// acceptance window, pruning every entry below its lower bound.
+    fn observe(&mut self, now_secs: i64) -> (i64, i64) {
+        self.high_water = self.high_water.max(now_secs);
+        let start = *self.start.get_or_insert(now_secs);
+        let earliest = start.max(
+            self.high_water
+                .saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS),
+        );
+        let latest = self
+            .high_water
+            .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS);
+        while let Some((issued_at, _, _)) = self.by_expiry.first() {
+            if *issued_at >= earliest {
+                break;
+            }
+            if let Some((_, node, nonce)) = self.by_expiry.pop_first() {
+                if let Some(count) = self.per_peer.get_mut(&node) {
+                    *count = count.saturating_sub(1);
+                    if *count == 0 {
+                        self.per_peer.remove(&node);
+                    }
+                }
+                self.seen.remove(&(node, nonce));
+            }
+        }
+        (earliest, latest)
+    }
 }
 
 impl PeerNonceCache {
+    /// A cache for a receiver pinning `pinned_peers` peers. `start_secs` is
+    /// the receiver time the cache starts at; when the receiver clock cannot
+    /// be read at construction, the first observed time becomes the start.
+    #[must_use]
+    pub fn new(start_secs: Option<i64>, pinned_peers: usize) -> Self {
+        Self::with_capacity(start_secs, pinned_peers, CLUSTER_PEER_NONCE_CACHE_CAPACITY)
+    }
+
+    /// As [`PeerNonceCache::new`], holding at most `capacity` entries.
+    #[must_use]
+    pub fn with_capacity(start_secs: Option<i64>, pinned_peers: usize, capacity: usize) -> Self {
+        Self {
+            state: Mutex::new(NonceState {
+                start: start_secs,
+                high_water: start_secs.unwrap_or(i64::MIN),
+                seen: HashSet::new(),
+                by_expiry: BTreeSet::new(),
+                per_peer: HashMap::new(),
+            }),
+            capacity,
+            per_peer_capacity: capacity / pinned_peers.max(1),
+        }
+    }
+
+    fn check_fresh(&self, issued_at: i64, now_secs: i64) -> Result<(), PeerAuthError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| PeerAuthError::ReplayCacheUnavailable)?;
+        let (earliest, latest) = state.observe(now_secs);
+        if issued_at < earliest || issued_at > latest {
+            return Err(PeerAuthError::Stale);
+        }
+        Ok(())
+    }
+
     fn record(
         &self,
         node_id: &str,
@@ -1066,25 +1211,24 @@ impl PeerNonceCache {
             .state
             .lock()
             .map_err(|_| PeerAuthError::ReplayCacheUnavailable)?;
-        while let Some((expires_at, _, _)) = state.by_expiry.first() {
-            if *expires_at >= now_secs {
-                break;
-            }
-            if let Some((_, node, nonce)) = state.by_expiry.pop_first() {
-                state.seen.remove(&(node, nonce));
-            }
+        let (earliest, latest) = state.observe(now_secs);
+        if issued_at < earliest || issued_at > latest {
+            return Err(PeerAuthError::Stale);
         }
         let key = (node_id.to_string(), nonce.to_string());
         if state.seen.contains(&key) {
             return Err(PeerAuthError::ReplayedNonce);
         }
-        if state.seen.len() >= CLUSTER_PEER_NONCE_CACHE_CAPACITY {
+        if state.seen.len() >= self.capacity {
             return Err(PeerAuthError::ReplayCacheUnavailable);
         }
-        let expires_at = issued_at.saturating_add(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS);
+        if state.per_peer.get(node_id).copied().unwrap_or(0) >= self.per_peer_capacity {
+            return Err(PeerAuthError::PeerNonceQuotaExhausted);
+        }
+        *state.per_peer.entry(key.0.clone()).or_insert(0) += 1;
         state
             .by_expiry
-            .insert((expires_at, key.0.clone(), key.1.clone()));
+            .insert((issued_at, key.0.clone(), key.1.clone()));
         state.seen.insert(key);
         Ok(())
     }
@@ -1211,6 +1355,10 @@ pub enum PeerAuthError {
     ReplayedNonce,
     #[error("cluster peer replay cache cannot admit another request")]
     ReplayCacheUnavailable,
+    #[error("cluster peer has no nonce capacity left in the replay cache")]
+    PeerNonceQuotaExhausted,
+    #[error("receiver clock is unavailable for cluster peer authentication")]
+    ClockUnavailable,
     #[error("cluster peer signature is outside the freshness window")]
     Stale,
     #[error("cluster peer lacks scope {0}")]
@@ -1224,7 +1372,9 @@ impl PeerAuthError {
     pub const fn status(self) -> StatusCode {
         match self {
             PeerAuthError::MissingScope(_) => StatusCode::FORBIDDEN,
-            PeerAuthError::ReplayCacheUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            PeerAuthError::ReplayCacheUnavailable
+            | PeerAuthError::PeerNonceQuotaExhausted
+            | PeerAuthError::ClockUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             PeerAuthError::Unauthenticated
             | PeerAuthError::BadSignature
             | PeerAuthError::BodyMismatch

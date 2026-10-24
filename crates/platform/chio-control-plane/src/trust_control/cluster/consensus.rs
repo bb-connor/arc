@@ -4,7 +4,7 @@ pub(crate) async fn handle_internal_cluster_status(
     State(state): State<TrustServiceState>,
     grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) = require_peer_grant(grant.as_ref()) {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
 

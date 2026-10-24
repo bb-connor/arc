@@ -5,7 +5,9 @@ use super::super::cluster::{
     handle_internal_cluster_status, handle_internal_lineage_delta,
     handle_internal_revocations_delta, handle_internal_tool_receipts_delta,
 };
-use super::super::route_authorization::{authorize_route, Listener, RouteAuthorizer};
+use super::super::route_authorization::{
+    authorize_route, refuse_unrouted_api_path, Listener, RouteAuthorizer,
+};
 use super::super::*;
 use axum::extract::DefaultBodyLimit;
 
@@ -625,6 +627,7 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
 
     let authorizer = route_authorizer(&state, Listener::Public);
     let router = router
+        .layer(axum::middleware::from_fn(refuse_unrouted_api_path))
         .route_layer(axum::middleware::from_fn(
             super::super::json_ingress::validate,
         ))
@@ -702,6 +705,7 @@ pub(crate) fn build_internal_router(state: TrustServiceState) -> Router {
             INTERNAL_LINEAGE_DELTA_PATH,
             get(handle_internal_lineage_delta),
         )
+        .layer(axum::middleware::from_fn(refuse_unrouted_api_path))
         .route_layer(axum::middleware::from_fn(
             super::super::json_ingress::validate,
         ))
