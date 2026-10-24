@@ -1,4 +1,4 @@
-"""Probe the receipt_openings DDL, the store identity and the erasure log with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
+"""Probe the receipt_openings DDL, the store identity, the erasure log and the erasure facts with the sqlite3 CLI: python3 -I probe.py <sqlite3> <ddl.sql>."""
 import json, subprocess, sys
 cli, ddl_path = sys.argv[1], sys.argv[2]
 ddl = open(ddl_path).read()
@@ -111,6 +111,35 @@ for mode, flag in (("off", "OFF"), ("on", "ON")):
         ("store_identity_second_insert_refuses", f"{I}(1, {S2});"),
     ):
         replace_cases.append((f"{name}_recursive_triggers_{mode}", seed_identity + show + stmt + "\n" + PRESERVED, (marker, "state-preserved")))
+F = "INSERT INTO receipt_erasure_facts VALUES "
+FACT_PRESERVED = (
+    "SELECT CASE WHEN (SELECT count(*) FROM receipt_erasure_facts) = 1"
+    f" AND (SELECT origin_store_id FROM receipt_erasure_facts WHERE receipt_id = {R}) = {S}"
+    f" AND (SELECT origin_openings_seq FROM receipt_erasure_facts WHERE receipt_id = {R}) = 7"
+    f" AND (SELECT conflicted FROM receipt_erasure_facts WHERE receipt_id = {R}) = 0"
+    " THEN 'fact-preserved' ELSE 'fact-changed' END;"
+)
+fact_cases = [
+    ("erasure_fact_accepts", True, f"{F}({R}, {S}, 7, {T}, {T}, 0);", ()),
+    ("erasure_fact_accepts_conflicted", True, f"{F}({R}, {S}, 7, {T}, {T}, 1);", ()),
+    ("erasure_fact_refuses_conflicted_2", False, f"{F}({R}, {S}, 7, {T}, {T}, 2);", ()),
+    ("erasure_fact_refuses_conflicted_negative", False, f"{F}({R}, {S}, 7, {T}, {T}, -1);", ()),
+    ("erasure_fact_refuses_conflicted_text", False, f"{F}({R}, {S}, 7, {T}, {T}, 'true');", ()),
+    ("erasure_fact_refuses_conflicted_null", False, f"{F}({R}, {S}, 7, {T}, {T}, NULL);", ()),
+    ("erasure_fact_refuses_receipt_id_uppercase", False, f"{F}('{'A' * 64}', {S}, 7, {T}, {T}, 0);", ()),
+    ("erasure_fact_refuses_origin_node_url", False, f"{F}({R}, {M}, 7, {T}, {T}, 0);", ()),
+    ("erasure_fact_refuses_origin_seq_zero", False, f"{F}({R}, {S}, 0, {T}, {T}, 0);", ()),
+    ("erasure_fact_refuses_negative_erased_at", False, f"{F}({R}, {S}, 7, -1, {T}, 0);", ()),
+    ("erasure_fact_refuses_negative_recorded_at", False, f"{F}({R}, {S}, 7, {T}, -1, 0);", ()),
+    ("erasure_fact_refuses_second_insert", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\n{F}({R}, {S2}, 3, {T}, {T}, 1);\n{FACT_PRESERVED}", ("fact-preserved",)),
+    ("erasure_fact_insert_or_replace_refuses_recursive_triggers_off", False, f"PRAGMA recursive_triggers = OFF;\n{F}({R}, {S}, 7, {T}, {T}, 0);\nINSERT OR REPLACE INTO receipt_erasure_facts VALUES ({R}, {S2}, 3, {T}, {T}, 1);\n{FACT_PRESERVED}", ("fact-preserved",)),
+    ("erasure_fact_insert_or_replace_refuses_recursive_triggers_on", False, f"PRAGMA recursive_triggers = ON;\n{F}({R}, {S}, 7, {T}, {T}, 0);\nINSERT OR REPLACE INTO receipt_erasure_facts VALUES ({R}, {S2}, 3, {T}, {T}, 1);\n{FACT_PRESERVED}", ("fact-preserved",)),
+    ("erasure_fact_update_marks_conflict_accepts", True, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nUPDATE receipt_erasure_facts SET conflicted = 1;", ()),
+    ("erasure_fact_update_clears_conflict_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 1);\nUPDATE receipt_erasure_facts SET conflicted = 0;", ()),
+    ("erasure_fact_update_changes_origin_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nUPDATE receipt_erasure_facts SET origin_store_id = {S2};\n{FACT_PRESERVED}", ("fact-preserved",)),
+    ("erasure_fact_update_changes_erased_at_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nUPDATE receipt_erasure_facts SET erased_at = 1;\n{FACT_PRESERVED}", ("fact-preserved",)),
+    ("erasure_fact_delete_refuses", False, f"{F}({R}, {S}, 7, {T}, {T}, 0);\nDELETE FROM receipt_erasure_facts;\n{FACT_PRESERVED}", ("fact-preserved",)),
+]
 version = subprocess.run([cli, "--version"], capture_output=True, text=True).stdout.strip()
 results, ok = [], True
 def run(name, expect, sql, must_print=()):
@@ -132,5 +161,7 @@ for name, expect, stmt in log_cases:
     run(name, expect, "\n" + stmt + "\n")
 for name, stmt, marks in replace_cases:
     run(name, False, "\n" + stmt + "\n", marks)
+for name, expect, stmt, marks in fact_cases:
+    run(name, expect, "\n" + stmt + "\n", marks)
 print(json.dumps({"sqlite": version, "ddl": ddl, "all_as_expected": ok, "results": results}, indent=1))
 sys.exit(0 if ok else 1)
