@@ -1041,12 +1041,13 @@ fn dispatch_public_settlement_rpc(
 fn parse_json_rpc_hex_u64(value: &serde_json::Value, label: &str) -> Result<u64, CliError> {
     let raw = value
         .as_str()
-        .ok_or_else(|| verifier_context_invalid(format!("{label} must be a hex string")))?;
+        .ok_or_else(|| CliError::cli_io_error(format!("{label} must be a hex string")))?;
     let hex = raw
         .strip_prefix("0x")
-        .ok_or_else(|| verifier_context_invalid(format!("{label} must start with 0x")))?;
-    u64::from_str_radix(hex, 16)
-        .map_err(|error| verifier_context_invalid(format!("{label} is not a u64: {error}")))
+        .ok_or_else(|| CliError::cli_io_error(format!("{label} must start with 0x")))?;
+    u64::from_str_radix(hex, 16).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+    })
 }
 
 fn required_json_rpc_string<'a>(
@@ -1057,7 +1058,7 @@ fn required_json_rpc_string<'a>(
     value
         .get(field)
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| verifier_context_invalid(format!("{label}.{field} must be a string")))
+        .ok_or_else(|| CliError::cli_io_error(format!("{label}.{field} must be a string")))
 }
 
 pub(super) fn public_settlement_verifier_trust_from_env(

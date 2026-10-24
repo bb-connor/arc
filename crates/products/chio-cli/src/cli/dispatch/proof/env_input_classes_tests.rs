@@ -79,11 +79,11 @@ fn malformed_rpc_result_shapes_are_io_failures() {
         serde_json::json!("0xnope"),
         serde_json::json!("0x10000000000000000"),
     ] {
-        assert_rejection(
-            parse_json_rpc_hex_u64(&value, "eth_blockNumber result").unwrap_err(),
-            &CLI_IO,
-            1,
-        );
+        let error = parse_json_rpc_hex_u64(&value, "eth_blockNumber result").unwrap_err();
+        if value.as_str().is_some_and(|raw| raw.starts_with("0x")) {
+            assert!(has_source::<std::num::ParseIntError>(&error));
+        }
+        assert_rejection(error, &CLI_IO, 1);
     }
     for value in [
         serde_json::json!(null),
