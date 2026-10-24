@@ -170,6 +170,32 @@ conflict_cases = [
     ("conflict_row_update_hold_refuses", False, f"{Q}{QROW};\nUPDATE replication_quarantine_erasures SET hold = 'below_watermark';\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
     ("conflict_row_delete_refuses", False, f"{Q}{QROW};\nDELETE FROM replication_quarantine_erasures;\n{CONFLICT_PRESERVED}", ("conflict-preserved",)),
 ]
+QBW = f"({S}, 7, 'erasure_event_conflict', 'below_watermark', {R}, {T}, {R2}, {T}, {M}, {T}, NULL)"
+def held(hold, resolved="IS NULL", source=M):
+    return (
+        "SELECT CASE WHEN (SELECT count(*) FROM replication_quarantine_erasures) = 1"
+        f" AND (SELECT hold FROM replication_quarantine_erasures) = '{hold}'"
+        f" AND (SELECT resolved_at FROM replication_quarantine_erasures) {resolved}"
+        f" AND (SELECT source_node_id FROM replication_quarantine_erasures) = {source}"
+        f" THEN 'conflict-{hold}' ELSE 'conflict-changed' END;"
+    )
+monotone_cases = []
+for mode, flag in (("off", "OFF"), ("on", "ON")):
+    pr = f"PRAGMA recursive_triggers = {flag};\n"
+    monotone_cases += [
+        (f"conflict_row_escalate_accepts_recursive_triggers_{mode}", True, f"{pr}{Q}{QBW};\nUPDATE replication_quarantine_erasures SET hold = 'origin_frozen';\n{held('origin_frozen')}", ("conflict-origin_frozen",)),
+        (f"conflict_row_downgrade_refuses_recursive_triggers_{mode}", False, f"{pr}{Q}{QROW};\nUPDATE replication_quarantine_erasures SET hold = 'below_watermark';\n{held('origin_frozen')}", ("conflict-origin_frozen",)),
+        (f"conflict_row_update_source_node_refuses_recursive_triggers_{mode}", False, f"{pr}{Q}{QBW};\nUPDATE replication_quarantine_erasures SET source_node_id = 'https://node-c.example';\n{held('below_watermark')}", ("conflict-below_watermark",)),
+    ]
+monotone_cases += [
+    ("conflict_row_escalate_to_own_origin_refuses", False, f"{Q}{QBW};\nUPDATE replication_quarantine_erasures SET hold = 'own_origin', reason = 'erasure_event_conflict_own_origin';\n{held('below_watermark')}", ("conflict-below_watermark",)),
+    ("conflict_row_escalate_and_resolve_together_refuses", False, f"{Q}{QBW};\nUPDATE replication_quarantine_erasures SET hold = 'origin_frozen', resolved_at = {T};\n{held('below_watermark')}", ("conflict-below_watermark",)),
+    ("conflict_row_escalate_resolved_refuses", False, f"{Q}{QBW};\nUPDATE replication_quarantine_erasures SET resolved_at = {T};\nUPDATE replication_quarantine_erasures SET hold = 'origin_frozen';\n{held('below_watermark', 'IS NOT NULL')}", ("conflict-below_watermark",)),
+    ("conflict_row_noop_update_refuses", False, f"{Q}{QBW};\nUPDATE replication_quarantine_erasures SET hold = 'below_watermark';", ()),
+    ("conflict_row_plain_hold_naming_own_store_refuses", False, f"{I}(1, {S});\n{Q}{QROW};", ()),
+    ("conflict_row_plain_hold_naming_other_store_accepts", True, f"{I}(1, {S2});\n{Q}{QROW};", ()),
+    ("conflict_row_own_origin_naming_own_store_accepts", True, f"{I}(1, {S});\n{Q}({S}, 7, 'erasure_event_conflict_own_origin', 'own_origin', {R}, {T}, {R2}, {T}, {M}, {T}, NULL);", ()),
+]
 version = subprocess.run([cli, "--version"], capture_output=True, text=True).stdout.strip()
 results, ok = [], True
 def run(name, expect, sql, must_print=()):
@@ -194,6 +220,8 @@ for name, stmt, marks in replace_cases:
 for name, expect, stmt, marks in fact_cases:
     run(name, expect, "\n" + stmt + "\n", marks)
 for name, expect, stmt, marks in conflict_cases:
+    run(name, expect, "\n" + stmt + "\n", marks)
+for name, expect, stmt, marks in monotone_cases:
     run(name, expect, "\n" + stmt + "\n", marks)
 print(json.dumps({"sqlite": version, "ddl": ddl, "all_as_expected": ok, "results": results}, indent=1))
 sys.exit(0 if ok else 1)
