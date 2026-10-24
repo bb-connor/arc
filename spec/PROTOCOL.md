@@ -157,15 +157,19 @@ documented below. The HTTP substrate's `HttpReceipt` maps
 deterministically to `ChioReceipt` so all existing receipt verification,
 checkpoint, and evidence-export workflows continue to apply.
 
-Compatibility rule:
+Wire-format rules:
 
 - signed capability-tree bodies and signed manifests are closed: `CapabilityToken`,
   `CapabilityTokenBody`, `ChioScope`, every grant and attenuation record, `DelegationLink`
   and `ToolManifest` reject an unknown member at decode time
-- additive members are tolerated only where the type is not closed: unsigned JSON
-  responses, and `ChioReceipt`, `ChioReceiptBody`, `ChildRequestReceipt` and
-  `ChildRequestReceiptBody`, whose decoders drop members outside the body and sign
-  only the body fields
+- `ChioReceipt`, `ChioReceiptBody`, `ChildRequestReceipt` and
+  `ChildRequestReceiptBody` also reject unknown members at decode time
+- `ChioReceipt` signs canonical JSON of
+  `ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }`,
+  including `bbs_signature` when present; see the [receipt contract](#6-receipt-contract)
+- `ChildRequestReceipt` signs canonical JSON of `ChildRequestReceiptBody`
+- additive members are tolerated only where the type is not closed, such as
+  unsigned JSON responses
 - unknown schema identifiers for schema-tagged artifacts must be rejected
 - fail-closed behavior is part of the protocol contract, not an implementation
   detail
