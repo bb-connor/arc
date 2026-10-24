@@ -1,7 +1,7 @@
 {
   "schema": "chio.verifier-trust.v1",
   "kernel_keys": [
-    "7e93a27f379f38c0ab7568b9e39f871d6d7f7aa3cfbcb48c9f1c80a536fedf9a"
+    "739261e092c2c581b12e4312265654e896f0c700253f35f032479606a5883ed4"
   ],
   "exchange_keys": [],
   "root_policy_keys": []
