@@ -515,6 +515,81 @@ extensions:
     let _ = std::fs::remove_dir(policy_dir);
 }
 
+fn threat_intel_policy(pattern_db: &std::path::Path) -> HushSpec {
+    HushSpec::parse(&format!(
+        r#"
+hushspec: "0.1.0"
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+"#,
+        pattern_db.display()
+    ))
+    .unwrap()
+}
+
+fn sized_threat_intel_pattern_db(len: usize) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "chio-policy-threat-intel-sized-{}.json",
+        uuid::Uuid::new_v4()
+    ));
+    let mut bytes = sample_threat_intel_pattern_db().as_bytes().to_vec();
+    bytes.resize(len, b' ');
+    std::fs::write(&path, bytes).unwrap();
+    path
+}
+
+fn pattern_db_refusal(pattern_db: &std::path::Path) -> String {
+    match compile_policy(&threat_intel_policy(pattern_db)) {
+        Err(CompileError::Invalid(message)) => message,
+        Ok(compiled) => panic!("expected refusal, compiled {:?}", compiled.guard_names),
+    }
+}
+
+#[test]
+fn compile_detection_threat_intel_accepts_pattern_db_at_byte_limit() {
+    let pattern_db =
+        sized_threat_intel_pattern_db(chio_guards::embedding_anomaly::MAX_PATTERN_BYTES);
+    let compiled = compile_policy(&threat_intel_policy(&pattern_db)).unwrap();
+    std::fs::remove_file(&pattern_db).unwrap();
+    assert_eq!(compiled.guard_names, vec!["embedding-anomaly".to_string()]);
+}
+
+#[test]
+fn compile_detection_threat_intel_refuses_pattern_db_over_byte_limit() {
+    let pattern_db =
+        sized_threat_intel_pattern_db(chio_guards::embedding_anomaly::MAX_PATTERN_BYTES + 1);
+    let message = pattern_db_refusal(&pattern_db);
+    std::fs::remove_file(&pattern_db).unwrap();
+    assert_eq!(
+        message,
+        format!(
+            "invalid detection.threat_intel.pattern_db '{0}' (resolved to '{0}'): failed to read pattern database: guard input exceeds byte limit",
+            pattern_db.display()
+        )
+    );
+}
+
+#[test]
+fn compile_detection_threat_intel_refuses_directory_pattern_db() {
+    let pattern_db = std::env::temp_dir().join(format!(
+        "chio-policy-threat-intel-directory-{}",
+        uuid::Uuid::new_v4()
+    ));
+    std::fs::create_dir_all(&pattern_db).unwrap();
+    let message = pattern_db_refusal(&pattern_db);
+    std::fs::remove_dir(&pattern_db).unwrap();
+    assert_eq!(
+        message,
+        format!(
+            "invalid detection.threat_intel.pattern_db '{0}' (resolved to '{0}'): failed to read pattern database: guard input must be a regular file",
+            pattern_db.display()
+        )
+    );
+}
+
 #[test]
 fn compile_origin_budget_adds_agent_velocity() {
     let spec = HushSpec::parse(

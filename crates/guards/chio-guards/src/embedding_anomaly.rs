@@ -46,7 +46,8 @@ pub const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.85;
 pub const DEFAULT_AMBIGUITY_BAND: f64 = 0.10;
 /// Default top-K pattern matches to score.
 pub const DEFAULT_TOP_K: usize = 5;
-const MAX_PATTERN_BYTES: usize = 16 * 1024 * 1024;
+/// Maximum size in bytes of a pattern database document.
+pub const MAX_PATTERN_BYTES: usize = 16 * 1024 * 1024;
 
 /// Policy for scores landing inside the ambiguity band.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -72,7 +73,7 @@ pub enum EmbeddingAnomalyError {
     #[error("invalid configuration: {0}")]
     Config(String),
     /// I/O error reading the pattern database from disk.
-    #[error("failed to read pattern database")]
+    #[error("failed to read pattern database: {0}")]
     Io(#[from] std::io::Error),
 }
 
@@ -149,6 +150,22 @@ impl EmbeddingAnomalyPatternDb {
             chio_core::canonical::UntrustedJsonText::from_wire(json.as_bytes(), MAX_PATTERN_BYTES)?
                 .decode_document()?;
         Self::from_entries(entries)
+    }
+
+    /// Read a pattern database from a regular file of at most
+    /// [`MAX_PATTERN_BYTES`] bytes and validate it as [`Self::from_json`] does.
+    pub fn from_json_file(path: &std::path::Path) -> Result<Self, EmbeddingAnomalyError> {
+        let bytes = Self::read_file_bytes(path)?;
+        let entries =
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_PATTERN_BYTES)?
+                .decode_document()?;
+        Self::from_entries(entries)
+    }
+
+    /// Read the raw bytes of a pattern database file under the same regular
+    /// file and [`MAX_PATTERN_BYTES`] bounds as [`Self::from_json_file`].
+    pub fn read_file_bytes(path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+        crate::input::read_file(path, MAX_PATTERN_BYTES)
     }
 
     /// Build from an explicit entry vector (convenience for tests).
@@ -249,18 +266,6 @@ impl EmbeddingAnomalyGuard {
     pub fn from_json(json: &str) -> Result<Self, EmbeddingAnomalyError> {
         let db = EmbeddingAnomalyPatternDb::from_json(json)?;
         Self::new(db, EmbeddingAnomalyConfig::default())
-    }
-
-    /// Read a pattern database from a JSON file on disk.
-    pub fn from_json_file(path: &str) -> Result<Self, EmbeddingAnomalyError> {
-        let bytes = crate::input::read_file(std::path::Path::new(path), MAX_PATTERN_BYTES)?;
-        let entries =
-            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_PATTERN_BYTES)?
-                .decode_document()?;
-        Self::new(
-            EmbeddingAnomalyPatternDb::from_entries(entries)?,
-            EmbeddingAnomalyConfig::default(),
-        )
     }
 
     /// Score an embedding against the pattern database. Returns the
@@ -605,5 +610,55 @@ mod reader_boundary_tests {
                 chio_core::canonical::UntrustedJsonError::TooLarge { .. }
             ))
         ));
+    }
+
+    const PATTERN: &str =
+        r#"[{"id":"p","category":"c","stage":"s","label":"l","embedding":[1.0]}]"#;
+
+    fn scratch_path(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("chio-pattern-db-{}-{name}", std::process::id()))
+    }
+
+    fn pattern_file(name: &str, len: usize) -> std::path::PathBuf {
+        let path = scratch_path(name);
+        let mut bytes = PATTERN.as_bytes().to_vec();
+        bytes.resize(len, b' ');
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    fn file_refusal(path: &std::path::Path) -> std::io::Error {
+        match EmbeddingAnomalyPatternDb::from_json_file(path) {
+            Err(EmbeddingAnomalyError::Io(source)) => source,
+            other => panic!("expected Io refusal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pattern_file_at_byte_limit_is_accepted() {
+        let path = pattern_file("at-limit.json", MAX_PATTERN_BYTES);
+        let db = EmbeddingAnomalyPatternDb::from_json_file(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(db.dim, 1);
+        assert_eq!(db.entries.len(), 1);
+    }
+
+    #[test]
+    fn pattern_file_over_byte_limit_is_refused() {
+        let path = pattern_file("over-limit.json", MAX_PATTERN_BYTES + 1);
+        let source = file_refusal(&path);
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(source.to_string(), "guard input exceeds byte limit");
+    }
+
+    #[test]
+    fn pattern_file_directory_is_refused() {
+        let path = scratch_path("directory");
+        std::fs::create_dir_all(&path).unwrap();
+        let source = file_refusal(&path);
+        std::fs::remove_dir(&path).unwrap();
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(source.to_string(), "guard input must be a regular file");
     }
 }
