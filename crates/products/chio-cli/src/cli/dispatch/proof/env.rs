@@ -423,11 +423,22 @@ pub(super) fn cognition_market_proof_trust_from_env(
     )
 }
 
+fn decode_pinned_context<T: serde::de::DeserializeOwned + serde::Serialize>(
+    bytes: &[u8],
+) -> Result<T, CliError> {
+    crate::input::canonical_ijson(bytes).map_err(|source| {
+        CliError::with_source(
+            &chio_errors::_generated::error_codes::TRANSACTION_VERIFIER_CONTEXT_INVALID,
+            source,
+        )
+    })
+}
+
 fn finding_verifier_profile_from_env(
 ) -> Result<chio_finding::SignedFindingChallengeVerifierProfile, CliError> {
     let path = required_utf8_env(FINDING_VERIFIER_PROFILE_PATH_ENV)?;
     let bytes = crate::input::read_regular(Path::new(&path), FINDING_VERIFIER_PROFILE_MAX_BYTES)?;
-    let profile = crate::input::canonical_ijson(&bytes)?;
+    let profile = decode_pinned_context(&bytes)?;
     Ok(profile)
 }
 
@@ -446,8 +457,7 @@ fn finding_authority_status_trust_from_env(
         Path::new(&path),
         FINDING_VERIFIER_AUTHORITY_STATUS_MAX_BYTES,
     )?;
-    let signed_status: chio_finding::SignedFindingAuthorityStatus =
-        crate::input::canonical_ijson(&bytes)?;
+    let signed_status: chio_finding::SignedFindingAuthorityStatus = decode_pinned_context(&bytes)?;
     chio_finding::verify_signed_authority_status(&signed_status, &status_authority.key).map_err(
         |error| {
             verifier_context_invalid(format!(
@@ -476,7 +486,7 @@ fn finding_authority_policy_from_env(
 ) -> Result<chio_finding::FindingAuthorityKeyPolicy, CliError> {
     let path = required_utf8_env(policy_path_env)?;
     let bytes = crate::input::read_regular(Path::new(&path), FINDING_AUTHORITY_POLICY_MAX_BYTES)?;
-    let policy: chio_finding::FindingAuthorityKeyPolicy = crate::input::canonical_ijson(&bytes)?;
+    let policy: chio_finding::FindingAuthorityKeyPolicy = decode_pinned_context(&bytes)?;
     policy.validate(subject).map_err(|error| {
         verifier_context_invalid(format!("{policy_path_env} is invalid: {error}"))
     })?;
@@ -508,7 +518,7 @@ fn cognition_market_status_trust_from_env(
     )?;
     let signed_status_operator_authorization: chio_core_types::receipt::lineage::SignedExportEnvelope<
         chio_finding::FindingStatusOperatorAuthorization,
-    > = crate::input::canonical_ijson(&authorization_bytes)?;
+    > = decode_pinned_context(&authorization_bytes)?;
     signed_status_operator_authorization
         .body
         .validate()
@@ -619,9 +629,9 @@ fn required_utf8_env(env_name: &str) -> Result<String, CliError> {
         Ok(_) => Err(verifier_context_invalid(format!(
             "{env_name} must be non-empty"
         ))),
-        Err(std::env::VarError::NotPresent) => {
-            Err(verifier_feature_unsupported(format!("{env_name} must be set")))
-        }
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
+            "{env_name} must be set"
+        ))),
         Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
@@ -670,9 +680,7 @@ fn parse_public_keys(
                 )));
             }
             chio_core_types::PublicKey::from_hex(key).map_err(|error| {
-                verifier_context_invalid(format!(
-                    "{env_name} contains invalid public key: {error}"
-                ))
+                verifier_context_invalid(format!("{env_name} contains invalid public key: {error}"))
             })
         })
         .collect()
@@ -951,14 +959,16 @@ fn public_settlement_rpc_call(
 }
 
 fn settlement_rpc_result(bytes: &[u8]) -> Result<serde_json::Value, CliError> {
-    let body: serde_json::Value = crate::input::json(bytes)?;
+    let body: serde_json::Value = crate::input::json(bytes).map_err(|source| {
+        CliError::with_source(&chio_errors::_generated::error_codes::CLI_IO, source)
+    })?;
     let object = body
         .as_object()
-        .ok_or_else(|| verifier_context_invalid("settlement RPC response is not an object"))?;
+        .ok_or_else(|| CliError::cli_io_error("settlement RPC response is not an object"))?;
     if object.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0")
         || object.get("id").and_then(serde_json::Value::as_u64) != Some(1)
     {
-        return Err(verifier_context_invalid(
+        return Err(CliError::cli_io_error(
             "settlement RPC response binding mismatch",
         ));
     }
@@ -974,11 +984,9 @@ fn settlement_rpc_result(bytes: &[u8]) -> Result<serde_json::Value, CliError> {
                     .and_then(serde_json::Value::as_str)
                     .is_some() =>
         {
-            Err(CliError::cli_io_error(
-                "settlement RPC returned an error",
-            ))
+            Err(CliError::cli_io_error("settlement RPC returned an error"))
         }
-        _ => Err(verifier_context_invalid(
+        _ => Err(CliError::cli_io_error(
             "settlement RPC response envelope is invalid",
         )),
     }

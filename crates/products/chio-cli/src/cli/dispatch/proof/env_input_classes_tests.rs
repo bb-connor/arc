@@ -2,6 +2,22 @@ use super::super::unit_tests::{TestEnvGuard, AGENT_WEB_ENV_LOCK};
 use super::*;
 use chio_errors::_generated::error_codes::{CLI_IO, TRANSACTION_VERIFIER_CONTEXT_INVALID};
 
+fn has_source<T: std::error::Error + 'static>(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut source = error.source();
+    while let Some(cause) = source {
+        if cause.downcast_ref::<T>().is_some() {
+            return true;
+        }
+        source = cause.source();
+    }
+    false
+}
+
+fn assert_context_rejection(error: CliError) {
+    assert!(has_source::<CliError>(&error));
+    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+}
+
 fn with_pinned_document<T>(name: &'static str, bytes: &[u8], read: impl FnOnce() -> T) -> T {
     let _lock = AGENT_WEB_ENV_LOCK
         .lock()
@@ -32,6 +48,7 @@ fn malformed_rpc_json_is_an_io_failure() {
         br#"{"result":1,"result":2}"#,
     ] {
         let error = settlement_rpc_result(bytes).unwrap_err();
+        assert!(has_source::<chio_core_types::canonical::UntrustedJsonError>(&error));
         assert!(!error.to_string().contains("private-marker"));
         assert_rejection(error, &CLI_IO, 1);
     }
@@ -58,7 +75,7 @@ fn malformed_pinned_verifier_profile_is_context_invalid() {
     let error = with_pinned_document(FINDING_VERIFIER_PROFILE_PATH_ENV, b"{", || {
         finding_verifier_profile_from_env().unwrap_err()
     });
-    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+    assert_context_rejection(error);
 }
 
 #[test]
@@ -75,7 +92,7 @@ fn malformed_pinned_authority_status_is_context_invalid() {
         .map(|_| ())
         .unwrap_err()
     });
-    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+    assert_context_rejection(error);
 }
 
 #[test]
@@ -91,7 +108,7 @@ fn malformed_pinned_authority_policy_is_context_invalid() {
             .unwrap_err()
         },
     );
-    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+    assert_context_rejection(error);
 }
 
 #[test]
@@ -102,7 +119,7 @@ fn malformed_pinned_status_authorization_is_context_invalid() {
             .map(|_| ())
             .unwrap_err()
     });
-    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+    assert_context_rejection(error);
 }
 
 fn verifier_profile() -> chio_finding::SignedFindingChallengeVerifierProfile {
@@ -116,7 +133,7 @@ fn noncanonical_pinned_verifier_profile_is_context_invalid() {
     let error = with_pinned_document(FINDING_VERIFIER_PROFILE_PATH_ENV, &bytes, || {
         finding_verifier_profile_from_env().unwrap_err()
     });
-    assert_rejection(error, &TRANSACTION_VERIFIER_CONTEXT_INVALID, 50);
+    assert_context_rejection(error);
 }
 
 #[test]
@@ -181,8 +198,8 @@ fn verifier_context_sites_carry_typed_codes() {
     );
     assert_rejection(
         settlement_rpc_result(br#"{"jsonrpc":"2.0","id":2,"result":"0x1"}"#).unwrap_err(),
-        &TRANSACTION_VERIFIER_CONTEXT_INVALID,
-        50,
+        &CLI_IO,
+        1,
     );
     assert_rejection(
         settlement_rpc_result(br#"{"jsonrpc":"2.0","id":1,"error":{"code":-1,"message":"m"}}"#)
