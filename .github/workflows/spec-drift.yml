@@ -218,6 +218,9 @@ jobs:
       - name: Verify the tenant index known-answer vectors match their reference
         run: python3 -I scripts/gen-tenant-index-kat.py check
 
+      - name: Verify the enterprise subject known-answer vectors match their reference
+        run: python3 -I scripts/gen-enterprise-subject-kat.py check
+
       - name: Assert no drift in committed vectors or manifest
         run: |
           set -euo pipefail
