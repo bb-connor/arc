@@ -173,11 +173,27 @@ class ApalacheFormalSliceTests(unittest.TestCase):
             "apalache-negative must fetch commit objects named by its registry",
         )
 
-    def test_green_other_job_fetch_depth_does_not_supply_negative_job_custody(self) -> None:
+    def test_green_spec_mutants_fetch_depth_is_not_governed(self) -> None:
         self.mutate_occurrence(SAFETY, "fetch-depth: 0", "fetch-depth: 1", 1)
         result = self.run_check()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "check-apalache-formal-slice: OK")
+
+    def test_red_inserted_job_cannot_supply_negative_job_history(self) -> None:
+        self.mutate_occurrence(SAFETY, "fetch-depth: 0", "fetch-depth: 1", 0)
+        original = (self.root / SAFETY).read_text(encoding="utf-8")
+        for key in ("history-helper", '\"history-helper\"', "'history-helper'"):
+            with self.subTest(key=key):
+                (self.root / SAFETY).write_text(original, encoding="utf-8")
+                self.mutate(
+                    SAFETY,
+                    "  spec-mutants:\n",
+                    f"  {key}:\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n\n  spec-mutants:\n",
+                )
+                self.assert_red(
+                    "check_safety_workflow_wiring",
+                    "apalache-negative must fetch commit objects named by its registry",
+                )
 
     def test_red_safety_matrix_row_changes_timeout(self) -> None:
         self.mutate(SAFETY, "timeout_seconds: 1800", "timeout_seconds: 60")

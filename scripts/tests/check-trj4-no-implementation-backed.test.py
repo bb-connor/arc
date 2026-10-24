@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -29,10 +31,11 @@ class RegistryStatusGateTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
-    def run_check(self) -> subprocess.CompletedProcess[str]:
+    def run_check(self, env=None) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", "--noprofile", "--norc", "scripts/check-trj4-no-implementation-backed.sh"],
             cwd=self.root,
+            env=env,
             capture_output=True,
             text=True,
             check=False,
@@ -64,8 +67,19 @@ class RegistryStatusGateTests(unittest.TestCase):
         self.assertEqual(result.stderr, "::error::registry status gate: required scan root missing: formal\n")
 
     def test_red_scan_error(self) -> None:
-        (self.root / "formal/broken-link").symlink_to("missing-source")
-        result = self.run_check()
+        tools = self.root / "tools"
+        tools.mkdir()
+        grep = tools / "grep"
+        actual_grep = shutil.which("grep")
+        self.assertIsNotNone(actual_grep)
+        grep.write_text(
+            '#!/bin/sh\ncase "$*" in *formal*) exit 2;; esac\n'
+            + f'exec {shlex.quote(actual_grep)} "$@"\n',
+            encoding="utf-8",
+        )
+        grep.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"])
+        result = self.run_check(env)
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout, "")
         self.assertEqual(result.stderr, "::error::registry status gate: cannot scan formal\n")
