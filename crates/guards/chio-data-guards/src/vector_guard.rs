@@ -65,7 +65,7 @@ use tracing::warn;
 
 use chio_core::capability::scope::{ChioScope, Constraint, SqlOperationClass, ToolGrant};
 use chio_guards::{extract_action_checked, ToolAction};
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use thiserror::Error;
 
 /// Structured reason for a [`VectorDbGuard`] denial.
@@ -494,6 +494,10 @@ impl VectorDbGuard {
 impl chio_kernel::Guard for VectorDbGuard {
     fn name(&self) -> &str {
         "vector-db"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

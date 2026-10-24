@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use chio_security_types::ports::{
     empty_session_throttle_snapshot, session_throttle_version_hash,
     session_throttle_window_identity, validate_session_throttle_snapshot, PortError, RecordId,
@@ -172,6 +172,10 @@ impl SessionThrottleGuard {
 impl Guard for SessionThrottleGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, guard_context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

@@ -18,7 +18,8 @@ use std::time::Duration;
 
 use chio_chaos::{chaos_iterations, ChaosError};
 use chio_kernel::{
-    Guard, GuardContext, GuardDecision, HotPathDeadlineConfig, KernelError, Verdict,
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, HotPathDeadlineConfig,
+    KernelError, Verdict,
 };
 use chio_loadgen::{LoadgenConfig, StackHarness, StoreBacking};
 use chio_test_support::prelude::*;
@@ -72,6 +73,10 @@ struct BlockingGuard {
 impl Guard for BlockingGuard {
     fn name(&self) -> &str {
         "chaos-blocking-guard"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

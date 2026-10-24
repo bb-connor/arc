@@ -19,7 +19,7 @@ use regex::{Regex, RegexBuilder};
 use tracing::warn;
 
 use chio_guards::{extract_action_checked, ToolAction};
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::config::{SqlGuardConfig, SqlOperation};
 use crate::error::SqlGuardDenyReason;
@@ -299,6 +299,10 @@ fn predicate_pattern_complexity(pattern: &str) -> usize {
 impl chio_kernel::Guard for SqlQueryGuard {
     fn name(&self) -> &str {
         "sql-query"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

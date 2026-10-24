@@ -201,56 +201,73 @@ pub struct GuardEvidence {
     pub details: Option<String>,
 }
 
-// Reserved top-level keys in the `ChioReceipt::metadata` object.
-//
-// ADR-0018 item 7 makes this registry normative: the kernel merges its typed
-// blocks under these keys last and rejects a pre-existing collision from caller
-// or hook metadata, so a downstream reader can trust that a block found under a
-// reserved key was written by the kernel and is covered by the receipt
-// signature. These consts are the `chio-core-types` reader-side source of
-// truth; the human-readable table lives in `spec/PROTOCOL.md` 6.4.
+/// Whether a guard's evidence `details` may appear in a committed receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceDisclosure {
+    /// `details` never carries an argument or result value.
+    Safe,
+    /// `details` may carry an argument or result value.
+    Unsafe,
+}
 
-/// Every top-level receipt-metadata key that only a Chio signer writes: the
-/// kernel, the receipt signing path, or the HTTP receipt projection. The
-/// kernel refuses caller metadata naming any of them before any effect, and a
-/// runtime-admission hook may name only `chio_runtime`.
-pub const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
-    "admission_operation",
-    "attribution",
-    "chio_manifest_security_v1",
-    "protocol_admission",
-    BUDGET_AUTHORITY_METADATA_KEY,
-    "budget_denial_authority",
-    FINANCIAL_METADATA_KEY,
-    GOVERNED_TRANSACTION_METADATA_KEY,
-    "caller_delivery",
-    "protocol_refusal",
-    "chio_runtime",
-    "receipt_context",
-    "governed_transaction_diagnostics",
-    "model_metadata",
-    CHANNEL_METADATA_KEY,
-    DELIVERY_CONTRACT_METADATA_KEY,
-    FINDING_DELIVERY_METADATA_KEY,
-    FINDING_RECOVERY_METADATA_KEY,
-    "finding_purchase_replay_snapshot",
-    "finding_recovery_replay_snapshot",
-    "findingDenial",
-    "stream",
-    "threshold_approval",
-    "memory_provenance",
-    "post_invocation",
-    "execution_nonce",
-    "chio_kernel",
-    "runtime_admission",
-    "active_response_terminal_evidence",
-    "chio_http_receipt_v1",
-    super::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
-    super::signing::CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
-    "finding_pool_mutation",
-    "session_report",
-    "prior_metadata",
-];
+/// A guard's declaration about the `details` of the evidence it emits.
+///
+/// The three constants are the only values. A guard that requires its
+/// `details` and declares them unsafe cannot be expressed, so no such guard
+/// can be registered:
+///
+/// ```compile_fail,E0451
+/// use chio_core_types::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+/// let _ = GuardEvidenceDeclaration {
+///     details: EvidenceDisclosure::Unsafe,
+///     details_required: true,
+/// };
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GuardEvidenceDeclaration {
+    details: EvidenceDisclosure,
+    details_required: bool,
+}
+
+impl GuardEvidenceDeclaration {
+    /// Builds each declaration constant. Required unsafe `details` fail const
+    /// evaluation.
+    const fn declare(details: EvidenceDisclosure, details_required: bool) -> Self {
+        assert!(
+            !(matches!(details, EvidenceDisclosure::Unsafe) && details_required),
+            "unsafe evidence details cannot be required"
+        );
+        Self {
+            details,
+            details_required,
+        }
+    }
+
+    /// `details` never carry an argument or result value and may be dropped.
+    pub const SAFE: Self = Self::declare(EvidenceDisclosure::Safe, false);
+
+    /// `details` never carry an argument or result value and must be kept.
+    pub const SAFE_REQUIRED: Self = Self::declare(EvidenceDisclosure::Safe, true);
+
+    /// `details` may carry an argument or result value and are dropped
+    /// before signing a committed receipt.
+    pub const UNSAFE: Self = Self::declare(EvidenceDisclosure::Unsafe, false);
+
+    #[must_use]
+    pub const fn details(self) -> EvidenceDisclosure {
+        self.details
+    }
+
+    #[must_use]
+    pub const fn details_required(self) -> bool {
+        self.details_required
+    }
+}
+
+// Named top-level keys of the `ChioReceipt::metadata` object. Every key is
+// registered once in `RECEIPT_METADATA_KEYS`, which records its origin and
+// committed disclosure and from which the reserved set is derived;
+// `spec/PROTOCOL.md` 6.4 renders that registry.
 
 /// Financial attribution and settlement metadata block key.
 pub const FINANCIAL_METADATA_KEY: &str = "financial";
@@ -602,6 +619,13 @@ pub struct ReceiptAttributionMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grant_index: Option<u32>,
 }
+
+mod key_registry;
+
+pub use key_registry::{
+    check_internal_receipt_metadata, metadata_key_spec, reserved_receipt_metadata_keys,
+    MetadataDisclosure, MetadataKeyOrigin, MetadataKeySpec, RECEIPT_METADATA_KEYS,
+};
 
 #[cfg(test)]
 mod tests {

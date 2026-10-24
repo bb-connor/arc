@@ -36,7 +36,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, Verdict,
+};
 
 use crate::action::{extract_action_checked, ToolAction};
 
@@ -245,6 +247,10 @@ impl Default for BrowserAutomationGuard {
 impl Guard for BrowserAutomationGuard {
     fn name(&self) -> &str {
         "browser-automation"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

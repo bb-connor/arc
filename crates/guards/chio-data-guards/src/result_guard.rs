@@ -61,7 +61,7 @@ use chio_core::capability::scope::{ChioScope, Constraint};
 use chio_guards::post_invocation::{
     PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity, PostInvocationVerdict,
 };
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 /// Default redaction marker written in place of denied columns.
 pub const DEFAULT_REDACTION_MARKER: &str = "[REDACTED]";
@@ -350,6 +350,10 @@ fn query_result_hook_identity(
 impl chio_kernel::Guard for QueryResultGuard {
     fn name(&self) -> &str {
         "query-result"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

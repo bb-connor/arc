@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use arc_swap::ArcSwap;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use tracing::{debug, warn};
 
 use crate::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
@@ -341,6 +341,10 @@ fn emit_guard_eval_metrics(guard_id: &str, verdict: &str, elapsed: std::time::Du
 impl Guard for WasmGuard {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

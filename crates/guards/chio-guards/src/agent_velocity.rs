@@ -14,7 +14,7 @@ use std::time::Instant;
 
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 // ---------------------------------------------------------------------------
 // Token bucket (private, same algorithm as velocity.rs)
@@ -254,6 +254,10 @@ impl AgentVelocityState {
 impl Guard for AgentVelocityGuard {
     fn name(&self) -> &str {
         "agent-velocity"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

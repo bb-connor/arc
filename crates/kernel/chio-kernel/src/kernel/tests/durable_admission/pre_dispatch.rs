@@ -105,6 +105,10 @@ async fn dropped_durable_guard_evaluation_terminalizes_before_dispatch() {
             "durable-parking-guard"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
             self.started.notify_one();
             std::thread::sleep(std::time::Duration::from_secs(2));
@@ -249,6 +253,10 @@ fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     impl Guard for DenyAll {
         fn name(&self) -> &str {
             "durable-deny-all"
+        }
+
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

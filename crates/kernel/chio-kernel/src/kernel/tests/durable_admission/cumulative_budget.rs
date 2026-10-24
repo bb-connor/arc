@@ -360,6 +360,10 @@ fn cumulative_approval_guard_denial_creates_no_budget_state() {
             "cumulative-deny-all"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::deny(Vec::new()))
         }

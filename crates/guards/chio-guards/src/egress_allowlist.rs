@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 use glob::Pattern;
 
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::action::{extract_action_checked, ToolAction};
 
@@ -128,6 +128,10 @@ impl Default for EgressAllowlistGuard {
 impl chio_kernel::Guard for EgressAllowlistGuard {
     fn name(&self) -> &str {
         "egress-allowlist"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

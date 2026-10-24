@@ -41,7 +41,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use chio_core::capability::scope::Constraint;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, ToolServerOutput};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, ToolServerOutput,
+};
 
 use crate::action::{extract_action_checked, ToolAction};
 use crate::finding_retraction::{
@@ -319,6 +321,10 @@ impl Default for MemoryGovernanceGuard {
 impl Guard for MemoryGovernanceGuard {
     fn name(&self) -> &str {
         "memory-governance"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
