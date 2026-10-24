@@ -310,6 +310,8 @@ pub mod cluster;
 mod cluster_and_reports;
 #[path = "trust_control/config_and_public.rs"]
 mod config_and_public;
+#[path = "trust_control/credential_roles.rs"]
+pub mod credential_roles;
 #[path = "trust_control/credit_and_loss.rs"]
 mod credit_and_loss;
 #[path = "trust_control/finding_challenge_coordinator.rs"]

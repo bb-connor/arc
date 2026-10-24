@@ -685,7 +685,8 @@ chio \
 Remote verifier flows use the same policy-reference and replay-safe challenge
 contract as local CLI flows. Trust-control exposes verifier policy CRUD,
 passport lifecycle publish/list/get/resolve/revoke, and challenge create/verify
-endpoints behind the same service token boundary.
+endpoints to credentials holding `passport:read` or `passport:write`, such as
+the `operator` role.
 
 When `--advertise-url` is configured, trust-control also exposes the bounded
 holder transport plane:

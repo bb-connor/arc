@@ -31,24 +31,29 @@ and session keys are retained on process restart. Disabled and Shadow policies
 cannot launch tools. The example signers stay in the private container storage;
 operator-managed persistent storage is required for custody across replacement.
 
-The stack runs with four distinct demo credentials: `demo-token` for clients
+The stack runs with five distinct demo credentials: `demo-token` for clients
 of the hosted edge, `demo-admin-token` for the edge's admin routes,
-`demo-control-token` for the trust service, and `demo-workload-token` for the
-edge's calls to the trust service's authority. Override them with
-`CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`, `CHIO_SERVICE_TOKEN`, and
-`CHIO_WORKLOAD_TOKEN`; the edge refuses to start when any two share a value.
-The `chio-trust-demo` entrypoint writes a trust-control access configuration
-holding only the SHA-256 digests of `CHIO_SERVICE_TOKEN` (a credential with
-every caller scope) and the workload token, passed to the container as
-`CHIO_AUTHORITY_WORKLOAD_TOKEN` (a credential with `authority:read` and
-`capabilities:issue`), and starts `chio trust serve --access-config` with it.
-See [Trust-Control Access Configuration](../../docs/reference/TRUST_CONTROL_ACCESS.md).
+`demo-control-token` for the edge's kernel-host calls to the trust service,
+`demo-operator-token` for the dashboard and operator commands, and
+`demo-workload-token` for the edge's calls to the trust service's authority.
+Override them with `CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`,
+`CHIO_KERNEL_HOST_TOKEN`, `CHIO_OPERATOR_TOKEN`, and `CHIO_WORKLOAD_TOKEN`; the
+edge refuses to start when any two of its tokens share a value, and the trust
+service refuses to start when any two of its three do. The `chio-trust-demo`
+entrypoint writes a trust-control access configuration with
+`chio trust config credential --role`: a `kernel-host` credential for
+`CHIO_KERNEL_HOST_TOKEN`, an `operator` credential for `CHIO_OPERATOR_TOKEN`,
+and an `authority-workload` credential (`authority:read` and
+`capabilities:issue`) for the workload token, passed to the container as
+`CHIO_AUTHORITY_WORKLOAD_TOKEN`. The file holds only SHA-256 digests. The
+entrypoint then starts `chio trust serve --access-config` with it. See
+[Trust-Control Access Configuration](../../docs/reference/TRUST_CONTROL_ACCESS.md).
 
 These defaults are public strings, so every port is published on 127.0.0.1
 only. Set your own tokens before changing that binding. The `chio-trust-demo`
 image accepts the demo tokens only with `CHIO_DEMO=1`, which this compose file
-sets; without it the container refuses to start unless both trust tokens are
-set to other values. Outside the demo the listener needs `CHIO_TLS_CERT` and
+sets; without it the container refuses to start unless all three trust tokens
+are set to other values. Outside the demo the listener needs `CHIO_TLS_CERT` and
 `CHIO_TLS_KEY` (owned by the image's `chio` user, UID 10001, with an owner-only
 key), or `CHIO_ALLOW_PLAINTEXT=1` when a proxy protects it.
 
@@ -58,7 +63,7 @@ Then open:
 http://127.0.0.1:8940/
 ```
 
-Enter `demo-control-token` (or your configured `CHIO_SERVICE_TOKEN`) in the **Bearer token** field and select **Log in**.
+Enter `demo-operator-token` (or your configured `CHIO_OPERATOR_TOKEN`) in the **Bearer token** field and select **Log in**.
 
 The smoke script performs one governed `echo_text` call through the hosted
 edge, queries the resulting receipt from the trust service, and prints the

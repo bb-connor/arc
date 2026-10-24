@@ -9,7 +9,8 @@ services:
       target: chio-trust-demo
     environment:
       CHIO_DEMO: "1"
-      CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_KERNEL_HOST_TOKEN: ${CHIO_KERNEL_HOST_TOKEN:-demo-control-token}
+      CHIO_OPERATOR_TOKEN: ${CHIO_OPERATOR_TOKEN:-demo-operator-token}
       CHIO_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
     ports:
       - "127.0.0.1:${CHIO_TRUST_PORT:-8940}:8940"
@@ -34,7 +35,7 @@ services:
       CHIO_ADMIN_TOKEN: ${CHIO_ADMIN_TOKEN:-demo-admin-token}
       CHIO_CONTROL_URL: http://chio-trust-demo:8940
       CHIO_CONTROL_INTERNAL_URL: http://chio-trust-demo:8941
-      CHIO_CONTROL_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
+      CHIO_CONTROL_TOKEN: ${CHIO_KERNEL_HOST_TOKEN:-demo-control-token}
       CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
       CHIO_CAGE_INIT: ${CHIO_CAGE_INIT:-}
       CHIO_RECEIPT_ANCHOR_ROOT: ${CHIO_RECEIPT_ANCHOR_ROOT:-}

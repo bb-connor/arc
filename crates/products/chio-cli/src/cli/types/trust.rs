@@ -151,12 +151,12 @@ pub(crate) enum TrustCommands {
         roster_policy_file: Option<PathBuf>,
     },
 
-    /// Manage enterprise federation provider-admin records.
-    /// Inspect a trust-control access configuration.
+    /// Check a trust-control access configuration or write one credential entry.
     Config {
         #[command(subcommand)]
         command: TrustConfigCommands,
     },
+    /// Manage enterprise federation provider-admin records.
     Provider {
         #[command(subcommand)]
         command: TrustProviderCommands,
@@ -1565,9 +1565,14 @@ pub(crate) enum TrustConfigCommands {
         /// Credential id.
         #[arg(long)]
         id: String,
-        /// `caller` or `deployment`.
-        #[arg(long)]
-        kind: String,
+        /// Role preset that sets the kind and scopes: `kernel-host`,
+        /// `operator`, `authority-workload` or `tenant-reader` (with
+        /// `--tenant`).
+        #[arg(long, value_name = "ROLE")]
+        role: Option<String>,
+        /// `caller` or `deployment`, for a credential without a role.
+        #[arg(long, required_unless_present = "role", conflicts_with = "role")]
+        kind: Option<String>,
         /// Deployment the credential belongs to.
         #[arg(long)]
         deployment: String,
@@ -1577,12 +1582,10 @@ pub(crate) enum TrustConfigCommands {
         /// Environment variable holding the secret.
         #[arg(long, value_name = "NAME")]
         secret_env: Option<String>,
-        /// Scope to grant. Repeat for several.
+        /// Scope to grant; with `--role`, a scope beyond the preset. Repeat
+        /// for several.
         #[arg(long = "scope")]
         scopes: Vec<String>,
-        /// Grant every caller scope.
-        #[arg(long, conflicts_with = "scopes")]
-        all_caller_scopes: bool,
         /// Limit the credential to one tenant instead of the deployment.
         #[arg(long)]
         tenant: Option<String>,

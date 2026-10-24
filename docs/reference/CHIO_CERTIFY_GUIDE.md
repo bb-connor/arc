@@ -171,7 +171,8 @@ operator and returns:
 
 `chio certify registry publish-network` fans one signed artifact out to all
 selected operators that explicitly allow publication and have a configured
-service token.
+`controlToken`: the secret of a credential holding `certifications:write` on
+that operator's trust-control, such as its `operator` credential.
 
 Trust-control can host the same discovery behavior:
 

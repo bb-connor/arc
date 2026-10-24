@@ -142,37 +142,39 @@ baseline is present, and the keylog example configs agree with the units.
 
    ```bash
    umask 077
-   for name in trust-service-token trust-authority-workload-token edge-session-token edge-admin-token; do
+   for name in edge-control-token edge-workload-token edge-session-token edge-admin-token operator-token; do
      openssl rand -base64 33 | tr -d '\n' > /etc/chio/credentials/$name
    done
    ```
 
    Write the trust-control access configuration. It holds one credential per
-   caller role, each with only the SHA-256 digest of its secret: the control
-   client (every caller scope) and the authority workload (authority status
-   and capability issuance only). Check it before starting the service:
+   caller role, each with only the SHA-256 digest of its secret and its role
+   preset's scopes: the edge's `kernel-host` credential (receipts, budgets,
+   revocations, capability authority and durable admission), the edge's
+   `authority-workload` credential (authority status and capability issuance
+   only) and the `operator` credential for `chio trust` administration. The
+   edge never holds operator scopes. Check the file before starting the
+   service:
 
    ```bash
    {
      printf 'deployment = "reference-runtime"\ninternal_listen = "127.0.0.1:8941"\n'
-     chio trust config credential --id edge-control --kind deployment \
-       --deployment reference-runtime --all-caller-scopes \
-       --secret-file /etc/chio/credentials/trust-service-token
-     chio trust config credential --id edge-workload --kind deployment \
-       --deployment reference-runtime --scope authority:read --scope capabilities:issue \
-       --secret-file /etc/chio/credentials/trust-authority-workload-token
+     chio trust config credential --id edge-control --role kernel-host \
+       --deployment reference-runtime \
+       --secret-file /etc/chio/credentials/edge-control-token
+     chio trust config credential --id edge-workload --role authority-workload \
+       --deployment reference-runtime \
+       --secret-file /etc/chio/credentials/edge-workload-token
+     chio trust config credential --id operator --role operator \
+       --deployment reference-runtime \
+       --secret-file /etc/chio/credentials/operator-token
    } > /etc/chio/credentials/trust-access.toml
    chio trust config check --access-config /etc/chio/credentials/trust-access.toml
    ```
 
-   The edge presents the control client secret as its control token and the
-   authority workload secret as its workload token, so those two
-   credentials are copies:
-
-   ```bash
-   cp /etc/chio/credentials/trust-service-token /etc/chio/credentials/edge-control-token
-   cp /etc/chio/credentials/trust-authority-workload-token /etc/chio/credentials/edge-workload-token
-   ```
+   The edge presents `edge-control-token` as its control token and
+   `edge-workload-token` as its workload token. Operators pass
+   `operator-token` to `chio trust` commands with `--control-token`.
 
    Write the resume keyring with the helper from `scripts/lib/provision-mcp-launch.sh`:
 
@@ -189,7 +191,7 @@ baseline is present, and the keylog example configs agree with the units.
 
    ```bash
    systemctl enable --now chio-trust-control.service
-   curl -s -H "Authorization: Bearer $(cat /etc/chio/credentials/trust-service-token)" \
+   curl -s -H "Authorization: Bearer $(cat /etc/chio/credentials/edge-workload-token)" \
      http://127.0.0.1:8940/v1/authority | jq -r .publicKey
    ```
 

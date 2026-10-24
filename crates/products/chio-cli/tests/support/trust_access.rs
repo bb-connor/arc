@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use chio_control_plane::trust_control::caller_credentials::Scope;
+use chio_control_plane::trust_control::credential_roles::CredentialRole;
 
 /// Deployment id every test access configuration names.
 pub const TEST_DEPLOYMENT: &str = "cli-test-deployment";
@@ -33,11 +34,27 @@ pub struct TestCluster<'a> {
     pub peers: &'a [TestPeer<'a>],
 }
 
-/// Every caller scope, for the credential standing in for a full client.
+/// Every caller scope, for the test-only credential standing in for every
+/// operator and service client at once.
 pub fn all_caller_scopes() -> Vec<&'static str> {
     Scope::ALL
         .iter()
         .filter(|scope| !scope.is_cluster())
+        .map(|scope| scope.as_str())
+        .collect()
+}
+
+/// The secret of the kernel-host credential every test access configuration
+/// holds beside the full test client whose secret is `token`.
+pub fn kernel_host_token(token: &str) -> String {
+    format!("{token}.kernel-host")
+}
+
+/// The scopes of the `kernel-host` role preset.
+pub fn kernel_host_scopes() -> Vec<&'static str> {
+    CredentialRole::KernelHost
+        .scopes()
+        .iter()
         .map(|scope| scope.as_str())
         .collect()
 }
@@ -63,7 +80,8 @@ fn credential_entry(out: &mut String, credential: &TestCredential<'_>) {
 }
 
 /// The access configuration text: a deployment credential for `token`
-/// holding every caller scope, then `extra`, then the cluster identity.
+/// holding every caller scope, the `kernel-host` preset credential for
+/// `kernel_host_token(token)`, then `extra`, then the cluster identity.
 pub fn access_config_text(
     token: &str,
     extra: &[TestCredential<'_>],
@@ -79,6 +97,16 @@ pub fn access_config_text(
             kind: "deployment",
             secret: token,
             scopes: &all_caller_scopes(),
+            tenant: None,
+        },
+    );
+    credential_entry(
+        &mut out,
+        &TestCredential {
+            id: "kernel-host",
+            kind: "deployment",
+            secret: &kernel_host_token(token),
+            scopes: &kernel_host_scopes(),
             tenant: None,
         },
     );

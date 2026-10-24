@@ -52,7 +52,7 @@ scopes = ["cluster:replicate", "cluster-openings:replicate"]
 
 ## Scopes
 
-Caller scopes (38):
+Caller scopes (39):
 
 ```text
 admin:emergency            admission-authority:write  attestation:write
@@ -67,17 +67,48 @@ passport:write             receipt-openings:erase     receipt-openings:read
 receipts:admin             receipts:append            receipts:read
 registry:write             reports:read               reputation:read
 reputation:write           revocations:read           revocations:write
-scim:write                 settlement:write
+root-exchange:sign         scim:write                 settlement:write
 ```
+
+A credential naming `root-exchange:sign` loads, but no route accepts it until
+the root-exchange signing route exists.
 
 Peer scopes, valid only on `[[cluster.peers]]`: `cluster:replicate` and
 `cluster-openings:replicate`.
 
+## Role presets
+
+`chio trust config credential --role <ROLE>` writes a credential with its
+role's kind and exactly these scopes. Each preset holds only the scopes of the
+routes that role calls.
+
+| Role | Kind | Scopes |
+|---|---|---|
+| `kernel-host` | `deployment` | `admission-authority:write`, `authority:read`, `budgets:read`, `budgets:write`, `capabilities:issue`, `lineage:write`, `receipt-openings:read`, `receipts:append`, `receipts:read`, `reports:read`, `revocations:read`, `revocations:write` |
+| `operator` | `caller` | `admin:emergency`, `authority:admin`, `certifications:read`, `certifications:write`, `credit:read`, `credit:write`, `evidence:read`, `evidence:write`, `federation:read`, `federation:write`, `findings:read`, `findings:write`, `fiscal:read`, `fiscal:write`, `lineage:read`, `metrics:read`, `passport:read`, `passport:write`, `receipts:admin`, `receipts:read`, `registry:write`, `reports:read`, `reputation:read`, `reputation:write`, `revocations:read`, `revocations:write`, `scim:write` |
+| `authority-workload` | `deployment` | `authority:read`, `capabilities:issue` |
+| `tenant-reader` | `caller` | `evidence:read`, `receipts:read`, `reports:read` (requires `--tenant`) |
+
+- A kernel host (`chio mcp serve-http`, `chio mcp serve`, `chio run`,
+  `chio check`, `chio api protect` with `--control-url`) appends receipts,
+  reads parent receipts and credit bonds, records capability lineage, keeps
+  budgets and revocations, issues capabilities through the remote authority
+  and reaches the admission authority on the internal listener. It is the
+  only role that holds `receipt-openings:read`.
+- An operator holds no `receipt-openings:*`, `budgets:*`,
+  `admission-authority:write`, `receipts:append` or `capabilities:issue`
+  scope. Its `caller` kind keeps it off every deployment-kind route.
+- No preset holds `receipt-openings:erase`, `attestation:write`,
+  `settlement:write` or `root-exchange:sign`. A process that needs one gets a
+  credential written with `--kind` and explicit `--scope`s.
+
 ## Routes, kinds, and tenant authority
 
 Every route has one entry in the route table: the listener that serves it, the
-credential kind it accepts, the scope it requires, and its tenant rule. A route
-absent from the table returns `404`.
+credential kind it accepts, the scope it requires, and its tenant rule. A
+request whose method and route have no table row is refused with `404`. The
+public listener answers `404` for every `/v1/` path it does not serve before
+the dashboard fallback, which serves only the dashboard's static files.
 
 - Deployment-kind routes refuse `caller` credentials. These are receipt append,
   budgets, capability issuance, settlement reconciliation, authority status
@@ -96,7 +127,9 @@ absent from the table returns `404`.
 `internal_listen` binds a second listener. It serves every `/v1/internal/*`
 route and nothing else. The public `--listen` listener never serves
 `/v1/internal/*`. Keep the internal address on a network reachable only by
-other trust-control nodes and operators. TLS settings apply to both listeners.
+other trust-control nodes, the kernel hosts that reach the admission authority
+through `--control-internal-url` (`CHIO_CONTROL_INTERNAL_URL`), and operators.
+TLS settings apply to both listeners.
 
 ## Cluster peer authentication
 
@@ -145,42 +178,51 @@ writes its access configuration once.
 
 ## Writing the configuration
 
-Create one credential per caller role:
+Create one credential per caller, each from the narrowest role preset that
+covers what it calls:
 
-| Caller role | Credential |
+| Caller | Credential |
 |---|---|
-| Administrative control client | `kind = "deployment"`, every caller scope (`--all-caller-scopes`), `tenant_authority = "deployment"` |
-| MCP edge authority workload | `kind = "deployment"`, `authority:read` and `capabilities:issue` |
-| Tenant reader for tenant `t` | `kind = "caller"`, `receipts:read`, `reports:read`, and `evidence:read`, `tenant_authority = { tenant = "t" }` |
+| Kernel host (MCP edge, `chio mcp serve`, `chio run`, `chio api protect`) | `--role kernel-host` |
+| MCP edge authority workload | `--role authority-workload` |
+| Operator and dashboard | `--role operator` |
+| Tenant reader for tenant `t` | `--role tenant-reader --tenant t` |
 | Clustered node | `[cluster]` with its own `node_key_file`, plus one `[[cluster.peers]]` per other node |
 
-Tenant readers need `evidence:read` to export evidence.
+Each kernel host, operator and workload gets its own secret; two credentials
+never share one.
 
 `chio trust config credential` prints one validated `[[credentials]]` entry and
 computes the digest from a secret file (one trailing newline is removed) or an
 environment variable:
 
 ```bash
-chio trust config credential --id <ID> --kind caller|deployment \
-  --deployment <D> (--secret-file <PATH> | --secret-env <NAME>) \
-  (--scope <S> ... | --all-caller-scopes) [--tenant <T>]
+chio trust config credential --id <ID> --deployment <D> \
+  (--secret-file <PATH> | --secret-env <NAME>) \
+  (--role <ROLE> [--scope <S> ...] | --kind caller|deployment --scope <S> ...) \
+  [--tenant <T>]
 ```
+
+With `--role`, each `--scope` adds a scope beyond the preset and a scope the
+preset already holds refuses. Without a role, `--kind` and the `--scope`s
+describe the whole credential.
 
 Worked example for a single-node deployment named `prod-eu`:
 
 ```bash
 {
   printf 'deployment = "prod-eu"\ninternal_listen = "127.0.0.1:8941"\n\n'
-  chio trust config credential --id control-client --kind deployment \
-    --deployment prod-eu --secret-env CHIO_CONTROL_TOKEN --all-caller-scopes
+  chio trust config credential --id edge-control --role kernel-host \
+    --deployment prod-eu --secret-env CHIO_CONTROL_TOKEN
   echo
-  chio trust config credential --id authority-workload --kind deployment \
-    --deployment prod-eu --secret-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN \
-    --scope authority:read --scope capabilities:issue
+  chio trust config credential --id authority-workload --role authority-workload \
+    --deployment prod-eu --secret-env CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN
   echo
-  chio trust config credential --id tenant-a-reader --kind caller \
+  chio trust config credential --id operator --role operator \
+    --deployment prod-eu --secret-file /run/secrets/operator
+  echo
+  chio trust config credential --id tenant-a-reader --role tenant-reader \
     --deployment prod-eu --secret-file /run/secrets/tenant-a-reader \
-    --scope receipts:read --scope reports:read --scope evidence:read \
     --tenant tenant-a
 } > /etc/chio/trust-access.toml
 chmod 600 /etc/chio/trust-access.toml
@@ -191,10 +233,11 @@ chio trust serve --listen 127.0.0.1:8940 \
   --receipt-db /var/lib/chio/receipts.sqlite3
 ```
 
-The control client then authenticates with
-`--control-token "$CHIO_CONTROL_TOKEN"`, the MCP edge with
-`--remote-authority-workload-token`, and the tenant reader with the contents of
-`/run/secrets/tenant-a-reader` as its bearer.
+The MCP edge then authenticates with `--control-token "$CHIO_CONTROL_TOKEN"`
+and `--remote-authority-workload-token`, operators pass the contents of
+`/run/secrets/operator` to `chio trust` commands with `--control-token`, and
+the tenant reader presents the contents of `/run/secrets/tenant-a-reader` as
+its bearer.
 
 ## Checking a configuration
 

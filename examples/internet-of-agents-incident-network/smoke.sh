@@ -52,7 +52,7 @@ cleanup() {
 trap cleanup EXIT
 
 # -- Chio trust-control --
-write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access.toml" "${SERVICE_TOKEN}"
+write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access.toml" "${SERVICE_TOKEN}" "" lineage:read
 "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-sessions.sqlite3" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" --access-config "${STATE_DIR}/trust-access.toml" \
   --receipt-db "${STATE_DIR}/trust-receipts.sqlite3" \

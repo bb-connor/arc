@@ -106,22 +106,22 @@ pub(crate) fn dispatch_trust(
                 }
                 TrustConfigCommands::Credential {
                     id,
+                    role,
                     kind,
                     deployment,
                     secret_file,
                     secret_env,
                     scopes,
-                    all_caller_scopes,
                     tenant,
                 } => crate::trust_config_check::cmd_trust_config_credential(
                     &crate::trust_config_check::CredentialEntryArgs {
                         id: &id,
-                        kind: &kind,
+                        role: role.as_deref(),
+                        kind: kind.as_deref(),
                         deployment: &deployment,
                         secret_file: secret_file.as_deref(),
                         secret_env: secret_env.as_deref(),
                         scopes: &scopes,
-                        all_caller_scopes,
                         tenant: tenant.as_deref(),
                     },
                 ),

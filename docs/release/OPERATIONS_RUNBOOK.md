@@ -362,7 +362,7 @@ Then load:
 http://127.0.0.1:8940/
 ```
 
-Enter your trust-control service token in the **Bearer token** field and select **Log in**.
+Enter the secret of your trust-control `operator` credential in the **Bearer token** field and select **Log in**.
 
 ## 3. Configuration Checks Before Promotion
 
@@ -450,8 +450,9 @@ tag/publication.
 Authority pins are exact by design. An edge does not automatically trust a new
 current key just because trust-control reports it.
 
-1. Read and archive `/v1/authority` with the administrative service token.
-2. Rotate the authority with the administrative service token.
+1. Read and archive `/v1/authority` with a deployment-kind credential holding
+   `authority:read`, such as the edge's `authority-workload` credential.
+2. Rotate the authority with the `operator` credential (`authority:admin`).
 3. Drain each edge. Existing cached capabilities can remain usable until their
    normal expiry or revocation, but new issuance fails closed while the edge's
    current-key pin is stale.

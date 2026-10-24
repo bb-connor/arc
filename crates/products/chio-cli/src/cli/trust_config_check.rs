@@ -4,8 +4,9 @@
 use std::path::Path;
 
 use chio_control_plane::trust_control::caller_credentials::{
-    CredentialKind, Scope, TenantAuthority, TrustAccess, TrustAccessConfig,
+    CredentialKind, TenantAuthority, TrustAccess, TrustAccessConfig,
 };
+use chio_control_plane::trust_control::credential_roles::CredentialRole;
 use serde_json::json;
 
 use crate::CliError;
@@ -97,13 +98,59 @@ pub(crate) fn cmd_trust_config_check(access_config: &Path, json_output: bool) ->
 
 pub(crate) struct CredentialEntryArgs<'a> {
     pub(crate) id: &'a str,
-    pub(crate) kind: &'a str,
+    pub(crate) role: Option<&'a str>,
+    pub(crate) kind: Option<&'a str>,
     pub(crate) deployment: &'a str,
     pub(crate) secret_file: Option<&'a Path>,
     pub(crate) secret_env: Option<&'a str>,
     pub(crate) scopes: &'a [String],
-    pub(crate) all_caller_scopes: bool,
     pub(crate) tenant: Option<&'a str>,
+}
+
+/// The entry's kind and scopes: a role preset widened by each `--scope` not
+/// already in it, or, without a role, `--kind` and exactly the `--scope`s.
+fn kind_and_scopes(args: &CredentialEntryArgs<'_>) -> Result<(String, Vec<String>), CliError> {
+    let Some(name) = args.role else {
+        let kind = args
+            .kind
+            .ok_or_else(|| CliError::cli_other_error("pass --role or --kind".to_owned()))?;
+        return Ok((kind.to_owned(), args.scopes.to_vec()));
+    };
+    let role = CredentialRole::parse(name).ok_or_else(|| {
+        CliError::cli_other_error(format!(
+            "unknown credential role \"{name}\"; expected one of {}",
+            CredentialRole::ALL
+                .iter()
+                .map(|role| role.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))
+    })?;
+    if role.requires_tenant() && args.tenant.is_none() {
+        return Err(CliError::cli_other_error(format!(
+            "role {} requires --tenant",
+            role.as_str()
+        )));
+    }
+    let mut scopes: Vec<String> = role
+        .scopes()
+        .iter()
+        .map(|scope| scope.as_str().to_owned())
+        .collect();
+    for extra in args.scopes {
+        if scopes.contains(extra) {
+            return Err(CliError::cli_other_error(format!(
+                "scope \"{extra}\" is already in role {}",
+                role.as_str()
+            )));
+        }
+        scopes.push(extra.clone());
+    }
+    let kind = match role.kind() {
+        CredentialKind::Caller => "caller",
+        CredentialKind::Deployment => "deployment",
+    };
+    Ok((kind.to_owned(), scopes))
 }
 
 fn read_secret(args: &CredentialEntryArgs<'_>) -> Result<String, CliError> {
@@ -135,16 +182,8 @@ fn read_secret(args: &CredentialEntryArgs<'_>) -> Result<String, CliError> {
 /// Print one validated `[[credentials]]` entry. The entry is parsed back as a
 /// complete access configuration before it is printed.
 pub(crate) fn cmd_trust_config_credential(args: &CredentialEntryArgs<'_>) -> Result<(), CliError> {
+    let (kind, scopes) = kind_and_scopes(args)?;
     let secret = read_secret(args)?;
-    let scopes: Vec<&str> = if args.all_caller_scopes {
-        Scope::ALL
-            .iter()
-            .filter(|scope| !scope.is_cluster())
-            .map(|scope| scope.as_str())
-            .collect()
-    } else {
-        args.scopes.iter().map(String::as_str).collect()
-    };
     let tenant_authority = match args.tenant {
         None => "\"deployment\"".to_owned(),
         Some(tenant) => format!("{{ tenant = {} }}", toml_string(tenant)),
@@ -152,7 +191,7 @@ pub(crate) fn cmd_trust_config_credential(args: &CredentialEntryArgs<'_>) -> Res
     let entry = format!(
         "[[credentials]]\nid = {}\nkind = {}\nsecret_sha256 = \"{}\"\nscopes = [{}]\ndeployment = {}\ntenant_authority = {tenant_authority}\n",
         toml_string(args.id),
-        toml_string(args.kind),
+        toml_string(&kind),
         chio_core::sha256_hex(secret.as_bytes()),
         scopes
             .iter()
