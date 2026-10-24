@@ -71,6 +71,47 @@ fn malformed_rpc_envelopes_are_io_failures() {
 }
 
 #[test]
+fn malformed_rpc_result_shapes_are_io_failures() {
+    for value in [
+        serde_json::json!(null),
+        serde_json::json!(7),
+        serde_json::json!("12"),
+        serde_json::json!("0xnope"),
+        serde_json::json!("0x10000000000000000"),
+    ] {
+        assert_rejection(
+            parse_json_rpc_hex_u64(&value, "eth_blockNumber result").unwrap_err(),
+            &CLI_IO,
+            1,
+        );
+    }
+    for value in [
+        serde_json::json!(null),
+        serde_json::json!({}),
+        serde_json::json!({"hash": 7}),
+    ] {
+        assert_rejection(
+            required_json_rpc_string(&value, "hash", "eth_getBlockByNumber result").unwrap_err(),
+            &CLI_IO,
+            1,
+        );
+    }
+}
+
+#[test]
+fn valid_rpc_result_shapes_are_accepted() {
+    assert_eq!(
+        parse_json_rpc_hex_u64(&serde_json::json!("0x10"), "eth_blockNumber result").unwrap(),
+        16
+    );
+    let block = serde_json::json!({"hash": "0xabc"});
+    assert_eq!(
+        required_json_rpc_string(&block, "hash", "eth_getBlockByNumber result").unwrap(),
+        "0xabc"
+    );
+}
+
+#[test]
 fn malformed_pinned_verifier_profile_is_context_invalid() {
     let error = with_pinned_document(FINDING_VERIFIER_PROFILE_PATH_ENV, b"{", || {
         finding_verifier_profile_from_env().unwrap_err()
