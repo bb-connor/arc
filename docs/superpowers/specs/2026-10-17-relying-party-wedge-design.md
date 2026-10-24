@@ -860,7 +860,7 @@ New manifest members:
 - New artifact roles: `capability_presentation`, `delegation_context`, `root_policy`, `enterprise_provider_identity` (the identity projection of every provider record a bundle's roots name), `idp_key_snapshot`, `idp_artifact` (retained ID-JAG, auditor profiles only, D7, M2), `receipt_disclosure`, `revocation_entry`, `revocation_request` (M2), `settlement_closure` (M3), `pdp_decision_receipt` (M2).
 - The manifest is signed by the kernel key (existing commitment artifact pattern, `chio.evidence_export_commitment.v1`).
 
-The tenant confirms the bundle is its own by opening the subject and tenant commitments with the included salts.
+The tenant confirms the bundle is its own by opening the subject and tenant commitments with the included salts. The verifier report carries `tenant_confirmed` (every tenant commitment opens with the caller's tenant value) and `principals_confirmed` (every subject commitment opens against a principal the caller supplies, false when none is supplied).
 
 `chio.verifier-trust.v1` is a local, unsigned file the verifying party writes and controls:
 

@@ -200,4 +200,8 @@ The manifest is signed by the kernel key through
 `chio.evidence_export_commitment.v1`. Export refuses salt-only openings in
 auditor profiles, and refuses a `caller` export without `tenant_tags`. A
 tenant confirms a bundle is its own by opening the subject and tenant
-commitments with the included salts.
+commitments with the included salts. The verifier report carries
+`tenant_confirmed`, true only when every tenant commitment opens with the
+caller's tenant value, and `principals_confirmed`, true only when every
+subject commitment opens against a principal the caller supplies and false
+when none is supplied.
