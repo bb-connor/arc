@@ -373,9 +373,15 @@ fn absence_requires_an_authenticated_nonempty_sibling_branch() -> TestResult {
     assert_eq!(lookup(&mut memory, root, [0x80; 32])?, None);
     assert_eq!(memory.reads, 2);
     memory.nodes.remove(&child);
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(
+        lookup(&mut memory, root, [0x80; 32]),
+        Err(Error::MissingNode)
+    );
     memory.nodes.insert(child, leaf([0; 32], 3)?);
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(
+        lookup(&mut memory, root, [0x80; 32]),
+        Err(Error::NodeDigest)
+    );
     Ok(())
 }
 
@@ -390,9 +396,12 @@ fn an_empty_sibling_beside_a_leaf_is_noncanonical_on_both_paths() -> TestResult 
             right: empty_digest(),
         },
     )?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
-    assert!(batch_update(&mut memory, root, &[([0; 32], pointer(2))]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Shape));
+    assert_eq!(lookup(&mut memory, root, [0x80; 32]), Err(Error::Shape));
+    assert_eq!(
+        batch_update(&mut memory, root, &[([0; 32], pointer(2))]),
+        Err(Error::Shape)
+    );
     Ok(())
 }
 
@@ -407,8 +416,9 @@ fn a_new_key_cannot_repair_a_noncanonical_predecessor_sibling() -> TestResult {
             right: child,
         },
     )?;
-    assert!(
-        batch_update(&mut memory, root, &[([0; 32], pointer(2))]).is_err(),
+    assert_eq!(
+        batch_update(&mut memory, root, &[([0; 32], pointer(2))]),
+        Err(Error::Shape),
         "an inserted left key must not hide the predecessor's invalid right leaf"
     );
     Ok(())
@@ -424,7 +434,7 @@ fn two_empty_children_never_prove_absence() -> TestResult {
             right: empty_digest(),
         },
     )?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Shape));
     Ok(())
 }
 
@@ -434,8 +444,8 @@ fn misplaced_leaf_never_proves_absence() -> TestResult {
     let left = seed(&mut memory, leaf([0x80; 32], 1)?)?;
     let right = seed(&mut memory, leaf([0; 32], 2)?)?;
     let root = seed(&mut memory, Node::Branch { left, right })?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Placement));
+    assert_eq!(lookup(&mut memory, root, [0x80; 32]), Err(Error::Placement));
     Ok(())
 }
 
@@ -448,7 +458,7 @@ fn a_branch_at_depth_256_is_refused() -> TestResult {
     for _ in 0..256 {
         root = seed(&mut memory, Node::Branch { left: root, right })?;
     }
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Depth));
     assert!(memory.reads <= 257);
     Ok(())
 }
@@ -458,12 +468,18 @@ fn missing_and_corrupt_nodes_refuse_inclusion_and_absence() -> TestResult {
     let mut memory = Memory::default();
     let root = seed(&mut memory, leaf([0; 32], 1)?)?;
     memory.nodes.remove(&root);
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::MissingNode));
+    assert_eq!(
+        lookup(&mut memory, root, [0xff; 32]),
+        Err(Error::MissingNode)
+    );
     memory.nodes.insert(root, leaf([0; 32], 2)?);
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
-    assert!(batch_update(&mut memory, root, &[]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::NodeDigest));
+    assert_eq!(
+        lookup(&mut memory, root, [0xff; 32]),
+        Err(Error::NodeDigest)
+    );
+    assert_eq!(batch_update(&mut memory, root, &[]), Err(Error::NodeDigest));
     Ok(())
 }
 
@@ -488,18 +504,20 @@ fn authenticated_malformed_payloads_never_prove_absence() -> TestResult {
     let root: Digest = hash.finalize().into();
     let mut memory = Memory::default();
     memory.nodes.insert(root, Node::Leaf { key, payload });
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0xff; 32]), Err(Error::Encoding));
     Ok(())
 }
 
 #[test]
 fn duplicate_batch_keys_are_refused() {
-    assert!(batch_update(
-        &mut Memory::default(),
-        empty_digest(),
-        &[([0; 32], pointer(1)), ([0; 32], pointer(2))]
-    )
-    .is_err());
+    assert_eq!(
+        batch_update(
+            &mut Memory::default(),
+            empty_digest(),
+            &[([0; 32], pointer(1)), ([0; 32], pointer(2))]
+        ),
+        Err(Error::DuplicateKey)
+    );
 }
 
 #[test]
