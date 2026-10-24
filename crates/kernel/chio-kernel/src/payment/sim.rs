@@ -7,17 +7,50 @@
 
 use crate::payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentRailMode, PaymentResult, RailSettlementStatus,
+    PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
 };
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// Deterministic no-broadcast payment adapter.
+///
+/// Authorizations are remembered per reference for the life of the process so
+/// recovery can answer the settlement-state query. A restarted adapter has no
+/// authorizations and reports `NoAuthorization`, which is accurate because it
+/// moved no funds.
 #[derive(Debug, Clone, Default)]
-pub struct SimPaymentAdapter;
+pub struct SimPaymentAdapter {
+    authorizations: Arc<Mutex<HashMap<String, (String, RailSettlementStatus)>>>,
+}
 
 impl SimPaymentAdapter {
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    fn record_status(
+        &self,
+        reference: &str,
+        authorization_id: &str,
+        status: RailSettlementStatus,
+    ) -> Result<(), PaymentError> {
+        let mut ledger = self
+            .authorizations
+            .lock()
+            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?;
+        match ledger.get_mut(reference) {
+            Some(entry) if entry.0 == authorization_id => {
+                entry.1 = status;
+                Ok(())
+            }
+            Some(_) => Err(PaymentError::RailError(
+                "sim authorization does not match the recorded identifier".into(),
+            )),
+            None => Err(PaymentError::RailError(
+                "sim has no authorization for the referenced payment".into(),
+            )),
+        }
     }
 
     fn deterministic_id(
@@ -51,6 +84,11 @@ impl PaymentAdapter for SimPaymentAdapter {
             request.amount_units,
             &request.currency,
         );
+        self.authorizations
+            .lock()
+            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?
+            .entry(request.reference.clone())
+            .or_insert_with(|| (authorization_id.clone(), RailSettlementStatus::Settled));
         Ok(PaymentAuthorization {
             authorization_id,
             state: PaymentAuthorizationState::PrepaidFinal,
@@ -68,8 +106,9 @@ impl PaymentAdapter for SimPaymentAdapter {
         authorization_id: &str,
         _amount_units: u64,
         _currency: &str,
-        _reference: &str,
+        reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.record_status(reference, authorization_id, RailSettlementStatus::Settled)?;
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Settled,
@@ -80,8 +119,9 @@ impl PaymentAdapter for SimPaymentAdapter {
     fn release(
         &self,
         authorization_id: &str,
-        _reference: &str,
+        reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.record_status(reference, authorization_id, RailSettlementStatus::Released)?;
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Released,
@@ -94,12 +134,47 @@ impl PaymentAdapter for SimPaymentAdapter {
         transaction_id: &str,
         _amount_units: u64,
         _currency: &str,
-        _reference: &str,
+        reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.record_status(reference, transaction_id, RailSettlementStatus::Refunded)?;
         Ok(PaymentResult {
             transaction_id: transaction_id.to_string(),
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "sim", "action": "refund" }),
+        })
+    }
+
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<RailSettlementState, PaymentError> {
+        let recorded = self
+            .authorizations
+            .lock()
+            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?
+            .get(reference)
+            .cloned();
+        let Some((recorded, status)) = recorded else {
+            return match authorization_id {
+                None => Ok(RailSettlementState::NoAuthorization),
+                Some(_) => Err(PaymentError::RailError(
+                    "sim has no authorization for the queried reference".into(),
+                )),
+            };
+        };
+        if authorization_id.is_some_and(|expected| expected != recorded) {
+            return Err(PaymentError::RailError(
+                "sim authorization does not match the queried identifier".into(),
+            ));
+        }
+        Ok(RailSettlementState::Settled {
+            result: PaymentResult {
+                transaction_id: recorded.clone(),
+                settlement_status: status,
+                metadata: serde_json::json!({ "adapter": "sim", "action": "settlement_state" }),
+            },
+            authorization_id: recorded,
         })
     }
 }
@@ -141,9 +216,127 @@ mod tests {
     #[test]
     fn capture_and_release_map_to_settled_and_released() {
         let adapter = SimPaymentAdapter::new();
-        let captured = adapter.capture("sim-abc", 100, "USD", "req-1").unwrap();
+        let id = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        let captured = adapter.capture(&id, 100, "USD", "req-1").unwrap();
         assert_eq!(captured.settlement_status, RailSettlementStatus::Settled);
-        let released = adapter.release("sim-abc", "req-1").unwrap();
+        let released = adapter.release(&id, "req-1").unwrap();
         assert_eq!(released.settlement_status, RailSettlementStatus::Released);
+    }
+
+    #[test]
+    fn settlement_state_reports_no_authorization_before_authorize() {
+        let adapter = SimPaymentAdapter::new();
+        assert_eq!(
+            adapter.settlement_state("req-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        );
+        let error = adapter
+            .settlement_state("req-1", Some("sim-x"))
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "payment rail error: sim has no authorization for the queried reference"
+        );
+    }
+
+    #[test]
+    fn settlement_state_reports_the_prepaid_final_authorization() {
+        let adapter = SimPaymentAdapter::new();
+        let authorization = adapter.authorize(&request("req-1", 100)).unwrap();
+        let expected = RailSettlementState::Settled {
+            authorization_id: authorization.authorization_id.clone(),
+            result: PaymentResult {
+                transaction_id: authorization.authorization_id.clone(),
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({ "adapter": "sim", "action": "settlement_state" }),
+            },
+        };
+        assert_eq!(adapter.settlement_state("req-1", None).unwrap(), expected);
+        assert_eq!(
+            adapter
+                .settlement_state("req-1", Some(&authorization.authorization_id))
+                .unwrap(),
+            expected
+        );
+        let error = adapter
+            .settlement_state("req-1", Some("sim-other"))
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "payment rail error: sim authorization does not match the queried identifier"
+        );
+        assert_eq!(
+            adapter.settlement_state("req-2", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        );
+    }
+
+    #[test]
+    fn settlement_state_follows_release_and_refund() {
+        let adapter = SimPaymentAdapter::new();
+        let authorization = adapter.authorize(&request("req-1", 100)).unwrap();
+        let id = authorization.authorization_id;
+        let status = |adapter: &SimPaymentAdapter| match adapter
+            .settlement_state("req-1", Some(&id))
+            .unwrap()
+        {
+            RailSettlementState::Settled { result, .. } => result.settlement_status,
+            other => panic!("expected settled state, got {other:?}"),
+        };
+        assert_eq!(status(&adapter), RailSettlementStatus::Settled);
+        adapter.release(&id, "req-1").unwrap();
+        assert_eq!(status(&adapter), RailSettlementStatus::Released);
+        adapter.refund(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(status(&adapter), RailSettlementStatus::Refunded);
+    }
+
+    #[test]
+    fn authorize_retry_keeps_terminal_status() {
+        let adapter = SimPaymentAdapter::new();
+        let id = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        adapter.release(&id, "req-1").unwrap();
+        adapter.authorize(&request("req-1", 100)).unwrap();
+        match adapter.settlement_state("req-1", None).unwrap() {
+            RailSettlementState::Settled { result, .. } => {
+                assert_eq!(result.settlement_status, RailSettlementStatus::Released);
+            }
+            other => panic!("expected settled state, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn terminal_calls_reject_unknown_or_mismatched_bindings() {
+        let adapter = SimPaymentAdapter::new();
+        let unknown = adapter.capture("sim-x", 1, "USD", "req-1").unwrap_err();
+        assert_eq!(
+            unknown.to_string(),
+            "payment rail error: sim has no authorization for the referenced payment"
+        );
+        let id = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        for error in [
+            adapter.capture("sim-other", 1, "USD", "req-1").unwrap_err(),
+            adapter.release("sim-other", "req-1").unwrap_err(),
+            adapter.refund("sim-other", 1, "USD", "req-1").unwrap_err(),
+        ] {
+            assert_eq!(
+                error.to_string(),
+                "payment rail error: sim authorization does not match the recorded identifier"
+            );
+        }
+        match adapter.settlement_state("req-1", Some(&id)).unwrap() {
+            RailSettlementState::Settled { result, .. } => {
+                assert_eq!(result.settlement_status, RailSettlementStatus::Settled);
+            }
+            other => panic!("expected settled state, got {other:?}"),
+        }
     }
 }
