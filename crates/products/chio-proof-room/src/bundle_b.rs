@@ -145,6 +145,17 @@ pub(crate) fn validate_json_artifact_schema(
             "proof-room.schema-mismatch: {label} expected {expected_schema} got {actual_schema}"
         ))
         .into()),
+        // A chio.receipt.v1 artifact is a closed `ChioReceipt`, which has no
+        // schema member.
+        None if expected_schema == CHIO_RECEIPT_SCHEMA => {
+            input::project::<chio_core_types::receipt::body::ChioReceipt>(value.clone())
+                .map(drop)
+                .map_err(|_| {
+                    ProofRoomError::from(format!(
+                        "proof-room.schema-violation: {label} is not a chio.receipt.v1 receipt"
+                    ))
+                })
+        }
         None => Err((format!("proof-room.schema-missing: {label} missing schema field")).into()),
     }?;
     if let Some(schema_json) = proof_room_artifact_schema_json(expected_schema) {
