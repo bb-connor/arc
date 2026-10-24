@@ -65,7 +65,12 @@ fn backlog_saturation_reports_real_progress() {
     let harness = StackHarness::boot_smoke(&config).test_unwrap();
     let error = std::thread::scope(|scope| {
         scope.spawn(|| {
-            std::thread::sleep(Duration::from_millis(500));
+            for _ in 0..6_000 {
+                if harness.completed_tool_invocations() > 0 {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
             harness.set_tool_latency_ms(2_000);
         });
         run_sustained(&harness, &config)

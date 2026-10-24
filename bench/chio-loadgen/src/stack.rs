@@ -41,6 +41,7 @@ pub struct StackHarness {
     store: Option<Arc<SqliteReceiptStore>>,
     capability: CapabilityToken,
     tool_latency_nanos: Arc<AtomicU64>,
+    tool_completions: Arc<AtomicU64>,
     request_counter: AtomicU64,
 }
 
@@ -84,8 +85,10 @@ impl StackHarness {
         let mut kernel = ChioKernel::new(kernel_config(Keypair::generate(), deadlines));
 
         let tool_latency_nanos = Arc::new(AtomicU64::new(duration_as_nanos(config.tool_latency)));
+        let tool_completions = Arc::new(AtomicU64::new(0));
         kernel.register_tool_server(Box::new(FixtureToolServer {
             latency_nanos: Arc::clone(&tool_latency_nanos),
+            completions: Arc::clone(&tool_completions),
         }));
 
         let store = match &config.store {
@@ -146,6 +149,7 @@ impl StackHarness {
             store,
             capability,
             tool_latency_nanos,
+            tool_completions,
             request_counter: AtomicU64::new(0),
         })
     }
@@ -224,6 +228,12 @@ impl StackHarness {
     pub fn set_tool_latency_ms(&self, milliseconds: u64) {
         self.tool_latency_nanos
             .store(milliseconds.saturating_mul(1_000_000), Ordering::Relaxed);
+    }
+
+    /// Tool invocations the fixture server has finished, so a harness can wait
+    /// for observed progress before injecting a fault.
+    pub fn completed_tool_invocations(&self) -> u64 {
+        self.tool_completions.load(Ordering::Acquire)
     }
 
     fn build_request(&self) -> ToolCallRequest {
@@ -332,6 +342,7 @@ fn wait_for_writer_health(store: &SqliteReceiptStore) -> Result<(), LoadgenError
 /// truncated to a zero-latency invoke.
 struct FixtureToolServer {
     latency_nanos: Arc<AtomicU64>,
+    completions: Arc<AtomicU64>,
 }
 
 #[async_trait::async_trait]
@@ -354,6 +365,7 @@ impl ToolServerConnection for FixtureToolServer {
         if latency_nanos > 0 {
             tokio::time::sleep(Duration::from_nanos(latency_nanos)).await;
         }
+        self.completions.fetch_add(1, Ordering::Release);
         Ok(serde_json::json!({
             "tool": tool_name,
             "allowed": true,
