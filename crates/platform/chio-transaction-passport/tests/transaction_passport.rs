@@ -371,7 +371,7 @@ fn governed_action_artifacts_with_digest_binding(
     );
     let receipt_bytes = signed_json_bytes(
         json!({
-            "schema": "chio.receipt.v1",
+            "schema": "chio.proof-room.receipt-evidence.v1",
             "receipt_id": "receipt-minimal-allow",
             "capability_id": "cap-tool-read-demo",
             "guard_decision_id": "guard-decision",
@@ -459,7 +459,7 @@ fn governed_action_evidence_graph_bytes_with_verifier_policy_path(
             },
             {
                 "id": digest("kernel-receipt.json"),
-                "schema": "chio.receipt.v1",
+                "schema": "chio.proof-room.receipt-evidence.v1",
                 "path": "kernel-receipt.json",
                 "sha256": digest("kernel-receipt.json"),
                 "role": "receipt"
@@ -811,7 +811,7 @@ fn transaction_passport_rejects_unsafe_artifact_paths() {
 
 #[test]
 fn transaction_passport_rejects_duplicate_evidence_graph_node_ids() {
-    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-duplicate-node","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.transaction.verifier-policy.v1","path":"verifier-policy.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"verifier-policy"},{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.receipt.v1","path":"receipt.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"receipt"}],"edges":[]}"#;
+    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-duplicate-node","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.transaction.verifier-policy.v1","path":"verifier-policy.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"verifier-policy"},{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.proof-room.receipt-evidence.v1","path":"receipt.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"receipt"}],"edges":[]}"#;
 
     let error = passport_error_for_evidence_graph(evidence_graph_bytes);
 
@@ -833,7 +833,7 @@ fn transaction_passport_rejects_unresolved_evidence_graph_edge_refs() {
 
 #[test]
 fn transaction_passport_rejects_cyclic_evidence_graph() {
-    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-cycle","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.transaction.verifier-policy.v1","path":"verifier-policy.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"verifier-policy"},{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.receipt.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}],"edges":[{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"binds","evidence_class":"digest-bound-reference"},{"from":"2222222222222222222222222222222222222222222222222222222222222222","to":"1111111111111111111111111111111111111111111111111111111111111111","predicate":"binds","evidence_class":"digest-bound-reference"}]}"#;
+    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-cycle","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.transaction.verifier-policy.v1","path":"verifier-policy.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"verifier-policy"},{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.proof-room.receipt-evidence.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}],"edges":[{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"binds","evidence_class":"digest-bound-reference"},{"from":"2222222222222222222222222222222222222222222222222222222222222222","to":"1111111111111111111111111111111111111111111111111111111111111111","predicate":"binds","evidence_class":"digest-bound-reference"}]}"#;
 
     let error = passport_error_for_evidence_graph(evidence_graph_bytes);
 
@@ -844,7 +844,7 @@ fn transaction_passport_rejects_cyclic_evidence_graph() {
 fn transaction_evidence_graph_rejects_advisory_authority_predicates() {
     for predicate in ["authorizes", "executes", "leases", "attenuates", "settles"] {
         let evidence_graph_bytes = format!(
-            r#"{{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-advisory-{predicate}","issued_at":"2026-06-10T00:00:00Z","nodes":[{{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.capability.proof.v1","path":"capability.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"capability"}},{{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.receipt.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}}],"edges":[{{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"{predicate}","evidence_class":"advisory-observation"}}]}}"#
+            r#"{{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-advisory-{predicate}","issued_at":"2026-06-10T00:00:00Z","nodes":[{{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.capability.proof.v1","path":"capability.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"capability"}},{{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.proof-room.receipt-evidence.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}}],"edges":[{{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"{predicate}","evidence_class":"advisory-observation"}}]}}"#
         );
 
         let error = chio_transaction_passport::validate_transaction_evidence_graph(
@@ -863,7 +863,7 @@ fn transaction_evidence_graph_rejects_advisory_authority_predicates() {
 
 #[test]
 fn transaction_evidence_graph_rejects_advisory_authority_endpoint() {
-    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-advisory-node","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.external.observation.v1","path":"advisory.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"advisory-observation"},{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.receipt.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}],"edges":[{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"authorizes","evidence_class":"digest-bound-reference"}]}"#;
+    let evidence_graph_bytes = br#"{"schema":"chio.transaction.evidence-graph.v1","id":"evidence-graph-advisory-node","issued_at":"2026-06-10T00:00:00Z","nodes":[{"id":"1111111111111111111111111111111111111111111111111111111111111111","schema":"chio.external.observation.v1","path":"advisory.json","sha256":"1111111111111111111111111111111111111111111111111111111111111111","role":"advisory-observation"},{"id":"2222222222222222222222222222222222222222222222222222222222222222","schema":"chio.proof-room.receipt-evidence.v1","path":"receipt.json","sha256":"2222222222222222222222222222222222222222222222222222222222222222","role":"receipt"}],"edges":[{"from":"1111111111111111111111111111111111111111111111111111111111111111","to":"2222222222222222222222222222222222222222222222222222222222222222","predicate":"authorizes","evidence_class":"digest-bound-reference"}]}"#;
 
     let error =
         chio_transaction_passport::validate_transaction_evidence_graph(evidence_graph_bytes)
@@ -1074,7 +1074,7 @@ fn standalone_minimal_passport_accepts_verifier_policy_as_policy_digest_anchor()
         "kernel-receipt.json".to_string(),
         signed_json_bytes(
             json!({
-                "schema": "chio.receipt.v1",
+                "schema": "chio.proof-room.receipt-evidence.v1",
                 "receipt_id": "receipt-minimal-allow",
                 "capability_id": "cap-tool-read-demo",
                 "guard_decision_id": "guard-decision",

@@ -17,6 +17,8 @@
   "properties": {
     "schema": { "const": "chio.proof-room.receipt-evidence.v1" },
     "receipt_id": { "type": "string", "minLength": 1 },
+    "capability_id": { "type": "string", "minLength": 1 },
+    "guard_decision_id": { "type": "string", "minLength": 1 },
     "terminal_status": { "type": "string", "minLength": 1 },
     "policy_digest": { "$ref": "#/$defs/sha256" },
     "request_digest": { "$ref": "#/$defs/sha256" },

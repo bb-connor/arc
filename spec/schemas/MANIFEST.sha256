@@ -1,4 +1,4 @@
-8d6f859da94296818a41538f23eeb680eff8890986fca66b0a1ed035dbb0504c  spec/schemas/MANIFEST.sha256
+d92d22cdd93613cb41b0f8b86bf14daa7338be61c346967b648239bd7ec55d46  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -291,7 +291,7 @@ b89f05f05175e8f815c4e022e9bc727a4b58fafeefdcd37d3808348b9e3e6bc1  spec/schemas/c
 7c5ab9dae27197618b887997d82119c6fb087d2b1ce9b7414b2c8be713ac0736  spec/schemas/chio-proof-room/v1/first-run-trust-roots.schema.json
 68955841aadf8295c0d239071c6cd7e459f4f84907d1b581bfb85f06c23b9ac4  spec/schemas/chio-proof-room/v1/fixture-catalog.schema.json
 ccc82cbc188ce4ab63d6ef982e1c22bdf8f8aaf4f8812c8934c22b4a981e87f3  spec/schemas/chio-proof-room/v1/fixture-root-catalog.schema.json
-994a1655be9830a7d88aefe65624829f40f397c95a4e0c216bbedb928219dca3  spec/schemas/chio-proof-room/v1/receipt-evidence.schema.json
+c315124d1e112e8e5345b5a008cc20d896304ad68b82a7530595c02019b78b90  spec/schemas/chio-proof-room/v1/receipt-evidence.schema.json
 4e5672593edbf7ae205d4116fc940ad0f926c1d4f2b22b9b0942070e7e079d63  spec/schemas/chio-proof-room/v1/release-truth.schema.json
 9c8dde4f870c0c52d4411cc20ab997e64a1a1d92981808b9c296520a5eae4fb1  spec/schemas/chio-proof-room/v1/verifier-report.schema.json
 b5c77c9e31e998faa58e0de494ce3a3d3394a8ec62c5c1ee0adcad4e733b5f74  spec/schemas/chio-replay-report/v1.schema.json

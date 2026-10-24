@@ -24,3 +24,5 @@ mod core;
 mod receipt_schema_tests;
 mod source;
 mod support;
+
+mod evidence_schema_tests;

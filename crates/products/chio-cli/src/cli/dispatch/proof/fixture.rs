@@ -34,6 +34,9 @@ use fixture_public_settlement_runtime::public_settlement_runtime_hashes;
 #[path = "fixture_paths.rs"]
 mod fixture_paths;
 use fixture_paths::proof_fixture_source_root;
+#[path = "fixture_receipt_evidence.rs"]
+mod fixture_receipt_evidence;
+use fixture_receipt_evidence::{generate_minimal_receipt_evidence, write_terminal_receipt_evidence, RECEIPT_EVIDENCE_SCHEMA};
 
 const PROOF_FIXTURE_ROOT_ENV: &str = "CHIO_PROOF_FIXTURE_ROOT";
 const PROOF_FIXTURE_CATALOG_FILE: &str = "catalog.json";
@@ -369,6 +372,7 @@ fn materialize_proof_fixture(
     normalize_agent_web_fixture_material(descriptor, out)?;
     normalize_commerce_mandate_projection_edges(out)?;
     normalize_commerce_order_passport_binding(descriptor, out)?;
+    generate_minimal_receipt_evidence(descriptor, out)?;
     normalize_declared_evidence_graph_node_ids(descriptor, out)?;
     if descriptor.kind != "negative-transaction-passport" {
         refresh_proof_room_bundle_source_reports(out)?;
@@ -2148,12 +2152,12 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     let nodes = json_array_mut(&mut evidence_graph, "nodes", &evidence_graph_path)?;
     for (path, node_id, receipt_id, terminal_status) in receipts {
         let receipt_path = bundle.join(path);
-        write_signed_terminal_receipt(&receipt_path, receipt_id, terminal_status, &policy_sha256)?;
+        write_terminal_receipt_evidence(&receipt_path, receipt_id, terminal_status, &policy_sha256)?;
         upsert_fixture_graph_node(
             nodes,
             node_id,
             path,
-            "chio.receipt.v1",
+            RECEIPT_EVIDENCE_SCHEMA,
             "receipt",
             &sha256_file(&receipt_path)?,
         );
@@ -2169,26 +2173,6 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn write_signed_terminal_receipt(
-    destination: &Path,
-    receipt_id: &str,
-    terminal_status: &str,
-    policy_sha256: &str,
-) -> Result<(), CliError> {
-    let keypair = Keypair::from_seed(&[29u8; 32]);
-    let mut receipt = serde_json::json!({
-        "schema": "chio.receipt.v1",
-        "receipt_id": receipt_id,
-        "terminal_status": terminal_status,
-        "policy_digest": policy_sha256,
-        "kernel_key": keypair.public_key().to_hex()
-    });
-    let (signature, _) = keypair.sign_canonical(&receipt).map_err(|error| {
-        CliError::cli_other_error(format!("proof fixture receipt signing failed: {error}"))
-    })?;
-    receipt["signature"] = serde_json::Value::String(signature.to_hex());
-    write_json_line_file(destination, &receipt)
-}
 
 fn generate_disclosure_agent_web_fixture(out: &Path) -> Result<(), CliError> {
     if path_exists_or_is_symlink(out)? {
