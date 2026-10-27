@@ -7,8 +7,7 @@ use chio_core::canonical::{canonical_json_bytes, UntrustedJsonError};
 use chio_core::crypto::sha256_hex;
 use chio_security_types::ports::RecordId;
 
-pub const NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA: &str = "chio.native-dispatch-preparation-ledger.v1";
-pub const NATIVE_DISPATCH_LEDGER_SCHEMA: &str = "chio.native-dispatch-preparation-ledger.v2";
+pub const NATIVE_DISPATCH_LEDGER_SCHEMA: &str = "chio.native-dispatch-preparation-ledger.v1";
 const MAX_LIVE_REQUEST_BYTES: usize = 16 * 1024 * 1024;
 const MAX_LEDGER_BYTES: usize = 1024 * 1024;
 
@@ -43,12 +42,10 @@ impl NativeSecurityDispatchRequestBindingV1 {
         })
     }
 
-    /// Inspect exact bounded data after the caller has independently read the
-    /// original fenced ledger. A legacy record supplies no missing provenance.
     pub fn from_ledger(
         record: &NativeSecurityDispatchLedgerRecordV1,
         context: &crate::SecurityInvocationContext,
-    ) -> Result<Option<Self>, AdmissionOperationStoreError> {
+    ) -> Result<Self, AdmissionOperationStoreError> {
         let bytes = &record.canonical_record;
         if bytes.is_empty() || bytes.len() > MAX_LEDGER_BYTES {
             return Err(invalid("original native ledger exceeds its bound"));
@@ -77,11 +74,6 @@ impl NativeSecurityDispatchRequestBindingV1 {
             return Err(invalid("original native ledger changed its data binding"));
         }
         match value.get("schema").and_then(serde_json::Value::as_str) {
-            Some(NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA)
-                if value.get("original_dispatch_commitment_id").is_none() =>
-            {
-                Ok(None)
-            }
             Some(NATIVE_DISPATCH_LEDGER_SCHEMA) => {
                 let dispatch_commitment_id: RecordId = serde_json::from_value(
                     value
@@ -93,7 +85,7 @@ impl NativeSecurityDispatchRequestBindingV1 {
                 if !valid_dispatch_commitment_id(&dispatch_commitment_id) {
                     return Err(invalid("original native dispatch commitment is invalid"));
                 }
-                Ok(Some(Self {
+                Ok(Self {
                     dispatch_commitment_id,
                     live_request_digest: serde_json::from_value(
                         value
@@ -102,7 +94,7 @@ impl NativeSecurityDispatchRequestBindingV1 {
                             .unwrap_or(serde_json::Value::Null),
                     )
                     .map_err(UntrustedJsonError::Decode)?,
-                }))
+                })
             }
             _ => Err(invalid("original native ledger schema is invalid")),
         }

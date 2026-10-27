@@ -7,6 +7,9 @@ use crate::admission_operation::{
 };
 use std::sync::Mutex;
 
+#[path = "native_dispatch_ledger/wire_contract.rs"]
+mod wire_contract;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Clone, Copy, Debug, Default)]

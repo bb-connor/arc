@@ -452,11 +452,10 @@ impl ChioKernel {
                     &ledger,
                     custody.security_context(),
                 )
-                .map(|binding| binding.map(Box::new))
+                .map(Box::new)
                 .map_err(tool_outcome_error)
             })
-            .transpose()?
-            .flatten();
+            .transpose()?;
         let context = DurableToolReturnContext {
             operation_id: wire.operation_id,
             request_binding_hash: wire.request_binding_hash,

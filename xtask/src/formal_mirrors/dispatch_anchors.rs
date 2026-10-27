@@ -242,7 +242,6 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
         path: "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs",
         symbols: &[
             "NATIVE_DISPATCH_LEDGER_SCHEMA",
-            "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA",
             "NativeSecurityDispatchRequestBindingV1::from_live_request",
             "NativeSecurityDispatchRequestBindingV1::from_ledger",
         ],

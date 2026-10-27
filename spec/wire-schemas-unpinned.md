@@ -8,9 +8,9 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-186 of 597 identifier constants in the security crates are unpinned.
+185 of 596 identifier constants in the security crates are unpinned.
 
-## crates/core/chio-core-types (66)
+## crates/core/chio-core-types (65)
 
 - `crates/core/chio-core-types/src/declassification.rs:12` `DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN` = `chio:declassification-grant:v1`
 - `crates/core/chio-core-types/src/economic_continuity.rs:27` `RESOURCE_HEAD_DIGEST_DOMAIN` = `chio.economy.resource-head.digest.v1`
@@ -36,7 +36,6 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/provider_attempt.rs:37` `EXECUTION_LEASE_DIGEST_DOMAIN` = `chio.provider-execution-lease.v1`
 - `crates/core/chio-core-types/src/provider_attempt.rs:38` `COMPLETION_DIGEST_DOMAIN` = `chio.provider-completion.v1`
 - `crates/core/chio-core-types/src/receipt/economics.rs:16` `CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA` = `chio.channel.receipt-metadata.v1`
-- `crates/core/chio-core-types/src/receipt/metadata.rs:533` `FINDING_RECOVERY_SCHEMA` = `chio.finding.recovery.v1`
 - `crates/core/chio-core-types/src/recovery/authority.rs:149` `RECOVERY_PROVIDER_SIGNATURE_DOMAIN` = `chio:recovery-provider-finality:v1`
 - `crates/core/chio-core-types/src/recovery/confinement.rs:11` `CONFINED_DISCLOSURE_SIGNATURE_DOMAIN` = `chio:confined-disclosure:v1`
 - `crates/core/chio-core-types/src/recovery/confinement.rs:12` `CONFINED_ENDORSEMENT_SIGNATURE_DOMAIN` = `chio:confined-endorsement:v1`
@@ -82,7 +81,7 @@ since been pinned is removed by the next `--update`.
 ## crates/kernel/chio-kernel (33)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
-- `crates/kernel/chio-kernel/src/admission_operation.rs:95` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
+- `crates/kernel/chio-kernel/src/admission_operation.rs:94` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9` `SCHEMA` = `chio.admission-caller-dispatch-context.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:12` `SCHEMA` = `chio.governed-approval-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs:6` `SCHEMA` = `chio.native-security-authority-binding.v1`
