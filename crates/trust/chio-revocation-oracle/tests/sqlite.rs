@@ -445,3 +445,100 @@ fn a_leaf_document_with_an_unknown_field_or_kind_is_refused() -> TestResult {
     }
     Ok(())
 }
+
+const PRIOR_SCHEMA: &str = "
+CREATE TABLE chio_revocation_oracle_meta (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1)
+) STRICT;
+CREATE TABLE chio_revocation_oracle_leaves (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL CHECK (
+        typeof(subject) = 'text'
+        AND length(subject) BETWEEN 1 AND 4096
+        AND octet_length(subject) <= 16384
+        AND instr(subject, char(0)) = 0
+    ),
+    epoch_nonce BLOB NOT NULL
+        CHECK (typeof(epoch_nonce) = 'blob' AND length(epoch_nonce) = 8),
+    inserted_at_unix_ms BLOB NOT NULL
+        CHECK (typeof(inserted_at_unix_ms) = 'blob' AND length(inserted_at_unix_ms) = 8),
+    UNIQUE (subject, epoch_nonce)
+) STRICT;
+INSERT INTO chio_revocation_oracle_meta (singleton, schema_version) VALUES (1, 1);
+";
+
+type CatalogSnapshot = (Vec<(String, String, Option<String>)>, Vec<(i64, String)>);
+
+fn catalog_and_leaves(
+    path: &std::path::Path,
+) -> Result<CatalogSnapshot, Box<dyn std::error::Error>> {
+    let raw = rusqlite::Connection::open(path)?;
+    let catalog = raw
+        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    let leaves = raw
+        .prepare("SELECT seq, subject FROM chio_revocation_oracle_leaves ORDER BY seq")?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok((catalog, leaves))
+}
+
+#[test]
+fn a_reopen_of_the_current_catalog_succeeds() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    SqliteRevocationOracle::open(&path)?.revoke(key("passport-a", 1), 10)?;
+    let before = catalog_and_leaves(&path)?;
+    let reopened = SqliteRevocationOracle::open(&path)?;
+    assert_eq!(reopened.current_epoch_root()?.leaf_count, 1);
+    assert_eq!(catalog_and_leaves(&path)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_reopen_of_the_prior_catalog_shape_is_refused_and_leaves_it_unchanged() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    let raw = rusqlite::Connection::open(&path)?;
+    raw.execute_batch(PRIOR_SCHEMA)?;
+    raw.execute(
+        "INSERT INTO chio_revocation_oracle_leaves (subject, epoch_nonce, inserted_at_unix_ms)
+         VALUES ('passport-a', ?1, ?2)",
+        rusqlite::params![
+            1_u64.to_be_bytes().as_slice(),
+            10_u64.to_be_bytes().as_slice()
+        ],
+    )?;
+    drop(raw);
+    let before = catalog_and_leaves(&path)?;
+
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    assert_eq!(catalog_and_leaves(&path)?, before);
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_stamped_catalog_with_an_extra_oracle_index_is_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    SqliteRevocationOracle::open(&path)?.revoke(key("passport-a", 1), 10)?;
+    rusqlite::Connection::open(&path)?.execute_batch(
+        "CREATE INDEX chio_revocation_oracle_leaves_extra ON chio_revocation_oracle_leaves (subject);",
+    )?;
+    let before = catalog_and_leaves(&path)?;
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    assert_eq!(catalog_and_leaves(&path)?, before);
+    Ok(())
+}
