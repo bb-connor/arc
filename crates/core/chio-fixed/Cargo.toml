@@ -1,0 +1,34 @@
+[package]
+name = "chio-fixed"
+description = "Float-free Q16.16 checked fixed-point arithmetic for Chio decision models"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_fixed"
+
+[dependencies]
+serde = { version = "1", default-features = false, optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]
+kani = []
+
+[dev-dependencies]
+proptest = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

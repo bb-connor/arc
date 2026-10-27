@@ -611,3 +611,33 @@ default_unwind = 4
 timeout_secs = 60
 unwinding_checks = true
 primary_rust_symbol = "chio_security_types::response_state::is_legal_response_transition"
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_q16_checked_mul_matches_i128_reference"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range i32 operands against an i128 floor reference."
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_q16_checked_add_never_wraps"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range i32 operands against exact i64 addition."
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_ratio_cmp_total_order"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range u32 ratios against exact u128 cross products, reversal and reflexivity."

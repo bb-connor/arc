@@ -796,6 +796,16 @@ multi-crate runner reads `.kani/harnesses.toml`; its covered symbol is listed in
 | --- | --- | --- | --- | --- |
 | `public_challenge_outcome_envelope_is_bond_capped_and_exact_sum` | `crates/economy/chio-open-market/src/kani_public_harnesses.rs` | `chio_open_market::finding_slash_amount::compute_slash_allocation` | n/a for arithmetic; bounded to three ordered buyer slots in a fixed `1:2:3` harm ratio whose destinations were already verified | Full-range `u64` bond inputs and concrete zero-harm, full-width harm-overflow, and destination-cap witnesses prove checked failures, bond caps, per-buyer harm caps, and exact-sum buyer plus community distribution. |
 
+## Kani fixed-point harnesses
+
+Source file: `crates/core/chio-fixed/src/kani_public_harnesses.rs`.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `verify_q16_checked_mul_matches_i128_reference` | `crates/core/chio-fixed/src/kani_public_harnesses.rs` | `chio_fixed::Q16_16::checked_mul` | Arithmetic only | Over every pair of `i32` bit patterns the product is `floor(a * b / 2^16)` from an `i128` reference, and `None` exactly when that value leaves the `i32` range. |
+| `verify_q16_checked_add_never_wraps` | `crates/core/chio-fixed/src/kani_public_harnesses.rs` | `chio_fixed::Q16_16::checked_add` | Arithmetic only | A returned sum equals exact `i64` addition, and `None` is returned only when the exact sum leaves the `i32` range. |
+| `verify_ratio_cmp_total_order` | `crates/core/chio-fixed/src/kani_public_harnesses.rs` | `chio_fixed::ratio_cmp` | Arithmetic only | Zero denominators return `None`; otherwise the order equals exact `u128` cross-multiplication, swapping the operands reverses it, and a ratio compares `Equal` to itself. |
+
 ## Lean recursive-delegation theorems (Capability/Delegation.lean)
 
 Source file: `formal/lean4/Chio/Chio/Capability/Delegation.lean`. Rows

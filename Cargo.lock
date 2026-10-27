@@ -4011,6 +4011,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-fixed"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-fixture-rng"
 version = "0.1.0"
 dependencies = [
