@@ -2,6 +2,7 @@ use super::*;
 #[derive(Clone, Copy)]
 enum PaymentAmbiguityMode {
     AuthorizeUnavailable,
+    AuthorizeOutcomeUnknown,
     AuthorizeRailError,
     AuthorizePanic,
     AuthorizeDeclined,
@@ -16,6 +17,14 @@ enum PaymentAmbiguityMode {
     RefundPanic,
     RefundFailed,
     RefundPaddedTransactionId,
+}
+
+fn payment_ambiguity_evidence() -> serde_json::Value {
+    serde_json::json!({
+        "adapter": "payment-ambiguity-test",
+        "settlement": "pending",
+        "transaction": "payment-ambiguity-broadcast",
+    })
 }
 
 #[derive(Clone, Default)]
@@ -45,6 +54,10 @@ impl PaymentAdapter for PaymentAmbiguityAdapter {
             PaymentAmbiguityMode::AuthorizeUnavailable => Err(PaymentError::Unavailable(
                 "authorization acknowledgement missing".to_string(),
             )),
+            PaymentAmbiguityMode::AuthorizeOutcomeUnknown => Err(PaymentError::OutcomeUnknown {
+                detail: "settlement broadcast but not confirmed".to_string(),
+                evidence: payment_ambiguity_evidence(),
+            }),
             PaymentAmbiguityMode::AuthorizeRailError => Err(PaymentError::RailError(
                 "authorization commit outcome unknown".to_string(),
             )),
@@ -1685,4 +1698,72 @@ async fn nested_padded_refund_transaction_id_is_not_reported_as_clean_unwind(
         .get("pre_dispatch_payment_unwind")
         .is_none());
     Ok(())
+}
+
+fn assert_payment_evidence_signed(
+    response: &ToolCallResponse,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let financial = &response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("payment ambiguity metadata missing")?["financial"];
+    assert_eq!(financial["payment_authorization_ambiguous"], true);
+    assert_eq!(
+        financial["payment_authorization_error_code"],
+        "outcome_unknown"
+    );
+    assert_eq!(
+        financial["payment_authorization_evidence"],
+        payment_ambiguity_evidence()
+    );
+    assert!(response.receipt.verify_signature()?);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn hosted_outcome_unknown_authorization_signs_its_rail_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = make_payment_ambiguity_fixture(
+        "hosted-authorization-outcome-unknown",
+        PaymentAmbiguityMode::AuthorizeOutcomeUnknown,
+    );
+    let response = fixture.kernel.evaluate_tool_call(&fixture.request).await?;
+    assert_payment_ambiguity_retained(
+        &fixture,
+        &response,
+        "payment_authorization",
+        "payment_authorization_outcome_unknown",
+        None,
+    )?;
+    assert_payment_evidence_signed(&response)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn nested_outcome_unknown_authorization_signs_its_rail_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = make_payment_ambiguity_fixture(
+        "nested-authorization-outcome-unknown",
+        PaymentAmbiguityMode::AuthorizeOutcomeUnknown,
+    );
+    let session_id = fixture.kernel.open_session(
+        fixture.request.agent_id.clone(),
+        vec![fixture.capability.clone()],
+    )?;
+    fixture.kernel.activate_session(&session_id)?;
+    let response = evaluate_nested_payment_ambiguity_request(
+        &fixture.kernel,
+        &session_id,
+        &fixture.request,
+        "nested-authorization-outcome-unknown-parent",
+    )
+    .await?;
+    assert_payment_ambiguity_retained(
+        &fixture,
+        &response,
+        "payment_authorization",
+        "payment_authorization_outcome_unknown",
+        None,
+    )?;
+    assert_payment_evidence_signed(&response)
 }

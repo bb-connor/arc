@@ -1078,6 +1078,49 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
 }
 
 #[test]
+fn payment_authority_expiry_is_bounded_by_the_quote_expiry() {
+    let kernel = make_kernel(make_monetary_config());
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1000, "USD",
+        )]),
+        3600,
+    );
+    let quote_expires_at = capability.expires_at - 600;
+    let mut intent = super::sim_payment::make_mustprepay_intent(
+        "intent-quote-expiry",
+        "cost-srv",
+        "compute",
+        100,
+        "USD",
+    );
+    if let Some(metered) = intent.metered_billing.as_mut() {
+        metered.quote.expires_at = Some(quote_expires_at);
+    }
+    let mut request = make_request("req-quote-expiry", &capability, "compute", "cost-srv");
+    request.governed_intent = Some(intent);
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        quote_expires_at
+    );
+
+    if let Some(metered) = request
+        .governed_intent
+        .as_mut()
+        .and_then(|intent| intent.metered_billing.as_mut())
+    {
+        metered.quote.expires_at = Some(capability.expires_at + 600);
+    }
+    assert_eq!(
+        ChioKernel::payment_authority_expires_at(&request),
+        capability.expires_at
+    );
+}
+
+#[test]
 fn governed_x402_without_a_presented_payment_denies_before_any_rail_call() {
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let mut kernel = make_kernel(make_monetary_config());

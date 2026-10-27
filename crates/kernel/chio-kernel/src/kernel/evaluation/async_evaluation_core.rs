@@ -1475,12 +1475,7 @@ impl ChioKernel {
             Err(error) => {
                 let internal_reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&internal_reason), "payment denied");
-                let error_code = match &error {
-                    PaymentError::Unavailable(_) => "unavailable",
-                    PaymentError::RailError(_) => "rail_error",
-                    PaymentError::Declined(_) => "declined",
-                    PaymentError::InsufficientFunds => "insufficient_funds",
-                };
+                let error_code = error.code();
                 let reason = format!("payment authorization failed: {error_code}");
                 if matches!(
                     &error,

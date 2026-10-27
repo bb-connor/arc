@@ -3,21 +3,12 @@
 use super::*;
 use crate::payment::{PaymentAdapter, PaymentResult};
 
-pub(super) fn payment_error_code(error: &PaymentError) -> &'static str {
-    match error {
-        PaymentError::Unavailable(_) => "unavailable",
-        PaymentError::RailError(_) => "rail_error",
-        PaymentError::Declined(_) => "declined",
-        PaymentError::InsufficientFunds => "insufficient_funds",
-    }
-}
-
 pub(super) fn retained_payment_capture_metadata(
     request: &ToolCallRequest,
     authorization: &PaymentAuthorization,
     error: &PaymentError,
 ) -> serde_json::Value {
-    let error_code = payment_error_code(error);
+    let error_code = error.code();
     warn!(
         request_id = %request.request_id,
         authorization_id = %authorization.authorization_id,
@@ -99,7 +90,7 @@ pub(super) fn release_unsettled_payment_metadata(
             }
         }
         Err(error) => {
-            let error_code = payment_error_code(&error);
+            let error_code = error.code();
             financial.insert(
                 "release_outcome".into(),
                 serde_json::json!("outcome_unknown"),

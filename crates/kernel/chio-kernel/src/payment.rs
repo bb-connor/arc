@@ -87,6 +87,18 @@ pub trait PaymentAdapter: Send + Sync {
             "settlement_state query is unsupported by this payment adapter".to_owned(),
         ))
     }
+
+    /// Authorization metadata to restore when a durable journal replays
+    /// `authorization_id` without calling the rail. Must be side-effect free.
+    /// Rails whose identifier carries no settlement evidence return an empty
+    /// object.
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        let _ = authorization_id;
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -102,6 +114,71 @@ pub enum PaymentError {
 
     #[error("payment rail error: {0}")]
     RailError(String),
+
+    /// The rail accepted the request but has not confirmed whether value
+    /// moved. `evidence` is what the rail returned to locate the payment.
+    #[error("payment outcome unknown: {detail}")]
+    OutcomeUnknown {
+        detail: String,
+        evidence: serde_json::Value,
+    },
+}
+
+impl PaymentError {
+    /// Stable classification recorded in receipts instead of the rail detail.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Unavailable(_) => "unavailable",
+            Self::RailError(_) => "rail_error",
+            Self::Declined(_) => "declined",
+            Self::InsufficientFunds => "insufficient_funds",
+            Self::OutcomeUnknown { .. } => "outcome_unknown",
+        }
+    }
+
+    /// Rail evidence for a payment whose outcome is unknown.
+    #[must_use]
+    pub fn outcome_evidence(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::OutcomeUnknown { evidence, .. } => Some(evidence),
+            _ => None,
+        }
+    }
+}
+
+/// Rebuild the authorization a durable journal already recorded, without
+/// calling the rail. Returns `None` when the journal still needs one.
+pub(crate) fn replayed_payment_authorization(
+    adapter: &dyn PaymentAdapter,
+    journal: &PaymentJournalRecord,
+) -> Result<Option<PaymentAuthorization>, PaymentError> {
+    let (state, missing_id) = match (journal.state, journal.rail_mode) {
+        (PaymentJournalState::Authorized, PaymentRailMode::ReversibleHold) => (
+            PaymentAuthorizationState::Held,
+            "authorized payment journal omitted authorization_id",
+        ),
+        (PaymentJournalState::Settled, PaymentRailMode::PrepaidFinal) => (
+            PaymentAuthorizationState::PrepaidFinal,
+            "settled prepayment journal omitted authorization_id",
+        ),
+        (PaymentJournalState::HoldPlaced, _) => return Ok(None),
+        _ => {
+            return Err(PaymentError::RailError(format!(
+                "payment journal cannot authorize from state {:?}",
+                journal.state
+            )));
+        }
+    };
+    let authorization_id = journal
+        .authorization_id
+        .clone()
+        .ok_or_else(|| PaymentError::RailError(missing_id.to_owned()))?;
+    Ok(Some(PaymentAuthorization {
+        authorization_id,
+        state,
+        metadata: serde_json::json!({ "durable_replay": true }),
+    }))
 }
 
 /// Shared-payment-token payment bridge for ACP-style commerce approvals.

@@ -74,7 +74,7 @@ impl ReservedCaptureFailure {
     }
 
     pub(crate) fn error_code(&self) -> &'static str {
-        payment_outcome::payment_error_code(&self.error)
+        self.error.code()
     }
 }
 
@@ -1690,42 +1690,10 @@ impl ChioKernel {
                 amount_units,
                 &currency,
             )?;
-            match (journal.state, journal.rail_mode) {
-                (
-                    crate::payment::PaymentJournalState::Authorized,
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                ) => {
-                    return Ok(Some(PaymentAuthorization {
-                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
-                            PaymentError::RailError(
-                                "authorized payment journal omitted authorization_id".to_owned(),
-                            )
-                        })?,
-                        state: crate::payment::PaymentAuthorizationState::Held,
-                        metadata: serde_json::json!({ "durable_replay": true }),
-                    }));
-                }
-                (
-                    crate::payment::PaymentJournalState::Settled,
-                    crate::payment::PaymentRailMode::PrepaidFinal,
-                ) => {
-                    return Ok(Some(PaymentAuthorization {
-                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
-                            PaymentError::RailError(
-                                "settled prepayment journal omitted authorization_id".to_owned(),
-                            )
-                        })?,
-                        state: crate::payment::PaymentAuthorizationState::PrepaidFinal,
-                        metadata: serde_json::json!({ "durable_replay": true }),
-                    }));
-                }
-                (crate::payment::PaymentJournalState::HoldPlaced, _) => {}
-                _ => {
-                    return Err(PaymentError::RailError(format!(
-                        "payment journal cannot authorize from state {:?}",
-                        journal.state
-                    )));
-                }
+            if let Some(authorization) =
+                crate::payment::replayed_payment_authorization(adapter.as_ref(), journal)?
+            {
+                return Ok(Some(authorization));
             }
         }
 

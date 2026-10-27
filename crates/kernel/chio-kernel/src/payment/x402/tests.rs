@@ -1,5 +1,6 @@
 use super::*;
 use crate::payment::test_http::{spawn_json_server, spawn_once_json_server};
+use crate::payment::{PaymentJournalRecord, PaymentJournalTransition};
 
 const NETWORK: &str = "eip155:84532";
 const ASSET: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -15,6 +16,15 @@ fn identity_string() -> String {
     format!(
         "x402/{NETWORK}/{}/{PAYER}/{NONCE}/{VALID_BEFORE}",
         ASSET.to_ascii_lowercase()
+    )
+}
+
+fn settled_authorization_id() -> String {
+    format!(
+        "{}/{TRANSACTION}/{}/{}",
+        identity_string(),
+        canonical_digest(&context().payment_payload).expect("payload digest"),
+        canonical_digest(&settle_success()).expect("response digest")
     )
 }
 
@@ -133,7 +143,7 @@ fn authorize_verifies_then_settles_and_returns_the_rail_identity() {
         assert!(captured.contains("\"paymentRequirements\":{"));
     }
 
-    assert_eq!(authorization.authorization_id, identity_string());
+    assert_eq!(authorization.authorization_id, settled_authorization_id());
     assert_eq!(authorization.state, PaymentAuthorizationState::PrepaidFinal);
     assert_eq!(authorization.metadata["adapter"], "x402");
     let settlement: X402SettlementRef =
@@ -384,7 +394,7 @@ fn recovery_has_no_rail_status_query() {
     ));
     assert!(no_status_query(
         adapter
-            .settlement_state("operation-1", Some(&identity_string()))
+            .settlement_state("operation-1", Some(&settled_authorization_id()))
             .expect_err("no status query")
     ));
 }
@@ -459,7 +469,7 @@ fn settlement_without_a_payer_is_rejected() {
 
 #[test]
 fn recovery_refuses_an_identity_outside_the_configured_rail() {
-    let other_asset = identity_string().replace(&ASSET.to_ascii_lowercase(), PAY_TO);
+    let other_asset = settled_authorization_id().replace(&ASSET.to_ascii_lowercase(), PAY_TO);
     let error = adapter(UNREACHABLE)
         .settlement_state("operation-1", Some(&other_asset))
         .expect_err("other asset");
@@ -485,9 +495,11 @@ fn authorization_identity_round_trips_through_its_canonical_form() {
 
 #[test]
 fn non_canonical_authorization_identities_are_refused_exactly() {
-    let canonical = identity_string();
+    let canonical = settled_authorization_id();
     let asset = ASSET.to_ascii_lowercase();
+    let payload_digest = canonical_digest(&context().payment_payload).expect("payload digest");
     for invalid in [
+        identity_string(),
         canonical.to_ascii_uppercase(),
         canonical.replace(&asset, ASSET),
         canonical.replace(&format!("/{PAYER}/"), &format!("/0X{}/", &PAYER[2..])),
@@ -498,16 +510,14 @@ fn non_canonical_authorization_identities_are_refused_exactly() {
         canonical.replace(NETWORK, "eip155:084532"),
         canonical.replace("/1744000600", "/01744000600"),
         canonical.replace("x402/", "X402/"),
+        canonical.replace(TRANSACTION, &TRANSACTION.replace('b', "B")),
+        canonical.replace(&payload_digest, &payload_digest[..63]),
+        canonical.replace(&payload_digest, &payload_digest.to_ascii_uppercase()),
         format!("{canonical}/extra"),
         format!(" {canonical}"),
         format!("{canonical} "),
         canonical.replacen('/', "//", 1),
     ] {
-        assert_eq!(
-            X402AuthorizationIdentity::parse(&invalid),
-            None,
-            "{invalid}"
-        );
         let error = adapter(UNREACHABLE)
             .settlement_state("operation-1", Some(&invalid))
             .expect_err("non-canonical identity");
@@ -551,4 +561,146 @@ fn final_prepayment_has_no_release_or_refund() {
     assert!(
         matches!(adapter.refund("transaction", 125, "USDC", "operation-1"), Err(PaymentError::Unavailable(message)) if message == "x402 remote refund is unsupported")
     );
+}
+
+fn pending_settlement(transaction: &str, network: &str) -> serde_json::Value {
+    serde_json::json!({
+        "success": false,
+        "errorReason": "settlement_pending",
+        "transaction": transaction,
+        "network": network,
+    })
+}
+
+#[test]
+fn pending_settlement_preserves_the_broadcast_transaction() {
+    let pending = pending_settlement(TRANSACTION, NETWORK);
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (200, pending.clone()),
+    ]);
+    let error = adapter(&url)
+        .authorize(&request(Some(context())))
+        .expect_err("a pending settlement is not a confirmed prepayment");
+    handle.join().expect("facilitator stub exits");
+    let PaymentError::OutcomeUnknown { evidence, .. } = error else {
+        panic!("a pending settlement must be outcome-unknown, got {error:?}");
+    };
+    assert_eq!(evidence["adapter"], "x402");
+    assert_eq!(evidence["settlement"], "pending");
+    assert_eq!(evidence["authorization_identity"], identity_string());
+    let settlement: X402SettlementRef =
+        serde_json::from_value(evidence["x402"].clone()).expect("typed reference");
+    assert_eq!(settlement.network, NETWORK);
+    assert_eq!(settlement.transaction, TRANSACTION);
+    assert_eq!(settlement.payer, PAYER);
+    assert_eq!(
+        settlement.payment_payload_digest,
+        canonical_digest(&context().payment_payload).expect("payload digest")
+    );
+    assert_eq!(
+        settlement.settlement_response_digest,
+        canonical_digest(&pending).expect("response digest")
+    );
+}
+
+#[test]
+fn pending_settlement_without_a_bound_transaction_is_rejected() {
+    for pending in [
+        pending_settlement("", NETWORK),
+        pending_settlement(TRANSACTION, "eip155:8453"),
+        pending_settlement(&TRANSACTION[..64], NETWORK),
+    ] {
+        let (url, _requests, handle) = spawn_json_server(vec![
+            (200, serde_json::json!({ "isValid": true })),
+            (200, pending.clone()),
+        ]);
+        let error = adapter(&url)
+            .authorize(&request(Some(context())))
+            .expect_err("pending settlement binding invalid");
+        handle.join().expect("facilitator stub exits");
+        assert!(
+            matches!(&error, PaymentError::RailError(message) if message == "x402 settlement response binding is invalid"),
+            "{pending}: {error:?}"
+        );
+    }
+}
+
+fn settled_prepaid_journal(authorization_id: &str) -> PaymentJournalRecord {
+    PaymentJournalRecord {
+        operation_id: "operation-1".to_owned(),
+        journal_version: 1,
+        request_namespace_digest: "a".repeat(64),
+        request_id: "request-1".to_owned(),
+        capability_id: "capability-1".to_owned(),
+        grant_index: 0,
+        hold_id: Some("hold-1".to_owned()),
+        rail: "x402".to_owned(),
+        rail_mode: PaymentRailMode::PrepaidFinal,
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 125,
+        authorized_amount_units: Some(125),
+        authorization_attempt: Some(crate::payment::PaymentAuthorizationAttempt::NotStarted),
+        settle_action: None,
+        settle_amount_units: None,
+        release_authority: None,
+        currency: "USD".to_owned(),
+        state: crate::payment::PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_700_000_000_000,
+    }
+    .apply_transition(&PaymentJournalTransition::BeginAuthorizationAttempt)
+    .and_then(|journal| {
+        journal.apply_transition(&PaymentJournalTransition::PrepaymentSettled {
+            authorization_id: authorization_id.to_owned(),
+        })
+    })
+    .expect("settled prepaid journal")
+}
+
+#[test]
+fn durable_replay_restores_the_settlement_reference() {
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (200, settle_success()),
+    ]);
+    let adapter = adapter(&url);
+    let authorization = adapter
+        .authorize(&request(Some(context())))
+        .expect("payment settles");
+    handle.join().expect("facilitator stub exits");
+
+    let replayed = crate::payment::replayed_payment_authorization(
+        &adapter,
+        &settled_prepaid_journal(&authorization.authorization_id),
+    )
+    .expect("replay succeeds")
+    .expect("settled journal replays its authorization");
+    assert_eq!(replayed.authorization_id, authorization.authorization_id);
+    assert_eq!(replayed.state, PaymentAuthorizationState::PrepaidFinal);
+    assert_eq!(replayed.metadata["adapter"], "x402");
+    assert_eq!(replayed.metadata["mode"], "prepaid");
+    assert_eq!(replayed.metadata["durable_replay"], true);
+    assert_eq!(replayed.metadata["x402"], authorization.metadata["x402"]);
+}
+
+#[test]
+fn durable_replay_refuses_an_identifier_it_cannot_bind() {
+    let adapter = adapter(UNREACHABLE);
+    for authorization_id in [
+        identity_string(),
+        settled_authorization_id().replace(&ASSET.to_ascii_lowercase(), PAY_TO),
+        settled_authorization_id().replace(TRANSACTION, &TRANSACTION[..64]),
+        format!("{}/extra", settled_authorization_id()),
+    ] {
+        let error = crate::payment::replayed_payment_authorization(
+            &adapter,
+            &settled_prepaid_journal(&authorization_id),
+        )
+        .expect_err("replay must not drop the settlement reference");
+        assert!(
+            matches!(&error, PaymentError::RailError(_)),
+            "{authorization_id}: {error:?}"
+        );
+    }
 }
