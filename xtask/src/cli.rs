@@ -211,6 +211,14 @@ pub enum CheckCommand {
         #[arg(long)]
         negative_only: bool,
     },
+    /// Fail if a root's default-feature closure reaches web3 or finding-market
+    /// code (deny list in ci-gates/web3-free-closure.toml).
+    #[command(name = "web3-free-closure")]
+    Web3FreeClosure {
+        /// Check only this root; repeatable. Each must be listed in the deny-list file.
+        #[arg(long = "root")]
+        roots: Vec<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

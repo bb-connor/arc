@@ -1,0 +1,39 @@
+# ci-gates/web3-free-closure.toml
+# Deny list for `cargo xtask check web3-free-closure` (ADR-0035).
+#
+# For each root the check runs
+#   cargo tree -p <root> -e normal,features --prefix depth --format "{p} {f}"
+# with default features and fails if the closure contains a denied package or
+# enables a denied feature on any crate. A package pattern is an exact crate
+# name or a name prefix ending in `*`. Unknown keys, an empty list, a duplicate
+# entry or a malformed pattern reject the file.
+
+schema = "chio.ci-gate.web3-free-closure.v1"
+
+roots = [
+  "chio-kernel",
+  "chio-core",
+  "chio-core-types",
+  "chio-control-plane",
+  "chio-cli",
+]
+
+[deny]
+packages = [
+  "chio-web3",
+  "chio-web3-bindings",
+  "chio-anchor",
+  "chio-settle",
+  "alloy",
+  "alloy-*",
+  "secp256k1",
+  "ethers*",
+  "chio-finding",
+  "chio-finding-*",
+  "chio-open-market",
+  "chio-swarm-authority",
+]
+features = [
+  "web3",
+  "finding-market",
+]

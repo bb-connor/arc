@@ -14,6 +14,7 @@
 //! cargo xtask snippets regen [--check]
 //! cargo xtask check crate-paths
 //! cargo xtask check formal-mirrors [--bless]
+//! cargo xtask check web3-free-closure [--root <crate>]...
 //! cargo xtask gen proof-coverage [--check]
 //! cargo xtask formal itf-to-regression --trace <path> --spec <family>
 //! ```
@@ -112,6 +113,7 @@ mod scenarios;
 mod snippets_subcommand;
 mod support;
 mod vectors;
+mod web3_free_closure;
 
 pub(crate) use codegen::{errors_regen, run_codegen};
 #[cfg(test)]

@@ -26,7 +26,7 @@ Cargo workspace, or nonmember package stops root discovery.
 | Command family | Implemented work |
 | --- | --- |
 | `gen` | Rust/TS/Go/Python bindings, errors, snippets, vectors, proof coverage |
-| `check` | Adapter boundaries, crate paths, formal mirrors, named fixture facets |
+| `check` | Adapter boundaries, crate paths, formal mirrors, named fixture facets, web3-free closure |
 | `validate-scenarios` | Validate each scenario declaring a string `$schema` |
 | `qualify bounded-chio` | Validate the bounded matrix and referenced artifacts |
 | `verify launch-acceptance` | Assemble a Proof Room acceptance bundle |
@@ -37,6 +37,21 @@ Generation leaves support `--check` for drift detection. Formal mirrors use
 check mode by default and write recorded hashes with `--bless`.
 Fixture gates accept `--schema-only` or `--negative-only` as mutually exclusive
 modes; their full handlers can run Cargo, CLI, shell, or dashboard checks.
+`check web3-free-closure` resolves each root listed in
+`ci-gates/web3-free-closure.toml` on its own with default features
+(`cargo tree -p <root> -e normal,features`) and fails if the closure reaches a
+denied package or enables a denied feature on any crate. Each failure names
+the root, the denied item, the inverted path back to the root, the root's
+direct dependencies that reach it, and the `cargo tree -i` command that shows
+every path. `--root <crate>` (repeatable) limits the run to listed roots; an
+unlisted root, a malformed deny-list file or a failed `cargo tree` is an
+error. The gate implements ADR-0035 and is not yet required in CI.
+
+```sh
+cargo xtask check web3-free-closure
+cargo xtask check web3-free-closure --root chio-core-types
+```
+
 Flat aliases retain `codegen`, `errors regen`, `snippets regen`,
 `freeze-vectors`, and `eval-receipt-regen` spellings.
 
