@@ -14,10 +14,8 @@ fn takeover_after_apply_query_returns_stale_lease_before_effect() {
         takeover.clone(),
     ));
 
-    assert!(matches!(
-        expect_err(executor.execute(&planned, &first_work, 110)),
-        ExecutorError::StaleLease
-    ));
+    let error = expect_err(executor.execute(&planned, &first_work, 110));
+    assert!(matches!(error, ExecutorError::StaleLease), "{error:?}");
     assert!(harness.effects.state().takeover_on_query.is_none());
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
     let pending = harness.load(&planned);
@@ -53,10 +51,8 @@ fn takeover_after_rollback_query_returns_stale_lease_before_effect() {
         takeover.clone(),
     ));
 
-    assert!(matches!(
-        expect_err(executor.execute(&active, &rollback, 1_000)),
-        ExecutorError::StaleLease
-    ));
+    let error = expect_err(executor.execute(&active, &rollback, 1_000));
+    assert!(matches!(error, ExecutorError::StaleLease), "{error:?}");
     assert!(harness.effects.state().takeover_on_query.is_none());
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
     let pending = harness.load(&active);
