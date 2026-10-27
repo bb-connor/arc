@@ -13,6 +13,7 @@ use super::{
     ResolvedIdentity, ENTERPRISE_IDENTITY_INDEX_SCHEMA,
 };
 use crate::passport_verifier::RegistryUpdateError;
+use crate::signed_input::MAX_SIGNED_FILE_BYTES;
 
 const SCOPE: &str = "https://idp.example";
 const DEACTIVATED_AT: u64 = 1_767_225_600;
@@ -508,5 +509,79 @@ fn old_unkeyed_shape_refuses() {
             ),
             "loaded {document}: {refused:?}"
         );
+    }
+}
+
+const CAPACITY_SCOPE: &str = "scope";
+const FULL_PRINCIPAL_BYTES: usize = 16_776_885;
+const DEACTIVATION_RESERVE_BYTES: usize = 16;
+
+fn insert_in(
+    path: &Path,
+    keys: &TenantIndexKeySet,
+    rng: &dyn Rng,
+    principal: &str,
+) -> Result<ResolvedIdentity, EnterpriseIdentityIndexError> {
+    with_enterprise_identity_index(path, keys, |index| {
+        index.resolve_or_insert(rng, CAPACITY_SCOPE, principal)
+    })
+}
+
+fn is_persist_refusal(result: &Result<impl std::fmt::Debug, EnterpriseIdentityIndexError>) -> bool {
+    matches!(
+        result,
+        Err(EnterpriseIdentityIndexError::Registry(
+            RegistryUpdateError::Persist(_)
+        ))
+    )
+}
+
+#[test]
+fn an_insert_that_leaves_no_room_to_deactivate_is_refused() {
+    let dir = chio_test_support::private_tempdir().test_unwrap();
+    let path = index_path(&dir);
+    let keys = set(1, &[]);
+    let principal = "p".repeat(FULL_PRINCIPAL_BYTES);
+    let refused = insert_in(&path, &keys, &SequenceRng::new(), &principal);
+    assert!(is_persist_refusal(&refused), "{refused:?}");
+    assert!(!path.exists());
+}
+
+#[test]
+fn an_identity_admitted_at_capacity_can_always_be_deactivated() {
+    for at in [DEACTIVATED_AT, u64::MAX] {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        let path = index_path(&dir);
+        let keys = set(1, &[]);
+        let rng = SequenceRng::new();
+        let principal = "p".repeat(FULL_PRINCIPAL_BYTES - DEACTIVATION_RESERVE_BYTES);
+        let admitted = insert_in(&path, &keys, &rng, &principal).test_unwrap();
+        let admitted_bytes = std::fs::read(&path).test_unwrap();
+        assert_eq!(
+            admitted_bytes.len(),
+            MAX_SIGNED_FILE_BYTES - DEACTIVATION_RESERVE_BYTES
+        );
+
+        let crowded = insert_in(&path, &keys, &rng, "bob");
+        assert!(is_persist_refusal(&crowded), "{crowded:?}");
+        assert_eq!(std::fs::read(&path).test_unwrap(), admitted_bytes);
+
+        let deactivated = with_enterprise_identity_index(&path, &keys, |index| {
+            index.deactivate(&admitted.identity.identity_id, at)
+        })
+        .test_unwrap();
+        assert_eq!(deactivated.deactivated_at, Some(at));
+        assert!(
+            std::fs::metadata(&path).test_unwrap().len()
+                <= u64::try_from(MAX_SIGNED_FILE_BYTES).test_unwrap()
+        );
+
+        let reloaded = with_enterprise_identity_index(&path, &keys, |index| {
+            Ok(index.resolve(CAPACITY_SCOPE, &principal))
+        })
+        .test_unwrap()
+        .test_unwrap();
+        assert_eq!(reloaded.identity_id, admitted.identity.identity_id);
+        assert_eq!(reloaded.deactivated_at, Some(at));
     }
 }

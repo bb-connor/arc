@@ -7,7 +7,8 @@
 //! identity after a rotation, commits whole or not at all. Every operation loads the document
 //! under the lock, refuses a stored subject whose generation the key set does not hold, and
 //! commits the re-key of every identity that is not under the active generation before it
-//! reads anything.
+//! reads anything. Every write keeps room below the read cap for the deactivation of each
+//! active identity, so an identity the index admits can always be deactivated.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -19,7 +20,7 @@ use chio_core_types::tenant_index::{TenantBindingError, TenantIndexKeySet};
 use serde::{Deserialize, Serialize};
 
 use crate::passport_verifier::RegistryUpdateError;
-use crate::signed_input::{self, RegistryLock, MAX_SIGNED_FILE_BYTES};
+use crate::signed_input::{self, RegistryLock, RevocationReserve};
 use crate::CliError;
 
 pub const ENTERPRISE_IDENTITY_INDEX_SCHEMA: &str = "chio.enterprise-identity-index.v1";
@@ -179,6 +180,19 @@ struct IdentityRow {
     principal: String,
     subject: EnterpriseSubjectKey,
     deactivated_at: Option<u64>,
+}
+
+impl RevocationReserve for IndexDocument {
+    /// Each active identity may still grow from `null` to the widest deactivation timestamp.
+    fn revocation_reserve(&self) -> Result<usize, CliError> {
+        let growth = signed_input::revocation_headroom(&None::<u64>, &Some(u64::MAX))?;
+        let active = self
+            .identities
+            .iter()
+            .filter(|row| row.deactivated_at.is_none())
+            .count();
+        Ok(growth.saturating_mul(active))
+    }
 }
 
 impl IdentityRow {
@@ -489,9 +503,9 @@ fn persist_if_changed(
     if !index.changed {
         return Ok(());
     }
-    signed_input::write_bounded_registry(lock, &index.document(), MAX_SIGNED_FILE_BYTES).map_err(
-        |error| EnterpriseIdentityIndexError::Registry(RegistryUpdateError::Persist(error)),
-    )?;
+    signed_input::write_reserving_registry(lock, &index.document()).map_err(|error| {
+        EnterpriseIdentityIndexError::Registry(RegistryUpdateError::Persist(error))
+    })?;
     index.changed = false;
     Ok(())
 }
