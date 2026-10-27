@@ -191,6 +191,42 @@ class ClockGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "composition source changed"):
                 gate.allowed_sites(fixture, baseline)
 
+    def test_cpp_host_compositions_are_individually_pinned(self):
+        import json
+        import shutil
+        import tempfile
+
+        path = "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs"
+        owners = ("evaluate_json_str", "verify_capability_with_parts", "verify_passport_json_str")
+        baseline = json.loads((root / "scripts/security-clock-inventory.json").read_text())
+        allowed = gate.allowed_sites(root, baseline)
+        source = (root / path).read_text()
+        observed = gate.sites(path, source)
+        for owner in owners:
+            key = f"{path}::{owner}::native-adapter"
+            self.assertEqual(allowed[key], 1)
+            self.assertEqual(observed[key], 1)
+            self.assertNotIn(key, baseline["sites"])
+            self.assertNotIn(key, baseline["expanded_preexisting_sites"])
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            paths = {gate.SCOPE_EVIDENCE, *(key.split("::")[0] for key in gate.COMPOSITION_CONTRACTS)}
+            for source_path in paths:
+                (fixture / source_path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(root / source_path, fixture / source_path)
+            for owner in owners:
+                with self.subTest(owner=owner):
+                    start = source.index(f"fn {owner}(")
+                    position = source.index("let system_clock = SystemClock;", start)
+                    changed = source[:position] + "let extra_clock = SystemClock;\n" + source[position:]
+                    (fixture / path).write_text(changed)
+                    with self.assertRaisesRegex(ValueError, "composition source changed"):
+                        gate.allowed_sites(fixture, baseline)
+            (fixture / path).write_text(source)
+            extra = source + "\nfn unrelated_host_clock() { let clock = SystemClock; }\n"
+            self.assertEqual(gate.sites(path, extra)[f"{path}::unrelated_host_clock::native-adapter"], 1)
+            self.assertEqual(allowed[f"{path}::unrelated_host_clock::native-adapter"], 0)
+
     def test_reviewed_composition_does_not_permit_another_observation(self):
         import json
         import shutil
