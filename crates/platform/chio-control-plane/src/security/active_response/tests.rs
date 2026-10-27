@@ -532,7 +532,9 @@ impl Harness {
             authorization_capability_hash: digest(30),
             governed_intent_hash: digest(32),
             policy_decision_hash: digest(33),
-            admission_artifact_fingerprint: request.admission_artifact_fingerprint,
+            admission_artifact_fingerprint: request
+                .admission_artifact_fingerprint
+                .unwrap_or_else(|| panic!("bound preparation fixture")),
             approval: ResponseDispatchApproval::Automatic,
         };
         assert_eq!(
@@ -765,19 +767,18 @@ fn raw_request(
     let policy_decision_hash = digest_hex(&digest(33));
     let admission_artifact_fingerprint = Some(digest(35));
     let authorized_at_unix_ms = plan.created_at_unix_ms;
-    let dispatch_id = derive_active_response_dispatch_id(
-        &plan,
-        &executor_authority,
-        &authorization_capability_hash,
-        &governed_intent_hash,
-        &policy_decision_hash,
-        authorized_at_unix_ms,
-        &approval,
-    )
-    .unwrap_or_else(|error| panic!("derive active-response dispatch id: {error}"));
     let dispatch_id =
-        super::bind_active_response_dispatch_id_to_artifact(&dispatch_id, &digest(35))
-            .unwrap_or_else(|error| panic!("bind active-response artifact: {error}"));
+        derive_active_response_dispatch_id(chio_kernel::ActiveResponseDispatchIdInput {
+            response_plan: &plan,
+            executor_authority: &executor_authority,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &governed_intent_hash,
+            policy_decision_hash: &policy_decision_hash,
+            authorized_at_unix_ms,
+            approval: &approval,
+            admission_artifact_fingerprint: &digest(35),
+        })
+        .unwrap_or_else(|error| panic!("derive active-response dispatch id: {error}"));
     RawActiveResponseExecutionRequest {
         dispatch_id,
         request_id: plan.action_id.as_str().to_string(),
@@ -1819,7 +1820,9 @@ mod automatic_fence_boundary {
             authorization_capability_hash: digest(30),
             governed_intent_hash: digest(32),
             policy_decision_hash: digest(33),
-            admission_artifact_fingerprint: request.admission_artifact_fingerprint,
+            admission_artifact_fingerprint: request
+                .admission_artifact_fingerprint
+                .unwrap_or_else(|| panic!("bound preparation fixture")),
             approval: ResponseDispatchApproval::Automatic,
         };
         (identity, plan, binding)

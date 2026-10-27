@@ -9,6 +9,7 @@ pub(super) struct DispatchIdentity<'a> {
     pub(super) executor_authority_generation: u64,
     pub(super) authorization_capability_hash: &'a str,
     pub(super) governed_intent_hash: &'a str,
+    pub(super) admission_artifact_fingerprint: &'a Digest32,
     pub(super) policy_decision_hash: &'a str,
     pub(super) authorized_at_unix_ms: u64,
     pub(super) approval: &'a ActiveResponseExecutionApproval,
@@ -28,6 +29,7 @@ fn canonical_dispatch_identity(
         executor_authority_generation: u64,
         authorization_capability_hash: &'a str,
         governed_intent_hash: &'a str,
+        admission_artifact_fingerprint: &'a Digest32,
         policy_decision_hash: &'a str,
         authorized_at_unix_ms: u64,
         approval_mode: &'static str,
@@ -59,6 +61,7 @@ fn canonical_dispatch_identity(
         executor_authority_generation: identity.executor_authority_generation,
         authorization_capability_hash: identity.authorization_capability_hash,
         governed_intent_hash: identity.governed_intent_hash,
+        admission_artifact_fingerprint: identity.admission_artifact_fingerprint,
         policy_decision_hash: identity.policy_decision_hash,
         authorized_at_unix_ms: identity.authorized_at_unix_ms,
         approval_mode,
@@ -69,9 +72,14 @@ fn canonical_dispatch_identity(
     .map_err(|error| ActiveResponseDispatchIdError::Canonicalization(error.to_string()))
 }
 
-pub(super) fn derive_legacy_dispatch_id(
+pub(super) fn derive_dispatch_id(
     identity: DispatchIdentity<'_>,
 ) -> Result<RecordId, ActiveResponseDispatchIdError> {
+    if identity.admission_artifact_fingerprint.is_zero() {
+        return Err(ActiveResponseDispatchIdError::InvalidIdentifier(
+            "admission artifact fingerprint is zero".to_owned(),
+        ));
+    }
     let canonical = canonical_dispatch_identity(identity)?;
     let mut preimage = Vec::with_capacity(ACTIVE_RESPONSE_DISPATCH_DOMAIN.len() + canonical.len());
     preimage.extend_from_slice(ACTIVE_RESPONSE_DISPATCH_DOMAIN);
@@ -88,11 +96,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn canonical_legacy_dispatch_preimages_and_identifiers_are_unchanged(
+    fn canonical_v1_dispatch_preimages_and_identifiers_bind_artifact(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let tenant = TenantId::new("tenant-legacy-dispatch")?;
-        let action = ActionId::new("action-legacy-dispatch")?;
+        let tenant = TenantId::new("tenant-bound-dispatch")?;
+        let action = ActionId::new("action-bound-dispatch")?;
         let plan_hash = Digest32::new([1; 32]);
+        let fingerprint = Digest32::new([7; 32]);
         {
             let approval = ActiveResponseExecutionApproval::Automatic;
             let identity = || DispatchIdentity {
@@ -106,13 +115,30 @@ mod tests {
                     "0303030303030303030303030303030303030303030303030303030303030303",
                 governed_intent_hash:
                     "0404040404040404040404040404040404040404040404040404040404040404",
+                admission_artifact_fingerprint: &fingerprint,
                 policy_decision_hash:
                     "0505050505050505050505050505050505050505050505050505050505050505",
                 authorized_at_unix_ms: 41_000,
                 approval: &approval,
             };
-            assert_eq!(canonical_dispatch_identity(identity())?, br#"{"actionId":"action-legacy-dispatch","admissionOperationId":null,"admissionOperationVersion":null,"approvalMode":"automatic","approvalSetHash":null,"authorizationCapabilityHash":"0303030303030303030303030303030303030303030303030303030303030303","authorizedAtUnixMs":41000,"executorAuthorityGeneration":7,"executorAuthorityId":"0202020202020202020202020202020202020202020202020202020202020202","governedIntentHash":"0404040404040404040404040404040404040404040404040404040404040404","planHash":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"policyDecisionHash":"0505050505050505050505050505050505050505050505050505050505050505","schema":"chio.active-response-dispatch.v1","tenantId":"tenant-legacy-dispatch"}"#);
-            assert_eq!(derive_legacy_dispatch_id(identity())?.as_str(), "active_response_dispatch_1638b515135d62993943c82d8a565b63f5845e8e83aa73cb1d39edd1a592e621");
+            assert_eq!(canonical_dispatch_identity(identity())?, br#"{"actionId":"action-bound-dispatch","admissionArtifactFingerprint":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"admissionOperationId":null,"admissionOperationVersion":null,"approvalMode":"automatic","approvalSetHash":null,"authorizationCapabilityHash":"0303030303030303030303030303030303030303030303030303030303030303","authorizedAtUnixMs":41000,"executorAuthorityGeneration":7,"executorAuthorityId":"0202020202020202020202020202020202020202020202020202020202020202","governedIntentHash":"0404040404040404040404040404040404040404040404040404040404040404","planHash":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"policyDecisionHash":"0505050505050505050505050505050505050505050505050505050505050505","schema":"chio.active-response-dispatch.v1","tenantId":"tenant-bound-dispatch"}"#);
+            assert_eq!(derive_dispatch_id(identity())?.as_str(), "active_response_dispatch_65e0f1dcb5c57dd134aca1dd9fa342d1710662adf862e060bd1dc3300a1db22d");
+            let alternate_fingerprint = Digest32::new([8; 32]);
+            let mut alternate = identity();
+            alternate.admission_artifact_fingerprint = &alternate_fingerprint;
+            assert_ne!(
+                derive_dispatch_id(alternate)?,
+                derive_dispatch_id(identity())?
+            );
+            let zero = Digest32::new([0; 32]);
+            let mut invalid = identity();
+            invalid.admission_artifact_fingerprint = &zero;
+            assert_eq!(
+                derive_dispatch_id(invalid),
+                Err(ActiveResponseDispatchIdError::InvalidIdentifier(
+                    "admission artifact fingerprint is zero".to_owned()
+                ))
+            );
         }
         {
             let approval = ActiveResponseExecutionApproval::Governed {
@@ -131,13 +157,30 @@ mod tests {
                     "0303030303030303030303030303030303030303030303030303030303030303",
                 governed_intent_hash:
                     "0404040404040404040404040404040404040404040404040404040404040404",
+                admission_artifact_fingerprint: &fingerprint,
                 policy_decision_hash:
                     "0505050505050505050505050505050505050505050505050505050505050505",
                 authorized_at_unix_ms: 41_000,
                 approval: &approval,
             };
-            assert_eq!(canonical_dispatch_identity(identity())?, br#"{"actionId":"action-legacy-dispatch","admissionOperationId":"original-governed-operation","admissionOperationVersion":9,"approvalMode":"governed","approvalSetHash":"0606060606060606060606060606060606060606060606060606060606060606","authorizationCapabilityHash":"0303030303030303030303030303030303030303030303030303030303030303","authorizedAtUnixMs":41000,"executorAuthorityGeneration":7,"executorAuthorityId":"0202020202020202020202020202020202020202020202020202020202020202","governedIntentHash":"0404040404040404040404040404040404040404040404040404040404040404","planHash":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"policyDecisionHash":"0505050505050505050505050505050505050505050505050505050505050505","schema":"chio.active-response-dispatch.v1","tenantId":"tenant-legacy-dispatch"}"#);
-            assert_eq!(derive_legacy_dispatch_id(identity())?.as_str(), "active_response_dispatch_f74c081c99ef8eb5b0bd48c9c7647a73f32b47156274b6170ffa68cc88151fc7");
+            assert_eq!(canonical_dispatch_identity(identity())?, br#"{"actionId":"action-bound-dispatch","admissionArtifactFingerprint":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"admissionOperationId":"original-governed-operation","admissionOperationVersion":9,"approvalMode":"governed","approvalSetHash":"0606060606060606060606060606060606060606060606060606060606060606","authorizationCapabilityHash":"0303030303030303030303030303030303030303030303030303030303030303","authorizedAtUnixMs":41000,"executorAuthorityGeneration":7,"executorAuthorityId":"0202020202020202020202020202020202020202020202020202020202020202","governedIntentHash":"0404040404040404040404040404040404040404040404040404040404040404","planHash":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"policyDecisionHash":"0505050505050505050505050505050505050505050505050505050505050505","schema":"chio.active-response-dispatch.v1","tenantId":"tenant-bound-dispatch"}"#);
+            assert_eq!(derive_dispatch_id(identity())?.as_str(), "active_response_dispatch_5a08d359f2dfb621935033fa62772e29ee55d783ad185dc53daeb672d32a9759");
+            let alternate_fingerprint = Digest32::new([8; 32]);
+            let mut alternate = identity();
+            alternate.admission_artifact_fingerprint = &alternate_fingerprint;
+            assert_ne!(
+                derive_dispatch_id(alternate)?,
+                derive_dispatch_id(identity())?
+            );
+            let zero = Digest32::new([0; 32]);
+            let mut invalid = identity();
+            invalid.admission_artifact_fingerprint = &zero;
+            assert_eq!(
+                derive_dispatch_id(invalid),
+                Err(ActiveResponseDispatchIdError::InvalidIdentifier(
+                    "admission artifact fingerprint is zero".to_owned()
+                ))
+            );
         }
         Ok(())
     }

@@ -28,7 +28,7 @@ fn id(value: &str) -> Result<RecordId, Box<dyn std::error::Error>> {
 }
 
 fn fixture(
-    legacy: bool,
+    artifact_byte: u8,
 ) -> Result<
     (
         ActiveResponseExecutionRequest,
@@ -82,24 +82,18 @@ fn fixture(
         approval_set_hash: Hash::from_bytes([34; 32]).to_hex(),
     };
     let authorized_at_unix_ms = 40_001;
-    let legacy_id = crate::derive_active_response_dispatch_id(
-        &plan,
-        &identity,
-        &authorization_capability_hash,
-        &governed_intent_hash,
-        &policy_decision_hash,
-        authorized_at_unix_ms,
-        &approval,
-    )?;
-    let fingerprint = if legacy {
-        None
-    } else {
-        Some(Digest32::new([35; 32]))
-    };
-    let dispatch_id = match fingerprint {
-        Some(value) => crate::bind_active_response_dispatch_id_to_artifact(&legacy_id, &value)?,
-        None => legacy_id,
-    };
+    let fingerprint = Digest32::new([artifact_byte; 32]);
+    let dispatch_id =
+        crate::derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+            response_plan: &plan,
+            executor_authority: &identity,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &governed_intent_hash,
+            policy_decision_hash: &policy_decision_hash,
+            authorized_at_unix_ms,
+            approval: &approval,
+            admission_artifact_fingerprint: &fingerprint,
+        })?;
     let request = execution_request(ExecutionRequestFixture {
         request_id: plan.action_id.as_str().to_owned(),
         plan_body_hash: Hash::from_bytes(*plan.plan_hash.as_bytes()).to_hex(),
@@ -113,11 +107,7 @@ fn fixture(
         admission_artifact_fingerprint: fingerprint,
         approval,
         authorized_at_unix_ms,
-        origin: if legacy {
-            ActiveResponseExecutionOrigin::CommittedAdmission
-        } else {
-            ActiveResponseExecutionOrigin::Fresh
-        },
+        origin: ActiveResponseExecutionOrigin::Fresh,
     });
     let prepared = request.prepare_dispatch(
         ResponseDispatchLease {
@@ -203,7 +193,7 @@ fn make_evidence(
 
 #[test]
 fn proof_authorization_rejects_fingerprint_different_from_sealed_execution() -> TestResult {
-    let (request, original, snapshot) = fixture(false)?;
+    let (request, original, snapshot) = fixture(35)?;
     let expected =
         active_response_execution_dispatch_binding(&request, request.authorized_at_unix_ms())?;
     assert_eq!(snapshot.execution_dispatch.as_ref(), Some(&expected));
@@ -213,7 +203,7 @@ fn proof_authorization_rejects_fingerprint_different_from_sealed_execution() -> 
     );
     let before = canonical_json_bytes(&expected)?;
     let mut authorization = original.dispatch_authorization().clone();
-    authorization.body.admission_artifact_fingerprint = Some(Digest32::new([36; 32]));
+    authorization.body.admission_artifact_fingerprint = Digest32::new([36; 32]);
     let bytes = canonical_json_bytes(&authorization.body)?;
     authorization.body_hash = Digest32::new(*sha256(&bytes).as_bytes());
     authorization.canonical_body = CanonicalBody::new(bytes)?;
@@ -251,15 +241,14 @@ fn proof_authorization_rejects_fingerprint_different_from_sealed_execution() -> 
 }
 
 #[test]
-fn proof_authorization_accepts_coherent_legacy_schema_one() -> TestResult {
-    let (request, evidence, snapshot) = fixture(true)?;
+fn proof_authorization_accepts_coherent_bound_schema_one() -> TestResult {
+    let (request, evidence, snapshot) = fixture(35)?;
     let expected =
         active_response_execution_dispatch_binding(&request, request.authorized_at_unix_ms())?;
     assert_eq!(expected.schema_version, 1);
-    assert_eq!(expected.admission_artifact_fingerprint, None);
-    assert!(
-        !std::str::from_utf8(evidence.dispatch_authorization().canonical_body.as_bytes())?
-            .contains("admission_artifact_fingerprint")
+    assert_eq!(
+        expected.admission_artifact_fingerprint,
+        Digest32::new([35; 32])
     );
     assert_eq!(
         verify_active_response_dispatch_authorization(&request, &evidence, &snapshot, &expected)?,
@@ -273,7 +262,7 @@ fn proof_authorization_accepts_coherent_legacy_schema_one() -> TestResult {
 // effects, persist a terminal outbox, or claim public end-to-end qualification.
 
 fn terminal_executor_binding_fixture(
-    legacy: bool,
+    artifact_byte: u8,
 ) -> Result<
     (
         crate::security_admission_operation::AdmissionOperation,
@@ -283,7 +272,6 @@ fn terminal_executor_binding_fixture(
     Box<dyn std::error::Error>,
 > {
     use crate::kernel::active_response_operation_binding::{
-        bind_active_response_operation_request_hash_to_artifact,
         build_active_response_operation_anchor,
         derive_active_response_operation_request_binding_hash,
     };
@@ -300,7 +288,7 @@ fn terminal_executor_binding_fixture(
     // Reuse the existing kernel proof carrier and its deterministic signing key.
     // The closed completion is a genuine signed validator fixture, without a
     // claim that an executor produced or stored its lifecycle/effect history.
-    let (request, applying_evidence, snapshot) = fixture(legacy)?;
+    let (request, applying_evidence, snapshot) = fixture(artifact_byte)?;
     let plan = request.response_plan();
     let fingerprint = request.admission_artifact_fingerprint();
     let approval_set_hash = match request.approval() {
@@ -309,17 +297,18 @@ fn terminal_executor_binding_fixture(
         } => approval_set_hash.clone(),
         _ => return Err("terminal binding fixture requires governed approval".into()),
     };
-    let legacy_request_hash = derive_active_response_operation_request_binding_hash(
-        request.plan_body_hash(),
-        request.executor_authority_id(),
-        request.executor_authority_generation(),
-        request.authorization_capability_hash(),
-        request.governed_intent_hash(),
-        &approval_set_hash,
+    let request_binding_hash = derive_active_response_operation_request_binding_hash(
+        crate::kernel::active_response_operation_binding::ActiveResponseOperationSeed {
+            plan_hash: request.plan_body_hash(),
+            executor_authority_id: request.executor_authority_id(),
+            executor_authority_generation: request.executor_authority_generation(),
+            authorization_capability_hash: request.authorization_capability_hash(),
+            governed_intent_hash: request.governed_intent_hash(),
+            approval_set_hash: &approval_set_hash,
+            admission_artifact_fingerprint: &fingerprint,
+        },
         &Hash::from_bytes(*plan.policy_hash.as_bytes()).to_hex(),
     )?;
-    let request_binding_hash =
-        bind_active_response_operation_request_hash_to_artifact(&legacy_request_hash, fingerprint)?;
     let prepared = AdmissionOperation::prepared(PreparedAdmissionOperation {
         kind: AdmissionOperationKind::GovernedActiveResponse,
         coordinator_authority_id: request.executor_authority_id().to_owned(),
@@ -352,16 +341,18 @@ fn terminal_executor_binding_fixture(
         1,
         None,
     )?;
-    let mut anchor = build_active_response_operation_anchor(
-        plan,
-        request.executor_authority(),
-        request.authorized_at_unix_ms(),
-        request.authorization_capability_hash(),
-        request.governed_intent_hash(),
-        request.policy_decision_hash(),
-        &approval_set_hash,
+    let anchor = build_active_response_operation_anchor(
+        crate::kernel::active_response_operation_binding::ActiveResponseOperationAnchorInput {
+            response_plan: plan,
+            executor_authority: request.executor_authority(),
+            authorized_at_unix_ms: request.authorized_at_unix_ms(),
+            authorization_capability_hash: request.authorization_capability_hash(),
+            governed_intent_hash: request.governed_intent_hash(),
+            policy_decision_hash: request.policy_decision_hash(),
+            approval_set_hash: &approval_set_hash,
+            admission_artifact_fingerprint: fingerprint,
+        },
     )?;
-    anchor.admission_artifact_fingerprint = fingerprint;
     assert!(anchor.is_valid());
 
     let mut binding =
@@ -376,19 +367,18 @@ fn terminal_executor_binding_fixture(
         admission_operation_version: committed.version(),
         approval_set_hash,
     };
-    let original_id = crate::derive_active_response_dispatch_id(
-        plan,
-        request.executor_authority(),
-        request.authorization_capability_hash(),
-        request.governed_intent_hash(),
-        request.policy_decision_hash(),
-        request.authorized_at_unix_ms(),
-        &execution_approval,
-    )?;
-    binding.dispatch_id = match fingerprint {
-        Some(value) => crate::bind_active_response_dispatch_id_to_artifact(&original_id, &value)?,
-        None => original_id,
-    };
+    let original_id =
+        crate::derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+            response_plan: plan,
+            executor_authority: request.executor_authority(),
+            authorization_capability_hash: request.authorization_capability_hash(),
+            governed_intent_hash: request.governed_intent_hash(),
+            policy_decision_hash: request.policy_decision_hash(),
+            authorized_at_unix_ms: request.authorized_at_unix_ms(),
+            approval: &execution_approval,
+            admission_artifact_fingerprint: &fingerprint,
+        })?;
+    binding.dispatch_id = original_id;
     binding.validate_for_plan(plan)?;
     let effects = plan
         .effects
@@ -762,15 +752,7 @@ fn assert_terminal_executor_original_predicates(
         binding.admission_artifact_fingerprint,
         anchor.admission_artifact_fingerprint
     );
-    setup_check!(
-        "original artifact schema",
-        binding.schema_version,
-        if anchor.admission_artifact_fingerprint.is_some() {
-            2
-        } else {
-            1
-        }
-    );
+    setup_check!("original artifact schema", binding.schema_version, 1);
     setup_check!(
         "native producer supplies no signing nonce",
         metadata
@@ -793,11 +775,11 @@ fn assert_terminal_executor_original_predicates(
 
 fn reject_terminal_executor_artifact_mismatch(
     schema_version: u8,
-    fingerprint: Option<Digest32>,
+    fingerprint: Digest32,
 ) -> TestResult {
     use crate::kernel::active_response_coordinator::validate_active_response_terminal_executor_receipt;
     use chio_core::receipt::security::ActiveDefenseReceiptBody;
-    let (operation, anchor, original) = terminal_executor_binding_fixture(false)?;
+    let (operation, anchor, original) = terminal_executor_binding_fixture(35)?;
     validate_active_response_terminal_executor_receipt(&operation, &anchor, &original)?;
     let before = (
         operation.clone(),
@@ -820,7 +802,7 @@ fn reject_terminal_executor_artifact_mismatch(
         .execution_dispatch
         .as_mut()
         .ok_or("original execution binding")?;
-    assert_eq!(binding.schema_version, 2);
+    assert_eq!(binding.schema_version, 1);
     assert_eq!(
         binding.admission_artifact_fingerprint,
         anchor.admission_artifact_fingerprint
@@ -855,28 +837,21 @@ fn reject_terminal_executor_artifact_mismatch(
 
 #[test]
 fn terminal_executor_rejects_other_signed_artifact_fingerprint() -> TestResult {
-    reject_terminal_executor_artifact_mismatch(2, Some(Digest32::new([36; 32])))
-}
-
-#[test]
-fn terminal_executor_rejects_signed_legacy_binding_beside_bound_anchor() -> TestResult {
-    reject_terminal_executor_artifact_mismatch(1, None)
+    reject_terminal_executor_artifact_mismatch(1, Digest32::new([36; 32]))
 }
 
 #[test]
 fn terminal_executor_rejects_signed_other_original_dispatch_id() -> TestResult {
     use crate::kernel::active_response_coordinator::validate_active_response_terminal_executor_receipt;
     use chio_core::receipt::security::ActiveDefenseReceiptBody;
-    let (operation, anchor, original) = terminal_executor_binding_fixture(false)?;
+    let (operation, anchor, original) = terminal_executor_binding_fixture(35)?;
     validate_active_response_terminal_executor_receipt(&operation, &anchor, &original)?;
     let before = (
         operation.clone(),
         canonical_json_bytes(&anchor)?,
         canonical_json_bytes(&original)?,
     );
-    // The other identifier comes from the existing coherent legacy control's
-    // real producer derivation. Only the bound receipt's dispatch ID changes.
-    let (_, _, other_receipt) = terminal_executor_binding_fixture(true)?;
+    let (_, _, other_receipt) = terminal_executor_binding_fixture(36)?;
     let other_body: ActiveDefenseReceiptBody = serde_json::from_value(
         other_receipt
             .metadata
@@ -910,7 +885,7 @@ fn terminal_executor_rejects_signed_other_original_dispatch_id() -> TestResult {
         .as_mut()
         .ok_or("original execution binding")?;
     assert_ne!(binding.dispatch_id, other_id);
-    assert_eq!(binding.schema_version, 2);
+    assert_eq!(binding.schema_version, 1);
     assert_eq!(
         binding.admission_artifact_fingerprint,
         anchor.admission_artifact_fingerprint
@@ -938,7 +913,7 @@ fn terminal_executor_rejects_signed_other_original_dispatch_id() -> TestResult {
 
 #[test]
 fn terminal_executor_accepts_exact_signed_bound_anchor() -> TestResult {
-    let (operation, anchor, receipt) = terminal_executor_binding_fixture(false)?;
+    let (operation, anchor, receipt) = terminal_executor_binding_fixture(35)?;
     crate::kernel::active_response_coordinator::validate_active_response_terminal_executor_receipt(
         &operation, &anchor, &receipt,
     )?;
@@ -946,13 +921,33 @@ fn terminal_executor_accepts_exact_signed_bound_anchor() -> TestResult {
 }
 
 #[test]
-fn terminal_executor_accepts_exact_signed_legacy_anchor() -> TestResult {
-    let (operation, anchor, receipt) = terminal_executor_binding_fixture(true)?;
-    assert_eq!(anchor.admission_artifact_fingerprint, None);
-    let encoded = canonical_json_bytes(&receipt)?;
-    assert!(!std::str::from_utf8(&encoded)?.contains("admission_artifact_fingerprint"));
-    crate::kernel::active_response_coordinator::validate_active_response_terminal_executor_receipt(
-        &operation, &anchor, &receipt,
-    )?;
+fn terminal_anchor_refuses_missing_or_null_artifact_fingerprint() -> TestResult {
+    use crate::kernel::active_response_operation_binding::ActiveResponseOperationAnchor;
+    let (_, anchor, _) = terminal_executor_binding_fixture(35)?;
+    let original = serde_json::to_value(&anchor)?;
+    for null in [false, true] {
+        let mut altered = original.clone();
+        let fields = altered.as_object_mut().ok_or("anchor object")?;
+        if null {
+            fields.insert(
+                "admissionArtifactFingerprint".to_owned(),
+                serde_json::Value::Null,
+            );
+        } else {
+            fields.remove("admissionArtifactFingerprint");
+        }
+        let error = serde_json::from_value::<ActiveResponseOperationAnchor>(altered)
+            .err()
+            .ok_or("unbound anchor accepted")?;
+        assert_eq!(error.classify(), serde_json::error::Category::Data);
+        assert_eq!(
+            error.to_string(),
+            if null {
+                "invalid type: null, expected an array of length 32"
+            } else {
+                "missing field `admissionArtifactFingerprint`"
+            }
+        );
+    }
     Ok(())
 }

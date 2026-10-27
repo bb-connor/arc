@@ -26,7 +26,8 @@ use super::active_response_coordinator::{
 };
 use super::active_response_operation_binding::{
     active_response_dispatch_operation_version, build_active_response_operation_anchor,
-    derive_active_response_operation_request_binding_hash,
+    derive_active_response_operation_request_binding_hash, ActiveResponseOperationAnchorInput,
+    ActiveResponseOperationSeed,
 };
 use super::{
     derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
@@ -92,17 +93,20 @@ impl PreparedActiveResponseAdmission {
                 let operation = &reservation.operation;
                 let expected_request_binding_hash =
                     derive_active_response_operation_request_binding_hash(
-                        &digest_hex(&response_plan.plan_hash),
-                        &reservation.executor_authority_id,
-                        reservation.executor_authority_generation,
-                        &reservation.authorization_capability_hash,
-                        &reservation.governed_intent_hash,
-                        reservation.approval_set.approval_set_hash(),
+                        ActiveResponseOperationSeed {
+                            plan_hash: &digest_hex(&response_plan.plan_hash),
+                            executor_authority_id: &reservation.executor_authority_id,
+                            executor_authority_generation: reservation
+                                .executor_authority_generation,
+                            authorization_capability_hash: &reservation
+                                .authorization_capability_hash,
+                            governed_intent_hash: &reservation.governed_intent_hash,
+                            approval_set_hash: reservation.approval_set.approval_set_hash(),
+                            admission_artifact_fingerprint: &reservation
+                                .admission_artifact_fingerprint,
+                        },
                         &digest_hex(&response_plan.policy_hash),
                     )?;
-                let expected_request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
-                    &expected_request_binding_hash, reservation.admission_artifact_fingerprint,
-                )?;
                 if operation.kind() != AdmissionOperationKind::GovernedActiveResponse
                     || operation.request_id() != response_plan.action_id.as_str()
                     || operation.coordinator_authority_id() != reservation.executor_authority_id
@@ -144,11 +148,7 @@ impl PreparedActiveResponseAdmission {
             }
         };
         let binding = PreparedActiveResponseDispatchBinding {
-            schema_version: if admission_artifact_fingerprint.is_some() {
-                PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
-            } else {
-                1
-            },
+            schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
             tenant_id: response_plan.tenant_id.clone(),
             action_id: response_plan.action_id.clone(),
             plan_hash: response_plan.plan_hash,
@@ -915,16 +915,16 @@ impl ChioKernel {
         };
         let operation = self.load_active_response_operation(admission_operation_id)?;
         let expected_request_binding_hash = derive_active_response_operation_request_binding_hash(
-            execution.plan_body_hash.as_str(),
-            execution.executor_authority.authority_id(),
-            execution.executor_authority.generation(),
-            execution.authorization_capability_hash.as_str(),
-            execution.governed_intent_hash.as_str(),
-            approval_set_hash,
+            ActiveResponseOperationSeed {
+                plan_hash: execution.plan_body_hash.as_str(),
+                executor_authority_id: execution.executor_authority.authority_id(),
+                executor_authority_generation: execution.executor_authority.generation(),
+                authorization_capability_hash: execution.authorization_capability_hash.as_str(),
+                governed_intent_hash: execution.governed_intent_hash.as_str(),
+                approval_set_hash,
+                admission_artifact_fingerprint: &execution.admission_artifact_fingerprint,
+            },
             &digest_hex(&execution.response_plan.policy_hash),
-        )?;
-        let expected_request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
-            &expected_request_binding_hash, execution.admission_artifact_fingerprint,
         )?;
         if operation.kind() != AdmissionOperationKind::GovernedActiveResponse
             || !matches!(
@@ -951,16 +951,17 @@ impl ChioKernel {
                 "durable governed admission operation does not match the committed dispatch",
             ));
         }
-        let mut expected_anchor = build_active_response_operation_anchor(
-            &execution.response_plan,
-            &execution.executor_authority,
-            execution.authorized_at_unix_ms,
-            execution.authorization_capability_hash.as_str(),
-            execution.governed_intent_hash.as_str(),
-            execution.policy_decision_hash.as_str(),
-            approval_set_hash,
-        )?;
-        expected_anchor.admission_artifact_fingerprint = execution.admission_artifact_fingerprint;
+        let expected_anchor =
+            build_active_response_operation_anchor(ActiveResponseOperationAnchorInput {
+                response_plan: &execution.response_plan,
+                executor_authority: &execution.executor_authority,
+                authorized_at_unix_ms: execution.authorized_at_unix_ms,
+                authorization_capability_hash: execution.authorization_capability_hash.as_str(),
+                governed_intent_hash: execution.governed_intent_hash.as_str(),
+                policy_decision_hash: execution.policy_decision_hash.as_str(),
+                approval_set_hash,
+                admission_artifact_fingerprint: execution.admission_artifact_fingerprint,
+            })?;
         if self.load_active_response_operation_anchor(&operation)? != expected_anchor {
             return Err(committed_recovery_denied(
                 "durable governed admission anchor does not match the committed dispatch",
@@ -1041,26 +1042,18 @@ fn validate_prepared_binding(
             approval_set_hash: digest_hex(approval_set_hash),
         },
     };
-    let expected_dispatch_id = derive_active_response_dispatch_id(
-        response_plan,
-        &executor,
-        &digest_hex(&binding.authorization_capability_hash),
-        &digest_hex(&binding.governed_intent_hash),
-        &digest_hex(&binding.policy_decision_hash),
-        binding.authorized_at_unix_ms,
-        &approval,
-    )
-    .map_err(|error| active_response_denied(error.to_string()))?;
-    let expected_dispatch_id = match binding.admission_artifact_fingerprint {
-        Some(fingerprint) => {
-            super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-                &expected_dispatch_id,
-                &fingerprint,
-            )
-            .map_err(|error| active_response_denied(error.to_string()))?
-        }
-        None => expected_dispatch_id,
-    };
+    let expected_dispatch_id =
+        derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+            response_plan,
+            executor_authority: &executor,
+            authorization_capability_hash: &digest_hex(&binding.authorization_capability_hash),
+            governed_intent_hash: &digest_hex(&binding.governed_intent_hash),
+            policy_decision_hash: &digest_hex(&binding.policy_decision_hash),
+            authorized_at_unix_ms: binding.authorized_at_unix_ms,
+            approval: &approval,
+            admission_artifact_fingerprint: &binding.admission_artifact_fingerprint,
+        })
+        .map_err(|error| active_response_denied(error.to_string()))?;
     if expected_dispatch_id != binding.dispatch_id {
         return Err(never_committed_denied(
             "prepared dispatch identifier is not canonical for its durable binding",
@@ -1106,16 +1099,16 @@ fn validate_durable_governed_operation_binding(
     let policy_hash = digest_hex(&response_plan.policy_hash);
     let approval_set_hash = digest_hex(approval_set_hash);
     let expected_request_binding_hash = derive_active_response_operation_request_binding_hash(
-        &digest_hex(&binding.plan_hash),
-        binding.executor_authority_id.as_str(),
-        binding.executor_authority_generation,
-        &authorization_capability_hash,
-        &governed_intent_hash,
-        &approval_set_hash,
+        ActiveResponseOperationSeed {
+            plan_hash: &digest_hex(&binding.plan_hash),
+            executor_authority_id: binding.executor_authority_id.as_str(),
+            executor_authority_generation: binding.executor_authority_generation,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &governed_intent_hash,
+            approval_set_hash: &approval_set_hash,
+            admission_artifact_fingerprint: &binding.admission_artifact_fingerprint,
+        },
         &policy_hash,
-    )?;
-    let expected_request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
-        &expected_request_binding_hash, binding.admission_artifact_fingerprint,
     )?;
     let stable_version_matches = match operation.state() {
         AdmissionOperationState::Prepared
@@ -1148,16 +1141,17 @@ fn validate_durable_governed_operation_binding(
         ));
     }
     let (executor_authority, _) = validate_prepared_binding(response_plan, binding)?;
-    let mut expected_anchor = build_active_response_operation_anchor(
-        response_plan,
-        &executor_authority,
-        binding.authorized_at_unix_ms,
-        &authorization_capability_hash,
-        &governed_intent_hash,
-        &policy_decision_hash,
-        &approval_set_hash,
-    )?;
-    expected_anchor.admission_artifact_fingerprint = binding.admission_artifact_fingerprint;
+    let expected_anchor =
+        build_active_response_operation_anchor(ActiveResponseOperationAnchorInput {
+            response_plan,
+            executor_authority: &executor_authority,
+            authorized_at_unix_ms: binding.authorized_at_unix_ms,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &governed_intent_hash,
+            policy_decision_hash: &policy_decision_hash,
+            approval_set_hash: &approval_set_hash,
+            admission_artifact_fingerprint: binding.admission_artifact_fingerprint,
+        })?;
     if kernel.load_active_response_operation_anchor(operation)? != expected_anchor {
         return Err(never_committed_denied(
             "durable governed operation anchor does not match the prepared dispatch",
@@ -1244,10 +1238,8 @@ fn validate_committed_dispatch(
     if canonical_authorization.as_slice() != authorization.canonical_body.as_bytes()
         || authorization_hash != authorization.body_hash
         || authorization.body_hash.is_zero()
-        || !matches!(
-            (body.schema_version, body.admission_artifact_fingerprint),
-            (1, None) | (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(_))
-        )
+        || (body.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+            || body.admission_artifact_fingerprint.is_zero())
         || body.key.tenant_id != expected_plan.tenant_id
         || &body.key.dispatch_id != expected_dispatch_id
         || body.action_id != expected_plan.action_id
@@ -1359,26 +1351,18 @@ fn validate_committed_dispatch(
     let authorization_capability_hash = digest_hex(&body.authorization_capability_hash);
     let governed_intent_hash = digest_hex(&body.governed_intent_hash);
     let policy_decision_hash = digest_hex(&body.policy_decision_hash);
-    let derived_dispatch_id = derive_active_response_dispatch_id(
-        expected_plan,
-        executor,
-        &authorization_capability_hash,
-        &governed_intent_hash,
-        &policy_decision_hash,
-        body.authorized_at_unix_ms,
-        &approval,
-    )
-    .map_err(|error| active_response_denied(error.to_string()))?;
-    let derived_dispatch_id = match body.admission_artifact_fingerprint {
-        Some(fingerprint) => {
-            super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-                &derived_dispatch_id,
-                &fingerprint,
-            )
-            .map_err(|error| active_response_denied(error.to_string()))?
-        }
-        None => derived_dispatch_id,
-    };
+    let derived_dispatch_id =
+        derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+            response_plan: expected_plan,
+            executor_authority: executor,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &governed_intent_hash,
+            policy_decision_hash: &policy_decision_hash,
+            authorized_at_unix_ms: body.authorized_at_unix_ms,
+            approval: &approval,
+            admission_artifact_fingerprint: &body.admission_artifact_fingerprint,
+        })
+        .map_err(|error| active_response_denied(error.to_string()))?;
     if &derived_dispatch_id != expected_dispatch_id {
         return Err(committed_recovery_denied(
             "committed dispatch identifier is not the canonical recovery identifier",

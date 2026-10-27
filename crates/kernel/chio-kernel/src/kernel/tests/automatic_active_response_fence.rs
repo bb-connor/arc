@@ -85,7 +85,7 @@ impl ActiveResponseExecutorAuthority for RacingAutomaticExecutorAuthority {
             ActiveResponseExecutorError::RejectedBeforeCommit("invalid preparation".to_owned())
         })?;
         if response_plan != &self.expected_plan
-            || binding.admission_artifact_fingerprint.is_none()
+            || binding.admission_artifact_fingerprint.is_zero()
             || binding.executor_authority_id.as_str() != self.identity.authority_id()
             || binding.executor_authority_generation != self.identity.generation()
         {
@@ -218,21 +218,18 @@ fn two_kernel_fixture(
     let policy_decision_hash = Digest32::new([0x62; 32]);
     let admission_artifact_fingerprint = Digest32::new([0x63; 32]);
     let execution_approval = ActiveResponseExecutionApproval::Automatic;
-    let dispatch_id = crate::derive_active_response_dispatch_id(
-        &response_plan,
-        &identity,
-        &digest_hex(&authorization_capability_hash),
-        &digest_hex(&governed_intent_hash),
-        &digest_hex(&policy_decision_hash),
-        authorized_at_unix_ms,
-        &execution_approval,
-    )
-    .expect("automatic dispatch id");
-    let dispatch_id = crate::bind_active_response_dispatch_id_to_artifact(
-        &dispatch_id,
-        &admission_artifact_fingerprint,
-    )
-    .expect("artifact-bound dispatch id");
+    let dispatch_id =
+        crate::derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+            response_plan: &response_plan,
+            executor_authority: &identity,
+            authorization_capability_hash: &digest_hex(&authorization_capability_hash),
+            governed_intent_hash: &digest_hex(&governed_intent_hash),
+            policy_decision_hash: &digest_hex(&policy_decision_hash),
+            authorized_at_unix_ms,
+            approval: &execution_approval,
+            admission_artifact_fingerprint: &admission_artifact_fingerprint,
+        })
+        .expect("automatic dispatch id");
     let binding = PreparedActiveResponseDispatchBinding {
         schema_version: PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
         tenant_id: response_plan.tenant_id.clone(),
@@ -246,7 +243,7 @@ fn two_kernel_fixture(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
-        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
+        admission_artifact_fingerprint,
         approval: ResponseDispatchApproval::Automatic,
     };
     let fresh = chio_security_types::FreshLiveAdmission::new(response_plan.clone())
@@ -262,7 +259,7 @@ fn two_kernel_fixture(
             authorization_capability_hash: digest_hex(&authorization_capability_hash),
             governed_intent_hash: digest_hex(&governed_intent_hash),
             policy_decision_hash: digest_hex(&policy_decision_hash),
-            admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
+            admission_artifact_fingerprint,
             approval: execution_approval,
             authorized_at_unix_ms,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
