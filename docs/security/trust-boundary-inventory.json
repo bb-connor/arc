@@ -7761,6 +7761,9 @@
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
       "parse::from_value"
+    ],
+    "crates/core/chio-fixed/src/q16.rs": [
+      "serialize::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -13088,6 +13091,22 @@
           ],
           "apis": [
             "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-fixed/src/q16.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Q16_16 deserializes from an already decoded i32 field of an outer reader; any i32 is a valid bit pattern. No original-byte ingress and no authority token is constructed.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
           ],
           "checked": true
         }
