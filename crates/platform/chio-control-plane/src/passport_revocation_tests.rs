@@ -1,15 +1,19 @@
 use std::path::Path;
 
 use chio_credentials::{
-    passport_credential_digests, present_agent_passport, AgentPassport, PassportLifecycleRecord,
-    PassportLifecycleState, PassportPresentationOptions, PassportStatusDistribution,
+    passport_credential_digests, present_agent_passport, verify_agent_passport, AgentPassport,
+    PassportLifecycleRecord, PassportLifecycleState, PassportPresentationOptions,
+    PassportStatusDistribution,
 };
 use chio_revocation_oracle::{
     credential_revocation_key, passport_revocation_key, PassportRevocationLeaf,
     PassportRevocationLeafKind, SqliteRevocationOracle,
 };
 
-use super::{check_passport_revocation, passport_revocation_oracle_path, revoke_passport_status};
+use super::{
+    check_passport_revocation, check_presented_passport_revocation,
+    passport_revocation_oracle_path, revoke_passport_status,
+};
 use crate::passport_verifier::test_fixtures::passport_from_issuers;
 use crate::passport_verifier::{PassportStatusRegistry, RegistryUpdateError};
 
@@ -141,6 +145,39 @@ fn a_filtered_view_of_a_revoked_passport_is_refused_by_the_local_oracle() -> Tes
         check_passport_revocation(&path, &resolution, &passport_credential_digests(&filtered)?)
             .err()
             .ok_or("a revoked credential must refuse the filtered view")?;
+    assert!(
+        error
+            .to_string()
+            .contains("is revoked in the passport revocation oracle"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_revoked_passport_with_rewritten_proof_metadata_is_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("passport-statuses.json");
+    let passport = passport()?;
+    let record = publish(&path, &passport)?;
+    revoke_passport_status(&path, &record.passport_id, None, Some(REVOKED_AT), NOW)?;
+
+    let mut rewritten = passport.clone();
+    for credential in &mut rewritten.credentials {
+        credential.proof.created = "2030-01-01T00:00:00Z".to_string();
+    }
+    verify_agent_passport(&rewritten, NOW)?;
+    let resolution = PassportStatusRegistry::load(&path)?.resolve_for_passport(&rewritten, NOW)?;
+    assert_eq!(resolution.state, PassportLifecycleState::NotFound);
+    assert_ne!(resolution.passport_id, record.passport_id);
+    assert_eq!(
+        passport_credential_digests(&rewritten)?,
+        record.credential_digests
+    );
+
+    let error = check_presented_passport_revocation(&path, &resolution, &rewritten)
+        .err()
+        .ok_or("a revoked credential must refuse rewritten proof metadata")?;
     assert!(
         error
             .to_string()

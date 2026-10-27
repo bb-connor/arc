@@ -43,13 +43,13 @@ fn record_with_digests(credential_digests: Vec<String>) -> PassportLifecycleReco
 }
 
 #[test]
-fn a_credential_digest_is_the_sha256_of_the_signed_credential() {
+fn a_credential_digest_is_the_sha256_of_the_issuer_signed_body() {
     let passport = two_issuer_passport();
     for credential in &passport.credentials {
         let digest = credential_digest(credential).expect("digest");
         assert_eq!(
             digest,
-            sha256_hex(&canonical_json_bytes(credential).expect("canonical credential"))
+            sha256_hex(&canonical_json_bytes(&credential.unsigned).expect("canonical body"))
         );
         assert_eq!(digest.len(), 64);
     }
@@ -112,4 +112,36 @@ fn a_record_without_credential_digests_is_refused() {
             "{digests:?}: {error}"
         );
     }
+}
+
+#[test]
+fn a_credential_digest_ignores_every_proof_field() {
+    let passport = two_issuer_passport();
+    let credential = &passport.credentials[0];
+    let digest = credential_digest(credential).expect("digest");
+    let mutations: [fn(&mut CredentialProof); 5] = [
+        |proof| proof.created = "2030-01-01T00:00:00Z".to_string(),
+        |proof| proof.proof_type = "AnotherProof".to_string(),
+        |proof| proof.proof_purpose = "authentication".to_string(),
+        |proof| proof.verification_method = "did:chio:other#key-1".to_string(),
+        |proof| proof.proof_value = "00".repeat(64),
+    ];
+    for mutate in mutations {
+        let mut mutated = credential.clone();
+        mutate(&mut mutated.proof);
+        assert_ne!(mutated, *credential);
+        assert_eq!(credential_digest(&mutated).expect("mutated digest"), digest);
+    }
+
+    let mut retimed = credential.clone();
+    retimed.proof.created = "2030-01-01T00:00:00Z".to_string();
+    verify_reputation_credential(&retimed, 1_710_000_100)
+        .expect("proof.created is outside the signed body");
+
+    let mut rebodied = credential.clone();
+    rebodied.unsigned.expiration_date = "2030-01-01T00:00:00Z".to_string();
+    assert_ne!(
+        credential_digest(&rebodied).expect("rebodied digest"),
+        digest
+    );
 }
