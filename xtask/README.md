@@ -26,7 +26,7 @@ Cargo workspace, or nonmember package stops root discovery.
 | Command family | Implemented work |
 | --- | --- |
 | `gen` | Rust/TS/Go/Python bindings, errors, snippets, vectors, proof coverage |
-| `check` | Adapter boundaries, crate paths, formal mirrors, named fixture facets |
+| `check` | Adapter boundaries, crate paths, formal mirrors, named fixture facets, web3-free closure |
 | `validate-scenarios` | Validate each scenario declaring a string `$schema` |
 | `qualify bounded-chio` | Validate the bounded matrix and referenced artifacts |
 | `verify launch-acceptance` | Assemble a Proof Room acceptance bundle |
@@ -37,6 +37,26 @@ Generation leaves support `--check` for drift detection. Formal mirrors use
 check mode by default and write recorded hashes with `--bless`.
 Fixture gates accept `--schema-only` or `--negative-only` as mutually exclusive
 modes; their full handlers can run Cargo, CLI, shell, or dashboard checks.
+`check web3-free-closure` reads the modes in `ci-gates/web3-free-closure.toml`
+and resolves each mode's roots on their own (`cargo tree -p <root> -e
+normal,features`, plus `--features <set>` for an opt-in mode). The `default`
+mode fails if a closure reaches a web3 or finding-market package or enables a
+`web3` or `finding-market` feature; the `web3` mode requires settlement and
+web3 crates and denies finding-market ones; the `web3-finding-market` mode
+requires both. Each failure names the root, the mode and the item; a denied
+item also carries the inverted path back to the root, the root's direct
+dependencies that reach it, and the `cargo tree -i` command that shows every
+path. `--mode <name>` and `--root <crate>` (both repeatable) limit the run to
+listed entries; an unlisted name, a malformed policy file or a failed
+`cargo tree` is an error. The gate implements
+[ADR-0035](../docs/adr/ADR-0035-web3-free-distribution.md) and is not yet
+required in CI.
+
+```sh
+cargo xtask check web3-free-closure
+cargo xtask check web3-free-closure --mode default --root chio-core-types
+```
+
 Flat aliases retain `codegen`, `errors regen`, `snippets regen`,
 `freeze-vectors`, and `eval-receipt-regen` spellings.
 
