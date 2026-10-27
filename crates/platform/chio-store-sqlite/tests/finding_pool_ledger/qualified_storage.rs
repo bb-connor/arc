@@ -174,13 +174,15 @@ PRAGMA application_id = 1128810831;",
             .test_expect("capture damaged catalog");
         drop(connection);
 
-        let result = open_qualified(&database, &domain);
+        let error = match open_qualified(&database, &domain) {
+            Ok(_) => panic!("partial unstamped ledger was accepted after {removed_object}"),
+            Err(error) => error,
+        };
         assert!(
-            matches!(result, Err(FindingPoolLedgerError::Storage(ref message))
+            matches!(error, FindingPoolLedgerError::Storage(ref message)
                 if message == "schema namespace finding_pool_ledger is missing"),
-            "partial unstamped ledger must refuse its missing namespace"
+            "unexpected partial-ledger refusal: {error:?}"
         );
-        drop(result);
         let connection =
             rusqlite::Connection::open(&database).test_expect("inspect refused ledger");
         let after: String = connection
