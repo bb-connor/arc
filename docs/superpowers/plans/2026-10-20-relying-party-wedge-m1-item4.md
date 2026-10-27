@@ -422,7 +422,8 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 
 **PR A2: receipt tenant tag (R1, Root-2: side table).** `receipt_tenant_tags` is authoritative derived state in the `serve-http` state directory only (Decision 12).
   - **How it is written:** only the serving-owner tool-receipt append transaction writes it, on item 2 F's append (F19). That transaction reads the receipt's root capability id from the verified receipt's capability chain (in M1 the chain depth is 0, so it is the receipt's `capability_id`), reads `(tag_key_id, tenant_tag)` from the projection-checked `anchored_roots` row, and writes it.
-  - **Tool receipts only.** A `ChildRequestReceipt` on main (`chio-core-types` `receipt/lineage.rs`) carries `session_id`, `parent_request_id` and `request_id` but no capability id, and it is often appended before its parent tool receipt, so its append transaction has no verified root to read a tag from. Tagging it from session state would trust unverified data. Child receipts therefore get no tag row and are outside tenant export in M1: `receipts_for_tenant` selects tool receipts only, and item 6's caller export lists none. A later signed root capability id on `ChildRequestReceipt` (coordinated with item 2 F) is the only way to bring them in scope; it is raised on item 2 and item 6, and this plan does not depend on it.
+  - **Tool receipts only.** A `ChildRequestReceipt` on main (`chio-core-types` `receipt/lineage.rs`) carries `session_id`, `parent_request_id` and `request_id` but no capability id, and it is often appended before its parent tool receipt, so its append transaction has no verified root to read a tag from. Tagging it from session state would trust unverified data. Child receipts therefore get no tag row and are outside tenant export in M1: `receipts_for_tenant` selects tool receipts only, and item 6's caller export lists none. Child receipts enter an export only through the commitment hashes below. A later signed root capability id on `ChildRequestReceipt` (coordinated with item 2 F) is the only way to list them in a tenant export; it is raised on item 2 and item 6, and this plan does not depend on it.
+  - **Child receipt commitments.** Each parent tool receipt carries deterministic commitment hashes binding its child receipts, so the export stays auditable fail-closed without listing them and M2 can hydrate the children with no wire break. A parent that omits a commitment for a child, or carries one that does not match the child, refuses tenant export.
   - **No other writer:** no caller metadata, request field or separate tagging API writes it, and no import path exists (Decision 12).
   - **Keying:** the key is the tool `receipt_id`. Task 0 checks that tool receipt ids are unique.
   - **Read binding:** `receipts_for_tenant` reads each tag row together with its stored signed receipt, verifies the receipt, and accepts the row only when the verified receipt's root capability id equals `root_capability_id` and the full pair `(tag_key_id, tenant_tag)` equals that root's projection-checked pair. Changing both columns together to another valid root, or the `key_id` alone to another loaded generation, therefore refuses.
@@ -514,6 +515,8 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
     - `caller_supplied_tenant_metadata_is_ignored`
     - `child_receipt_append_writes_no_tag_row`
     - `tenant_export_lists_no_child_receipts`
+    - `export_refuses_parent_that_omits_a_child_commitment`
+    - `export_refuses_parent_with_mismatched_child_commitment`
     - `receipts_for_tenant_returns_each_receipt_with_its_stored_tag` (a receipt tagged under a retired generation comes back with that generation's `KeyedIndexValue`)
     - `swapping_root_id_and_tag_together_refuses_tenant_export`
     - `receipt_tag_key_id_replaced_with_another_loaded_generation_refuses_tenant_export`
@@ -765,7 +768,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 | O1 | owner (Connor) | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | PR D2 implements whichever is chosen; it does not open until the decision is recorded. Nothing else waits on O1 |
 | O2 | owner (Connor) | Decision 1: `serve-http` has no remote store and refuses `--control-url` | proposed (Root-2 endorses it technically); item 5's Q4 refusal stays until PR E lands the rule and both amendments atomically |
 | O6 | owner (Connor) | Sign off the spec amendment (2.4 trust-control row, the last 8.3 refusal, 10.5 `factory.rs`, 10.8 signer flags) | separate docs PR; gates PR D2 and PR E |
-| O7 | owner (Connor) | Child receipts and tenant export: `ChildRequestReceipt` carries no root capability id on main | out of tenant export in M1 (PR A2 tags tool receipts only); bringing them in needs a signed root id on `ChildRequestReceipt` (item 2 F), raised on items 2 and 6 |
+| O7 | owner (Connor) | Child receipts and tenant export: `ChildRequestReceipt` carries no root capability id on main | Decided: M1 tenant export excludes child receipts (PR A2 tags tool receipts only). Each parent receipt MUST carry deterministic commitment hashes binding its child receipts, so the export stays auditable fail-closed and M2 can hydrate children with no wire break |
 
 ## Cross-plan amendments
 
@@ -786,7 +789,7 @@ Each lands in the named PR or is raised on the owning plan; none changes this pl
 | item 6 | `context_openings(context_digest)` resolves through the UNIQUE `context_digest` index (no Task 8 change); drop "bearer roots" from L133 (item 6 exports no bearer role) | raised on item 6 |
 | item 6 | `receipts_for_tenant` returns `Vec<TenantTaggedReceipt { record, tag: KeyedIndexValue }>`, so the export copies each receipt's stored tag (item 6 T136) | A2 |
 | item 5 | F12's nullable `tenant_tag` becomes NOT NULL (Decision 4); item 5's tenant-kind match needs no NULL case | raised on item 5 |
-| items 2 and 6 | child receipts are outside tenant export in M1 (O7); a signed root capability id on `ChildRequestReceipt` would bring them in | raised on items 2 and 6 |
+| items 2 and 6 | child receipts are outside tenant export in M1, and each parent receipt carries commitment hashes binding its child receipts (O7); a signed root capability id on `ChildRequestReceipt` would let M2 list them | raised on items 2 and 6 |
 | item 1 | census row for #1713's snapshot signer if #1713 merges before item 1; the D2 route under the pinned-route rule (F24) | raised on item 1; D2 |
 | spec | 2.4 trust-control row, the last 8.3 refusal, 10.5 `factory.rs`, 10.8 signer flags | separate docs PR (O6) |
 
