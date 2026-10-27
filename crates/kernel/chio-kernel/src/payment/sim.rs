@@ -1,26 +1,65 @@
 //! Deterministic, no-broadcast payment adapter for sim-first acceptance lanes.
 //!
 //! Custody-neutral by construction: it performs no HTTP, holds no key, and moves
-//! no funds. Authorization ids are a pure function of the request so smokes are
-//! reproducible. It echoes the governed binding into `metadata` so the settled
-//! tool-call receipt carries the governed intent hash and approval token id.
+//! no funds. Authorization ids are a pure function of the payment reference so
+//! smokes are reproducible and a restarted adapter can verify journaled ids. It
+//! echoes the governed binding into `metadata` so the settled tool-call receipt
+//! carries the governed intent hash and approval token id.
 
 use crate::payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
     PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
+
+const LEDGER_CAPACITY: usize = 65_536;
 
 /// Deterministic no-broadcast payment adapter.
 ///
-/// Authorizations are remembered per reference for the life of the process so
-/// recovery can answer the settlement-state query. A restarted adapter has no
-/// authorizations and reports `NoAuthorization`, which is accurate because it
-/// moved no funds.
-#[derive(Debug, Clone, Default)]
+/// The latest settlement status is remembered per reference so recovery can
+/// answer the settlement-state query. The ledger keeps the most recent
+/// `LEDGER_CAPACITY` references. A reference that was evicted, or that a
+/// restarted adapter never saw, reports `NoAuthorization`, which is accurate
+/// because the adapter moved no funds. Terminal calls verify the identifier
+/// against the reference, so journaled calls complete after a restart.
+#[derive(Debug, Clone)]
 pub struct SimPaymentAdapter {
-    authorizations: Arc<Mutex<HashMap<String, (String, RailSettlementStatus)>>>,
+    ledger: Arc<Mutex<Ledger>>,
+}
+
+#[derive(Debug)]
+struct Ledger {
+    capacity: usize,
+    statuses: HashMap<String, RailSettlementStatus>,
+    order: VecDeque<String>,
+}
+
+impl Ledger {
+    fn record(&mut self, reference: &str, status: RailSettlementStatus, overwrite: bool) {
+        if let Some(entry) = self.statuses.get_mut(reference) {
+            if overwrite {
+                *entry = status;
+            }
+            return;
+        }
+        while self.order.len() >= self.capacity {
+            match self.order.pop_front() {
+                Some(evicted) => {
+                    self.statuses.remove(&evicted);
+                }
+                None => break,
+            }
+        }
+        self.statuses.insert(reference.to_owned(), status);
+        self.order.push_back(reference.to_owned());
+    }
+}
+
+impl Default for SimPaymentAdapter {
+    fn default() -> Self {
+        Self::with_capacity(LEDGER_CAPACITY)
+    }
 }
 
 impl SimPaymentAdapter {
@@ -29,39 +68,40 @@ impl SimPaymentAdapter {
         Self::default()
     }
 
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            ledger: Arc::new(Mutex::new(Ledger {
+                capacity,
+                statuses: HashMap::new(),
+                order: VecDeque::new(),
+            })),
+        }
+    }
+
+    fn ledger(&self) -> Result<std::sync::MutexGuard<'_, Ledger>, PaymentError> {
+        self.ledger
+            .lock()
+            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))
+    }
+
     fn record_status(
         &self,
         reference: &str,
         authorization_id: &str,
         status: RailSettlementStatus,
     ) -> Result<(), PaymentError> {
-        let mut ledger = self
-            .authorizations
-            .lock()
-            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?;
-        match ledger.get_mut(reference) {
-            Some(entry) if entry.0 == authorization_id => {
-                entry.1 = status;
-                Ok(())
-            }
-            Some(_) => Err(PaymentError::RailError(
+        if authorization_id != Self::authorization_id(reference) {
+            return Err(PaymentError::RailError(
                 "sim authorization does not match the recorded identifier".into(),
-            )),
-            None => Err(PaymentError::RailError(
-                "sim has no authorization for the referenced payment".into(),
-            )),
+            ));
         }
+        self.ledger()?.record(reference, status, true);
+        Ok(())
     }
 
-    fn deterministic_id(
-        prefix: &str,
-        reference: &str,
-        amount_units: u64,
-        currency: &str,
-    ) -> String {
-        let seed = format!("{reference}|{amount_units}|{currency}");
-        let digest = chio_core::sha256_hex(seed.as_bytes());
-        format!("{prefix}-{}", &digest[..32])
+    fn authorization_id(reference: &str) -> String {
+        let digest = chio_core::sha256_hex(reference.as_bytes());
+        format!("sim-{}", &digest[..32])
     }
 }
 
@@ -78,17 +118,9 @@ impl PaymentAdapter for SimPaymentAdapter {
         &self,
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError> {
-        let authorization_id = Self::deterministic_id(
-            "sim",
-            &request.reference,
-            request.amount_units,
-            &request.currency,
-        );
-        self.authorizations
-            .lock()
-            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?
-            .entry(request.reference.clone())
-            .or_insert_with(|| (authorization_id.clone(), RailSettlementStatus::Settled));
+        let authorization_id = Self::authorization_id(&request.reference);
+        self.ledger()?
+            .record(&request.reference, RailSettlementStatus::Settled, false);
         Ok(PaymentAuthorization {
             authorization_id,
             state: PaymentAuthorizationState::PrepaidFinal,
@@ -149,13 +181,14 @@ impl PaymentAdapter for SimPaymentAdapter {
         reference: &str,
         authorization_id: Option<&str>,
     ) -> Result<RailSettlementState, PaymentError> {
-        let recorded = self
-            .authorizations
-            .lock()
-            .map_err(|_| PaymentError::RailError("sim authorization ledger is poisoned".into()))?
-            .get(reference)
-            .cloned();
-        let Some((recorded, status)) = recorded else {
+        let recorded = Self::authorization_id(reference);
+        if authorization_id.is_some_and(|expected| expected != recorded) {
+            return Err(PaymentError::RailError(
+                "sim authorization does not match the queried identifier".into(),
+            ));
+        }
+        let status = self.ledger()?.statuses.get(reference).copied();
+        let Some(status) = status else {
             return match authorization_id {
                 None => Ok(RailSettlementState::NoAuthorization),
                 Some(_) => Err(PaymentError::RailError(
@@ -163,11 +196,6 @@ impl PaymentAdapter for SimPaymentAdapter {
                 )),
             };
         };
-        if authorization_id.is_some_and(|expected| expected != recorded) {
-            return Err(PaymentError::RailError(
-                "sim authorization does not match the queried identifier".into(),
-            ));
-        }
         Ok(RailSettlementState::Settled {
             result: PaymentResult {
                 transaction_id: recorded.clone(),
@@ -316,7 +344,11 @@ mod tests {
         let unknown = adapter.capture("sim-x", 1, "USD", "req-1").unwrap_err();
         assert_eq!(
             unknown.to_string(),
-            "payment rail error: sim has no authorization for the referenced payment"
+            "payment rail error: sim authorization does not match the recorded identifier"
+        );
+        assert_eq!(
+            adapter.settlement_state("req-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
         );
         let id = adapter
             .authorize(&request("req-1", 100))
@@ -338,5 +370,67 @@ mod tests {
             }
             other => panic!("expected settled state, got {other:?}"),
         }
+    }
+
+    fn status(adapter: &SimPaymentAdapter, reference: &str) -> RailSettlementStatus {
+        match adapter.settlement_state(reference, None).unwrap() {
+            RailSettlementState::Settled { result, .. } => result.settlement_status,
+            other => panic!("expected settled state, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn restarted_adapter_completes_journaled_terminal_calls() {
+        let id = SimPaymentAdapter::new()
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        let restarted = SimPaymentAdapter::new();
+        let refunded = restarted.refund(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(refunded.settlement_status, RailSettlementStatus::Refunded);
+        assert_eq!(refunded.transaction_id, id);
+        assert_eq!(status(&restarted, "req-1"), RailSettlementStatus::Refunded);
+
+        let id = SimPaymentAdapter::new()
+            .authorize(&request("req-2", 100))
+            .unwrap()
+            .authorization_id;
+        let restarted = SimPaymentAdapter::new();
+        let captured = restarted.capture(&id, 40, "USD", "req-2").unwrap();
+        assert_eq!(captured.settlement_status, RailSettlementStatus::Settled);
+        let released = restarted.release(&id, "req-2").unwrap();
+        assert_eq!(released.settlement_status, RailSettlementStatus::Released);
+
+        let error = SimPaymentAdapter::new()
+            .refund(&id, 100, "USD", "req-1")
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "payment rail error: sim authorization does not match the recorded identifier"
+        );
+    }
+
+    #[test]
+    fn ledger_retains_at_most_its_capacity() {
+        let adapter = SimPaymentAdapter::with_capacity(2);
+        let first = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        adapter.authorize(&request("req-2", 100)).unwrap();
+        adapter.authorize(&request("req-3", 100)).unwrap();
+        assert_eq!(
+            adapter.settlement_state("req-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        );
+        assert_eq!(status(&adapter, "req-2"), RailSettlementStatus::Settled);
+        assert_eq!(status(&adapter, "req-3"), RailSettlementStatus::Settled);
+        let refunded = adapter.refund(&first, 100, "USD", "req-1").unwrap();
+        assert_eq!(refunded.settlement_status, RailSettlementStatus::Refunded);
+        assert_eq!(status(&adapter, "req-1"), RailSettlementStatus::Refunded);
+        assert_eq!(
+            adapter.settlement_state("req-2", None).unwrap(),
+            RailSettlementState::NoAuthorization
+        );
     }
 }
