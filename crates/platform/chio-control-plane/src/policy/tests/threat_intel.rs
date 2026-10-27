@@ -2,15 +2,8 @@ use super::*;
 
 #[test]
 fn load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes() {
-    let policy_dir = std::env::temp_dir().join(format!(
-        "chio-hushspec-asset-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .test_unwrap()
-            .as_millis()
-    ));
-    std::fs::create_dir_all(&policy_dir).test_unwrap();
+    let directory = tempfile::tempdir().test_unwrap();
+    let policy_dir = directory.path();
     let pattern_db = policy_dir.join("pattern-db.json");
     let policy_path = policy_dir.join("policy.yaml");
 
@@ -40,8 +33,6 @@ extensions:
 
     assert_ne!(first.identity.source_hash, second.identity.source_hash);
     assert_ne!(first.identity.runtime_hash, second.identity.runtime_hash);
-
-    let _ = std::fs::remove_dir_all(policy_dir);
 }
 
 #[test]
