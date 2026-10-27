@@ -52,7 +52,9 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
                 &facet,
                 fixtures::Mode::from_flags(schema_only, negative_only)?,
             ),
-            CheckCommand::Web3FreeClosure { roots } => web3_free_closure::run(&roots),
+            CheckCommand::Web3FreeClosure { modes, roots } => {
+                web3_free_closure::run(&modes, &roots)
+            }
         },
         // -- qualify group --
         cli::Command::Qualify { command } => match command {

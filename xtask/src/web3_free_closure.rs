@@ -1,12 +1,13 @@
 //! `cargo xtask check web3-free-closure`: per-root dependency closure gate.
 //!
-//! Each root named in `ci-gates/web3-free-closure.toml` is resolved on its own
-//! with default features (`cargo tree -p <root> -e normal,features`), so the
-//! check sees the graph a `cargo build -p <root>` links rather than the
-//! workspace-unified one. The closure fails if it contains a denied package or
-//! enables a denied feature on any crate. Every violation names the root, the
-//! denied item, the shortest inverted path from it back to the root and the
-//! root's direct dependencies through which it is reached.
+//! `ci-gates/web3-free-closure.toml` lists modes. A mode names a feature set
+//! (empty for default features), the packages and features its closures must
+//! not reach, and per root the packages they must reach. Each (mode, root) is
+//! resolved on its own (`cargo tree -p <root> -e normal,features
+//! [--features <set>]`), so the check sees the graph a `cargo build -p <root>`
+//! links rather than the workspace-unified one. Every failure names the mode,
+//! the root and the item; a denied item also carries the shortest inverted path
+//! back to the root and the root's direct dependencies that reach it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fs;
@@ -26,15 +27,24 @@ const DEDUP_MARKER: &str = " (*)";
 #[serde(deny_unknown_fields)]
 struct PolicyFile {
     schema: String,
-    roots: Vec<String>,
-    deny: DenyFile,
+    mode: Vec<ModeFile>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct DenyFile {
-    packages: Vec<String>,
+struct ModeFile {
+    name: String,
     features: Vec<String>,
+    deny_packages: Vec<String>,
+    deny_features: Vec<String>,
+    root: Vec<RootFile>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RootFile {
+    name: String,
+    require: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,10 +79,37 @@ fn is_crate_name_char(c: char) -> bool {
 }
 
 #[derive(Debug)]
+pub(crate) struct RootRule {
+    name: String,
+    require: Vec<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct Mode {
+    name: String,
+    features: Vec<String>,
+    deny_packages: Vec<PackagePattern>,
+    deny_features: BTreeSet<String>,
+    roots: Vec<RootRule>,
+}
+
+impl Mode {
+    fn label(&self) -> String {
+        format!("[{}]", self.name)
+    }
+
+    fn tree_features(&self) -> Option<String> {
+        if self.features.is_empty() {
+            None
+        } else {
+            Some(self.features.join(","))
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Policy {
-    roots: Vec<String>,
-    packages: Vec<PackagePattern>,
-    features: BTreeSet<String>,
+    modes: Vec<Mode>,
 }
 
 impl Policy {
@@ -84,45 +121,89 @@ impl Policy {
                 file.schema
             ));
         }
-        let roots = unique_nonempty("roots", file.roots)?;
-        for root in &roots {
-            if !root.chars().all(is_crate_name_char) {
-                return Err(format!("malformed root `{root}`"));
-            }
+        if file.mode.is_empty() {
+            return Err("no `[[mode]]` entries".to_string());
         }
-        let packages = unique_nonempty("deny.packages", file.deny.packages)?
-            .iter()
-            .map(|raw| PackagePattern::parse(raw))
-            .collect::<Result<Vec<_>, _>>()?;
-        let features = unique_nonempty("deny.features", file.deny.features)?;
-        for feature in &features {
-            if !feature.chars().all(is_crate_name_char) {
-                return Err(format!("malformed feature `{feature}`"));
+        let mut names = BTreeSet::new();
+        let mut modes = Vec::new();
+        for raw in file.mode {
+            let mode = parse_mode(raw)?;
+            if !names.insert(mode.name.clone()) {
+                return Err(format!("mode `{}` is listed twice", mode.name));
             }
+            modes.push(mode);
         }
-        Ok(Self {
-            roots,
-            packages,
-            features: features.into_iter().collect(),
-        })
+        Ok(Self { modes })
     }
 
-    pub(crate) fn roots(&self) -> &[String] {
-        &self.roots
+    pub(crate) fn modes(&self) -> &[Mode] {
+        &self.modes
     }
 }
 
-fn unique_nonempty(field: &str, values: Vec<String>) -> Result<Vec<String>, String> {
-    if values.is_empty() {
-        return Err(format!("`{field}` is empty"));
+fn parse_mode(raw: ModeFile) -> Result<Mode, String> {
+    let name = checked_name("mode name", raw.name)?;
+    let field = |key: &str| format!("mode `{name}` {key}");
+    let features = unique_names(&field("features"), raw.features)?;
+    let deny_packages = unique_entries(&field("deny_packages"), raw.deny_packages)?
+        .iter()
+        .map(|entry| PackagePattern::parse(entry))
+        .collect::<Result<Vec<_>, _>>()?;
+    let deny_features = unique_names(&field("deny_features"), raw.deny_features)?;
+    if raw.root.is_empty() {
+        return Err(format!("mode `{name}` has no `[[mode.root]]` entries"));
     }
+    let mut roots: Vec<RootRule> = Vec::new();
+    for root in raw.root {
+        let root_name = checked_name(&field("root"), root.name)?;
+        if roots.iter().any(|seen| seen.name == root_name) {
+            return Err(format!("mode `{name}` lists root `{root_name}` twice"));
+        }
+        let require = unique_names(&field(&format!("root `{root_name}` require")), root.require)?;
+        if deny_packages.is_empty() && deny_features.is_empty() && require.is_empty() {
+            return Err(format!(
+                "mode `{name}` root `{root_name}` has no denied or required entry"
+            ));
+        }
+        roots.push(RootRule {
+            name: root_name,
+            require,
+        });
+    }
+    Ok(Mode {
+        name,
+        features,
+        deny_packages,
+        deny_features: deny_features.into_iter().collect(),
+        roots,
+    })
+}
+
+fn checked_name(field: &str, value: String) -> Result<String, String> {
+    if value.is_empty() || !value.chars().all(is_crate_name_char) {
+        return Err(format!("{field} `{value}` is malformed"));
+    }
+    Ok(value)
+}
+
+fn unique_entries(field: &str, values: Vec<String>) -> Result<Vec<String>, String> {
     let mut seen = BTreeSet::new();
     for value in &values {
         if value.is_empty() {
-            return Err(format!("`{field}` has an empty entry"));
+            return Err(format!("{field} has an empty entry"));
         }
         if !seen.insert(value.as_str()) {
-            return Err(format!("`{field}` lists `{value}` twice"));
+            return Err(format!("{field} lists `{value}` twice"));
+        }
+    }
+    Ok(values)
+}
+
+fn unique_names(field: &str, values: Vec<String>) -> Result<Vec<String>, String> {
+    let values = unique_entries(field, values)?;
+    for value in &values {
+        if !value.chars().all(is_crate_name_char) {
+            return Err(format!("{field} entry `{value}` is malformed"));
         }
     }
     Ok(values)
@@ -304,61 +385,82 @@ fn parse_node(body: &str) -> Option<(String, Node)> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Denied {
-    Package { package: String },
-    Feature { package: String, feature: String },
+pub(crate) enum Breach {
+    DeniedPackage { package: String },
+    DeniedFeature { package: String, feature: String },
+    MissingPackage { package: String },
 }
 
-impl Denied {
+impl Breach {
     fn package(&self) -> &str {
         match self {
-            Self::Package { package } | Self::Feature { package, .. } => package,
+            Self::DeniedPackage { package }
+            | Self::DeniedFeature { package, .. }
+            | Self::MissingPackage { package } => package,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Violation {
+    pub(crate) mode: String,
     pub(crate) root: String,
-    pub(crate) denied: Denied,
+    pub(crate) breach: Breach,
     pub(crate) inverted_path: Vec<String>,
     pub(crate) via: Vec<String>,
 }
 
 impl Violation {
-    fn render(&self) -> String {
-        let item = match &self.denied {
-            Denied::Package { package } => format!("denied package `{package}`"),
-            Denied::Feature { package, feature } => {
+    fn render(&self, mode: &Mode) -> String {
+        let features = mode
+            .tree_features()
+            .map(|set| format!(" --features {set}"))
+            .unwrap_or_default();
+        let item = match &self.breach {
+            Breach::DeniedPackage { package } => format!("denied package `{package}`"),
+            Breach::DeniedFeature { package, feature } => {
                 format!("denied feature `{feature}` on `{package}`")
+            }
+            Breach::MissingPackage { package } => {
+                return format!(
+                    "web3-free-closure: {root} [{mode}]: required package `{package}` is not reached\n  inspect: cargo tree -p {root} -e normal,features{features}",
+                    root = self.root,
+                    mode = self.mode,
+                );
             }
         };
         format!(
-            "web3-free-closure: {root}: {item}\n  path (inverted): {path}\n  via direct dependencies: {via}\n  inspect: cargo tree -p {root} -e normal,features -i {package}",
+            "web3-free-closure: {root} [{mode}]: {item}\n  path (inverted): {path}\n  via direct dependencies: {via}\n  inspect: cargo tree -p {root} -e normal,features{features} -i {package}",
             root = self.root,
+            mode = self.mode,
             path = self.inverted_path.join(" <- "),
             via = self.via.join(", "),
-            package = self.denied.package(),
+            package = self.breach.package(),
         )
     }
 }
 
-/// Evaluate one root's closure against the policy. Violations are sorted and
-/// carry one entry per denied package or (package, feature) pair.
-pub(crate) fn evaluate(policy: &Policy, graph: &ClosureGraph) -> Vec<Violation> {
-    let mut hits: BTreeMap<Denied, usize> = BTreeMap::new();
+/// Evaluate one root's closure under one mode. Violations are sorted and carry
+/// one entry per denied package, denied (package, feature) pair or missing
+/// required package.
+pub(crate) fn evaluate(mode: &Mode, rule: &RootRule, graph: &ClosureGraph) -> Vec<Violation> {
+    let mut hits: BTreeMap<Breach, usize> = BTreeMap::new();
+    let mut present = BTreeSet::new();
     for (id, node) in graph.nodes.iter().enumerate() {
         match &node.kind {
             NodeKind::Package { features } => {
-                if id != 0 && policy.packages.iter().any(|p| p.matches(&node.name)) {
-                    hits.entry(Denied::Package {
-                        package: node.name.clone(),
-                    })
-                    .or_insert(id);
+                if id != 0 {
+                    present.insert(node.name.as_str());
+                    if mode.deny_packages.iter().any(|p| p.matches(&node.name)) {
+                        hits.entry(Breach::DeniedPackage {
+                            package: node.name.clone(),
+                        })
+                        .or_insert(id);
+                    }
                 }
                 for feature in features {
-                    if policy.features.contains(feature) {
-                        hits.entry(Denied::Feature {
+                    if mode.deny_features.contains(feature) {
+                        hits.entry(Breach::DeniedFeature {
                             package: node.name.clone(),
                             feature: feature.clone(),
                         })
@@ -367,9 +469,9 @@ pub(crate) fn evaluate(policy: &Policy, graph: &ClosureGraph) -> Vec<Violation> 
                 }
             }
             NodeKind::Feature { feature } => {
-                if policy.features.contains(feature) {
+                if mode.deny_features.contains(feature) {
                     hits.insert(
-                        Denied::Feature {
+                        Breach::DeniedFeature {
                             package: node.name.clone(),
                             feature: feature.clone(),
                         },
@@ -383,8 +485,9 @@ pub(crate) fn evaluate(policy: &Policy, graph: &ClosureGraph) -> Vec<Violation> 
         .iter()
         .map(|&child| (graph.nodes[child].name.clone(), graph.reachable_from(child)))
         .collect();
-    hits.into_iter()
-        .map(|(denied, target)| {
+    let mut violations: Vec<Violation> = hits
+        .into_iter()
+        .map(|(breach, target)| {
             let inverted_path = graph
                 .shortest_path(target)
                 .into_iter()
@@ -400,13 +503,44 @@ pub(crate) fn evaluate(policy: &Policy, graph: &ClosureGraph) -> Vec<Violation> 
                 .map(|(name, _)| name.clone())
                 .collect();
             Violation {
+                mode: mode.name.clone(),
                 root: graph.root_name().to_string(),
-                denied,
+                breach,
                 inverted_path,
                 via: via.into_iter().collect(),
             }
         })
-        .collect()
+        .collect();
+    for package in &rule.require {
+        if !present.contains(package.as_str()) {
+            violations.push(Violation {
+                mode: mode.name.clone(),
+                root: graph.root_name().to_string(),
+                breach: Breach::MissingPackage {
+                    package: package.clone(),
+                },
+                inverted_path: Vec::new(),
+                via: Vec::new(),
+            });
+        }
+    }
+    violations
+}
+
+/// Outcome of one (mode, root) check. `tree` is the `cargo tree` stdout or the
+/// reason it could not be produced; either failure is reported, never skipped.
+pub(crate) fn check_root(
+    mode: &Mode,
+    rule: &RootRule,
+    tree: Result<String, String>,
+) -> Result<(usize, Vec<Violation>), String> {
+    let text = tree?;
+    let graph = ClosureGraph::parse(&text)
+        .map_err(|detail| format!("unreadable cargo tree output: {detail}"))?;
+    if graph.root_name() != rule.name {
+        return Err(format!("cargo tree resolved root `{}`", graph.root_name()));
+    }
+    Ok((graph.nodes.len(), evaluate(mode, rule, &graph)))
 }
 
 pub(crate) fn load_policy(root: &Path) -> Result<Policy, XtaskError> {
@@ -416,98 +550,113 @@ pub(crate) fn load_policy(root: &Path) -> Result<Policy, XtaskError> {
         .map_err(|detail| XtaskError::Web3FreeClosure(format!("{POLICY_PATH}: {detail}")))
 }
 
-fn select_roots(policy: &Policy, requested: &[String]) -> Result<Vec<String>, XtaskError> {
-    if requested.is_empty() {
-        return Ok(policy.roots().to_vec());
-    }
-    let mut selected = Vec::new();
-    for root in requested {
-        if !policy.roots().contains(root) {
+/// Select (mode, root) pairs. Empty filters select everything; a requested
+/// mode or root the policy does not list is a usage error.
+pub(crate) fn select<'p>(
+    policy: &'p Policy,
+    modes: &[String],
+    roots: &[String],
+) -> Result<Vec<(&'p Mode, &'p RootRule)>, XtaskError> {
+    for mode in modes {
+        if !policy.modes().iter().any(|m| &m.name == mode) {
             return Err(XtaskError::Usage(format!(
-                "root `{root}` is not listed in {POLICY_PATH}"
+                "mode `{mode}` is not listed in {POLICY_PATH}"
             )));
         }
-        if !selected.contains(root) {
-            selected.push(root.clone());
+    }
+    let selected_modes: Vec<&Mode> = policy
+        .modes()
+        .iter()
+        .filter(|m| modes.is_empty() || modes.contains(&m.name))
+        .collect();
+    for root in roots {
+        if !selected_modes
+            .iter()
+            .any(|m| m.roots.iter().any(|r| &r.name == root))
+        {
+            return Err(XtaskError::Usage(format!(
+                "root `{root}` is not listed in {POLICY_PATH} for the selected modes"
+            )));
         }
     }
-    Ok(selected)
+    Ok(selected_modes
+        .into_iter()
+        .flat_map(|mode| {
+            mode.roots
+                .iter()
+                .filter(|rule| roots.is_empty() || roots.contains(&rule.name))
+                .map(move |rule| (mode, rule))
+        })
+        .collect())
 }
 
-fn cargo_tree(workspace: &Path, root: &str) -> Result<String, XtaskError> {
-    let output = Command::new("cargo")
-        .current_dir(workspace)
-        .args([
-            "tree",
-            "--locked",
-            "-p",
-            root,
-            "-e",
-            "normal,features",
-            "--prefix",
-            "depth",
-            "--format",
-            TREE_FORMAT,
-        ])
+fn cargo_tree(workspace: &Path, mode: &Mode, root: &str) -> Result<String, String> {
+    let mut command = Command::new("cargo");
+    command.current_dir(workspace).args([
+        "tree",
+        "--locked",
+        "-p",
+        root,
+        "-e",
+        "normal,features",
+        "--prefix",
+        "depth",
+        "--format",
+        TREE_FORMAT,
+    ]);
+    if let Some(set) = mode.tree_features() {
+        command.args(["--features", &set]);
+    }
+    let output = command
         .output()
-        .map_err(|err| {
-            XtaskError::Process(format!("failed to spawn cargo tree -p {root}: {err}"))
-        })?;
+        .map_err(|err| format!("failed to spawn cargo tree: {err}"))?;
     if !output.status.success() {
-        return Err(XtaskError::Process(format!(
-            "cargo tree -p {root} failed with {}: {}",
+        return Err(format!(
+            "cargo tree failed with {}: {}",
             output.status,
             String::from_utf8_lossy(&output.stderr).trim()
-        )));
+        ));
     }
-    String::from_utf8(output.stdout).map_err(|err| {
-        XtaskError::Process(format!(
-            "cargo tree -p {root} printed non-UTF-8 output: {err}"
-        ))
-    })
+    String::from_utf8(output.stdout)
+        .map_err(|err| format!("cargo tree printed non-UTF-8 output: {err}"))
 }
 
-pub(crate) fn run(requested: &[String]) -> Result<(), XtaskError> {
+pub(crate) fn run(modes: &[String], roots: &[String]) -> Result<(), XtaskError> {
     let workspace = workspace_root()?;
     let policy = load_policy(&workspace)?;
-    let roots = select_roots(&policy, requested)?;
+    let selected = select(&policy, modes, roots)?;
     let mut failing = Vec::new();
     let mut total = 0usize;
-    for root in &roots {
-        let text = cargo_tree(&workspace, root)?;
-        let graph = ClosureGraph::parse(&text).map_err(|detail| {
-            XtaskError::Web3FreeClosure(format!("{root}: unreadable cargo tree output: {detail}"))
-        })?;
-        if graph.root_name() != root {
-            return Err(XtaskError::Web3FreeClosure(format!(
-                "{root}: cargo tree resolved root `{}`",
-                graph.root_name()
-            )));
+    for &(mode, rule) in &selected {
+        let label = format!("{} {}", rule.name, mode.label());
+        match check_root(mode, rule, cargo_tree(&workspace, mode, &rule.name)) {
+            Err(detail) => {
+                println!("web3-free-closure: {label}: {detail}");
+                total += 1;
+                failing.push(label);
+            }
+            Ok((nodes, violations)) if violations.is_empty() => {
+                println!("web3-free-closure: {label}: clean ({nodes} nodes)");
+            }
+            Ok((_, violations)) => {
+                for violation in &violations {
+                    println!("{}", violation.render(mode));
+                }
+                println!(
+                    "web3-free-closure: {label}: {} failure(s)",
+                    violations.len()
+                );
+                total += violations.len();
+                failing.push(label);
+            }
         }
-        let violations = evaluate(&policy, &graph);
-        if violations.is_empty() {
-            println!(
-                "web3-free-closure: {root}: clean ({} nodes)",
-                graph.nodes.len()
-            );
-            continue;
-        }
-        for violation in &violations {
-            println!("{}", violation.render());
-        }
-        println!(
-            "web3-free-closure: {root}: {} denied item(s)",
-            violations.len()
-        );
-        total += violations.len();
-        failing.push(root.clone());
     }
     if failing.is_empty() {
-        println!("web3-free-closure: OK ({} roots)", roots.len());
+        println!("web3-free-closure: OK ({} checks)", selected.len());
         return Ok(());
     }
     Err(XtaskError::Web3FreeClosure(format!(
-        "{total} denied item(s) in the default closure of {}",
+        "{total} failure(s) in {}",
         failing.join(", ")
     )))
 }

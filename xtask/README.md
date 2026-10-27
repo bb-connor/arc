@@ -37,19 +37,23 @@ Generation leaves support `--check` for drift detection. Formal mirrors use
 check mode by default and write recorded hashes with `--bless`.
 Fixture gates accept `--schema-only` or `--negative-only` as mutually exclusive
 modes; their full handlers can run Cargo, CLI, shell, or dashboard checks.
-`check web3-free-closure` resolves each root listed in
-`ci-gates/web3-free-closure.toml` on its own with default features
-(`cargo tree -p <root> -e normal,features`) and fails if the closure reaches a
-denied package or enables a denied feature on any crate. Each failure names
-the root, the denied item, the inverted path back to the root, the root's
-direct dependencies that reach it, and the `cargo tree -i` command that shows
-every path. `--root <crate>` (repeatable) limits the run to listed roots; an
-unlisted root, a malformed deny-list file or a failed `cargo tree` is an
-error. The gate implements ADR-0035 and is not yet required in CI.
+`check web3-free-closure` reads the modes in `ci-gates/web3-free-closure.toml`
+and resolves each mode's roots on their own (`cargo tree -p <root> -e
+normal,features`, plus `--features <set>` for an opt-in mode). The `default`
+mode fails if a closure reaches a web3 or finding-market package or enables a
+`web3` or `finding-market` feature; the `web3` mode requires settlement and
+web3 crates and denies finding-market ones; the `web3-finding-market` mode
+requires both. Each failure names the root, the mode and the item; a denied
+item also carries the inverted path back to the root, the root's direct
+dependencies that reach it, and the `cargo tree -i` command that shows every
+path. `--mode <name>` and `--root <crate>` (both repeatable) limit the run to
+listed entries; an unlisted name, a malformed policy file or a failed
+`cargo tree` is an error. The gate implements ADR-0035 and is not yet required
+in CI.
 
 ```sh
 cargo xtask check web3-free-closure
-cargo xtask check web3-free-closure --root chio-core-types
+cargo xtask check web3-free-closure --mode default --root chio-core-types
 ```
 
 Flat aliases retain `codegen`, `errors regen`, `snippets regen`,

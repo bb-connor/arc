@@ -1,25 +1,24 @@
 # ci-gates/web3-free-closure.toml
-# Deny list for `cargo xtask check web3-free-closure` (ADR-0035).
+# Policy for `cargo xtask check web3-free-closure` (ADR-0035 acceptance gates
+# 1 and 3).
 #
-# For each root the check runs
+# Each `[[mode]]` resolves every listed root on its own with
 #   cargo tree -p <root> -e normal,features --prefix depth --format "{p} {f}"
-# with default features and fails if the closure contains a denied package or
-# enables a denied feature on any crate. A package pattern is an exact crate
-# name or a name prefix ending in `*`. Unknown keys, an empty list, a duplicate
-# entry or a malformed pattern reject the file.
+# plus `--features <features>` when `features` is not empty. A mode fails a
+# root if the closure contains a package matching `deny_packages`, enables a
+# feature named in `deny_features` on any crate, or does not contain every
+# package in that root's `require`. A package pattern is an exact crate name
+# or a name prefix ending in `*`; `require` entries are exact names. Unknown
+# keys, duplicate entries, malformed names and a root with nothing to check
+# reject the file. A failed `cargo tree` (for example a feature the root does
+# not declare) fails that check.
 
 schema = "chio.ci-gate.web3-free-closure.v1"
 
-roots = [
-  "chio-kernel",
-  "chio-core",
-  "chio-core-types",
-  "chio-control-plane",
-  "chio-cli",
-]
-
-[deny]
-packages = [
+[[mode]]
+name = "default"
+features = []
+deny_packages = [
   "chio-web3",
   "chio-web3-bindings",
   "chio-anchor",
@@ -33,7 +32,57 @@ packages = [
   "chio-open-market",
   "chio-swarm-authority",
 ]
-features = [
-  "web3",
-  "finding-market",
+deny_features = ["web3", "finding-market"]
+
+[[mode.root]]
+name = "chio-kernel"
+require = []
+
+[[mode.root]]
+name = "chio-core"
+require = []
+
+[[mode.root]]
+name = "chio-core-types"
+require = []
+
+[[mode.root]]
+name = "chio-control-plane"
+require = []
+
+[[mode.root]]
+name = "chio-cli"
+require = []
+
+[[mode]]
+name = "web3"
+features = ["web3"]
+deny_packages = [
+  "chio-finding",
+  "chio-finding-*",
+  "chio-open-market",
+  "chio-swarm-authority",
 ]
+deny_features = ["finding-market"]
+
+[[mode.root]]
+name = "chio-control-plane"
+require = ["chio-settle", "chio-web3"]
+
+[[mode.root]]
+name = "chio-cli"
+require = ["chio-settle", "chio-web3", "chio-proof-room"]
+
+[[mode]]
+name = "web3-finding-market"
+features = ["web3", "finding-market"]
+deny_packages = []
+deny_features = []
+
+[[mode.root]]
+name = "chio-control-plane"
+require = ["chio-settle", "chio-web3", "chio-finding"]
+
+[[mode.root]]
+name = "chio-cli"
+require = ["chio-settle", "chio-web3", "chio-finding", "chio-proof-room"]

@@ -14,7 +14,7 @@
 //! cargo xtask snippets regen [--check]
 //! cargo xtask check crate-paths
 //! cargo xtask check formal-mirrors [--bless]
-//! cargo xtask check web3-free-closure [--root <crate>]...
+//! cargo xtask check web3-free-closure [--mode <name>]... [--root <crate>]...
 //! cargo xtask gen proof-coverage [--check]
 //! cargo xtask formal itf-to-regression --trace <path> --spec <family>
 //! ```
