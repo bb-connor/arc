@@ -1,8 +1,10 @@
 # Chio Protocol
 
-**Version:** 1.0
-**Date:** 2026-04-14
-**Status:** Current bounded Chio release profile
+**Version:** 1.0 preview, not stable
+**Date:** 2026-10-27
+**Status:** Pre-release preview profile. The wire contract may change until the
+preview contract is frozen with its schemas and test vectors.
+`spec/schemas/VERSION` stays at 1.0.0 and carries this preview label.
 
 Chio is pre-release. This document describes the current v1 protocol profile.
 Earlier internal draft versions have been folded into this v1 contract rather
@@ -1437,6 +1439,11 @@ it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
   decodes, so a rolling upgrade does not fail at parse time, but it is denied at
   verification. That prevents a nonce from being presented for a different
   request that shares the other five fields.
+- The kernel signs execution nonces with its classical Ed25519 capability key.
+  Under the `AllowClassical` floor that key also signs receipts. Under
+  `AllowHybrid` and `PqRequired` the receipt key is the hybrid composite, the
+  Ed25519 nonce signature does not verify under it, and the receipt is not
+  authoritative (ADR-0016).
 
 Advisory (`advisory_evaluation`) records and label-only receipts are never
 authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,
