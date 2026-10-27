@@ -2,7 +2,7 @@
 //! connection each, and hands every captured request back to the test.
 
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -24,7 +24,7 @@ pub(crate) fn spawn_json_server(
     let (request_tx, request_rx) = mpsc::channel();
     let handle = thread::spawn(move || {
         for (status_code, body) in responses {
-            let (mut stream, _) = listener.accept().expect("server should accept request");
+            let mut stream = accept_bounded(&listener);
             stream
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .expect("server should configure read timeout");
@@ -47,7 +47,33 @@ pub(crate) fn spawn_json_server(
     (format!("http://{address}"), request_rx, handle)
 }
 
-fn read_request(stream: &mut std::net::TcpStream) -> String {
+const ACCEPT_POLL: Duration = Duration::from_millis(10);
+const ACCEPT_ATTEMPTS: u32 = 500;
+
+/// Accept the next request, or fail the stub after about five seconds so a
+/// request the adapter never sends fails the test instead of hanging it.
+fn accept_bounded(listener: &TcpListener) -> TcpStream {
+    listener
+        .set_nonblocking(true)
+        .expect("listener should become nonblocking");
+    for _ in 0..ACCEPT_ATTEMPTS {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream
+                    .set_nonblocking(false)
+                    .expect("stream should become blocking");
+                return stream;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(ACCEPT_POLL);
+            }
+            Err(error) => panic!("stub accept failed: {error}"),
+        }
+    }
+    panic!("stub expected a request that never arrived");
+}
+
+fn read_request(stream: &mut TcpStream) -> String {
     let mut request = Vec::new();
     let mut chunk = [0_u8; 1024];
     let mut header_end = None;
@@ -111,9 +137,12 @@ mod tests {
     #[test]
     fn a_missing_request_fails_the_stub_instead_of_hanging() {
         let (_url, _requests, handle) = spawn_once_json_server(200, serde_json::json!({}));
-        assert!(
-            handle.join().is_err(),
-            "a stub whose request never arrives must fail"
+        let failure = handle
+            .join()
+            .expect_err("a stub whose request never arrives must fail");
+        assert_eq!(
+            failure.downcast_ref::<&str>(),
+            Some(&"stub expected a request that never arrived")
         );
     }
 }

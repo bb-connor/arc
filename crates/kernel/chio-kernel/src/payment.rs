@@ -1229,6 +1229,7 @@ mod tests {
         prepaid.rail = "sim".to_owned();
         prepaid.rail_mode = PaymentRailMode::PrepaidFinal;
         prepaid.authorization_attempt = Some(PaymentAuthorizationAttempt::NotStarted);
+        prepaid.authorized_amount_units = Some(prepaid.amount_units);
         let prepaid = prepaid
             .apply_transition(&PaymentJournalTransition::BeginAuthorizationAttempt)
             .and_then(|journal| {

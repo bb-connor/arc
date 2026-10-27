@@ -1645,27 +1645,6 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub(crate) fn payment_authority_expires_at(request: &ToolCallRequest) -> u64 {
-        request
-            .approval_token
-            .iter()
-            .chain(&request.approval_tokens)
-            .map(|token| token.expires_at)
-            .chain(
-                request
-                    .threshold_approval_proposal
-                    .iter()
-                    .map(|proposal| proposal.body.proposal_deadline),
-            )
-            .chain(request.governed_intent.iter().filter_map(|intent| {
-                intent
-                    .metered_billing
-                    .as_ref()
-                    .and_then(|metered| metered.quote.expires_at)
-            }))
-            .fold(request.capability.expires_at, u64::min)
-    }
-
     pub(crate) fn authorize_payment_if_needed(
         &self,
         request: &ToolCallRequest,
@@ -1911,7 +1890,8 @@ impl ChioKernel {
                     ))
                 }),
                 error: KernelError::GovernedTransactionDenied(format!(
-                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"
+                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {}",
+                    error.code()
                 )),
             })?
             .ok_or_else(|| {
