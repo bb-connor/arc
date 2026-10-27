@@ -55,6 +55,20 @@ RETIRED_DIRECT_HELPERS = {
 }
 
 
+RETIRED_DIRECT_FILES = {
+    "crates/kernel/chio-kernel-browser/src/wasm.rs": ("parse_json",),
+    "crates/kernel/chio-kernel-mobile/src/lib.rs": (
+        "evaluate", "sign_receipt", "sign_receipt_relaying_trusted_body",
+        "verify_capability", "verify_capability_with_context"),
+    "crates/sdk/chio-binding-helpers/src/canonical.rs": ("canonicalize_json_str",),
+    "crates/sdk/chio-binding-helpers/src/capability.rs": ("parse_capability_json",),
+    "crates/sdk/chio-binding-helpers/src/signing.rs": ("signed_json_value",),
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": (
+        "evaluate_json_str", "sign_receipt_json_str", "sign_receipt_relaying_trusted_body_json_str",
+        "verify_capability_json_str", "verify_capability_with_context_json_str"),
+}
+
+
 RETIRED_DIRECT_BOUNDS = {
     "crates/products/chio-mercury/src/commands/shared/utils.rs": "MAX_JSON_INPUT_BYTES",
 }
@@ -113,7 +127,7 @@ def local_helper_consumers(files, path, helper):
 
 
 def retired_direct_contracts(catalog, found, files):
-    """Retain debt for two reviewed wrappers, without declaring input closure."""
+    """Retain original debt after a reviewed direct-reader replacement."""
     errors = []
     contracts = catalog.get("decoder_file_contracts", {})
     baseline = sorted(path for path, row in contracts.items()
@@ -124,10 +138,9 @@ def retired_direct_contracts(catalog, found, files):
     retired = catalog.get("retired_direct_readers", {})
     for path, review in retired.items():
         pinned = RETIRED_DIRECT_HELPERS.get(path)
-        if pinned is None:
+        if pinned is None and path not in RETIRED_DIRECT_FILES:
             errors.append(f"unreviewed retired direct reader: {path}")
             continue
-        helper, reader, constructor = pinned
         baseline_contract = contracts.get(path, {})
         contract_hash = hashlib.sha256(json.dumps(
             baseline_contract, sort_keys=True, separators=(",", ":")
@@ -139,6 +152,26 @@ def retired_direct_contracts(catalog, found, files):
         if path in found["decoder_census"]:
             errors.append(f"retired direct reader gained direct decoder: {path}")
         source = files.get(path)
+        if (review.get("status") != "direct-serde-site-migrated-original-debt-open"
+                or not review.get("scope") or not review.get("remaining_acceptance")):
+            errors.append(f"retired direct-reader remaining debt is missing: {path}")
+        if path in RETIRED_DIRECT_FILES:
+            expected = sorted(f"{path}::{owner}::from_wire#1::decode_signed"
+                              for owner in RETIRED_DIRECT_FILES[path])
+            actual = [site for site in found["decoding_contracts"] if site.startswith(path + "::")]
+            if actual != expected:
+                errors.append(f"retired direct-reader signed helper changed: {path}")
+            bound_path = ("crates/sdk/chio-binding-helpers/src/lib.rs"
+                          if path.startswith("crates/sdk/chio-binding-helpers/") else path)
+            bound_hash = constant_hash(files.get(bound_path, ""), "MAX_JSON_INPUT_BYTES")
+            if bound_hash is None or review.get("bound_source_sha256") != bound_hash:
+                errors.append(f"retired direct-reader bound constant changed: {path}")
+            if (source is None
+                    or review.get("source_sha256") != hashlib.sha256(source.encode()).hexdigest()
+                    or review.get("ingress") != found["ingress_census"].get(path)):
+                errors.append(f"retired direct-reader file changed: {path}")
+            continue
+        helper, reader, constructor = pinned
         bound = RETIRED_DIRECT_BOUNDS.get(path)
         if bound is not None:
             bound_hash = constant_hash(source or "", bound)
@@ -176,9 +209,6 @@ def retired_direct_contracts(catalog, found, files):
             errors.append(f"retired direct-reader consumer custody changed: {path}")
         elif seen != local_helper_consumers(files, path, helper):
             errors.append(f"retired direct-reader consumer custody changed: {path}")
-        if (review.get("status") != "direct-serde-site-migrated-original-debt-open"
-                or not review.get("scope") or not review.get("remaining_acceptance")):
-            errors.append(f"retired direct-reader remaining debt is missing: {path}")
     if set(contracts) != set(found["decoder_census"]) | set(retired):
         errors.append("workspace decoder file contracts are incomplete")
     return errors

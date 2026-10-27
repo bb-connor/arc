@@ -1661,7 +1661,22 @@
     "crates/trust/chio-tee-frame/src/frame.rs::parse::from_wire",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire",
     "crates/trust/chio-tee/src/runner.rs::capture::from_wire",
-    "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire"
+    "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire",
+    "crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::sign_receipt::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::sign_receipt_relaying_trusted_body::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_wire",
+    "crates/sdk/chio-binding-helpers/src/canonical.rs::canonicalize_json_str::from_wire",
+    "crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json::from_wire",
+    "crates/sdk/chio-binding-helpers/src/manifest.rs::parse_signed_manifest_json::from_wire",
+    "crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire"
   ],
   "raw_decoders": [
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -2800,13 +2815,6 @@
     "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_value",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_value",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability::from_str",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_str",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_value",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_value",
     "crates/kernel/chio-kernel/src/admission_operation.rs::is_pre_dispatch::custom_deserialize",
     "crates/kernel/chio-kernel/src/admission_operation.rs::validate::custom_deserialize",
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs::as_str::custom_deserialize",
@@ -5261,11 +5269,6 @@
     "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed.",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate.",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_str": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_value": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability::from_str": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_str": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
-    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_value": "The mobile receipt inspection seam now uses bounded original parsing and no verifier alias. Other public capability and passport JSON readers in this file remain outside this batch and require semantic disposition; do not count the complete file as closed.",
     "crates/kernel/chio-kernel/src/admission_operation.rs::is_pre_dispatch::custom_deserialize": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
     "crates/kernel/chio-kernel/src/admission_operation.rs::validate::custom_deserialize": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs::as_str::custom_deserialize": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
@@ -6825,24 +6828,12 @@
     "crates/kernel/chio-kernel-browser/src/pure.rs": [
       "parse_authority_input::from_str"
     ],
-    "crates/kernel/chio-kernel-browser/src/wasm.rs": [
-      "parse_json::from_str"
-    ],
     "crates/kernel/chio-kernel-core/src/fuzz.rs": [
       "drive_ndjson_log::from_slice",
       "drive_single_receipt::from_slice"
     ],
     "crates/kernel/chio-kernel-core/src/passport_verify.rs": [
       "serialize::custom_deserialize"
-    ],
-    "crates/kernel/chio-kernel-mobile/src/lib.rs": [
-      "evaluate::from_str",
-      "evaluate::from_value",
-      "evaluate::from_value",
-      "verify_capability::from_str",
-      "verify_capability_with_context::from_str",
-      "verify_capability_with_context::from_value",
-      "verify_capability_with_context::from_value"
     ],
     "crates/kernel/chio-process/examples/langgraph_report.rs": [
       "invoke::from_slice",
@@ -7387,30 +7378,11 @@
     "crates/protocol/chio-provider-adapter-core/src/input.rs": [
       "typed::from_value"
     ],
-    "crates/sdk/chio-binding-helpers/src/canonical.rs": [
-      "canonicalize_json_str::from_str"
-    ],
-    "crates/sdk/chio-binding-helpers/src/capability.rs": [
-      "parse_capability_json::from_str"
-    ],
     "crates/sdk/chio-binding-helpers/src/manifest.rs": [
       "parse_signed_manifest_json::from_str"
     ],
-    "crates/sdk/chio-binding-helpers/src/signing.rs": [
-      "sign_json_str_ed25519::from_str",
-      "verify_json_str_signature_ed25519::from_str"
-    ],
     "crates/sdk/chio-bindings-ffi/src/lib.rs": [
       "chio_verify_receipt_json_with_trusted_signers::from_str"
-    ],
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": [
-      "evaluate_json_str::from_str",
-      "evaluate_json_str::from_value",
-      "evaluate_json_str::from_value",
-      "verify_capability_json_str::from_str",
-      "verify_capability_with_context_json_str::from_str",
-      "verify_capability_with_context_json_str::from_value",
-      "verify_capability_with_context_json_str::from_value"
     ],
     "crates/sdk/chio-eval-receipt/src/verify.rs": [
       "test_signature_for_bundle_json::from_str",
@@ -18531,7 +18503,22 @@
     "crates/trust/chio-tee-frame/src/frame.rs::parse#2::from_wire#1::decode_signed",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire#1::decode_signed",
     "crates/trust/chio-tee/src/runner.rs::capture::from_wire#1::decode_signed",
-    "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire#1::decode_canonical"
+    "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire#1::decode_canonical",
+    "crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::evaluate::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::sign_receipt::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::sign_receipt_relaying_trusted_body::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/lib.rs::verify_capability_with_context::from_wire#1::decode_signed",
+    "crates/sdk/chio-binding-helpers/src/canonical.rs::canonicalize_json_str::from_wire#1::decode_signed",
+    "crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json::from_wire#1::decode_signed",
+    "crates/sdk/chio-binding-helpers/src/manifest.rs::parse_signed_manifest_json::from_wire#1::decode_signed",
+    "crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value::from_wire#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str::from_wire#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::from_wire#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::from_wire#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str::from_wire#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire#1::decode_signed"
   ],
   "ingress_census": {
     "crates/core/chio-arena/src/promote.rs": [
@@ -18927,9 +18914,9 @@
     ],
     "crates/kernel/chio-kernel-browser/src/wasm.rs": [
       "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
-      "parse_signed_json::original-json-reader::UntrustedJsonText",
-      "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_signed_json",
-      "sign_receipt_relaying_trusted_body::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_signed_json",
+      "parse_json::original-json-reader::UntrustedJsonText",
+      "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+      "sign_receipt_relaying_trusted_body::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
       "verify_capability::shared-reader::crates/kernel/chio-kernel-browser/src/pure.rs::parse_authority_input",
       "verify_capability::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
       "verify_capability_with_context::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
@@ -18943,9 +18930,12 @@
       "verify_passport::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel-mobile/src/lib.rs": [
+      "evaluate::original-json-reader::UntrustedJsonText",
       "inspect_mobile_receipt_envelopes::shared-reader::crates/trust/chio-custody-hw/src/attestation/receipt_chain.rs::parse_mobile_receipt_envelopes",
       "sign_receipt::original-json-reader::UntrustedJsonText",
       "sign_receipt_relaying_trusted_body::original-json-reader::UntrustedJsonText",
+      "verify_capability::original-json-reader::UntrustedJsonText",
+      "verify_capability_with_context::original-json-reader::UntrustedJsonText",
       "verify_passport::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport",
       "verify_play_integrity_evidence::shared-reader::crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity"
     ],
@@ -22996,9 +22986,11 @@
       "validate::original-json-reader::UntrustedJsonText"
     ],
     "crates/sdk/chio-binding-helpers/src/capability.rs": [
+      "parse_capability_json::original-json-reader::UntrustedJsonText",
       "verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json"
     ],
     "crates/sdk/chio-binding-helpers/src/manifest.rs": [
+      "parse_signed_manifest_json::original-json-reader::UntrustedJsonText",
       "verify_signed_manifest_json::shared-reader::crates/sdk/chio-binding-helpers/src/manifest.rs::parse_signed_manifest_json"
     ],
     "crates/sdk/chio-binding-helpers/src/receipt.rs": [
@@ -23022,8 +23014,11 @@
       "chio_kernel_verify_capability_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str",
       "chio_kernel_verify_capability_with_context_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str",
       "chio_kernel_verify_passport_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str",
+      "evaluate_json_str::original-json-reader::UntrustedJsonText",
       "sign_receipt_json_str::original-json-reader::UntrustedJsonText",
       "sign_receipt_relaying_trusted_body_json_str::original-json-reader::UntrustedJsonText",
+      "verify_capability_json_str::original-json-reader::UntrustedJsonText",
+      "verify_capability_with_context_json_str::original-json-reader::UntrustedJsonText",
       "verify_passport_json_str::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport"
     ],
     "crates/sdk/chio-eval-receipt/py/src/lib.rs": [
@@ -23989,6 +23984,14 @@
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
       "parse::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
+    ],
+    "crates/sdk/chio-binding-helpers/src/canonical.rs": [
+      "canonicalize_json_str::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/sdk/chio-binding-helpers/src/signing.rs": [
+      "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value",
+      "signed_json_value::original-json-reader::UntrustedJsonText",
+      "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value"
     ]
   },
   "retired_direct_readers": {
@@ -24122,6 +24125,106 @@
       ],
       "scope": "Original duplicate/lossless-number validation of each observation line through decode_signed, then the existing canonical re-encoding equality check. Parsing does not establish observation signatures.",
       "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Qualify trace input provenance and operator error behavior separately."
+    },
+    "crates/kernel/chio-kernel-browser/src/wasm.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "source_sha256": "8d057ed7f30eeb050457029c8d6cb5323b7c43aaeba66005def7a55b83909a19",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "parse_json::original-json-reader::UntrustedJsonText",
+        "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "sign_receipt_relaying_trusted_body::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "verify_capability::shared-reader::crates/kernel/chio-kernel-browser/src/pure.rs::parse_authority_input",
+        "verify_capability::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "verify_capability_with_context::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "verify_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
+    },
+    "crates/kernel/chio-kernel-mobile/src/lib.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "0803c7b927796232ca4df505bbec715ca1e0ed9b8161eb3be983a4656f8d941b",
+      "source_sha256": "34286a99038d762f13dd1339020d753d3cc640b968d9f91203e88294487f8dc3",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "evaluate::original-json-reader::UntrustedJsonText",
+        "inspect_mobile_receipt_envelopes::shared-reader::crates/trust/chio-custody-hw/src/attestation/receipt_chain.rs::parse_mobile_receipt_envelopes",
+        "sign_receipt::original-json-reader::UntrustedJsonText",
+        "sign_receipt_relaying_trusted_body::original-json-reader::UntrustedJsonText",
+        "verify_capability::original-json-reader::UntrustedJsonText",
+        "verify_capability_with_context::original-json-reader::UntrustedJsonText",
+        "verify_passport::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport",
+        "verify_play_integrity_evidence::shared-reader::crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
+    },
+    "crates/sdk/chio-binding-helpers/src/canonical.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "source_sha256": "74719681e115120721a4ce4cf8b2ba9e9d18dc3bd84a64b33315899c9515e1f7",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "canonicalize_json_str::original-json-reader::UntrustedJsonText"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
+    },
+    "crates/sdk/chio-binding-helpers/src/capability.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "source_sha256": "4581afcd7c783116056e53af2e8a93266c1b76d924566a94073fb95c4e67f6c9",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "parse_capability_json::original-json-reader::UntrustedJsonText",
+        "verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
+    },
+    "crates/sdk/chio-binding-helpers/src/signing.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "source_sha256": "f6fde1d40f13a8921cd50c7d8ad021c0590191e138d66e2447c21b58ade157a5",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value",
+        "signed_json_value::original-json-reader::UntrustedJsonText",
+        "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
+    },
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": {
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "source_sha256": "32684f0401c3e2fae86d5b4fc84402a84f0dc0e87f212ed428dfbca06e51c818",
+      "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
+      "ingress": [
+        "chio_kernel_evaluate_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str",
+        "chio_kernel_sign_receipt_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str",
+        "chio_kernel_sign_receipt_relaying_trusted_body_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str",
+        "chio_kernel_verify_capability_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str",
+        "chio_kernel_verify_capability_with_context_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str",
+        "chio_kernel_verify_passport_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str",
+        "evaluate_json_str::original-json-reader::UntrustedJsonText",
+        "sign_receipt_json_str::original-json-reader::UntrustedJsonText",
+        "sign_receipt_relaying_trusted_body_json_str::original-json-reader::UntrustedJsonText",
+        "verify_capability_json_str::original-json-reader::UntrustedJsonText",
+        "verify_capability_with_context_json_str::original-json-reader::UntrustedJsonText",
+        "verify_passport_json_str::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport"
+      ],
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     }
   }
 }
