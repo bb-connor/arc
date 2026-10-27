@@ -6821,6 +6821,7 @@
       "parse_tool_call_operation_execution_nonce::from_value"
     ],
     "crates/kernel/chio-kernel/src/kernel/settlement_observer.rs": [
+      "build_observation::from_value",
       "build_observation::from_value"
     ],
     "crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs": [
@@ -8766,6 +8767,7 @@
         {
           "reader": "build_observation",
           "decoders": [
+            "from_value",
             "from_value"
           ],
           "apis": [

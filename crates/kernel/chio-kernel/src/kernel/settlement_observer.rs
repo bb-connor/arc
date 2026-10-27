@@ -12,11 +12,14 @@
 use std::sync::Arc;
 
 use chio_core::crypto::PublicKey;
-use chio_core::receipt::{body::ChioReceipt, economics::ChannelReceiptMetadataV1};
+use chio_core::receipt::{
+    body::ChioReceipt,
+    economics::{ChannelReceiptMetadataV1, SettlementStatus},
+};
 use chio_settle::{
-    SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
-    SettlementHookError, SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
-    SettlementSkipReason,
+    ObservedSettlement, SettlementFailureClass, SettlementFailureCode, SettlementFailureReason,
+    SettlementHook, SettlementHookError, SettlementIdempotencyKey, SettlementObservation,
+    SettlementOutcome, SettlementSkipReason,
 };
 
 /// Schema string emitted on the wire for settlement-observer status frames.
@@ -65,7 +68,7 @@ impl SettlementObserverStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettlementObservationBuild {
     /// A valid positive-charge receipt produced an observation.
-    Observation(SettlementObservation),
+    Observation(Box<SettlementObservation>),
     /// The receipt legitimately requires no settlement work.
     Skipped(SettlementSkipReason),
     /// The receipt failed integrity or economic-metadata validation.
@@ -74,6 +77,89 @@ pub enum SettlementObservationBuild {
 
 fn permanent(code: SettlementFailureCode, detail: impl AsRef<[u8]>) -> SettlementObservationBuild {
     SettlementObservationBuild::Permanent(SettlementFailureReason::from_detail(code, detail))
+}
+
+fn malformed(detail: &'static str) -> SettlementFailureReason {
+    SettlementFailureReason::from_detail(SettlementFailureCode::MalformedFinancialMetadata, detail)
+}
+
+fn optional_text(
+    value: Option<&serde_json::Value>,
+    detail: &'static str,
+) -> Result<Option<String>, SettlementFailureReason> {
+    match value {
+        None => Ok(None),
+        Some(serde_json::Value::String(text)) if !text.is_empty() => Ok(Some(text.clone())),
+        Some(_) => Err(malformed(detail)),
+    }
+}
+
+fn budget_hold_id(metadata: &serde_json::Value) -> Result<Option<String>, SettlementFailureReason> {
+    match metadata.get("budget_authority") {
+        None => Ok(None),
+        Some(serde_json::Value::Object(budget)) => match budget.get("hold_id") {
+            Some(serde_json::Value::String(hold_id)) if !hold_id.is_empty() => {
+                Ok(Some(hold_id.clone()))
+            }
+            _ => Err(malformed("budget authority hold id is malformed")),
+        },
+        Some(_) => Err(malformed("budget authority metadata is not an object")),
+    }
+}
+
+fn retained_payment_settlement(
+    metadata: &serde_json::Value,
+) -> Option<Result<ObservedSettlement, SettlementFailureReason>> {
+    let financial = match metadata.get("financial")? {
+        serde_json::Value::Object(financial) => financial,
+        _ => return Some(Err(malformed("financial metadata is not an object"))),
+    };
+    match financial.get("payment_authorization_ambiguous") {
+        None | Some(serde_json::Value::Bool(false)) => None,
+        Some(serde_json::Value::Bool(true)) => Some(retained_payment_fields(metadata, financial)),
+        Some(_) => Some(Err(malformed(
+            "payment authorization ambiguity marker is not a boolean",
+        ))),
+    }
+}
+
+fn retained_payment_fields(
+    metadata: &serde_json::Value,
+    financial: &serde_json::Map<String, serde_json::Value>,
+) -> Result<ObservedSettlement, SettlementFailureReason> {
+    let operation_id = optional_text(
+        financial.get("payment_attempt_reference"),
+        "payment attempt reference is malformed",
+    )?
+    .ok_or_else(|| malformed("retained payment requires a payment attempt reference"))?;
+    let hold_id = budget_hold_id(metadata)?
+        .ok_or_else(|| malformed("retained payment requires a budget hold id"))?;
+    let exposure_units = metadata
+        .pointer("/budget_authority/authorize/exposure_units")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| malformed("retained payment requires held exposure units"))?;
+    Ok(ObservedSettlement::RetainedPayment {
+        operation_id,
+        hold_id,
+        exposure_units,
+    })
+}
+
+fn observation_for(receipt: &ChioReceipt, settlement: ObservedSettlement) -> SettlementObservation {
+    let observation = SettlementObservation::new(
+        receipt.id.clone(),
+        receipt.timestamp,
+        receipt.tool_server.clone(),
+        receipt.tool_name.clone(),
+        receipt.capability_id.clone(),
+        settlement,
+        receipt.content_hash.clone(),
+        receipt.policy_hash.clone(),
+    );
+    match receipt.tenant_id.clone() {
+        Some(tenant_id) => observation.with_tenant(tenant_id),
+        None => observation,
+    }
 }
 
 #[must_use]
@@ -151,7 +237,13 @@ pub fn build_observation(
         );
     }
     if receipt.is_denied() {
-        return SettlementObservationBuild::Skipped(SettlementSkipReason::Denied);
+        return match metadata.and_then(retained_payment_settlement) {
+            None => SettlementObservationBuild::Skipped(SettlementSkipReason::Denied),
+            Some(Err(reason)) => SettlementObservationBuild::Permanent(reason),
+            Some(Ok(settlement)) => SettlementObservationBuild::Observation(Box::new(
+                observation_for(receipt, settlement),
+            )),
+        };
     }
     if !receipt.is_allowed() {
         return permanent(
@@ -209,25 +301,43 @@ pub fn build_observation(
         );
     }
 
-    let observation = SettlementObservation::new(
-        receipt.id.clone(),
-        receipt.timestamp,
-        receipt.tool_server.clone(),
-        receipt.tool_name.clone(),
-        receipt.capability_id.clone(),
-        chio_core::capability::scope::MonetaryAmount {
-            currency: currency.to_string(),
-            units,
-        },
-        receipt.content_hash.clone(),
-        receipt.policy_hash.clone(),
-    );
+    let status = match financial
+        .get("settlement_status")
+        .cloned()
+        .map(serde_json::from_value::<SettlementStatus>)
+    {
+        Some(Ok(status)) => status,
+        Some(Err(_)) | None => {
+            return permanent(
+                SettlementFailureCode::MalformedFinancialMetadata,
+                "positive cost_charged requires a settlement status",
+            );
+        }
+    };
+    let payment_reference = match optional_text(
+        financial.get("payment_reference"),
+        "payment reference is malformed",
+    ) {
+        Ok(payment_reference) => payment_reference,
+        Err(reason) => return SettlementObservationBuild::Permanent(reason),
+    };
+    let hold_id = match budget_hold_id(metadata) {
+        Ok(hold_id) => hold_id,
+        Err(reason) => return SettlementObservationBuild::Permanent(reason),
+    };
 
-    SettlementObservationBuild::Observation(if let Some(tenant_id) = receipt.tenant_id.clone() {
-        observation.with_tenant(tenant_id)
-    } else {
-        observation
-    })
+    SettlementObservationBuild::Observation(Box::new(observation_for(
+        receipt,
+        ObservedSettlement::Charge {
+            amount: chio_core::capability::scope::MonetaryAmount {
+                currency: currency.to_string(),
+                units,
+            },
+            status,
+            payment_reference,
+            hold_id,
+        },
+    )))
 }
 
 /// Run the registered settlement hook against a freshly signed receipt.
@@ -527,7 +637,7 @@ mod tests {
         let receipt = sign_with(
             serde_json::json!({
                 "channel": {"schema": CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA},
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -569,7 +679,7 @@ mod tests {
     fn build_observation_rejects_invalid_signature() {
         let mut receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -588,7 +698,7 @@ mod tests {
         action.parameters = serde_json::json!({"path": "/tmp/b"});
         let receipt = sign_with_action(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
             action,
@@ -604,7 +714,7 @@ mod tests {
     fn build_observation_constructs_priced_frame() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -616,20 +726,174 @@ mod tests {
         assert_eq!(observation.receipt_id, receipt.id);
         assert_eq!(observation.finalized_at, 100);
         assert_eq!(
-            observation.amount,
-            MonetaryAmount {
-                currency: "USD".to_string(),
-                units: 250,
+            observation.settlement,
+            ObservedSettlement::Charge {
+                amount: MonetaryAmount {
+                    currency: "USD".to_string(),
+                    units: 250,
+                },
+                status: SettlementStatus::Settled,
+                payment_reference: None,
+                hold_id: None,
             }
         );
         assert_eq!(observation.content_hash, "ch-1");
     }
 
     #[test]
+    fn build_observation_carries_the_recorded_settlement_truth() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "financial": {
+                    "cost_charged": 250,
+                    "currency": "USD",
+                    "settlement_status": "settled",
+                    "payment_reference": "pay-1"
+                },
+                "budget_authority": {"hold_id": "hold-1"}
+            }),
+            Decision::Allow,
+        );
+        let SettlementObservationBuild::Observation(observation) =
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
+        else {
+            panic!("settled receipt did not yield an observation");
+        };
+        assert_eq!(
+            observation.settlement,
+            ObservedSettlement::Charge {
+                amount: MonetaryAmount {
+                    currency: "USD".to_string(),
+                    units: 250,
+                },
+                status: SettlementStatus::Settled,
+                payment_reference: Some("pay-1".to_string()),
+                hold_id: Some("hold-1".to_string()),
+            }
+        );
+    }
+
+    fn retained_payment_metadata() -> serde_json::Value {
+        serde_json::json!({
+            "financial": {
+                "payment_authorization_ambiguous": true,
+                "payment_authorization_error_code": "timeout",
+                "payment_attempt_reference": "op-1"
+            },
+            "budget_authority": {
+                "hold_id": "hold-1",
+                "authorize": {"exposure_units": 100, "committed_cost_units_after": 100}
+            }
+        })
+    }
+
+    fn denied() -> Decision {
+        Decision::Deny {
+            reason: "payment authorization outcome is ambiguous".to_string(),
+            guard: "kernel".to_string(),
+        }
+    }
+
+    #[test]
+    fn build_observation_observes_a_retained_payment_denial() {
+        let receipt = sign_with(retained_payment_metadata(), denied());
+        let SettlementObservationBuild::Observation(observation) =
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
+        else {
+            panic!("retained payment denial did not yield an observation");
+        };
+        assert_eq!(
+            observation.settlement,
+            ObservedSettlement::RetainedPayment {
+                operation_id: "op-1".to_string(),
+                hold_id: "hold-1".to_string(),
+                exposure_units: 100,
+            }
+        );
+    }
+
+    #[test]
+    fn build_observation_skips_a_denial_with_an_absent_or_false_ambiguity_marker() {
+        let cases = [
+            serde_json::json!({}),
+            serde_json::json!({"financial": {"cost_charged": 0, "currency": "USD"}}),
+            serde_json::json!({"financial": {"payment_authorization_ambiguous": false}}),
+        ];
+        for metadata in cases {
+            let receipt = sign_with(metadata.clone(), denied());
+            assert_eq!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Skipped(SettlementSkipReason::Denied),
+                "{metadata}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_observation_rejects_a_denial_with_malformed_ambiguity_evidence() {
+        let cases = [
+            (
+                serde_json::json!({"financial": "invalid"}),
+                "financial metadata is not an object",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": "true"}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": null}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": 1}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+        ];
+        for (metadata, detail) in cases {
+            let receipt = sign_with(metadata.clone(), denied());
+            assert_eq!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Permanent(SettlementFailureReason::from_detail(
+                    SettlementFailureCode::MalformedFinancialMetadata,
+                    detail,
+                )),
+                "{metadata}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_observation_rejects_a_retained_payment_without_its_bindings() {
+        let removals = [
+            ("/financial", "payment_attempt_reference"),
+            ("/budget_authority", "hold_id"),
+            ("/budget_authority/authorize", "exposure_units"),
+        ];
+        for (parent, key) in removals {
+            let mut metadata = retained_payment_metadata();
+            if let Some(object) = metadata
+                .pointer_mut(parent)
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                object.remove(key);
+            }
+            let receipt = sign_with(metadata, denied());
+            assert!(
+                matches!(
+                    build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                    SettlementObservationBuild::Permanent(ref reason)
+                        if reason.code() == SettlementFailureCode::MalformedFinancialMetadata
+                ),
+                "missing {parent}/{key} must be malformed"
+            );
+        }
+    }
+
+    #[test]
     fn build_observation_rejects_untrusted_signer() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -644,7 +908,7 @@ mod tests {
     fn run_observer_returns_not_registered_without_hook() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -661,7 +925,7 @@ mod tests {
     fn run_observer_records_hook_outcome() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -730,8 +994,14 @@ mod tests {
         else {
             panic!("canonical financial metadata did not yield an observation");
         };
-        assert_eq!(observation.amount.units, 250);
-        assert_eq!(observation.amount.currency, "USD");
+        assert!(matches!(
+            observation.settlement,
+            ObservedSettlement::Charge {
+                ref amount,
+                status: SettlementStatus::Pending,
+                ..
+            } if amount.units == 250 && amount.currency == "USD"
+        ));
     }
 
     #[test]
@@ -755,7 +1025,7 @@ mod tests {
     fn run_observer_records_hook_failures_without_panicking() {
         let receipt = sign_with(
             serde_json::json!({
-                "financial": {"cost_charged": 250, "currency": "USD"}
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"}
             }),
             Decision::Allow,
         );
@@ -783,6 +1053,18 @@ mod tests {
             serde_json::json!({"financial": {"cost_charged": 250}}),
             serde_json::json!({"financial": {"cost_charged": 250, "currency": "usd"}}),
             serde_json::json!({"financial": {"cost_charged": 250, "currency": "US D"}}),
+            serde_json::json!({"financial": {"cost_charged": 250, "currency": "USD"}}),
+            serde_json::json!({"financial": {
+                "cost_charged": 250, "currency": "USD", "settlement_status": "unknown"
+            }}),
+            serde_json::json!({"financial": {
+                "cost_charged": 250, "currency": "USD", "settlement_status": "settled",
+                "payment_reference": 7
+            }}),
+            serde_json::json!({
+                "financial": {"cost_charged": 250, "currency": "USD", "settlement_status": "settled"},
+                "budget_authority": {"hold_id": ""}
+            }),
             serde_json::json!({"financial": "invalid"}),
         ];
 
