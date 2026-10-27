@@ -1,3 +1,4 @@
+mod passport_credential_digests;
 mod portable_sd_jwt;
 
 use super::*;
