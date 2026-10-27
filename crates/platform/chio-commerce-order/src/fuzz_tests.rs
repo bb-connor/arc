@@ -95,8 +95,9 @@ fn undecodable_dispatch_receipts_keep_input_class() {
             "{name}"
         );
         assert_eq!(outcome.receipt_ref, DISPATCH, "{name}");
-        assert_eq!(outcome.replay, Err(decode_error(name)), "{name}");
-        assert_eq!(outcome.settlement, Err(decode_error(name)), "{name}");
+        let expected = format!("{:?}", Err::<(), _>(decode_error(name)));
+        assert_eq!(format!("{:?}", outcome.replay), expected, "{name}");
+        assert_eq!(format!("{:?}", outcome.settlement), expected, "{name}");
     }
 }
 

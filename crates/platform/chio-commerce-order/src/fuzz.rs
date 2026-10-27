@@ -36,11 +36,11 @@ use crate::types::{
 };
 
 macro_rules! fixture {
-    ($name:literal) => {
+    ($($part:literal),+) => {
         include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../../fixtures/proof-room/commerce-payments/offline-psp-valid/",
-            $name
+            $($part),+
         ))
     };
 }
@@ -49,7 +49,7 @@ macro_rules! receipt_fixture {
     ($name:literal) => {
         (
             $name,
-            fixture!(concat!("authority-receipts/", $name, ".json")).as_slice(),
+            fixture!("authority-receipts/", $name, ".json").as_slice(),
         )
     };
 }
@@ -263,6 +263,19 @@ fn action_hash_gate(receipt: &ChioReceipt, reaches_action_hash: bool) -> ActionH
     }
 }
 
+/// Input errors compare by identity, so independent decodes of the same bytes
+/// are matched by their variant and rule code.
+fn same_failure(left: &CommerceOrderError, right: &CommerceOrderError) -> bool {
+    format!("{left:?}") == format!("{right:?}")
+}
+
+fn same_receipt(left: &ChioReceipt, right: &ChioReceipt) -> bool {
+    match (serde_json::to_value(left), serde_json::to_value(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
 fn passes_key_and_signature(fixture: &Fixture, receipt: &ChioReceipt) -> bool {
     receipt.kernel_key == fixture.trusted_key() && matches!(receipt.verify_signature(), Ok(true))
 }
@@ -277,7 +290,10 @@ fn check_replay(
     let receipt = match decoded {
         Ok(receipt) => receipt,
         Err(error) => {
-            assert_eq!(actual.as_ref().err(), Some(error), "replay decode class");
+            assert!(
+                matches!(actual, Err(actual) if same_failure(actual, error)),
+                "replay decode class: expected {error:?}, got {actual:?}"
+            );
             return;
         }
     };
@@ -305,7 +321,7 @@ fn check_replay(
             );
         }
     }
-    if receipt == original {
+    if same_receipt(receipt, original) {
         assert_eq!(actual, &Ok(()), "the fixture receipt must replay");
     }
 }
@@ -320,10 +336,9 @@ fn check_settlement(
     let receipt = match decoded {
         Ok(receipt) => receipt,
         Err(error) => {
-            assert_eq!(
-                actual.as_ref().err(),
-                Some(error),
-                "settlement decode class"
+            assert!(
+                matches!(actual, Err(actual) if same_failure(actual, error)),
+                "settlement decode class: expected {error:?}, got {actual:?}"
             );
             return;
         }
@@ -354,7 +369,7 @@ fn check_settlement(
             );
         }
     }
-    if receipt == original {
+    if same_receipt(receipt, original) {
         assert_eq!(actual, &Ok(()), "the fixture receipt must settle");
     }
 }
