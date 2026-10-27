@@ -195,12 +195,11 @@ fn review_payment_authorization_window_sim_crash_before_journal_refunds_the_reco
         matches!(error.downcast_ref::<PaymentError>(), Some(PaymentError::Unavailable(detail))
         if detail == "process stopped before the sim authorization reached the journal")
     );
-    let authorization_id = authorized
-        .lock()
-        .map_err(|_| "authorization lock")?
-        .first()
-        .cloned()
-        .ok_or("sim authorization")?;
+    let authorization_id = {
+        let authorized = authorized.lock().map_err(|_| "authorization lock")?;
+        assert_eq!(authorized.len(), 1);
+        authorized[0].clone()
+    };
     let journal = store.payment_journal().ok_or("ambiguous journal")?;
     assert_eq!(journal.state, PaymentJournalState::HoldPlaced);
     assert_eq!(journal.rail_mode, PaymentRailMode::PrepaidFinal);
