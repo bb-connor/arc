@@ -1,0 +1,91 @@
+{
+  "schema": "chio.root-policy.v1",
+  "policy_id": "rp_acme_prod",
+  "policy_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+  "exchange_keys": [
+    "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+  ],
+  "rules": [
+    {
+      "rule_id": "okta-crm-agents",
+      "match": {
+        "anchor_kind": "oauth_id_jag",
+        "provider_record_id": "acme-okta",
+        "provider_identity_digest": "sha256:eba2bdd1bff4ffd93cdd19b349c62676c3580522201a061d8635d894c36195d1",
+        "allowed_algs": [
+          "RS256"
+        ],
+        "claims": {
+          "client_id": [
+            "mcp-client-claude"
+          ]
+        }
+      },
+      "idp_scope_projection": {
+        "crm.read": [
+          "crm/search",
+          "crm/search/extra"
+        ],
+        "crm.write": [
+          "crm/update"
+        ]
+      },
+      "ceiling_scope": {
+        "grants": [
+          {
+            "server_id": "crm",
+            "tool_name": "search",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "get",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "update",
+            "operations": [
+              "invoke"
+            ]
+          }
+        ]
+      },
+      "ceiling_scope_hash": "sha256:5128a2c589cad4c6868605fda684d2c6f7225344a9fb50ea096a4b2b604d9eb5",
+      "recorded_claims": {
+        "client_id": "plain",
+        "scope": "plain"
+      },
+      "holder_classes": [
+        "edge_session",
+        "caller"
+      ],
+      "capability_ttl_secs": 300,
+      "max_assertion_lifetime_secs": 300,
+      "max_clock_skew_secs": 30,
+      "retain_idp_artifact": false
+    }
+  ],
+  "disclosure": {
+    "default": "committed",
+    "tools": {
+      "crm/search": {
+        "parameters": {
+          "inline_fields": [
+            "/query"
+          ]
+        },
+        "result": {
+          "inline_fields": []
+        }
+      }
+    }
+  },
+  "valid_from": 1792000000,
+  "valid_until": 1799999999,
+  "signature": "ae72fde5a1e52b56c6712da931cfc29d7a9cfeeacfbc25f94f595236fad95606e12ddf761284975d6f499ade27cea57cb19c10f72589682eda298c1c30b4f8be"
+}

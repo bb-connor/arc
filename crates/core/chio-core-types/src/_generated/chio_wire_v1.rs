@@ -147727,11 +147727,11 @@ pub mod root_authority_root_policy {
     ///      "additionalProperties": {
     ///        "type": "array",
     ///        "items": {
-    ///          "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///          "description": "A `server/tool` name: a non-empty server and a non-empty tool name around the only `/`, without NUL.",
     ///          "type": "string",
     ///          "maxLength": 128,
-    ///          "minLength": 1,
-    ///          "pattern": "^[^\\u0000]+$"
+    ///          "minLength": 3,
+    ///          "pattern": "^[^\\u0000/]+/[^\\u0000/]+$"
     ///        },
     ///        "maxItems": 256
     ///      },
@@ -148124,17 +148124,17 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///A `server/tool` name: a non-empty server and a non-empty tool name around the only `/`, without NUL.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "description": "A `server/tool` name: a non-empty server and a non-empty tool name around the only `/`, without NUL.",
     ///  "type": "string",
     ///  "maxLength": 128,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\u0000]+$"
+    ///  "minLength": 3,
+    ///  "pattern": "^[^\\u0000/]+/[^\\u0000/]+$"
     ///}
     /// ```
     /// </details>
@@ -148165,13 +148165,15 @@ pub mod root_authority_root_policy {
             if value.chars().count() > 128usize {
                 return Err("longer than 128 characters".into());
             }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
+            if value.chars().count() < 3usize {
+                return Err("shorter than 3 characters".into());
             }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[^\\u0000/]+/[^\\u0000/]+$").unwrap()
+                });
             if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+                return Err("doesn't match pattern \"^[^\\u0000/]+/[^\\u0000/]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
