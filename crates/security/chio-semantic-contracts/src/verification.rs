@@ -3,7 +3,7 @@
 use crate::work::units;
 use crate::{
     evaluate_semantic_selector, resolve_semantic_constraints, validate_semantic_payload,
-    CompiledSemanticRegistryV1, ResolvedSemanticConstraintsV1, VerificationBudget,
+    CompiledSemanticRegistryV1, ResolvedSemanticConstraintsV1,
 };
 use alloc::vec::Vec;
 use chio_core_types::recovery::{
@@ -19,6 +19,7 @@ use chio_security_types::semantic::{
     SemanticAclCursorV1, SemanticAudienceCompletenessV1, SemanticEndorsementTargetV1,
     SemanticOperationKindV1, SemanticOutputDispositionV1, SemanticPrerequisiteKindV1,
 };
+use chio_security_types::work::VerificationBudget;
 
 pub const MAX_ACL_PAGES: u64 = 16;
 pub const MAX_REQUIRED_ANNOTATIONS: usize = 8;

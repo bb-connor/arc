@@ -6,8 +6,9 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     vec::Vec,
 };
+use chio_security_types::work::VerificationBudget;
 use chio_security_types::{recovery::*, InformationLabel};
-use chio_semantic_contracts::{validate_dependency_graph, VerificationBudget};
+use chio_semantic_contracts::validate_dependency_graph;
 
 enum Stop {
     Bound(PlannerSearchLimit),
@@ -130,7 +131,8 @@ fn candidate(
     }
     let remaining =
         u32::try_from(work.remaining()?).map_err(|_| ContractError::ArithmeticOverflow)?;
-    let mut graph_work = VerificationBudget::new(remaining)?;
+    let mut graph_work = VerificationBudget::new(remaining, MAX_RECOVERY_VERIFICATION_WORK)
+        .map_err(ContractError::from)?;
     let validated = validate_dependency_graph(&registered.graph.nodes, &mut graph_work)?;
     work.spend(u64::from(
         remaining

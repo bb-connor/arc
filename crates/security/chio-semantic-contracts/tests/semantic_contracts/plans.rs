@@ -22,7 +22,10 @@ fn dense_semantic_plan_at_the_step_ceiling_fits_its_declared_budget() -> TestRes
         steps: NonEmptyBoundedList::new(steps)?,
         ..f.plan
     };
-    let ordered = validate_semantic_plan(&plan, &mut VerificationBudget::new(4096)?)?;
+    let ordered = validate_semantic_plan(
+        &plan,
+        &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
+    )?;
     assert_eq!(ordered.len(), 8);
     assert_eq!(ordered[0].as_str(), "step-00");
     assert_eq!(ordered[7].as_str(), "step-07");
@@ -61,7 +64,10 @@ fn prerequisite_dags_refuse_cycles_duplicates_missing_and_undeclared_future_inpu
         SemanticOperationKindV1::IssueWrite,
     )?;
     assert_eq!(
-        validate_semantic_plan(&f.plan, &mut VerificationBudget::new(4096)?)?,
+        validate_semantic_plan(
+            &f.plan,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
+        )?,
         vec![StepId::new("remedy")?]
     );
     for (dependency, expected) in [
@@ -73,7 +79,11 @@ fn prerequisite_dags_refuse_cycles_duplicates_missing_and_undeclared_future_inpu
         step.dependencies = BoundedList::new(vec![StepId::new(dependency)?])?;
         plan.steps = NonEmptyBoundedList::new(vec![step])?;
         assert_eq!(
-            (validate_semantic_plan(&plan, &mut VerificationBudget::new(4096)?)).err(),
+            (validate_semantic_plan(
+                &plan,
+                &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
+            ))
+            .err(),
             Some(expected)
         );
     }
@@ -83,7 +93,11 @@ fn prerequisite_dags_refuse_cycles_duplicates_missing_and_undeclared_future_inpu
         plan.steps.as_slice()[0].clone(),
     ])?;
     assert_eq!(
-        (validate_semantic_plan(&plan, &mut VerificationBudget::new(4096)?)).err(),
+        (validate_semantic_plan(
+            &plan,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
+        ))
+        .err(),
         Some(ContractError::DuplicateIdentity)
     );
     assert_eq!(
@@ -103,7 +117,7 @@ fn prerequisite_dags_refuse_cycles_duplicates_missing_and_undeclared_future_inpu
                 native_disclosure_target: None,
                 now_unix_ms: 1001
             },
-            &mut VerificationBudget::new(1)?
+            &mut VerificationBudget::new(1, MAX_RECOVERY_VERIFICATION_WORK)?
         ))
         .err(),
         Some(ContractError::WorkBudgetExceeded)
@@ -124,7 +138,11 @@ fn future_inputs_require_declared_prerequisites() -> TestResult {
     }])?;
     plan.steps = NonEmptyBoundedList::new(vec![step])?;
     assert_eq!(
-        (validate_semantic_plan(&plan, &mut VerificationBudget::new(4096)?)).err(),
+        (validate_semantic_plan(
+            &plan,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
+        ))
+        .err(),
         Some(ContractError::MissingDependency)
     );
     Ok(())

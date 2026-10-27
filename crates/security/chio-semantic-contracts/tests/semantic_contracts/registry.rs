@@ -36,7 +36,7 @@ fn a_valid_operator_signature_cannot_reuse_a_package_publisher_role() -> TestRes
             &f.publisher.public_key(),
             &[f.publisher.public_key()],
             core::slice::from_ref(&f.exposed),
-            &mut VerificationBudget::new(4096)?,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
         )
         .err(),
         Some(ContractError::BindingMismatch)
@@ -112,7 +112,7 @@ fn registry_compilation_accepts_sixteen_operations_with_sixteen_fields_and_selec
         &f.operator.public_key(),
         &[f.publisher.public_key()],
         &exposed,
-        &mut VerificationBudget::new(4096)?,
+        &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
     )?;
     assert!(registry.resolve("server-a", "tool-15").is_ok());
     Ok(())
@@ -132,7 +132,7 @@ fn signed_packages_cannot_install_tenant_authority_or_missing_coverage() -> Test
             &f.publisher.public_key(),
             &[f.publisher.public_key()],
             core::slice::from_ref(&f.exposed),
-            &mut VerificationBudget::new(4096)?
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
         ))
         .err(),
         Some(ContractError::BindingMismatch)
@@ -145,7 +145,7 @@ fn signed_packages_cannot_install_tenant_authority_or_missing_coverage() -> Test
             &f.operator.public_key(),
             &[f.publisher.public_key()],
             &[],
-            &mut VerificationBudget::new(4096)?
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
         ))
         .err(),
         Some(ContractError::BindingMismatch)
@@ -289,6 +289,6 @@ fn compile_bound_manifest(
         &fixture.operator.public_key(),
         &[fixture.publisher.public_key()],
         exposed,
-        &mut VerificationBudget::new(4096)?,
+        &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
     ))
 }

@@ -1,10 +1,12 @@
 use chio_core_types::{canonical_json_bytes, recovery::decode_contract};
 use chio_security_types::recovery::{
     BoundedList, ContractError, NonEmptyBoundedList, SafeInteger, StepId, TemplateId, VersionV1,
+    MAX_RECOVERY_VERIFICATION_WORK,
 };
+use chio_security_types::work::{VerificationBudget, WorkBudgetError};
 use chio_semantic_contracts::{
     validate_dependency_graph, DependencyGraphSchema, DependencyGraphV1, DependencyNodeV1,
-    ValidatedDependencyGraph, VerificationBudget, MAX_DEPENDENCY_GRAPH_NODES,
+    ValidatedDependencyGraph, MAX_DEPENDENCY_GRAPH_NODES,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -26,7 +28,7 @@ fn node(id: &str, dependencies: &[&str], cost: u64) -> TestResult<DependencyNode
 fn validate(nodes: Vec<DependencyNodeV1>) -> Result<ValidatedDependencyGraph, ContractError> {
     validate_dependency_graph(
         &NonEmptyBoundedList::new(nodes)?,
-        &mut VerificationBudget::new(4096)?,
+        &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
     )
 }
 
@@ -105,11 +107,11 @@ fn cycles_duplicate_identities_missing_evidence_and_unsafe_costs_fail_closed() -
 #[test]
 fn repeated_expansion_consumes_shared_budget_and_exhaustion_is_irreversible() -> TestResult {
     let nodes = NonEmptyBoundedList::new(vec![node("a", &[], 1)?, node("b", &["a"], 2)?])?;
-    let mut calibration = VerificationBudget::new(4096)?;
+    let mut calibration = VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?;
     validate_dependency_graph(&nodes, &mut calibration)?;
     let per_expansion = 4096 - calibration.remaining();
     assert!(per_expansion >= 3);
-    let mut budget = VerificationBudget::new(per_expansion * 2)?;
+    let mut budget = VerificationBudget::new(per_expansion * 2, MAX_RECOVERY_VERIFICATION_WORK)?;
     validate_dependency_graph(&nodes, &mut budget)?;
     validate_dependency_graph(&nodes, &mut budget)?;
     assert_eq!(
@@ -117,21 +119,7 @@ fn repeated_expansion_consumes_shared_budget_and_exhaustion_is_irreversible() ->
         Some(ContractError::WorkBudgetExceeded)
     );
     assert_eq!(budget.remaining(), 0);
-    assert_eq!(budget.charge(0), Err(ContractError::WorkBudgetExceeded));
-    let mut exact = VerificationBudget::new(1)?;
-    exact.charge(1)?;
-    assert_eq!(exact.remaining(), 0);
-    assert_eq!(exact.charge(0), Err(ContractError::WorkBudgetExceeded));
-    for invalid in [0, 4097] {
-        assert_eq!(
-            VerificationBudget::new(invalid).err(),
-            Some(ContractError::WorkBudgetExceeded)
-        );
-    }
-    let mut refused = VerificationBudget::new(1)?;
-    assert_eq!(refused.charge(2), Err(ContractError::WorkBudgetExceeded));
-    assert_eq!(refused.remaining(), 0);
-    assert_eq!(refused.charge(0), Err(ContractError::WorkBudgetExceeded));
+    assert_eq!(budget.charge(0), Err(WorkBudgetError::Exhausted));
     Ok(())
 }
 
