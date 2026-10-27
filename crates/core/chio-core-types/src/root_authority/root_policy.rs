@@ -237,6 +237,16 @@ impl RootPolicyRuleFields {
             for (scope_value, tools) in projection {
                 check_nul_free("idp_scope_projection", scope_value, 128)?;
                 check_items("idp_scope_projection", tools.len(), 0, 256)?;
+                if !tools
+                    .iter()
+                    .all(|target| is_projection_target(target.as_str()))
+                {
+                    return Err(RootAuthorityShapeError::Pattern {
+                        field: "idp_scope_projection",
+                        expected:
+                            "server/tool with a non-empty server and a non-empty tool without `/`",
+                    });
+                }
             }
         }
         check_items("holder_classes", self.holder_classes.len(), 1, 2)?;
@@ -260,6 +270,13 @@ impl RootPolicyRuleFields {
             MAX_CLOCK_SKEW_SECS,
         )
     }
+}
+
+/// One `server/tool` pair: a non-empty server, a non-empty tool, one `/`.
+fn is_projection_target(target: &str) -> bool {
+    target
+        .split_once('/')
+        .is_some_and(|(server, tool)| !server.is_empty() && !tool.is_empty() && !tool.contains('/'))
 }
 
 impl RootPolicyRule {

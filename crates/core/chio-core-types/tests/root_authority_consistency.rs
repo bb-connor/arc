@@ -376,6 +376,17 @@ fn policy_load_refuses_identity_provider_artifact_retention() {
 }
 
 #[test]
+fn policy_load_refuses_a_malformed_projection_target() {
+    let mut value = policy_json();
+    value["rules"][0]["idp_scope_projection"]["crm.read"] = json!(["crm/search/extra"]);
+    let error = serde_json::from_value::<RootPolicy>(value).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "`idp_scope_projection` is not server/tool with a non-empty server and a non-empty tool without `/`"
+    );
+}
+
+#[test]
 fn policy_load_refuses_a_ceiling_hash_that_does_not_recompute() {
     let policy = signed_policy(|value| {
         value["rules"][0]["ceiling_scope_hash"] = json!(format!("sha256:{}", "00".repeat(32)));

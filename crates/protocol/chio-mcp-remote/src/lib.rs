@@ -16,6 +16,8 @@ mod sender_constraint;
 use enterprise_provider_registry::{
     EnterpriseProviderRegistryFile, EnterpriseProviderRegistryRefusal,
 };
+#[path = "remote_mcp/root_exchange/mod.rs"]
+pub mod root_exchange;
 mod transport_identity;
 use input::{
     decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,
