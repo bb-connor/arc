@@ -1321,6 +1321,10 @@ pub(crate) fn resolve_oid4vp_verifier_signing_key(
 #[path = "config_and_public/portable_issuer_fetch.rs"]
 mod portable_issuer_fetch;
 pub(crate) use portable_issuer_fetch::*;
+#[path = "config_and_public/partner_revocation_sync.rs"]
+mod partner_revocation_sync;
+#[cfg(test)]
+pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
