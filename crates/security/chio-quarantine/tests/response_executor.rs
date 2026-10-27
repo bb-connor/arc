@@ -1,5 +1,7 @@
 #[path = "response_executor/execution_mode.rs"]
 mod execution_mode;
+#[path = "response_executor/lease_takeover.rs"]
+mod lease_takeover;
 mod response_support;
 #[path = "response_executor/rollback_budget.rs"]
 mod rollback_budget;
@@ -580,6 +582,7 @@ struct EffectState {
     fail_remove: bool,
     fail_remove_after_commit_once: bool,
     query_fault: Option<QueryFault>,
+    takeover_on_query: Option<(EffectOperation, Arc<CrashStore>, ScheduledWork)>,
 }
 
 #[derive(Clone, Copy)]
@@ -701,6 +704,15 @@ impl EffectPort for IdempotentEffects {
     fn load_result(&self, query: &EffectResultQuery) -> PortResult<EffectExecutionStatus> {
         let mut state = self.state.lock().map_err(|_| PortError::unavailable())?;
         state.queries.push(query.clone());
+        if state
+            .takeover_on_query
+            .as_ref()
+            .is_some_and(|(operation, _, _)| *operation == query.operation)
+        {
+            if let Some((_, store, work)) = state.takeover_on_query.take() {
+                store.install_work(work);
+            }
+        }
         match state.query_fault {
             Some(QueryFault::Unknown) => return Ok(EffectExecutionStatus::Unknown),
             Some(QueryFault::Unavailable) => return Err(PortError::unavailable()),
