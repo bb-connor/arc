@@ -214,7 +214,13 @@ pub fn fixture(
     effects.insert(0, freeze);
     let plan = dry_run_plan(&tenant_id, action_id, &affected_ids, effects)?;
     let scope = ResponseSimulationScope {
-        effect_id: plan.effects.as_slice()[0].effect_id.clone(),
+        effect_id: plan
+            .effects
+            .as_slice()
+            .first()
+            .ok_or("dry-run plan has no effects")?
+            .effect_id
+            .clone(),
         result: scope,
     };
     let snapshot = ResponseSimulationSnapshot {

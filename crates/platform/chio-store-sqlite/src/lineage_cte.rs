@@ -51,18 +51,19 @@ pub fn forward_receipt_lineage(
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query(rusqlite::params![
         parent_receipt_id,
-        depth_limit as i64,
-        row_limit as i64,
+        i64::from(depth_limit),
+        i64::from(row_limit),
     ])?;
     let mut ids = Vec::new();
     let mut deepest = 0u32;
     while let Some(row) = rows.next()? {
         let id: String = row.get(0)?;
-        let depth: i64 = row.get(1)?;
-        deepest = deepest.max(depth as u32);
+        let depth: u32 = row.get(1)?;
+        deepest = deepest.max(depth);
         ids.push(id);
     }
-    let truncated = ids.len() as u32 >= row_limit || deepest + 1 >= depth_limit;
+    let truncated = u32::try_from(ids.len()).map_or(true, |rows| rows >= row_limit)
+        || deepest + 1 >= depth_limit;
     Ok(WalkResult {
         receipt_ids: ids,
         depth_reached: deepest,
@@ -98,18 +99,19 @@ pub fn reverse_receipt_lineage(
     let mut stmt = conn.prepare(sql)?;
     let mut rows = stmt.query(rusqlite::params![
         child_receipt_id,
-        depth_limit as i64,
-        row_limit as i64,
+        i64::from(depth_limit),
+        i64::from(row_limit),
     ])?;
     let mut ids = Vec::new();
     let mut deepest = 0u32;
     while let Some(row) = rows.next()? {
         let id: String = row.get(0)?;
-        let depth: i64 = row.get(1)?;
-        deepest = deepest.max(depth as u32);
+        let depth: u32 = row.get(1)?;
+        deepest = deepest.max(depth);
         ids.push(id);
     }
-    let truncated = ids.len() as u32 >= row_limit || deepest + 1 >= depth_limit;
+    let truncated = u32::try_from(ids.len()).map_or(true, |rows| rows >= row_limit)
+        || deepest + 1 >= depth_limit;
     Ok(WalkResult {
         receipt_ids: ids,
         depth_reached: deepest,
