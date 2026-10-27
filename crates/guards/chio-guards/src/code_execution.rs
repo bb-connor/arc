@@ -43,7 +43,7 @@ use std::sync::OnceLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::action::{extract_action_checked, ToolAction};
 
@@ -262,6 +262,10 @@ impl Default for CodeExecutionGuard {
 impl Guard for CodeExecutionGuard {
     fn name(&self) -> &str {
         "code-execution"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

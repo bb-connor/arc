@@ -5,7 +5,7 @@
 
 use regex::Regex;
 
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::action::{extract_action_checked, ToolAction};
 use crate::forbidden_path::ForbiddenPathGuard;
@@ -206,6 +206,10 @@ impl Default for ShellCommandGuard {
 impl chio_kernel::Guard for ShellCommandGuard {
     fn name(&self) -> &str {
         "shell-command"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

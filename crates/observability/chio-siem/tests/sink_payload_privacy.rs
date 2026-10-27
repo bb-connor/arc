@@ -11,8 +11,8 @@ use chio_core::receipt::{body::ChioReceipt, decision::Decision, metadata::GuardE
 use chio_egress_contract::HttpEgressContract;
 use chio_kernel::{
     BlockingToolServerAdapter, BlockingToolServerConnection, ChioKernel, Guard, GuardContext,
-    GuardDecision, KernelConfig, KernelError, ReceiptReadContext, ReceiptStore, ReceiptStoreError,
-    ToolCallRequest, Verdict,
+    GuardDecision, GuardEvidenceDeclaration, KernelConfig, KernelError, ReceiptReadContext,
+    ReceiptStore, ReceiptStoreError, ToolCallRequest, Verdict,
 };
 use chio_siem::*;
 use rusqlite::{params, Connection};
@@ -83,6 +83,10 @@ impl BlockingToolServerConnection for CanaryServer {
 impl Guard for CanaryGuard {
     fn name(&self) -> &str {
         "SecretLeakGuard::ordinary-reason-canary-d001::ordinary-guard-canary-2384"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

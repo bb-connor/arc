@@ -654,6 +654,8 @@ mod kernel;
 #[cfg(not(loom))]
 pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 
+pub use chio_core::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+
 #[cfg(not(loom))]
 pub use kernel::{
     active_response_admission_artifact_payload_digest,

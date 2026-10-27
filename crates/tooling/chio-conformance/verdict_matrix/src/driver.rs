@@ -15,9 +15,10 @@ use chio_kernel::post_invocation::{
     PostInvocationContext, PostInvocationHook, PostInvocationInspection, PostInvocationVerdict,
 };
 use chio_kernel::{
-    ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, NestedFlowBridge,
-    ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelConfig,
+    KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -1022,6 +1023,10 @@ struct MatrixInputGuard;
 impl Guard for MatrixInputGuard {
     fn name(&self) -> &str {
         "verdict-matrix-input"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

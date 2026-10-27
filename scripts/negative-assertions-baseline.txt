@@ -218,7 +218,6 @@
 1	crates/kernel/chio-kernel/src/kernel/tests/execution_nonce/receipt_and_reaper.rs	reaper_releases_shares_for_holds_closed_before_a_store_error	kernel.reap_expired_reserved_budget_holds(1_000).is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/execution_nonce/receipt_and_reaper.rs	reaper_releases_shares_for_holds_closed_before_a_store_error	result.is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/execution_nonce/reservations.rs	reserving_authorization_keeps_hold_open_and_blocks_oversubscription	is_authoritative_spend_receipt(&authorized.receipt, &admitted, nonce.as_ref()).is_err()
-1	crates/kernel/chio-kernel/src/kernel/tests/immediate_dispatch_revalidation.rs	forced_credential_revalidation_preserves_legacy_runtime_admission_verdict	kernel .verify_presented_execution_nonce(&nonce, &nonce_binding) .is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/invocation_dispatch.rs	blocking_adapter_preserves_kernel_caller_binding_in_value_and_cost_paths	server .invoke( , request.arguments.clone(), None) .await .is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/nested_url_side_effects.rs	nested_child_before_url_elicitation_is_terminal_and_consumes_nonce	kernel .verify_presented_execution_nonce(&nonce, &nonce_binding) .is_err()
 1	crates/kernel/chio-kernel/src/kernel/tests/nonce_admission.rs	nonce_admission_reservation_checks_every_request_binding_before_consumption	kernel .reserve_presented_execution_nonce(&request, &request.capability) .is_err()

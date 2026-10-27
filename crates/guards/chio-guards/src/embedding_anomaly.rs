@@ -38,7 +38,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, Verdict,
+};
 
 /// Default cosine similarity threshold.
 pub const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.85;
@@ -314,6 +316,10 @@ impl EmbeddingAnomalyGuard {
 impl Guard for EmbeddingAnomalyGuard {
     fn name(&self) -> &str {
         "embedding-anomaly"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

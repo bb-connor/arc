@@ -7,6 +7,7 @@
 //! ```ignore
 //! pub trait Guard: Send + Sync {
 //!     fn name(&self) -> &str;
+//!     fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
 //!     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelCoreError>;
 //! }
 //! ```
@@ -19,6 +20,7 @@
 use alloc::string::String;
 
 use chio_core_types::capability::scope::ChioScope;
+use chio_core_types::receipt::metadata::GuardEvidenceDeclaration;
 
 use crate::Verdict;
 
@@ -26,6 +28,10 @@ use crate::Verdict;
 pub trait Guard: Send + Sync {
     /// Human-readable guard name (e.g. `forbidden-path`).
     fn name(&self) -> &str;
+
+    /// Whether the `details` of this guard's evidence may appear in a
+    /// committed receipt.
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
 
     /// Evaluate this guard against a tool-call context.
     ///

@@ -15,7 +15,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_egress_contract::ContractClient;
-use chio_kernel::Verdict;
+use chio_kernel::{GuardEvidenceDeclaration, Verdict};
 use reqwest::header::{HeaderMap, HeaderValue};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -235,6 +235,10 @@ fn normalize_sha256_hex(input: &str) -> Option<String> {
 impl ExternalGuard for VirusTotalGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {

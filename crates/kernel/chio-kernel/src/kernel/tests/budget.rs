@@ -241,6 +241,10 @@ fn monetary_guard_denial_consumes_no_budget_and_records_attempted_cost(
             "deny-once"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             let mut denied = self.denied.lock().unwrap();
             if !*denied {

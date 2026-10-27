@@ -51,7 +51,7 @@ use thiserror::Error;
 use tracing::warn;
 
 use chio_guards::{extract_action_checked, ToolAction};
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use chio_metering::CostDimension;
 
 // ---------------------------------------------------------------------------
@@ -342,6 +342,10 @@ impl WarehouseCostGuard {
 impl chio_kernel::Guard for WarehouseCostGuard {
     fn name(&self) -> &str {
         "warehouse-cost"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

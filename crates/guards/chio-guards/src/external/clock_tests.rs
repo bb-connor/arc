@@ -1,4 +1,5 @@
 use super::{CircuitBreaker, CircuitBreakerConfig, CircuitState, TokenBucket, TtlCache};
+use chio_kernel::GuardEvidenceDeclaration;
 use chio_security_types::clock::{
     Clock, ClockError, ClockFence, ClockReading, MonotonicInstant, UnixMillis,
 };
@@ -164,6 +165,9 @@ struct CountingGuard(AtomicU32);
 impl super::ExternalGuard for CountingGuard {
     fn name(&self) -> &str {
         "counting"
+    }
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
     fn cache_key(&self, _ctx: &super::GuardCallContext) -> Option<String> {
         None

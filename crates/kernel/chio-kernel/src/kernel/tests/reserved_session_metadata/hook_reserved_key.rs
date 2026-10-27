@@ -1,8 +1,8 @@
 //! A runtime-admission hook writes only `chio_runtime`. A hook whose `Ok`
-//! decision, allow or deny, names any other reserved key is refused on the
-//! runtime-admission denial path: its reservations are released with the
-//! metadata it returned, the tool never runs, and the forged block is absent
-//! from the signed denial.
+//! decision, allow or deny, names any other top-level key, reserved or not,
+//! is refused on the runtime-admission denial path: its reservations are
+//! released with the metadata it returned, the tool never runs, and the
+//! refused block is absent from the signed denial.
 use super::*;
 use std::sync::{Mutex, PoisonError};
 
@@ -115,7 +115,7 @@ fn hook_metadata_naming_a_reserved_key_is_refused_on_the_blocking_path() {
         response,
         &hook,
         &invocations,
-        "delivery_contract is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
     );
 }
 
@@ -135,7 +135,7 @@ fn hook_metadata_naming_a_reserved_key_is_refused_on_the_async_path() {
         response,
         &hook,
         &invocations,
-        "delivery_contract is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
     );
 }
 
@@ -155,8 +155,26 @@ fn hook_metadata_naming_a_reserved_key_is_refused_on_the_nested_path() {
         response,
         &hook,
         &invocations,
-        "delivery_contract is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
     );
+}
+
+#[test]
+fn hook_metadata_naming_any_key_but_chio_runtime_is_refused() {
+    for key in ["route", "workflow_id", "hook_note"] {
+        let (mut kernel, request, _context, invocations) = fixture();
+        let hook = StdArc::new(ForgingRuntimeHook::forging(key));
+        kernel.set_runtime_admission_hook(hook.clone());
+        let response = kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect("runtime admission denial");
+        assert_hook_forgery_refused(
+            response,
+            &hook,
+            &invocations,
+            crate::kernel::HOOK_METADATA_KEY_REFUSAL,
+        );
+    }
 }
 
 fn operation_without_metadata(request: &ToolCallRequest) -> ToolCallOperation {
@@ -181,7 +199,7 @@ fn hook_metadata_naming_runtime_admission_is_refused() {
         response,
         &hook,
         &invocations,
-        "runtime_admission is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
     );
 }
 
@@ -197,7 +215,7 @@ fn hook_deny_forging_the_kernel_runtime_admission_record_is_refused() {
         response,
         &hook,
         &invocations,
-        "runtime_admission is reserved for kernel-derived receipts",
+        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
     );
 }
 

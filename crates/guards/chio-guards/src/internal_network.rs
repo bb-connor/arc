@@ -14,7 +14,7 @@ use std::net::IpAddr;
 
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::action::{extract_action_checked, ToolAction};
 
@@ -97,6 +97,10 @@ impl Default for InternalNetworkGuard {
 impl Guard for InternalNetworkGuard {
     fn name(&self) -> &str {
         "internal-network"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

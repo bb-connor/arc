@@ -51,7 +51,9 @@ use std::sync::Mutex;
 use lru::LruCache;
 use sha2::{Digest, Sha256};
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, Verdict,
+};
 
 use crate::action::{extract_action_checked, ToolAction};
 pub use crate::jailbreak_detector::{
@@ -190,6 +192,10 @@ impl Default for JailbreakGuard {
 impl Guard for JailbreakGuard {
     fn name(&self) -> &str {
         "jailbreak"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

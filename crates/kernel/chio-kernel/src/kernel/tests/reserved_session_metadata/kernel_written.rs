@@ -1,5 +1,6 @@
-//! Caller metadata cannot pre-set a top-level key that only the kernel writes.
-//! Each key is pinned with its exact refusal across every caller entry point.
+//! Caller metadata cannot pre-set a top-level key that only a Chio signer
+//! writes. Each key is pinned with its exact refusal across every caller entry
+//! point.
 use super::*;
 
 fn refused<T>(result: Result<T, KernelError>, expected: &str) -> bool {
@@ -278,8 +279,57 @@ fn caller_cannot_set_prior_metadata() {
     );
 }
 
-/// Every key the kernel crate names for a block it writes is in the shared
-/// reserved set.
+#[test]
+fn caller_cannot_set_lineage_references() {
+    assert_refused_on_every_caller_path(
+        "lineageReferences",
+        "lineageReferences is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
+fn caller_cannot_set_acp() {
+    assert_refused_on_every_caller_path("acp", "acp is reserved for kernel-derived receipts");
+}
+
+#[test]
+fn caller_cannot_set_otel() {
+    assert_refused_on_every_caller_path("otel", "otel is reserved for kernel-derived receipts");
+}
+
+#[test]
+fn caller_cannot_set_parent_receipt_ids() {
+    assert_refused_on_every_caller_path(
+        "parent_receipt_ids",
+        "parent_receipt_ids is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
+fn caller_cannot_set_chio_kernel_receipt_id() {
+    assert_refused_on_every_caller_path(
+        "chio_kernel_receipt_id",
+        "chio_kernel_receipt_id is reserved for kernel-derived receipts",
+    );
+}
+
+/// Caller-origin keys stay admissible as caller metadata; only `ChioInternal`
+/// keys are reserved.
+#[test]
+fn caller_origin_keys_are_not_reserved() {
+    use chio_core::receipt::metadata::{MetadataKeyOrigin, RECEIPT_METADATA_KEYS};
+    for spec in RECEIPT_METADATA_KEYS {
+        let metadata = serde_json::json!({ spec.key: {"forged": true} });
+        let reserved = crate::kernel::reserved_receipt_metadata_key(Some(&metadata));
+        match spec.origin {
+            MetadataKeyOrigin::ChioInternal => assert_eq!(reserved, Some(spec.key)),
+            MetadataKeyOrigin::CallerOrHook => assert_eq!(reserved, None, "{}", spec.key),
+        }
+    }
+}
+
+/// Every key the kernel crate names for a block it writes is in the reserved
+/// set derived from the registry.
 #[test]
 fn kernel_written_metadata_key_consts_are_reserved() {
     for key in [
@@ -297,19 +347,21 @@ fn kernel_written_metadata_key_consts_are_reserved() {
         crate::finding_denial::FINDING_DENIAL_METADATA_KEY,
     ] {
         assert!(
-            crate::kernel::RESERVED_RECEIPT_METADATA_KEYS.contains(&key),
+            chio_core::receipt::metadata::reserved_receipt_metadata_keys()
+                .any(|reserved| reserved == key),
             "{key}"
         );
     }
 }
 
-/// Pins the reserved set exactly, so a key added to or removed from the const
-/// fails here until its own refusal test exists, and pins each key's exact
-/// refusal reason.
+/// Pins the reserved set the registry derives exactly, so a key whose origin
+/// changes fails here, and pins each key's exact refusal reason.
 #[test]
 fn reserved_receipt_metadata_keys_are_pinned_exactly() {
+    let reserved: Vec<&str> =
+        chio_core::receipt::metadata::reserved_receipt_metadata_keys().collect();
     assert_eq!(
-        crate::kernel::RESERVED_RECEIPT_METADATA_KEYS,
+        reserved,
         [
             "admission_operation",
             "attribution",
@@ -346,9 +398,30 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "finding_pool_mutation",
             "session_report",
             "prior_metadata",
+            "lineageReferences",
+            "chio_http_status_scope",
+            "chio_decision_receipt_id",
+            "chio_kernel_receipt_id",
+            "otel",
+            "correlation",
+            "keyEnterpriseReceipt",
+            "active_defense_evidence_id",
+            "occurred_at_unix_ms",
+            "response_simulation_evidence_id",
+            "active_defense_backfill_v1",
+            "scimLifecycle",
+            "mercury",
+            "authorizationContext",
+            "guardOutcome",
+            "deniedAccessRecord",
+            "policySnapshot",
+            "acp",
+            "agent_web_receipt_ref",
+            "parent_receipt_ids",
+            "batch_witness",
         ]
     );
-    for key in crate::kernel::RESERVED_RECEIPT_METADATA_KEYS {
+    for key in reserved {
         let purpose = match key {
             "chio_manifest_security_v1" => "registry-validated kernel entrypoints",
             "protocol_admission" => "kernel-derived admission receipts",

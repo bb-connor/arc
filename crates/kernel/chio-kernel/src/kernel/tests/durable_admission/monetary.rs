@@ -33,6 +33,10 @@ fn durable_monetary_guard_denial_closes_unstarted_payment() {
             "durable-monetary-deny-all"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::deny(Vec::new()))
         }

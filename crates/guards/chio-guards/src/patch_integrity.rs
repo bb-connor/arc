@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{GuardContext, GuardDecision, KernelError};
+use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::action::{extract_action_checked, ToolAction};
 
@@ -203,6 +203,10 @@ impl Default for PatchIntegrityGuard {
 impl chio_kernel::Guard for PatchIntegrityGuard {
     fn name(&self) -> &str {
         "patch-integrity"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

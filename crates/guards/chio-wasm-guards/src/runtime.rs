@@ -461,6 +461,19 @@ mod tests {
     }
 
     #[test]
+    fn wasm_guard_declares_unsafe() {
+        let allowing = MockWasmBackend::allowing();
+        let denying = MockWasmBackend::denying("no");
+        for backend in [allowing, denying] {
+            let guard = WasmGuard::new("g".to_string(), Box::new(backend), false, None);
+            assert_eq!(
+                guard.evidence_declaration(),
+                chio_kernel::GuardEvidenceDeclaration::UNSAFE
+            );
+        }
+    }
+
+    #[test]
     fn guard_request_serialization() {
         let req = GuardRequest {
             tool_name: "read_file".to_string(),

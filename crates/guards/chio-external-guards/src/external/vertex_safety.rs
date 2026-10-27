@@ -19,7 +19,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_egress_contract::ContractClient;
-use chio_kernel::Verdict;
+use chio_kernel::{GuardEvidenceDeclaration, Verdict};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -269,6 +269,10 @@ impl VertexDecisionDetails {
 impl ExternalGuard for VertexSafetyGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {

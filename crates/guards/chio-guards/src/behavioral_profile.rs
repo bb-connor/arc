@@ -40,7 +40,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::operator_report::EmaBaselineState;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 /// Default EMA smoothing factor. Equivalent to a ~10-sample window.
 pub const DEFAULT_EMA_ALPHA: f64 = 0.2;
@@ -350,6 +350,10 @@ fn robust_z_score(state: &EmaBaselineState, sample: f64) -> Option<f64> {
 impl Guard for BehavioralProfileGuard {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

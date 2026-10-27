@@ -142,6 +142,10 @@ impl Guard for PostPaymentMutationGuard {
         "post-payment-mutation-guard"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
     }

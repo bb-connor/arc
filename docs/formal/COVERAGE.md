@@ -1298,7 +1298,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `5d687cab27481cd4c774796c3ac297a68eb0932ff02f51ca9ec01ba1904c6a73`
+- Input digest: `3328b4f2121602e8bfac3be48ec7a2b72faed2b77a5801af902da7c2bc4f9f64`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1391,7 +1391,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/receipt/governance.rs`: `250954d1cfa40416256d372d0aa9f054dad15f00bdcdda60eecd54ca9f5de10f`
 - `crates/core/chio-core-types/src/receipt/kinds.rs`: `daa42fc42b98268c905f5fb12f8f72cbaa15f2f0a64bf52e5a43f16339c184b4`
 - `crates/core/chio-core-types/src/receipt/lineage.rs`: `9249bb20914655123a0c40945fc63d107ad7cdbf59925667b3ff81c63990ecd7`
-- `crates/core/chio-core-types/src/receipt/metadata.rs`: `d028e67b05656d73ca3364914b1fd7870e19ae4128a8392f1109b74163a9ef94`
+- `crates/core/chio-core-types/src/receipt/metadata.rs`: `83fe27e9e7c8c66c02a9492061f7504a44de8c5549dac9b65f610c0835054e62`
+- `crates/core/chio-core-types/src/receipt/metadata/key_registry.rs`: `8b167b31476c256a3f857c11af0e778531da64a1bd92c8e444c690c362fe1cc3`
 - `crates/core/chio-core-types/src/receipt/mod.rs`: `fb12943c576d2f831cdac78fa73ac46d19ae589b9a1dbc1f5a866263c30f19df`
 - `crates/core/chio-core-types/src/receipt/security.rs`: `ffbdd30d0b86603e620398ccf974e5124020b51ec594f36531c02e68f347f45e`
 - `crates/core/chio-core-types/src/receipt/security_parts/scheduler_fence_tests.rs`: `04ebe900b96c5124787ad64cbf3a87b89ce507d971c23d0a0f60148f7fa1a630`
@@ -1463,15 +1464,15 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel-core/src/capability_verify/lineage.rs`: `aee76316b1bfa39eba675d7455f518a6fc05adc6bac49211c4b9bda9172ff992`
 - `crates/kernel/chio-kernel-core/src/capability_verify_tests.rs`: `ba778ca98bb86617f9ce18ecbd5028a3613d0350eb994cd0aaa70d902aa4613b`
 - `crates/kernel/chio-kernel-core/src/clock.rs`: `a0de8284ece93eb97e4da7645c3371eda0c3b59b2ba0f0c58699f4e769fa6b6a`
-- `crates/kernel/chio-kernel-core/src/evaluate.rs`: `2232be41077a8c5b985f69af5c5b8b6f048e0c1d8d37a786f6f6c9159efde6e0`
+- `crates/kernel/chio-kernel-core/src/evaluate.rs`: `8bdee774c0b2d3b086332658dd407a8bbd309552e1435bae07d67ca31c23b064`
 - `crates/kernel/chio-kernel-core/src/formal_aeneas.rs`: `bb2c15c3dc90a27f24db07663c130b6b2803849bb6a15e94bc8837db112d118b`
 - `crates/kernel/chio-kernel-core/src/formal_core.rs`: `7534114d5d49f4b480e0a2dbdcec059467502e53dd2773d1e6856aacf85d9e76`
 - `crates/kernel/chio-kernel-core/src/fuzz.rs`: `184d1082d3ef20267a766e554bc0b4456159521d94f6ed82a7aeda453b019072`
-- `crates/kernel/chio-kernel-core/src/guard.rs`: `4734d658d8dd17759cf5c8ecc20dfb92ffc49eb6b0c0df22d79da67e6ed22c3c`
+- `crates/kernel/chio-kernel-core/src/guard.rs`: `13f43c84d4479881243961131543a79e58708f70fc5b6495c86d4bd78c8efbc7`
 - `crates/kernel/chio-kernel-core/src/kani_harnesses.rs`: `a7481eb0805cef7b117410d569d95ade4f0fb81caf0bd56095e31b8eb0d3e80b`
 - `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs`: `c15f0acd6966ba779e8052f51ef25792d33cca59124c26873ef5738f9bc5637f`
 - `crates/kernel/chio-kernel-core/src/kani_public_harnesses/revocation.rs`: `6f0e2d11ceadd3a6bdc7bd2ea58e3838b52bc023769671528ed5562466a27fe5`
-- `crates/kernel/chio-kernel-core/src/lib.rs`: `6fcd3ff2c476940b0e7afb0af4710afdf4c89e402cdb9fcff2dd80d4ccec5abe`
+- `crates/kernel/chio-kernel-core/src/lib.rs`: `85cba429747580577c5a68eb291f7e4018fe23425d6ffa7f06e386cdc713140b`
 - `crates/kernel/chio-kernel-core/src/normalized.rs`: `f9ecccda2c9b0cb1fd8604af06df5523d3828cc78257e160c260c89706d0df29`
 - `crates/kernel/chio-kernel-core/src/passport_verify.rs`: `1b61bbc5b080efafbdee4fa86990b2eef49b9a92fdf4fcc9ce9f6afb24acc8af`
 - `crates/kernel/chio-kernel-core/src/receipts.rs`: `696434dba355286d6fb0b246c5f74092df0e16d3079893b8851fbdb1a519dbea`
@@ -1484,7 +1485,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs`: `5f162b9f2abae251b4b93286bfa65258f99fe7c9749b16febc9944d416ed7021`
 - `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`: `44e7dc20b5447a46a9251beba90401cef5dbcf722bba404bd8a9c85ce988ea8a`
 - `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`: `666a575a2f76f7ef23086fb25e465b899cd757eef5f16fb909ac4b73fe6e1541`
-- `crates/kernel/chio-kernel/src/kernel/tests/budget.rs`: `4a47a40dc3563acbd82f698c5bcdec032c6a712a7f965721a7dd9936c254d518`
+- `crates/kernel/chio-kernel/src/kernel/tests/budget.rs`: `be00a573e044e327ec3e8ef56ff36992780409cdb445a245f8e8bf5b7db47b39`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs`: `c7691e99f88100c2d98741054012284c2cc08717a9cb99fc34514d159e2ef50f`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/post_dispatch_retention.rs`: `9c146e956904c8437aebad60c6b7b1b5830b90bbdb7e128173daf68df8bcdd48`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/pre_dispatch_cleanup.rs`: `f5026b50f9cde97f03feb59285ce79ba1b48098e9ecedcc6cfa5c045b9d4d569`
@@ -1607,7 +1608,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
 - `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `a6b58607f9a4e7ad3cf40113c4f2508acafd6a7d62732effdca077f71b434f93`
+- `git-worktree://rust-files`: `eca49c2b421512f37d913f7e096c658fbe28f58fffc2e24abe6755762e8aea03`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
