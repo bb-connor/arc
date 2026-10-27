@@ -10,7 +10,8 @@
 //! The adapter holds no keys and never broadcasts. It has no rail status
 //! query: `settlement_state` answers `Unavailable`, so a settlement whose
 //! acknowledgement was lost ends in `ReconcileFailed` and a dead letter for the
-//! operator.
+//! operator. A facilitator `settlement_pending` answer is outcome-unknown and
+//! carries the broadcast transaction so the operator can reconcile on chain.
 
 use std::fmt;
 use std::time::Duration;
@@ -33,6 +34,8 @@ pub const X402_EXACT_SCHEME: &str = "exact";
 const X402_VERIFY_PATH: &str = "/verify";
 const X402_SETTLE_PATH: &str = "/settle";
 const X402_AUTHORIZATION_ID_PREFIX: &str = "x402";
+/// Non-terminal settle `errorReason`: broadcast, confirmation not established.
+const X402_SETTLEMENT_PENDING: &str = "settlement_pending";
 const MAX_X402_SIGNATURE_HEX_BYTES: usize = 4096;
 
 /// CAIP-2 networks the x402 rail may settle on. On-chain value stays
@@ -200,9 +203,7 @@ pub struct X402PaymentContext {
     pub payment_requirements: X402PaymentRequirements,
 }
 
-/// Rail coordinates that identify one x402 prepayment on chain. Rendered as
-/// `x402/<caip2>/<asset>/<from>/<nonce>/<validBefore>` and used as the
-/// authorization identifier, so recovery can query the rail from it alone.
+/// Rail coordinates that identify one x402 prepayment on chain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct X402AuthorizationIdentity {
     network: String,
@@ -222,31 +223,80 @@ impl fmt::Display for X402AuthorizationIdentity {
     }
 }
 
-impl X402AuthorizationIdentity {
+/// A settled x402 prepayment: its rail coordinates, the settlement
+/// transaction and the digests that bind it. Rendered as
+/// `x402/<caip2>/<asset>/<from>/<nonce>/<validBefore>/<transaction>/<payloadDigest>/<responseDigest>`
+/// and used as the authorization identifier, so the durable journal holds
+/// the whole settlement reference and a replay restores it without the rail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct X402SettledAuthorization {
+    identity: X402AuthorizationIdentity,
+    transaction: String,
+    payment_payload_digest: String,
+    settlement_response_digest: String,
+}
+
+impl fmt::Display for X402SettledAuthorization {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/{}/{}/{}",
+            self.identity,
+            self.transaction,
+            self.payment_payload_digest,
+            self.settlement_response_digest
+        )
+    }
+}
+
+impl X402SettledAuthorization {
     fn parse(value: &str) -> Option<Self> {
-        let mut parts = value.split('/');
-        let (Some(prefix), Some(network), Some(asset), Some(from), Some(nonce), Some(before)) = (
-            parts.next(),
-            parts.next(),
-            parts.next(),
-            parts.next(),
-            parts.next(),
-            parts.next(),
-        ) else {
+        let parts: Vec<&str> = value.split('/').collect();
+        let [prefix, network, asset, from, nonce, before, transaction, payload_digest, response_digest] =
+            parts.as_slice()
+        else {
             return None;
         };
-        if prefix != X402_AUTHORIZATION_ID_PREFIX || parts.next().is_some() {
+        if *prefix != X402_AUTHORIZATION_ID_PREFIX {
             return None;
         }
         X402Network::allowlisted(network).ok()?;
-        let identity = Self {
-            network: network.to_owned(),
-            asset: evm_address(asset)?,
-            from: evm_address(from)?,
-            nonce: bytes32(nonce)?,
-            valid_before: decimal_u64(before)?,
+        let settled = Self {
+            identity: X402AuthorizationIdentity {
+                network: (*network).to_owned(),
+                asset: evm_address(asset)?,
+                from: evm_address(from)?,
+                nonce: bytes32(nonce)?,
+                valid_before: decimal_u64(before)?,
+            },
+            transaction: bytes32(transaction)?,
+            payment_payload_digest: sha256_hex(payload_digest)?,
+            settlement_response_digest: sha256_hex(response_digest)?,
         };
-        (identity.to_string() == value).then_some(identity)
+        (settled.to_string() == value).then_some(settled)
+    }
+
+    fn settlement_ref(&self) -> X402SettlementRef {
+        X402SettlementRef {
+            x402_version: X402_VERSION,
+            scheme: X402_EXACT_SCHEME.to_owned(),
+            network: self.identity.network.clone(),
+            transaction: self.transaction.clone(),
+            payer: self.identity.from.clone(),
+            payment_payload_digest: self.payment_payload_digest.clone(),
+            settlement_response_digest: self.settlement_response_digest.clone(),
+        }
+    }
+
+    fn authorization_metadata(&self) -> Result<serde_json::Value, PaymentError> {
+        let x402 = serde_json::to_value(self.settlement_ref()).map_err(|error| {
+            PaymentError::RailError(format!("x402 settlement reference is invalid: {error}"))
+        })?;
+        Ok(serde_json::json!({
+            "adapter": "x402",
+            "mode": "prepaid",
+            "x402": x402,
+        }))
     }
 }
 
@@ -389,7 +439,7 @@ impl X402PaymentAdapter {
         &self,
         body: &X402FacilitatorRequest<'_>,
         identity: &X402AuthorizationIdentity,
-    ) -> Result<X402SettlementRef, PaymentError> {
+    ) -> Result<X402SettledAuthorization, PaymentError> {
         let response: X402SettleResponse = post_json(
             &self.http,
             &self.facilitator_url,
@@ -403,29 +453,65 @@ impl X402PaymentAdapter {
             }
             _ => PaymentError::RailError("x402 facilitator settlement failed".to_owned()),
         })?;
-        let response_digest = canonical_digest(&response)?;
-        let payer_matches = response.payer.as_deref().and_then(evm_address).as_deref()
-            == Some(identity.from.as_str());
+        let payer = response.payer.as_deref().map(evm_address);
+        let pending =
+            !response.success && response.error_reason.as_deref() == Some(X402_SETTLEMENT_PENDING);
+        let payer_bound = match payer {
+            Some(payer) => payer.as_deref() == Some(identity.from.as_str()),
+            None => pending,
+        };
         let transaction = response.transaction.as_deref().and_then(bytes32);
-        match (response.success, transaction) {
-            (true, Some(transaction)) if response.network == identity.network && payer_matches => {
-                Ok(X402SettlementRef {
-                    x402_version: X402_VERSION,
-                    scheme: X402_EXACT_SCHEME.to_owned(),
-                    network: identity.network.clone(),
+        let settled = match transaction {
+            Some(transaction) if response.network == identity.network && payer_bound => {
+                Some(X402SettledAuthorization {
+                    identity: identity.clone(),
                     transaction,
-                    payer: identity.from.clone(),
                     payment_payload_digest: canonical_digest(&body.payment_payload)?,
-                    settlement_response_digest: response_digest,
+                    settlement_response_digest: canonical_digest(&response)?,
                 })
             }
-            (true, _) => Err(PaymentError::RailError(
+            _ => None,
+        };
+        match (response.success, pending, settled) {
+            (true, _, Some(settled)) => Ok(settled),
+            (false, true, Some(settled)) => Err(PaymentError::OutcomeUnknown {
+                detail: "x402 settlement was broadcast but not confirmed".to_owned(),
+                evidence: serde_json::json!({
+                    "adapter": "x402",
+                    "settlement": "pending",
+                    "authorization_identity": identity.to_string(),
+                    "x402": serde_json::to_value(settled.settlement_ref()).map_err(|error| {
+                        PaymentError::RailError(format!(
+                            "x402 settlement reference is invalid: {error}"
+                        ))
+                    })?,
+                }),
+            }),
+            (true, _, None) | (false, true, None) => Err(PaymentError::RailError(
                 "x402 settlement response binding is invalid".to_owned(),
             )),
-            (false, _) => Err(PaymentError::RailError(
+            (false, false, _) => Err(PaymentError::RailError(
                 "x402 facilitator did not confirm settlement".to_owned(),
             )),
         }
+    }
+
+    /// The settled authorization `authorization_id` names on this rail.
+    fn bound_settlement(
+        &self,
+        authorization_id: &str,
+    ) -> Result<X402SettledAuthorization, PaymentError> {
+        let settled = X402SettledAuthorization::parse(authorization_id).ok_or_else(|| {
+            PaymentError::RailError("x402 authorization identity is invalid".to_owned())
+        })?;
+        if settled.identity.network != self.rail.network.as_str()
+            || settled.identity.asset != self.rail.asset
+        {
+            return Err(PaymentError::RailError(
+                "x402 authorization identity is outside the configured rail".to_owned(),
+            ));
+        }
+        Ok(settled)
     }
 }
 
@@ -450,24 +536,17 @@ impl PaymentAdapter for X402PaymentAdapter {
             payment_requirements: &context.payment_requirements,
         };
         self.verify(&body)?;
-        let settlement = self.settle(&body, &identity)?;
-        let authorization_id = identity.to_string();
+        let settled = self.settle(&body, &identity)?;
+        let authorization_id = settled.to_string();
         if !payment_identifier_is_valid(&authorization_id) {
             return Err(PaymentError::RailError(
                 "x402 authorization identifier is invalid".to_owned(),
             ));
         }
-        let x402 = serde_json::to_value(&settlement).map_err(|error| {
-            PaymentError::RailError(format!("x402 settlement reference is invalid: {error}"))
-        })?;
         Ok(PaymentAuthorization {
             authorization_id,
             state: PaymentAuthorizationState::PrepaidFinal,
-            metadata: serde_json::json!({
-                "adapter": "x402",
-                "mode": "prepaid",
-                "x402": x402,
-            }),
+            metadata: settled.authorization_metadata()?,
         })
     }
 
@@ -526,18 +605,21 @@ impl PaymentAdapter for X402PaymentAdapter {
             ));
         }
         if let Some(authorization_id) = authorization_id {
-            let identity = X402AuthorizationIdentity::parse(authorization_id).ok_or_else(|| {
-                PaymentError::RailError("x402 authorization identity is invalid".to_owned())
-            })?;
-            if identity.network != self.rail.network.as_str() || identity.asset != self.rail.asset {
-                return Err(PaymentError::RailError(
-                    "x402 authorization identity is outside the configured rail".to_owned(),
-                ));
-            }
+            self.bound_settlement(authorization_id)?;
         }
         Err(PaymentError::Unavailable(
             "x402 has no settlement status query".to_owned(),
         ))
+    }
+
+    /// The settlement reference is part of the journaled authorization
+    /// identifier, so replay rebuilds the original authorization metadata.
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        self.bound_settlement(authorization_id)?
+            .authorization_metadata()
     }
 }
 
@@ -584,6 +666,15 @@ fn hex_body(value: &str, len: usize) -> Option<String> {
 /// Lowercase `0x` form of a 20-byte EVM address.
 fn evm_address(value: &str) -> Option<String> {
     hex_body(value, 40)
+}
+
+/// A lowercase hex SHA-256 digest, as `canonical_digest` renders it.
+fn sha256_hex(value: &str) -> Option<String> {
+    (value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')))
+    .then(|| value.to_owned())
 }
 
 /// Lowercase `0x` form of a 32-byte word.

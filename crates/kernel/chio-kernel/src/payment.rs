@@ -174,10 +174,18 @@ pub(crate) fn replayed_payment_authorization(
         .authorization_id
         .clone()
         .ok_or_else(|| PaymentError::RailError(missing_id.to_owned()))?;
+    let serde_json::Value::Object(mut metadata) =
+        adapter.replayed_authorization_metadata(&authorization_id)?
+    else {
+        return Err(PaymentError::RailError(
+            "replayed authorization metadata is not an object".to_owned(),
+        ));
+    };
+    metadata.insert("durable_replay".to_owned(), serde_json::Value::Bool(true));
     Ok(Some(PaymentAuthorization {
         authorization_id,
         state,
-        metadata: serde_json::json!({ "durable_replay": true }),
+        metadata: serde_json::Value::Object(metadata),
     }))
 }
 

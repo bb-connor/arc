@@ -479,18 +479,18 @@ fn recovery_refuses_an_identity_outside_the_configured_rail() {
 }
 
 #[test]
-fn authorization_identity_round_trips_through_its_canonical_form() {
-    let identity = X402AuthorizationIdentity::parse(&identity_string()).expect("identity parses");
-    assert_eq!(identity.network, NETWORK);
-    assert_eq!(identity.asset, ASSET.to_ascii_lowercase());
-    assert_eq!(identity.from, PAYER);
-    assert_eq!(identity.nonce, NONCE);
-    assert_eq!(identity.valid_before, VALID_BEFORE);
-    assert_eq!(identity.to_string(), identity_string());
-    assert_eq!(
-        X402AuthorizationIdentity::parse(&identity.to_string()),
-        Some(identity)
-    );
+fn settled_authorization_round_trips_through_its_canonical_form() {
+    let settled = X402SettledAuthorization::parse(&settled_authorization_id())
+        .expect("settled authorization parses");
+    assert_eq!(settled.identity.network, NETWORK);
+    assert_eq!(settled.identity.asset, ASSET.to_ascii_lowercase());
+    assert_eq!(settled.identity.from, PAYER);
+    assert_eq!(settled.identity.nonce, NONCE);
+    assert_eq!(settled.identity.valid_before, VALID_BEFORE);
+    assert_eq!(settled.identity.to_string(), identity_string());
+    assert_eq!(settled.transaction, TRANSACTION);
+    assert_eq!(settled.to_string(), settled_authorization_id());
+    assert!(payment_identifier_is_valid(&settled.to_string()));
 }
 
 #[test]

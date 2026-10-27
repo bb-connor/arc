@@ -28,6 +28,7 @@ mod caller_budget;
 #[path = "validation/capability_evidence.rs"]
 mod capability_evidence;
 pub(in crate::kernel) use capability_evidence::CapabilityPreAdmissionError;
+pub(in crate::kernel) use payment_outcome::ambiguous_payment_authorization_metadata;
 #[path = "validation/cumulative.rs"]
 mod cumulative;
 #[path = "validation/issuance.rs"]
@@ -55,7 +56,12 @@ pub(crate) struct ReservedPrepayment {
 }
 
 pub(crate) enum ReservedPrepaymentFailure {
-    Denied(KernelError),
+    /// `ambiguity` carries receipt metadata when the rail could not confirm
+    /// whether the prepayment moved value.
+    Denied {
+        error: KernelError,
+        ambiguity: Option<Box<serde_json::Value>>,
+    },
     CaptureOutcomeUnknown(ReservedCaptureFailure),
 }
 
@@ -80,7 +86,10 @@ impl ReservedCaptureFailure {
 
 impl From<KernelError> for ReservedPrepaymentFailure {
     fn from(error: KernelError) -> Self {
-        Self::Denied(error)
+        Self::Denied {
+            error,
+            ambiguity: None,
+        }
     }
 }
 
@@ -1648,6 +1657,12 @@ impl ChioKernel {
                     .iter()
                     .map(|proposal| proposal.body.proposal_deadline),
             )
+            .chain(request.governed_intent.iter().filter_map(|intent| {
+                intent
+                    .metered_billing
+                    .as_ref()
+                    .and_then(|metered| metered.quote.expires_at)
+            }))
             .fold(request.capability.expires_at, u64::min)
     }
 
@@ -1885,10 +1900,19 @@ impl ChioKernel {
                 trusted_now_unix_ms,
                 verified_payee_binding,
             )
-            .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
+            .map_err(|error| ReservedPrepaymentFailure::Denied {
+                ambiguity: error.outcome_evidence().is_some().then(|| {
+                    Box::new(ambiguous_payment_authorization_metadata(
+                        &error,
+                        Self::payment_operation_reference(
+                            request,
+                            durable_admission.map(DurableToolAdmission::operation),
+                        ),
+                    ))
+                }),
+                error: KernelError::GovernedTransactionDenied(format!(
                     "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"
-                ))
+                )),
             })?
             .ok_or_else(|| {
                 KernelError::GovernedTransactionDenied(

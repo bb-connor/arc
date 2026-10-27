@@ -7,6 +7,7 @@ use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::finding_denial::denied_metadata;
 use crate::kernel::admission_coordinator::{DispatchTransport, DurableRefusalResponse};
 use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::kernel::validation::ambiguous_payment_authorization_metadata;
 
 impl ChioKernel {
     #[cfg(test)]
@@ -1215,16 +1216,15 @@ impl ChioKernel {
                         &budget_mutation,
                         runtime_admission_metadata,
                     ),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "payment_authorization_ambiguous": true,
-                            "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": Self::payment_operation_reference(
-                                request,
-                                durable_admission.as_ref().map(DurableToolAdmission::operation),
-                            )
-                        }
-                    })),
+                    Some(ambiguous_payment_authorization_metadata(
+                        &error,
+                        Self::payment_operation_reference(
+                            request,
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                        ),
+                    )),
                 );
                 let (denial_reason, credential_disposition) =
                     match credential_reservation.commit() {

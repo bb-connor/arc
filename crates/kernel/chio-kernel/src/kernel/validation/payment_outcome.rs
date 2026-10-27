@@ -3,6 +3,34 @@
 use super::*;
 use crate::payment::{PaymentAdapter, PaymentResult};
 
+/// Receipt metadata for a payment authorization the rail did not confirm.
+pub(in crate::kernel) fn ambiguous_payment_authorization_metadata(
+    error: &PaymentError,
+    attempt_reference: &str,
+) -> serde_json::Value {
+    let mut financial = serde_json::Map::from_iter([
+        (
+            "payment_authorization_ambiguous".to_owned(),
+            serde_json::Value::Bool(true),
+        ),
+        (
+            "payment_authorization_error_code".to_owned(),
+            serde_json::json!(error.code()),
+        ),
+        (
+            "payment_attempt_reference".to_owned(),
+            serde_json::json!(attempt_reference),
+        ),
+    ]);
+    if let Some(evidence) = error.outcome_evidence() {
+        financial.insert(
+            "payment_authorization_evidence".to_owned(),
+            evidence.clone(),
+        );
+    }
+    serde_json::json!({ "financial": financial })
+}
+
 pub(super) fn retained_payment_capture_metadata(
     request: &ToolCallRequest,
     authorization: &PaymentAuthorization,

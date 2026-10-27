@@ -772,11 +772,15 @@ receipt-side settlement mapping helper.
 on EVM. Before the tool runs it checks the presented `PaymentPayload` against
 the issued requirements and the configured rail (allowlisted testnet, asset,
 currency, `payTo`, amount), refuses an EIP-3009 `validBefore` later than the
-capability or approval expiry, then calls the facilitator's `/verify` and
-`/settle`. Every authorization is a final prepayment: there is no hold to
-release and no remote refund. Charges are denominated in the token base unit,
-and the adapter requires a durable admission reference so a retry cannot
-settle twice. x402 has no settlement status query, so a settlement whose
+capability, approval or metered quote expiry, then calls the facilitator's
+`/verify` and `/settle`. Every authorization is a final prepayment: there is no
+hold to release and no remote refund. Charges are denominated in the token base
+unit, and the adapter requires a durable admission reference so a retry cannot
+settle twice. The authorization identifier carries the settlement transaction
+and its binding digests, so a durable replay restores the x402 settlement
+reference on the receipt. A `settlement_pending` answer is outcome-unknown: the
+denial receipt records the broadcast transaction and network for on-chain
+reconciliation. x402 has no settlement status query, so a settlement whose
 acknowledgement was lost is reconciled by the operator from a dead letter.
 Until the transport presents x402 payloads to the kernel, the adapter refuses
 every charge before contacting the facilitator.
