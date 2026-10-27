@@ -3054,10 +3054,14 @@ A success returns the status: `scope`, `stopped`, `readiness` (`ready`,
 `process_local`, `process_only` or `unverified`), the optional `head`,
 `host_latch`, and, while a stop holds over a durable admission store,
 `withheld_operations`: the number of returned operations whose output stays in
-durable custody until resume. A refusal returns `{"error", "message"}` with
+durable custody until resume. A refusal returns `{"error", "message", "urn"}` with
 `error` one of `bad_request` (400), `stop_head_moved` (409, with the current
 `head`), `stop_not_durable` (503, with the `status` of the stop this process
-still holds), `stop_not_ready` (503) or `resume_refused` (503). A tool call
+still holds), `stop_not_ready` (503) or `resume_refused` (503). The `message`
+is fixed for each refusal kind and excludes store diagnostics. The registered
+kernel-domain `urn` identifies the refusal: `stop-bad-request`,
+`stop-head-moved`, `stop-not-durable`, `stop-not-ready` or `resume-refused`,
+respectively. Store failure details remain in operator diagnostic logs. A tool call
 denied by a stop carries `chio_runtime.identity_disposition = "reusable"` and
 `chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
 

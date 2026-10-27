@@ -558,9 +558,29 @@ impl StopControlError {
     /// stop it holds.
     #[must_use]
     pub fn body(&self) -> serde_json::Value {
+        let (message, urn) = match self {
+            Self::BadRequest(_) => (
+                "Invalid stop request.",
+                "urn:chio:error:kernel:stop-bad-request",
+            ),
+            Self::NotDurable { .. } => (
+                "Stop holds in this process but could not be made durable.",
+                "urn:chio:error:kernel:stop-not-durable",
+            ),
+            Self::HeadMoved { .. } => ("Stop head moved.", "urn:chio:error:kernel:stop-head-moved"),
+            Self::NotReady(_) => (
+                "Stop control is not ready.",
+                "urn:chio:error:kernel:stop-not-ready",
+            ),
+            Self::Refused(_) => (
+                "Resume was refused.",
+                "urn:chio:error:kernel:resume-refused",
+            ),
+        };
         let mut body = serde_json::Map::new();
         body.insert("error".into(), self.code().into());
-        body.insert("message".into(), self.to_string().into());
+        body.insert("message".into(), message.into());
+        body.insert("urn".into(), urn.into());
         let detail = match self {
             Self::NotDurable { status, .. } => Some(("status", serde_json::to_value(status))),
             Self::HeadMoved { head } => Some(("head", serde_json::to_value(head))),
@@ -741,10 +761,16 @@ impl StopControl {
                 Ok(self.status())
             }
             Err(DurableStopError::HeadMoved { head }) => Err(StopControlError::HeadMoved { head }),
-            Err(DurableStopError::TimeUnavailable) => Err(StopControlError::Refused(
-                "authority time is unavailable".to_owned(),
-            )),
-            Err(error) => Err(StopControlError::Refused(error.to_string())),
+            Err(DurableStopError::TimeUnavailable) => {
+                tracing::warn!("durable resume refused because authority time is unavailable");
+                Err(StopControlError::Refused(
+                    "authority time is unavailable".to_owned(),
+                ))
+            }
+            Err(error) => {
+                tracing::error!(error = %error, "durable resume append failed");
+                Err(StopControlError::Refused(error.to_string()))
+            }
         }
     }
 

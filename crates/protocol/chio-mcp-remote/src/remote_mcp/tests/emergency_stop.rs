@@ -142,3 +142,52 @@ async fn emergency_routes_authenticate_and_survive_an_edge_rebuild() -> TestResu
     assert!(!second.factory.stop.heads().is_stopped());
     Ok(())
 }
+
+#[tokio::test]
+async fn stop_routes_redact_failed_store_appends() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let state = state(directory.path())?;
+    let database =
+        chio_control_plane::durable_admission_sidecar_path(&directory.path().join("sessions.db"))?;
+    let connection = rusqlite::Connection::open(database)?;
+    let (status, stopped) = call(
+        &state,
+        "POST",
+        ADMIN_EMERGENCY_STOP_PATH,
+        Some("admin-token"),
+        Some(serde_json::json!({"reason": "incident"})),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    connection.execute_batch("CREATE TABLE stop_test_external_write (value INTEGER);")?;
+    let (status, body) = call(&state, "POST", ADMIN_EMERGENCY_RESUME_PATH, Some("admin-token"),
+        Some(serde_json::json!({"expected_epoch": {"chain_generation": stopped["head"]["chain_generation"], "epoch": stopped["head"]["epoch"]}}))).await?;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        body,
+        serde_json::json!({"error": "resume_refused", "message": "Resume was refused.", "urn": "urn:chio:error:kernel:resume-refused"})
+    );
+    assert!(state.factory.stop.heads().is_stopped());
+    let (status, body) = call(
+        &state,
+        "POST",
+        ADMIN_EMERGENCY_STOP_PATH,
+        Some("admin-token"),
+        Some(serde_json::json!({"reason": "incident"})),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"], "stop_not_durable");
+    assert_eq!(
+        body["message"],
+        "Stop holds in this process but could not be made durable."
+    );
+    assert_eq!(body["urn"], "urn:chio:error:kernel:stop-not-durable");
+    assert_eq!(body["status"]["stopped"], true);
+    assert_eq!(body["status"]["durability"], "process_only");
+    assert!(!body.to_string().contains("authority database changed"));
+    assert!(!body.to_string().contains("serving-owner"));
+    Ok(())
+}
