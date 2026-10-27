@@ -84,7 +84,9 @@ Three facts constrain the implementation:
    ([lib.rs:9](../../crates/economy/chio-settle/src/lib.rs)). Its `web3`
    feature pulls `alloy-primitives`, `alloy-sol-types`, `secp256k1`,
    `chio-web3`, `chio-web3-bindings`, `chio-finding` and `chio-open-market`.
-   The kernel uses settlement types from it in 10 non-test modules: the
+   The two finding crates serve only the `finding_enforcement` module, so
+   W3a moves them to a separate `finding-market` feature and `web3` alone
+   reaches no finding-market crate. The kernel uses settlement types from it in 10 non-test modules: the
    hook, outcome-store and retry vocabulary, the completion-flow id
    helpers, and a family of signed and verified channel types. Turning the
    feature off removes all of them, so the kernel does not build without
@@ -116,6 +118,7 @@ implements it).
 | W1 | `chio-core` -> `chio-web3` | [chio-core/Cargo.toml:33](../../crates/core/chio-core/Cargo.toml); re-exported as `chio_core::web3` and its `anchors`, `chain`, `contracts`, `error`, `identity`, `qualification`, `settlement` and `trust_profile` items ([lib.rs:45, 348-383](../../crates/core/chio-core/src/lib.rs)) | Feature gate: `chio-core` feature `web3 = ["dep:chio-web3", "chio-autonomy/web3"]`; the re-exports are `cfg(feature = "web3")`. |
 | W2 | `chio-core` -> `chio-autonomy` -> `chio-web3` | [chio-core/Cargo.toml:24](../../crates/core/chio-core/Cargo.toml), [chio-autonomy/Cargo.toml:17](../../crates/economy/chio-autonomy/Cargo.toml); `chio-autonomy` re-exports `chio_web3 as web3` and its model carries `latest_web3_settlement_state: Option<Web3SettlementLifecycleState>` | Feature gate on `chio-autonomy`: `web3 = ["dep:chio-web3"]`, gating the re-export and the field. `chio-core` keeps `chio-autonomy` unconditional and forwards `web3` to it (W1). |
 | W3 | `chio-kernel` -> `chio-settle` | [chio-kernel/Cargo.toml:94](../../crates/kernel/chio-kernel/Cargo.toml), 10 non-test modules | Crate split plus feature gate. The generic settlement vocabulary moves to a new crate `chio-settle-types` (inventory below); the channel consumers move behind `chio-kernel/web3` (channel disposition below). `chio-settle` becomes `default = []`. |
+| W3a | `chio-settle/web3` -> `chio-finding`, `chio-open-market` | [chio-settle/Cargo.toml:23-24](../../crates/economy/chio-settle/Cargo.toml); used only by [finding_enforcement](../../crates/economy/chio-settle/src/finding_enforcement) and its re-exports ([lib.rs:16, 62](../../crates/economy/chio-settle/src/lib.rs)) | Feature gate: `dep:chio-finding` and `dep:chio-open-market` leave the `web3` list. `chio-settle` gains `finding-market = ["web3", "dep:chio-finding", "dep:chio-open-market", "chio-core/finding-market", "chio-federation/finding-market"]`, and `finding_enforcement` and its re-exports are `cfg(feature = "finding-market")`. Its consumers (the control-plane finding challenge coordinator, W8, and the CLI operator path, W10) already require both features. |
 | W4 | `chio-kernel` -> `chio-core::web3::anchors::OracleConversionEvidence` | [payment_pricing.rs:19, 240](../../crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_pricing.rs), [price_oracle.rs:44, 72](../../crates/kernel/chio-kernel/src/kernel/validation/price_oracle.rs) | Path change: the type already lives in `chio_core_types::oracle` and `chio-web3` re-exports it. The kernel imports it from `chio_core_types::oracle`, so W1 does not break the price-oracle path. |
 | W5 | `chio-kernel` -> `chio-link` with `web3` | [chio-kernel/Cargo.toml:88](../../crates/kernel/chio-kernel/Cargo.toml) (`default-features = false`) | Already cut. `chio-link` becomes `default = []` so the edge stays cut without the override, and the gate fails if any crate in a root closure turns `chio-link/web3` on. |
 | W6 | `chio-store-sqlite` -> `chio-settle` | [chio-store-sqlite/Cargo.toml:53](../../crates/platform/chio-store-sqlite/Cargo.toml), 19 source files | Crate split plus feature gate: the store depends on `chio-settle-types` (W3) for the generic vocabulary. The channel consumers (`channel_lifecycle_store`, `channel_release_publisher_store`, `economic_state_cache` and the channel reservation path in `admission_operation_store/obligation.rs`) move behind a `chio-store-sqlite` feature `web3 = ["dep:chio-settle", "chio-settle/web3", "chio-kernel/web3"]`, matching the kernel channel disposition. |
@@ -125,10 +128,20 @@ implements it).
 | W10 | `chio-cli` -> `chio-settle` | [chio-cli/Cargo.toml:50](../../crates/products/chio-cli/Cargo.toml); one use, `chio_settle::FindingFinalityRequirement` in [finding/operator.rs:842](../../crates/products/chio-cli/src/cli/dispatch/finding/operator.rs) | Feature gate: `chio-settle` becomes optional behind `chio-cli/web3`, and the operator path that sets a finality requirement compiles only with both `web3` and `finding-market`. |
 | W11 | `chio-cli` -> `chio-proof-room` -> `chio-web3` | [chio-cli/Cargo.toml:66](../../crates/products/chio-cli/Cargo.toml), [chio-proof-room/Cargo.toml:37](../../crates/products/chio-proof-room/Cargo.toml); proof-room verifies `chio_web3::settlement_proof` bundles | Feature gate: `chio-proof-room` becomes optional in `chio-cli` behind `web3`, gating the `proof` dispatch tree (5 source files). |
 
-The `web3` features forward downward: `chio-cli/web3` enables
-`chio-control-plane/web3`, `chio-store-sqlite/web3`, `chio-kernel/web3`,
-`chio-core/web3` and `dep:chio-proof-room`; `chio-control-plane/web3`
-enables `chio-store-sqlite/web3`, `chio-kernel/web3` and `chio-core/web3`.
+The `web3` and `finding-market` features are independent and forward
+downward separately. Neither list names a crate from the other set; where a
+crate needs both, it uses a weak `?` forward, so the combined code compiles
+only when both features are on.
+
+| Crate | `web3` | `finding-market` |
+|---|---|---|
+| `chio-core` | `dep:chio-web3`, `chio-autonomy/web3` | `dep:chio-open-market`, `chio-federation/finding-market` |
+| `chio-settle` | alloy, `secp256k1`, `chio-web3`, `chio-web3-bindings` and the other current `web3` entries, minus the two finding crates | `web3`, `dep:chio-finding`, `dep:chio-open-market`, `chio-core/finding-market`, `chio-federation/finding-market` |
+| `chio-kernel` | `dep:chio-settle`, `chio-settle/web3`, `chio-core/web3` | `dep:chio-swarm-authority`, `chio-core/finding-market`, `chio-settle?/finding-market` |
+| `chio-store-sqlite` | `dep:chio-settle`, `chio-settle/web3`, `chio-kernel/web3` | `dep:chio-finding`, `dep:chio-swarm-authority`, `chio-kernel/finding-market`, `chio-transaction-passport/finding-market`, `chio-settle?/finding-market` |
+| `chio-proof-room` | (whole crate is web3, W11) | `dep:chio-swarm-authority` |
+| `chio-control-plane` | `chio-store-sqlite/web3`, `chio-kernel/web3`, `chio-core/web3`, `dep:chio-settle`, `chio-settle/web3` | the six `chio-finding*` crates, `dep:chio-open-market`, `chio-store-sqlite/finding-market`, `chio-kernel/finding-market`, `chio-transaction-passport/finding-market`, `chio-settle?/finding-market` |
+| `chio-cli` | `chio-control-plane/web3`, `chio-store-sqlite/web3`, `chio-kernel/web3`, `chio-core/web3`, `dep:chio-web3`, `dep:chio-settle`, `dep:chio-proof-room` | `chio-control-plane/finding-market`, `chio-store-sqlite/finding-market`, `chio-kernel/finding-market`, `dep:chio-finding`, `dep:chio-finding-verifier`, `dep:chio-open-market`, `dep:chio-swarm-authority`, `chio-settle?/finding-market`, `chio-proof-room?/finding-market` |
 
 ### W3 extraction inventory
 
@@ -169,7 +182,7 @@ string-erased replacement error, and no conversion that lets
 channel implementation stays in `chio-settle` behind `web3`.
 
 The kernel's channel consumers move behind a `chio-kernel` feature
-`web3 = ["dep:chio-settle", "chio-settle/web3"]`:
+`web3` (feature table above):
 
 - [admission_operation/projection.rs:9-13](../../crates/kernel/chio-kernel/src/admission_operation/projection.rs):
   `ChannelEscrowReservationViewV1`, `ChannelLifecycleViewV1`,
@@ -259,12 +272,18 @@ The decision is implemented when all of these pass at one commit.
    The deny list lives in one data file read by the check. The failure
    output names the root, the forbidden package or feature, and the
    inverted path (`cargo tree -i`) that reaches it.
-2. The gate fails on `main` at `2df26f433d` and names edges W1, W2, W3, W6,
-   W7, W9, W10, W11 and F1 to F9. A run against that commit is kept as the
+2. The gate fails on `main` at `2df26f433d` and names edges W1, W2, W3, W3a,
+   W6, W7, W9, W10, W11 and F1 to F9. A run against that commit is kept as the
    negative control.
-3. `cargo tree -p chio-cli --features web3,finding-market -e normal` reaches
-   `chio-settle`, `chio-web3`, `chio-proof-room` and `chio-finding`, which
-   shows the gate inspects the graph the opt-in build uses.
+3. The check also runs two opt-in configurations for `chio-cli` and
+   `chio-control-plane`, with
+   `cargo tree -p <root> -e normal,features --features <set>`:
+   - `web3` only: reaches `chio-settle`, `chio-web3` (and `chio-proof-room`
+     for `chio-cli`), and names no package in the finding-market set and no
+     `finding-market` feature.
+   - `web3,finding-market`: reaches `chio-settle`, `chio-web3` and
+     `chio-finding` (and `chio-proof-room` for `chio-cli`), which shows the
+     gate inspects the graph the combined opt-in build uses.
 4. `cargo check -p <root>` passes for each of the five roots with default
    features, and `cargo check -p chio-cli --features web3,finding-market`
    passes.
