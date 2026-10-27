@@ -384,7 +384,9 @@ fn resolve_passport_lifecycle(
     let registry = load_passport_status_registry_for_admin(path)?;
     let mut lifecycle = registry.resolve_for_passport(passport, at)?;
     lifecycle.source = Some(format!("registry:{}", path.display()));
-    chio_control_plane::passport_revocation::check_passport_revocation(path, &lifecycle)?;
+    chio_control_plane::passport_revocation::check_presented_passport_revocation(
+        path, &lifecycle, passport,
+    )?;
     Ok(Some(lifecycle))
 }
 

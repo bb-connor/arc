@@ -967,7 +967,11 @@ pub(crate) fn cmd_passport_status_resolve(
         let registry = load_passport_status_registry_for_admin(path)?;
         let mut resolution = registry.resolve(passport_id)?;
         resolution.source = Some(format!("registry:{}", path.display()));
-        chio_control_plane::passport_revocation::check_passport_revocation(path, &resolution)?;
+        chio_control_plane::passport_revocation::check_registered_passport_revocation(
+            path,
+            &registry,
+            &resolution,
+        )?;
         resolution
     };
 
@@ -1024,6 +1028,7 @@ pub(crate) fn cmd_passport_status_revoke(
             passport_id,
             reason,
             revoked_at,
+            unix_now()?,
         )?
     };
 

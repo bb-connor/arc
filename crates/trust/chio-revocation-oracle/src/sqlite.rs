@@ -2,10 +2,12 @@
 //!
 //! The sparse-Merkle oracle is a pure function of the ordered sequence of
 //! inserted leaves, so the database stores that sequence (subject, epoch
-//! nonce and insertion time, ordered by a monotone sequence number) and every
-//! handle rebuilds the same tree by replay. A handle consults the database
-//! before each read and each write, so revocations committed through another
-//! handle or process on the same file are observed without a restart.
+//! nonce and insertion time, numbered densely from one) and every handle
+//! rebuilds the same tree by replay. The sequence number of the newest leaf
+//! equals the leaf count, and a stored sequence with a gap is corrupt. A
+//! handle consults the database before each read and each write, so
+//! revocations committed through another handle or process on the same file
+//! are observed without a restart.
 //!
 //! Writes run inside one `BEGIN IMMEDIATE` transaction: the handle replays any
 //! leaves committed by peers, stages the new leaves against a copy of the
@@ -40,7 +42,7 @@ CREATE TABLE chio_revocation_oracle_meta (
     schema_version INTEGER NOT NULL CHECK (schema_version = 1)
 ) STRICT;
 CREATE TABLE chio_revocation_oracle_leaves (
-    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    seq INTEGER PRIMARY KEY CHECK (seq >= 1),
     subject TEXT NOT NULL CHECK (
         typeof(subject) = 'text'
         AND length(subject) BETWEEN 1 AND 4096
@@ -67,6 +69,8 @@ pub enum SqliteRevocationOracleError {
     CorruptRecord(String),
     #[error("revocation subject exceeds {MAX_REVOCATION_SUBJECT_BYTES} bytes")]
     SubjectTooLong,
+    #[error("revocation leaf cursor {0} is outside the stored sequence range")]
+    CursorOutOfRange(u64),
     #[error("revocation oracle state lock is poisoned")]
     Poisoned,
     #[error(transparent)]
@@ -83,11 +87,21 @@ impl From<rusqlite::Error> for SqliteRevocationOracleError {
 
 type Result<T> = core::result::Result<T, SqliteRevocationOracleError>;
 
-/// The replayed tree and the last sequence number it includes.
+/// One committed leaf. `seq` numbers the leaves densely from one in
+/// insertion order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationLeaf {
+    pub seq: u64,
+    pub key: RevocationKey,
+    pub inserted_at_unix_ms: u64,
+}
+
+/// The replayed tree and the sequence number of the last leaf it includes,
+/// which is also its leaf count.
 #[derive(Clone)]
 struct Replayed {
     oracle: InMemoryRevocationOracle,
-    seq: i64,
+    seq: u64,
 }
 
 /// Durable sparse-Merkle revocation oracle.
@@ -203,6 +217,31 @@ impl SqliteRevocationOracle {
         Ok(self.current()?.contains(key))
     }
 
+    /// Up to `limit` committed leaves with a sequence number above `after`,
+    /// in sequence order.
+    pub fn leaves_after(&self, after: u64, limit: usize) -> Result<Vec<RevocationLeaf>> {
+        let cursor = i64::try_from(after)
+            .map_err(|_| SqliteRevocationOracleError::CursorOutOfRange(after))?;
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let connection = self.lock_connection()?;
+        let mut statement = connection.prepare_cached(
+            "SELECT seq, subject, epoch_nonce, inserted_at_unix_ms
+             FROM chio_revocation_oracle_leaves WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2",
+        )?;
+        let mut rows = statement.query(params![cursor, limit])?;
+        let mut leaves = Vec::new();
+        let mut expected = after;
+        while let Some(row) = rows.next()? {
+            let leaf = decode_leaf(row)?;
+            expected = next_seq(expected)?;
+            if leaf.seq != expected {
+                return Err(corrupt_leaf(leaf.seq));
+            }
+            leaves.push(leaf);
+        }
+        Ok(leaves)
+    }
+
     pub fn current_epoch_root(&self) -> Result<EpochRoot> {
         Ok(self.current()?.epoch_root())
     }
@@ -266,7 +305,7 @@ fn to_oracle_error(error: SqliteRevocationOracleError) -> RevocationOracleError 
 pub struct RevocationTransaction<'t> {
     connection: &'t Connection,
     oracle: InMemoryRevocationOracle,
-    seq: i64,
+    seq: u64,
     now_unix_ms: u64,
 }
 
@@ -281,6 +320,13 @@ impl RevocationTransaction<'_> {
         self.oracle.contains(key)
     }
 
+    /// The root of the staged tree, including keys revoked so far in this
+    /// transaction.
+    #[must_use]
+    pub fn epoch_root(&self) -> EpochRoot {
+        self.oracle.epoch_root()
+    }
+
     /// Revokes `key` within the transaction. Returns `false` when the key is
     /// already revoked.
     pub fn revoke(&mut self, key: &RevocationKey) -> Result<bool> {
@@ -290,18 +336,21 @@ impl RevocationTransaction<'_> {
         if key.subject_id.as_str().len() > MAX_REVOCATION_SUBJECT_BYTES {
             return Err(SqliteRevocationOracleError::SubjectTooLong);
         }
+        let seq = next_seq(self.seq)?;
+        let stored_seq = i64::try_from(seq).map_err(|_| corrupt_leaf(seq))?;
         self.oracle.insert(key.clone(), self.now_unix_ms)?;
         self.connection.execute(
             "INSERT INTO chio_revocation_oracle_leaves
-                (subject, epoch_nonce, inserted_at_unix_ms)
-             VALUES (?1, ?2, ?3)",
+                (seq, subject, epoch_nonce, inserted_at_unix_ms)
+             VALUES (?1, ?2, ?3, ?4)",
             params![
+                stored_seq,
                 key.subject_id.as_str(),
                 key.epoch_nonce.get().to_be_bytes().as_slice(),
                 self.now_unix_ms.to_be_bytes().as_slice()
             ],
         )?;
-        self.seq = self.connection.last_insert_rowid();
+        self.seq = seq;
         Ok(true)
     }
 }
@@ -346,29 +395,51 @@ fn initialize(transaction: &Transaction<'_>) -> Result<()> {
 
 /// Replays every leaf committed after `replayed.seq`, in sequence order.
 fn catch_up(connection: &Connection, mut replayed: Replayed) -> Result<Replayed> {
+    let cursor = i64::try_from(replayed.seq).map_err(|_| corrupt_leaf(replayed.seq))?;
     let mut statement = connection.prepare_cached(
         "SELECT seq, subject, epoch_nonce, inserted_at_unix_ms
          FROM chio_revocation_oracle_leaves WHERE seq > ?1 ORDER BY seq ASC",
     )?;
-    let mut rows = statement.query(params![replayed.seq])?;
+    let mut rows = statement.query(params![cursor])?;
     while let Some(row) = rows.next()? {
-        let seq: i64 = row.get(0)?;
-        let subject: String = row.get(1)?;
-        let nonce: Vec<u8> = row.get(2)?;
-        let inserted_at: Vec<u8> = row.get(3)?;
-        let corrupt = || SqliteRevocationOracleError::CorruptRecord(format!("leaf {seq}"));
-        let nonce: [u8; 8] = nonce.try_into().map_err(|_| corrupt())?;
-        let inserted_at: [u8; 8] = inserted_at.try_into().map_err(|_| corrupt())?;
-        let inserted_at = u64::from_be_bytes(inserted_at);
-        let key = RevocationKey::new(
-            SubjectId::new(subject),
-            EpochNonce::new(u64::from_be_bytes(nonce)),
-        );
+        let leaf = decode_leaf(row)?;
+        if leaf.seq != next_seq(replayed.seq)? {
+            return Err(corrupt_leaf(leaf.seq));
+        }
         replayed
             .oracle
-            .insert(key, inserted_at)
-            .map_err(|_| corrupt())?;
-        replayed.seq = seq;
+            .insert(leaf.key, leaf.inserted_at_unix_ms)
+            .map_err(|_| corrupt_leaf(leaf.seq))?;
+        replayed.seq = leaf.seq;
     }
     Ok(replayed)
+}
+
+fn next_seq(seq: u64) -> Result<u64> {
+    seq.checked_add(1)
+        .filter(|next| i64::try_from(*next).is_ok())
+        .ok_or_else(|| corrupt_leaf(seq))
+}
+
+fn decode_leaf(row: &rusqlite::Row<'_>) -> Result<RevocationLeaf> {
+    let stored_seq: i64 = row.get(0)?;
+    let seq = u64::try_from(stored_seq)
+        .map_err(|_| SqliteRevocationOracleError::CorruptRecord(format!("leaf {stored_seq}")))?;
+    let subject: String = row.get(1)?;
+    let nonce: Vec<u8> = row.get(2)?;
+    let inserted_at: Vec<u8> = row.get(3)?;
+    let nonce: [u8; 8] = nonce.try_into().map_err(|_| corrupt_leaf(seq))?;
+    let inserted_at: [u8; 8] = inserted_at.try_into().map_err(|_| corrupt_leaf(seq))?;
+    Ok(RevocationLeaf {
+        seq,
+        key: RevocationKey::new(
+            SubjectId::new(subject),
+            EpochNonce::new(u64::from_be_bytes(nonce)),
+        ),
+        inserted_at_unix_ms: u64::from_be_bytes(inserted_at),
+    })
+}
+
+fn corrupt_leaf(seq: u64) -> SqliteRevocationOracleError {
+    SqliteRevocationOracleError::CorruptRecord(format!("leaf {seq}"))
 }

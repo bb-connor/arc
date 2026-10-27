@@ -27,7 +27,11 @@ fn passport() -> Fallible<AgentPassport> {
 
 fn publish(path: &Path, passport: &AgentPassport) -> Fallible<PassportLifecycleRecord> {
     Ok(PassportStatusRegistry::update(path, |registry| {
-        registry.publish(passport, PUBLISHED_AT, PassportStatusDistribution::default())
+        registry.publish(
+            passport,
+            PUBLISHED_AT,
+            PassportStatusDistribution::default(),
+        )
     })?)
 }
 
@@ -133,13 +137,10 @@ fn a_filtered_view_of_a_revoked_passport_is_refused_by_the_local_oracle() -> Tes
     assert_eq!(resolution.state, PassportLifecycleState::NotFound);
     assert_ne!(resolution.passport_id, record.passport_id);
 
-    let error = check_passport_revocation(
-        &path,
-        &resolution,
-        &passport_credential_digests(&filtered)?,
-    )
-    .err()
-    .ok_or("a revoked credential must refuse the filtered view")?;
+    let error =
+        check_passport_revocation(&path, &resolution, &passport_credential_digests(&filtered)?)
+            .err()
+            .ok_or("a revoked credential must refuse the filtered view")?;
     assert!(
         error
             .to_string()
@@ -208,7 +209,10 @@ fn a_revocation_dated_after_now_is_refused_before_the_oracle_is_written() -> Tes
         matches!(refused, RegistryUpdateError::Refused(_)),
         "{refused}"
     );
-    assert!(refused.to_string().contains("after the current time"), "{refused}");
+    assert!(
+        refused.to_string().contains("after the current time"),
+        "{refused}"
+    );
     assert!(oracle_leaves(&path)?.is_empty());
     assert_eq!(
         PassportStatusRegistry::load(&path)?

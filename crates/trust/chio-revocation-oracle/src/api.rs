@@ -83,6 +83,7 @@ impl RevocationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EpochRoot {
     pub epoch: u64,
     pub root_hash: [u8; 32],
@@ -91,6 +92,7 @@ pub struct EpochRoot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RootSignature {
     pub signer_id: String,
     pub algorithm: String,

@@ -53,6 +53,97 @@ pub fn passport_revocation_key(passport_id: &str) -> RevocationKey {
     )
 }
 
+/// Epoch nonce of every credential revocation leaf. A credential leaf names
+/// the SHA-256 digest of one signed reputation credential, so a passport
+/// rebuilt from a subset of a revoked passport's credentials is still
+/// refused.
+pub const CREDENTIAL_REVOCATION_NONCE: u64 = 0x635F_6350_7252_7600;
+
+/// The oracle key that records the revocation of the signed credential whose
+/// canonical JSON hashes to `digest`.
+#[must_use]
+pub fn credential_revocation_key(digest: &str) -> RevocationKey {
+    RevocationKey::new(
+        SubjectId::from(digest),
+        EpochNonce::new(CREDENTIAL_REVOCATION_NONCE),
+    )
+}
+
+/// The kind of a passport revocation leaf. Each kind owns exactly one epoch
+/// nonce, so a published leaf names its kind and never its nonce.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum PassportRevocationLeafKind {
+    Passport,
+    Credential,
+}
+
+impl PassportRevocationLeafKind {
+    #[must_use]
+    pub fn epoch_nonce(self) -> EpochNonce {
+        EpochNonce::new(match self {
+            Self::Passport => PASSPORT_REVOCATION_NONCE,
+            Self::Credential => CREDENTIAL_REVOCATION_NONCE,
+        })
+    }
+
+    #[must_use]
+    pub fn from_epoch_nonce(nonce: EpochNonce) -> Option<Self> {
+        match nonce.get() {
+            PASSPORT_REVOCATION_NONCE => Some(Self::Passport),
+            CREDENTIAL_REVOCATION_NONCE => Some(Self::Credential),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn revocation_key(self, subject: &str) -> RevocationKey {
+        RevocationKey::new(SubjectId::from(subject), self.epoch_nonce())
+    }
+}
+
+/// A committed passport revocation leaf as a peer rebuilds it: its dense
+/// sequence number, its kind and its subject. The epoch nonce is derived
+/// from the kind.
+#[cfg(feature = "sqlite")]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PassportRevocationLeaf {
+    pub seq: u64,
+    pub kind: PassportRevocationLeafKind,
+    pub subject: String,
+}
+
+/// Refusals of [`PassportRevocationLeaf::from_oracle_leaf`].
+#[cfg(feature = "sqlite")]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum PassportRevocationLeafError {
+    #[error("revocation leaf {seq} carries an epoch nonce outside the passport leaf kinds")]
+    UnpublishableLeaf { seq: u64 },
+}
+
+#[cfg(feature = "sqlite")]
+impl PassportRevocationLeaf {
+    pub fn from_oracle_leaf(
+        leaf: &crate::sqlite::RevocationLeaf,
+    ) -> Result<Self, PassportRevocationLeafError> {
+        let kind = PassportRevocationLeafKind::from_epoch_nonce(leaf.key.epoch_nonce)
+            .ok_or(PassportRevocationLeafError::UnpublishableLeaf { seq: leaf.seq })?;
+        Ok(Self {
+            seq: leaf.seq,
+            kind,
+            subject: leaf.key.subject_id.as_str().to_owned(),
+        })
+    }
+
+    #[must_use]
+    pub fn to_revocation_key(&self) -> RevocationKey {
+        self.kind.revocation_key(&self.subject)
+    }
+}
+
 /// Bridge value emitted when a passport flips to `Revoked`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PassportRevocationEvent {

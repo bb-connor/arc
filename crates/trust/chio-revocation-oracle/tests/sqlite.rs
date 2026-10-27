@@ -412,7 +412,10 @@ fn a_leaf_projects_to_seq_kind_and_subject_with_the_nonce_from_the_kind() -> Tes
             {"seq": 2, "kind": "credential", "subject": digest},
         ])
     );
-    assert_eq!(leaves[1].to_revocation_key(), credential_revocation_key(&digest));
+    assert_eq!(
+        leaves[1].to_revocation_key(),
+        credential_revocation_key(&digest)
+    );
     Ok(())
 }
 

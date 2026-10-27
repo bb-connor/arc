@@ -31,9 +31,12 @@ pub use finding_status_sparse::{
 };
 pub use freshness::{verify_fresh_epoch_root, FreshnessConfig};
 pub use passport_bridge::{
-    apply_passport_revocation, passport_revocation_key, PassportRevocationBridgeError,
-    PassportRevocationEvent, PASSPORT_REVOCATION_NONCE,
+    apply_passport_revocation, credential_revocation_key, passport_revocation_key,
+    PassportRevocationBridgeError, PassportRevocationEvent, PassportRevocationLeafKind,
+    CREDENTIAL_REVOCATION_NONCE, PASSPORT_REVOCATION_NONCE,
 };
+#[cfg(feature = "sqlite")]
+pub use passport_bridge::{PassportRevocationLeaf, PassportRevocationLeafError};
 pub use signer::{
     Ed25519RootSigner, Ed25519RootVerifier, EpochRootSigner, EpochRootVerifier, ALGORITHM_ED25519,
     DOMAIN_SEPARATION_CONTEXT,
@@ -41,6 +44,6 @@ pub use signer::{
 pub use sparse_merkle::InMemoryRevocationOracle;
 #[cfg(feature = "sqlite")]
 pub use sqlite::{
-    RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
+    RevocationLeaf, RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
     MAX_REVOCATION_SUBJECT_BYTES, SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION,
 };

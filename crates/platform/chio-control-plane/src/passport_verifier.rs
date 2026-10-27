@@ -424,11 +424,14 @@ impl PassportStatusRegistry {
             return Ok(existing.clone());
         }
 
+        let credential_digests = chio_credentials::passport_credential_digests(passport)
+            .map_err(|error| CliError::policy_error(error.to_string()))?;
         let record = PassportLifecycleRecord {
             passport_id: verification.passport_id.clone(),
             subject: verification.subject.clone(),
             issuers: verification.issuers.clone(),
             issuer_count: verification.issuer_count,
+            credential_digests,
             published_at,
             updated_at: published_at,
             status: PassportLifecycleState::Active,
@@ -1871,6 +1874,7 @@ mod revocation_lag_tests {
             subject: "did:example:subject".to_string(),
             issuers: Vec::new(),
             issuer_count: 0,
+            credential_digests: vec!["ab".repeat(32)],
             published_at: 1_000,
             updated_at: 1_000,
             status: PassportLifecycleState::Active,

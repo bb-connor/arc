@@ -90,6 +90,9 @@ pub struct PassportLifecycleRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub issuers: Vec<String>,
     pub issuer_count: usize,
+    /// SHA-256 digests of the signed credentials the published passport
+    /// carries, as lowercase hex in strictly ascending order.
+    pub credential_digests: Vec<String>,
     pub published_at: u64,
     #[serde(default)]
     pub updated_at: u64,
@@ -141,6 +144,7 @@ impl PassportLifecycleRecord {
             Some(self.published_at),
             &self.valid_until,
         )?;
+        validate_credential_digests(&self.passport_id, &self.credential_digests)?;
         if self.status == PassportLifecycleState::NotFound
             || self.status == PassportLifecycleState::Stale
         {
@@ -203,6 +207,31 @@ impl PassportLifecycleRecord {
         )?;
         Ok(Some(event))
     }
+}
+
+fn validate_credential_digests(passport_id: &str, digests: &[String]) -> Result<(), CredentialError> {
+    if digests.is_empty() {
+        return Err(CredentialError::InvalidPassportLifecycle(format!(
+            "passport lifecycle entry `{passport_id}` must list its credential digests"
+        )));
+    }
+    for digest in digests {
+        let well_formed = digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        if !well_formed {
+            return Err(CredentialError::InvalidPassportLifecycle(format!(
+                "passport lifecycle entry `{passport_id}` carries a credential digest that is not 64 lowercase hex characters"
+            )));
+        }
+    }
+    if !digests.windows(2).all(|pair| pair[0] < pair[1]) {
+        return Err(CredentialError::InvalidPassportLifecycle(format!(
+            "passport lifecycle entry `{passport_id}` must list credential digests in strictly ascending order"
+        )));
+    }
+    Ok(())
 }
 
 impl PassportLifecycleResolution {
