@@ -27,7 +27,7 @@ impl PausedStatusRegistry {
         let registry = serde_json::to_vec(&PassportStatusRegistry::default()).test_unwrap();
         std::fs::write(&path, registry).test_unwrap();
         let (pause, opened) =
-            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND);
+            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND).test_unwrap();
         (Self(pause), opened)
     }
 

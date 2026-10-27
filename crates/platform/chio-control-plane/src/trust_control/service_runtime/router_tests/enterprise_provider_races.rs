@@ -47,7 +47,7 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
     state.config.enterprise_providers_file = Some(path.clone());
     std::fs::write(&path, &bytes)?;
     let (pause, mut opened) =
-        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
+        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD)?;
     let upsert = tokio::task::spawn_blocking({
         let state = state.clone();
         let added = added.clone();

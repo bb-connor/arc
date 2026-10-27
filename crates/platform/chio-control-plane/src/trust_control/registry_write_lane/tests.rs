@@ -93,7 +93,7 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
 
     std::fs::write(&path, bytes)?;
     let (pause, mut opened) =
-        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
+        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD)?;
 
     let lane = BlockingLane::new("operator_registry_write", 1);
     let request = tokio::spawn({

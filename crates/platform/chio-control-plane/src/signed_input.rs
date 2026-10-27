@@ -27,14 +27,15 @@ pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
         .read(true)
         .custom_flags(flags)
         .open(path)?;
-    if !file.metadata()?.file_type().is_file() {
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "signed input must be a regular file",
         ));
     }
     #[cfg(test)]
-    read_pause::wait(path);
+    read_pause::wait(&metadata);
     let mut bytes = Vec::new();
     file.take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
         .read_to_end(&mut bytes)?;

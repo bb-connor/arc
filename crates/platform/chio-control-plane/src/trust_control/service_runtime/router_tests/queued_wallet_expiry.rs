@@ -442,7 +442,7 @@ impl PausedOffers {
     ) -> TestResult<(Self, tokio::sync::mpsc::UnboundedReceiver<()>)> {
         std::fs::write(&path, bytes)?;
         let (pause, entered) =
-            crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
+            crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD)?;
         Ok((Self(Some(pause)), entered))
     }
 

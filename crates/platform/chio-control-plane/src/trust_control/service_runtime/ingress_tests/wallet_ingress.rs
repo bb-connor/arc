@@ -14,7 +14,7 @@ impl PausedRegistry {
         let bytes = canonical_json_bytes(&PassportIssuanceOfferRegistry::default())?;
         std::fs::write(&path, bytes)?;
         let (pause, opened) =
-            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND);
+            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND)?;
         Ok((Self(pause), opened))
     }
 

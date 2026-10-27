@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -11,11 +12,11 @@ struct Barrier {
     finished: Arc<AtomicBool>,
 }
 
-static BARRIERS: LazyLock<Mutex<BTreeMap<PathBuf, Barrier>>> =
+static BARRIERS: LazyLock<Mutex<BTreeMap<(u64, u64), Barrier>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
 
 pub(crate) struct ReadPause {
-    path: PathBuf,
+    identity: (u64, u64),
     release: mpsc::Sender<()>,
     finished: Arc<AtomicBool>,
 }
@@ -24,14 +25,19 @@ impl ReadPause {
     pub(crate) fn install(
         path: &Path,
         bound: Duration,
-    ) -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
+    ) -> std::io::Result<(Self, tokio::sync::mpsc::UnboundedReceiver<()>)> {
+        let metadata = std::fs::metadata(path)?;
+        let identity = (metadata.dev(), metadata.ino());
         let (entered, receiver) = tokio::sync::mpsc::unbounded_channel();
         let (release, released) = mpsc::channel();
         let finished = Arc::new(AtomicBool::new(false));
         let mut barriers = BARRIERS.lock().unwrap_or_else(|error| error.into_inner());
-        assert!(!barriers.contains_key(path), "read pause already installed");
+        assert!(
+            !barriers.contains_key(&identity),
+            "read pause already installed"
+        );
         barriers.insert(
-            path.to_owned(),
+            identity,
             Barrier {
                 entered,
                 released,
@@ -39,14 +45,14 @@ impl ReadPause {
                 finished: Arc::clone(&finished),
             },
         );
-        (
+        Ok((
             Self {
-                path: path.to_owned(),
+                identity,
                 release,
                 finished,
             },
             receiver,
-        )
+        ))
     }
 
     pub(crate) fn release(self) {
@@ -63,19 +69,43 @@ impl Drop for ReadPause {
         BARRIERS
             .lock()
             .unwrap_or_else(|error| error.into_inner())
-            .remove(&self.path);
+            .remove(&self.identity);
         let _ = self.release.send(());
     }
 }
 
-pub(super) fn wait(path: &Path) {
+pub(super) fn wait(metadata: &std::fs::Metadata) {
     let barrier = BARRIERS
         .lock()
         .unwrap_or_else(|error| error.into_inner())
-        .remove(path);
+        .remove(&(metadata.dev(), metadata.ino()));
     if let Some(barrier) = barrier {
         let _ = barrier.entered.send(());
         let _ = barrier.released.recv_timeout(barrier.bound);
         barrier.finished.store(true, Ordering::SeqCst);
     }
+}
+
+#[tokio::test]
+async fn read_pause_matches_a_canonical_read_after_install_through_a_directory_alias(
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let directory = chio_test_support::private_tempdir()?;
+    let real = directory.path().join("real");
+    std::fs::create_dir(&real)?;
+    let alias = directory.path().join("alias");
+    std::os::unix::fs::symlink(&real, &alias)?;
+    let file = real.join("registry.json");
+    std::fs::write(&file, b"{}")?;
+    let bound = Duration::from_secs(10);
+    let (pause, mut entered) = ReadPause::install(&alias.join("registry.json"), bound)?;
+    let canonical = file.canonicalize()?;
+    let read = tokio::task::spawn_blocking(move || super::read_bounded(&canonical));
+    tokio::time::timeout(bound, entered.recv())
+        .await?
+        .ok_or("aliased registry read did not enter pause")?;
+    assert!(!pause.is_finished());
+    assert!(!read.is_finished());
+    pause.release();
+    assert_eq!(tokio::time::timeout(bound, read).await???, b"{}");
+    Ok(())
 }

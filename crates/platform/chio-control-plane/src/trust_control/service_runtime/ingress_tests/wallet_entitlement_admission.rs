@@ -20,7 +20,7 @@ impl PausedOffers {
     fn serve(path: PathBuf, offers: Vec<u8>) -> TestResult<(Self, UnboundedReceiver<()>)> {
         std::fs::write(&path, offers)?;
         let (pause, opened) =
-            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND);
+            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND)?;
         Ok((Self(pause), opened))
     }
 
