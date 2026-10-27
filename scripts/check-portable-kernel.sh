@@ -23,6 +23,10 @@ echo "[portable-kernel] building chio-decision-model for host and wasm32-unknown
 cargo build -p chio-decision-model --no-default-features
 cargo build -p chio-decision-model --target wasm32-unknown-unknown --no-default-features
 
+echo "[portable-kernel] building chio-predicate-dag for host and wasm32-unknown-unknown with --no-default-features"
+cargo build -p chio-predicate-dag --no-default-features
+cargo build -p chio-predicate-dag --target wasm32-unknown-unknown --no-default-features
+
 echo "[portable-kernel] testing chio-core-types library and integration tests with --no-default-features"
 cargo test -p chio-core-types --tests --no-default-features
 

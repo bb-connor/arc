@@ -671,3 +671,43 @@ default_unwind = 6
 timeout_secs = 600
 unwinding_checks = true
 notes = "Symbolic Q16.16 scores over a four-element feasible set; first maximum wins."
+
+[[harness]]
+crate = "chio-predicate-dag"
+features = ["kani"]
+harness = "verify_fill_is_zero_or_all_ones"
+lane = "pr"
+default_unwind = 2
+timeout_secs = 600
+unwinding_checks = true
+notes = "The branch-free fill mask is zero or all ones and matches its input."
+
+[[harness]]
+crate = "chio-predicate-dag"
+features = ["kani"]
+harness = "verify_classify_respects_thresholds"
+lane = "pr"
+default_unwind = 17
+timeout_secs = 600
+unwinding_checks = true
+notes = "Two symbolic Q16.16 scores, ordered thresholds and attestation bits classify per the threshold table."
+
+[[harness]]
+crate = "chio-predicate-dag"
+features = ["kani"]
+harness = "verify_eval_matches_reference_small"
+lane = "pr"
+default_unwind = 17
+timeout_secs = 600
+unwinding_checks = true
+notes = "A fixed four-atom two-rule artifact with symbolic atom trits matches a strong Kleene reference; unwind covers the 16-word atom planes."
+
+[[harness]]
+crate = "chio-predicate-dag"
+features = ["kani"]
+harness = "verify_widen_uncertainty_never_admits_single_rule"
+lane = "pr"
+default_unwind = 17
+timeout_secs = 600
+unwinding_checks = true
+notes = "A two-atom Deny or Hold rule: widening thresholds and dropping attestation never turns a non-Allow outcome into Allow."
