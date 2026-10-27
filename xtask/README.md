@@ -48,8 +48,9 @@ item also carries the inverted path back to the root, the root's direct
 dependencies that reach it, and the `cargo tree -i` command that shows every
 path. `--mode <name>` and `--root <crate>` (both repeatable) limit the run to
 listed entries; an unlisted name, a malformed policy file or a failed
-`cargo tree` is an error. The gate implements ADR-0035 and is not yet required
-in CI.
+`cargo tree` is an error. The gate implements
+[ADR-0035](../docs/adr/ADR-0035-web3-free-distribution.md) and is not yet
+required in CI.
 
 ```sh
 cargo xtask check web3-free-closure

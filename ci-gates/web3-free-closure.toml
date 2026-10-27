@@ -1,6 +1,6 @@
 # ci-gates/web3-free-closure.toml
-# Policy for `cargo xtask check web3-free-closure` (ADR-0035 acceptance gates
-# 1 and 3).
+# Policy for `cargo xtask check web3-free-closure`, acceptance gates 1 and 3
+# of docs/adr/ADR-0035-web3-free-distribution.md.
 #
 # Each `[[mode]]` resolves every listed root on its own with
 #   cargo tree -p <root> -e normal,features --prefix depth --format "{p} {f}"
