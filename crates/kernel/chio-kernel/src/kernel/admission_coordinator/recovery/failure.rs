@@ -61,5 +61,8 @@ pub(crate) fn operation_error(
 pub(crate) fn port_error(
     error: crate::admission_operation::AdmissionRecoveryPortError,
 ) -> KernelError {
+    if error.kind() == crate::admission_operation::RemoteRecoveryFailureKind::OutputWithheld {
+        return KernelError::OutputWithheld;
+    }
     KernelError::AdmissionRecovery(Box::new(AdmissionRecoveryError::Port(error)))
 }

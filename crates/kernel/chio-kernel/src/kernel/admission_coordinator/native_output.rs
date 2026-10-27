@@ -393,12 +393,11 @@ impl ChioKernel {
         // release after revocation or containment. Query current authority
         // outside the mutation lock, then revalidate the original lease.
         super::super::security_dispatch::callback("native output release authority", || {
-            self.check_revocation(&request.capability)?;
-            if self.is_emergency_stopped() {
-                return Err(invalid("native output denied by emergency stop"));
-            }
-            Ok(())
+            self.check_revocation(&request.capability)
         })?;
+        if self.is_emergency_stopped() {
+            return Err(KernelError::OutputWithheld);
+        }
         authority.finish()
     }
 }

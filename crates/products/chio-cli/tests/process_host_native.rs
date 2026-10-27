@@ -133,7 +133,7 @@ fn process_host_keeps_a_durable_stop_across_os_death() -> Result<(), Box<dyn std
     );
     let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let cases = evidence["cases"].as_array().ok_or("missing cases")?;
-    let expected = [("hold", 1), ("C7", 0), ("C8", 1)];
+    let expected = [("hold", 1), ("C7", 0), ("C6", 1), ("C8", 1)];
     assert_eq!(cases.len(), expected.len());
     for (case, (cutpoint, publications)) in cases.iter().zip(expected) {
         assert_eq!(case["cutpoint"], cutpoint);

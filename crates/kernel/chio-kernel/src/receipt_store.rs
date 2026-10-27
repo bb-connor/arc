@@ -333,6 +333,8 @@ pub struct AuthorizationReceiptConsumption {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
+    #[error("durable output is withheld while the kernel is stopped")]
+    OutputWithheld,
     #[error(transparent)]
     Schema(#[from] chio_security_types::schema::SchemaRefusal),
     #[error(transparent)]
@@ -1442,6 +1444,9 @@ fn claimed_authorization_error(
     match error {
         Store::Unavailable(detail) => AdmissionBudgetAuthorizationError::Unavailable(detail),
         Store::Fenced => AdmissionBudgetAuthorizationError::Fenced,
+        Store::KernelStopped => AdmissionBudgetAuthorizationError::Invariant(
+            "stopped admission cannot acquire a budget authorization claim".into(),
+        ),
         Store::NotFound => AdmissionBudgetAuthorizationError::Invariant(
             "admission operation was not found".to_owned(),
         ),
@@ -1459,6 +1464,9 @@ fn claimed_capture_error(
     match error {
         Store::Unavailable(detail) => Capture::Unavailable(detail),
         Store::Fenced => Capture::Fenced,
+        Store::KernelStopped => {
+            Capture::Invariant("stopped admission cannot acquire a capture claim".into())
+        }
         Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
         Store::Invariant(detail) => Capture::Invariant(detail),
         Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),

@@ -141,6 +141,8 @@ impl std::fmt::Display for ReplayClockDirection {
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
+    #[error("durable output is withheld while the kernel is stopped")]
+    OutputWithheld,
     #[error(transparent)]
     UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("unknown session: {0}")]
@@ -491,6 +493,11 @@ impl KernelError {
 
     pub fn report(&self) -> StructuredErrorReport {
         match self {
+            Self::OutputWithheld => self.report_with_context(
+                "CHIO-KERNEL-OUTPUT-WITHHELD",
+                serde_json::json!({ "retry_after_resume": true }),
+                "Resume the kernel before retrying the retained request with the same identity.",
+            ),
             Self::Overloaded { resource } => self.report_with_context(
                 "CHIO-KERNEL-OVERLOADED",
                 serde_json::json!({ "resource": format!("{resource:?}") }),

@@ -90,9 +90,14 @@ incremental stream transport in this version.
 Protocol/runtime failures use `{"protocol":"chio.process.v1","ok":false,
 "error":{"code":"..."}}`. Codes are `unauthenticated`, `invalid_request`,
 `cancelled`, `conflict`, `checkpoint_conflict`, `limit_reached`, `runtime_error`,
-`blob_missing`, `blob_corrupt`, `response_too_large`, `invalid_frame`, and `frame_timeout`. Internal paths,
+`output_withheld`, `blob_missing`, `blob_corrupt`, `response_too_large`, `invalid_frame`, and `frame_timeout`. Internal paths,
 SQL errors and credentials are not returned. Transport/authentication errors
 have no tool receipt; admitted kernel denials retain their signed receipts.
+
+A durable output held by an active stop returns `output_withheld` without a
+receipt or output. The host retains the operation and its original attempt.
+After resume, retry with the same operation key and arguments to release the
+retained result without dispatching the effect again.
 
 ## Recovery and signed data
 

@@ -852,6 +852,7 @@ fn invalid_outcome(
 fn operation_store_error(error: AdmissionOperationStoreError) -> AdmissionAuthorityWireError {
     let code = match error {
         AdmissionOperationStoreError::Unavailable(_) => AdmissionAuthorityErrorCode::Unavailable,
+        AdmissionOperationStoreError::KernelStopped => AdmissionAuthorityErrorCode::OutputWithheld,
         AdmissionOperationStoreError::Fenced => AdmissionAuthorityErrorCode::Fenced,
         AdmissionOperationStoreError::NotFound => AdmissionAuthorityErrorCode::NotFound,
         AdmissionOperationStoreError::Invariant(_) | AdmissionOperationStoreError::Operation(_) => {
@@ -926,6 +927,7 @@ fn outcome_store_error(error: ToolOutcomeStoreError) -> AdmissionAuthorityWireEr
 
 fn receipt_store_error(error: ReceiptStoreError) -> AdmissionAuthorityWireError {
     let code = match error {
+        ReceiptStoreError::OutputWithheld => AdmissionAuthorityErrorCode::OutputWithheld,
         ReceiptStoreError::Fenced => AdmissionAuthorityErrorCode::Fenced,
         ReceiptStoreError::OutcomeUnknown(_) => AdmissionAuthorityErrorCode::OutcomeUnknown,
         ReceiptStoreError::NotFound(_) => AdmissionAuthorityErrorCode::NotFound,

@@ -94,6 +94,7 @@ impl AdmissionAuthorityRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum AdmissionAuthorityErrorCode {
+    OutputWithheld,
     InvalidRequest,
     Unavailable,
     Fenced,

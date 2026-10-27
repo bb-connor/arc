@@ -629,6 +629,7 @@ run_exact_target --label "live admission ownership" --allow-filtered --expected 
   -- cargo test -p chio-kernel --lib admission_operation::sequencer::tests::
 
 run_exact_target --label "native post-join policy" --allow-filtered --expected \
+  security::adapters::tests::native_flow::support::capture::output::preparation::native_output_preparation_stop_returns_typed_withholding \
   security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody \
   security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement \
   security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rechecks_original_parent_and_signs_actual_revocation_cut \
@@ -864,6 +865,8 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
+  kernel::tests::durable_admission::return_context::stop_output::stopped_completed_replay_withholds_without_reinvocation \
+  kernel::tests::durable_admission::return_context::stop_output::stopped_live_return_and_retry_retain_output_until_resume \
   kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_v1_schema_identity \
   kernel::admission_coordinator::return_context::caller::tests::missing_frozen_signer_refuses_caller_decode_without_state_changes \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_wire_requires_signer_participants_custody_and_deadline \
