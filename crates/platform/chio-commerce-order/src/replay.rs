@@ -599,7 +599,7 @@ pub(super) fn action_hash_encoding_error(
     receipt_ref: &str,
     error: chio_core_types::error::Error,
 ) -> CommerceOrderError {
-    CommerceOrderError::ReplayDigestMismatch(format!(
+    CommerceOrderError::ReplayFailed(format!(
         "authority receipt action hash invalid: {receipt_ref}: {error}"
     ))
 }

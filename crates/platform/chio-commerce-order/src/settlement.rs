@@ -237,7 +237,7 @@ pub(super) fn action_hash_encoding_error(
     receipt_ref: &str,
     error: chio_core_types::error::Error,
 ) -> CommerceOrderError {
-    CommerceOrderError::SettlementDigestMismatch(format!(
+    CommerceOrderError::SettlementFailed(format!(
         "settlement dispatch receipt action hash invalid: {receipt_ref}: {error}"
     ))
 }
