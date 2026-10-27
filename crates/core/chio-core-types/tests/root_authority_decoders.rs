@@ -92,6 +92,21 @@ fn root_policy_rule_decode_applies_its_kind_rules() {
 }
 
 #[test]
+fn root_policy_rule_decode_checks_projection_targets() {
+    let valid = example("valid", "root-policy.spec-5-6-4.json")["rules"][0].clone();
+    for target in ["crm", "/search", "crm/", "crm/search/extra", "/"] {
+        let mut rule = valid.clone();
+        rule["idp_scope_projection"]["crm.read"] = json!([target]);
+        assert_eq!(
+            refused!(RootPolicyRule, rule),
+            "`idp_scope_projection` is not server/tool with a non-empty server and a non-empty tool without `/`",
+            "{target}"
+        );
+    }
+    RootPolicyRule::deserialize(valid).unwrap();
+}
+
+#[test]
 fn root_policy_disclosure_decode_checks_tool_names() {
     let disclosure = json!({
         "default": "committed",
