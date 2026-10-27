@@ -152,14 +152,12 @@ pub fn native_returned_value(
     let original = crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_ledger(
         ledger, context,
     )
-    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?
-    .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
     if live != original || operation.native_dispatch_ledger_digest() != Some(&ledger.record_digest)
     {
         return Err(ToolOutcomeError::Binding("test_support.original_dispatch"));
     }
-    let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?
-        .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
+    let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?;
     let commit = operation
         .dispatch_commit()
         .ok_or(ToolOutcomeError::Binding("test_support.dispatch_commit"))?;

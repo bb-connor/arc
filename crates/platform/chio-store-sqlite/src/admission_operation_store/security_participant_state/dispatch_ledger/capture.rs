@@ -87,8 +87,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             custody.security_context,
         )?;
         if record.schema != SCHEMA
-            || record.original_dispatch_commitment_id.as_ref()
-                != Some(original_dispatch.dispatch_commitment_id())
+            || &record.original_dispatch_commitment_id != original_dispatch.dispatch_commitment_id()
             || record.evidence()? != *input.ledger
             || record.operation != operation.to_persisted()
             || usize::try_from(record.grant_index).ok() != Some(grant_index)

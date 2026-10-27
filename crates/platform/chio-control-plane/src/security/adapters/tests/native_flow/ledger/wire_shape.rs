@@ -48,8 +48,7 @@ pub(super) fn verify(
     let context: chio_kernel::SecurityInvocationContext =
         serde_json::from_value(record["context"].clone())?;
     let expected = NativeSecurityDispatchRequestBindingV1::from_live_request(request, &context)?;
-    let retained = NativeSecurityDispatchRequestBindingV1::from_ledger(ledger, &context)?
-        .ok_or("v2 original request binding")?;
+    let retained = NativeSecurityDispatchRequestBindingV1::from_ledger(ledger, &context)?;
     assert!(retained == expected);
     assert_eq!(
         record["original_dispatch_commitment_id"],
@@ -60,21 +59,10 @@ pub(super) fn verify(
         chio_core::sha256_hex(&chio_core::canonical::canonical_json_bytes(request)?)
     );
 
-    // Historical v1 has no original full-request commitment. Reading its
-    // structure must preserve that absence, never synthesize fresh authority.
-    let mut legacy = record.clone();
-    legacy["schema"] = serde_json::json!("chio.native-dispatch-preparation-ledger.v1");
-    legacy
-        .as_object_mut()
-        .ok_or("ledger object")?
-        .remove("original_dispatch_commitment_id");
-    let legacy_record = with_bytes(ledger, &legacy)?;
-    assert!(
-        NativeSecurityDispatchRequestBindingV1::from_ledger(&legacy_record, &context)?.is_none()
-    );
-    legacy["original_dispatch_commitment_id"] = record["original_dispatch_commitment_id"].clone();
+    let mut unsupported = record.clone();
+    unsupported["schema"] = serde_json::json!("chio.native-dispatch-preparation-ledger.v2");
     assert!(matches!(
-        NativeSecurityDispatchRequestBindingV1::from_ledger(&with_bytes(ledger, &legacy)?, &context),
+        NativeSecurityDispatchRequestBindingV1::from_ledger(&with_bytes(ledger, &unsupported)?, &context),
         Err(AdmissionOperationStoreError::Invariant(detail)) if detail == "original native ledger schema is invalid"
     ));
 
@@ -105,11 +93,11 @@ pub(super) fn verify(
                         "invalid type: null, expected a bounded canonical identifier"
                     );
                 }
-                _ => panic!("missing v2 commitment must preserve its typed Serde data cause"),
+                _ => panic!("missing v1 commitment must preserve its typed Serde data cause"),
             }
         }
-        Err(error) => panic!("missing v2 commitment changed error owner: {error:?}"),
-        Ok(_) => panic!("v2 ledger accepted a missing original commitment"),
+        Err(error) => panic!("missing v1 commitment changed error owner: {error:?}"),
+        Ok(_) => panic!("v1 ledger accepted a missing original commitment"),
     }
     Ok(())
 }

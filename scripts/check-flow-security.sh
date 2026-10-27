@@ -475,6 +475,9 @@ run_exact_target --label "native dispatch ledger callbacks" --allow-filtered --e
   kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_confirms_both_reads_without_activating_dispatch \
   kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_faults_deny_even_when_history_survives \
   kernel::tests::durable_admission::native_dispatch_ledger::native_dispatch_ledger_rejects_invalid_inputs_before_egress_mutation \
+  kernel::tests::durable_admission::native_dispatch_ledger::wire_contract::native_ledger_v1_accepts_required_original_commitment \
+  kernel::tests::durable_admission::native_dispatch_ledger::wire_contract::native_ledger_v1_rejects_missing_original_commitment \
+  kernel::tests::durable_admission::native_dispatch_ledger::wire_contract::native_ledger_v1_rejects_v2_with_original_commitment \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_dispatch_ledger::
 
 run_exact_target --label "public nested credential custody" --allow-filtered --expected \

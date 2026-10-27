@@ -5,7 +5,7 @@ use super::*;
 use chio_kernel::admission_operation::{
     NativeSecurityAuthorityBindingV1, NativeSecurityDispatchLedgerContext,
     NativeSecurityDispatchLedgerRecordV1, NativeSecurityDispatchRequestBindingV1,
-    NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA, NATIVE_DISPATCH_LEDGER_SCHEMA,
+    NATIVE_DISPATCH_LEDGER_SCHEMA,
 };
 
 mod capture;
@@ -21,7 +21,6 @@ use record::Record;
 pub(in crate::admission_operation_store) use storage::verify_all;
 
 const SCHEMA: &str = NATIVE_DISPATCH_LEDGER_SCHEMA;
-const LEGACY_SCHEMA: &str = NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA;
 const PROJECTION: &str = "native_dispatch_ledger";
 const MUTATION: &str = "retain_native_dispatch_ledger";
 const MAX_RECORD_BYTES: usize = 1024 * 1024;
