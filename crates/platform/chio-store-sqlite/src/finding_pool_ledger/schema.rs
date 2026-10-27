@@ -1,3 +1,5 @@
+// tenant-read-contract: finding_pool_debits; class=administrative; principal=kernel-admission
+// Contracts: docs/security/trust-boundary-inventory.json
 use crate::schema_version::SchemaTransaction;
 use chio_kernel::finding_pool::{FindingPoolLedgerError, FindingPoolLedgerError::Storage};
 
