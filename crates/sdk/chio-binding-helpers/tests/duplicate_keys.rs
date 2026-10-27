@@ -1,5 +1,4 @@
-//! Signed JSON entry points refuse a repeated object key or a non-canonical
-//! number token before typed decoding.
+//! Duplicate refusal and numeric contracts at JSON entry points.
 
 use chio_binding_helpers::{
     canonicalize_json_str, parse_capability_json, parse_signed_manifest_json,
@@ -48,17 +47,21 @@ fn json_entry_points_refuse_a_repeated_key() -> Result<()> {
 }
 
 #[test]
-fn json_entry_points_refuse_a_non_canonical_number() -> Result<()> {
+fn canonical_helpers_normalize_numbers_and_signed_readers_refuse_them() -> Result<()> {
     let exponent = r#"{"a":{"b":2e0}}"#;
-
-    assert_refused(canonicalize_json_str(exponent));
-    assert_refused(sign_json_str_ed25519(exponent, SEED_HEX));
-    let signed = sign_json_str_ed25519(r#"{"a":{"b":2}}"#, SEED_HEX)?;
-    assert_refused(verify_json_str_signature_ed25519(
-        exponent,
-        &signed.public_key_hex,
-        &signed.signature_hex,
-    ));
+    let integer = r#"{"a":{"b":2}}"#;
+    assert_eq!(canonicalize_json_str(exponent)?, integer);
+    let normalized = sign_json_str_ed25519(exponent, SEED_HEX)?;
+    let signed = sign_json_str_ed25519(integer, SEED_HEX)?;
+    assert_eq!(normalized.canonical_json, signed.canonical_json);
+    assert_eq!(normalized.signature_hex, signed.signature_hex);
+    for text in [exponent, integer] {
+        assert!(verify_json_str_signature_ed25519(
+            text,
+            &signed.public_key_hex,
+            &signed.signature_hex,
+        )?);
+    }
     assert_refused(parse_capability_json(r#"{"issued_at":1e0}"#));
     assert_refused(parse_signed_manifest_json(r#"{"version":1e0}"#));
     Ok(())

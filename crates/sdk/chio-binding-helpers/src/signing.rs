@@ -53,17 +53,17 @@ pub fn verify_utf8_message_ed25519(
     Ok(public_key.verify(input.as_bytes(), &signature))
 }
 
-fn signed_json_value(input: &str) -> Result<serde_json::Value> {
+fn json_document(input: &str) -> Result<serde_json::Value> {
     chio_core::canonical::UntrustedJsonText::from_wire(
         input.as_bytes(),
         crate::MAX_JSON_INPUT_BYTES,
     )
-    .and_then(|text| text.decode_signed())
+    .and_then(|text| text.decode_document())
     .map_err(|error| chio_core::Error::UntrustedInput(error.into()).into())
 }
 
 pub fn sign_json_str_ed25519(input: &str, seed_hex: &str) -> Result<CanonicalJsonSignature> {
-    let value = signed_json_value(input)?;
+    let value = json_document(input)?;
     let keypair = chio_core::Keypair::from_seed_hex(seed_hex)?;
     let (signature, canonical_bytes) = keypair.sign_canonical(&value)?;
     let canonical_json = String::from_utf8(canonical_bytes)
@@ -81,7 +81,7 @@ pub fn verify_json_str_signature_ed25519(
     public_key_hex: &str,
     signature_hex: &str,
 ) -> Result<bool> {
-    let value = signed_json_value(input)?;
+    let value = json_document(input)?;
     let public_key = chio_core::PublicKey::from_hex(public_key_hex)?;
     let signature = chio_core::Signature::from_hex(signature_hex)?;
     Ok(public_key.verify_canonical(&value, &signature)?)

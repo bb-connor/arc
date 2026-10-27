@@ -20,7 +20,7 @@ pub mod manifest;
 pub mod receipt;
 pub mod signing;
 
-/// Bound on each JSON text argument, matching the mobile receipt inspection.
+/// Maximum byte length of each JSON text argument.
 pub(crate) const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
 
 pub use canonical::canonicalize_json_str;

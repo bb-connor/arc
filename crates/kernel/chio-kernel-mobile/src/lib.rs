@@ -76,6 +76,7 @@
 
 mod clock;
 mod errors;
+mod evaluate_input;
 mod rng;
 
 pub use clock::MobileClock;
@@ -344,7 +345,7 @@ fn decode_trusted_issuers(values: &[String]) -> Result<Vec<PublicKey>, ChioMobil
         .collect()
 }
 
-/// Bound on each JSON text argument, matching the mobile receipt inspection.
+/// Maximum byte length of each JSON text argument.
 const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
 
 const MEDIATED_AUTHORIZATION_REQUIRED: &str =
@@ -371,11 +372,11 @@ fn requires_mediated_authorization(matched_grant: Option<&ToolGrant>) -> bool {
 /// unwrapping an exception.
 pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
     let parsed: EvaluateRequest =
-        UntrustedJsonText::from_wire(request_json.as_bytes(), MAX_JSON_INPUT_BYTES)
-            .and_then(|text| text.decode_signed())
-            .map_err(|error| ChioMobileError::InvalidJson {
+        evaluate_input::decode_evaluate_request(&request_json, MAX_JSON_INPUT_BYTES).map_err(
+            |error| ChioMobileError::InvalidJson {
                 message: format!("evaluate request: {error}"),
-            })?;
+            },
+        )?;
     if parsed.request.has_unsupported_authorization_extensions() {
         return Err(ChioMobileError::InvalidCapability {
             message: "mobile portable evaluation cannot authenticate governed approvals or supplemental authorization".to_string(),

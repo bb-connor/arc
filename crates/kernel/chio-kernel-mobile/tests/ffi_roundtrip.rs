@@ -1025,8 +1025,17 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     })
     .to_string();
     evaluate(request_json.clone()).expect("evaluate with canonical numbers");
+    for number in ["1e-07", "1.0E-7"] {
+        let member = r#""msg":"hello""#;
+        assert_eq!(request_json.matches(member).count(), 1);
+        let arguments = request_json.replacen(member, &format!(r#""threshold":{number}"#), 1);
+        evaluate(arguments).expect("unsigned argument exponent is accepted");
+    }
     assert_signed_input_refused(
-        evaluate(exponent_member(&request_json, &now)),
+        evaluate(exponent_member(
+            &request_json,
+            &format!(r#""issued_at":{ISSUED_AT}"#),
+        )),
         "evaluate request",
     );
 

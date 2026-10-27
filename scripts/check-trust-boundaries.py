@@ -56,16 +56,18 @@ RETIRED_DIRECT_HELPERS = {
 
 
 RETIRED_DIRECT_FILES = {
-    "crates/kernel/chio-kernel-browser/src/wasm.rs": ("parse_json",),
-    "crates/kernel/chio-kernel-mobile/src/lib.rs": (
-        "evaluate", "sign_receipt", "sign_receipt_relaying_trusted_body",
-        "verify_capability", "verify_capability_with_context"),
-    "crates/sdk/chio-binding-helpers/src/canonical.rs": ("canonicalize_json_str",),
-    "crates/sdk/chio-binding-helpers/src/capability.rs": ("parse_capability_json",),
-    "crates/sdk/chio-binding-helpers/src/signing.rs": ("signed_json_value",),
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": (
-        "evaluate_json_str", "sign_receipt_json_str", "sign_receipt_relaying_trusted_body_json_str",
-        "verify_capability_json_str", "verify_capability_with_context_json_str"),
+    "crates/kernel/chio-kernel-browser/src/wasm.rs": {"parse_json": "decode_signed"},
+    "crates/kernel/chio-kernel-mobile/src/lib.rs": {
+        "sign_receipt": "decode_signed",
+        "sign_receipt_relaying_trusted_body": "decode_signed",
+        "verify_capability": "decode_signed", "verify_capability_with_context": "decode_signed"},
+    "crates/sdk/chio-binding-helpers/src/canonical.rs": {"canonicalize_json_str": "decode_document"},
+    "crates/sdk/chio-binding-helpers/src/capability.rs": {"parse_capability_json": "decode_signed"},
+    "crates/sdk/chio-binding-helpers/src/signing.rs": {"json_document": "decode_document"},
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": {
+        "sign_receipt_json_str": "decode_signed",
+        "sign_receipt_relaying_trusted_body_json_str": "decode_signed",
+        "verify_capability_json_str": "decode_signed", "verify_capability_with_context_json_str": "decode_signed"},
 }
 
 
@@ -156,11 +158,11 @@ def retired_direct_contracts(catalog, found, files):
                 or not review.get("scope") or not review.get("remaining_acceptance")):
             errors.append(f"retired direct-reader remaining debt is missing: {path}")
         if path in RETIRED_DIRECT_FILES:
-            expected = sorted(f"{path}::{owner}::from_wire#1::decode_signed"
-                              for owner in RETIRED_DIRECT_FILES[path])
+            expected = sorted(f"{path}::{owner}::from_wire#1::{method}"
+                              for owner, method in RETIRED_DIRECT_FILES[path].items())
             actual = [site for site in found["decoding_contracts"] if site.startswith(path + "::")]
             if actual != expected:
-                errors.append(f"retired direct-reader signed helper changed: {path}")
+                errors.append(f"retired direct-reader contract changed: {path}")
             bound_path = ("crates/sdk/chio-binding-helpers/src/lib.rs"
                           if path.startswith("crates/sdk/chio-binding-helpers/") else path)
             bound_hash = constant_hash(files.get(bound_path, ""), "MAX_JSON_INPUT_BYTES")

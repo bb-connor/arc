@@ -690,10 +690,16 @@ fn exponent_member(json: &str, member: &str) -> String {
 #[test]
 fn signed_entry_points_refuse_a_non_canonical_number() {
     let envelope = evaluate_envelope("echo");
-    let now = format!(r#""now_secs":{}"#, ISSUED_AT + 1);
+    let issued_at = format!(r#""issued_at":{ISSUED_AT}"#);
     evaluate_json_str(&envelope).unwrap();
+    for number in ["1e-07", "1.0E-7"] {
+        let member = r#""msg":"hello""#;
+        assert_eq!(envelope.matches(member).count(), 1);
+        let arguments = envelope.replacen(member, &format!(r#""threshold":{number}"#), 1);
+        evaluate_json_str(&arguments).expect("unsigned argument exponent is accepted");
+    }
     assert_signed_input_refused(
-        evaluate_json_str(&exponent_member(&envelope, &now)),
+        evaluate_json_str(&exponent_member(&envelope, &issued_at)),
         "evaluate request",
     );
 

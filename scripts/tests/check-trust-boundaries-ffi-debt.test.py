@@ -55,8 +55,21 @@ class MigratedFileDebt(unittest.TestCase):
             with self.subTest(replacement=new):
                 original = self.found["decoding_contracts"]
                 self.found["decoding_contracts"] = [site.replace(old, new) for site in original]
-                self.assertIn("retired direct-reader signed helper changed: " + self.path, self.errors())
+                self.assertIn("retired direct-reader contract changed: " + self.path, self.errors())
                 self.found["decoding_contracts"] = original
+
+    def test_canonical_transform_contract_cannot_be_replaced_with_signed_decode(self):
+        old_path = self.path
+        self.path = "crates/sdk/chio-binding-helpers/src/canonical.rs"
+        self.catalog["decoder_file_contracts"][self.path] = self.catalog["decoder_file_contracts"].pop(old_path)
+        self.catalog["retired_direct_readers"][self.path] = self.catalog["retired_direct_readers"].pop(old_path)
+        self.files = {self.path: self.source, "crates/sdk/chio-binding-helpers/src/lib.rs": self.source}
+        self.found["ingress_census"] = {self.path: self.review["ingress"]}
+        self.found["decoding_contracts"] = [f"{self.path}::canonicalize_json_str::from_wire#1::decode_document"]
+        self.digest = hashlib.sha256(json.dumps([self.path], separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(self.errors(), [])
+        self.found["decoding_contracts"][0] = self.found["decoding_contracts"][0].replace("decode_document", "decode_signed")
+        self.assertIn("retired direct-reader contract changed: " + self.path, self.errors())
 
     def test_source_change_requires_review(self):
         self.files[self.path] += "pub fn another_reader() {}\n"

@@ -28,8 +28,8 @@ use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
 };
 use chio_kernel_browser::wasm::{
-    evaluate, mint_signing_seed_hex, sign_receipt, verify_capability,
-    verify_capability_with_context,
+    evaluate, mint_signing_seed_hex, sign_receipt, sign_receipt_relaying_trusted_body,
+    verify_capability, verify_capability_with_context,
 };
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_test::console_log;
@@ -295,8 +295,17 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     })
     .to_string();
     evaluate(&request).expect("evaluate with canonical numbers");
+    for number in ["1e-07", "1.0E-7"] {
+        let member = r#""msg":"hello""#;
+        assert_eq!(request.matches(member).count(), 1);
+        let arguments = request.replacen(member, &format!(r#""threshold":{number}"#), 1);
+        evaluate(&arguments).expect("unsigned argument exponent is accepted");
+    }
     assert_signed_input_refused(
-        evaluate(&exponent_member(&request, &clock)),
+        evaluate(&exponent_member(
+            &request,
+            &format!(r#""issued_at":{ISSUED_AT}"#),
+        )),
         "evaluate request",
     );
 
@@ -318,4 +327,31 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
         verify_capability_with_context(&exponent_member(&context, &clock)),
         "verify_capability request",
     );
+}
+
+#[wasm_bindgen_test]
+fn receipt_signers_refuse_repeated_keys_and_noncanonical_numbers() {
+    let seed = mint_signing_seed_hex().expect("mint signer seed");
+    let content = br#"{"shown":true}"#.to_vec();
+    let body = signable_body(sha256_hex(&content));
+    let public = serde_json::json!({"body": body, "canonical_content": content}).to_string();
+    let trusted = serde_json::json!({"body": body}).to_string();
+    sign_receipt(&public, &seed).expect("valid public signer control");
+    sign_receipt_relaying_trusted_body(&trusted, &seed).expect("valid trusted signer control");
+    let timestamp = format!(r#""timestamp":{ISSUED_AT}"#);
+    for text in [
+        repeat_member(&public, &timestamp),
+        exponent_member(&public, &timestamp),
+    ] {
+        assert_signed_input_refused(sign_receipt(&text, &seed), "sign_receipt body");
+    }
+    for text in [
+        repeat_member(&trusted, &timestamp),
+        exponent_member(&trusted, &timestamp),
+    ] {
+        assert_signed_input_refused(
+            sign_receipt_relaying_trusted_body(&text, &seed),
+            "sign_receipt_relaying_trusted_body body",
+        );
+    }
 }

@@ -37,7 +37,7 @@ fn to_js_error(error: &BindingError) -> JsValue {
     to_plain_js(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
 }
 
-/// Bound on each JSON text argument, matching the mobile receipt inspection.
+/// Maximum byte length of each JSON text argument.
 const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
 
 fn parse_json<T: DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
@@ -96,7 +96,14 @@ fn encode_signed_receipt(
 /// authoritative `allow`.
 #[wasm_bindgen]
 pub fn evaluate(request_json: &str) -> Result<JsValue, JsValue> {
-    let request: EvaluateRequestJson = parse_json("evaluate request", request_json)?;
+    let request: EvaluateRequestJson =
+        crate::evaluate_input::decode_evaluate_request(request_json, MAX_JSON_INPUT_BYTES)
+            .map_err(|error| {
+                to_js_error(&BindingError::new(
+                    "invalid_json_input",
+                    format!("evaluate request: {error}"),
+                ))
+            })?;
     let clock = BrowserClock::new();
     let verdict = evaluate_pure(request, &clock).map_err(|err| to_js_error(&err))?;
     encode_result(&verdict)

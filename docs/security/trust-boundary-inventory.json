@@ -74,7 +74,9 @@
     "crates/guards/chio-wasm-guards/src/input.rs",
     "crates/guards/chio-wasm-guards/src/manifest.rs",
     "crates/guards/chio-wasm-guards/src/runtime/wasmtime_backend.rs",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs",
     "crates/kernel/chio-kernel-mobile/src/lib.rs",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc",
     "crates/kernel/chio-kernel/src/admission_operation.rs",
@@ -509,6 +511,7 @@
     "crates/protocol/chio-provider-conformance/src/replay/fixture.rs",
     "crates/protocol/chio-tool-call-fabric/src/types.rs",
     "crates/protocol/chio-tower/src/error.rs",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs",
     "crates/security/chio-active-response-authority/src/config.rs",
     "crates/security/chio-active-response-authority/src/store.rs",
     "crates/security/chio-cage-init/src/bootstrap.rs",
@@ -1676,7 +1679,14 @@
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::from_wire",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::from_wire",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str::from_wire",
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire"
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_wire",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_wire",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_wire",
+    "crates/sdk/chio-binding-helpers/src/signing.rs::json_document::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_wire",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_wire"
   ],
   "raw_decoders": [
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -2814,7 +2824,11 @@
     "crates/economy/chio-settle/src/ccip.rs::sample_receipt::from_str",
     "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_str",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_str",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_str",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_str",
     "crates/kernel/chio-kernel/src/admission_operation.rs::is_pre_dispatch::custom_deserialize",
     "crates/kernel/chio-kernel/src/admission_operation.rs::validate::custom_deserialize",
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs::as_str::custom_deserialize",
@@ -2968,6 +2982,8 @@
     "crates/protocol/chio-openapi/src/input.rs::decode::Deserializer::from_slice",
     "crates/protocol/chio-openapi/src/input.rs::decode::custom_deserialize",
     "crates/protocol/chio-provider-adapter-core/src/input.rs::typed::from_value",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_str",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_str",
     "crates/security/chio-active-response-authority/src/store.rs::prepare_logical_records::from_slice",
     "crates/security/chio-active-response-authority/src/store.rs::validate_artifact_records::from_value",
     "crates/security/chio-active-response-authority/src/store.rs::validate_policy_records::from_value",
@@ -5455,7 +5471,10 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::deserialize::from_str": "Lexical census alias for the bounded method conversion inside initialize_request_shape: borrow the original RawValue and require its wire length <=62 before decoding a small Cow string. The only successful classification is initialize id presence for immediate refusal; nonmatches/malformed values keep the original accounted decode. No positive request admission or authority is created.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::custom_deserialize": "Lexical enclosing-function alias for nested Present::deserialize. IgnoredAny discards one id value and records presence only, including null; it does not build a Value document or interpret id authority. The containing reject-only helper and immediate-refusal caller are pinned by the finite Source witness.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs::verified_receipt::from_value": "Typed receipt projection from bounded MCP worker values. Verify the pinned kernel signature, exact call identity and parameter binding, and signed output hash before rebuilding delivery. Optional nonce metadata uses the shared duplicate-aware signed reader with a 64 KiB ceiling, then verifies schema/domain, binding, signature and the signed receipt-time window; it grants no fresh execution authority.",
-    "crates/platform/chio-control-plane/src/keyring_runtime.rs::serialize::custom_deserialize": "AuthoritySeedHex deserializes one typed string field into zeroizing storage after the bounded, duplicate-aware signed handoff reader. The handoff separately checks canonical seed text, key identity and epoch binding; this field conversion grants no authority."
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs::serialize::custom_deserialize": "AuthoritySeedHex deserializes one typed string field into zeroizing storage after the bounded, duplicate-aware signed handoff reader. The handoff separately checks canonical seed text, key identity and epoch binding; this field conversion grants no authority.",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_str": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_str": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_str": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline."
   },
   "proofs": [
     {
@@ -7722,6 +7741,18 @@
     ],
     "crates/core/chio-fixed/src/q16.rs": [
       "serialize::custom_deserialize"
+    ],
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
+    ],
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
+    ],
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
     ]
   },
   "decoder_file_contracts": {
@@ -13112,6 +13143,60 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": {
+      "kind": "strict-preflight-reparse",
+      "contract": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
+      "readers": [
+        {
+          "reader": "decode_evaluate_request",
+          "decoders": [
+            "from_str",
+            "from_str"
+          ],
+          "apis": [
+            "UntrustedJsonText::from_wire#1::decode_document",
+            "UntrustedJsonText::from_wire#2::decode_signed"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": {
+      "kind": "strict-preflight-reparse",
+      "contract": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
+      "readers": [
+        {
+          "reader": "decode_evaluate_request",
+          "decoders": [
+            "from_str",
+            "from_str"
+          ],
+          "apis": [
+            "UntrustedJsonText::from_wire#1::decode_document",
+            "UntrustedJsonText::from_wire#2::decode_signed"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": {
+      "kind": "strict-preflight-reparse",
+      "contract": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
+      "readers": [
+        {
+          "reader": "decode_evaluate_request",
+          "decoders": [
+            "from_str",
+            "from_str"
+          ],
+          "apis": [
+            "UntrustedJsonText::from_wire#1::decode_document",
+            "UntrustedJsonText::from_wire#2::decode_signed"
           ],
           "checked": true
         }
@@ -18518,7 +18603,15 @@
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::from_wire#1::decode_signed",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::from_wire#1::decode_signed",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str::from_wire#1::decode_signed",
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire#1::decode_signed"
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_wire#1::decode_document",
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_wire#2::decode_signed",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_wire#1::decode_document",
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_wire#2::decode_signed",
+    "crates/sdk/chio-binding-helpers/src/canonical.rs::canonicalize_json_str::from_wire#1::decode_document",
+    "crates/sdk/chio-binding-helpers/src/signing.rs::json_document::from_wire#1::decode_document",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_wire#1::decode_document",
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_wire#2::decode_signed"
   ],
   "ingress_census": {
     "crates/core/chio-arena/src/promote.rs": [
@@ -18913,7 +19006,7 @@
       "verify_receipt_pure::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel-browser/src/wasm.rs": [
-      "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+      "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request",
       "parse_json::original-json-reader::UntrustedJsonText",
       "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
       "sign_receipt_relaying_trusted_body::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
@@ -18930,7 +19023,7 @@
       "verify_passport::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel-mobile/src/lib.rs": [
-      "evaluate::original-json-reader::UntrustedJsonText",
+      "evaluate::shared-reader::crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request",
       "inspect_mobile_receipt_envelopes::shared-reader::crates/trust/chio-custody-hw/src/attestation/receipt_chain.rs::parse_mobile_receipt_envelopes",
       "sign_receipt::original-json-reader::UntrustedJsonText",
       "sign_receipt_relaying_trusted_body::original-json-reader::UntrustedJsonText",
@@ -23014,7 +23107,7 @@
       "chio_kernel_verify_capability_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str",
       "chio_kernel_verify_capability_with_context_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str",
       "chio_kernel_verify_passport_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str",
-      "evaluate_json_str::original-json-reader::UntrustedJsonText",
+      "evaluate_json_str::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request",
       "sign_receipt_json_str::original-json-reader::UntrustedJsonText",
       "sign_receipt_relaying_trusted_body_json_str::original-json-reader::UntrustedJsonText",
       "verify_capability_json_str::original-json-reader::UntrustedJsonText",
@@ -23989,9 +24082,18 @@
       "canonicalize_json_str::original-json-reader::UntrustedJsonText"
     ],
     "crates/sdk/chio-binding-helpers/src/signing.rs": [
-      "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value",
-      "signed_json_value::original-json-reader::UntrustedJsonText",
-      "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value"
+      "json_document::original-json-reader::UntrustedJsonText",
+      "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
+      "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
+    ],
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
     ]
   },
   "retired_direct_readers": {
@@ -24129,10 +24231,10 @@
     "crates/kernel/chio-kernel-browser/src/wasm.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "8d057ed7f30eeb050457029c8d6cb5323b7c43aaeba66005def7a55b83909a19",
+      "source_sha256": "a6bf69d00957a1e690c151fc184c8b67cb2e43763ee7619d48830cb0b5c1d237",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
-        "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
+        "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request",
         "parse_json::original-json-reader::UntrustedJsonText",
         "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
         "sign_receipt_relaying_trusted_body::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
@@ -24142,16 +24244,16 @@
         "verify_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     },
     "crates/kernel/chio-kernel-mobile/src/lib.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "0803c7b927796232ca4df505bbec715ca1e0ed9b8161eb3be983a4656f8d941b",
-      "source_sha256": "34286a99038d762f13dd1339020d753d3cc640b968d9f91203e88294487f8dc3",
+      "source_sha256": "02e5f80c9d496687a11682c7f5318828a5ecbc52007fcc1110f1fc54414b1489",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
-        "evaluate::original-json-reader::UntrustedJsonText",
+        "evaluate::shared-reader::crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request",
         "inspect_mobile_receipt_envelopes::shared-reader::crates/trust/chio-custody-hw/src/attestation/receipt_chain.rs::parse_mobile_receipt_envelopes",
         "sign_receipt::original-json-reader::UntrustedJsonText",
         "sign_receipt_relaying_trusted_body::original-json-reader::UntrustedJsonText",
@@ -24161,19 +24263,19 @@
         "verify_play_integrity_evidence::shared-reader::crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     },
     "crates/sdk/chio-binding-helpers/src/canonical.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "74719681e115120721a4ce4cf8b2ba9e9d18dc3bd84a64b33315899c9515e1f7",
+      "source_sha256": "a7a3b98fbef81313e174fec80d0abf42fd3eb6411b437e3dbed2a59910559e9f",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "canonicalize_json_str::original-json-reader::UntrustedJsonText"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     },
     "crates/sdk/chio-binding-helpers/src/capability.rs": {
@@ -24186,27 +24288,27 @@
         "verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     },
     "crates/sdk/chio-binding-helpers/src/signing.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "f6fde1d40f13a8921cd50c7d8ad021c0590191e138d66e2447c21b58ade157a5",
+      "source_sha256": "8730c90eae28e3510e71c1cec1c091da9f8825e19ef8787e237c738a6919e84c",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
-        "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value",
-        "signed_json_value::original-json-reader::UntrustedJsonText",
-        "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::signed_json_value"
+        "json_document::original-json-reader::UntrustedJsonText",
+        "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
+        "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     },
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "32684f0401c3e2fae86d5b4fc84402a84f0dc0e87f212ed428dfbca06e51c818",
+      "source_sha256": "b5518816be2ebf01a344bbf0ac07c52e19816e2f519348a7811baed1e9b263a1",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "chio_kernel_evaluate_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str",
@@ -24215,7 +24317,7 @@
         "chio_kernel_verify_capability_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str",
         "chio_kernel_verify_capability_with_context_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str",
         "chio_kernel_verify_passport_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str",
-        "evaluate_json_str::original-json-reader::UntrustedJsonText",
+        "evaluate_json_str::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request",
         "sign_receipt_json_str::original-json-reader::UntrustedJsonText",
         "sign_receipt_relaying_trusted_body_json_str::original-json-reader::UntrustedJsonText",
         "verify_capability_json_str::original-json-reader::UntrustedJsonText",
@@ -24223,7 +24325,7 @@
         "verify_passport_json_str::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
-      "scope": "Direct Serde readers now use bounded original signed JSON parsing; duplicate keys and noncanonical number tokens refuse. This records parser migration only.",
+      "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",
       "remaining_acceptance": "Retain the original file-level debt until caller authentication, authority provenance and downstream semantic acceptance receive a separate complete source review and execution evidence."
     }
   }

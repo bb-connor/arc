@@ -380,13 +380,14 @@ fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
     }
 }
 
-/// Bound on each JSON text argument, matching the mobile receipt inspection.
+mod evaluate_input;
+
+/// Maximum byte length of each JSON text argument.
 const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
 
 fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     let parsed: EvaluateRequestEnvelope =
-        UntrustedJsonText::from_wire(request_json.as_bytes(), MAX_JSON_INPUT_BYTES)
-            .and_then(|text| text.decode_signed())
+        evaluate_input::decode_evaluate_request(request_json, MAX_JSON_INPUT_BYTES)
             .map_err(|error| KernelFfiError::invalid_json("evaluate request", error))?;
     if parsed.request.has_unsupported_authorization_extensions() {
         return Err(KernelFfiError::InvalidCapability(
