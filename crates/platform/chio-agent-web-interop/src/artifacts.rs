@@ -313,7 +313,7 @@ pub(super) fn validate_projection_manifest(
     }
     if !protocols::is_supported_source_version(&manifest.source_protocol, &manifest.source_version)
     {
-        return Err(claim_failed(protocols::unsupported_source_version_message(
+        return Err(unsupported(protocols::unsupported_source_version_message(
             &manifest.source_protocol,
         )));
     }
@@ -1463,7 +1463,7 @@ fn validate_source_protocol(protocol: &str) -> Result<(), TransactionPassportErr
     if protocols::is_supported_source_protocol(protocol) {
         Ok(())
     } else {
-        Err(claim_failed(format!(
+        Err(unsupported(format!(
             "unsupported Agent Web source protocol: {protocol}"
         )))
     }
