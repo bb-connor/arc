@@ -9,8 +9,6 @@ use chio_credentials::{
     PassportPresentationVerification,
 };
 use futures_util::FutureExt;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Bounds every wait in this module.
@@ -22,70 +20,19 @@ const PAUSE_BOUND: Duration = Duration::from_secs(10);
 const SELF_URL: &str = "http://127.0.0.1:1";
 const VERIFIER: &str = "https://verifier.example.test";
 
-/// A passport status registry served through a FIFO. The verification that
-/// resolves lifecycle state opens it and then waits for the registry bytes,
-/// which the test withholds until it releases them.
-struct PausedStatusRegistry {
-    path: PathBuf,
-    release: std::sync::mpsc::Sender<()>,
-    writer: Option<std::thread::JoinHandle<()>>,
-}
+struct PausedStatusRegistry(crate::signed_input::read_pause::ReadPause);
 
 impl PausedStatusRegistry {
-    /// Serves one read of an empty registry at `path`. Each delivery on the
-    /// returned receiver means a verification has opened the registry and is
-    /// waiting for its bytes.
     fn serve(path: PathBuf) -> (Self, tokio::sync::mpsc::UnboundedReceiver<()>) {
-        let created = std::process::Command::new("mkfifo")
-            .args(["-m", "600"])
-            .arg(&path)
-            .status()
-            .test_unwrap();
-        assert!(created.success(), "status registry FIFO creation failed");
         let registry = serde_json::to_vec(&PassportStatusRegistry::default()).test_unwrap();
-        let (opened_tx, opened) = tokio::sync::mpsc::unbounded_channel();
-        let (release, released) = std::sync::mpsc::channel::<()>();
-        let fifo = path.clone();
-        let writer = std::thread::spawn(move || {
-            // Opening a FIFO for writing returns only once a reader opened it.
-            let Ok(mut file) = std::fs::OpenOptions::new().write(true).open(&fifo) else {
-                return;
-            };
-            let _ = opened_tx.send(());
-            let _ = released.recv_timeout(PAUSE_BOUND);
-            let _ = file.write_all(&registry);
-        });
-        (
-            Self {
-                path,
-                release,
-                writer: Some(writer),
-            },
-            opened,
-        )
+        std::fs::write(&path, registry).test_unwrap();
+        let (pause, opened) =
+            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND).test_unwrap();
+        (Self(pause), opened)
     }
 
-    fn release(mut self) {
-        self.release.send(()).test_unwrap();
-        if let Some(writer) = self.writer.take() {
-            writer.join().test_unwrap();
-        }
-    }
-}
-
-impl Drop for PausedStatusRegistry {
-    fn drop(&mut self) {
-        let _ = self.release.send(());
-        if let Some(writer) = self.writer.take() {
-            // A writer still waiting for a reader is let through by one that
-            // does not wait for a writer.
-            let reader = std::fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NONBLOCK)
-                .open(&self.path);
-            let _ = writer.join();
-            drop(reader);
-        }
+    fn release(self) {
+        self.0.release();
     }
 }
 
