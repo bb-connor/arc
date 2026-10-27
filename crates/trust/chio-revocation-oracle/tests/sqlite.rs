@@ -542,3 +542,24 @@ fn a_stamped_catalog_with_an_extra_oracle_index_is_refused() -> TestResult {
     assert_eq!(catalog_and_leaves(&path)?, before);
     Ok(())
 }
+
+#[test]
+fn leaf_counts_are_kept_per_nonce() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.transact(10, |txn| {
+        txn.revoke(&passport_revocation_key("passport-a"))?;
+        txn.revoke(&passport_revocation_key("passport-b"))?;
+        txn.revoke(&credential_revocation_key(&"ab".repeat(32)))?;
+        Ok(())
+    })?;
+    assert_eq!(
+        oracle.leaf_count_with_nonce(PassportRevocationLeafKind::Passport.epoch_nonce())?,
+        2
+    );
+    assert_eq!(
+        oracle.leaf_count_with_nonce(PassportRevocationLeafKind::Credential.epoch_nonce())?,
+        1
+    );
+    assert_eq!(oracle.leaf_count_with_nonce(EpochNonce::new(7))?, 0);
+    Ok(())
+}
