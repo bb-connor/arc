@@ -10,6 +10,9 @@ mod settlement;
 mod types;
 mod validation;
 
+#[cfg(test)]
+mod receipt_action_hash_tests;
+
 pub use error::CommerceOrderError;
 pub use ids::{
     COMMERCE_EVENT_LOG_SCHEMA_ID, COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
