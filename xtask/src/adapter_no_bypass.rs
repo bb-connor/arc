@@ -7,11 +7,12 @@ use std::path::{Path, PathBuf};
 use quote::ToTokens;
 use serde::Deserialize;
 use syn::visit::{self, Visit};
-use syn::{Attribute, ExprBinary, ExprCall, ExprMethodCall, ExprPath, ItemImpl};
+use syn::{Attribute, ExprBinary, ExprCall, ExprMethodCall, ExprPath, ExprStruct, ItemImpl};
 
 use crate::{display_path, workspace_root, XtaskError};
 
 mod constructors;
+mod nonce_signing;
 mod source;
 
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
@@ -68,6 +69,7 @@ struct FunctionFacts {
     paths: BTreeSet<String>,
     binaries: Vec<String>,
     dangerous: Vec<DangerousCall>,
+    struct_literals: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -424,6 +426,7 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
     let adapter_sources = discover_adapter_sources(root, &inventory)?;
     let mut parsed = source::parse_repo_sources(root, &adapter_sources)?;
     validate_dangerous_calls(&parsed, true)?;
+    nonce_signing::validate(root, &adapter_sources)?;
 
     parsed.extend(source::parse_repo_sources(
         root,
@@ -800,6 +803,7 @@ impl FunctionVisitor {
                 paths: body.paths,
                 binaries: body.binaries,
                 dangerous: body.dangerous,
+                struct_literals: body.struct_literals,
             },
         ));
     }
@@ -811,6 +815,7 @@ struct BodyVisitor {
     paths: BTreeSet<String>,
     binaries: Vec<String>,
     dangerous: Vec<DangerousCall>,
+    struct_literals: Vec<String>,
 }
 
 impl<'ast> Visit<'ast> for BodyVisitor {
@@ -860,6 +865,11 @@ impl<'ast> Visit<'ast> for BodyVisitor {
     fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
         self.binaries.push(normalize_tokens(node));
         visit::visit_expr_binary(self, node);
+    }
+
+    fn visit_expr_struct(&mut self, node: &'ast ExprStruct) {
+        self.struct_literals.push(normalize_tokens(&node.path));
+        visit::visit_expr_struct(self, node);
     }
 }
 

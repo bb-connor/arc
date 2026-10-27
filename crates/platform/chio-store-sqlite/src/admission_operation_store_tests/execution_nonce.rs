@@ -118,7 +118,7 @@ fn unowned_prepared_nonce_fixture_in(
     let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,
-        &key,
+        &chio_core::crypto::Ed25519Backend::new(key.clone()),
         &ExecutionNonceConfig::default(),
         now_ms(),
     )?;

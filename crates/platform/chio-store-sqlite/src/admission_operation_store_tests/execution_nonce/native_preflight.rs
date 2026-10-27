@@ -14,7 +14,7 @@ fn native_issuance_requires_preflight_taint_before_budget_preflight() -> TestRes
         let issuance = AdmissionExecutionNonceReservationV1::mint_for_operation(
             &operation,
             &original,
-            &key,
+            &chio_core::crypto::Ed25519Backend::new(key.clone()),
             &ExecutionNonceConfig::default(),
             now_ms(),
         )?;

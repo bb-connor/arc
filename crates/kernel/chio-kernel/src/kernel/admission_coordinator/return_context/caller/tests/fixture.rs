@@ -152,7 +152,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
     let nonce = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,
-        &key,
+        &chio_core::crypto::Ed25519Backend::new(key.clone()),
         &ExecutionNonceConfig::default(),
         now,
     )?;

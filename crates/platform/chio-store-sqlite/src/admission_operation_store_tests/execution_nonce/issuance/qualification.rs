@@ -34,7 +34,7 @@ fn durable_nonce_issuance_candidates_for_one_operation_have_one_winner() -> Test
     let candidate = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &fixture.operation,
         &fixture.original,
-        &fixture.key,
+        &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
         &ExecutionNonceConfig::default(),
         now_ms(),
     )?;
