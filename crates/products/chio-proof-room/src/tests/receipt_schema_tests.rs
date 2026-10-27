@@ -55,3 +55,23 @@ fn other_artifact_schema_still_requires_an_exact_match() -> Result<(), ProofRoom
     );
     Ok(())
 }
+
+#[test]
+fn receipt_with_duplicate_parameter_member_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let text = std::str::from_utf8(RECEIPT)?;
+    let bytes = text.replacen(
+        r#""parameters":{"#,
+        r#""parameters":{"order_id":"forged","#,
+        1,
+    );
+    let error = validate_json_artifact_schema(bytes.as_bytes(), CHIO_RECEIPT_SCHEMA, "receipt")
+        .err()
+        .ok_or("duplicate receipt parameter was accepted")?;
+    assert!(matches!(
+        error,
+        ProofRoomError::Input(chio_core_types::canonical::UntrustedJsonError::SignedInput(
+            _
+        ))
+    ));
+    Ok(())
+}

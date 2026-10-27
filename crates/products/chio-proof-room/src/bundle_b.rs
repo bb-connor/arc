@@ -140,7 +140,7 @@ pub(crate) fn validate_json_artifact_schema(
 ) -> Result<(), ProofRoomError> {
     let value: serde_json::Value = input::decode(bytes)?;
     if expected_schema == CHIO_RECEIPT_SCHEMA {
-        return input::project::<chio_core_types::receipt::body::ChioReceipt>(value)
+        return input::decode::<chio_core_types::receipt::body::ChioReceipt>(bytes)
             .map(drop)
             .map_err(|_| {
                 ProofRoomError::from(format!(
