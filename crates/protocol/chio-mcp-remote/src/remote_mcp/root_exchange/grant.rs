@@ -169,8 +169,9 @@ impl IdJagGrant {
     }
 
     /// `SHA-256("chio.root-exchange-request.v1\0" || canonical_json(request))`
-    /// over the grant type, the ID-JAG, the requested token type and the
-    /// client id. Client authentication is not part of it.
+    /// over the grant type, the ID-JAG, the requested token type, the client
+    /// id and the RFC 8707 `resource`. Client authentication is not part of
+    /// it.
     #[must_use]
     pub fn request_digest(&self) -> &Sha256Digest {
         &self.request_digest
