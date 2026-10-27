@@ -14,3 +14,6 @@ mod protocol_tests;
 mod subjects;
 #[path = "agent_web_interop/support.rs"]
 mod support;
+
+#[path = "agent_web_interop/error_classes.rs"]
+mod error_classes;
