@@ -51,7 +51,7 @@ impl ActiveResponseRequestSource for ActiveResponseExecutionRequest {
             authorization_capability_hash: self.authorization_capability_hash().to_string(),
             governed_intent_hash: self.governed_intent_hash().to_string(),
             policy_decision_hash: self.policy_decision_hash().to_string(),
-            admission_artifact_fingerprint: self.admission_artifact_fingerprint(),
+            admission_artifact_fingerprint: Some(self.admission_artifact_fingerprint()),
             approval: self.approval().clone(),
             expires_at_unix_ms: self.expires_at_unix_ms(),
             authorized_at_unix_ms: self.authorized_at_unix_ms(),
@@ -79,7 +79,11 @@ impl ActiveResponseRequestSource for RawActiveResponseExecutionRequest {
             authorization_capability_hash: self.authorization_capability_hash.clone(),
             governed_intent_hash: self.governed_intent_hash.clone(),
             policy_decision_hash: self.policy_decision_hash.clone(),
-            admission_artifact_fingerprint: self.admission_artifact_fingerprint,
+            admission_artifact_fingerprint: self.admission_artifact_fingerprint.ok_or(
+                ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                    chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+                ),
+            )?,
             approval: self.approval.clone(),
             authorized_at_unix_ms: self.authorized_at_unix_ms,
             expires_at_unix_ms: self.expires_at_unix_ms,

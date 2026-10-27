@@ -8,7 +8,7 @@ use super::{
 #[cfg(feature = "std")]
 use super::{PortError, PortResult, SchedulerWorkKey};
 
-pub const RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION: u8 = 2;
+pub const RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION: u8 = 1;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -63,8 +63,7 @@ pub struct ResponseDispatchAuthorizationBody {
     pub authorization_capability_hash: Digest32,
     pub governed_intent_hash: Digest32,
     pub policy_decision_hash: Digest32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub admission_artifact_fingerprint: Option<Digest32>,
+    pub admission_artifact_fingerprint: Digest32,
     pub executor_authority_id: RecordId,
     pub executor_authority_generation: u64,
     pub approval: ResponseDispatchApproval,

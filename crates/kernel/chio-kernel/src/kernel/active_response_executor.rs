@@ -124,22 +124,36 @@ pub enum ActiveResponseDispatchIdError {
     InvalidIdentifier(String),
 }
 
-/// Derive the canonical dispatch identifier shared by the kernel and durable executor.
+pub struct ActiveResponseDispatchIdInput<'a> {
+    pub response_plan: &'a ResponsePlan,
+    pub executor_authority: &'a ActiveResponseExecutorAuthorityIdentity,
+    pub authorization_capability_hash: &'a str,
+    pub governed_intent_hash: &'a str,
+    pub policy_decision_hash: &'a str,
+    pub admission_artifact_fingerprint: &'a Digest32,
+    pub authorized_at_unix_ms: u64,
+    pub approval: &'a ActiveResponseExecutionApproval,
+}
+
 pub fn derive_active_response_dispatch_id(
-    response_plan: &ResponsePlan,
-    executor_authority: &ActiveResponseExecutorAuthorityIdentity,
-    authorization_capability_hash: &str,
-    governed_intent_hash: &str,
-    policy_decision_hash: &str,
-    authorized_at_unix_ms: u64,
-    approval: &ActiveResponseExecutionApproval,
+    input: ActiveResponseDispatchIdInput<'_>,
 ) -> Result<RecordId, ActiveResponseDispatchIdError> {
+    let ActiveResponseDispatchIdInput {
+        response_plan,
+        executor_authority,
+        authorization_capability_hash,
+        governed_intent_hash,
+        policy_decision_hash,
+        admission_artifact_fingerprint,
+        authorized_at_unix_ms,
+        approval,
+    } = input;
     if authorized_at_unix_ms < response_plan.created_at_unix_ms
         || authorized_at_unix_ms >= response_plan.expires_at_unix_ms
     {
         return Err(ActiveResponseDispatchIdError::AuthorizationTimeOutsidePlan);
     }
-    dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
+    dispatch_identity::derive_dispatch_id(dispatch_identity::DispatchIdentity {
         tenant_id: &response_plan.tenant_id,
         action_id: &response_plan.action_id,
         plan_hash: &response_plan.plan_hash,
@@ -148,28 +162,10 @@ pub fn derive_active_response_dispatch_id(
         authorization_capability_hash,
         governed_intent_hash,
         policy_decision_hash,
+        admission_artifact_fingerprint,
         authorized_at_unix_ms,
         approval,
     })
-}
-
-/// Bind the existing immutable dispatch identity to its exact original artifact.
-/// This pure commitment grants no admission authority.
-pub fn bind_active_response_dispatch_id_to_artifact(
-    legacy_dispatch_id: &RecordId,
-    fingerprint: &Digest32,
-) -> Result<RecordId, ActiveResponseDispatchIdError> {
-    if fingerprint.is_zero() {
-        return Err(ActiveResponseDispatchIdError::InvalidIdentifier(
-            "admission artifact fingerprint is zero".to_string(),
-        ));
-    }
-    let canonical = canonical_json_bytes(&(legacy_dispatch_id, fingerprint))
-        .map_err(|error| ActiveResponseDispatchIdError::Canonicalization(error.to_string()))?;
-    let mut bytes = b"chio.active-response-artifact-dispatch.v2\0".to_vec();
-    bytes.extend_from_slice(&canonical);
-    RecordId::new(format!("active_response_dispatch_{}", sha256_hex(&bytes)))
-        .map_err(|error| ActiveResponseDispatchIdError::InvalidIdentifier(error.to_string()))
 }
 
 /// Derive the original governed identity from durable anchor and compact evidence.
@@ -185,23 +181,19 @@ pub(in crate::kernel) fn derive_active_response_terminal_dispatch_id(
         admission_operation_version: original_dispatch_version,
         approval_set_hash: anchor.approval_set_hash.clone(),
     };
-    let legacy =
-        dispatch_identity::derive_legacy_dispatch_id(dispatch_identity::DispatchIdentity {
-            tenant_id: &binding.tenant_id,
-            action_id: &binding.action_id,
-            plan_hash: &binding.plan_hash,
-            executor_authority_id: &anchor.executor_authority_id,
-            executor_authority_generation: anchor.executor_authority_generation,
-            authorization_capability_hash: &anchor.authorization_capability_hash,
-            governed_intent_hash: &anchor.governed_intent_hash,
-            policy_decision_hash: &anchor.policy_decision_hash,
-            authorized_at_unix_ms: anchor.authorized_at_unix_ms,
-            approval: &approval,
-        })?;
-    match anchor.admission_artifact_fingerprint {
-        Some(fingerprint) => bind_active_response_dispatch_id_to_artifact(&legacy, &fingerprint),
-        None => Ok(legacy),
-    }
+    dispatch_identity::derive_dispatch_id(dispatch_identity::DispatchIdentity {
+        tenant_id: &binding.tenant_id,
+        action_id: &binding.action_id,
+        plan_hash: &binding.plan_hash,
+        executor_authority_id: &anchor.executor_authority_id,
+        executor_authority_generation: anchor.executor_authority_generation,
+        authorization_capability_hash: &anchor.authorization_capability_hash,
+        governed_intent_hash: &anchor.governed_intent_hash,
+        admission_artifact_fingerprint: &anchor.admission_artifact_fingerprint,
+        policy_decision_hash: &anchor.policy_decision_hash,
+        authorized_at_unix_ms: anchor.authorized_at_unix_ms,
+        approval: &approval,
+    })
 }
 
 /// Closed durable result of one committed active-response dispatch.
@@ -241,7 +233,7 @@ pub struct ActiveResponseExecutionRequest {
     authorization_capability_hash: String,
     governed_intent_hash: String,
     policy_decision_hash: String,
-    admission_artifact_fingerprint: Option<Digest32>,
+    admission_artifact_fingerprint: Digest32,
     approval: ActiveResponseExecutionApproval,
     authorized_at_unix_ms: u64,
     expires_at_unix_ms: u64,
@@ -258,7 +250,7 @@ pub(crate) struct ActiveResponseExecutionRequestParts {
     pub(crate) authorization_capability_hash: String,
     pub(crate) governed_intent_hash: String,
     pub(crate) policy_decision_hash: String,
-    pub(crate) admission_artifact_fingerprint: Option<Digest32>,
+    pub(crate) admission_artifact_fingerprint: Digest32,
     pub(crate) approval: ActiveResponseExecutionApproval,
     pub(crate) authorized_at_unix_ms: u64,
     pub(crate) expires_at_unix_ms: u64,
@@ -283,7 +275,7 @@ impl ActiveResponseExecutionRequest {
         admission: &FreshLiveAdmission,
         parts: ActiveResponseExecutionRequestParts,
     ) -> Result<Self, super::KernelError> {
-        if parts.admission_artifact_fingerprint.is_none() {
+        if parts.admission_artifact_fingerprint.is_zero() {
             return Err(super::KernelError::ResponseDispatchRejected(
                 chio_security_types::DispatchRejection::UnboundArtifactPreparation,
             ));
@@ -399,7 +391,7 @@ impl ActiveResponseExecutionRequest {
     }
 
     #[must_use]
-    pub const fn admission_artifact_fingerprint(&self) -> Option<Digest32> {
+    pub const fn admission_artifact_fingerprint(&self) -> Digest32 {
         self.admission_artifact_fingerprint
     }
 

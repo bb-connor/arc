@@ -523,7 +523,7 @@ fn active_response_recovery_reconciles_committed_approval_before_compensation() 
         authorization_capability_hash: prepared.authorization_capability_hash().into(),
         governed_intent_hash: sha256_hex(b"original-governed-intent"),
         policy_decision_hash: sha256_hex(b"original-policy-decision"),
-        admission_artifact_fingerprint: None,
+        admission_artifact_fingerprint: chio_security_types::ports::Digest32::new([91; 32]),
         approval_set_hash: approval_set.approval_set_hash().into(),
     };
     kernel

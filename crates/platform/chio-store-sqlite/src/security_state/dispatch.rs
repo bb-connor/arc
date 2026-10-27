@@ -302,10 +302,9 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(ResponseDispatchCommitOutcome::Existing(existing));
         }
-        if request.mode == ResponseDispatchCommitMode::Fresh
-            && prepared_dispatch_binding
-                .admission_artifact_fingerprint
-                .is_none()
+        if prepared_dispatch_binding
+            .admission_artifact_fingerprint
+            .is_zero()
         {
             return Err(PortError::invalid_data());
         }
@@ -740,13 +739,10 @@ fn validate_response_dispatch_request(
         .and_then(|input| input.decode_signed())
         .map_err(|_| PortError::invalid_data())?;
     if decoded_authorization != request.authorization.body
-        || !matches!(
-            (
-                decoded_authorization.schema_version,
-                decoded_authorization.admission_artifact_fingerprint
-            ),
-            (1, None) | (RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION, Some(_))
-        )
+        || decoded_authorization.schema_version != RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
+        || decoded_authorization
+            .admission_artifact_fingerprint
+            .is_zero()
         || decoded_authorization.key.tenant_id != request.response_plan.tenant_id
         || decoded_authorization.action_id != request.response_plan.action_id
         || decoded_authorization.executor_authority_generation == 0
@@ -1117,19 +1113,8 @@ fn load_automatic_response_dispatch_fence(
 fn validate_automatic_response_dispatch_fence_binding_shape(
     binding: &PreparedActiveResponseDispatchBinding,
 ) -> PortResult<()> {
-    if !matches!(
-        (
-            binding.schema_version,
-            binding.admission_artifact_fingerprint
-        ),
-        (1, None)
-            | (
-                PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
-                Some(_)
-            )
-    ) || binding
-        .admission_artifact_fingerprint
-        .is_some_and(|value| value.is_zero())
+    if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
+        || binding.admission_artifact_fingerprint.is_zero()
         || binding.executor_authority_generation == 0
         || binding.authorized_at_unix_ms == 0
         || binding.plan_hash.is_zero()

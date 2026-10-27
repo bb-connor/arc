@@ -117,9 +117,9 @@ run_exact_target --label "security response-dispatch types" --expected \
   dispatch_recovery_rejects_zero_fencing_token_on_wire \
   execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields \
   execution_binding_requires_exact_artifact_schema_pairing \
-  legacy_dispatch_authorization_v1_preserves_canonical_bytes_and_hash \
-  legacy_execution_binding_v1_preserves_canonical_bytes_and_hash \
-  legacy_prepared_descriptor_v1_preserves_canonical_bytes_and_hash \
+  bound_dispatch_authorization_v1_preserves_canonical_bytes_and_hash \
+  bound_execution_binding_v1_preserves_canonical_bytes_and_hash \
+  bound_prepared_descriptor_v1_preserves_canonical_bytes_and_hash \
   -- cargo test -p chio-security-types --features std --test response_dispatch
 run_exact_target --label "security response types" --expected \
   execution_binding_preserves_its_closed_wire_shape \
