@@ -188,3 +188,27 @@ fn valid_authority_receipts_verify_for_replay_and_settlement() {
     assert_eq!(fixture.replay(), Ok(()));
     assert_eq!(fixture.settle(), Ok(()));
 }
+
+#[test]
+fn replay_action_hash_encoding_error_keeps_failure_class() {
+    let error = chio_core_types::error::Error::CanonicalJson("unsupported JSON number".to_owned());
+    assert_eq!(
+        crate::replay::action_hash_encoding_error("receipt-ref", error),
+        CommerceOrderError::ReplayFailed(
+            "authority receipt action hash invalid: receipt-ref: canonical JSON error: unsupported JSON number"
+                .to_owned()
+        )
+    );
+}
+
+#[test]
+fn settlement_action_hash_encoding_error_keeps_failure_class() {
+    let error = chio_core_types::error::Error::CanonicalJson("unsupported JSON number".to_owned());
+    assert_eq!(
+        crate::settlement::action_hash_encoding_error("receipt-ref", error),
+        CommerceOrderError::SettlementFailed(
+            "settlement dispatch receipt action hash invalid: receipt-ref: canonical JSON error: unsupported JSON number"
+                .to_owned()
+        )
+    );
+}

@@ -179,12 +179,10 @@ fn validate_settlement_dispatch_receipt(
             settlement.dispatch_receipt_ref
         )));
     }
-    let action_hash_valid = receipt.action.verify_hash().map_err(|error| {
-        CommerceOrderError::SettlementDigestMismatch(format!(
-            "settlement dispatch receipt action hash invalid: {}: {error}",
-            settlement.dispatch_receipt_ref
-        ))
-    })?;
+    let action_hash_valid = receipt
+        .action
+        .verify_hash()
+        .map_err(|error| action_hash_encoding_error(&settlement.dispatch_receipt_ref, error))?;
     if !action_hash_valid {
         return Err(CommerceOrderError::SettlementDigestMismatch(format!(
             "settlement dispatch receipt action hash invalid: {}",
@@ -233,4 +231,13 @@ fn require_receipt_action_string(
         )));
     }
     Ok(())
+}
+
+pub(super) fn action_hash_encoding_error(
+    receipt_ref: &str,
+    error: chio_core_types::error::Error,
+) -> CommerceOrderError {
+    CommerceOrderError::SettlementDigestMismatch(format!(
+        "settlement dispatch receipt action hash invalid: {receipt_ref}: {error}"
+    ))
 }
