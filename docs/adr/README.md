@@ -27,7 +27,7 @@ Current ADR set:
 13. [ADR-0013 Async Receipt Durability](ADR-0013-async-receipt-durability.md)
 14. [ADR-0014 Iroh As Federation Transport (Deferred To Year-2)](ADR-0014-iroh-federation-transport.md)
 15. [ADR-0015 Predeclared Non-Discretionary Escrow Circuit Breakers](ADR-0015-predeclared-escrow-circuit-breakers.md)
-16. [ADR-0016 Authoritative Spend Contract](ADR-0016-authoritative-spend-contract.md)
+16. [ADR-0016 Authoritative Spend Contract](ADR-0016-authoritative-spend-contract.md) - accepted; the binding spend contract for execution nonces, budget holds and the `chio.mediated_spend.v1` predicate.
 17. [ADR-0017 Cognition-Market Finding Artifacts And Reveal-As-Governed-Call](ADR-0017-cognition-market-finding-artifacts.md)
 18. [ADR-0018 Radicle Is A Carrier, Never An Authority (Adoption Deferred)](ADR-0018-radicle-carrier-not-authority.md)
 19. [ADR-0019 Kernel Delivery Contract](ADR-0019-kernel-delivery-contract.md)

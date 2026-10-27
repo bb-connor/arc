@@ -83,6 +83,12 @@ on `main` for that preview.
 
 ### Documentation
 
+- ADR-0016 is accepted as the binding spend contract. Its predicate requires
+  the execution nonce and the receipt to verify under the same kernel key, so
+  authoritative spend receipts come from kernels on the classical signing
+  floor; hybrid and PQ floors fail the predicate closed.
+- `spec/PROTOCOL.md` is labeled 1.0 preview, not stable, and
+  `spec/schemas/VERSION` stays at 1.0.0 (decision D20).
 - Reconciled the `cargo-deny` configuration comments with the real waiver
   counts and rationale, removing stale or misleading caps.
 
