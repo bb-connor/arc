@@ -48,6 +48,32 @@ fn authority_sibling_paths(receipt_path: &str) -> (PathBuf, PathBuf) {
     (lock_root.join("authority.db"), lock_root)
 }
 
+/// Install the kernel settlement ledger for a configured payment adapter.
+/// Startup refuses when the durable receipt store cannot carry it.
+fn install_settlement_ledger(
+    kernel: &mut chio_kernel::ChioKernel,
+    receipt_store: Option<&Arc<chio_store_sqlite::SqliteReceiptStore>>,
+) -> Result<(), ProtectError> {
+    let Some(receipt_store) = receipt_store else {
+        return Err(ProtectError::Config(
+            "a payment adapter requires a durable receipt store for its settlement ledger".into(),
+        ));
+    };
+    let outcome_store = chio_store_sqlite::SqliteSettlementOutcomeStore::open_alongside(
+        receipt_store,
+    )
+    .map_err(|error| {
+        ProtectError::Config(format!(
+            "failed to open the settlement outcome store: {error}"
+        ))
+    })?;
+    kernel
+        .install_settlement_ledger(Arc::new(outcome_store), Default::default())
+        .map_err(|error| {
+            ProtectError::Config(format!("failed to install the settlement ledger: {error}"))
+        })
+}
+
 fn prepare_authority_lock_root(path: &std::path::Path) -> Result<(), ProtectError> {
     fs::create_dir_all(path).map_err(|error| ProtectError::Config(error.to_string()))?;
     #[cfg(unix)]
@@ -378,6 +404,13 @@ impl ProtectProxy {
             .as_deref()
             .filter(|path| !chio_store_sqlite::is_in_memory_sqlite_path(path));
 
+        if self.payment_adapter.is_some() && durable_receipt_db.is_none() {
+            return Err(ProtectError::Config(
+                "a payment adapter requires a durable receipt store for its settlement ledger"
+                    .into(),
+            ));
+        }
+
         if durable_receipt_db.is_none() && !self.config.allow_ephemeral_receipts {
             return Err(ProtectError::Config(
                 "refusing to start without a durable receipt store: set receipt_db to a durable \
@@ -592,6 +625,7 @@ impl ProtectProxy {
         // budget authority exists; without one, `/v1/evaluate` and
         // `/v1/reconcile` deny fail-closed.
         let payment_adapter = self.payment_adapter;
+        let settlement_ledger_required = payment_adapter.is_some();
         let mediation_kernel = match mediation_budget {
             Some(budget) => {
                 let mut kernel = build_mediation_kernel(
@@ -609,6 +643,9 @@ impl ProtectProxy {
                     payment_adapter,
                     Arc::new(clock.clone()),
                 )?;
+                if settlement_ledger_required {
+                    install_settlement_ledger(&mut kernel, durable_receipt_store.as_ref())?;
+                }
                 kernel.set_stop_control(stop.clone());
                 if let Some(store) = revocation_store.as_ref() {
                     for capability_id in &revoked_capability_ids {
@@ -793,6 +830,7 @@ impl ProtectProxy {
                 ticks_completed = health.ticks_completed,
                 recovered = health.recovered,
                 reaped = health.reaped,
+                settlement_drained = health.settlement_drained,
                 busy_skips = health.busy_skips,
                 worker_running = health.worker_running,
                 worker_joined = health.worker_joined,

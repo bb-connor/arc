@@ -339,6 +339,93 @@ async fn durable_receipt_store_enables_mediation_without_external_budget(
     Ok(())
 }
 
+#[tokio::test]
+async fn payment_adapter_without_a_durable_receipt_store_refuses_startup(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let mut config = minimal_config();
+    config.budget_db = Some(
+        directory
+            .path()
+            .join("budget.db")
+            .to_string_lossy()
+            .into_owned(),
+    );
+    config.spec_content = Some(
+        "openapi: 3.0.3
+info:
+  title: Ledger
+  version: 1.0.0
+paths: {}
+"
+        .into(),
+    );
+    let outcome = ProtectProxy::new(config)
+        .with_payment_adapter(Some(Box::new(
+            chio_kernel::payment::SimPaymentAdapter::new(),
+        )))
+        .run_with_observer(|_| panic!("sidecar served a payment adapter without its ledger"))
+        .await;
+    assert!(
+        matches!(
+            &outcome,
+            Err(ProtectError::Config(message)) if message
+                == "a payment adapter requires a durable receipt store for its settlement ledger"
+        ),
+        "{outcome:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn payment_adapter_without_any_budget_authority_refuses_startup(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = minimal_config();
+    config.spec_content =
+        Some("openapi: 3.0.3\ninfo:\n  title: Ledger\n  version: 1.0.0\npaths: {}\n".into());
+    assert!(config.receipt_db.is_none());
+    assert!(config.budget_db.is_none());
+    assert!(config.control_url.is_none());
+    let outcome = ProtectProxy::new(config)
+        .with_payment_adapter(Some(Box::new(
+            chio_kernel::payment::SimPaymentAdapter::new(),
+        )))
+        .run_with_observer(|_| panic!("sidecar served a payment adapter without its ledger"))
+        .await;
+    assert!(
+        matches!(
+            &outcome,
+            Err(ProtectError::Config(message)) if message
+                == "a payment adapter requires a durable receipt store for its settlement ledger"
+        ),
+        "{outcome:?}"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn payment_adapter_installs_the_settlement_ledger_on_the_durable_receipt_store(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let sidecar = durable_sidecar(directory.path())?;
+    let (ready, address) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(
+        ProtectProxy::new(sidecar.config)
+            .with_payment_adapter(Some(Box::new(
+                chio_kernel::payment::SimPaymentAdapter::new(),
+            )))
+            .run_with_observer(move |address| {
+                let _ = ready.send(address);
+            }),
+    );
+    let published = tokio::time::timeout(Duration::from_secs(10), address).await;
+    task.abort();
+    let _ = task.await;
+    assert!(matches!(published, Ok(Ok(_))), "{published:?}");
+    Ok(())
+}
+
 #[cfg(unix)]
 struct DurableSidecar {
     config: ProtectConfig,

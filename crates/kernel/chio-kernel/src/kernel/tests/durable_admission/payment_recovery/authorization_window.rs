@@ -106,3 +106,118 @@ fn review_payment_authorization_window_lost_ack_queries_original_reference_befor
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
+
+/// Runs the sim rail and then stops before its authorization id reaches the
+/// payment journal, as a process crash between the two would.
+struct SimRailStoppedBeforeJournal {
+    inner: crate::payment::SimPaymentAdapter,
+    authorized: Arc<Mutex<Vec<String>>>,
+}
+
+impl PaymentAdapter for SimRailStoppedBeforeJournal {
+    fn rail_id(&self) -> &'static str {
+        self.inner.rail_id()
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        self.inner.rail_mode()
+    }
+
+    fn authorize(
+        &self,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        let authorization = self.inner.authorize(request)?;
+        self.authorized
+            .lock()
+            .map_err(|_| PaymentError::RailError("authorization lock".into()))?
+            .push(authorization.authorization_id);
+        Err(PaymentError::Unavailable(
+            "process stopped before the sim authorization reached the journal".into(),
+        ))
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.inner
+            .capture(authorization_id, amount_units, currency, reference)
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.inner.release(authorization_id, reference)
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.inner
+            .refund(transaction_id, amount_units, currency, reference)
+    }
+
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        self.inner.settlement_state(reference, authorization_id)
+    }
+}
+
+#[test]
+fn review_payment_authorization_window_sim_crash_before_journal_compensates() -> TestResult {
+    let authorized = Arc::new(Mutex::new(Vec::new()));
+    let (kernel, request, store, invocations) = payment_fixture_with_adapter(
+        "review-payment-sim-crash-before-journal",
+        Box::new(SimRailStoppedBeforeJournal {
+            inner: crate::payment::SimPaymentAdapter::new(),
+            authorized: authorized.clone(),
+        }),
+    );
+    let error = authorize_without_dispatch(&kernel, &request)
+        .err()
+        .ok_or("sim authorization that never reached the journal was accepted")?;
+    assert!(
+        matches!(error.downcast_ref::<PaymentError>(), Some(PaymentError::Unavailable(detail))
+        if detail == "process stopped before the sim authorization reached the journal")
+    );
+    assert_eq!(
+        authorized.lock().map_err(|_| "authorization lock")?.len(),
+        1
+    );
+    let journal = store.payment_journal().ok_or("ambiguous journal")?;
+    assert_eq!(journal.state, PaymentJournalState::HoldPlaced);
+    assert_eq!(journal.rail_mode, PaymentRailMode::PrepaidFinal);
+    assert_eq!(journal.authorization_id, None);
+
+    let operation = store.operation();
+    kernel.compensate_durable_admission_before_dispatch(
+        &operation,
+        serde_json::json!({"authority": "sim-crash-before-journal"}),
+        current_unix_timestamp_ms(),
+        None,
+        compensation_response(),
+    )?;
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    let journal = store.payment_journal().ok_or("closed journal")?;
+    assert_eq!(journal.state, PaymentJournalState::Closed);
+    assert_eq!(journal.authorization_id, None);
+    assert_released_budget(&store)?;
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}

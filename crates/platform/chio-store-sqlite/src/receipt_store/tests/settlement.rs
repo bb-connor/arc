@@ -614,3 +614,57 @@ fn receipt_retention_refuses_store_without_settlement_projection(
     let _ = fs::remove_file(archive_path);
     Ok(())
 }
+
+#[test]
+fn settlement_reconciliation_insert_keeps_the_existing_row(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (_root, path) = temp_db("chio-settlement-reconciliation")?;
+    let store = SqliteReceiptStore::open(&path)?;
+    let receipt = sample_receipt();
+    store.append_chio_receipt(&receipt)?;
+    let stored_before = store.receipts_canonical_bytes_range(1, 1)?;
+
+    assert!(ReceiptStore::supports_settlement_reconciliation(&store));
+    assert!(ReceiptStore::record_settlement_reconciliation(
+        &store,
+        &receipt.id,
+        SettlementReconciliationState::Reconciled,
+        Some("pay-1"),
+    )?);
+    store.upsert_settlement_reconciliation(
+        &receipt.id,
+        SettlementReconciliationState::Ignored,
+        Some("operator decision"),
+    )?;
+    assert!(!ReceiptStore::record_settlement_reconciliation(
+        &store,
+        &receipt.id,
+        SettlementReconciliationState::Reconciled,
+        Some("pay-1"),
+    )?);
+    let row = store.connection()?.query_row(
+        "SELECT reconciliation_state, note FROM settlement_reconciliations WHERE receipt_id = ?1",
+        [&receipt.id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+    )?;
+    assert_eq!(
+        row,
+        ("ignored".to_string(), Some("operator decision".to_string()))
+    );
+    assert_eq!(store.receipts_canonical_bytes_range(1, 1)?, stored_before);
+
+    let missing = ReceiptStore::record_settlement_reconciliation(
+        &store,
+        "rcpt-missing",
+        SettlementReconciliationState::Reconciled,
+        None,
+    );
+    assert!(
+        matches!(
+            &missing,
+            Err(ReceiptStoreError::NotFound(detail)) if detail == "receipt rcpt-missing does not exist"
+        ),
+        "unexpected reconciliation result: {missing:?}"
+    );
+    Ok(())
+}
