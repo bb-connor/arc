@@ -77,7 +77,8 @@ const CONSTRUCTOR_SITES: &[ConstructorSite] = &[
     },
 ];
 
-type Census = BTreeMap<String, Vec<(String, FunctionFacts)>>;
+type FileFunctions = Vec<(String, FunctionFacts)>;
+type Census = BTreeMap<String, FileFunctions>;
 
 pub(super) fn validate(root: &Path, adapter_sources: &[String]) -> Result<(), String> {
     let mut sources = adapter_sources.to_vec();
@@ -116,10 +117,7 @@ fn census(root: &Path, sources: &[String]) -> Result<Census, String> {
     Ok(parsed)
 }
 
-fn parse_functions(
-    text: &str,
-    label: &str,
-) -> Result<(Vec<(String, FunctionFacts)>, Vec<String>), String> {
+fn parse_functions(text: &str, label: &str) -> Result<(FileFunctions, Vec<String>), String> {
     let syntax = syn::parse_file(text)
         .map_err(|error| format!("cannot parse production Rust source {label}: {error}"))?;
     if test_only(&syntax.attrs) {
