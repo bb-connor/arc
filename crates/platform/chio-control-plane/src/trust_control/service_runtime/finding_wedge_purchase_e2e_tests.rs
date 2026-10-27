@@ -1820,6 +1820,10 @@ impl PaymentAdapter for ReversibleHoldAdapter {
             metadata: serde_json::json!({}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 /// A final-settlement rail: it prepays, so it cannot arbitrate a compare
@@ -1889,6 +1893,10 @@ impl PaymentAdapter for PrepaidFinalAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({}),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

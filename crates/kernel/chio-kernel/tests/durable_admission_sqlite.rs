@@ -338,6 +338,10 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
             metadata: serde_json::json!({}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 /// A final-settlement rail. A delivery-digest grant cannot be honored here:
@@ -409,6 +413,10 @@ impl PaymentAdapter for PrepaidFinalPaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({}),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

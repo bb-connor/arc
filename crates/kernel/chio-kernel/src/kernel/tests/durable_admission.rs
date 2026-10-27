@@ -449,6 +449,10 @@ impl PaymentAdapter for QualifiedDurablePaymentAdapter {
             metadata: serde_json::json!({}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {

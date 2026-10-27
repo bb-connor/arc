@@ -130,6 +130,10 @@ impl PaymentAdapter for MutatingPaymentAdapter {
             metadata: serde_json::json!({"adapter": "mutating-test"}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct PostPaymentMutationGuard {

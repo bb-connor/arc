@@ -547,6 +547,10 @@ impl PaymentAdapter for StubPaymentAdapter {
             metadata: serde_json::json!({ "adapter": "stub" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 impl PaymentAdapter for DecliningPaymentAdapter {
@@ -587,6 +591,10 @@ impl PaymentAdapter for DecliningPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("refund should not run".to_string()))
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 
@@ -640,6 +648,10 @@ impl PaymentAdapter for PrepaidSettledPaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "x402" }),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

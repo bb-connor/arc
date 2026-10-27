@@ -276,6 +276,10 @@ impl PaymentAdapter for FailingAuthorizationPaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("unexpected refund".to_string()))
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct BlockingAuthorizationState {
@@ -380,6 +384,10 @@ impl PaymentAdapter for BlockingAuthorizationPaymentAdapter {
             metadata: serde_json::json!({ "adapter": "blocking" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -440,6 +448,10 @@ impl PaymentAdapter for NonceCleanupPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("unexpected refund".to_string()))
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

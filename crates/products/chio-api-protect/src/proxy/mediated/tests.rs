@@ -690,6 +690,13 @@ impl chio_kernel::PaymentAdapter for RecordingPaymentAdapter {
         self.inner
             .refund(transaction_id, amount_units, currency, reference)
     }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, chio_kernel::PaymentError> {
+        self.inner.replayed_authorization_metadata(authorization_id)
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

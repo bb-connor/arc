@@ -188,6 +188,10 @@ impl PaymentAdapter for PaymentAmbiguityAdapter {
             metadata: serde_json::json!({"adapter": "payment-ambiguity-test"}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct PaymentAmbiguityFailingReverseBudgetStore {
@@ -733,6 +737,10 @@ impl PaymentAdapter for DurableDeclinedPaymentAdapter {
         _: Option<&str>,
     ) -> Result<crate::payment::RailSettlementState, PaymentError> {
         Ok(crate::payment::RailSettlementState::NoAuthorization)
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

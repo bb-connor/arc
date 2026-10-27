@@ -1210,6 +1210,10 @@ impl PaymentAdapter for TrackingPaymentAdapter {
             metadata: serde_json::json!({ "adapter": "tracking" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[path = "support_monetary_durability.rs"]

@@ -205,6 +205,10 @@ impl PaymentAdapter for SimPaymentAdapter {
             authorization_id: recorded,
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({ "adapter": "sim", "mode": "prepaid_no_broadcast" }))
+    }
 }
 
 #[cfg(test)]

@@ -89,16 +89,12 @@ pub trait PaymentAdapter: Send + Sync {
     }
 
     /// Authorization metadata to restore when a durable journal replays
-    /// `authorization_id` without calling the rail. Must be side-effect free.
-    /// Rails whose identifier carries no settlement evidence return an empty
-    /// object.
+    /// `authorization_id` without calling the rail. Must be side-effect free
+    /// and return a JSON object.
     fn replayed_authorization_metadata(
         &self,
         authorization_id: &str,
-    ) -> Result<serde_json::Value, PaymentError> {
-        let _ = authorization_id;
-        Ok(serde_json::json!({}))
-    }
+    ) -> Result<serde_json::Value, PaymentError>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -401,6 +397,14 @@ impl PaymentAdapter for AcpPaymentAdapter {
             ],
         )?;
         response.into_state(&request_digest, &binding)
+    }
+
+    /// Provider metadata is not journaled, so replay restores the rail identity.
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({
+            "adapter": "acp",
+            "mode": "shared_payment_token_hold"
+        }))
     }
 }
 
@@ -1198,6 +1202,54 @@ mod tests {
 
         assert_eq!(receipt.payment_reference.as_deref(), Some("txn_123"));
         assert_eq!(receipt.settlement_status, SettlementStatus::Failed);
+    }
+
+    #[test]
+    fn durable_replay_restores_each_rail_identity() {
+        let acp = hold_placed_payment_journal()
+            .apply_transition(&PaymentJournalTransition::AuthorizationHeld {
+                authorization_id: "acp-authorization".to_owned(),
+            })
+            .expect("authorized journal");
+        let replayed =
+            replayed_payment_authorization(&AcpPaymentAdapter::new("https://acp.example"), &acp)
+                .expect("replay succeeds")
+                .expect("authorized journal replays");
+        assert_eq!(replayed.state, PaymentAuthorizationState::Held);
+        assert_eq!(
+            replayed.metadata,
+            serde_json::json!({
+                "adapter": "acp",
+                "mode": "shared_payment_token_hold",
+                "durable_replay": true
+            })
+        );
+
+        let mut prepaid = hold_placed_payment_journal();
+        prepaid.rail = "sim".to_owned();
+        prepaid.rail_mode = PaymentRailMode::PrepaidFinal;
+        prepaid.authorization_attempt = Some(PaymentAuthorizationAttempt::NotStarted);
+        let prepaid = prepaid
+            .apply_transition(&PaymentJournalTransition::BeginAuthorizationAttempt)
+            .and_then(|journal| {
+                journal.apply_transition(&PaymentJournalTransition::PrepaymentSettled {
+                    authorization_id: "sim-authorization".to_owned(),
+                })
+            })
+            .expect("settled prepaid journal");
+        let replayed =
+            replayed_payment_authorization(&super::sim::SimPaymentAdapter::new(), &prepaid)
+                .expect("replay succeeds")
+                .expect("settled journal replays");
+        assert_eq!(replayed.state, PaymentAuthorizationState::PrepaidFinal);
+        assert_eq!(
+            replayed.metadata,
+            serde_json::json!({
+                "adapter": "sim",
+                "mode": "prepaid_no_broadcast",
+                "durable_replay": true
+            })
+        );
     }
 
     #[test]
