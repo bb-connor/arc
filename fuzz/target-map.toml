@@ -382,6 +382,20 @@ triggers = [
 seeds    = "fuzz/corpus/rollback_anchor_slots"
 notes    = "Rollback anchor slot images: marker, length, checksum and canonical JSON record decode; torn and forged slots are rejected without panics and accepted slots re-encode to themselves."
 
+[targets.commerce_receipt_verify]
+crate    = "chio-commerce-order"
+path     = "fuzz/fuzz_targets/commerce_receipt_verify.rs"
+triggers = [
+    "crates/platform/chio-commerce-order/**",
+    "crates/core/chio-core-types/src/receipt/decision.rs",
+    "fixtures/proof-room/commerce-payments/offline-psp-valid/**",
+    "scripts/gen-commerce-receipt-fuzz-seeds.py",
+    "fuzz/fuzz_targets/commerce_receipt_verify.rs",
+    "fuzz/corpus/commerce_receipt_verify/**",
+]
+seeds    = "fuzz/corpus/commerce_receipt_verify"
+notes    = "Commerce authority receipts through order replay and settlement verification: bounded signed decode, re-signed action mutations, and the action hash mismatch versus encoding fault error classes; no input may panic."
+
 [targets.peers_lock_decode]
 crate    = "chio-conformance"
 path     = "fuzz/fuzz_targets/peers_lock_decode.rs"

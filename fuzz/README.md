@@ -28,7 +28,7 @@ the workflow under `.github/workflows/cflite_pr.yml` and
 
 ## Targets
 
-There are 27 targets. Each one drives a trust-boundary decode or
+There are 34 targets. Each one drives a trust-boundary decode or
 fail-closed-verification surface with arbitrary bytes. The full mapping
 (owning crate, source path, trigger globs, seed corpus) lives in
 `target-map.toml`; the summaries below are grouped by surface.
@@ -71,6 +71,10 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
 - `rollback_anchor_slots` - SQLite serving-owner rollback anchor slot images:
   marker, length, checksum, and canonical-JSON record decode, with accepted
   slots re-encoding to the bytes they were read from.
+- `commerce_receipt_verify` - commerce authority receipts through order
+  replay and settlement verification. Seeds are written by
+  `scripts/gen-commerce-receipt-fuzz-seeds.py`; an action hash mismatch must
+  surface as the digest-mismatch class and an encoding fault must not.
 - `peers_lock_decode` - conformance `peers.lock.toml` decode, schema
   validation, and the language, target, and published queries that
   `fetch-peers` relies on.
