@@ -498,3 +498,34 @@ fn outcome_unknown_prepayment_signs_its_rail_evidence() -> TestResult {
     assert!(!metadata.to_string().contains(SENSITIVE_ERROR));
     Ok(())
 }
+
+#[test]
+fn outcome_unknown_prepayment_denial_keeps_the_fixed_reason() -> TestResult {
+    let fixture = Fixture::new(Mode::AuthorizeOutcomeUnknown)?;
+    let response = fixture.reserve()?;
+    let expected = KernelError::GovernedTransactionDenied(
+        "MustPrepay prepayment authorization failed before reserving an execution nonce: outcome_unknown"
+            .to_string(),
+    )
+    .to_string();
+    assert_eq!(response.reason.as_deref(), Some(expected.as_str()));
+    match response.receipt.decision.clone() {
+        Some(Decision::Deny { reason, guard }) => {
+            assert_eq!(reason, expected);
+            assert_eq!(guard, "kernel");
+        }
+        other => panic!("expected a kernel deny decision, got {other:?}"),
+    }
+    assert!(response.receipt.verify_signature()?);
+    assert!(!serde_json::to_string(&response.receipt)?.contains(SENSITIVE_ERROR));
+    let financial = &response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("prepayment ambiguity metadata missing")?["financial"];
+    assert_eq!(
+        financial["payment_authorization_evidence"],
+        prepayment_evidence()
+    );
+    Ok(())
+}

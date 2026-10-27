@@ -103,3 +103,17 @@ fn status_text(status_code: u16) -> &'static str {
         _ => "Error",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_request_fails_the_stub_instead_of_hanging() {
+        let (_url, _requests, handle) = spawn_once_json_server(200, serde_json::json!({}));
+        assert!(
+            handle.join().is_err(),
+            "a stub whose request never arrives must fail"
+        );
+    }
+}
