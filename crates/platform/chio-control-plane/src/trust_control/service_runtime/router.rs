@@ -248,6 +248,14 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             get(handle_public_resolve_passport_status),
         )
         .route(
+            PUBLIC_PASSPORT_REVOCATION_ROOT_PATH,
+            get(handle_public_passport_revocation_root),
+        )
+        .route(
+            PUBLIC_PASSPORT_REVOCATION_LEAVES_PATH,
+            get(handle_public_passport_revocation_leaves),
+        )
+        .route(
             PASSPORT_STATUS_REVOKE_PATH,
             post(handle_revoke_passport_status),
         )

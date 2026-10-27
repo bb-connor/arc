@@ -615,6 +615,7 @@ fn market_state(
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        passport_revocation_oracle: None,
         receipt_store: None,
         receipt_query_snapshots: None,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),

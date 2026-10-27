@@ -19,6 +19,10 @@ pub(crate) struct TrustServiceState {
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
     pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
     pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
+    /// The passport revocation oracle beside `config.passport_statuses_file`,
+    /// opened before serving. The public revocation feed reads through it.
+    pub(crate) passport_revocation_oracle:
+        Option<Arc<chio_revocation_oracle::SqliteRevocationOracle>>,
     /// The single receipt store for `config.receipt_db_path`, opened before
     /// serving. Handlers share it and its one writer instead of opening a store
     /// (and seeding a writer) per request.
