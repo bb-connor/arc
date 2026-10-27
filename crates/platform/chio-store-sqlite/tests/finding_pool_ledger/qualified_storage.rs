@@ -143,3 +143,57 @@ fn cognition_market_qualified_pool_refuses_in_memory_storage() {
         );
     }
 }
+
+#[test]
+fn qualified_pool_refuses_partial_unstamped_catalog_without_repair() {
+    for removed_object in [
+        "DROP TABLE finding_pool_receipt_outbox",
+        "DROP INDEX finding_pool_receipt_outbox_pending",
+    ] {
+        let directory = tempfile::tempdir().test_expect("create ledger directory");
+        let database = directory.path().join("pool.sqlite3");
+        let domain = format!("{}:{removed_object}", ledger_domain());
+        drop(open_qualified(&database, &domain).test_expect("create complete ledger"));
+        let connection = rusqlite::Connection::open(&database).test_expect("open ledger fixture");
+        connection
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS chio_store_schema_versions (
+    store_key TEXT NOT NULL PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version = 1)
+) STRICT;
+DELETE FROM chio_store_schema_versions WHERE store_key = 'finding_pool_ledger';
+PRAGMA application_id = 1128810831;",
+            )
+            .test_expect("remove namespace stamp");
+        connection
+            .execute_batch(removed_object)
+            .test_expect("remove ledger object");
+        let catalog_sql = "SELECT group_concat(sql, char(10)) FROM (SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name)";
+        let before: String = connection
+            .query_row(catalog_sql, [], |row| row.get(0))
+            .test_expect("capture damaged catalog");
+        drop(connection);
+
+        let result = open_qualified(&database, &domain);
+        assert!(
+            matches!(result, Err(FindingPoolLedgerError::Storage(ref message))
+                if message == "schema namespace finding_pool_ledger is missing"),
+            "partial unstamped ledger must refuse its missing namespace"
+        );
+        drop(result);
+        let connection =
+            rusqlite::Connection::open(&database).test_expect("inspect refused ledger");
+        let after: String = connection
+            .query_row(catalog_sql, [], |row| row.get(0))
+            .test_expect("read catalog after refusal");
+        assert_eq!(after, before);
+        let stamp_count: i64 = connection
+            .query_row(
+                "SELECT count(*) FROM chio_store_schema_versions WHERE store_key = 'finding_pool_ledger'",
+                [],
+                |row| row.get(0),
+            )
+            .test_expect("read namespace stamp count");
+        assert_eq!(stamp_count, 0);
+    }
+}
