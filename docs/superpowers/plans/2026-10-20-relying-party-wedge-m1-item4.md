@@ -341,7 +341,7 @@ PR A2 adds, under the same rules:
 
 ```sql
 CREATE TABLE receipt_tenant_tags (         -- tool receipts only; child receipts carry no root id (see PR A2)
-  receipt_id TEXT PRIMARY KEY,
+  receipt_id TEXT NOT NULL PRIMARY KEY,   -- SQLite admits NULL in a TEXT PRIMARY KEY without NOT NULL
   root_capability_id TEXT NOT NULL REFERENCES anchored_roots(capability_id),
   tag_key_id TEXT NOT NULL CHECK (HEX64(tag_key_id)),
   tenant_tag TEXT NOT NULL CHECK (HEX64(tenant_tag))  -- (key_id, value) copied from anchored_roots, never from the request
@@ -361,7 +361,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
      **Replay keys are rebindable after retention.** Once a binding passes `retain_until` and is pruned, the same replay key may bind again (the artifact it came from is past `exp`, so only a new authenticated artifact can present it). The new root gets a new `replay_bound_at`, so it never collides with a retained old root, and item 5's `replay_key` revocation, which matches `replay_key_digest`, covers both.
   5. Insert the root's `root_context_openings` rows (Decision 8).
   6. For bearer intake, read `bearer_token_roots` by `token_digest` inside this transaction before writing it:
-     - a mapped root that is live and returnable is recovered: the transaction rolls back its own rows and goes to Release with the mapped root, and no second root is inserted. This holds even when the replay keys differ, as for two `operator_static_bearer` first sights that straddle a clock second and compute different `expires_at`;
+     - a mapped root that is live and returnable is recovered: the transaction rolls back its own rows and goes to Release with the mapped root, and no second root is inserted. This holds even when the replay keys differ, as for two `operator_static_bearer` first sights that straddle a clock second and compute different `expires_at`. Before recovery, the transaction rechecks the mapped root under its own original replay key, not the newly proposed one: the root row's `replay_key_digest` and `replay_bound_at` must name a live `exchange_replay` binding whose `capability_id` is that root, and the row must pass the row check; otherwise the request refuses `AnchoredRootTampered` and nothing is replaced;
      - a mapped root that is expired (or names another policy digest, so it is not live) is replaced: the new root and the replaced mapping commit together, under the per-kind rules in Bearer expiry;
      - no mapping inserts one.
      The read is inside the IMMEDIATE transaction, so a concurrent first sight serializes behind it and sees the committed mapping.
@@ -454,7 +454,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
     - `recovery_under_another_policy_digest_refuses`
   - Projection: one `<column>_mutation_refuses` per projection member, `context_blob_mutation_refuses`, `capability_blob_mutation_refuses` and `capability_scope_disagreeing_with_context_refuses`.
   - Row check by kind: `static_bearer_row_check_passes_without_context_artifact_digest` (and one each for `oauth_introspection`, `chio_local_as`, `chio_operator_key`), `jws_kind_context_artifact_digest_mismatch_refuses`, `static_bearer_context_carrying_artifact_digest_refuses`.
-  - DDL: one rejected insert per CHECK (`non_hex_digest_refuses`, `uppercase_hex_refuses`, `nul_in_text_refuses`, `unknown_anchor_kind_refuses`, `null_tenant_tag_refuses`, `present_salt_of_31_bytes_refuses`, `erased_row_with_salt_refuses`), and `foreign_catalog_layout_refuses_open`.
+  - DDL: one rejected insert per CHECK (`non_hex_digest_refuses`, `uppercase_hex_refuses`, `nul_in_text_refuses`, `unknown_anchor_kind_refuses`, `null_tenant_tag_refuses`, `null_receipt_id_refuses` (A2), `present_salt_of_31_bytes_refuses`, `erased_row_with_salt_refuses`), and `foreign_catalog_layout_refuses_open`.
   - Retention by digest:
     - `retained_policy_bytes_under_wrong_digest_refuse`
     - `retained_identity_bytes_under_wrong_digest_refuse`
@@ -475,6 +475,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
     - `bearer_token_digest_maps_to_one_root`
     - `simultaneous_first_seen_mints_one_root`
     - `static_bearer_first_sights_one_second_apart_mint_one_root` (different `expires_at`, so different replay keys; step 6's mapping read recovers the first root)
+    - `mapping_recovery_rechecks_the_original_replay_binding` (the mapped root's own binding removed or pointing at another root refuses `AnchoredRootTampered`)
     - `entra_second_token_same_uti_refuses`
     - `static_bearer_one_live_root_per_token`
     - `local_reexchange_twice_refuses`
