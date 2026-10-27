@@ -35,11 +35,8 @@ fn provider(provider_id: &str) -> Result<EnterpriseProviderRecord, Box<dyn std::
     }))?)
 }
 
-/// A FIFO is only a deterministic read pause in this witness, never the
-/// supported registry storage format. The bytes and mutation handlers are real.
 #[tokio::test(flavor = "current_thread")]
 async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> TestResult {
-    use std::io::Write;
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("enterprise-providers.json");
     let mut initial = EnterpriseProviderRegistry::default();
@@ -48,25 +45,9 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
     let added = provider("unrelated")?;
     let mut state = metrics_state("service-secret");
     state.config.enterprise_providers_file = Some(path.clone());
-    let result = std::process::Command::new("mkfifo")
-        .args(["-m", "600"])
-        .arg(&path)
-        .status()?;
-    assert!(
-        result.success(),
-        "could not create deterministic read pause"
-    );
-    let (opened_tx, opened_rx) = mpsc::channel();
-    let (release_tx, release_rx) = mpsc::channel();
-    let fifo = path.clone();
-    let supplied = bytes.clone();
-    let writer = std::thread::spawn(move || -> std::io::Result<()> {
-        let mut file = std::fs::OpenOptions::new().write(true).open(fifo)?;
-        file.write_all(&supplied)?;
-        let _ = opened_tx.send(());
-        let _ = release_rx.recv_timeout(HANG_GUARD);
-        Ok(())
-    });
+    std::fs::write(&path, &bytes)?;
+    let (pause, mut opened) =
+        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
     let upsert = tokio::task::spawn_blocking({
         let state = state.clone();
         let added = added.clone();
@@ -80,9 +61,9 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
             ))
         }
     });
-    tokio::task::spawn_blocking(move || opened_rx.recv_timeout(HANG_GUARD)).await??;
-    std::fs::remove_file(&path)?;
-    std::fs::write(&path, &bytes)?;
+    tokio::time::timeout(HANG_GUARD, opened.recv())
+        .await?
+        .ok_or("registry read did not enter pause")?;
     let deletion = handle_delete_enterprise_provider(
         State(state.clone()),
         AxumPath("removed".to_string()),
@@ -90,10 +71,9 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
     )
     .await;
     let (status, text) = status_and_text(deletion).await?;
-    release_tx.send(())?;
+    pause.release();
     let response = tokio::time::timeout(HANG_GUARD, upsert).await??;
     assert_eq!(response.status(), StatusCode::OK);
-    writer.join().map_err(|_| "FIFO writer panicked")??;
     if status == StatusCode::OK {
         assert!(
             !EnterpriseProviderRegistry::load(&path)?

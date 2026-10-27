@@ -400,11 +400,8 @@ fn policy(policy_id: &str) -> Result<SignedPassportVerifierPolicy, Box<dyn std::
     )?)
 }
 
-/// A FIFO is only a deterministic read pause in this witness, never the
-/// supported registry storage format. The bytes and mutation handlers are real.
 #[tokio::test(flavor = "current_thread")]
 async fn an_unrelated_policy_upsert_cannot_restore_a_deleted_policy() -> TestResult {
-    use std::io::Write;
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("policies.json");
     let removed = policy("removed")?;
@@ -414,25 +411,9 @@ async fn an_unrelated_policy_upsert_cannot_restore_a_deleted_policy() -> TestRes
     let bytes = canonical_json_bytes(&initial)?;
     let mut state = metrics_state("service-secret");
     state.config.verifier_policies_file = Some(path.clone());
-    let result = std::process::Command::new("mkfifo")
-        .args(["-m", "600"])
-        .arg(&path)
-        .status()?;
-    assert!(
-        result.success(),
-        "could not create deterministic read pause"
-    );
-    let (opened_tx, opened_rx) = mpsc::channel();
-    let (release_tx, release_rx) = mpsc::channel();
-    let fifo = path.clone();
-    let supplied = bytes.clone();
-    let writer = std::thread::spawn(move || -> std::io::Result<()> {
-        let mut file = std::fs::OpenOptions::new().write(true).open(fifo)?;
-        file.write_all(&supplied)?;
-        let _ = opened_tx.send(());
-        let _ = release_rx.recv_timeout(HANG_GUARD);
-        Ok(())
-    });
+    std::fs::write(&path, &bytes)?;
+    let (pause, mut opened) =
+        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
     let upsert = tokio::task::spawn_blocking({
         let state = state.clone();
         let added = added.clone();
@@ -446,9 +427,9 @@ async fn an_unrelated_policy_upsert_cannot_restore_a_deleted_policy() -> TestRes
             ))
         }
     });
-    tokio::task::spawn_blocking(move || opened_rx.recv_timeout(HANG_GUARD)).await??;
-    std::fs::remove_file(&path)?;
-    std::fs::write(&path, &bytes)?;
+    tokio::time::timeout(HANG_GUARD, opened.recv())
+        .await?
+        .ok_or("registry read did not enter pause")?;
     let deletion = handle_delete_verifier_policy(
         State(state.clone()),
         AxumPath("removed".to_string()),
@@ -458,10 +439,9 @@ async fn an_unrelated_policy_upsert_cannot_restore_a_deleted_policy() -> TestRes
     assert_registry_busy(&path);
     assert_busy(deletion).await?;
     assert_eq!(std::fs::read(&path)?, bytes);
-    release_tx.send(())?;
+    pause.release();
     let response = tokio::time::timeout(HANG_GUARD, upsert).await??;
     assert_eq!(response.status(), StatusCode::OK);
-    writer.join().map_err(|_| "FIFO writer panicked")??;
     let response = handle_delete_verifier_policy(
         State(state),
         AxumPath("removed".to_string()),
