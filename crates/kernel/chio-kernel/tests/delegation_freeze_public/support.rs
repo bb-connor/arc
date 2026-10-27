@@ -6,9 +6,9 @@ use chio_core::capability::caveat::{
 };
 use chio_core::capability::scope::{ChioScope, Operation, ResourceGrant, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+use chio_core::receipt::evidence::CapabilitySnapshot;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_core::{Keypair, PublicKey, ResourceContent, ResourceDefinition, SessionId};
-use chio_kernel::capability_lineage::CapabilitySnapshot;
 use chio_kernel::{
     CapabilityIssuanceAdmissionAuthority, ChioKernel, KernelConfig, KernelError,
     MemoryBudgetConfig, ReceiptStore, ReceiptStoreError, ResourceProvider,
