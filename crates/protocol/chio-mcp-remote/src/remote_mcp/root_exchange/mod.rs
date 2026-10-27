@@ -30,10 +30,7 @@ pub use client_auth::{
     ConfidentialClient, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 pub use error::{OAuthErrorCode, RootExchangeError};
-pub use exchange::{
-    ContextOpening, EntropyFailure, ExchangeEntropy, ExchangeServices, PreparedAnchoredRoot,
-    RootExchange,
-};
+pub use exchange::{ContextOpening, ExchangeServices, PreparedAnchoredRoot, RootExchange};
 pub use grant::{IdJagGrant, RequestedTokenType};
 pub use id_jag::ID_JAG_MEDIA_TYPE;
 pub use key_lookup::{IdpKey, IdpKeyLookup};
