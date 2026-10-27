@@ -1042,8 +1042,7 @@ fn artifact_schema_from_file(path: &Path) -> Result<String, CliError> {
     {
         return Ok(schema.to_string());
     }
-    let is_receipt =
-        crate::input::project::<chio_core::receipt::body::ChioReceipt>(value).is_ok();
+    let is_receipt = crate::input::json::<chio_core::receipt::body::ChioReceipt>(&bytes).is_ok();
     Ok(if is_receipt {
         CHIO_RECEIPT_SCHEMA.to_string()
     } else {

@@ -55,3 +55,25 @@ fn other_artifact_schema_is_preserved() -> Result<(), Box<dyn std::error::Error>
     );
     Ok(())
 }
+
+#[test]
+fn receipt_with_duplicate_parameter_member_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    let text = std::str::from_utf8(RECEIPT)?;
+    let bytes = text.replacen(r#""parameters":{"#, r#""parameters":{"order_id":"forged","#, 1);
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("artifact.json");
+    std::fs::write(&path, bytes)?;
+    let error = artifact_schema_from_file(&path)
+        .err()
+        .ok_or("duplicate receipt parameter was accepted")?;
+    assert_eq!(
+        error.report().code,
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
+    assert!(matches!(
+        error,
+        crate::CliError::SignedJson(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+    ));
+    assert!(!artifact_declares_schema(&path, CHIO_RECEIPT_SCHEMA)?);
+    Ok(())
+}
