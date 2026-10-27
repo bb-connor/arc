@@ -2146,6 +2146,7 @@ dependencies = [
  "chio-acp-edge",
  "chio-anchor",
  "chio-attest-verify",
+ "chio-commerce-order",
  "chio-config",
  "chio-conformance",
  "chio-control-plane",
