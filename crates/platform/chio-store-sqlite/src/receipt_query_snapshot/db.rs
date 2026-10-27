@@ -352,6 +352,20 @@ impl SnapshotDb {
         self.dims.get(&(kind, value.to_string())).copied()
     }
 
+    /// True when a held receipt of `capability` has no signed subject, so its
+    /// attribution is taken from capability lineage.
+    pub(super) fn holds_unsigned_subject(&self, capability: &str) -> Result<bool, SnapshotDbError> {
+        let Some(capability_id) = self.dim_id(DIM_CAPABILITY, capability) else {
+            return Ok(false);
+        };
+        Ok(self.connection()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM snapshot_tool_receipt INDEXED BY sq_capability
+             WHERE capability = ?1 AND subject_signed = 0)",
+            [capability_id],
+            |row| row.get(0),
+        )?)
+    }
+
     pub(super) fn dim_value(&self, id: i64) -> Result<Option<String>, SnapshotDbError> {
         if id == ABSENT {
             return Ok(None);

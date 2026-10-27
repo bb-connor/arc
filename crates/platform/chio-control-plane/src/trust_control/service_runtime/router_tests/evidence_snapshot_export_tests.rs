@@ -233,13 +233,32 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     Ok(())
 }
 
-#[tokio::test]
-async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenants() -> TestResult {
+const REFUSED_LINEAGE: &str = "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-bad-signed', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')";
+
+/// A tenant-a receipt of `cap-bad-signed`, with signed attribution when
+/// `signed`, and a tenant-b receipt of another capability; a ready snapshot
+/// and a router state with both tenant tokens. A lineage row the canonical
+/// reader refuses is then inserted for `cap-bad-signed`.
+async fn refused_lineage_router(
+    signed: bool,
+) -> Result<
+    (
+        tempfile::TempDir,
+        Arc<ReceiptQuerySnapshots>,
+        TrustServiceState,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("receipts.db");
     let store = Arc::new(SqliteReceiptStore::open(&path)?);
     let signer = Keypair::from_seed(&[43; 32]);
-    let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    let mut template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
+    if signed {
+        template.metadata = Some(json!({
+            "attribution": {"subject_key": "signed-subject", "issuer_key": "signed-issuer", "delegation_depth": 0}
+        }));
+    }
     for (id, tenant, capability) in [
         ("bad-a", "tenant-a", "cap-bad-signed"),
         ("plain-b", "tenant-b", "cap-plain"),
@@ -256,10 +275,7 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
     )?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
     let connection = rusqlite::Connection::open(&path)?;
-    let inserted = connection.execute(
-        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-bad-signed', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')",
-        [],
-    );
+    let inserted = connection.execute(REFUSED_LINEAGE, []);
     assert_eq!(inserted?, 1);
     drop(connection);
     let mut state = metrics_state("snapshot-secret");
@@ -273,6 +289,50 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
         .config
         .tenant_read_tokens
         .insert("tenant-b".into(), "tenant-b-secret".into());
+    Ok((directory, snapshots, state))
+}
+
+/// Wait until an extension cycle that began after this call has completed:
+/// the second change of the observation time, as cycles run one at a time.
+/// Returns early when the snapshot leaves `Ready`.
+async fn await_extension_cycle(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+    tokio::task::spawn_blocking(move || {
+        let observed =
+            |status: &chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotStatus| {
+                status
+                    .watermark
+                    .as_ref()
+                    .map(|watermark| watermark.observed_at_unix_ms)
+            };
+        let mut seen = observed(&snapshots.status());
+        let mut changes = 0;
+        // A hang guard, not an extension cadence requirement.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        while changes < 2 {
+            let status = snapshots.status();
+            if status.state != ReceiptQuerySnapshotState::Ready {
+                return;
+            }
+            let current = observed(&status);
+            if current != seen {
+                changes += 1;
+                seen = current;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "no extension cycle completed"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    })
+    .await?;
+    Ok(())
+}
+
+async fn assert_typed_refusal_keeps_other_tenants(
+    snapshots: &ReceiptQuerySnapshots,
+    state: TrustServiceState,
+) -> TestResult {
     let (status, body) = export(state.clone()).await?;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert_eq!(body["code"], "receipt_query_export_refused");
@@ -289,6 +349,39 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
     assert_eq!(response.status(), StatusCode::OK);
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenants() -> TestResult {
+    let (_directory, snapshots, state) = refused_lineage_router(true).await?;
+    assert_typed_refusal_keeps_other_tenants(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_signed_lineage_seen_by_extension_first_is_the_same_typed_refusal() -> TestResult {
+    let (_directory, snapshots, state) = refused_lineage_router(true).await?;
+    await_extension_cycle(Arc::clone(&snapshots)).await?;
+    assert_typed_refusal_keeps_other_tenants(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn refused_lineage_of_unattributed_receipts_fails_the_snapshot_after_extension() -> TestResult
+{
+    let (_directory, snapshots, state) = refused_lineage_router(false).await?;
+    await_extension_cycle(Arc::clone(&snapshots)).await?;
+    let (status, body) = export(state).await?;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(body["code"], "receipt_query_snapshot_invalid");
+    assert_eq!(body["error"], "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token");
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
     snapshots.shutdown();
     Ok(())
 }
