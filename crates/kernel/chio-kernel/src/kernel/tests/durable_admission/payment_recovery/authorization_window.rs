@@ -177,12 +177,14 @@ impl PaymentAdapter for SimRailStoppedBeforeJournal {
 }
 
 #[test]
-fn review_payment_authorization_window_sim_crash_before_journal_compensates() -> TestResult {
+fn review_payment_authorization_window_sim_crash_before_journal_refunds_the_recorded_prepayment(
+) -> TestResult {
     let authorized = Arc::new(Mutex::new(Vec::new()));
+    let sim = crate::payment::SimPaymentAdapter::new();
     let (kernel, request, store, invocations) = payment_fixture_with_adapter(
         "review-payment-sim-crash-before-journal",
         Box::new(SimRailStoppedBeforeJournal {
-            inner: crate::payment::SimPaymentAdapter::new(),
+            inner: sim.clone(),
             authorized: authorized.clone(),
         }),
     );
@@ -193,10 +195,12 @@ fn review_payment_authorization_window_sim_crash_before_journal_compensates() ->
         matches!(error.downcast_ref::<PaymentError>(), Some(PaymentError::Unavailable(detail))
         if detail == "process stopped before the sim authorization reached the journal")
     );
-    assert_eq!(
-        authorized.lock().map_err(|_| "authorization lock")?.len(),
-        1
-    );
+    let authorization_id = authorized
+        .lock()
+        .map_err(|_| "authorization lock")?
+        .first()
+        .cloned()
+        .ok_or("sim authorization")?;
     let journal = store.payment_journal().ok_or("ambiguous journal")?;
     assert_eq!(journal.state, PaymentJournalState::HoldPlaced);
     assert_eq!(journal.rail_mode, PaymentRailMode::PrepaidFinal);
@@ -216,7 +220,19 @@ fn review_payment_authorization_window_sim_crash_before_journal_compensates() ->
     );
     let journal = store.payment_journal().ok_or("closed journal")?;
     assert_eq!(journal.state, PaymentJournalState::Closed);
-    assert_eq!(journal.authorization_id, None);
+    assert_eq!(
+        journal.authorization_id.as_deref(),
+        Some(authorization_id.as_str())
+    );
+    let crate::payment::RailSettlementState::Settled { result, .. } =
+        sim.settlement_state(&journal.operation_id, Some(&authorization_id))?
+    else {
+        return Err("recovered sim authorization has no settled state".into());
+    };
+    assert_eq!(
+        result.settlement_status,
+        crate::payment::RailSettlementStatus::Refunded
+    );
     assert_released_budget(&store)?;
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     Ok(())
