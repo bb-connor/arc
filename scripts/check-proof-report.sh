@@ -807,6 +807,7 @@ tracked_paths = {
     ADAPTER_SOURCE_INVENTORY,
     "xtask/src/adapter_no_bypass.rs",
     "xtask/src/adapter_no_bypass/constructors.rs",
+    "xtask/src/adapter_no_bypass/nonce_signing.rs",
     "xtask/src/adapter_no_bypass/source.rs",
     "xtask/src/cli.rs",
     "xtask/src/dispatch.rs",
