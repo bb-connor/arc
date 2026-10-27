@@ -188,6 +188,9 @@ fn exercise_cleanup(replay: bool, legacy: bool) -> TestResult {
         reference: request.request_id.clone(),
         governed: None,
         commerce: None,
+        x402: None,
+        authority_expires_at: None,
+        reference_is_durable: false,
     })?;
     kernel.set_payment_adapter(Box::new(adapter));
 

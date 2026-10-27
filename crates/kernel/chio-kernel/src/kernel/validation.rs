@@ -1636,6 +1636,21 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn payment_authority_expires_at(request: &ToolCallRequest) -> u64 {
+        request
+            .approval_token
+            .iter()
+            .chain(&request.approval_tokens)
+            .map(|token| token.expires_at)
+            .chain(
+                request
+                    .threshold_approval_proposal
+                    .iter()
+                    .map(|proposal| proposal.body.proposal_deadline),
+            )
+            .fold(request.capability.expires_at, u64::min)
+    }
+
     pub(crate) fn authorize_payment_if_needed(
         &self,
         request: &ToolCallRequest,
@@ -1812,6 +1827,9 @@ impl ChioKernel {
             ),
             governed,
             commerce,
+            x402: None,
+            authority_expires_at: Some(Self::payment_authority_expires_at(request)),
+            reference_is_durable: durable_journal.is_some(),
         };
         if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
             durable_journal = Some(self.begin_durable_payment_authorization_attempt(
