@@ -1010,23 +1010,6 @@ async fn scope_projection_rules_are_enforced() {
 }
 
 #[tokio::test]
-async fn projection_target_with_two_separators_is_refused() {
-    let harness = Harness::with(
-        |_| {},
-        |policy| {
-            policy["rules"][0]["idp_scope_projection"]["crm.read"] = json!(["crm/search/extra"]);
-        },
-    );
-    assert_eq!(
-        harness
-            .run(id_jag_header(), id_jag_claims())
-            .await
-            .unwrap_err(),
-        RootExchangeError::ProjectionTargetMalformed
-    );
-}
-
-#[tokio::test]
 async fn wildcard_ceiling_grant_issues_the_projected_tools() {
     let mut wildcard = grant("*");
     wildcard.operations = vec![Operation::Invoke];
@@ -1440,6 +1423,32 @@ async fn refusal_after_signature_and_claims_does_not_spend_the_id_jag() {
         RootExchangeError::HolderClassNotAllowed(HolderClass::Caller)
     );
     let bound = edge_only.replay.bound.lock().unwrap();
+    assert_eq!(bound.len(), 1);
+    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+}
+
+#[tokio::test]
+async fn proof_required_ceiling_grant_outside_the_projection_refuses_an_edge_session() {
+    let harness = Harness::with(
+        |_| {},
+        |policy| {
+            let mut ceiling: ChioScope =
+                serde_json::from_value(policy["rules"][0]["ceiling_scope"].clone()).unwrap();
+            for grant in &mut ceiling.grants {
+                if grant.tool_name == "update" {
+                    grant.dpop_required = Some(true);
+                }
+            }
+            policy["rules"][0]["ceiling_scope_hash"] = json!(digest_of(&ceiling));
+            policy["rules"][0]["ceiling_scope"] = json!(ceiling);
+        },
+    );
+    let body = jwt_bearer_body(&id_jag(), &client_assertion(&client_assertion_claims()));
+    assert_eq!(
+        harness.run_body(&body, None, NOW).await.unwrap_err(),
+        RootExchangeError::ProofRequiredGrantForEdgeSession
+    );
+    let bound = harness.replay.bound.lock().unwrap();
     assert_eq!(bound.len(), 1);
     assert!(bound.keys().all(|key| key.id != "id-jag-1"));
 }

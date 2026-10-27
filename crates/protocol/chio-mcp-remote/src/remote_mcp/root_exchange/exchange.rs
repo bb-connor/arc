@@ -447,9 +447,11 @@ impl RootExchange {
         }
         let scope = effective_scope(rule, &verified.scope_values)?;
         if holder == HolderClass::EdgeSession
-            && scope
+            && rule
+                .ceiling_scope
                 .grants
                 .iter()
+                .chain(&scope.grants)
                 .any(|grant| grant.dpop_required == Some(true))
         {
             return Err(RootExchangeError::ProofRequiredGrantForEdgeSession);
