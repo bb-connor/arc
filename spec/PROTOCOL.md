@@ -4808,6 +4808,44 @@ before the lifecycle registry is written:
 - both reads share the bounded public passport admission lane and refuse at
   capacity instead of queueing
 
+An operator mirrors the revocation feeds of the federation partners it lists
+in an operator-local `chio.revocation-partner-registry.v1` registry:
+
+- each entry carries `partnerId` (1 to 64 bytes of lowercase ASCII letters,
+  digits, `-` or `_`, equal to its map key), `issuer` (an `https` URL without
+  userinfo, query, fragment or trailing slash), `authorityPublicKey` (the key
+  that signs the partner's revocation roots), `issuerPublicKeys` (1 to 8
+  distinct keys the partner signs native passport credentials under,
+  including the authority key and any retired key whose credentials are still
+  presented) and `revocationFreshnessTtlSeconds` (1 to 300)
+- the registry is refused whole when any entry is invalid, when two entries
+  name one issuer under case-insensitive scheme and host, default port
+  elision and trailing path slashes, or when one key appears in two entries
+- a native credential binds to the partner one of whose `issuerPublicKeys`
+  has the credential issuer DID as its `did:chio`
+- each partner's mirror is a revocation oracle beside the registry; its leaf
+  count is its cursor
+- a sync fetches the signed root, verifies it against the pinned authority
+  key, then fetches leaf pages after the mirror's leaf count; every page must
+  echo the requested `after` and carry leaves whose `seq` values continue the
+  mirror by one each, and at most 65,536 leaves are fetched in one sync
+- every request of one sync is bounded by the time left before the sync's
+  single deadline, and the mirror commits only after the last fetch, at a
+  time read after it
+- the mirror accepts the signed root only when the rebuilt root, epoch and
+  leaf count equal it; a root that does not verify, is dated more than 5
+  seconds ahead, rolls back the accepted epoch or signing time, or signs a
+  second root for an accepted epoch is refused, and a refused sync leaves the
+  mirror unchanged
+- the mirror records a refused root that rolls back, re-signs an accepted
+  epoch, or does not match its leaves, once per distinct signed root (keyed
+  by the SHA-256 of its canonical JSON), up to 256 records, and refuses any
+  further conflicting root once that bound is reached
+- a mirror whose accepted root is older than the TTL, holds no verified
+  root, or whose tree differs from its accepted root is stale and refuses
+- a mirror refuses a passport when it holds the passport leaf or the
+  credential leaf of any credential digest checked with it
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 

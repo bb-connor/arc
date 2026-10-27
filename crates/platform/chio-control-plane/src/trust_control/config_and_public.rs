@@ -1323,6 +1323,7 @@ mod portable_issuer_fetch;
 pub(crate) use portable_issuer_fetch::*;
 #[path = "config_and_public/partner_revocation_sync.rs"]
 mod partner_revocation_sync;
+pub use partner_revocation_sync::sync_partner_revocation_mirror;
 #[cfg(test)]
 pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
 pub(crate) fn build_enterprise_admission_audit(

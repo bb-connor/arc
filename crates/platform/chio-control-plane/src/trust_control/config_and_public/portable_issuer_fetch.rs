@@ -29,7 +29,7 @@ pub(crate) const PORTABLE_ISSUER_FETCH_PERMITS: usize = 16;
 /// fixed pool below bounds those workers independently of the waiting callers.
 const PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_READ_TIMEOUT: Duration = Duration::from_secs(5);
-const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Fetch workers, and fetches that may queue behind them. A started fetch cannot
 /// be cancelled, so a peer trickling its TLS handshake holds one worker for as
@@ -49,7 +49,7 @@ pub(crate) fn portable_issuer_fetch_lane() -> Arc<tokio::sync::Semaphore> {
     Arc::clone(&PORTABLE_ISSUER_FETCH_LANE)
 }
 
-static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|| {
+pub(super) static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|| {
     BoundedWorkerPool::new(PORTABLE_ISSUER_FETCH_WORKERS, PORTABLE_ISSUER_FETCH_WORKERS)
 });
 
@@ -57,14 +57,14 @@ static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|
 /// before submitting the fetch, and every blocking phase samples only the time
 /// left before it.
 #[derive(Clone, Copy)]
-struct PortableFetchDeadline(Instant);
+pub(crate) struct PortableFetchDeadline(Instant);
 
 impl PortableFetchDeadline {
-    fn start() -> Result<Self, CliError> {
+    pub(crate) fn start() -> Result<Self, CliError> {
         Self::starting_at(Instant::now())
     }
 
-    fn starting_at(start: Instant) -> Result<Self, CliError> {
+    pub(super) fn starting_at(start: Instant) -> Result<Self, CliError> {
         start
             .checked_add(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT)
             .map(Self)
@@ -72,7 +72,7 @@ impl PortableFetchDeadline {
     }
 
     /// The time left, sampled now. A passed deadline refuses the next phase.
-    fn remaining(&self) -> Result<Duration, CliError> {
+    pub(super) fn remaining(&self) -> Result<Duration, CliError> {
         self.0
             .checked_duration_since(Instant::now())
             .filter(|left| !left.is_zero())
@@ -89,7 +89,7 @@ fn portable_fetch_deadline_exceeded() -> CliError {
 /// work back to the pool. The caller waits only until the deadline and accepts
 /// only an outcome observed before it; a fetch still running then keeps its
 /// worker until it returns.
-fn run_portable_fetch<T>(
+pub(super) fn run_portable_fetch<T>(
     pool: &BoundedWorkerPool,
     deadline: PortableFetchDeadline,
     fetch: impl FnOnce(PortableFetchDeadline) -> Result<T, CliError> + Send + 'static,
@@ -370,7 +370,7 @@ fn strict_portable_fetch_contract(
 /// Resolve a host once, check every resolved address against the strict policy,
 /// and return the exact checked addresses. Pinning these into the fetch agent's
 /// resolver closes the validate-then-re-resolve gap that DNS rebinding exploits.
-fn pin_checked_https_addrs<R>(
+pub(super) fn pin_checked_https_addrs<R>(
     contract: &HttpEgressContract,
     url: &Url,
     resolve: R,
@@ -405,7 +405,7 @@ where
     Ok(checked)
 }
 
-fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
+pub(super) fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
     (host, port).to_socket_addrs().map(|iter| iter.collect())
 }
 
@@ -416,7 +416,7 @@ fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>
 /// connect stage, which ureq otherwise times from its own start.
 /// `require_https` enforces HTTPS on the one production transport; the
 /// loopback test seam supplies plaintext.
-fn build_portable_fetch_agent(
+pub(crate) fn build_portable_fetch_agent(
     pinned: Vec<SocketAddr>,
     require_https: bool,
     deadline: &PortableFetchDeadline,
@@ -436,7 +436,7 @@ fn build_portable_fetch_agent(
 
 /// Map a transport error to a fail-closed message that never echoes the fetched
 /// body or any resolved internal address back to the caller.
-fn portable_fetch_transport_error(endpoint: &str, error: ureq::Error) -> CliError {
+pub(super) fn portable_fetch_transport_error(endpoint: &str, error: ureq::Error) -> CliError {
     match error {
         ureq::Error::Status(status, _response) => {
             CliError::cli_other_error(format!("{endpoint} returned HTTP {status}"))
