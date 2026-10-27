@@ -13,6 +13,10 @@ use crate::CliError;
 
 pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 
+#[cfg(all(test, unix))]
+#[path = "signed_input/read_pause.rs"]
+pub(crate) mod read_pause;
+
 #[cfg(unix)]
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
     use std::os::unix::fs::OpenOptionsExt;
@@ -29,6 +33,8 @@ pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
             "signed input must be a regular file",
         ));
     }
+    #[cfg(test)]
+    read_pause::wait(path);
     let mut bytes = Vec::new();
     file.take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
         .read_to_end(&mut bytes)?;

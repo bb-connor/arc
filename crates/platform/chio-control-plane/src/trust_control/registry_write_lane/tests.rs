@@ -79,7 +79,6 @@ async fn a_saturated_lane_refuses_at_once_and_runs_nothing() -> TestResult {
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> TestResult {
-    use std::io::Write;
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("passport-statuses.json");
     let mut registry = PassportStatusRegistry::default();
@@ -92,22 +91,9 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         .map_err(|error| error.to_string())?;
     let bytes = serde_json::to_vec(&registry)?;
 
-    // The registry is served through a FIFO, so the write's load waits inside
-    // the locked transaction until the test releases the bytes.
-    let created = std::process::Command::new("mkfifo")
-        .args(["-m", "600"])
-        .arg(&path)
-        .status()?;
-    assert!(created.success(), "registry FIFO creation failed");
-    let (opened_tx, opened_rx) = std::sync::mpsc::channel::<()>();
-    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
-    let fifo = path.clone();
-    let server = std::thread::spawn(move || -> std::io::Result<()> {
-        let mut file = std::fs::OpenOptions::new().write(true).open(&fifo)?;
-        let _ = opened_tx.send(());
-        let _ = release_rx.recv_timeout(HANG_GUARD);
-        file.write_all(&bytes)
-    });
+    std::fs::write(&path, bytes)?;
+    let (pause, mut opened) =
+        crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD);
 
     let lane = BlockingLane::new("operator_registry_write", 1);
     let request = tokio::spawn({
@@ -121,7 +107,9 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
             .await
         }
     });
-    tokio::task::spawn_blocking(move || opened_rx.recv_timeout(HANG_GUARD)).await??;
+    tokio::time::timeout(HANG_GUARD, opened.recv())
+        .await?
+        .ok_or("registry read ended before entering the pause")?;
 
     request.abort();
     assert!(request
@@ -134,10 +122,9 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         Err(RegistryUpdateError::Busy)
     ));
 
-    release_tx.send(())?;
+    pause.release();
     tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
     assert_eq!(lane.available_permits(), 1);
-    server.join().map_err(|_| "registry server panicked")??;
 
     let reopened = PassportStatusRegistry::load(&path)?;
     assert_eq!(
