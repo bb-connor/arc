@@ -15,8 +15,10 @@ classified:
 - Any other file is real-key when it lies in one of REAL_KEY_CRATES. A file outside them fails.
 
 The census also refuses unkeyed enterprise subject derivations and the unkeyed SCIM receipt
-aliases (UNKEYED_PATTERNS). PENDING_UNKEYED names each remaining site exactly; a site not in
-it fails, and an entry with no matching site fails, so the set only shrinks.
+aliases (UNKEYED_PATTERNS). Each site is identified by its file, the function that owns it
+(the nearest preceding `fn` item) and its kind. PENDING_UNKEYED pins the count of every
+remaining site; a site not in it fails, a count above or below its pin fails, and an entry with
+no matching site fails, so the set only shrinks.
 
 Usage: python3 -I scripts/check-enterprise-subject-census.py [--list]
 """
@@ -73,6 +75,7 @@ CREDENTIALS = "crates/trust/chio-credentials/"
 LINE_RULES: tuple[tuple[str, str, str], ...] = (
     ("crates/core/chio-core-types/src/session/auth.rs", r"^pub subject_key: String,$", DERIVED),
     ("crates/core/chio-core-types/src/session/tests.rs", r'^subject_key: "subject-key-123"', DERIVED),
+    ("crates/core/chio-core-types/src/receipt/metadata/key_registry.rs", r"Under enterprise attribution subject_key is", DERIVED),
     ("crates/core/chio-core/src/standards.rs", r'"subjectKey"\.to_string\(\), "subjectKeySource"', REAL),
     ("crates/kernel/chio-kernel/src/kernel/tests/multi_tenant_receipt.rs", r"^subject_key: format!\(\"subject-key-\{tenant\}\"\)", DERIVED),
     ("crates/kernel/chio-kernel/tests/durable_admission_sqlite/review_boundaries.rs", r'^subject_key: "tenant-b-subject"', DERIVED),
@@ -110,15 +113,15 @@ UNKEYED_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("unkeyed scim policy hash", re.compile(r"chio\.scim-lifecycle-delete\.v1")),
 )
 
-PENDING_UNKEYED: frozenset[tuple[str, str]] = frozenset(
-    {
-        (CONTROL_PLANE + "scim_lifecycle.rs", "unkeyed enterprise subject derivation"),
-        ("crates/protocol/chio-mcp-remote/src/remote_mcp/session_identity.rs", "unkeyed enterprise subject derivation"),
-        (CONTROL_PLANE + "trust_control/config_and_public.rs", "unkeyed scim deprovision receipt id"),
-        (CONTROL_PLANE + "trust_control/config_and_public.rs", "unkeyed scim capability id"),
-        (CONTROL_PLANE + "trust_control/config_and_public.rs", "unkeyed scim policy hash"),
-    }
-)
+PENDING_UNKEYED: dict[tuple[str, str, str], int] = {
+    (CONTROL_PLANE + "scim_lifecycle.rs", "derive_enterprise_subject_key", "unkeyed enterprise subject derivation"): 1,
+    ("crates/protocol/chio-mcp-remote/src/remote_mcp/session_identity.rs", "derive_enterprise_subject_key", "unkeyed enterprise subject derivation"): 1,
+    (CONTROL_PLANE + "trust_control/config_and_public.rs", "build_scim_deprovision_receipt", "unkeyed scim deprovision receipt id"): 1,
+    (CONTROL_PLANE + "trust_control/config_and_public.rs", "build_scim_deprovision_receipt", "unkeyed scim capability id"): 1,
+    (CONTROL_PLANE + "trust_control/config_and_public.rs", "build_scim_deprovision_receipt", "unkeyed scim policy hash"): 1,
+}
+
+FN_ITEM = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)")
 
 
 def rust_sources() -> list[str]:
@@ -166,19 +169,42 @@ def census(sources: list[str]) -> tuple[list[tuple[str, int, str, str]], list[st
     return rows, failures
 
 
-def unkeyed_sites(sources: list[str]) -> tuple[set[tuple[str, str]], list[str]]:
-    found: set[tuple[str, str]] = set()
+def owner_of(text: str, offset: int) -> str:
+    owner = "<module>"
+    for item in FN_ITEM.finditer(text):
+        if item.start() > offset:
+            break
+        owner = item.group(1)
+    return owner
+
+
+def unkeyed_sites(sources: list[str]) -> tuple[dict[tuple[str, str, str], int], list[str]]:
+    found: dict[tuple[str, str, str], int] = {}
+    lines: dict[tuple[str, str, str], list[int]] = {}
     failures: list[str] = []
     for path in sources:
         text = (ROOT / path).read_text(encoding="utf-8")
         for kind, pattern in UNKEYED_PATTERNS:
             for match in pattern.finditer(text):
-                found.add((path, kind))
-                if (path, kind) not in PENDING_UNKEYED:
-                    number = text.count("\n", 0, match.start()) + 1
-                    failures.append(f"{path}:{number}: {kind}; derive it with chio_core_types::enterprise_subject")
-    for path, kind in sorted(PENDING_UNKEYED - found):
-        failures.append(f"{path}: pending entry `{kind}` has no site; remove it from PENDING_UNKEYED")
+                site = (path, owner_of(text, match.start()), kind)
+                found[site] = found.get(site, 0) + 1
+                lines.setdefault(site, []).append(text.count("\n", 0, match.start()) + 1)
+    for site in sorted(found.keys() | PENDING_UNKEYED.keys()):
+        path, owner, kind = site
+        count = found.get(site, 0)
+        pinned = PENDING_UNKEYED.get(site, 0)
+        at = ",".join(str(number) for number in lines.get(site, []))
+        if pinned == 0:
+            failures.append(f"{path}:{at}: {kind} in `{owner}`; derive it with chio_core_types::enterprise_subject")
+        elif count == 0:
+            failures.append(f"{path}: pending entry `{kind}` in `{owner}` has no site; remove it from PENDING_UNKEYED")
+        elif count > pinned:
+            failures.append(
+                f"{path}:{at}: {count} `{kind}` sites in `{owner}`, pinned at {pinned}; "
+                "derive the new ones with chio_core_types::enterprise_subject"
+            )
+        elif count < pinned:
+            failures.append(f"{path}: {count} `{kind}` site(s) in `{owner}`, pinned at {pinned}; lower its pin in PENDING_UNKEYED")
     return found, failures
 
 
@@ -202,7 +228,7 @@ def main(argv: list[str]) -> int:
     derived = sum(1 for row in rows if row[2] == DERIVED)
     print(
         f"enterprise subject census: {len(rows) - derived} real-key, {derived} derived-enterprise, "
-        f"{len(PENDING_UNKEYED)} pending unkeyed site(s)"
+        f"{sum(PENDING_UNKEYED.values())} pending unkeyed site(s)"
     )
     return 0
 
