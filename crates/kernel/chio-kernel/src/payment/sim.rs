@@ -266,7 +266,25 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             error.to_string(),
+            "payment rail error: sim authorization does not match the queried identifier"
+        );
+    }
+
+    #[test]
+    fn settlement_state_rejects_a_valid_identifier_without_a_record() {
+        let id = SimPaymentAdapter::new()
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        let restarted = SimPaymentAdapter::new();
+        let error = restarted.settlement_state("req-1", Some(&id)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
             "payment rail error: sim has no authorization for the queried reference"
+        );
+        assert_eq!(
+            restarted.settlement_state("req-1", None).unwrap(),
+            RailSettlementState::NoAuthorization
         );
     }
 
