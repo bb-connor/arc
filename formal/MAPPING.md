@@ -806,6 +806,16 @@ Source file: `crates/core/chio-fixed/src/kani_public_harnesses.rs`.
 | `verify_q16_checked_add_never_wraps` | `crates/core/chio-fixed/src/kani_public_harnesses.rs` | `chio_fixed::Q16_16::checked_add` | Arithmetic only | A returned sum equals exact `i64` addition, and `None` is returned only when the exact sum leaves the `i32` range. |
 | `verify_ratio_cmp_total_order` | `crates/core/chio-fixed/src/kani_public_harnesses.rs` | `chio_fixed::ratio_cmp` | Arithmetic only | Zero denominators return `None`; otherwise the order equals exact `u128` cross-multiplication, swapping the operands reverses it, and a ratio compares `Equal` to itself. |
 
+## Kani decision-model envelope harnesses
+
+Source file: `crates/core/chio-decision-model/src/kani_public_harnesses.rs`.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `verify_projection_total_and_admitted` | `crates/core/chio-decision-model/src/kani_public_harnesses.rs` | `chio_decision_model::Envelope::project` | Bounded to a four-element `u8` feasible set | Every proposal, including errors and empty proposals, projects to an admitted action; `Identity` returns the proposal and every fallback returns `feasible[0]`. |
+| `verify_projection_idempotent_on_admitted` | `crates/core/chio-decision-model/src/kani_public_harnesses.rs` | `chio_decision_model::Envelope::project` | Bounded to a four-element `u8` feasible set | Projecting an already projected action returns the same action with `Identity`. |
+| `verify_select_in_envelope` | `crates/core/chio-decision-model/src/kani_public_harnesses.rs` | `chio_decision_model::Envelope::select` | Bounded to four symbolic `Q16_16` scores | Selection returns an admitted action, the first maximum of the scores, with `Identity`. |
+
 ## Lean recursive-delegation theorems (Capability/Delegation.lean)
 
 Source file: `formal/lean4/Chio/Chio/Capability/Delegation.lean`. Rows

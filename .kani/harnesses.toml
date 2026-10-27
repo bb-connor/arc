@@ -641,3 +641,33 @@ default_unwind = 1
 timeout_secs = 600
 unwinding_checks = true
 notes = "Full-range u32 ratios against exact u128 cross products, reversal and reflexivity."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_projection_total_and_admitted"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Symbolic four-element u8 feasible set and every proposal shape."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_projection_idempotent_on_admitted"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Re-projecting a projected action is the identity."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_select_in_envelope"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Symbolic Q16.16 scores over a four-element feasible set; first maximum wins."
