@@ -14,8 +14,9 @@
 //! tree, persists them, commits, and only then publishes the staged tree. A
 //! failure rolls back and leaves both the database and the handle unchanged.
 //!
-//! The schema is versioned. A database without this oracle's stamp, or with
-//! any other version, is refused.
+//! The schema is versioned. A database without this oracle's stamp, with any
+//! other version, or whose oracle tables and indexes differ from the catalog
+//! this version creates, is refused without repair.
 
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
@@ -65,6 +66,8 @@ pub enum SqliteRevocationOracleError {
     UnstampedDatabase,
     #[error("unsupported revocation oracle schema version {0}")]
     UnsupportedSchema(i64),
+    #[error("revocation oracle catalog does not match schema version {SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION}")]
+    CatalogMismatch,
     #[error("revocation oracle record is corrupt: {0}")]
     CorruptRecord(String),
     #[error("revocation subject exceeds {MAX_REVOCATION_SUBJECT_BYTES} bytes")]
@@ -374,6 +377,9 @@ fn initialize(transaction: &Transaction<'_>) -> Result<()> {
         if version != SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION {
             return Err(SqliteRevocationOracleError::UnsupportedSchema(version));
         }
+        if oracle_catalog(transaction)? != canonical_catalog()? {
+            return Err(SqliteRevocationOracleError::CatalogMismatch);
+        }
         return Ok(());
     }
     let tables = transaction.query_row(
@@ -391,6 +397,29 @@ fn initialize(transaction: &Transaction<'_>) -> Result<()> {
         params![SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION],
     )?;
     Ok(())
+}
+
+type Catalog = Vec<(String, String, String, Option<String>)>;
+
+/// The catalog entries of the oracle's own tables and their indexes.
+fn oracle_catalog(connection: &Connection) -> Result<Catalog> {
+    let mut statement = connection.prepare(
+        "SELECT type, name, tbl_name, sql FROM sqlite_schema
+         WHERE tbl_name IN ('chio_revocation_oracle_meta', 'chio_revocation_oracle_leaves')
+            OR name IN ('chio_revocation_oracle_meta', 'chio_revocation_oracle_leaves')
+         ORDER BY type, name",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+    })?;
+    Ok(rows.collect::<rusqlite::Result<Catalog>>()?)
+}
+
+/// The catalog [`SCHEMA`] creates in an empty database.
+fn canonical_catalog() -> Result<Catalog> {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(SCHEMA)?;
+    oracle_catalog(&connection)
 }
 
 /// Replays every leaf committed after `replayed.seq`, in sequence order.
