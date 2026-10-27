@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use chio_core::root_authority::{
+    RevocationEntry, RevocationEntryId, RevocationReason, RevocationTarget, RevocationTargetKind,
+};
 use chio_kernel::budget_store::{
     BudgetEventAuthority, BudgetGuaranteeLevel, RevocationCommitMetadata,
 };
@@ -209,6 +212,7 @@ impl SqliteRevocationStore {
         if exists {
             return Ok(false);
         }
+        let entry_id = self.record_capability_entry(transaction, capability_id, revoked_at)?;
         let joint = self.serving_owner.is_some();
         let revocation_index = allocate_revocation_index(transaction, joint)?;
         let index_column = if joint {
@@ -221,12 +225,17 @@ impl SqliteRevocationStore {
                 &format!(
                     r#"
             INSERT INTO revoked_capabilities (
-                capability_id, revoked_at, {index_column}
-            ) VALUES (?1, ?2, ?3)
+                capability_id, revoked_at, {index_column}, revocation_entry_id
+            ) VALUES (?1, ?2, ?3, ?4)
             ON CONFLICT(capability_id) DO NOTHING RETURNING 1
             "#
                 ),
-                params![capability_id, revoked_at, revocation_index],
+                params![
+                    capability_id,
+                    revoked_at,
+                    revocation_index,
+                    entry_id.as_str()
+                ],
                 |row| row.get::<_, i64>(0),
             )
             .optional()?;
@@ -261,6 +270,87 @@ impl SqliteRevocationStore {
         Ok(true)
     }
 
+    /// Record the `capability_id` entry for `capability_id`, or keep the
+    /// stored one. A replicated revocation carries no reason, so a new
+    /// entry records `operator_request`.
+    fn record_capability_entry(
+        &self,
+        transaction: &Transaction<'_>,
+        capability_id: &str,
+        revoked_at: i64,
+    ) -> Result<RevocationEntryId, RevocationStoreError> {
+        let target = RevocationTarget::capability(capability_id).map_err(|error| {
+            RevocationStoreError::Sync(format!("invalid revocation target: {error}"))
+        })?;
+        self.record_revocation_entry(
+            transaction,
+            &target,
+            revoked_at,
+            RevocationReason::OperatorRequest,
+        )
+        .map(|(entry_id, _)| entry_id)
+    }
+
+    /// Record `target` inside `transaction`, or keep the stored entry: the
+    /// first write's `revoked_at` and `reason` stand. Under a serving owner a
+    /// new entry advances the global commit chain whether or not it matches
+    /// any capability. Returns the entry id and whether this call created it.
+    pub(crate) fn record_revocation_entry(
+        &self,
+        transaction: &Transaction<'_>,
+        target: &RevocationTarget,
+        revoked_at: i64,
+        reason: RevocationReason,
+    ) -> Result<(RevocationEntryId, bool), RevocationStoreError> {
+        let entry_id = target.id();
+        let inserted = transaction
+            .query_row(
+                r#"
+                INSERT INTO revocation_entries (
+                    entry_id, target_kind, target_value, revoked_at, reason
+                ) VALUES (?1, ?2, ?3, ?4, ?5)
+                ON CONFLICT DO NOTHING RETURNING entry_seq
+                "#,
+                params![
+                    entry_id.as_str(),
+                    target.kind().as_str(),
+                    target.value(),
+                    revoked_at,
+                    reason.as_str()
+                ],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        let Some(entry_seq) = inserted else {
+            let stored = transaction.query_row(
+                r#"
+                SELECT entry_id FROM revocation_entries
+                WHERE target_kind = ?1 AND target_value = ?2
+                "#,
+                params![target.kind().as_str(), target.value()],
+                |row| row.get::<_, String>(0),
+            )?;
+            if stored != entry_id.as_str() {
+                return Err(RevocationStoreError::Sync(
+                    "stored revocation entry id does not match its target".to_string(),
+                ));
+            }
+            return Ok((entry_id, false));
+        };
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .append_global_commit(
+                    transaction,
+                    "revocation_entry_record",
+                    "revocation_entry",
+                    entry_id.as_str(),
+                    stored_index(entry_seq)?,
+                )
+                .map_err(map_serving_owner_error)?;
+        }
+        Ok((entry_id, true))
+    }
+
     fn read<T>(
         &self,
         query: impl FnOnce(&Transaction<'_>) -> Result<T, RevocationStoreError>,
@@ -276,6 +366,83 @@ impl SqliteRevocationStore {
         let value = query(&transaction)?;
         transaction.rollback()?;
         Ok(value)
+    }
+
+    /// The entry that revoked `capability_id`, if any: the first entry that
+    /// reached it.
+    pub fn revocation_entry(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<RevocationEntryId>, RevocationStoreError> {
+        let stored = self.read(|transaction| {
+            transaction
+                .query_row(
+                    "SELECT revocation_entry_id FROM revoked_capabilities WHERE capability_id = ?1",
+                    params![capability_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(Into::into)
+        })?;
+        stored
+            .map(|entry_id| {
+                RevocationEntryId::parse(&entry_id).map_err(|error| {
+                    RevocationStoreError::Sync(format!("stored revocation entry id: {error}"))
+                })
+            })
+            .transpose()
+    }
+
+    /// One page of entries with `entry_seq` above `after_seq`, in sequence
+    /// order, and the highest stored `entry_seq`, read from one snapshot.
+    pub fn list_revocation_entries_after(
+        &self,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<(Vec<RevocationEntry>, u64), RevocationStoreError> {
+        let after_seq = i64::try_from(after_seq).map_err(|_| {
+            RevocationStoreError::Sync("revocation entry cursor exceeds SQLite range".to_string())
+        })?;
+        self.read(|transaction| {
+            let rows = {
+                let mut statement = transaction.prepare(
+                    r#"
+                    SELECT entry_id, target_kind, target_value, revoked_at, reason
+                    FROM revocation_entries
+                    WHERE entry_seq > ?1
+                    ORDER BY entry_seq ASC
+                    LIMIT ?2
+                    "#,
+                )?;
+                let rows = statement
+                    .query_map(
+                        params![after_seq, crate::integer::checked::<_, i64>(limit)?],
+                        |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, String>(1)?,
+                                row.get::<_, String>(2)?,
+                                row.get::<_, i64>(3)?,
+                                row.get::<_, String>(4)?,
+                            ))
+                        },
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows
+            };
+            let entries = rows
+                .into_iter()
+                .map(|(entry_id, kind, value, revoked_at, reason)| {
+                    stored_entry(&entry_id, &kind, &value, revoked_at, &reason)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let head = transaction.query_row(
+                "SELECT COALESCE(MAX(entry_seq), 0) FROM revocation_entries",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+            Ok((entries, stored_index(head)?))
+        })
     }
 
     pub fn latest_revocation_index(&self) -> Result<u64, RevocationStoreError> {
@@ -446,6 +613,8 @@ impl SqliteRevocationStore {
             transaction.rollback()?;
             return Ok(false);
         }
+        let entry_id =
+            self.record_capability_entry(&transaction, &record.capability_id, record.revoked_at)?;
         let joint = self.serving_owner.is_some();
         let revocation_index = allocate_revocation_index(&transaction, joint)?;
         if joint {
@@ -453,14 +622,19 @@ impl SqliteRevocationStore {
                 r#"
                 INSERT INTO revoked_capabilities (
                     capability_id, revoked_at,
-                    admission_authority_commit_index
-                ) VALUES (?1, ?2, ?3)
+                    admission_authority_commit_index, revocation_entry_id
+                ) VALUES (?1, ?2, ?3, ?4)
                 ON CONFLICT(capability_id) DO UPDATE SET
                     revoked_at = excluded.revoked_at,
                     admission_authority_commit_index =
                         excluded.admission_authority_commit_index
                 "#,
-                params![record.capability_id, record.revoked_at, revocation_index],
+                params![
+                    record.capability_id,
+                    record.revoked_at,
+                    revocation_index,
+                    entry_id.as_str()
+                ],
             )?;
             append_admission_revocation_commit(
                 &transaction,
@@ -486,13 +660,18 @@ impl SqliteRevocationStore {
             transaction.execute(
                 r#"
                 INSERT INTO revoked_capabilities (
-                    capability_id, revoked_at, revocation_index
-                ) VALUES (?1, ?2, ?3)
+                    capability_id, revoked_at, revocation_index, revocation_entry_id
+                ) VALUES (?1, ?2, ?3, ?4)
                 ON CONFLICT(capability_id) DO UPDATE SET
                     revoked_at = excluded.revoked_at,
                     revocation_index = excluded.revocation_index
                 "#,
-                params![record.capability_id, record.revoked_at, revocation_index],
+                params![
+                    record.capability_id,
+                    record.revoked_at,
+                    revocation_index,
+                    entry_id.as_str()
+                ],
             )?;
         }
         append_revocation_delta(&transaction, record)?;
@@ -708,15 +887,43 @@ impl RevocationStore for SqliteRevocationStore {
 
 const REVOCATION_SCHEMA: &str = r#"
 
+        CREATE TABLE IF NOT EXISTS revocation_entries (
+            entry_seq INTEGER PRIMARY KEY CHECK (entry_seq > 0),
+            entry_id TEXT NOT NULL UNIQUE CHECK (
+                length(entry_id) = 68 AND substr(entry_id, 1, 4) = 'rev_'
+                AND substr(entry_id, 5) NOT GLOB '*[^0-9a-f]*'
+            ),
+            target_kind TEXT NOT NULL CHECK (target_kind IN (
+                'capability_id', 'root_policy_rule', 'anchor_subject', 'tenant_tag', 'replay_key'
+            )),
+            target_value TEXT NOT NULL CHECK (
+                length(target_value) BETWEEN 1 AND 512 AND instr(target_value, char(0)) = 0
+            ),
+            revoked_at INTEGER NOT NULL CHECK (revoked_at > 0),
+            reason TEXT NOT NULL CHECK (reason IN (
+                'operator_request', 'credential_compromise', 'principal_offboarded',
+                'tenant_offboarded', 'policy_withdrawn', 'incident_response'
+            )),
+            UNIQUE (target_kind, target_value),
+            CHECK (
+                target_kind IN ('capability_id', 'root_policy_rule')
+                OR (length(target_value) = 64 AND target_value NOT GLOB '*[^0-9a-f]*')
+            )
+        ) STRICT;
+
         CREATE TABLE IF NOT EXISTS revoked_capabilities (
             capability_id TEXT PRIMARY KEY,
             revoked_at INTEGER NOT NULL,
             revocation_index INTEGER UNIQUE,
-            admission_authority_commit_index INTEGER UNIQUE
+            admission_authority_commit_index INTEGER UNIQUE,
+            revocation_entry_id TEXT NOT NULL REFERENCES revocation_entries(entry_id)
         );
 
         CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_revoked_at
             ON revoked_capabilities(revoked_at);
+
+        CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_entry
+            ON revoked_capabilities(revocation_entry_id);
 
         CREATE TABLE IF NOT EXISTS revocation_delta_log (
             seq INTEGER PRIMARY KEY CHECK (seq > 0),
@@ -984,6 +1191,37 @@ fn append_admission_revocation_commit(
     Ok(())
 }
 
+/// Rebuild a stored entry and refuse one whose id is not its target's.
+fn stored_entry(
+    entry_id: &str,
+    kind: &str,
+    value: &str,
+    revoked_at: i64,
+    reason: &str,
+) -> Result<RevocationEntry, RevocationStoreError> {
+    let invalid = |error: chio_core::root_authority::RootAuthorityShapeError| {
+        RevocationStoreError::Sync(format!("stored revocation entry is invalid: {error}"))
+    };
+    let target =
+        RevocationTarget::from_parts(RevocationTargetKind::parse(kind).map_err(invalid)?, value)
+            .map_err(invalid)?;
+    let revoked_at = u64::try_from(revoked_at).map_err(|_| {
+        RevocationStoreError::Sync("stored revocation entry time is negative".to_string())
+    })?;
+    let entry = RevocationEntry::new(
+        &target,
+        revoked_at,
+        RevocationReason::parse(reason).map_err(invalid)?,
+    )
+    .map_err(invalid)?;
+    if entry.entry_id.as_str() != entry_id {
+        return Err(RevocationStoreError::Sync(
+            "stored revocation entry id does not match its target".to_string(),
+        ));
+    }
+    Ok(entry)
+}
+
 fn stored_index(value: i64) -> Result<u64, RevocationStoreError> {
     u64::try_from(value)
         .map_err(|_| RevocationStoreError::Sync("negative revocation index".to_string()))
@@ -1091,6 +1329,13 @@ fn verify_revocation_foreign_keys(connection: &Connection) -> Result<(), Revocat
 mod connection_recovery;
 #[cfg(all(test, unix))]
 pub(crate) use connection_recovery::write_probe_revocation;
+#[cfg(all(test, unix))]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test and proof fixtures deliberately fail on violated setup invariants."
+)]
+mod entry_tests;
 
 #[cfg(test)]
 #[allow(

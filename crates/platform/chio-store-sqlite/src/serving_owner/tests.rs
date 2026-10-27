@@ -598,8 +598,11 @@ fn serving_open_rejects_unjournaled_valid_revocation_commit() {
         .execute(
             r#"
             INSERT INTO revoked_capabilities (
-                capability_id, revoked_at, admission_authority_commit_index
-            ) VALUES ('unjournaled-revocation', 42, ?1)
+                capability_id, revoked_at, admission_authority_commit_index,
+                revocation_entry_id
+            ) SELECT 'unjournaled-revocation', 42, ?1, revocation_entry_id
+              FROM revoked_capabilities
+              WHERE capability_id = 'journaled-revocation'
             "#,
             [next_index],
         )

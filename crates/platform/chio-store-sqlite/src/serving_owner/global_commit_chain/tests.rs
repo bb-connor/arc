@@ -62,6 +62,10 @@ fn factor_projection_fixture() -> Result<Connection, rusqlite::Error> {
             projection_sequence INTEGER NOT NULL,
             commit_digest TEXT NOT NULL
         );
+        CREATE TABLE revocation_entries (
+            entry_id TEXT NOT NULL,
+            entry_seq INTEGER NOT NULL
+        );
         CREATE TABLE authority_global_commits (
             commit_sequence INTEGER,
             mutation_kind TEXT,
@@ -274,5 +278,56 @@ fn baseline_requires_the_complete_declared_projection_even_when_empty(
         )?,
         incomplete
     );
+    Ok(())
+}
+
+#[test]
+fn revocation_entry_coverage_is_exact_and_closed() -> Result<(), Box<dyn std::error::Error>> {
+    for (commits, exact) in [
+        (&[("rev_a", 1)][..], true),
+        (&[][..], false),
+        (&[("rev_a", 1), ("rev_a", 1)][..], false),
+        (&[("rev_a", 1), ("rev_b", 2)][..], false),
+        (&[("rev_a", 2)][..], false),
+    ] {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(
+            r#"
+            CREATE TABLE revocation_entries (
+                entry_id TEXT NOT NULL,
+                entry_seq INTEGER NOT NULL
+            );
+            CREATE TABLE authority_global_commits (
+                projection_kind TEXT NOT NULL,
+                projection_key TEXT NOT NULL,
+                projection_sequence INTEGER NOT NULL
+            );
+            INSERT INTO revocation_entries (entry_id, entry_seq) VALUES ('rev_a', 1);
+            "#,
+        )?;
+        for (key, sequence) in commits {
+            connection.execute(
+                r#"
+                INSERT INTO authority_global_commits
+                    (projection_kind, projection_key, projection_sequence)
+                VALUES ('revocation_entry', ?1, ?2)
+                "#,
+                params![key, sequence],
+            )?;
+        }
+        let result = revocation_entry::verify_coverage(&connection);
+        if exact {
+            result?;
+        } else {
+            assert!(
+                matches!(
+                    &result,
+                    Err(SqliteServingOwnerError::Invalid(detail))
+                        if detail == "revocation entry projection coverage is not exact"
+                ),
+                "{commits:?}: {result:?}"
+            );
+        }
+    }
     Ok(())
 }
