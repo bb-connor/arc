@@ -10,7 +10,7 @@ use chio_core::root_authority::{
 use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::root_exchange_store::{
-    BearerMapping, ContextOpening, MintOutcome, MintRequest, MintRevocationCheck,
+    BearerMapping, ContextOpening, MintOutcome, MintReplayNamespace, MintRequest, MintRevocationCheck,
     MintRevocationRefusal, RevocationCandidate, RootExchangeIntegrityError, RootExchangeStoreError,
     RootTags, SqliteRootExchangeStore,
 };
@@ -26,6 +26,8 @@ pub use serving::{Fixture, TestResult};
 pub const NOW: u64 = 1_792_234_800;
 pub const ID_JAG_RULE: &str = "okta-crm-agents";
 pub const STATIC_RULE: &str = "dev-static";
+pub const LOCAL_AS_RULE: &str = "local-as";
+pub const OPERATOR_KEY_RULE: &str = "operator-key";
 pub const CLIENT: &str = "mcp-client-claude";
 
 const IDENTITY: &str = include_str!(
@@ -121,6 +123,22 @@ pub fn loaded_policy(policy_id: &str) -> TestResult<LoadedRootPolicy> {
                 "holder_classes": ["edge_session"],
                 "principal": "dev:alice",
                 "tenant_value": "dev"
+            },
+            {
+                "rule_id": LOCAL_AS_RULE,
+                "match": { "anchor_kind": "chio_local_as" },
+                "ceiling_scope": scope(&["search"]),
+                "ceiling_scope_hash": Sha256Digest::of_scope(&scope(&["search"]))?,
+                "recorded_claims": {},
+                "holder_classes": ["edge_session", "caller"]
+            },
+            {
+                "rule_id": OPERATOR_KEY_RULE,
+                "match": { "anchor_kind": "chio_operator_key" },
+                "ceiling_scope": scope(&["search"]),
+                "ceiling_scope_hash": Sha256Digest::of_scope(&scope(&["search"]))?,
+                "recorded_claims": {},
+                "holder_classes": ["edge_session", "caller"]
             }
         ],
         "disclosure": { "default": "committed" },
@@ -140,6 +158,8 @@ pub fn loaded_policy(policy_id: &str) -> TestResult<LoadedRootPolicy> {
 pub enum Kind {
     IdJag,
     StaticBearer,
+    LocalAs,
+    OperatorKey,
 }
 
 /// One mint's inputs, owned, with knobs for every member a test varies.
@@ -152,6 +172,7 @@ pub struct Case {
     pub client_id: String,
     pub expires_at: u64,
     pub replay_retain_until: u64,
+    pub namespace: MintReplayNamespace,
     pub tags: RootTags,
     pub candidates: Vec<RootTags>,
     pub bearer: Option<BearerMapping>,
@@ -171,10 +192,10 @@ pub fn tags(generation: u8) -> RootTags {
             key_id,
             value: digest(0xb0 + generation),
         },
-        tenant: Some(KeyedIndexValue {
+        tenant: KeyedIndexValue {
             key_id,
             value: digest(0xc0 + generation),
-        }),
+        },
     }
 }
 
@@ -191,6 +212,7 @@ impl Case {
             client_id: CLIENT.into(),
             expires_at: NOW + 290,
             replay_retain_until: NOW + 360,
+            namespace: MintReplayNamespace::AnchorKind,
             tags: tags(1),
             candidates: vec![tags(1)],
             bearer: None,
@@ -217,6 +239,17 @@ impl Case {
                 token_digest: digest(0x44),
                 retain_until: NOW + 400,
             }),
+            ..Self::id_jag(capability_id)?
+        })
+    }
+
+    /// A root of a kind that is neither provider backed nor JWS verified and
+    /// carries no bearer mapping.
+    pub fn non_jws(kind: Kind, capability_id: &str) -> TestResult<Self> {
+        Ok(Self {
+            kind,
+            with_identity: false,
+            with_snapshot: false,
             ..Self::id_jag(capability_id)?
         })
     }
@@ -268,11 +301,11 @@ impl Case {
                 "root_policy_rule_id": ID_JAG_RULE,
                 "effective_root_scope_hash": Sha256Digest::of_scope(&root_scope)?
             }),
-            Kind::StaticBearer => json!({
+            Kind::StaticBearer | Kind::LocalAs | Kind::OperatorKey => json!({
                 "schema": "chio.delegation-context.v1",
                 "anchor": {
-                    "kind": "operator_static_bearer",
-                    "issuer": "urn:chio:operator",
+                    "kind": self.kind_name(),
+                    "issuer": self.issuer(),
                     "artifact_retained": false,
                     "replay_key_digest": digest(self.replay),
                     "token_iat": NOW - 5,
@@ -287,12 +320,39 @@ impl Case {
                     "request_digest": digest(self.request),
                     "holder": "edge_session"
                 },
-                "root_policy_rule_id": STATIC_RULE,
+                "root_policy_rule_id": self.rule_id(),
                 "effective_root_scope_hash": Sha256Digest::of_scope(&root_scope)?
             }),
         };
         (self.edit_context)(&mut value);
         Ok(serde_json::from_value(value)?)
+    }
+
+    fn kind_name(&self) -> &'static str {
+        match self.kind {
+            Kind::IdJag => "oauth_id_jag",
+            Kind::StaticBearer => "operator_static_bearer",
+            Kind::LocalAs => "chio_local_as",
+            Kind::OperatorKey => "chio_operator_key",
+        }
+    }
+
+    fn issuer(&self) -> &'static str {
+        match self.kind {
+            Kind::IdJag => "https://acme.okta.com",
+            Kind::StaticBearer => "urn:chio:operator",
+            Kind::LocalAs => "urn:chio:local-as",
+            Kind::OperatorKey => "urn:chio:operator-key",
+        }
+    }
+
+    fn rule_id(&self) -> &'static str {
+        match self.kind {
+            Kind::IdJag => ID_JAG_RULE,
+            Kind::StaticBearer => STATIC_RULE,
+            Kind::LocalAs => LOCAL_AS_RULE,
+            Kind::OperatorKey => OPERATOR_KEY_RULE,
+        }
     }
 
     pub fn build(&self) -> TestResult<Built> {
@@ -343,6 +403,7 @@ impl Built {
             tag_candidates: &case.candidates,
             client_id: &case.client_id,
             artifact_digest: digest(case.artifact),
+            replay_namespace: case.namespace,
             replay_retain_until: case.replay_retain_until,
             openings: &self.openings,
             bearer: case.bearer,
@@ -375,7 +436,7 @@ impl MintRevocationCheck for RevokedTenant {
         if candidate
             .tag_candidates
             .iter()
-            .any(|tags| tags.tenant.is_some() && tags.tenant == self.0.tenant)
+            .any(|tags| tags.tenant == self.0.tenant)
         {
             return Err(MintRevocationRefusal::Revoked {
                 entry_id: "rev-tenant-1".into(),
@@ -463,6 +524,19 @@ impl Env {
             Ok(outcome) => Err(format!("mint unexpectedly succeeded: {outcome:?}").into()),
             Err(error) => Ok(error),
         }
+    }
+
+    /// Every replay binding as `(namespace, capability_id)`, ordered by
+    /// namespace.
+    pub fn replay_bindings(&self) -> TestResult<Vec<(String, Option<String>)>> {
+        let raw = self.fixture.raw()?;
+        let mut statement = raw.prepare(
+            "SELECT namespace, capability_id FROM root_exchange_replay ORDER BY namespace",
+        )?;
+        let rows = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     /// Close the serving owner, edit the database with the named trigger

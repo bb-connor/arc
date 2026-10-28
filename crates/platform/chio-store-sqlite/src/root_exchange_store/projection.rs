@@ -46,7 +46,7 @@ struct Projection<'a> {
     root_policy_rule_id: &'a str,
     tag_key_id: String,
     subject_tag: String,
-    tenant_tag: Option<String>,
+    tenant_tag: String,
     replay_key_digest: String,
     replay_bound_at: u64,
     client_id: &'a str,
@@ -72,7 +72,7 @@ impl RootRow {
             root_policy_rule_id: &self.root_policy_rule_id,
             tag_key_id: digest_column(&self.tags.key_id()),
             subject_tag: digest_column(&self.tags.subject.value),
-            tenant_tag: self.tags.tenant.map(|tag| digest_column(&tag.value)),
+            tenant_tag: digest_column(&self.tags.tenant.value),
             replay_key_digest: digest_column(&self.replay_key_digest),
             replay_bound_at: self.replay_bound_at,
             client_id: &self.client_id,
@@ -146,7 +146,7 @@ const ROOT_COLUMNS: &str = "capability_id, root_policy_rule_id, tag_key_id, subj
     authorization_projection_digest";
 
 type RawRoot = (
-    (String, String, String, String, Option<String>, String, i64),
+    (String, String, String, String, String, String, i64),
     (String, String, String, i64, String, String, String),
     (
         Option<String>,
@@ -210,7 +210,7 @@ fn root_row(raw: RawRoot) -> Result<RootRow> {
             };
             RootTags {
                 subject: keyed(&subject_tag)?,
-                tenant: tenant_tag.as_deref().map(keyed).transpose()?,
+                tenant: keyed(&tenant_tag)?,
             }
         },
         replay_key_digest: parse_digest_column(&replay)?,
@@ -300,7 +300,7 @@ pub(super) fn insert_root_row(connection: &Connection, row: &RootRow) -> Result<
                 row.root_policy_rule_id,
                 digest_column(&row.tags.key_id()),
                 digest_column(&row.tags.subject.value),
-                row.tags.tenant.map(|tag| digest_column(&tag.value)),
+                digest_column(&row.tags.tenant.value),
                 digest_column(&row.replay_key_digest),
                 super::sql_u64(row.replay_bound_at)?,
                 row.client_id,

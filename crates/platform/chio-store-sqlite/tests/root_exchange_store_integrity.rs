@@ -267,3 +267,67 @@ fn ddl_checks_refuse_malformed_rows() -> TestResult {
     }
     Ok(())
 }
+
+/// One otherwise valid root row with `tenant_tag` set to `tenant`.
+fn root_insert(tenant: &str) -> String {
+    let h = hex(0x01);
+    format!(
+        "INSERT INTO root_exchange_roots VALUES ('cap-1', 'rule-1', '{h}', '{h}', {tenant}, \
+         '{h}', 1, 'client-1', '{h}', '{h}', 10, 'chio_local_as', 'edge_session', '{h}', NULL, \
+         NULL, '{h}', x'7b7d', x'7b7d', 1, '{h}');"
+    )
+}
+
+#[test]
+fn null_tenant_tag_refuses() -> TestResult {
+    let catalog = rusqlite::Connection::open_in_memory()?;
+    catalog.execute_batch(include_str!("../src/root_exchange_store.sql"))?;
+    catalog.execute(&root_insert(&format!("'{}'", hex(0x02))), [])?;
+    assert_eq!(
+        refused_insert(&root_insert("NULL"))?,
+        ffi::SQLITE_CONSTRAINT_NOTNULL
+    );
+    Ok(())
+}
+
+#[test]
+fn replay_namespaces_admit_local_as_issue_and_re_exchange() -> TestResult {
+    let catalog = rusqlite::Connection::open_in_memory()?;
+    catalog.execute_batch(include_str!("../src/root_exchange_store.sql"))?;
+    for (byte, namespace) in [(0x01, "chio_local_as_issue"), (0x02, "chio_local_as")] {
+        catalog.execute(
+            &format!(
+                "INSERT INTO root_exchange_replay VALUES ('{}', '{namespace}', 1, 2, 'cap-1');",
+                hex(byte)
+            ),
+            [],
+        )?;
+    }
+    assert_eq!(
+        refused_insert(&format!(
+            "INSERT INTO root_exchange_replay VALUES ('{}', 'chio_local_as.re_exchange', 1, 2, 'cap-1');",
+            hex(0x03)
+        ))?,
+        ffi::SQLITE_CONSTRAINT_CHECK
+    );
+    Ok(())
+}
+
+#[test]
+fn foreign_catalog_layout_refuses_open() -> TestResult {
+    for sql in [
+        "CREATE INDEX root_exchange_roots_client ON root_exchange_roots(client_id);",
+        "DROP INDEX root_exchange_roots_generation;",
+        "DROP TRIGGER root_exchange_replay_immutable;",
+        "CREATE TABLE root_exchange_extra (id INTEGER PRIMARY KEY);",
+    ] {
+        let env = minted_env()?;
+        let (fixture, reopened) = env.tamper_and_reopen(None, sql)?;
+        assert_eq!(reopened, I::SchemaMismatch, "{sql}");
+        let raw = fixture.raw()?;
+        let roots: i64 =
+            raw.query_row("SELECT COUNT(*) FROM root_exchange_roots", [], |row| row.get(0))?;
+        assert_eq!(roots, 1, "{sql}");
+    }
+    Ok(())
+}
