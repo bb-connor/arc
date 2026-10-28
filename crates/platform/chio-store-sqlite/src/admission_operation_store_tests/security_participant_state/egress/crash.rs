@@ -10,7 +10,7 @@ fn child_process_crash() -> AnchoredTestResult {
     let lock_root = directory.join("locks");
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
-        _temp: tempfile::tempdir()?,
+        _temp: tempfile::tempdir_in(&directory)?,
         database,
         lock_root,
         store: authority.admission_operation_store(),
