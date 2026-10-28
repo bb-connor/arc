@@ -1,6 +1,8 @@
+use chio_core::receipt::body::ChioReceipt;
 use chio_settle::{SettlementAttemptClaim, SettlementHookError, SettlementIdempotencyKey};
 
 use crate::settlement_routing::SettlementCompletion;
+use crate::ReceiptStoreError;
 
 use super::settlement_observer::SettlementObserverStatus;
 use super::{ChioKernel, KernelError};
@@ -36,18 +38,41 @@ impl ChioKernel {
             .claim_due(claim_now_ms, limit)
             .map_err(KernelError::SettlementDrain)?;
         let mut report = SettlementDrainReport::default();
-        for claim in &claims {
-            let status = self.drained_settlement_status(claim);
-            let completion = runtime
-                .complete_claim(
-                    claim,
-                    &status,
-                    self.read_authority_time()?.get().max(claim_now_ms),
-                )
-                .map_err(KernelError::SettlementDrain)?;
-            match completion {
-                SettlementCompletion::Recorded(_) => report.completed += 1,
-                SettlementCompletion::LostLease => report.lost_leases += 1,
+        for chunk in claims.chunks(256) {
+            let ids: Vec<_> = chunk
+                .iter()
+                .map(|claim| claim.receipt_id.as_str())
+                .collect();
+            let receipts = self
+                .receipt_store
+                .as_ref()
+                .map(|store| store.load_chio_receipts(&ids));
+            for (index, claim) in chunk.iter().enumerate() {
+                let status = match &receipts {
+                    Some(Ok(receipts)) if receipts.len() != chunk.len() => {
+                        SettlementObserverStatus::hook_failed(
+                            &SettlementHookError::InvalidObservation(
+                                "settlement receipt batch length does not match the claimed rows"
+                                    .to_string(),
+                            ),
+                        )
+                    }
+                    Some(Ok(receipts)) => {
+                        self.loaded_settlement_status(claim, Ok(receipts[index].as_ref()))
+                    }
+                    Some(Err(_)) | None => self.drained_settlement_status(claim),
+                };
+                let completion = runtime
+                    .complete_claim(
+                        claim,
+                        &status,
+                        self.read_authority_time()?.get().max(claim_now_ms),
+                    )
+                    .map_err(KernelError::SettlementDrain)?;
+                match completion {
+                    SettlementCompletion::Recorded(_) => report.completed += 1,
+                    SettlementCompletion::LostLease => report.lost_leases += 1,
+                }
             }
         }
         Ok(report)
@@ -64,7 +89,16 @@ impl ChioKernel {
                 ),
             );
         };
-        let receipt = match store.load_chio_receipt(&claim.receipt_id) {
+        let loaded = store.load_chio_receipt(&claim.receipt_id);
+        self.loaded_settlement_status(claim, loaded.as_ref().map(Option::as_ref))
+    }
+
+    fn loaded_settlement_status(
+        &self,
+        claim: &SettlementAttemptClaim,
+        loaded: Result<Option<&ChioReceipt>, &ReceiptStoreError>,
+    ) -> SettlementObserverStatus {
+        let receipt = match loaded {
             Ok(Some(receipt))
                 if receipt.id == claim.receipt_id && receipt.timestamp == claim.finalized_at =>
             {
@@ -91,7 +125,7 @@ impl ChioKernel {
             }
         };
         self.run_settlement_observer(
-            &receipt,
+            receipt,
             &SettlementIdempotencyKey {
                 receipt_id: claim.receipt_id.clone(),
                 row_version: claim.row_version,
