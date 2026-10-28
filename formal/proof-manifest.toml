@@ -1082,13 +1082,13 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "f3c4970408c49a14da548c61ed6e7007e2d5fc3aac1b944534c421bfd71d8d2c"
+normalized_sha256 = "ff3fc3e747c6b534b628375ca1090fc7a77a78e289669b72921ca3b8bfc458dd"
 symbol_sha256 = [
   { symbol = "PostAdmissionDropGuard", sha256 = "50fb6ebdb2ed2f281c534412aba0b13cb7f96e6ef5daf373a870ab1d15b06b6e" },
   { symbol = "PostAdmissionDropGuard::new", sha256 = "ef9ec0db94abad7561b5b48a1d95a6a1f3f5932f46d91ae07a8845a9209d3d86" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
   { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "b6674fe06713e27fcd408d7b00c7fa6c894d06f47c23065c41e888c558d54f82" },
-  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "df6b921f789283c58d60a13ae9670d5c6b6cf68515ee99b47301bd286d440c95" },
+  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "2c75d4259d2df05157dd92e55e198031ccccd0368b12ce53fec1f35db65edb94" },
   { symbol = "PostAdmissionDropGuard::drop", sha256 = "3b12e27332b865f1228d1022e644a519fa261f97f217ae20db73794e5e5f796b" },
 ]
 
@@ -1118,7 +1118,7 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "3c8ccb82e7125dcfff680178fac004d79e9a54a73fc561a88e43711a7e7b779e"
+normalized_sha256 = "8a642a0100f52251d7df55b73b264fd1008b86cb062387ade0229cf9b9ed9216"
 symbol_sha256 = [
   { symbol = "PostAdmissionReceiptContext", sha256 = "84155728c35fa1783115e17afdf15eed7941dec248d0f059a62f4cdfe5523c5f" },
   { symbol = "PostAdmissionDropGuard", sha256 = "50fb6ebdb2ed2f281c534412aba0b13cb7f96e6ef5daf373a870ab1d15b06b6e" },
@@ -1126,7 +1126,7 @@ symbol_sha256 = [
   { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "075ee346bdcb7602fd9396c62e115ac78fb0ada7fbac6731d6a5ff4086c37ce3" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
   { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "b6674fe06713e27fcd408d7b00c7fa6c894d06f47c23065c41e888c558d54f82" },
-  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "df6b921f789283c58d60a13ae9670d5c6b6cf68515ee99b47301bd286d440c95" },
+  { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "2c75d4259d2df05157dd92e55e198031ccccd0368b12ce53fec1f35db65edb94" },
   { symbol = "PostAdmissionDropGuard::drop", sha256 = "3b12e27332b865f1228d1022e644a519fa261f97f217ae20db73794e5e5f796b" },
 ]
 [[mirror]]
@@ -1220,11 +1220,11 @@ rust_symbols = [
   "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed",
   "ChioKernel::wait_for_runtime_admission_dispatch_readiness",
 ]
-normalized_sha256 = "af451aae34c7814b77a666ec31db16a5221828f5e7f253e2c4493226062a4037"
+normalized_sha256 = "542f2c8f1f355318fd4a1069cce268013a66b83808294bc91106a9b23db666ec"
 symbol_sha256 = [
   { symbol = "ChioKernel::revalidate_immediately_before_dispatch", sha256 = "707baf075fec2097eced1dc8119619f3e90b4a6407de0ca5af030cdc7c2ef6a6" },
   { symbol = "ChioKernel::release_runtime_admission_reservations", sha256 = "8bd9f0694609edd241bb6b970bc6b74a9d00b01471f7e487772a78acbc30e757" },
-  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "e9097e16d978d4faf00ab5d131a60be98f0ac5079e80201385e33c51d1db0ff1" },
+  { symbol = "ChioKernel::mark_runtime_admission_reservations_retained_fail_closed", sha256 = "d25dd242c1b3ecbbdadfdcde265295adccf98c1a3a29b89eff119275d1d273b5" },
   { symbol = "ChioKernel::wait_for_runtime_admission_dispatch_readiness", sha256 = "e8d294dbcf7a17f8bebd651898723bc3ea799562b29cc39f6e6752b364d7b843" },
 ]
 [[mirror]]
@@ -1703,10 +1703,10 @@ rust_symbols = [
   "ChioKernel::configured_runtime_participant_binding",
   "ChioKernel::run_runtime_admission_hook",
 ]
-normalized_sha256 = "bbaaec6c64d382558e6d704215cc1707b9ab4bde8e902cf634669a9ac1db252f"
+normalized_sha256 = "41d50d25eda6b2f3238dc459ea8ec5d01c4b9a4355d305b0b348a49697ce25a6"
 symbol_sha256 = [
   { symbol = "ChioKernel::configured_runtime_participant_binding", sha256 = "4834308b5071d000ed1194b7d78f5eded2e435b58c59e2b437494249f8c01e9e" },
-  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "02aca8759cea20334d7ce5043fe9142a62b8d0bd807ecb4b96d8541deb797e67" },
+  { symbol = "ChioKernel::run_runtime_admission_hook", sha256 = "ac41243fa1f66a0c724719374e7bff18a3dd3f43a921ac01274298d937b9ce37" },
 ]
 
 [[mirror]]
@@ -4519,7 +4519,7 @@ rust_symbols = [
   "Discharged::drop",
   "run_post_effect",
 ]
-normalized_sha256 = "c78c3a7be5d51641ea74e5bc99363ff9628d378c2610f63708da2aba208d2dbc"
+normalized_sha256 = "fde7c98141e431a306756f15b1253f910053d30554d21fc4861695c6e9c850cc"
 symbol_sha256 = [
   { symbol = "PostEffectError", sha256 = "580fdad417efb5965bfd3118c466e412f7f108bbcc0e1ff4f265f0da468e21ef" },
   { symbol = "PostEffectError::at", sha256 = "c6ba9b349f124ef688ed041b544de1a96ee9fffd81eb6f9dbf5b1a92fe07fe5e" },
@@ -4530,7 +4530,7 @@ symbol_sha256 = [
   { symbol = "PostEffectObligation::enter", sha256 = "afc090d2ded6a515df90611f3b2bebc81d25d3d292a4a932acdc30cd216fc5f2" },
   { symbol = "PostEffectObligation::nested_receipt_sinks", sha256 = "7cdb0480893005ba5eeb33edcda24cd51ce756813b471ec16c39b80c0ee58057" },
   { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "30de4ca97c6e86b1f4709ec627808c2786b4f4090eac1f3ecaaf9ffdc4ebf105" },
-  { symbol = "PostEffectObligation::fail", sha256 = "a111e741a94c79ab8d4d7ff28551e4ecb2a15784a8294f8dc3eb5c0b30caeb12" },
+  { symbol = "PostEffectObligation::fail", sha256 = "6d647ad9de9e20ee42bb5060418e863a115d0877a6b834e2303c87cacae690e1" },
   { symbol = "PostEffectObligation::buffer", sha256 = "4d7e6e820190a96980dfb9b622e614f4908fdef5db1c2f335c5733f97e3c9929" },
   { symbol = "PostEffectObligation::drop", sha256 = "e2a78b7af42fee5f92e2635feeae2a99392005112cebf8da8ed0f70bac0f12bb" },
   { symbol = "Discharged::deliver", sha256 = "13b2e8bbaf84bccb136227795913c0dbb58ee8b879f8d6b83dc40ab8b840f780" },
@@ -4572,9 +4572,9 @@ rust_symbols = [
   "ChioKernel::prepare_post_effect",
   "fault_response",
 ]
-normalized_sha256 = "40aa968c4819e4f804c2d5473ec60af85df48825b4fa4061fe346bb821f24cb3"
+normalized_sha256 = "42eaa836efe259998e8b4cd0e030b4970daf835ab74384ff44ff21ec324086d4"
 symbol_sha256 = [
-  { symbol = "PreparedFaultReceipt::observe_fault_timestamp", sha256 = "1db5fbee129980baba4e975911432e6effdbcb6f6d3d760af9ad46361ccd0787" },
+  { symbol = "PreparedFaultReceipt::observe_fault_timestamp", sha256 = "f993091cb973eace60a791022d42dd8001fc1669b78dd9af282b0161ab138730" },
   { symbol = "PreparedFaultReceipt::observe_economics", sha256 = "566996166aae0fe72b21b6c6883224afb9fbcebc690a8215ae7cd963b79b9bba" },
   { symbol = "PreparedFaultReceipt::observe_payment_result", sha256 = "f061af3d2f1d8f424d5d481654b1076e675d5396f81e7afbbb99130f79a8f1c1" },
   { symbol = "retain_bounded_reference", sha256 = "d3213f407b81a680664cbb22c51b10e954708e6c190dfd80c008efd674779626" },
@@ -4582,7 +4582,7 @@ symbol_sha256 = [
   { symbol = "DischargeBinding::validate_receipt", sha256 = "af013d8a665e10bab267f0c1aea744215d1cae54fdaff6b9aec2b7e8c0143deb" },
   { symbol = "PreparedPostEffect", sha256 = "71261edebfea10b075c687faca1d0fbcdc2675d292becc3513f35d197538637e" },
   { symbol = "PostEffectPreparation", sha256 = "5093025fe02704fe3bf651719f95cb91a2fff1734098ed0649452a05be7d2d5c" },
-  { symbol = "ChioKernel::prepare_post_effect", sha256 = "e9279a3ac33a6af2ff1d399d1d0cc367e28ac9bbeccc4410d5fef254f8449cf3" },
+  { symbol = "ChioKernel::prepare_post_effect", sha256 = "330fdce5f0137a3cc2ebf07ef030a077890e8db74b9f7b21fe23040d8fe764e2" },
   { symbol = "fault_response", sha256 = "972befe98f910a9e5cda44cb042cf2cd989ea04318560a801772e31982249c33" },
 ]
 [[mirror]]
