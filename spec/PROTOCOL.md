@@ -1949,7 +1949,9 @@ amount, currency, depositor, or beneficiary differ from the order id, quote
 amount, quote currency, buyer subject, or merchant subject of the order
 context. A ledger is `locked` from `settlement_packet_assembled` through
 `settlement_observed` and `released` from `settlement_reconciled` on; earlier
-states MUST NOT pin a digest. A ledger is locked only against a
+states MUST NOT pin a digest. An order in `failed_closed` may retain either the
+`locked` or the `released` pinned ledger, and pins no digest when the order has
+no escrow. A ledger is locked only against a
 `chio.commerce.reservation-receipt.v1` that a pinned reservation authority
 signed for the order and the exact offer token, and released only against a
 matched capital execution instruction that a pinned execution authority signed
