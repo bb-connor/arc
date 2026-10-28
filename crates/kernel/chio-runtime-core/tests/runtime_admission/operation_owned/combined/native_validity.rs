@@ -243,7 +243,7 @@ fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_p
         ("planDigest", serde_json::json!("e".repeat(64))),
         ("requestBindingHash", serde_json::json!("f".repeat(64))),
         ("grantIndex", serde_json::json!(1)),
-        ("expectationId", serde_json::json!("wrong-expectation")),
+        ("qualificationId", serde_json::json!("wrong-qualification")),
         ("phase", serde_json::json!("nonce_preflight")),
         ("resources", serde_json::json!([])),
     ] {
