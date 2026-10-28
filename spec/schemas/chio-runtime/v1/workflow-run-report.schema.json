@@ -9,7 +9,7 @@
     "runId",
     "accepted",
     "generatedAtUnixMs",
-    "admissionReportSha256",
+    "admissionReceiptSha256",
     "evidencePaths",
     "stepEvidence"
   ],
@@ -29,7 +29,7 @@
     "accepted": { "type": "boolean" },
     "failureCode": { "type": "string", "minLength": 1 },
     "generatedAtUnixMs": { "type": "integer", "minimum": 0 },
-    "admissionReportSha256": {
+    "admissionReceiptSha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },

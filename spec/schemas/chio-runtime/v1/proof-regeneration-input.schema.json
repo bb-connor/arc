@@ -9,7 +9,7 @@
     "runId",
     "evidenceManifestSha256",
     "workflowRunReportSha256",
-    "admissionReportSha256",
+    "admissionReceiptSha256",
     "trustBundleSha256",
     "verificationContextSha256",
     "sourceRecords"
@@ -19,7 +19,7 @@
     "runId": { "type": "string", "minLength": 1 },
     "evidenceManifestSha256": { "$ref": "#/$defs/sha256" },
     "workflowRunReportSha256": { "$ref": "#/$defs/sha256" },
-    "admissionReportSha256": { "$ref": "#/$defs/sha256" },
+    "admissionReceiptSha256": { "$ref": "#/$defs/sha256" },
     "trustBundleSha256": { "$ref": "#/$defs/sha256" },
     "verificationContextSha256": { "$ref": "#/$defs/sha256" },
     "sourceRecords": {

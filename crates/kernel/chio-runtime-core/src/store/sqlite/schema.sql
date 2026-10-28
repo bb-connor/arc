@@ -27,7 +27,7 @@ CREATE TABLE runtime_step_states (
     admission_id TEXT NOT NULL,
     state TEXT NOT NULL,
     destructive INTEGER NOT NULL,
-    admission_report_sha256 TEXT,
+    admission_receipt_sha256 TEXT,
     tool_receipt_sha256 TEXT,
     lease_id TEXT,
     PRIMARY KEY (run_id, step_index)

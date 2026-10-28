@@ -15,7 +15,7 @@ pub(crate) struct RuntimeLoopbackTreatyContext {
 }
 
 pub(crate) fn insert_runtime_loopback_treaty_context(
-    hook_store: &chio_runtime_core::InMemoryRuntimeAdmissionStore,
+    hook_store: &chio_runtime_core::SqliteRuntimeOrchestrationStore,
     step_index: usize,
     step: &RuntimeLoopbackStep,
     vendor_key: &chio_core::Keypair,
@@ -466,7 +466,7 @@ mod tests {
     }
 
     fn stored_schema(
-        store: &chio_runtime_core::InMemoryRuntimeAdmissionStore,
+        store: &chio_runtime_core::SqliteRuntimeOrchestrationStore,
         evidence_kind: &str,
         evidence_id: &str,
     ) -> Result<String, crate::RuntimeLoopbackError> {
@@ -495,7 +495,7 @@ mod tests {
     }
 
     fn stored_artifact_json(
-        store: &chio_runtime_core::InMemoryRuntimeAdmissionStore,
+        store: &chio_runtime_core::SqliteRuntimeOrchestrationStore,
         evidence_kind: &str,
         evidence_id: &str,
     ) -> Result<serde_json::Value, crate::RuntimeLoopbackError> {
@@ -518,7 +518,10 @@ mod tests {
     fn runtime_loopback_treaty_context_emits_chio_federation_schemas(
     ) -> Result<(), crate::RuntimeLoopbackError> {
         let step = destructive_runtime_loopback_step();
-        let store = chio_runtime_core::InMemoryRuntimeAdmissionStore::new();
+        let root = crate::tests::temp_root("treaty-source")?;
+        let store =
+            chio_runtime_core::SqliteRuntimeOrchestrationStore::open(root.join("source.sqlite"))
+                .map_err(|error| crate::RuntimeLoopbackError::message(error.to_string()))?;
         let vendor_key = chio_attest_loopback::runtime_vendor_keypair(2).map_err(|error| {
             crate::RuntimeLoopbackError::message(format!(
                 "runtime loopback vendor key failed: {error}"
@@ -624,7 +627,10 @@ mod tests {
         let mut step = destructive_runtime_loopback_step();
         step.admission_bundle.destructive = false;
         step.admission_bundle.governance_receipt_id = None;
-        let store = chio_runtime_core::InMemoryRuntimeAdmissionStore::new();
+        let root = crate::tests::temp_root("treaty-source")?;
+        let store =
+            chio_runtime_core::SqliteRuntimeOrchestrationStore::open(root.join("source.sqlite"))
+                .map_err(|error| crate::RuntimeLoopbackError::message(error.to_string()))?;
         let vendor_key = chio_attest_loopback::runtime_vendor_keypair(0).map_err(|error| {
             crate::RuntimeLoopbackError::message(format!(
                 "runtime loopback vendor key failed: {error}"

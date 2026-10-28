@@ -501,7 +501,7 @@ pub struct RuntimeWorkflowRunReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure_code: Option<String>,
     pub generated_at_unix_ms: u64,
-    pub admission_report_sha256: String,
+    pub admission_receipt_sha256: String,
     pub evidence_paths: Vec<String>,
     pub step_evidence: Vec<RuntimeStepEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -514,7 +514,7 @@ pub struct RuntimeStepEvidence {
     pub schema: String,
     pub step_index: u64,
     pub admission_id: String,
-    pub admission_report_sha256: String,
+    pub admission_receipt_sha256: String,
     pub tool_receipt_id: String,
     pub tool_receipt_sha256: String,
     pub output_sha256: String,
@@ -534,7 +534,7 @@ pub struct RuntimeStepEvidence {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeProofSourceRecord {
     pub step_index: u64,
-    pub admission_report_sha256: String,
+    pub admission_receipt_sha256: String,
     pub tool_receipt_sha256: String,
     pub bilateral_dsse_sha256: String,
     pub workflow_step_sha256: String,
@@ -567,7 +567,7 @@ pub struct RuntimeProofRegenerationInput {
     pub run_id: String,
     pub evidence_manifest_sha256: String,
     pub workflow_run_report_sha256: String,
-    pub admission_report_sha256: String,
+    pub admission_receipt_sha256: String,
     pub trust_bundle_sha256: String,
     pub verification_context_sha256: String,
     pub source_records: Vec<RuntimeProofSourceRecord>,
@@ -653,7 +653,7 @@ pub struct RuntimeOrchestrationStepState {
     pub state: String,
     pub destructive: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub admission_report_sha256: Option<String>,
+    pub admission_receipt_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_receipt_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
