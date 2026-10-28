@@ -1,7 +1,6 @@
 //! Signed observations of completed fixed fan-out, never new dispatch authority.
 
 use std::collections::BTreeMap;
-use std::io::Read;
 use std::path::Path;
 
 use chio_core::capability::token::CapabilityToken;
@@ -98,18 +97,7 @@ pub(super) fn verify_file(
     native_pins: &[String],
 ) -> Result<(), CliError> {
     let key = crate::load_trusted_kernel_pubkey(key_path).map_err(error)?;
-    let file = std::fs::File::open(path)?;
-    require(
-        file.metadata()?.is_file(),
-        "run artifact must be a regular file",
-    )?;
-    let mut text = String::new();
-    file.take(MAX_ARTIFACT_BYTES + 1)
-        .read_to_string(&mut text)?;
-    require(
-        text.len() as u64 <= MAX_ARTIFACT_BYTES,
-        "run artifact exceeds 64 MiB",
-    )?;
+    let text = crate::input::read_text_bounded(path, MAX_ARTIFACT_BYTES as usize)?;
     let signed = crate::receipt_verify::verify_original_receipt(&text, &key)?;
     let evidence: Evidence =
         serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;

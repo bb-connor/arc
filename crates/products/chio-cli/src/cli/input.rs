@@ -74,7 +74,16 @@ pub(crate) fn read_stream(reader: impl Read, bound: usize) -> Result<Vec<u8>, st
     Ok(bytes)
 }
 
+pub(crate) fn read_text_bounded(path: &Path, bound: usize) -> Result<String, std::io::Error> {
+    String::from_utf8(read_regular(path, bound)?)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+}
+
 pub(crate) fn read_regular(path: &Path, bound: usize) -> Result<Vec<u8>, std::io::Error> {
+    read_stream(open_regular(path)?, bound)
+}
+
+pub(crate) fn open_regular(path: &Path) -> Result<std::fs::File, std::io::Error> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -86,7 +95,7 @@ pub(crate) fn read_regular(path: &Path, bound: usize) -> Result<Vec<u8>, std::io
     if !file.metadata()?.is_file() {
         return Err(std::io::Error::other("input must be a regular file"));
     }
-    read_stream(file, bound)
+    Ok(file)
 }
 
 #[cfg(test)]
