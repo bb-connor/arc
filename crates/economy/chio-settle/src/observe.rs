@@ -579,6 +579,7 @@ mod tests {
             deny_ipv6_ula: true,
             max_redirect_chain: 0,
             max_response_bytes: 64 * 1024 * 1024,
+            private_network_allowances: Default::default(),
         }
     }
 

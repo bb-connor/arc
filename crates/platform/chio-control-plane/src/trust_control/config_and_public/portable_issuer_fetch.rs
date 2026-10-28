@@ -435,7 +435,7 @@ where
     let mut checked = Vec::with_capacity(resolved.len());
     for addr in resolved {
         contract
-            .enforce_resolved_ip(host, addr.ip())
+            .enforce_resolved_address(host, addr)
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         checked.push(addr);
     }

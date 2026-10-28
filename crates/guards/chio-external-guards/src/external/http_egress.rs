@@ -37,6 +37,7 @@ pub(crate) fn contract_for_url(
         deny_ipv6_ula: true,
         max_redirect_chain: EXTERNAL_GUARD_REDIRECT_LIMIT,
         max_response_bytes: EXTERNAL_GUARD_MAX_RESPONSE_BYTES,
+        private_network_allowances: Default::default(),
     };
     contract
         .validate_dispatchable_with_pinned_dns()

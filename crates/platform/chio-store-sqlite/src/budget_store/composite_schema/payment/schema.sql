@@ -15,6 +15,10 @@ CREATE TABLE payment_journal (
         rail <> '' AND rail <> 'unspecified' AND length(rail) <= 512
     ),
     rail_mode TEXT NOT NULL CHECK (rail_mode IN ('reversible_hold', 'prepaid_final')),
+    rail_egress_allowance_digest TEXT NOT NULL CHECK (
+        length(rail_egress_allowance_digest) = 64
+        AND rail_egress_allowance_digest NOT GLOB '*[^0-9a-f]*'
+    ),
     authorization_id TEXT CHECK (
         authorization_id IS NULL
         OR (authorization_id <> '' AND length(authorization_id) <= 512)
@@ -168,7 +172,7 @@ CREATE INDEX idx_payment_journal_state
 CREATE TRIGGER payment_journal_identity_immutable
 BEFORE UPDATE OF operation_id, request_namespace_digest, request_id,
                  capability_id, grant_index, hold_id, rail, rail_mode,
-                 amount_units, authorized_amount_units, currency, created_at_unix_ms
+                 rail_egress_allowance_digest, amount_units, authorized_amount_units, currency, created_at_unix_ms
 ON payment_journal
 BEGIN
     SELECT RAISE(ABORT, 'payment journal identity is immutable');

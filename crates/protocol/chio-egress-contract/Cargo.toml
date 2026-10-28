@@ -12,7 +12,7 @@ publish = false
 name = "chio_egress_contract"
 
 [dependencies]
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types", optional = true }
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
@@ -27,7 +27,7 @@ default = []
 # Opt-in helper that wraps a `reqwest` dispatch with `HttpEgressContract`
 # enforcement on the initial URL, on every redirect, and on observed response
 # size. Callers that depend on this feature get `send_with_contract`.
-reqwest-egress = ["dep:http", "dep:reqwest", "dep:serde_json", "dep:tokio", "dep:chio-core"]
+reqwest-egress = ["dep:http", "dep:reqwest", "dep:serde_json", "dep:tokio"]
 # Blocking ureq helper: `BlockingContractAgent` enforces the contract on the
 # request URL, on every resolved address, and on the response size, and never
 # follows redirects.
@@ -38,6 +38,7 @@ name = "ureq_proxy_env"
 required-features = ["ureq-egress"]
 
 [dev-dependencies]
+serde_json = { workspace = true }
 reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

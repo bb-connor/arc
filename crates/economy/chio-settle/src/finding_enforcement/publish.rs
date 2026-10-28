@@ -182,6 +182,7 @@ impl RemoteFindingImpairmentPublisherConfig {
             deny_ipv6_ula: true,
             max_redirect_chain: 0,
             max_response_bytes: MAX_PUBLISHER_RESPONSE_BYTES as u64,
+            private_network_allowances: Default::default(),
         };
         contract
             .validate_dispatchable_with_pinned_dns()
@@ -247,7 +248,7 @@ impl HttpsFindingImpairmentTransport {
             }
             for address in &addresses {
                 contract
-                    .enforce_resolved_ip(host, address.ip())
+                    .enforce_resolved_address(host, *address)
                     .map_err(|_| FindingImpairmentPublisherConfigError::InvalidEgressPolicy)?;
             }
             builder = builder.resolve_to_addrs(host, &addresses);

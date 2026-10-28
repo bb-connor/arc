@@ -59,7 +59,7 @@ fn adapter_with(
     clock: Arc<dyn Clock>,
     replay: Arc<dyn ExecutionNonceStore>,
 ) -> X402PaymentAdapter {
-    X402PaymentAdapter::new(facilitator, test_rail(), clock, replay)
+    X402PaymentAdapter::new(facilitator, test_rail(), &std::collections::BTreeSet::new(), clock, replay)
         .expect("valid facilitator")
         .with_timeout(Duration::from_secs(2))
 }
@@ -460,7 +460,7 @@ fn facilitator_url_is_validated_at_construction() {
         "https://facilitator.example#fragment",
         "not a url",
     ] {
-        let error = X402PaymentAdapter::new(url, test_rail(), clock_at(NOW), replay_store())
+        let error = X402PaymentAdapter::new(url, test_rail(), &std::collections::BTreeSet::new(), clock_at(NOW), replay_store())
             .expect_err(url);
         assert!(
             matches!(&error, PaymentError::RailError(message) if message == "payment rail URL is invalid"),
@@ -470,6 +470,7 @@ fn facilitator_url_is_validated_at_construction() {
     X402PaymentAdapter::new(
         "https://facilitator.example/x402",
         test_rail(),
+        &std::collections::BTreeSet::new(),
         clock_at(NOW),
         replay_store(),
     )
@@ -484,7 +485,7 @@ fn facilitator_outside_the_public_network_is_refused_at_construction() {
         "https://[fd00::1]",
         "https://169.254.169.254",
     ] {
-        let error = X402PaymentAdapter::new(url, test_rail(), clock_at(NOW), replay_store())
+        let error = X402PaymentAdapter::new(url, test_rail(), &std::collections::BTreeSet::new(), clock_at(NOW), replay_store())
             .expect_err(url);
         assert!(
             matches!(&error, PaymentError::RailError(message) if message == "payment rail egress denied"),
@@ -683,6 +684,7 @@ fn settled_prepaid_journal(authorization_id: &str) -> PaymentJournalRecord {
         hold_id: Some("hold-1".to_owned()),
         rail: "x402".to_owned(),
         rail_mode: PaymentRailMode::PrepaidFinal,
+        rail_egress_allowance_digest: crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST.to_owned(),
         authorization_id: None,
         transaction_id: None,
         amount_units: 125,

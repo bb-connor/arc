@@ -161,7 +161,7 @@ impl ureq::Resolver for A2aContractResolver {
             .to_socket_addrs()?
             .map(|addr| {
                 self.contract
-                    .enforce_resolved_ip(host, addr.ip())
+                    .enforce_resolved_address(host, addr)
                     .map(|()| addr)
                     .map_err(|err| {
                         std::io::Error::new(std::io::ErrorKind::PermissionDenied, err.to_string())

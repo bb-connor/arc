@@ -506,11 +506,12 @@ INSERT INTO payment_journal (
     authorization_attempt, settle_action, settle_amount_units, release_authority_kind,
     release_authority_evidence_id, release_authority_evidence_digest,
     release_authority_operation_version, currency, state,
-    created_at_unix_ms, updated_at_unix_ms
+    created_at_unix_ms, updated_at_unix_ms, rail_egress_allowance_digest
 ) VALUES (
     ?1, 2, ?2, ?3, 'cap-journal', 0, ?4, 'rail-test', 'reversible_hold',
     ?5, NULL, 10, 10, ?12, ?6, NULL, ?7, ?8, ?9, ?10, 'USD', ?11,
-    1700000000000, 1700000000001
+    1700000000000, 1700000000001,
+    '2db7ba6d8c2c4ae9d07cad3c2a0bdbac06e6b4e0a7a53f5d4c8deea11893d31c'
 )
 "#;
 

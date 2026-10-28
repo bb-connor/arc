@@ -176,7 +176,7 @@ fn resolve_with_contract(
     prepared: &PreparedHttpEgressContract,
     netloc: &str,
 ) -> Result<Vec<SocketAddr>, HttpEgressError> {
-    let (host, _port) = netloc
+    let (host, _) = netloc
         .rsplit_once(':')
         .ok_or(HttpEgressError::MissingAuthority)?;
     let host = host.trim_start_matches('[').trim_end_matches(']');
@@ -205,9 +205,7 @@ fn enforce_resolved_addresses(
         });
     }
     for address in &addresses {
-        prepared
-            .contract()
-            .enforce_resolved_ip(host, address.ip())?;
+        prepared.contract().enforce_resolved_address(host, *address)?;
     }
     Ok(addresses)
 }

@@ -48,7 +48,7 @@ fn adapter_at(
     clock: Arc<dyn Clock>,
 ) -> Result<X402PaymentAdapter, Box<dyn Error>> {
     let rail = X402RailConfig::new(X402Network::allowlisted(NETWORK)?, ASSET, "USDC", 6, PAY_TO)?;
-    Ok(X402PaymentAdapter::new(facilitator, rail, clock, replay)?
+    Ok(X402PaymentAdapter::new(facilitator, rail, &std::collections::BTreeSet::new(), clock, replay)?
         .with_timeout(Duration::from_secs(2)))
 }
 

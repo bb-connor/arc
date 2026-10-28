@@ -20,16 +20,19 @@
 //! operator. A facilitator `settlement_pending` answer is outcome-unknown and
 //! carries the broadcast transaction so the operator can reconcile on chain.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256};
+use chio_egress_contract::PrivateNetworkAllowance;
 use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::{
     payment_identifier_is_valid, post_json, validate_payment_endpoint, PaymentAdapter,
+    PaymentRailEgress,
     PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
     PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus, X402SettlementRef,
 };
@@ -348,6 +351,7 @@ pub struct X402PaymentAdapter {
     timeout: Duration,
     clock: Arc<dyn Clock>,
     replay: Arc<dyn ExecutionNonceStore>,
+    egress: PaymentRailEgress,
 }
 
 impl fmt::Debug for X402PaymentAdapter {
@@ -370,18 +374,22 @@ impl X402PaymentAdapter {
     /// link-local or unique-local address literal, or that names a loopback
     /// host over `https`. A hostname that resolves to a private, loopback,
     /// link-local or unique-local address is refused when a request connects.
-    /// `clock` is the
-    /// trusted time the validity window is checked against; `replay` holds
-    /// each accepted authorization key until its `validBefore` and must be
-    /// durable for single use to survive a restart.
+    /// The one exception is the entry of `allowances` that pins the
+    /// facilitator's own `host:port`, through which it may reach a private
+    /// address inside that entry's CIDR. `clock` is the trusted time the
+    /// validity window is checked against; `replay` holds each accepted
+    /// authorization key until its `validBefore` and must be durable for
+    /// single use to survive a restart.
     pub fn new(
         facilitator_url: impl Into<String>,
         rail: X402RailConfig,
+        allowances: &BTreeSet<PrivateNetworkAllowance>,
         clock: Arc<dyn Clock>,
         replay: Arc<dyn ExecutionNonceStore>,
     ) -> Result<Self, PaymentError> {
         let facilitator_url = facilitator_url.into().trim_end_matches('/').to_string();
-        validate_payment_endpoint(&facilitator_url, X402_VERIFY_PATH, None)?;
+        let egress = PaymentRailEgress::for_rail(&facilitator_url, allowances)?;
+        validate_payment_endpoint(&facilitator_url, X402_VERIFY_PATH, None, &egress)?;
         Ok(Self {
             facilitator_url,
             rail,
@@ -389,6 +397,7 @@ impl X402PaymentAdapter {
             timeout: super::PAYMENT_RAIL_TIMEOUT,
             clock,
             replay,
+            egress,
         })
     }
 
@@ -514,6 +523,7 @@ impl X402PaymentAdapter {
     fn verify(&self, body: &X402FacilitatorRequest<'_>) -> Result<(), X402Refusal> {
         let response: X402VerifyResponse = post_json(
             self.timeout,
+            &self.egress,
             &self.facilitator_url,
             self.bearer_token.as_deref(),
             X402_VERIFY_PATH,
@@ -533,6 +543,7 @@ impl X402PaymentAdapter {
     ) -> Result<X402SettledAuthorization, PaymentError> {
         let response: X402SettleResponse = post_json(
             self.timeout,
+            &self.egress,
             &self.facilitator_url,
             self.bearer_token.as_deref(),
             X402_SETTLE_PATH,
@@ -613,6 +624,10 @@ impl PaymentAdapter for X402PaymentAdapter {
 
     fn rail_mode(&self) -> Option<PaymentRailMode> {
         Some(PaymentRailMode::PrepaidFinal)
+    }
+
+    fn egress_allowance_digest(&self) -> &str {
+        self.egress.digest()
     }
 
     fn authorize(

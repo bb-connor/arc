@@ -8,7 +8,9 @@ use chio_core::{canonical_json_bytes, sha256};
 use chio_core::{capability::scope::MonetaryAmount, receipt::economics::SettlementStatus};
 use chio_egress_contract::{
     BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
+    PrivateNetworkAllowance,
 };
+pub use chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
@@ -23,6 +25,9 @@ pub use journal::*;
 mod x402;
 pub use x402::*;
 
+mod rail_egress;
+use rail_egress::PaymentRailEgress;
+
 #[cfg(test)]
 mod test_http;
 
@@ -34,6 +39,12 @@ pub trait PaymentAdapter: Send + Sync {
 
     fn rail_mode(&self) -> Option<PaymentRailMode> {
         None
+    }
+
+    /// Digest of the private network allowances this rail dials under. An
+    /// adapter without HTTP egress declares none.
+    fn egress_allowance_digest(&self) -> &str {
+        EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
     }
 
     /// Authorize or prepay up to `amount_units` before the tool executes.
@@ -203,6 +214,7 @@ pub struct AcpPaymentAdapter {
     settlement_state_path: String,
     bearer_token: Option<String>,
     timeout: Duration,
+    egress: PaymentRailEgress,
 }
 
 impl fmt::Debug for AcpPaymentAdapter {
@@ -235,7 +247,20 @@ impl AcpPaymentAdapter {
             settlement_state_path: "/settlement-state".to_string(),
             bearer_token: None,
             timeout: PAYMENT_RAIL_TIMEOUT,
+            egress: PaymentRailEgress::default(),
         }
+    }
+
+    /// Let the rail reach a private address through the allowance that pins
+    /// its own `host:port`. The rail URL and allowance are checked here.
+    pub fn with_private_network_allowances(
+        mut self,
+        allowances: &BTreeSet<PrivateNetworkAllowance>,
+    ) -> Result<Self, PaymentError> {
+        let egress = PaymentRailEgress::for_rail(&self.base_url, allowances)?;
+        payment_rail_contract(&self.base_url, &self.authorize_path, None, &egress)?;
+        self.egress = egress;
+        Ok(self)
     }
 
     #[must_use]
@@ -290,6 +315,10 @@ impl PaymentAdapter for AcpPaymentAdapter {
         Some(PaymentRailMode::ReversibleHold)
     }
 
+    fn egress_allowance_digest(&self) -> &str {
+        self.egress.digest()
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -302,6 +331,7 @@ impl PaymentAdapter for AcpPaymentAdapter {
         };
         let response: AcpAuthorizeResponse = post_json(
             self.timeout,
+            &self.egress,
             &self.base_url,
             self.bearer_token.as_deref(),
             &self.authorize_path,
@@ -389,6 +419,7 @@ impl PaymentAdapter for AcpPaymentAdapter {
         let request_digest = acp_request_digest(&binding)?;
         let response: AcpSettlementStateResponse = get_json(
             self.timeout,
+            &self.egress,
             &self.base_url,
             self.bearer_token.as_deref(),
             &self.settlement_state_path,
@@ -428,6 +459,7 @@ impl AcpPaymentAdapter {
         };
         let response: AcpTerminalOperationResponse = post_json(
             self.timeout,
+            &self.egress,
             &self.base_url,
             self.bearer_token.as_deref(),
             path,
@@ -766,12 +798,13 @@ fn acp_request_digest<T: Serialize>(value: &T) -> Result<String, PaymentError> {
 
 fn post_json<B: Serialize, T: DeserializeOwned>(
     timeout: Duration,
+    egress: &PaymentRailEgress,
     base_url: &str,
     bearer_token: Option<&str>,
     path: &str,
     body: &B,
 ) -> Result<T, PaymentError> {
-    let agent = payment_rail_agent(base_url, path, bearer_token, timeout)?;
+    let agent = payment_rail_agent(base_url, path, bearer_token, egress, timeout)?;
     let payload = serde_json::to_value(body)
         .and_then(|value| serde_json::to_vec(&value))
         .map_err(|error| PaymentError::RailError(format!("invalid request payload: {error}")))?;
@@ -791,12 +824,13 @@ fn post_json<B: Serialize, T: DeserializeOwned>(
 
 fn get_json<T: DeserializeOwned>(
     timeout: Duration,
+    egress: &PaymentRailEgress,
     base_url: &str,
     bearer_token: Option<&str>,
     path: &str,
     query: &[(&str, &str)],
 ) -> Result<T, PaymentError> {
-    let agent = payment_rail_agent(base_url, path, bearer_token, timeout)?;
+    let agent = payment_rail_agent(base_url, path, bearer_token, egress, timeout)?;
     let mut request = agent
         .get(&format!("{base_url}{path}"))
         .map_err(map_rail_egress_error)?;
@@ -840,18 +874,21 @@ fn validate_payment_endpoint(
     base_url: &str,
     path: &str,
     bearer_token: Option<&str>,
+    egress: &PaymentRailEgress,
 ) -> Result<(), PaymentError> {
-    payment_rail_contract(base_url, path, bearer_token).map(|_| ())
+    payment_rail_contract(base_url, path, bearer_token, egress).map(|_| ())
 }
 
 /// The contract admits only the rail's own scheme and authority, plaintext
 /// `http` only to a loopback host, no redirects, and the payment response
-/// ceiling. The rail URL itself is checked here; resolved addresses are
-/// checked when the agent connects.
+/// ceiling. A private destination is reachable only through the allowance
+/// that pins the rail's own `host:port`. The rail URL itself is checked here;
+/// resolved addresses are checked when the agent connects.
 fn payment_rail_contract(
     base_url: &str,
     path: &str,
     bearer_token: Option<&str>,
+    egress: &PaymentRailEgress,
 ) -> Result<HttpEgressContract, PaymentError> {
     let invalid_url = || PaymentError::RailError("payment rail URL is invalid".to_owned());
     let parsed = Url::parse(base_url).map_err(|_| invalid_url())?;
@@ -902,7 +939,9 @@ fn payment_rail_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PAYMENT_RESPONSE_BYTES,
+        private_network_allowances: egress.allowances().clone(),
     };
+    contract.validate().map_err(map_rail_egress_error)?;
     contract
         .enforce_url(&format!("{base_url}{path}"), 0)
         .map_err(map_rail_egress_error)?;
@@ -913,9 +952,10 @@ fn payment_rail_agent(
     base_url: &str,
     path: &str,
     bearer_token: Option<&str>,
+    egress: &PaymentRailEgress,
     timeout: Duration,
 ) -> Result<BlockingContractAgent, PaymentError> {
-    let contract = payment_rail_contract(base_url, path, bearer_token)?;
+    let contract = payment_rail_contract(base_url, path, bearer_token, egress)?;
     BlockingContractAgent::new(&contract, timeout, timeout.saturating_mul(3))
         .map_err(map_rail_egress_error)
 }
@@ -936,6 +976,9 @@ fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
         HttpEgressError::ResponseTooLarge { .. } => {
             PaymentError::RailError("payment rail response is too large".to_owned())
         }
+        HttpEgressError::InvalidAllowance(_) => {
+            PaymentError::RailError("payment rail egress allowance is invalid".to_owned())
+        }
         HttpEgressError::InvalidContract(_)
         | HttpEgressError::InvalidUrl(_)
         | HttpEgressError::MissingAuthority
@@ -949,6 +992,9 @@ fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
         | HttpEgressError::LinkLocalDenied { .. }
         | HttpEgressError::Ipv6UlaDenied { .. }
         | HttpEgressError::PrivateNetworkDenied { .. }
+        | HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
+        | HttpEgressError::ReservedAddressDenied { .. }
+        | HttpEgressError::AllowanceRequiresPortAwareResolver { .. }
         | HttpEgressError::RedirectLimitExceeded { .. } => {
             PaymentError::RailError("payment rail egress denied".to_owned())
         }
@@ -992,6 +1038,7 @@ mod tests {
             hold_id: Some("hold-1".to_owned()),
             rail: "acp".to_owned(),
             rail_mode: PaymentRailMode::ReversibleHold,
+            rail_egress_allowance_digest: crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST.to_owned(),
             authorization_id: None,
             transaction_id: None,
             amount_units: 125,
@@ -1640,6 +1687,7 @@ mod tests {
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
+            &std::collections::BTreeSet::new(),
             std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(0)),
             std::sync::Arc::new(crate::InMemoryExecutionNonceStore::default()),
         )
