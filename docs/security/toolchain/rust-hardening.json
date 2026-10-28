@@ -23,6 +23,7 @@
     "chio-kernel": "crates/kernel/chio-kernel/src/lib.rs",
     "chio-bounded": "crates/core/chio-bounded/src/lib.rs",
     "chio-quarantine": "crates/security/chio-quarantine/src/lib.rs",
+    "chio-recovery": "crates/security/chio-recovery/src/lib.rs",
     "chio-supervisor": "crates/core/chio-supervisor/src/lib.rs",
     "chio-swarm-authority": "crates/kernel/chio-swarm-authority/src/lib.rs",
     "chio-store-sqlite": "crates/platform/chio-store-sqlite/src/lib.rs",
