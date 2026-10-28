@@ -1118,7 +1118,7 @@ activation remain separate work.
 
 Operation-owned runtime admission MUST verify its configured source against the destination's retained v1 qualification. The qualification MUST bind source and runtime authority IDs, destination authority ID, and the actual opened SQLite file's device, inode and single-link identity. A decoded descriptor alone MUST NOT authorize claims.
 
-A changed physical identity, including copy, restore, replacement, or device/inode change on remount, MUST refuse with `runtime_source_qualification_invalid`. Installed bindings are immutable for their lifetime. Replacement requires independently provisioned new source and runtime authority IDs; a destination exhausted at 128 installed records requires a new provisioned authority. No migration, adoption, deletion or supersession interface is defined by this profile. Operator requalification is separate work recorded as RUNTIME-SOURCE-REQUALIFY.
+A changed physical identity, including copy, restore, replacement, or device/inode change on remount, MUST refuse with `runtime_source_qualification_invalid`. Installed bindings are immutable for their lifetime. Replacement requires independently provisioned new source and runtime authority IDs; a destination exhausted at 128 installed records requires a new provisioned authority. No migration, adoption, deletion or supersession interface is defined by this profile. No operator requalification interface is defined.
 
 #### Native Atomic Capture Checkpoint
 
