@@ -368,6 +368,7 @@ use chio_acp_proxy::{AcpAttestationMode, AcpProxy, AcpProxyConfig, KernelCapabil
 let checker = KernelCapabilityChecker::new(kernel, "acp-server", manifest_registry)?;
 
 let config = AcpProxyConfig::new("claude-code", public_key_hex)
+    .with_server_id("acp-server")
     .with_allowed_path_prefix("/home/dev/project")
     .with_allowed_command("cargo");
 
