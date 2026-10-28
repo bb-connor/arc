@@ -151,6 +151,8 @@ private tool results. Signed receipts still need independent verification.
 
 ## Move or restore host state
 
+The state directory path must contain no symlinked components; relocation refuses directory nesting deeper than 64 levels below that root.
+
 The authority store binds itself to its path and to the inodes of its
 database and serving lock, so a copied or restored state directory refuses
 to serve. Relocation is the supported way to move that binding. With the host
