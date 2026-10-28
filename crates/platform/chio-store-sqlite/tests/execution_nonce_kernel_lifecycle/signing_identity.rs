@@ -152,21 +152,19 @@ fn changed_receipt_backend_refuses_before_durable_nonce_mutation() -> TestResult
         &support::AcceptedSigningQuote(fixture.signer.public_key()),
     )?;
     assert_ne!(kernel.receipt_signing_public_key()?, original_key);
-    let error = kernel
-        .evaluate_tool_call_blocking(&request)
-        .err()
-        .ok_or("changed backend admitted nonce")?;
-    assert!(
-        matches!(
-            error,
-            chio_kernel::KernelError::AdmissionRecovery(ref recovery)
-                if matches!(recovery.as_ref(), chio_kernel::admission_operation::AdmissionRecoveryError::Item {
-                    kind: chio_kernel::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
-                    detail,
-                } if detail == "durable admission signing identity changed")
-        ),
-        "{error}"
+    let denied = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert_eq!(
+        denied.reason.as_deref(),
+        Some(
+            "durable admission failed: ContractChanged: durable admission signing identity changed"
+        )
     );
+    assert!(denied.execution_nonce.is_none());
+    assert!(denied.output.is_none());
+    assert!(denied
+        .receipt
+        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)?);
     assert!(operation_state(&fixture, &request.request_id)?.is_none());
     for table in [
         "admission_nonce_preflight_holds",
