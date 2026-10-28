@@ -548,6 +548,40 @@ pub struct Rail {
 }
 EOF
 
+http_client_case ureq_alias_declared_after_use crates/chio-fake/src/lib.rs <<'EOF'
+use h::Agent as Http;
+use ureq as h;
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_constructor_split_across_lines crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    Http::
+        new()
+}
+EOF
+http_client_case ureq_absolute_path crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ::ureq::Agent::new()
+}
+EOF
+http_client_case ureq_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = ureq::AgentBuilder;
+
+pub fn agent() -> ureq::Agent {
+    Http::new().build()
+}
+EOF
+http_client_case ureq_function_reference crates/chio-fake/src/lib.rs <<'EOF'
+pub fn fetch(urls: &[&str]) {
+    let _ = urls.iter().map(|url| url.to_string()).map(|url| (ureq::get)(&url));
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
@@ -557,7 +591,9 @@ for expectation in \
     reject:ureq_multiline_group reject:hyper_module_alias reject:ureq_cargo_rename \
     reject:ureq_workspace_rename reject:unscanned_renamed_crate reject:ureq_glob \
     reject:ureq_self_rename reject:ureq_extern_crate accept:ureq_rename_classified \
-    accept:ureq_type_only; do
+    accept:ureq_type_only reject:ureq_alias_declared_after_use \
+    reject:ureq_constructor_split_across_lines reject:ureq_absolute_path \
+    reject:ureq_type_alias reject:ureq_function_reference; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
