@@ -240,6 +240,123 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("::bad", findings[0])
 
+    def test_qualified_deserialize_keeps_the_complete_target(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "mod nested { pub struct Envelope { receipt: ChioReceipt } } fn bad(d: D) { crate::nested::Envelope::deserialize(d); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_repeated_macro_names_after_a_fixed_argument(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! wrapped { ($check:ident; $($name:ident),+ $(,)?) => { $(pub struct $name(ChioReceipt);)+ }; } wrapped!(validate; First, Second); fn bad(s: &str) { serde_json::from_str::<Second>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_self_and_associated_bindings_are_type_syntax(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "enum Tree { Leaf(ChioReceipt), Children(Vec<Self>) } type Work = Box<dyn std::future::Future<Output = Tree>>; fn bad(s: &str) { serde_json::from_str::<Work>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_array_lengths_and_nested_attributes_are_not_type_paths(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "struct Plain { #[arg(values = [1, 2], default_value = 1)] values: [u8; Purpose::ALL.len()] } fn good(s: &str) { serde_json::from_str::<Plain>(s); }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_external_glob_does_not_hide_an_unresolved_type(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "use serde::*; struct Envelope { item: missing_type }",
+        })
+        self.assertTrue(any("unresolved" in finding and "missing_type" in finding for finding in findings), findings)
+
+    def test_later_cross_crate_glob_resolves_a_public_reexport(self):
+        findings = self.findings({
+            "crates/producer/src/lib.rs": "pub mod first {} pub mod second { mod data { pub struct Envelope { receipt: ChioReceipt } } pub use data::*; }",
+            "crates/consumer/src/lib.rs": "use producer::{first::*, second::*}; fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
+    def test_macro_repeated_fields_preserve_the_supplied_types(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! envelope { ($name:ident { $($field:ident : $ty:ty),* $(,)? }) => { pub struct $name { marker: u32, $(pub $field: $ty,)* } }; } envelope!(Wrapped { receipt: Option<ChioReceipt> }); fn bad(s: &str) { serde_json::from_str::<Wrapped>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_cfg_all_test_module_does_not_enter_production_types(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "#[cfg(all(test, unix))] mod checks { struct OnlyInTests { temporary: NotProduction } } struct Plain { value: u32 }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_test_only_out_of_line_module_is_not_a_production_root(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "#[cfg(all(test, unix))] mod checks; struct Plain { value: u32 }",
+            "crates/demo/src/checks.rs": "struct OnlyInTests { temporary: NotProduction }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_macro_template_local_types_are_not_instantiated_types(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! wrapped { ($name:ident) => { pub struct $name(u32); const _: () = { type Target = $name; }; }; } wrapped!(Plain); fn good(s: &str) { serde_json::from_str::<Plain>(s); }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_fixed_name_enum_generated_from_unit_variants(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! domain { ($($variant:ident),+) => { pub enum Domain { $($variant),+ } }; } domain!(First, Second); struct Plain { domain: Domain }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_aliased_external_glob_cannot_resolve_unknown_members(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "use serde as ser; use ser::*; struct Envelope { item: missing_type }",
+        })
+        self.assertTrue(any("unresolved" in finding and "missing_type" in finding for finding in findings), findings)
+
+    def test_unknown_qualified_receipt_name_is_still_an_error(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "struct Envelope { item: missing::ChioReceipt }",
+        })
+        self.assertTrue(any("unresolved" in finding and "missing::ChioReceipt" in finding for finding in findings), findings)
+
+    def test_glob_reexports_preserve_module_alias_paths(self):
+        findings = self.findings({
+            "crates/producer/src/lib.rs": "pub struct Envelope { receipt: ChioReceipt }",
+            "crates/consumer/src/lib.rs": "use producer as remote; mod outer { use super::*; mod inner { use super::*; fn bad(s: &str) { serde_json::from_str::<remote::Envelope>(s); } } }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
+    def test_package_name_does_not_inherit_another_crates_directory_name(self):
+        findings = self.findings({
+            "crates/library/worker/Cargo.toml": '[package]\nname = "worker"\nversion = "0.1.0"\n',
+            "crates/library/worker/src/lib.rs": "pub struct Envelope { receipt: ChioReceipt }",
+            "crates/products/worker/Cargo.toml": '[package]\nname = "worker-daemon"\nversion = "0.1.0"\n',
+            "crates/products/worker/src/main.rs": "use worker::Envelope; fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
+    def test_macro_decoder_template_is_not_a_concrete_raw_decode(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! make { ($name:ident) => { struct $name(u32); const _: () = { fn deserialize(d: D) { PrivateMirror::deserialize(d); } }; }; } make!(Plain);",
+        })
+        self.assertEqual(findings, [])
+
+    def test_unlisted_sibling_workspace_is_not_scanned(self):
+        findings = self.findings({
+            "Cargo.toml": '[workspace]\nmembers = ["formal/checks"]\n',
+            "formal/checks/src/lib.rs": "struct Plain { n: u32 }",
+            "formal/experiment/src/lib.rs": "struct Model { n: nat }",
+        })
+        self.assertEqual(findings, [])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
