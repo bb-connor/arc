@@ -19,6 +19,48 @@ use chio_underwriting::{
     UnderwritingPolicyInputQuery, UnderwritingSimulationReport, UnderwritingSimulationRequest,
 };
 
+/// Decode arbitrary bytes as a decision-model artifact. A refusal must leave
+/// the storage unvalidated; a validated schedule refuses a grant one below its
+/// op count and evaluates at exactly its op count on atom planes drawn from
+/// the input.
+pub fn decision_model_artifact(data: &[u8]) {
+    use std::sync::Mutex;
+
+    use chio_predicate_dag::{DagError, ScheduleStorage, TriSet, ATOM_WORDS};
+
+    static STORAGE: Mutex<ScheduleStorage> = Mutex::new(ScheduleStorage::empty());
+    let mut storage = STORAGE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if storage.decode(data).is_err() {
+        assert_eq!(storage.schedule().err(), Some(DagError::NotValidated));
+        return;
+    }
+    let Ok(schedule) = storage.schedule() else {
+        panic!("a decoded artifact yields a schedule");
+    };
+    let atoms = schedule.atom_count();
+    let mut pos = [0u64; ATOM_WORDS];
+    let mut neg = [0u64; ATOM_WORDS];
+    for (i, byte) in data.iter().rev().take(atoms).enumerate() {
+        match byte % 3 {
+            0 => pos[i / 64] |= 1 << (i % 64),
+            1 => neg[i / 64] |= 1 << (i % 64),
+            _ => {}
+        }
+    }
+    let Ok(input) = TriSet::new(pos, neg, atoms) else {
+        panic!("disjoint planes within the atom count form a set");
+    };
+    let ops = schedule.op_count();
+    assert_eq!(
+        schedule.evaluate(&input, ops.saturating_sub(1)).err(),
+        Some(DagError::WorkExhausted)
+    );
+    match schedule.evaluate(&input, ops) {
+        Ok(evaluation) => assert_eq!(evaluation.work_ops, ops),
+        Err(error) => panic!("a validated schedule evaluates at its op count: {error:?}"),
+    }
+}
+
 pub fn eval_receipt_bundle(data: &[u8]) {
     if let Ok(bundle_json) = core::str::from_utf8(data) {
         let _ = chio_eval_receipt::verify_bundle(bundle_json);

@@ -51,6 +51,7 @@ TARGETS=(
     rollback_anchor_slots
     commerce_receipt_verify
     peers_lock_decode
+    decision_model_artifact
     fuzz_tool_action
 )
 

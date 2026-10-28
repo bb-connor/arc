@@ -1,0 +1,33 @@
+[package]
+name = "chio-predicate-dag"
+description = "Alloc-free three-valued predicate rule DAG evaluator for Chio decision models"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_predicate_dag"
+
+[dependencies]
+chio-fixed = { workspace = true }
+
+[features]
+default = []
+kani = []
+
+[dev-dependencies]
+proptest = { workspace = true }
+sha2 = { workspace = true }
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

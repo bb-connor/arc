@@ -8,6 +8,7 @@ use crate::cli::{
     self, CheckCommand, CodegenArgs, ErrorsCompat, FormalCommand, GenCommand, Lang, QualifyCommand,
     SnippetsCompat, VerifyCommand,
 };
+use crate::decision_model_compile;
 use crate::fixtures;
 use crate::formal;
 use crate::formal_mirrors;
@@ -34,6 +35,12 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
             GenCommand::FreezeVectors { check } => freeze_vectors(check_argv(check)),
             GenCommand::CageVectors { check } => cage_vectors::run(check),
             GenCommand::ProofCoverage { check } => proof_coverage::run(check),
+            GenCommand::DecisionModel {
+                rules,
+                thresholds,
+                out,
+                check,
+            } => decision_model_compile::run(&rules, &thresholds, &out, check),
             GenCommand::RecoveryAuthorityVectors { check } => {
                 recovery_authority_vectors::run(check)
             }

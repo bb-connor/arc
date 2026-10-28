@@ -28,6 +28,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "anchor_bundle_verify",
     "chio_yaml_parse",
     "commerce_receipt_verify",
+    "decision_model_artifact",
     "did_resolve",
     "eval_receipt_bundle",
     "federation_trust_establishment",
@@ -321,6 +322,12 @@ fn rollback_anchor_slots_smoke() {
 fn commerce_receipt_verify_smoke() {
     use chio_commerce_order::fuzz::commerce_receipt_verify;
     assert_seed_floor("commerce_receipt_verify", commerce_receipt_verify);
+}
+
+#[test]
+fn decision_model_artifact_smoke() {
+    use chio_fuzz::entries::decision_model_artifact;
+    assert_seed_floor("decision_model_artifact", decision_model_artifact);
 }
 
 #[test]

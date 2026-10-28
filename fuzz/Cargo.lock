@@ -2128,6 +2128,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-fixed"
+version = "0.1.0"
+
+[[package]]
 name = "chio-flow"
 version = "0.1.0"
 dependencies = [
@@ -2167,6 +2171,7 @@ dependencies = [
  "chio-mcp-edge",
  "chio-openapi-mcp-bridge",
  "chio-policy",
+ "chio-predicate-dag",
  "chio-quarantine",
  "chio-revocation-oracle",
  "chio-security-types",
@@ -2546,6 +2551,13 @@ dependencies = [
  "thiserror 1.0.69",
  "uuid",
  "yaml_serde",
+]
+
+[[package]]
+name = "chio-predicate-dag"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
 ]
 
 [[package]]

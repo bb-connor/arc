@@ -28,6 +28,7 @@ kani_sources=(
   "crates/economy/chio-open-market/src/kani_public_harnesses.rs"
   "crates/core/chio-fixed/src/kani_public_harnesses.rs"
   "crates/core/chio-decision-model/src/kani_public_harnesses.rs"
+  "crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs"
 )
 loom_manifest=".loom/harnesses.toml"
 loom_runner="scripts/run-loom-manifest.sh"

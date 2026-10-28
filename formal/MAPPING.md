@@ -816,6 +816,17 @@ Source file: `crates/core/chio-decision-model/src/kani_public_harnesses.rs`.
 | `verify_projection_idempotent_on_admitted` | `crates/core/chio-decision-model/src/kani_public_harnesses.rs` | `chio_decision_model::Envelope::project` | Bounded to a four-element `u8` feasible set | Projecting an already projected action returns the same action with `Identity`. |
 | `verify_select_in_envelope` | `crates/core/chio-decision-model/src/kani_public_harnesses.rs` | `chio_decision_model::Envelope::select` | Bounded to four symbolic `Q16_16` scores | Selection returns an admitted action, the first maximum of the scores, with `Identity`. |
 
+## Kani predicate-DAG harnesses
+
+Source file: `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs`.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `verify_fill_is_zero_or_all_ones` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::trit::fill` | Exhaustive over `bool` | The branch-free fill mask is `0` or `u64::MAX` and is all ones exactly when its input is true. |
+| `verify_classify_respects_thresholds` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::classify` | Bounded to two atoms with symbolic scores, ordered thresholds and attestation bits | An unattested atom is unknown; an attested atom is true at or above `tau_pos`, false below `tau_neg`, and unknown between them. |
+| `verify_eval_matches_reference_small` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::Schedule::evaluate` | Bounded to one fixed four-atom, two-rule canonical artifact with symbolic atom trits | Rule trits and the outcome match a strong Kleene reference, including a negated rule literal. |
+| `verify_widen_uncertainty_never_admits_single_rule` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::classify`, `chio_predicate_dag::Schedule::evaluate` | Bounded to one two-atom rule of symbolic Deny or Hold polarity | Widening thresholds and removing attestation never turns a Deny or Hold outcome into Allow. |
+
 ## Lean recursive-delegation theorems (Capability/Delegation.lean)
 
 Source file: `formal/lean4/Chio/Chio/Capability/Delegation.lean`. Rows

@@ -78,6 +78,9 @@ fail-closed-verification surface with arbitrary bytes. The full mapping
 - `peers_lock_decode` - conformance `peers.lock.toml` decode, schema
   validation, and the language, target, and published queries that
   `fetch-peers` relies on.
+- `decision_model_artifact` - decision-model artifact decode and canonical-form
+  validation; refused images leave no schedule and validated schedules
+  evaluate exactly at their op count.
 - `policy_parse_compile` (binary `fuzz_policy_parse_compile`) - HushSpec
   parser, validator, compiler, and YAML round-trip.
 - `policy_analyze` - bounded policy relations and evaluator-confirmed
