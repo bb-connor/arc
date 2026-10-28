@@ -360,7 +360,7 @@ impl ChioKernel {
         };
         self.require_caller_output_release(&tool_return, request)?;
         self.require_durable_security_release(admission, &tool_return.raw, &tool_return.outcome)?;
-        let federation_scope = self.scope_retained_federation_return(
+        let _federation_scope = self.scope_retained_federation_return(
             admission,
             request,
             &tool_return.raw,
@@ -612,29 +612,6 @@ impl ChioKernel {
         if request.federated_origin_kernel_id.is_some()
             && self.federation_dsse_envelope(&receipt.id).is_none()
         {
-            // An outcome without retained federation evidence: a completed
-            // replay enters recovery before the ordinary runtime
-            // admission stage. Re-admit and reinstall the verified treaty
-            // material before retrying the missing bilateral projection.
-            if federation_scope.is_none() {
-                let now_unix_ms = self.read_authority_time()?.get();
-                let treaty_admission = self.run_runtime_admission_hook(
-                    request,
-                    tool_return.raw.receipt_metadata_snapshot(),
-                    now_unix_ms / 1_000,
-                    now_unix_ms,
-                    Some(matched_grant_index),
-                    None,
-                );
-                if !treaty_admission.allowed {
-                    return Err(KernelError::Internal(format!(
-                        "federation runtime treaty re-admission failed during completed replay: {}",
-                        treaty_admission
-                            .reason
-                            .unwrap_or_else(|| "runtime admission denied".to_string())
-                    )));
-                }
-            }
             self.apply_federation_cosign_for_admitted_request(request, &receipt)?;
         }
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
