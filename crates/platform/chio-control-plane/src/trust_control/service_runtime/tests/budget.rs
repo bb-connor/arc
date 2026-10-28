@@ -1095,12 +1095,12 @@ fn budget_transition_responses_round_trip_optional_hold_and_event_identity(
     assert_eq!(reconcile["holdId"], "hold-budget");
     assert_eq!(reconcile["eventId"], "hold-budget:reconcile");
 
-    let legacy: ReverseChargeCostResponse = serde_json::from_value(serde_json::json!({
+    let without_identity: ReverseChargeCostResponse = serde_json::from_value(serde_json::json!({
         "capabilityId": "cap-budget",
         "grantIndex": 2
     }))?;
-    assert!(legacy.hold_id.is_none());
-    assert!(legacy.event_id.is_none());
+    assert!(without_identity.hold_id.is_none());
+    assert!(without_identity.event_id.is_none());
     Ok(())
 }
 

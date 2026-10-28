@@ -1076,7 +1076,7 @@ impl ChioKernel {
         );
 
         // A retained nonce belongs to a durable operation whose reservation the
-        // admission authority governs; only a minted nonce stamps a legacy hold.
+        // admission authority governs; only a minted nonce stamps a standalone hold.
         let reserved_hold = match (&nonce, budget_mutation) {
             (PreflightNonceSource::Durable(_), _) => None,
             (PreflightNonceSource::Mint, PreExecutionBudgetMutation::Charge(charge)) => {

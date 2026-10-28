@@ -522,7 +522,7 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Route every rich hold lifecycle method through a versioned endpoint and
   require its exact event-time lifecycle, usage, authority, quota, admission,
   and cumulative projections when present. Versioned projections may omit the
-  admission binding only for a genuinely legacy hold with no structured quota
+  admission binding only for a standalone hold with no structured quota
   or cumulative children. Keep only the low-level compatibility methods on v1.
   An older server must reject an unknown semantic operation before mutation
   rather than ignore a new field or return an optional projection after applying

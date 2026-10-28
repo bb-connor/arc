@@ -79,7 +79,7 @@ fn stored_financial_receipt_preserves_full_unsigned_domain(
                 budget_remaining: Some(0),
                 budget_total: Some(u64::MAX),
                 delegation_depth: 0,
-                root_budget_holder: "legacy-holder".to_owned(),
+                root_budget_holder: "budget-holder".to_owned(),
                 payment_reference: None,
                 settlement_status: SettlementStatus::Settled,
                 cost_breakdown: None,

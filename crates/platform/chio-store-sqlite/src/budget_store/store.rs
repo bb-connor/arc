@@ -707,7 +707,7 @@ impl SqliteBudgetStore {
         Self::validate_supported_import_record(&normalized)?;
         let record = &normalized;
         if let Some(hold_id) = record.hold_id.as_deref() {
-            Self::reject_structured_hold_from_legacy_writer(
+            Self::reject_structured_hold_from_standalone_writer(
                 transaction,
                 Some(hold_id),
                 "budget mutation import",

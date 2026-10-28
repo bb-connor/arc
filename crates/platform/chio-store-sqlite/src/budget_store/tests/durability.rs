@@ -532,12 +532,11 @@ fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
     let mut fenced = request.clone();
     fenced.expected_cumulative_approval_state =
         Some(chio_kernel::budget_store::BudgetCumulativeApprovalState::PendingApproval);
-    assert!(store
-        .reverse_budget_hold(fenced)
-        .as_ref()
-        .is_err_and(|error| error
-            .to_string()
-            .contains("cumulative approval state fencing")));
+    assert!(matches!(
+        store.reverse_budget_hold(fenced),
+        Err(BudgetStoreError::Invariant(reason))
+            if reason == "standalone sqlite budget holds do not support cumulative approval state fencing"
+    ));
     assert_eq!(store.max_mutation_event_seq()?, event_seq_before);
 
     let reversed = store.reverse_budget_hold(request.clone())?;
