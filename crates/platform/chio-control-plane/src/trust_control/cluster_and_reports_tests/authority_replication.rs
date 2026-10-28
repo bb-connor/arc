@@ -22,11 +22,15 @@ impl LoopbackPeer {
         state: TrustServiceState,
     ) -> Self {
         use axum::routing::get;
-        let router = axum::Router::new()
-            .route(AUTHORITY_PATH, get(handle_authority_status))
+        let public = axum::Router::new().route(AUTHORITY_PATH, get(handle_authority_status));
+        let internal = axum::Router::new()
             .route(
                 INTERNAL_CLUSTER_STATUS_PATH,
                 get(handle_internal_cluster_status),
+            )
+            .route(
+                INTERNAL_AUTHORITY_STATUS_PATH,
+                get(handle_internal_authority_status),
             )
             .route(
                 INTERNAL_CLUSTER_SNAPSHOT_PATH,
@@ -39,8 +43,8 @@ impl LoopbackPeer {
             .route(
                 INTERNAL_REVOCATIONS_DELTA_PATH,
                 get(handle_internal_revocations_delta),
-            )
-            .with_state(state.clone());
+            );
+        let router = with_route_table(&state, public, internal);
         listener.set_nonblocking(true).test_unwrap();
         let (stop, stopped) = tokio::sync::oneshot::channel();
         let (finished_tx, finished) = std::sync::mpsc::channel();
@@ -138,10 +142,9 @@ impl AdmittedReplicationPair {
         );
         assert_eq!(
             initial.to_string(),
-            CliError::cli_other_error(format!(
-                "trust control service request failed with 503: {}",
-                json!({"error": "cluster authority context changed during inspection"})
-            ))
+            CliError::cli_other_error(
+                json!({"error": "cluster authority context changed during inspection"}).to_string()
+            )
             .to_string(),
             "first convergence import must not imply serving admission"
         );
@@ -165,9 +168,8 @@ impl AdmittedReplicationPair {
             (&self.follower, &self.source),
         ] {
             let client = service_runtime::client::build_cluster_peer_client(
+                &local.state.config.access,
                 &remote.url,
-                &local.state.config.service_token,
-                &local.url,
             )?;
             let status = client.cluster_status()?;
             assert_eq!(status.self_url, remote.url);
@@ -264,10 +266,15 @@ pub(super) fn pull_snapshot(
         write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).test_unwrap();
         stream.write_all(&body).test_unwrap();
     });
-    let client = crate::trust_control::service_runtime::client::build_cluster_peer_client(
-        &endpoint,
+    let client_access = crate::trust_control::caller_credentials::tests::test_access_with_cluster(
         "token",
-        "http://127.0.0.1:3300",
+        &[],
+        Some("http://127.0.0.1:3300"),
+        &[&endpoint],
+    );
+    let client = crate::trust_control::service_runtime::client::build_cluster_peer_client(
+        &client_access,
+        &endpoint,
     )
     .test_unwrap();
     let result = sync_peer_authority(state, &client);
@@ -471,11 +478,26 @@ fn assert_kernel_rejects_issuer(
 #[test]
 fn authority_replication_peer_client_rejects_plaintext_and_redirects() {
     use std::io::{Read, Write};
-    let build = crate::trust_control::service_runtime::client::build_cluster_peer_client;
-    assert!(
-        matches!(build("http://192.0.2.1:4000", "token", "http://127.0.0.1"), Err(error)
-        if error.to_string().contains("plaintext cluster URLs require a literal loopback address"))
-    );
+    let plaintext_peer = crate::trust_control::caller_credentials::tests::config(&format!(
+        "{}{}",
+        crate::trust_control::caller_credentials::tests::credential(
+            "client",
+            "caller",
+            "secret",
+            &["receipts:read"],
+            None
+        ),
+        crate::trust_control::caller_credentials::tests::peer(
+            "http://192.0.2.1:4000",
+            &Keypair::generate(),
+            crate::trust_control::caller_credentials::tests::REPLICA_SCOPES,
+        )
+    ));
+    assert!(matches!(
+        crate::trust_control::caller_credentials::TrustAccessConfig::from_toml_str(&plaintext_peer),
+        Err(crate::trust_control::caller_credentials::TrustAccessError::InvalidPeerUrl { reason, .. })
+            if reason.contains("plaintext cluster URLs require a literal loopback address")
+    ));
     let listener = std::net::TcpListener::bind("127.0.0.1:0").test_unwrap();
     let endpoint = format!("http://{}", listener.local_addr().test_unwrap());
     let server = std::thread::spawn(move || {
@@ -484,7 +506,16 @@ fn authority_replication_peer_client_rejects_plaintext_and_redirects() {
         stream.read(&mut request).test_unwrap();
         stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://192.0.2.1/authority\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").test_unwrap();
     });
-    let client = build(&endpoint, "token", "http://127.0.0.1:3300").test_unwrap();
+    let access = crate::trust_control::caller_credentials::tests::test_access_with_cluster(
+        "token",
+        &[],
+        Some("http://127.0.0.1:3300"),
+        &[&endpoint],
+    );
+    let client = crate::trust_control::service_runtime::client::build_cluster_peer_client(
+        &access, &endpoint,
+    )
+    .test_unwrap();
     // A disabled redirect reaches the bounded decoder with this empty body.
     // Following Location would instead attempt off-loopback network I/O.
     assert!(matches!(

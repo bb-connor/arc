@@ -662,10 +662,10 @@ fn elected_leader_provenance_bootstraps_a_fresh_follower() {
     body.chain_digest = budget_snapshot_anchor_chain_digest(&body).unwrap();
     let signature = keypair.sign_canonical(&body).unwrap().0;
     let chain = vec![SignedBudgetSnapshotAnchorCommitment { body, signature }];
+    let leader_node = chio_core::crypto::Keypair::generate();
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
-        cluster_authenticator: budget_snapshot_anchor_authenticator("cluster-secret", &chain)
-            .unwrap(),
+        cluster_authenticator: budget_snapshot_anchor_authenticator(&leader_node, &chain).unwrap(),
         chain,
     };
 
@@ -675,7 +675,7 @@ fn elected_leader_provenance_bootstraps_a_fresh_follower() {
             &provenance,
             "https://leader.example",
             9,
-            "cluster-secret",
+            &leader_node.public_key(),
         )
         .unwrap();
 
@@ -721,10 +721,11 @@ fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
         signature: keypair.sign_canonical(&body).unwrap().0,
         body,
     }];
+    let pinned_leader = chio_core::crypto::Keypair::generate();
+    let other_node = chio_core::crypto::Keypair::generate();
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
-        cluster_authenticator: budget_snapshot_anchor_authenticator("wrong-secret", &chain)
-            .unwrap(),
+        cluster_authenticator: budget_snapshot_anchor_authenticator(&other_node, &chain).unwrap(),
         chain,
     };
 
@@ -734,9 +735,9 @@ fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
             &provenance,
             "https://leader.example",
             2,
-            "cluster-secret",
+            &pinned_leader.public_key(),
         )
-        .expect_err("a different cluster trust root must not install anchors");
+        .expect_err("a signature by another node must not install anchors");
     assert!(error.to_string().contains("cluster authentication failed"));
     assert!(store.list_usage_history_anchors().unwrap().is_empty());
 

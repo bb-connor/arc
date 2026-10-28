@@ -21,8 +21,10 @@ Start the trust-control server, then open `http://localhost:<port>/` in a browse
 
 ### Authentication
 
-Receipt API calls require a bearer token. Open the dashboard and enter your
-trust-control service token in the **Bearer token** field, then select **Log in**.
+Receipt API calls require a bearer token. Open the dashboard and enter the
+secret of a trust-control `operator` credential (or a `tenant-reader`
+credential, which sees one tenant) in the **Bearer token** field, then select
+**Log in**.
 The dashboard sends the token in the `Authorization` header and keeps it in the
 tab's `sessionStorage` under `chio_token` for subsequent requests and reloads.
 

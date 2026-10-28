@@ -530,6 +530,15 @@ _mcp_tests = importlib.util.module_from_spec(_mcp_spec)
 _mcp_spec.loader.exec_module(_mcp_tests)
 InitializeRejectWitnessMutations = _mcp_tests.InitializeRejectWitnessMutations
 
+# Keep the ingress census and router-composition controls in the same CI gate command.
+_ingress_spec = importlib.util.spec_from_file_location(
+    "ingress_calibration", ROOT / "scripts/tests/check-trust-boundaries-ingress.test.py"
+)
+_ingress_tests = importlib.util.module_from_spec(_ingress_spec)
+_ingress_spec.loader.exec_module(_ingress_tests)
+IngressCensusCalibration = _ingress_tests.IngressCensusCalibration
+IngressContractCalibration = _ingress_tests.IngressContractCalibration
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -183,7 +183,7 @@ fn store(server: &ProjectionServer) -> TestResult<RemoteBudgetStore> {
     Ok(RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        recovery_fence: None,
+        recovery: None,
     })
 }
 

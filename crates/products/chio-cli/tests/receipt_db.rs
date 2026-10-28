@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -73,8 +76,8 @@ fn spawn_trust_service(
             "serve",
             "--listen",
             &listen.to_string(),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &trust_access::write_access_config_for(&listen.to_string(), service_token, &[]),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -173,8 +176,10 @@ fn check_command_persists_receipt_to_sqlite() {
 }
 
 #[test]
-fn check_command_persists_receipt_via_control_service() {
-    if skip_when_loopback_bind_denied("check_command_persists_receipt_via_control_service") {
+fn check_runs_through_the_control_service_with_only_the_kernel_host_preset() {
+    if skip_when_loopback_bind_denied(
+        "check_runs_through_the_control_service_with_only_the_kernel_host_preset",
+    ) {
         return;
     }
 
@@ -203,8 +208,10 @@ fn check_command_persists_receipt_via_control_service() {
         .args([
             "--control-url",
             &base_url,
+            "--control-internal-url",
+            &trust_access::internal_url_for(&base_url),
             "--control-token",
-            service_token,
+            &trust_access::kernel_host_token(service_token),
             "--session-db",
             session_db_path.to_str().expect("session db path"),
             "check",
@@ -245,4 +252,15 @@ fn check_command_persists_receipt_via_control_service() {
     assert_eq!(distinct_count, 1);
     assert_eq!(decision_kind, "allow");
     assert_eq!(child_count, 0);
+
+    let refused = client
+        .get(format!("{base_url}/v1/admin/emergency-status"))
+        .bearer_auth(trust_access::kernel_host_token(service_token))
+        .send()
+        .expect("send emergency status request");
+    assert_eq!(refused.status(), reqwest::StatusCode::FORBIDDEN);
+    assert_eq!(
+        refused.text().expect("refusal body"),
+        r#"{"error":"trust-control credential lacks scope admin:emergency"}"#
+    );
 }

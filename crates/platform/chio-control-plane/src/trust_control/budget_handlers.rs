@@ -10,7 +10,7 @@ use super::cluster::{
 use super::report_rendering::{
     forward_post_to_leader, json_response_with_leader_visibility_and_budget_commit,
 };
-use super::report_validation::{budget_visibility_matches, validate_service_auth};
+use super::report_validation::{budget_visibility_matches, validate_caller};
 use super::*;
 use chio_log_redact::redacted;
 
@@ -48,7 +48,7 @@ pub(crate) async fn handle_list_budgets(
     Query(query): Query<BudgetQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsRead) {
         return response;
     }
     let store = match state.budget_store() {
@@ -88,10 +88,10 @@ pub(crate) async fn handle_try_increment_budget(
     headers: HeaderMap,
     Json(payload): Json<TryIncrementBudgetRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_INCREMENT_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, BUDGET_INCREMENT_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -217,7 +217,7 @@ pub(crate) async fn handle_try_charge_cost(
     headers: HeaderMap,
     Json(payload): Json<TryChargeCostRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(response) =
@@ -225,7 +225,7 @@ pub(crate) async fn handle_try_charge_cost(
     {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_AUTHORIZE_EXPOSURE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, BUDGET_AUTHORIZE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -554,7 +554,7 @@ pub(crate) async fn handle_reverse_charge_cost(
     headers: HeaderMap,
     Json(payload): Json<ReverseChargeCostRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(response) =
@@ -562,7 +562,7 @@ pub(crate) async fn handle_reverse_charge_cost(
     {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -684,10 +684,10 @@ pub(crate) async fn handle_capture_invocation(
     headers: HeaderMap,
     Json(payload): Json<CaptureInvocationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_CAPTURE_INVOCATION_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, BUDGET_CAPTURE_INVOCATION_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -804,7 +804,7 @@ pub(crate) async fn handle_reduce_charge_cost(
     headers: HeaderMap,
     Json(payload): Json<ReduceChargeCostRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(response) =
@@ -813,7 +813,7 @@ pub(crate) async fn handle_reduce_charge_cost(
         return response;
     }
     let released_exposure_units = payload.release_units();
-    match forward_post_to_leader(&state, BUDGET_RECONCILE_SPEND_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, BUDGET_RECONCILE_SPEND_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,

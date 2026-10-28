@@ -1128,7 +1128,7 @@ async fn governance_routes_authenticate_before_reading_authority() {
     headers.insert(AUTHORIZATION, "Bearer not-the-token".parse().test_unwrap());
     let expected = status_and_body(plain_http_error(
         StatusCode::UNAUTHORIZED,
-        "missing or invalid control bearer token",
+        "missing or invalid trust-control credential",
     ))
     .await;
     for route in GOVERNANCE_ROUTES {

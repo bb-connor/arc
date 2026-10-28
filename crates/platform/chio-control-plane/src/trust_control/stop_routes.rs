@@ -1,22 +1,21 @@
 //! Operator stop routes over the kernel scope of this node's admission authority.
 //!
-//! The routes authenticate with the service token. With a joint admission
-//! authority the stop is durable on its store, and the admission authority RPC
-//! refuses to begin admissions while it holds, so remote edges observe it.
+//! The routes require a credential with deployment tenant authority holding
+//! `admin:emergency`. With a joint admission authority the stop is durable on
+//! its store, and the admission authority RPC refuses to begin admissions
+//! while it holds, so remote edges observe it.
 use chio_kernel::stop::{
     ResumeCommand, ResumeRequestBody, StopAuthorizer, StopCommand, StopControl, StopControlError,
     StopRequestBody, StopRequestPath,
 };
 use chio_store_sqlite::SqliteAdmissionOperationStore;
 
-use super::report_validation::validate_service_auth;
+use super::report_validation::validate_caller;
 use super::*;
 
 pub(crate) const EMERGENCY_STOP_PATH: &str = "/v1/admin/emergency-stop";
 pub(crate) const EMERGENCY_RESUME_PATH: &str = "/v1/admin/emergency-resume";
 pub(crate) const EMERGENCY_STATUS_PATH: &str = "/v1/admin/emergency-status";
-
-const SERVICE_CREDENTIAL_ID: &str = "trust-control:service-token";
 
 /// The kernel-scope stop of one trust-control node.
 #[derive(Clone)]
@@ -71,8 +70,9 @@ impl TrustStop {
     }
 }
 
-fn authorizer() -> StopAuthorizer {
-    StopAuthorizer::shared_credential(SERVICE_CREDENTIAL_ID)
+/// The stop record names the trust-control credential that authorized it.
+fn authorizer(caller: &super::caller_credentials::AuthenticatedCaller) -> StopAuthorizer {
+    StopAuthorizer::shared_credential(&format!("trust-control:{}", caller.credential_id))
 }
 
 fn requested_via(state: &TrustServiceState) -> StopRequestPath {
@@ -96,12 +96,13 @@ pub(crate) async fn handle_emergency_stop(
     headers: HeaderMap,
     Json(body): Json<StopRequestBody>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
+    let caller = match validate_caller(&headers, &state.config, Scope::AdminEmergency) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
     let command = StopCommand {
         reason: body.reason,
-        authorizer: authorizer(),
+        authorizer: authorizer(&caller),
         requested_via: requested_via(&state),
         allow_containment: body.allow_containment,
     };
@@ -116,12 +117,13 @@ pub(crate) async fn handle_emergency_resume(
     headers: HeaderMap,
     Json(body): Json<ResumeRequestBody>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
-        return response;
-    }
+    let caller = match validate_caller(&headers, &state.config, Scope::AdminEmergency) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
     let command = ResumeCommand {
         expected_epoch: Some(body.expected_epoch),
-        authorizer: authorizer(),
+        authorizer: authorizer(&caller),
         requested_via: requested_via(&state),
     };
     match state.stop.control().resume(command) {
@@ -134,7 +136,7 @@ pub(crate) async fn handle_emergency_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::AdminEmergency) {
         return response;
     }
     Json(state.stop.control().status()).into_response()

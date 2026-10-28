@@ -147,9 +147,8 @@ fn rank_after_late_custodian_status(change: impl FnOnce(&mut Value)) {
     held.recv_timeout(Duration::from_secs(30)).test_unwrap();
     let mut status = serde_json::to_value(
         service_runtime::client::build_cluster_peer_client(
+            &cluster.lowest.state.config.access,
             &cluster.custodian.url,
-            &cluster.lowest.state.config.service_token,
-            &cluster.lowest.url,
         )
         .test_unwrap()
         .cluster_status()

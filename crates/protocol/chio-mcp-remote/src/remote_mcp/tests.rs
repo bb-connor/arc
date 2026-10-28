@@ -250,6 +250,7 @@ fn test_remote_config() -> RemoteServeHttpConfig {
         admin_token: Some("admin-token".to_string()),
         approval: None,
         control_url: None,
+        control_internal_url: None,
         control_token: None,
         remote_authority_workload_token: None,
         control_authority_public_key: None,
@@ -817,6 +818,11 @@ fn runtime_contract_fingerprint_binds_upstream_argument_file_contents() {
     let authority_bound = fingerprint_remote_runtime_contract(&config, &registry)
         .expect("fingerprint authority-bound runtime contract");
     assert_ne!(first, authority_bound);
+
+    config.control_internal_url = Some("https://control-internal.example".to_string());
+    let internal_bound = fingerprint_remote_runtime_contract(&config, &registry)
+        .expect("fingerprint internal-endpoint-bound runtime contract");
+    assert_ne!(authority_bound, internal_bound);
 
     std::fs::write(&argument_path, b"print('second revision')\n")
         .expect("write changed upstream argument content");
@@ -1528,6 +1534,7 @@ fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
         admin_token: Some("admin-token".to_string()),
         approval: None,
         control_url: None,
+        control_internal_url: None,
         control_token: None,
         remote_authority_workload_token: None,
         control_authority_public_key: None,
@@ -1706,6 +1713,7 @@ fn jwt_remote_auth_requires_separate_admin_token() {
         admin_token: None,
         approval: None,
         control_url: None,
+        control_internal_url: None,
         control_token: None,
         remote_authority_workload_token: None,
         control_authority_public_key: None,

@@ -41,7 +41,7 @@ use chio_store_sqlite::finding_market_store::{
 };
 use chio_store_sqlite::SqliteFindingStatusStore;
 
-use super::report_validation::validate_service_auth;
+use super::report_validation::validate_caller;
 use super::*;
 
 #[path = "finding_admission_view.rs"]
@@ -421,7 +421,7 @@ pub(crate) async fn handle_publish_finding(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (_, store) = match finding_market_context(&state) {
@@ -677,7 +677,7 @@ pub(crate) async fn handle_upload_finding_dependency(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (_, store) = match finding_market_context(&state) {
@@ -744,7 +744,7 @@ pub(crate) async fn handle_register_finding_profile(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (config, store) = match finding_market_context(&state) {
@@ -787,7 +787,7 @@ pub(crate) async fn handle_register_finding_collateral(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (config, store) = match finding_market_context(&state) {
@@ -1206,7 +1206,7 @@ pub(crate) async fn handle_activate_finding(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (config, store) = match finding_market_context(&state) {
@@ -2092,7 +2092,7 @@ pub(crate) async fn handle_finding_participation(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let (config, store) = match finding_market_context(&state) {

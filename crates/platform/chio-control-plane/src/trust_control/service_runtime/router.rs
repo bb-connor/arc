@@ -1,9 +1,12 @@
 use super::super::cluster::{
-    handle_internal_authority_snapshot, handle_internal_budgets_delta,
-    handle_internal_child_receipts_delta, handle_internal_cluster_partition,
-    handle_internal_cluster_snapshot, handle_internal_cluster_status,
-    handle_internal_lineage_delta, handle_internal_revocations_delta,
-    handle_internal_tool_receipts_delta,
+    handle_internal_authority_snapshot, handle_internal_authority_status,
+    handle_internal_budgets_delta, handle_internal_child_receipts_delta,
+    handle_internal_cluster_partition, handle_internal_cluster_snapshot,
+    handle_internal_cluster_status, handle_internal_lineage_delta,
+    handle_internal_revocations_delta, handle_internal_tool_receipts_delta,
+};
+use super::super::route_authorization::{
+    authorize_route, refuse_unrouted_api_path, Listener, RouteAuthorizer,
 };
 use super::super::*;
 use axum::extract::DefaultBodyLimit;
@@ -38,11 +41,6 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let router = trust_control_health::install_health_routes(Router::new())
-        .route(
-            INTERNAL_ADMISSION_AUTHORITY_PATH,
-            post(super::admission_authority::handle_admission_authority)
-                .layer(DefaultBodyLimit::max(ADMISSION_AUTHORITY_MAX_BODY_BYTES)),
-        )
         .route(
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),
@@ -373,42 +371,6 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             STRUCTURED_BUDGET_CAPTURE_SPEND_PATH,
             post(handle_structured_budget_capture_spend),
         )
-        .route(
-            INTERNAL_CLUSTER_STATUS_PATH,
-            get(handle_internal_cluster_status),
-        )
-        .route(
-            INTERNAL_CLUSTER_SNAPSHOT_PATH,
-            get(handle_internal_cluster_snapshot),
-        )
-        .route(
-            INTERNAL_CLUSTER_PARTITION_PATH,
-            post(handle_internal_cluster_partition),
-        )
-        .route(
-            INTERNAL_AUTHORITY_SNAPSHOT_PATH,
-            get(handle_internal_authority_snapshot),
-        )
-        .route(
-            INTERNAL_REVOCATIONS_DELTA_PATH,
-            get(handle_internal_revocations_delta),
-        )
-        .route(
-            INTERNAL_TOOL_RECEIPTS_DELTA_PATH,
-            get(handle_internal_tool_receipts_delta),
-        )
-        .route(
-            INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
-            get(handle_internal_child_receipts_delta),
-        )
-        .route(
-            INTERNAL_BUDGETS_DELTA_PATH,
-            get(handle_internal_budgets_delta),
-        )
-        .route(
-            INTERNAL_LINEAGE_DELTA_PATH,
-            get(handle_internal_lineage_delta),
-        )
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
         .route(
             RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
@@ -671,14 +633,21 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         router
     };
 
+    let authorizer = route_authorizer(&state, Listener::Public);
     let router = router
+        .layer(axum::middleware::from_fn(refuse_unrouted_api_path))
         .route_layer(axum::middleware::from_fn(
             super::super::json_ingress::validate,
         ))
-        // The later layer runs first, before original-byte buffering and Json.
+        // Later layers run first: the route table, then the wallet entitlement,
+        // both before original-byte buffering and Json.
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
             super::super::json_ingress::authenticate,
+        ))
+        .route_layer(axum::middleware::from_fn_with_state(
+            authorizer,
+            authorize_route,
         ))
         .with_state(state);
 
@@ -694,22 +663,89 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
     ))
 }
 
+/// The internal listener's router: every `/v1/internal/*` route and nothing
+/// else. The public router serves none of these.
+pub(crate) fn build_internal_router(state: TrustServiceState) -> Router {
+    let authorizer = route_authorizer(&state, Listener::Internal);
+    Router::new()
+        .route(
+            INTERNAL_ADMISSION_AUTHORITY_PATH,
+            post(super::admission_authority::handle_admission_authority)
+                .layer(DefaultBodyLimit::max(ADMISSION_AUTHORITY_MAX_BODY_BYTES)),
+        )
+        .route(
+            INTERNAL_CLUSTER_STATUS_PATH,
+            get(handle_internal_cluster_status),
+        )
+        .route(
+            INTERNAL_CLUSTER_SNAPSHOT_PATH,
+            get(handle_internal_cluster_snapshot),
+        )
+        .route(
+            INTERNAL_CLUSTER_PARTITION_PATH,
+            post(handle_internal_cluster_partition),
+        )
+        .route(
+            INTERNAL_AUTHORITY_SNAPSHOT_PATH,
+            get(handle_internal_authority_snapshot),
+        )
+        .route(
+            INTERNAL_AUTHORITY_STATUS_PATH,
+            get(handle_internal_authority_status),
+        )
+        .route(
+            INTERNAL_REVOCATIONS_DELTA_PATH,
+            get(handle_internal_revocations_delta),
+        )
+        .route(
+            INTERNAL_TOOL_RECEIPTS_DELTA_PATH,
+            get(handle_internal_tool_receipts_delta),
+        )
+        .route(
+            INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
+            get(handle_internal_child_receipts_delta),
+        )
+        .route(
+            INTERNAL_BUDGETS_DELTA_PATH,
+            get(handle_internal_budgets_delta),
+        )
+        .route(
+            INTERNAL_LINEAGE_DELTA_PATH,
+            get(handle_internal_lineage_delta),
+        )
+        .layer(axum::middleware::from_fn(refuse_unrouted_api_path))
+        .route_layer(axum::middleware::from_fn(
+            super::super::json_ingress::validate,
+        ))
+        .route_layer(axum::middleware::from_fn_with_state(
+            authorizer,
+            authorize_route,
+        ))
+        .with_state(state)
+}
+
+fn route_authorizer(state: &TrustServiceState, listener: Listener) -> Arc<RouteAuthorizer> {
+    Arc::new(RouteAuthorizer::new(
+        listener,
+        Arc::clone(&state.config.access),
+        Arc::clone(&state.finding_challenge_clock),
+    ))
+}
+
 /// Prometheus scrape body for the trust-control surface: the kernel guard
 /// families plus the alert-pack families, composed (never fabricated) from the
 /// chio-metrics-spec runtime families.
 ///
-/// The route shares the trust-control listener, which binds `config.listen` and
-/// may be externally reachable, so it fails closed: it requires the SAME
-/// service-token bearer auth the authority/receipt/passport/budget routes
-/// enforce before returning operational counters and guard labels. Prometheus
-/// scrapes it with a configured bearer token.
+/// The route is on the public listener, so it requires a caller credential
+/// with `metrics:read` before returning operational counters and guard labels.
 async fn handle_trust_control_metrics(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = super::super::report_validation::validate_service_auth(
+    if let Err(response) = super::super::report_validation::validate_caller(
         &headers,
-        &state.config.service_token,
+        &state.config,
+        Scope::MetricsRead,
     ) {
         return response;
     }

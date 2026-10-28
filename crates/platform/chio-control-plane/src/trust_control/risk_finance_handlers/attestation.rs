@@ -5,7 +5,7 @@ pub(crate) async fn handle_runtime_attestation_appraisal_report(
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -28,7 +28,7 @@ pub(crate) async fn handle_runtime_attestation_appraisal_result_export(
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalResultExportRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -51,7 +51,7 @@ pub(crate) async fn handle_runtime_attestation_appraisal_import(
     headers: HeaderMap,
     Json(request): Json<RuntimeAttestationAppraisalImportRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 

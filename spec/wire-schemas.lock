@@ -1055,9 +1055,9 @@ files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "9019771960"
 
 [[schema]]
-value = "chio.cluster.peer.v1"
-files = ["crates/platform/chio-control-plane/src/trust_control/service_types/paths.rs"]
-first_seen = "11e573d2d7"
+value = "chio.cluster.peer-signature.v1"
+files = ["crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs"]
+first_seen = "4d148bde15"
 
 [[schema]]
 value = "chio.commerce.escrow-ledger.v1"

@@ -149,7 +149,7 @@ Review every issuer in a legacy checkpoint before distributing it. This operatio
 asserts operator trust in the current state; it does not manufacture signatures
 for old rotations. Unconfigured databases continue single-node use but refuse
 authority network import and export, and clustered trust control (`--authority-db`
-with `--peer-url`) refuses to start on one. Schema revision 3 makes older store
+with `[[cluster.peers]]` in the access configuration) refuses to start on one. Schema revision 3 makes older store
 binaries refuse the upgraded database rather than reopening unsigned or
 lifecycle-unaware paths.
 

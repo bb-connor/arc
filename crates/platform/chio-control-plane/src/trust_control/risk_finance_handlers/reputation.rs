@@ -10,7 +10,7 @@ pub(crate) async fn handle_local_reputation(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReputationRead) {
         return response;
     }
     let Some(receipt_store) = state.receipt_store.as_deref() else {
@@ -72,7 +72,7 @@ pub(crate) async fn handle_reputation_compare(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReputationWrite) {
         return response;
     }
     let Some(receipt_store) = state.receipt_store.as_deref() else {
@@ -157,7 +157,7 @@ pub(crate) async fn handle_issue_portable_reputation_summary(
     headers: HeaderMap,
     Json(request): Json<PortableReputationSummaryIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReputationWrite) {
         return response;
     }
     match service_runtime::reputation::issue_signed_portable_reputation_summary(
@@ -175,7 +175,7 @@ pub(crate) async fn handle_issue_portable_negative_event(
     headers: HeaderMap,
     Json(request): Json<PortableNegativeEventIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReputationWrite) {
         return response;
     }
     match service_runtime::reputation::issue_signed_portable_negative_event(&state.config, &request)
@@ -190,7 +190,7 @@ pub(crate) async fn handle_evaluate_portable_reputation(
     headers: HeaderMap,
     Json(request): Json<PortableReputationEvaluationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReputationWrite) {
         return response;
     }
     match service_runtime::reputation::evaluate_portable_reputation_request(&request) {

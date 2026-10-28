@@ -2,12 +2,10 @@ use super::*;
 
 pub(crate) async fn handle_internal_cluster_partition(
     State(state): State<TrustServiceState>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
     Json(payload): Json<ClusterPartitionRequest>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_PARTITION_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
     let Some(cluster) = state.cluster.as_ref() else {

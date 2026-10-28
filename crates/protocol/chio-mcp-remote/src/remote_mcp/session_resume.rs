@@ -296,6 +296,7 @@ fn fingerprint_remote_runtime_contract(
         "approval_authority": config.approval,
         "remote_authority": {
             "control_url": config.control_url,
+            "control_internal_url": config.control_internal_url,
             "service_token_sha256": config.control_token.as_deref().map(|token| sha256_hex(token.as_bytes())),
             "workload_token_sha256": config.remote_authority_workload_token.as_deref().map(|token| sha256_hex(token.as_bytes())),
             "current_public_key": config.control_authority_public_key.as_ref().map(PublicKey::to_hex),

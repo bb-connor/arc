@@ -138,7 +138,7 @@ import { ReceiptQueryClient } from "@chio-protocol/sdk";
 
 const client = new ReceiptQueryClient(
   "http://localhost:7391",  // trust-control base URL
-  "my-service-token",       // Bearer token
+  "my-control-token",       // Bearer secret of a trust-control credential
 );
 ```
 

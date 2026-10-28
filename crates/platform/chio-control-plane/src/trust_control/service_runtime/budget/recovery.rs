@@ -7,9 +7,10 @@ impl RemoteBudgetStore {
         &self,
         hold_id: &str,
     ) -> Result<Option<chio_kernel::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
-        let fence = self.recovery_fence.as_ref().ok_or_else(|| {
+        let recovery = self.recovery.as_ref().ok_or_else(|| {
             structured_budget_error("remote hold recovery requires a pinned joint authority")
         })?;
+        let fence = &recovery.fence;
         chio_kernel::admission_operation::AdmissionIdentifier::try_new(
             "hold_id",
             hold_id.to_owned(),
@@ -23,7 +24,7 @@ impl RemoteBudgetStore {
             },
         )
         .map_err(|error| structured_budget_error(error.to_string()))?;
-        let response: AdmissionAuthorityResponse = self
+        let response: AdmissionAuthorityResponse = recovery
             .client
             .post_json_capped(INTERNAL_ADMISSION_AUTHORITY_PATH, &request, 64 * 1024)
             .map_err(into_budget_store_error)?;

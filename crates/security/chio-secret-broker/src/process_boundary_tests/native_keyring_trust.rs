@@ -23,6 +23,8 @@ fn keyring_trust_service_starts_and_serves_admin_receipt_reads() -> TestResult {
     let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?
         .local_addr()?
         .port();
+    let access_config = root.join("trust-access.toml");
+    fs::write(&access_config, access_config_text())?;
     let mut child = Command::new(binary)
         .env_clear()
         .env("RUST_LOG", "warn,chio_control_plane=info")
@@ -31,8 +33,8 @@ fn keyring_trust_service_starts_and_serves_admin_receipt_reads() -> TestResult {
         .arg("--receipt-db")
         .arg(keyring.config_path.with_file_name("key-receipts.sqlite3"))
         .args(["trust", "serve", "--listen", &format!("127.0.0.1:{port}")])
-        .args(["--service-token", SERVICE_TOKEN])
-        .args(["--authority-workload-token", "keyring-trust-workload-token"])
+        .arg("--access-config")
+        .arg(&access_config)
         .arg("--authority-keyring-config")
         .arg(&keyring.config_path)
         .arg("--authority-keyring-receipt-anchor-root")
@@ -135,4 +137,19 @@ fn building_retry_after(response: &str) -> Option<Duration> {
         }
         value.trim().parse().ok().map(Duration::from_secs)
     })
+}
+
+/// One deployment credential for `SERVICE_TOKEN` holding every caller scope,
+/// which includes the capability issuance a keyring authority requires.
+fn access_config_text() -> String {
+    let scopes = chio_control_plane::trust_control::caller_credentials::Scope::ALL
+        .iter()
+        .filter(|scope| !scope.is_cluster())
+        .map(|scope| format!("\"{}\"", scope.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "deployment = \"keyring-trust\"\ninternal_listen = \"127.0.0.1:0\"\n[[credentials]]\nid = \"keyring-trust-client\"\nkind = \"deployment\"\nsecret_sha256 = \"{}\"\nscopes = [{scopes}]\ndeployment = \"keyring-trust\"\ntenant_authority = \"deployment\"\n",
+        chio_core_types::crypto::sha256_hex(SERVICE_TOKEN.as_bytes())
+    )
 }

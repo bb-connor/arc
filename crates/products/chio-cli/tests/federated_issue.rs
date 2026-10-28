@@ -9,6 +9,8 @@ use evidence_fixtures::{create_evidence_federation_policy, write_kernel_trust_fi
 
 #[path = "support/private_fixture.rs"]
 mod private_fixture;
+#[path = "support/trust_access.rs"]
+mod trust_access;
 use private_fixture::write_private_file;
 
 #[path = "support/fixture_paths.rs"]
@@ -107,8 +109,8 @@ fn spawn_trust_service_with_verifier(
         &listen.to_string(),
         "--advertise-url",
         advertise_url,
-        "--service-token",
-        service_token,
+        "--access-config",
+        &trust_access::write_access_config(service_token, &[]),
     ]);
     if let Some(path) = enterprise_providers_file {
         command.args([

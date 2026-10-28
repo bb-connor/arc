@@ -34,11 +34,11 @@ async fn submit(
 #[tokio::test]
 async fn f047_service_credentials_reject_before_polling_large_contract_uploads() -> TestResult {
     let mut state = metrics_state("service-secret");
-    state.config.authority_workload_token = Some("workload-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-read-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "service-secret",
+        Some("workload-secret"),
+        &[("tenant-a", "tenant-read-secret")],
+    );
     let router = super::super::super::build_router(state);
     for path in [
         TOOL_RECEIPTS_PATH,
@@ -48,8 +48,6 @@ async fn f047_service_credentials_reject_before_polling_large_contract_uploads()
         for credential in [
             None,
             Some("Bearer forged-service-secret"),
-            Some("Bearer workload-secret"),
-            Some("Bearer tenant-read-secret"),
             Some("Basic service-secret"),
         ] {
             let (body, polls) = body_with_poll_counter(b"{");
@@ -57,6 +55,12 @@ async fn f047_service_credentials_reject_before_polling_large_contract_uploads()
             assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
             assert_eq!(polls.load(Ordering::SeqCst), 0, "{path}");
             assert_eq!(response.headers()[WWW_AUTHENTICATE], "Bearer");
+        }
+        for credential in ["Bearer workload-secret", "Bearer tenant-read-secret"] {
+            let (body, polls) = body_with_poll_counter(b"{");
+            let response = submit(&router, "POST", path, Some(credential), body).await?;
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{path}");
+            assert_eq!(polls.load(Ordering::SeqCst), 0, "{path}");
         }
     }
     Ok(())
@@ -126,11 +130,11 @@ async fn f047_authorized_body_keeps_original_byte_validation() -> TestResult {
 #[tokio::test]
 async fn f047_workload_and_tenant_credentials_keep_their_dedicated_contracts() -> TestResult {
     let mut state = metrics_state("service-secret");
-    state.config.authority_workload_token = Some("workload-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-read-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "service-secret",
+        Some("workload-secret"),
+        &[("tenant-a", "tenant-read-secret")],
+    );
     let router = super::super::super::build_router(state);
     for (path, credential, expected, expected_polls) in [
         (
@@ -142,7 +146,7 @@ async fn f047_workload_and_tenant_credentials_keep_their_dedicated_contracts() -
         (
             ISSUE_CAPABILITY_PATH,
             "Bearer tenant-read-secret",
-            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
             0,
         ),
         (
@@ -206,16 +210,6 @@ async fn f047_nested_service_contract_rejects_before_body_polling() -> TestResul
     let (body, polls) = body_with_poll_counter(b"{");
     let response = submit(&router, "POST", &path, None, body).await?;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(polls.load(Ordering::SeqCst), 0);
-    Ok(())
-}
-
-#[tokio::test]
-async fn f047_invalid_service_configuration_rejects_before_body_polling() -> TestResult {
-    let router = super::super::super::build_router(metrics_state(""));
-    let (body, polls) = body_with_poll_counter(b"{");
-    let response = submit(&router, "POST", TOOL_RECEIPTS_PATH, None, body).await?;
-    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(polls.load(Ordering::SeqCst), 0);
     Ok(())
 }

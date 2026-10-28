@@ -73,10 +73,11 @@ pub(crate) async fn handle_structured_budget_authorize(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetAuthorizeRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_AUTHORIZE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, STRUCTURED_BUDGET_AUTHORIZE_PATH, &payload).await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -166,7 +167,7 @@ pub(crate) async fn handle_structured_budget_authorize_cumulative(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetAuthorizeCumulativeRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
@@ -174,6 +175,7 @@ pub(crate) async fn handle_structured_budget_authorize_cumulative(
     }
     match forward_post_to_leader(
         &state,
+        &headers,
         STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH,
         &payload,
     )
@@ -239,7 +241,7 @@ pub(crate) async fn handle_structured_budget_cumulative_operation(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetCumulativeOperationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
@@ -292,13 +294,20 @@ pub(crate) async fn handle_structured_budget_cancel_captured(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetCancelCapturedRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH, &payload).await {
+    match forward_post_to_leader(
+        &state,
+        &headers,
+        STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH,
+        &payload,
+    )
+    .await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -346,13 +355,19 @@ pub(crate) async fn handle_structured_budget_capture_invocation(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetCaptureInvocationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH, &payload).await
+    match forward_post_to_leader(
+        &state,
+        &headers,
+        STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
+        &payload,
+    )
+    .await
     {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -403,13 +418,20 @@ pub(crate) async fn handle_structured_budget_reverse(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetFencedReverseRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_FENCED_REVERSE_PATH, &payload).await {
+    match forward_post_to_leader(
+        &state,
+        &headers,
+        STRUCTURED_BUDGET_FENCED_REVERSE_PATH,
+        &payload,
+    )
+    .await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -456,13 +478,13 @@ pub(crate) async fn handle_structured_budget_release(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetReleaseRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_RELEASE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, STRUCTURED_BUDGET_RELEASE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -506,13 +528,14 @@ pub(crate) async fn handle_structured_budget_reconcile(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetReconcileRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_RECONCILE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, STRUCTURED_BUDGET_RECONCILE_PATH, &payload).await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -557,13 +580,20 @@ pub(crate) async fn handle_structured_budget_capture_spend(
     headers: HeaderMap,
     Json(payload): Json<StructuredBudgetCaptureSpendRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::BudgetsWrite) {
         return response;
     }
     if let Err(error) = require_structured_schema(&payload.schema) {
         return structured_bad_request(error);
     }
-    match forward_post_to_leader(&state, STRUCTURED_BUDGET_CAPTURE_SPEND_PATH, &payload).await {
+    match forward_post_to_leader(
+        &state,
+        &headers,
+        STRUCTURED_BUDGET_CAPTURE_SPEND_PATH,
+        &payload,
+    )
+    .await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
