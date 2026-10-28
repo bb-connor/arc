@@ -1,5 +1,7 @@
 #[path = "response_executor/execution_mode.rs"]
 mod execution_mode;
+#[path = "response_executor/lease_takeover.rs"]
+mod lease_takeover;
 mod response_support;
 #[path = "response_executor/rollback_budget.rs"]
 mod rollback_budget;
@@ -580,6 +582,7 @@ struct EffectState {
     fail_remove: bool,
     fail_remove_after_commit_once: bool,
     query_fault: Option<QueryFault>,
+    takeover_on_query: Option<(EffectOperation, Arc<CrashStore>, ScheduledWork)>,
 }
 
 #[derive(Clone, Copy)]
@@ -701,6 +704,15 @@ impl EffectPort for IdempotentEffects {
     fn load_result(&self, query: &EffectResultQuery) -> PortResult<EffectExecutionStatus> {
         let mut state = self.state.lock().map_err(|_| PortError::unavailable())?;
         state.queries.push(query.clone());
+        if state
+            .takeover_on_query
+            .as_ref()
+            .is_some_and(|(operation, _, _)| *operation == query.operation)
+        {
+            if let Some((_, store, work)) = state.takeover_on_query.take() {
+                store.install_work(work);
+            }
+        }
         match state.query_fault {
             Some(QueryFault::Unknown) => return Ok(EffectExecutionStatus::Unknown),
             Some(QueryFault::Unavailable) => return Err(PortError::unavailable()),
@@ -1572,14 +1584,47 @@ fn executor_crash_stale_takeover_pending_apply_never_calls_effect_port() {
     let takeover_work = work(&planned, 2, 900);
     harness.store.install_work(takeover_work.clone());
     let pending = harness.load(&planned);
-    assert!(
-        matches!(expect_err(executor.execute(&pending, &first_work, 111)), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Conflict)
-    );
+    assert!(matches!(
+        expect_err(executor.execute(&pending, &first_work, 111)),
+        ExecutorError::StaleLease
+    ));
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
 
     let reconciled = harness.load(&planned);
     let active = executor
         .execute(&reconciled, &takeover_work, 112)
+        .unwrap_or_else(|error| panic!("takeover apply failed: {error}"));
+    assert_eq!(
+        decode_response_record(&active)
+            .unwrap_or_else(|error| panic!("decode active: {error}"))
+            .state,
+        ResponseState::Active
+    );
+    assert_eq!(harness.effects.mutation_counts(), (1, 0));
+}
+
+#[test]
+fn takeover_after_the_executor_lease_check_is_refused_by_the_store_fence() {
+    let harness = Harness::new();
+    let executor = harness.executor();
+    let planned = create_plan(Arc::clone(&harness.store));
+    let first_work = work(&planned, 1, 900);
+    let takeover_work = work(&planned, 2, 900);
+    harness.store.install_work(first_work.clone());
+    harness
+        .store
+        .arm_takeover_during_applying_lease_cas(takeover_work.clone());
+
+    assert!(matches!(
+        expect_err(executor.execute(&planned, &first_work, 110)),
+        ExecutorError::StateMachine(StateMachineError::Store(ref error))
+            if error.kind() == PortErrorKind::Conflict
+    ));
+    assert_eq!(harness.load(&planned), planned);
+    assert_eq!(harness.effects.mutation_counts(), (0, 0));
+
+    let active = executor
+        .execute(&planned, &takeover_work, 111)
         .unwrap_or_else(|error| panic!("takeover apply failed: {error}"));
     assert_eq!(
         decode_response_record(&active)
@@ -1823,9 +1868,10 @@ fn executor_crash_stale_takeover_pending_rollback_never_calls_effect_port() {
     let takeover_work = work(&active, 3, 1_500);
     harness.store.install_work(takeover_work.clone());
     let pending = harness.load(&active);
-    assert!(matches!(expect_err(executor
-        .execute(&pending, &first_rollback_work, 1_001)
-        ), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Conflict));
+    assert!(matches!(
+        expect_err(executor.execute(&pending, &first_rollback_work, 1_001)),
+        ExecutorError::StaleLease
+    ));
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
 
     let reconciled = harness.load(&active);
