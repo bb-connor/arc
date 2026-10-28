@@ -198,6 +198,7 @@ fn checkpoint(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+#[path = "relocation/walk.rs"]
 mod walk;
 use walk::digests;
 
