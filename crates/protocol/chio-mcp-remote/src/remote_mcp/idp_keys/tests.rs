@@ -278,6 +278,35 @@ fn document_drops_incoherent_private_and_duplicate_keys() {
 }
 
 #[test]
+fn document_drops_a_kid_shared_with_an_inadmissible_key() {
+    let mut private = rsa_key("k", 2048);
+    private["d"] = json!(b64(&[1; 32]));
+    let mut encryption = rsa_key("k", 2048);
+    encryption["use"] = json!("enc");
+    for shadow in [rsa_key("k", 1024), private, encryption] {
+        for keys in [
+            [rsa_key("k", 2048), shadow.clone(), ec_key("other")],
+            [shadow.clone(), rsa_key("k", 2048), ec_key("other")],
+        ] {
+            let admitted = admit_jwks_document(&jwks(&keys)).unwrap();
+            assert_eq!(kids(&admitted), ["other"], "{shadow}");
+        }
+    }
+}
+
+#[test]
+fn inline_keys_drop_a_kid_shared_with_an_inadmissible_key() {
+    let decode = |value: Value| -> Jwk { serde_json::from_value(value).unwrap() };
+    let admitted = super::document::admit_keys(vec![
+        decode(rsa_key("k", 2048)),
+        decode(rsa_key("k", 1024)),
+        decode(ec_key("other")),
+    ])
+    .unwrap();
+    assert_eq!(kids(&admitted), ["other"]);
+}
+
+#[test]
 fn document_without_usable_keys_rejects() {
     assert_eq!(
         admit_jwks_document(&jwks(&[rsa_key("weak", 1024)])),

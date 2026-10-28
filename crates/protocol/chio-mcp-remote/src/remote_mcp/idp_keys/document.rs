@@ -37,8 +37,9 @@ struct JwksDocument {
 /// `use` other than `sig`, declares an `alg` its key type cannot carry, is
 /// an RSA key with a modulus below [`MIN_RSA_MODULUS_BITS`], or has no
 /// verification material the exchange can use ([`VerifyingKey::from_jwk`]:
-/// off-curve points, unsupported curves such as P-521). Every key sharing a
-/// `kid` with another key is dropped.
+/// off-curve points, unsupported curves such as P-521). A `kid` named by
+/// more than one entry of the document is dropped with every entry that
+/// names it, whether or not those entries decode or are admissible.
 pub fn admit_jwks_document(bytes: &[u8]) -> Result<Vec<Jwk>, JwksDocumentError> {
     if bytes.len() > MAX_JWKS_DOCUMENT_BYTES {
         return Err(JwksDocumentError::TooLarge { bytes: bytes.len() });
@@ -47,25 +48,39 @@ pub fn admit_jwks_document(bytes: &[u8]) -> Result<Vec<Jwk>, JwksDocumentError> 
         .map_err(|_| JwksDocumentError::Malformed)?
         .decode_external()
         .map_err(|_| JwksDocumentError::Malformed)?;
+    fn entry_kid(value: &Value) -> Option<&str> {
+        value.get("kid").and_then(Value::as_str)
+    }
+    let mut kid_entries: BTreeMap<&str, usize> = BTreeMap::new();
+    for kid in document.keys.iter().filter_map(entry_kid) {
+        *kid_entries.entry(kid).or_default() += 1;
+    }
     admit_keys(
         document
             .keys
             .iter()
+            .filter(|value| entry_kid(value).is_some_and(|kid| kid_entries.get(kid) == Some(&1)))
             .filter_map(|value| <Jwk as Deserialize>::deserialize(value).ok())
             .collect(),
     )
 }
 
-/// Apply the per-key checks and the set bounds to decoded keys.
+/// Apply the per-key checks and the set bounds to decoded keys. A `kid`
+/// named by more than one candidate is dropped with every candidate that
+/// names it, before any per-key check.
 pub(super) fn admit_keys(candidates: Vec<Jwk>) -> Result<Vec<Jwk>, JwksDocumentError> {
     let mut by_kid: BTreeMap<String, Option<Jwk>> = BTreeMap::new();
-    for key in candidates.into_iter().filter(key_is_admissible) {
+    for key in candidates {
         by_kid
             .entry(key.kid.as_str().to_owned())
             .and_modify(|slot| *slot = None)
             .or_insert(Some(key));
     }
-    let keys: Vec<Jwk> = by_kid.into_values().flatten().collect();
+    let keys: Vec<Jwk> = by_kid
+        .into_values()
+        .flatten()
+        .filter(key_is_admissible)
+        .collect();
     if keys.is_empty() {
         return Err(JwksDocumentError::NoUsableKeys);
     }
