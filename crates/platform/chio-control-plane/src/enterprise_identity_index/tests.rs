@@ -585,3 +585,40 @@ fn an_identity_admitted_at_capacity_can_always_be_deactivated() {
         assert_eq!(reloaded.deactivated_at, Some(at));
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn a_fifo_at_the_index_path_is_refused_without_blocking() {
+    use std::os::unix::fs::FileTypeExt;
+    let dir = chio_test_support::private_tempdir().test_unwrap();
+    let path = index_path(&dir);
+    rustix::fs::mkfifoat(
+        rustix::fs::CWD,
+        &path,
+        rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+    )
+    .test_unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let fifo = path.clone();
+    std::thread::spawn(move || {
+        let keys = set(1, &[]);
+        let outcome = with_enterprise_identity_index(&fifo, &keys, |index| Ok(index.len()));
+        let _ = sender.send(outcome);
+    });
+    let outcome = receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .test_unwrap();
+    assert!(
+        matches!(
+            &outcome,
+            Err(EnterpriseIdentityIndexError::Registry(RegistryUpdateError::Load(
+                crate::CliError::Io(error)
+            ))) if error.kind() == std::io::ErrorKind::InvalidInput
+        ),
+        "{outcome:?}"
+    );
+    assert!(std::fs::symlink_metadata(&path)
+        .test_unwrap()
+        .file_type()
+        .is_fifo());
+}
