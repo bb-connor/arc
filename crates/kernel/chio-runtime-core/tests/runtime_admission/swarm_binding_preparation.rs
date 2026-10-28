@@ -2,7 +2,7 @@ use super::*;
 
 #[path = "swarm_binding/fixtures.rs"]
 mod fixtures;
-use fixtures::{join_bundle, multihop_bundle, resign};
+use fixtures::{join_bundle, resign};
 
 #[path = "swarm_binding/live_admission.rs"]
 mod live_admission;
@@ -246,4 +246,25 @@ fn swarm_binding_join_root_requires_consistent_capability_on_every_outgoing_edge
         "chio_swarm_authority_rejected"
     );
     Ok(())
+}
+
+fn multihop_bundle() -> TestResult<SwarmAuthorityBundle> {
+    let mut swarm = runtime_swarm_bundle(false)?;
+    swarm.task_graph.multi_hop_witness_chains = true;
+    let chain = &mut swarm.witness_chains[0];
+    let intermediate_scope = runtime_swarm_scope(2);
+    let intermediate_digest = sha256_hex(b"intermediate capability");
+    let mut first = chain.hops[0].clone();
+    first.child_scope_hash = scope_hash(&intermediate_scope)?;
+    first.child_capability_digest = intermediate_digest.clone();
+    first.scope_subset_proof =
+        compute_attenuation_witness(&runtime_swarm_scope(3), &intermediate_scope)?;
+    let mut last = chain.hops[0].clone();
+    last.parent_scope_hash = scope_hash(&intermediate_scope)?;
+    last.parent_capability_digest = intermediate_digest;
+    last.scope_subset_proof =
+        compute_attenuation_witness(&intermediate_scope, &runtime_swarm_scope(1))?;
+    chain.hops = vec![first, last];
+    resign(&mut swarm)?;
+    Ok(swarm)
 }
