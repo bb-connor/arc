@@ -1,7 +1,9 @@
 use chio_kernel::{RuntimeAdmissionHook, RuntimeAdmissionRevalidationContext};
 use chio_runtime_core as runtime_api;
 use chio_runtime_core::CHIO_RUNTIME_FAILURE_CODES;
-include!("support/runtime_admission.rs");
+#[path = "support/runtime_admission.rs"]
+mod fixtures;
+use fixtures::*;
 
 #[path = "runtime_admission/operation_owned.rs"]
 #[cfg(unix)]
