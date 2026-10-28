@@ -4,7 +4,7 @@ use chio_core::root_authority::{EnterpriseProviderIdentity, Identifier, JwsAlgor
 use serde_json::{Map, Value};
 
 use super::claims::{
-    audience_is, required_seconds, required_string, scope_values, seconds, string,
+    audience_is, mapped_claim, required_seconds, required_string, scope_values, seconds, string,
 };
 use super::error::RootExchangeError;
 use super::jws::VerifiedJws;
@@ -43,21 +43,6 @@ pub struct VerifiedIdJag {
     pub tenant: String,
     pub scope_values: Vec<String>,
     pub claims: Map<String, Value>,
-}
-
-/// Read the claim `name` as the principal or tenant value.
-fn mapped_claim(
-    claims: &Map<String, Value>,
-    name: &str,
-    which: &'static str,
-) -> Result<String, RootExchangeError> {
-    match claims.get(name) {
-        Some(Value::String(value)) if !value.is_empty() && !value.contains('\0') => {
-            Ok(value.clone())
-        }
-        Some(_) => Err(RootExchangeError::ClaimInvalid(which)),
-        None => Err(RootExchangeError::ClaimMissing(which)),
-    }
 }
 
 /// Check the claims of a signature-verified ID-JAG against its provider

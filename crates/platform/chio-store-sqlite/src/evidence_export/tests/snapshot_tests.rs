@@ -543,7 +543,6 @@ fn missing_parent_lineage_export_refusal_keeps_other_tenant_readable() {
 
 const CHANGED_ATTRIBUTION: &str =
     "current unsigned capability attribution differs from the authenticated snapshot";
-const INVALID_LINEAGE_METADATA: &str = "capability lineage row contains invalid metadata";
 
 /// Out-of-band lineage edit with triggers left enabled.
 fn edit_lineage(path: &std::path::Path, sql: &str) {
@@ -644,31 +643,21 @@ fn assert_export_invalidates(snapshots: &ReceiptQuerySnapshots, query: &Evidence
     );
 }
 
-fn assert_export_refused(snapshots: &ReceiptQuerySnapshots, expected: &str) {
+/// A lineage row the canonical reader refuses fails the snapshot when a held
+/// receipt of its capability takes attribution from it.
+fn assert_reader_refusal_fails_the_snapshot(snapshots: &ReceiptQuerySnapshots, expected: &str) {
     let error = snapshots
         .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
         .unwrap_err();
     assert!(
-        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::ExportRefused(reason))) if reason == expected),
+        matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason))) if reason == expected),
         "{error:?}"
     );
-    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
-    let other = EvidenceExportQuery::tenant_scoped("b");
     assert_eq!(
-        snapshots
-            .query_receipts(&other.as_receipt_query(None))
-            .unwrap()
-            .total_count,
-        1
-    );
-    assert_eq!(
-        snapshots
-            .build_evidence_export_bundle_with_transparency(&other)
-            .unwrap()
-            .0
-            .tool_receipts
-            .len(),
-        1
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid {
+            reason: expected.into()
+        }
     );
 }
 
@@ -704,16 +693,16 @@ fn earlier_lineage_refusal_does_not_mask_a_later_attribution_change() {
 }
 
 #[test]
-fn earlier_lineage_refusal_with_honest_later_attribution_keeps_the_typed_refusal() {
+fn earlier_lineage_refusal_with_honest_later_attribution_fails_the_snapshot() {
     let (_directory, path, store) = signed_lineage_pair_store();
     let snapshots = start(store);
     edit_lineage(
         &path,
         "UPDATE capability_lineage SET signed_capability_json = NULL WHERE capability_id = 'cap-1'",
     );
-    assert_export_refused(
+    assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage cap-1 claims signed-token provenance without a signed token",
+        "capability lineage of cap-1 is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-1 claims signed-token provenance without a signed token",
     );
     snapshots.shutdown();
 }
@@ -734,28 +723,34 @@ fn signed_subject_change_invalidates_with_multiple_selected_receipts() {
 }
 
 #[test]
-fn non_utf8_unattributed_lineage_column_is_a_typed_refusal() {
+fn non_utf8_lineage_issuer_of_unsigned_receipts_fails_the_snapshot() {
     let (_directory, path, store, _subject) = signed_lineage_store(1);
     let snapshots = start(store);
     edit_lineage(&path, "UPDATE capability_lineage SET issuer_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap'");
-    assert_export_refused(&snapshots, INVALID_LINEAGE_METADATA);
+    assert_reader_refusal_fails_the_snapshot(
+        &snapshots,
+        "capability lineage of cap is refused by the local reader: invalid utf-8 sequence of 1 bytes from index 0 at index 2",
+    );
     snapshots.shutdown();
 }
 
 #[test]
-fn undecodable_signed_lineage_grants_are_a_typed_refusal() {
+fn undecodable_lineage_grants_of_unsigned_receipts_fail_the_snapshot() {
     let (_directory, path, store, _subject) = signed_lineage_store(1);
     let snapshots = start(store);
     edit_lineage(
         &path,
         "UPDATE capability_lineage SET grants_json = 'x' WHERE capability_id = 'cap'",
     );
-    assert_export_refused(&snapshots, INVALID_LINEAGE_METADATA);
+    assert_reader_refusal_fails_the_snapshot(
+        &snapshots,
+        "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, urn:chio:error:attest:signed-json-invalid-input",
+    );
     snapshots.shutdown();
 }
 
 #[test]
-fn signed_lineage_issuer_change_is_a_request_refusal() {
+fn signed_lineage_issuer_change_of_unsigned_receipts_fails_the_snapshot() {
     let (_directory, path, store, _subject) = signed_lineage_store(1);
     let snapshots = start(store);
     let changed = Keypair::from_seed(&[16; 32]).public_key().to_hex();
@@ -765,9 +760,9 @@ fn signed_lineage_issuer_change_is_a_request_refusal() {
             "UPDATE capability_lineage SET issuer_key = '{changed}' WHERE capability_id = 'cap'"
         ),
     );
-    assert_export_refused(
+    assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage cap does not match its signed token projection",
+        "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap does not match its signed token projection",
     );
     snapshots.shutdown();
 }

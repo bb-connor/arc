@@ -21,6 +21,7 @@ mod crash;
 mod declassification;
 mod egress_history;
 mod opening;
+mod retirement;
 mod row_codec;
 
 pub(crate) use declassification::{

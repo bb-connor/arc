@@ -17,15 +17,12 @@ where
     D: serde::Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    let value = serde_json::Value::deserialize(deserializer)?;
-    if value.is_null() {
-        return Err(serde::de::Error::custom(
+    match Option::<T>::deserialize(deserializer)? {
+        Some(value) => Ok(Some(value)),
+        None => Err(serde::de::Error::custom(
             "explicit null is not a canonical manifest representation",
-        ));
+        )),
     }
-    T::deserialize(value)
-        .map(Some)
-        .map_err(serde::de::Error::custom)
 }
 
 /// A single tool offered by a server.

@@ -362,7 +362,7 @@ impl SqliteBudgetStore {
                 hold.hold_id
             )));
         }
-        let (invocation, monetary) = Self::legacy_hold_lifecycle(hold);
+        let (invocation, monetary) = Self::standalone_hold_lifecycle(hold);
         if record.invocation_state_before != invocation || record.monetary_state_before != monetary
         {
             return Err(BudgetStoreError::Invariant(format!(
@@ -391,7 +391,7 @@ impl SqliteBudgetStore {
                 record.event_id
             ))
         })?;
-        let (invocation, monetary) = Self::legacy_hold_lifecycle(hold);
+        let (invocation, monetary) = Self::standalone_hold_lifecycle(hold);
         if record.invocation_state_after != invocation || record.monetary_state_after != monetary {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget hold `{}` imported `{}` successor does not match durable state",
@@ -402,7 +402,7 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
-    fn legacy_hold_lifecycle(
+    fn standalone_hold_lifecycle(
         hold: &SqliteBudgetHold,
     ) -> (BudgetInvocationState, BudgetMonetaryState) {
         let invocation = if hold.disposition == HoldDisposition::Reversed {

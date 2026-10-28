@@ -68,6 +68,7 @@ fn empty_config() -> TrustServiceConfig {
         verifier_policies_file: None,
         verifier_challenge_db_path: None,
         passport_statuses_file: None,
+        revocation_partners_file: None,
         passport_issuance_offers_file: None,
         certification_registry_file: None,
         certification_discovery_file: None,
@@ -761,4 +762,100 @@ fn allowlisted_remote_issuer_verifies_end_to_end() {
     .test_unwrap();
     assert_eq!(verification.issuer, issuer_url);
     assert_eq!(verification.subject_did, subject_did);
+}
+
+fn remote_status_ref(
+    cache_ttl_secs: Option<u64>,
+) -> chio_credentials::Oid4vciChioPassportStatusReference {
+    chio_credentials::Oid4vciChioPassportStatusReference {
+        passport_id: "passport-1".to_owned(),
+        distribution: chio_credentials::PassportStatusDistribution {
+            resolve_urls: vec!["https://status.example/v1/passports".to_owned()],
+            cache_ttl_secs,
+        },
+    }
+}
+
+fn remote_lifecycle() -> PassportLifecycleResolution {
+    PassportLifecycleResolution {
+        passport_id: "passport-1".to_owned(),
+        subject: "did:chio:holder".to_owned(),
+        issuers: Vec::new(),
+        issuer_count: 1,
+        state: PassportLifecycleState::Active,
+        published_at: Some(900),
+        updated_at: None,
+        superseded_by: None,
+        revoked_at: None,
+        revoked_reason: None,
+        distribution: chio_credentials::PassportStatusDistribution::default(),
+        valid_until: "2100-01-01T00:00:00Z".to_owned(),
+        source: None,
+    }
+}
+
+#[test]
+fn a_remote_lifecycle_within_its_ttl_holds_at_acceptance() {
+    let status_ref = remote_status_ref(Some(30));
+    let held = recheck_oid4vp_passport_lifecycle(
+        &empty_config(),
+        "passport-1",
+        Some(&status_ref),
+        Some(remote_lifecycle()),
+        1_000,
+        1_030,
+    )
+    .test_unwrap();
+    assert_eq!(held, Some(remote_lifecycle()));
+}
+
+#[test]
+fn a_remote_lifecycle_older_than_its_ttl_at_acceptance_is_refused() {
+    let status_ref = remote_status_ref(Some(30));
+    let error = recheck_oid4vp_passport_lifecycle(
+        &empty_config(),
+        "passport-1",
+        Some(&status_ref),
+        Some(remote_lifecycle()),
+        1_000,
+        1_031,
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("cache TTL"), "{error}");
+}
+
+#[test]
+fn a_remote_lifecycle_without_a_ttl_is_refused_at_acceptance() {
+    let status_ref = remote_status_ref(None);
+    let error = recheck_oid4vp_passport_lifecycle(
+        &empty_config(),
+        "passport-1",
+        Some(&status_ref),
+        Some(remote_lifecycle()),
+        1_000,
+        1_000,
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("cache TTL"), "{error}");
+}
+
+#[test]
+fn a_local_lifecycle_is_resolved_again_at_acceptance() {
+    let dir = tempfile::tempdir().test_unwrap();
+    let statuses = dir.path().join("passport-statuses.json");
+    let mut config = empty_config();
+    config.passport_statuses_file = Some(statuses.clone());
+    let PassportLifecyclePlan::Resolved(planned) =
+        plan_oid4vp_passport_lifecycle(&config, "passport-1", None, 1_000).test_unwrap()
+    else {
+        panic!("a local registry plans without a fetch");
+    };
+    std::fs::write(&statuses, b"{").test_unwrap();
+    let unreadable = PassportStatusRegistry::load(&statuses)
+        .test_unwrap_err()
+        .to_string();
+    let recheck =
+        recheck_oid4vp_passport_lifecycle(&config, "passport-1", None, planned, 1_000, 2_000)
+            .test_unwrap_err();
+    assert_eq!(recheck.to_string(), unreadable);
 }

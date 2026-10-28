@@ -10,7 +10,7 @@
 //! newest such checkpoint is published on receipt signatures alone.
 use std::time::Instant;
 
-use super::db::{SnapshotBatch, DIM_CAPABILITY};
+use super::db::SnapshotBatch;
 use super::service::Published;
 use super::walk::{
     authenticate, authenticate_checkpoints, check_sources, checked_prefix, commit_in_holds,
@@ -190,15 +190,14 @@ fn publish_verified(
 }
 
 /// A lineage row the canonical local reader refuses attributes nothing. When
-/// the snapshot holds receipts of its capability, the snapshot is refused.
-/// This is deliberately conservative: a build or recertification consults
-/// lineage only for a receipt whose signed subject or issuer is absent, so it
-/// would refuse the same row for those receipts but not for a capability
-/// whose receipts are all fully signed. A row for a capability the snapshot
-/// does not hold is validated again when a receipt first needs it.
+/// the snapshot holds a receipt of its capability without a signed subject,
+/// the snapshot is refused, as a build or recertification consulting lineage
+/// for that receipt would refuse it. When every held receipt of the
+/// capability carries a signed subject, the row is export metadata only and
+/// each export that selects it refuses the row. A row for a capability the
+/// snapshot does not hold is validated again when a receipt first needs it.
 fn refuse_lineage(published: &Published, capability: &str, reason: &str) -> Result<(), WalkError> {
-    let held = published.with_db(|db| Ok(db.dim_id(DIM_CAPABILITY, capability).is_some()))?;
-    if held {
+    if published.with_db(|db| db.holds_unsigned_subject(capability))? {
         return Err(WalkError::Integrity(format!(
             "capability lineage of {capability} is refused by the local reader: {reason}"
         )));

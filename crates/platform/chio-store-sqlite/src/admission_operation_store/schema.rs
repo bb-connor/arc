@@ -381,6 +381,8 @@ fn admission_operation_schema_catalog(
             FROM sqlite_schema
             WHERE name GLOB 'admission_operation*'
                OR tbl_name GLOB 'admission_operation*'
+               OR lower(name) GLOB 'admission_execution_nonce_*'
+               OR lower(tbl_name) GLOB 'admission_execution_nonce_*'
                OR name GLOB 'obligation_*'
                OR tbl_name GLOB 'obligation_*'
                OR name GLOB 'credit_exposure_*'

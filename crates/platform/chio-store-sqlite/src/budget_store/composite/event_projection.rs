@@ -123,11 +123,11 @@ fn project_mutation_event(
             || row.24;
         if has_structured_metadata {
             return Err(BudgetStoreError::Invariant(format!(
-                "legacy budget event `{}` contains composite projection state",
+                "standalone budget event `{}` contains composite projection state",
                 event.event_id
             )));
         }
-        validate_legacy_event_lifecycle(&event)?;
+        validate_standalone_event_lifecycle(&event)?;
         return Ok(event);
     }
     if row.0 != "composite_v1" {

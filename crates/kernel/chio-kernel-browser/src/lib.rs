@@ -66,6 +66,8 @@ extern crate std;
 pub mod clock;
 pub mod rng;
 
+#[cfg(any(target_arch = "wasm32", test))]
+mod evaluate_input;
 mod pure;
 mod wire;
 

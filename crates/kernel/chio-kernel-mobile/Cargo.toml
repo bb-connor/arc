@@ -33,7 +33,7 @@ chio-kernel-core = { workspace = true }
 # chio-kernel-core and we just wrap it.
 chio-core-types = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 hex = { workspace = true }
 sha2 = { workspace = true }
 # UniFFI ties the FFI scaffolding + bindings generator to the crate:

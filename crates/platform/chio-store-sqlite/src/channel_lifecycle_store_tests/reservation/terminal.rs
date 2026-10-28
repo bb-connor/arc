@@ -95,7 +95,11 @@ fn live_dispatch_committed(
     fixture: &Fixture,
     flow: &ReservationFlow,
 ) -> TestResult<AdmissionOperationV1> {
-    let claimant = format!("kernel:{}", flow.kernel_key.public_key().to_hex());
+    let claimant = chio_kernel::admission_operation::execution_nonce_coordinator_id(
+        &flow.kernel_key.public_key(),
+    )?
+    .as_str()
+    .to_owned();
     let operation = stage_and_anchor_with_claimant(fixture, flow, &claimant)?;
     let lease = claim(
         fixture,
@@ -268,7 +272,11 @@ fn dispatch_advance(
         DISPATCH_ANCHOR_AT,
     )?;
     let committed = committed_view(&flow.committed, advance.batch())?;
-    let claimant = format!("kernel:{}", flow.kernel_key.public_key().to_hex());
+    let claimant = chio_kernel::admission_operation::execution_nonce_coordinator_id(
+        &flow.kernel_key.public_key(),
+    )?
+    .as_str()
+    .to_owned();
     let lease = claim(
         fixture,
         operation,
@@ -402,7 +410,11 @@ fn terminal_receipt(
 }
 
 fn stage_terminal(fixture: &Fixture, flow: &ReservationFlow) -> TestResult<StagedTerminal> {
-    let claimant = format!("kernel:{}", flow.kernel_key.public_key().to_hex());
+    let claimant = chio_kernel::admission_operation::execution_nonce_coordinator_id(
+        &flow.kernel_key.public_key(),
+    )?
+    .as_str()
+    .to_owned();
     let operation = live_dispatch_committed(fixture, flow)?;
     let (_, dispatched) = dispatch_advance(fixture, flow, &operation)?;
     let (_, returned) = returned_value(
@@ -889,7 +901,11 @@ fn outcome_unknown_after_dispatch_keeps_the_reservation_live() -> TestResult {
     let _runtime = chio_test_support::clock::scope_unix_secs(1);
     let fixture = fixture()?;
     let flow = reservation_flow(&fixture.fence, "terminal-unknown")?;
-    let claimant = format!("kernel:{}", flow.kernel_key.public_key().to_hex());
+    let claimant = chio_kernel::admission_operation::execution_nonce_coordinator_id(
+        &flow.kernel_key.public_key(),
+    )?
+    .as_str()
+    .to_owned();
     let operation = live_dispatch_committed(&fixture, &flow)?;
     let operation = advance_operation(
         &fixture,

@@ -1,4 +1,5 @@
 use chio_core::{
+    canonical::UntrustedJsonText,
     capability::{attenuation::validate_delegation_chain, token::CapabilityToken},
     Error as CoreError,
 };
@@ -22,8 +23,13 @@ pub struct CapabilityVerification {
     pub time_status: CapabilityTimeStatus,
 }
 
+/// Decodes capability JSON with the signed-wire contract: a duplicate object
+/// key at any depth, or a number token that would change representation,
+/// fails before any field is read.
 pub fn parse_capability_json(input: &str) -> Result<CapabilityToken> {
-    Ok(serde_json::from_str(input)?)
+    UntrustedJsonText::from_wire(input.as_bytes(), crate::MAX_JSON_INPUT_BYTES)
+        .and_then(|text| text.decode_signed())
+        .map_err(|error| CoreError::UntrustedInput(error.into()).into())
 }
 
 pub fn capability_signing_body_canonical_json(capability: &CapabilityToken) -> Result<String> {

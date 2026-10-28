@@ -6,6 +6,70 @@ use std::os::unix::fs::PermissionsExt;
 
 use super::*;
 
+fn assert_original_row_keys_are_unique(table: &str) {
+    let connection = Connection::open_in_memory().test_expect("authority row database");
+    connection
+        .execute_batch(AUTHORITY_STORE_SCHEMA_SQL)
+        .test_expect("authority row schema");
+    let key = "a".repeat(64);
+    let insert = format!("INSERT INTO {table} (lookup_key, payload) VALUES (?1, ?2)");
+    let update = format!("UPDATE {table} SET payload = ?1 WHERE lookup_key = ?2");
+    let value = serde_json::json!({"binding": {"tenant": "tenant-a"}});
+    let canonical = canonical_json_bytes(&value).test_expect("canonical row");
+    connection
+        .execute(&insert, params![key, canonical])
+        .test_expect("insert canonical row");
+    let valid = load_logical_records(&connection, table).test_expect("read canonical row");
+    assert_eq!(valid.len(), 1);
+    assert_eq!(valid[0].key, key);
+    assert_eq!(valid[0].payload, value);
+
+    for duplicate in [
+        br#"{"binding":{"tenant":"tenant-a"},"binding":{"tenant":"tenant-a"}}"#.as_slice(),
+        br#"{"binding":{"tenant":"tenant-b","tenant":"tenant-a"}}"#.as_slice(),
+        br#"{"binding":{"tenant":"tenant-b","\u0074enant":"tenant-a"}}"#.as_slice(),
+    ] {
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(duplicate)
+                .test_expect("duplicate collapses to the control value"),
+            value
+        );
+        assert_eq!(
+            connection
+                .execute(&update, params![duplicate, key])
+                .test_expect("replace original row bytes"),
+            1
+        );
+        let error = load_logical_records(&connection, table)
+            .test_expect_err("refuse duplicate before projecting row payload");
+        assert!(matches!(
+            error,
+            AuthorityError::UntrustedInput(chio_core::canonical::UntrustedJsonError::NonCanonical)
+        ));
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:attest:signed-json-noncanonical"
+        );
+    }
+
+    connection
+        .execute(&update, params![canonical, key])
+        .test_expect("restore canonical row");
+    let restored = load_logical_records(&connection, table).test_expect("read restored row");
+    assert_eq!(restored.len(), 1);
+    assert_eq!(restored[0].payload, value);
+}
+
+#[test]
+fn policy_rows_refuse_repeated_original_keys_before_value_projection() {
+    assert_original_row_keys_are_unique("policies");
+}
+
+#[test]
+fn artifact_rows_refuse_repeated_original_keys_before_value_projection() {
+    assert_original_row_keys_are_unique("artifacts");
+}
+
 #[test]
 fn logical_store_digest_is_stable_and_order_sensitive() {
     let authority = Keypair::from_seed(&[8; 32]).public_key();
@@ -211,4 +275,37 @@ fn cleanup_guard_never_removes_a_replacement_inode() {
     drop(guard);
     assert!(path.exists());
     assert!(displaced.exists());
+}
+
+#[test]
+fn stored_records_refuse_a_repeated_key_before_typed_decoding() {
+    let connection = Connection::open_in_memory().test_expect("in-memory authority database");
+    connection
+        .execute_batch(AUTHORITY_STORE_SCHEMA_SQL)
+        .test_expect("authority schema");
+    let key = "a".repeat(64);
+    for table in ["policies", "artifacts"] {
+        connection
+            .execute(
+                &format!("INSERT INTO {table} (lookup_key, payload) VALUES (?1, ?2)"),
+                params![&key, br#"{"kind":"policy"}"#],
+            )
+            .test_expect("insert canonical record");
+        let records = load_logical_records(&connection, table).test_expect("load canonical record");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].payload, serde_json::json!({"kind": "policy"}));
+
+        connection
+            .execute(
+                &format!("UPDATE {table} SET payload = ?1"),
+                params![br#"{"kind":"policy","kind":"policy"}"#],
+            )
+            .test_expect("repeat a record key");
+        assert!(matches!(
+            load_logical_records(&connection, table),
+            Err(AuthorityError::UntrustedInput(
+                chio_core::canonical::UntrustedJsonError::NonCanonical
+            ))
+        ));
+    }
 }

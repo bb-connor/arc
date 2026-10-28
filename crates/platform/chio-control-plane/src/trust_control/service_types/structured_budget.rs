@@ -826,7 +826,7 @@ impl StructuredBudgetProjectionView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum StructuredBudgetProjectionKindView {
-    LegacyHold,
+    StandaloneHold,
     AdmissionOperation,
 }
 
@@ -860,7 +860,7 @@ impl StructuredBudgetProjectionContractView {
             kind: if projection.admission_binding.is_some() {
                 StructuredBudgetProjectionKindView::AdmissionOperation
             } else {
-                StructuredBudgetProjectionKindView::LegacyHold
+                StructuredBudgetProjectionKindView::StandaloneHold
             },
             projection_sha256: sha256_hex(&canonical_json_bytes(projection).map_err(|error| {
                 format!("structured projection canonicalization failed: {error}")

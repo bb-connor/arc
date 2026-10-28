@@ -47,7 +47,7 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    fn grant_quota_for_legacy_mutation(
+    fn grant_quota_for_standalone_mutation(
         &self,
         capability_id: &str,
         grant_index: u32,
@@ -220,16 +220,16 @@ impl InMemoryBudgetStoreInner {
                 "nonce preflight budget identity requires its owning participant".into(),
             ));
         }
-        let legacy = request.admission_binding.is_none()
+        let standalone = request.admission_binding.is_none()
             && request.invocation_quotas.is_empty()
             && request.cumulative_approval.is_none();
         let mutation = BudgetMutationRequest::AuthorizeComposite(Box::new(request.clone()));
         if let Some(existing) = self.duplicate_mutation(request.event_id.as_deref(), &mutation)? {
             return Ok(existing.record);
         }
-        if legacy && self.has_composite_history(&request.capability_id, request.grant_index) {
+        if standalone && self.has_composite_history(&request.capability_id, request.grant_index) {
             return Err(BudgetStoreError::Invariant(
-                "legacy budget authorization cannot bypass structured admission history"
+                "standalone budget authorization cannot bypass structured admission history"
                     .to_string(),
             ));
         }
@@ -268,7 +268,7 @@ impl InMemoryBudgetStoreInner {
         if self.invocation_quotas.contains_key(&grant_quota_key)
             && !quotas.iter().any(|quota| quota.key == grant_quota_key)
         {
-            if legacy {
+            if standalone {
                 let maximum = self
                     .invocation_quotas
                     .get(&grant_quota_key)
@@ -390,16 +390,16 @@ impl InMemoryBudgetStoreInner {
                     "total_cost_exposed + requested exposure overflowed u64".to_string(),
                 )
             })?;
-        let next_legacy_reversible = if allowed && request.hold_id.is_none() {
+        let next_standalone_reversible = if allowed && request.hold_id.is_none() {
             Some(
-                self.legacy_reversible_invocations
+                self.standalone_reversible_invocations
                     .get(&primary_key)
                     .copied()
                     .unwrap_or(0)
                     .checked_add(1)
                     .ok_or_else(|| {
                         BudgetStoreError::Overflow(
-                            "legacy reversible invocation count overflowed u32".to_string(),
+                            "standalone reversible invocation count overflowed u32".to_string(),
                         )
                     })?,
             )
@@ -430,9 +430,9 @@ impl InMemoryBudgetStoreInner {
             entry.total_cost_exposed = next_exposure;
             entry.updated_at = recorded_at;
             entry.seq = event_seq;
-            if let Some(next_legacy_reversible) = next_legacy_reversible {
-                self.legacy_reversible_invocations
-                    .insert(primary_key.clone(), next_legacy_reversible);
+            if let Some(next_standalone_reversible) = next_standalone_reversible {
+                self.standalone_reversible_invocations
+                    .insert(primary_key.clone(), next_standalone_reversible);
             }
 
             for quota in &quotas {
@@ -505,7 +505,7 @@ impl InMemoryBudgetStoreInner {
                         remaining_exposure_units: request.requested_exposure_units,
                         invocation_state: BudgetInvocationState::Authorized,
                         invocation_quotas: quotas.clone(),
-                        legacy_captured_invocation_quota: None,
+                        standalone_captured_invocation_quota: None,
                         captured_cancellation_allowed: request.cumulative_approval.is_some()
                             || (request.invocation_quotas.is_empty()
                                 && request.admission_binding.is_none()),

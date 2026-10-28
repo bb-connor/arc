@@ -45,8 +45,8 @@ pub use capture::*;
 pub use dispatch_launch::AdmissionDispatchLaunchV1;
 pub(crate) use dispatch_launch::{is_native_launch, is_worker_profile};
 pub use execution_nonce::{
-    verify_operation_execution_nonce_at, AdmissionExecutionNonceReservationV1,
-    OPERATION_EXECUTION_NONCE_SCHEMA,
+    execution_nonce_coordinator_id, verify_operation_execution_nonce_at,
+    AdmissionExecutionNonceReservationV1, OPERATION_EXECUTION_NONCE_SCHEMA,
 };
 pub use identity::*;
 pub use native_caller_custody::{NativeCallerReleaseCustodyV1, CALLER_RETURN_CONTEXT_SCHEMA};
@@ -143,6 +143,8 @@ pub enum AdmissionOperationError {
         "durable admission may be disabled only for unsafe development with ephemeral receipts"
     )]
     UnsafeDurableAdmissionOff,
+    #[error("durable admission receipt signing identity is unavailable")]
+    ReceiptSigningIdentityUnavailable,
     #[error("operation id does not match its immutable binding")]
     OperationIdMismatch,
     #[error("request namespace digest does not match its authenticated tenant binding")]

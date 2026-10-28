@@ -123,6 +123,7 @@ pub fn local_oauth_test_client() -> crate::OAuthClientRegistration {
     crate::OAuthClientRegistration {
         client_id: "https://client.example/app".to_string(),
         redirect_uri: "http://localhost:7777/callback".to_string(),
+        token_endpoint_auth: crate::TokenEndpointAuth::None,
     }
 }
 

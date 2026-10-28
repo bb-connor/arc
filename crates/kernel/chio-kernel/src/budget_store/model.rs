@@ -460,7 +460,7 @@ pub struct BudgetCommitMetadata {
     pub guarantee_level: BudgetGuaranteeLevel,
     pub budget_profile: BudgetAuthorityProfile,
     pub metering_profile: BudgetMeteringProfile,
-    /// Commit index for the decision, including a durable denial. Legacy backends
+    /// Commit index for the decision, including a durable denial. Standalone backends
     /// that cannot expose a denial event index return `None`.
     pub budget_commit_index: Option<u64>,
     pub event_id: Option<String>,

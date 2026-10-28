@@ -1,6 +1,11 @@
 use super::*;
+use crate::execution_nonce::InMemoryExecutionNonceStore;
 use crate::payment::test_http::{spawn_json_server, spawn_once_json_server};
 use crate::payment::{PaymentJournalRecord, PaymentJournalTransition};
+use chio_security_types::clock::{
+    ClockError, ClockReading, FixedClock, MonotonicInstant, UnixMillis,
+};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const NETWORK: &str = "eip155:84532";
 const ASSET: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -10,6 +15,8 @@ const NONCE: &str = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const TRANSACTION: &str = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const VALID_AFTER: u64 = 1_744_000_000;
 const VALID_BEFORE: u64 = 1_744_000_600;
+const NOW: u64 = VALID_AFTER + 60;
+const OTHER_NONCE: &str = "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 const UNREACHABLE: &str = "http://127.0.0.1:1";
 
 fn identity_string() -> String {
@@ -39,10 +46,26 @@ fn test_rail() -> X402RailConfig {
     .expect("valid rail")
 }
 
-fn adapter(facilitator: &str) -> X402PaymentAdapter {
-    X402PaymentAdapter::new(facilitator, test_rail())
+fn clock_at(unix_secs: u64) -> Arc<dyn Clock> {
+    Arc::new(FixedClock::from_millis(unix_secs * 1_000))
+}
+
+fn replay_store() -> Arc<dyn ExecutionNonceStore> {
+    Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock_at(NOW)))
+}
+
+fn adapter_with(
+    facilitator: &str,
+    clock: Arc<dyn Clock>,
+    replay: Arc<dyn ExecutionNonceStore>,
+) -> X402PaymentAdapter {
+    X402PaymentAdapter::new(facilitator, test_rail(), clock, replay)
         .expect("valid facilitator")
         .with_timeout(Duration::from_secs(2))
+}
+
+fn adapter(facilitator: &str) -> X402PaymentAdapter {
+    adapter_with(facilitator, clock_at(NOW), replay_store())
 }
 
 fn requirements() -> X402PaymentRequirements {
@@ -437,14 +460,20 @@ fn facilitator_url_is_validated_at_construction() {
         "https://facilitator.example#fragment",
         "not a url",
     ] {
-        let error = X402PaymentAdapter::new(url, test_rail()).expect_err(url);
+        let error = X402PaymentAdapter::new(url, test_rail(), clock_at(NOW), replay_store())
+            .expect_err(url);
         assert!(
             matches!(&error, PaymentError::RailError(message) if message == "payment rail URL is invalid"),
             "{url}: {error:?}"
         );
     }
-    X402PaymentAdapter::new("https://facilitator.example/x402", test_rail())
-        .expect("an https facilitator with a path is valid");
+    X402PaymentAdapter::new(
+        "https://facilitator.example/x402",
+        test_rail(),
+        clock_at(NOW),
+        replay_store(),
+    )
+    .expect("an https facilitator with a path is valid");
 }
 
 #[test]
@@ -703,4 +732,405 @@ fn durable_replay_refuses_an_identifier_it_cannot_bind() {
             "{authorization_id}: {error:?}"
         );
     }
+}
+
+fn settling_facilitator(
+    settlements: usize,
+) -> (
+    String,
+    std::sync::mpsc::Receiver<String>,
+    std::thread::JoinHandle<()>,
+) {
+    spawn_json_server(
+        (0..settlements)
+            .flat_map(|_| {
+                [
+                    (200, serde_json::json!({ "isValid": true })),
+                    (200, settle_success()),
+                ]
+            })
+            .collect(),
+    )
+}
+
+fn with_nonce(nonce: &str) -> X402PaymentContext {
+    let mut context = context();
+    context.payment_payload.payload.authorization.nonce = nonce.to_owned();
+    context
+}
+
+#[test]
+fn authorize_refuses_an_authorization_before_its_valid_after() {
+    for now in [VALID_AFTER - 1, VALID_AFTER] {
+        let error = adapter_with(UNREACHABLE, clock_at(now), replay_store())
+            .authorize(&request(Some(context())))
+            .expect_err("authorization is not yet valid");
+        assert!(refused(
+            error,
+            X402Refusal::NotYetValid {
+                now,
+                valid_after: VALID_AFTER,
+            }
+        ));
+    }
+}
+
+#[test]
+fn authorize_refuses_an_expired_authorization() {
+    for now in [VALID_BEFORE, VALID_BEFORE + 1] {
+        let error = adapter_with(UNREACHABLE, clock_at(now), replay_store())
+            .authorize(&request(Some(context())))
+            .expect_err("authorization expired");
+        assert!(refused(
+            error,
+            X402Refusal::Expired {
+                now,
+                valid_before: VALID_BEFORE,
+            }
+        ));
+    }
+}
+
+#[test]
+fn authorize_reaches_the_facilitator_inside_the_validity_window() {
+    for now in [VALID_AFTER + 1, VALID_BEFORE - 1] {
+        let (url, requests, handle) = settling_facilitator(1);
+        let replay: Arc<dyn ExecutionNonceStore> =
+            Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock_at(now)));
+        let authorization = adapter_with(&url, clock_at(now), replay)
+            .authorize(&request(Some(context())))
+            .expect("payment settles inside the window");
+        handle.join().expect("facilitator stub exits");
+        assert_eq!(authorization.authorization_id, settled_authorization_id());
+        assert!(requests
+            .recv()
+            .expect("verify request")
+            .starts_with("POST /verify HTTP/1.1"));
+        assert!(requests
+            .recv()
+            .expect("settle request")
+            .starts_with("POST /settle HTTP/1.1"));
+    }
+}
+
+#[test]
+fn authorize_refuses_a_nonce_already_settled() {
+    let (url, requests, handle) = settling_facilitator(1);
+    let adapter = adapter(&url);
+    adapter
+        .authorize(&request(Some(context())))
+        .expect("first use settles");
+    handle.join().expect("facilitator stub exits");
+    assert_eq!(requests.iter().count(), 2);
+
+    let error = adapter
+        .authorize(&request(Some(context())))
+        .expect_err("second use refused");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+#[test]
+fn authorize_refuses_a_nonce_settled_before_a_restart() {
+    let replay = replay_store();
+    let (url, _requests, handle) = settling_facilitator(1);
+    adapter_with(&url, clock_at(NOW), replay.clone())
+        .authorize(&request(Some(context())))
+        .expect("first use settles");
+    handle.join().expect("facilitator stub exits");
+
+    let error = adapter_with(UNREACHABLE, clock_at(NOW), replay)
+        .authorize(&request(Some(context())))
+        .expect_err("restarted adapter refuses the reused nonce");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+#[test]
+fn authorize_accepts_distinct_nonces_from_one_payer() {
+    let (url, _requests, handle) = settling_facilitator(2);
+    let adapter = adapter(&url);
+    adapter
+        .authorize(&request(Some(with_nonce(NONCE))))
+        .expect("first nonce settles");
+    adapter
+        .authorize(&request(Some(with_nonce(OTHER_NONCE))))
+        .expect("second nonce settles");
+    handle.join().expect("facilitator stub exits");
+}
+
+#[test]
+fn rejected_verification_leaves_the_nonce_unspent() {
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": false })),
+        (200, serde_json::json!({ "isValid": true })),
+        (200, settle_success()),
+    ]);
+    let adapter = adapter(&url);
+    let error = adapter
+        .authorize(&request(Some(context())))
+        .expect_err("verification rejected");
+    assert!(refused(error, X402Refusal::VerifyRejected));
+    adapter
+        .authorize(&request(Some(context())))
+        .expect("the unspent nonce settles");
+    handle.join().expect("facilitator stub exits");
+}
+
+#[test]
+fn settlement_without_confirmation_spends_the_nonce() {
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (503, serde_json::json!({})),
+    ]);
+    let adapter = adapter(&url);
+    let error = adapter
+        .authorize(&request(Some(context())))
+        .expect_err("settlement unavailable");
+    handle.join().expect("facilitator stub exits");
+    assert!(
+        matches!(error, PaymentError::Unavailable(message) if message == "x402 facilitator settlement is unavailable")
+    );
+    let error = adapter
+        .authorize(&request(Some(context())))
+        .expect_err("a possibly broadcast nonce is spent");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+/// Answers `NOW` for the first read and `VALID_BEFORE` afterwards, so the
+/// verification round trip crosses the authorization's expiry.
+struct ExpiringClock(AtomicU64);
+
+impl Clock for ExpiringClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let reads = self.0.fetch_add(1, Ordering::SeqCst);
+        let unix_secs = if reads == 0 { NOW } else { VALID_BEFORE };
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(unix_secs)?,
+            MonotonicInstant::from_nanos(reads),
+        ))
+    }
+}
+
+#[test]
+fn expiry_during_verification_refuses_before_settlement() {
+    let (url, requests, handle) =
+        spawn_once_json_server(200, serde_json::json!({ "isValid": true }));
+    let replay = replay_store();
+    let error = adapter_with(
+        &url,
+        Arc::new(ExpiringClock(AtomicU64::new(0))),
+        replay.clone(),
+    )
+    .authorize(&request(Some(context())))
+    .expect_err("authorization expired while verifying");
+    handle.join().expect("facilitator stub exits");
+    assert!(refused(
+        error,
+        X402Refusal::Expired {
+            now: VALID_BEFORE,
+            valid_before: VALID_BEFORE,
+        }
+    ));
+    assert_eq!(requests.iter().count(), 1, "settle must not be called");
+    assert!(matches!(
+        replay.is_consumed(&format!(
+            "x402/{NETWORK}/{}/{PAYER}/{NONCE}",
+            ASSET.to_ascii_lowercase()
+        )),
+        Ok(false)
+    ));
+}
+
+#[test]
+fn a_spent_nonce_is_refused_under_another_signed_expiry() {
+    let (url, _requests, handle) = settling_facilitator(1);
+    let adapter = adapter(&url);
+    adapter
+        .authorize(&request(Some(context())))
+        .expect("first use settles");
+    handle.join().expect("facilitator stub exits");
+
+    let mut shorter = request(Some(context()));
+    x402_mut(&mut shorter)
+        .payment_payload
+        .payload
+        .authorization
+        .valid_before = (VALID_BEFORE - 1).to_string();
+    let error = adapter
+        .authorize(&shorter)
+        .expect_err("the nonce is spent whatever its expiry");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+#[test]
+fn a_malformed_authorization_leaves_the_nonce_unspent() {
+    let (url, _requests, handle) = settling_facilitator(1);
+    let adapter = adapter(&url);
+    let mut malformed = request(Some(context()));
+    x402_mut(&mut malformed).payment_payload.payload.signature = "0x".to_owned();
+    let error = adapter
+        .authorize(&malformed)
+        .expect_err("malformed authorization refused");
+    assert!(refused(error, X402Refusal::MalformedAuthorization));
+    adapter
+        .authorize(&request(Some(context())))
+        .expect("the unspent nonce settles");
+    handle.join().expect("facilitator stub exits");
+}
+
+#[test]
+fn journal_replay_of_a_spent_nonce_restores_its_settlement() {
+    let (url, _requests, handle) = settling_facilitator(1);
+    let adapter = adapter(&url);
+    let authorization = adapter
+        .authorize(&request(Some(context())))
+        .expect("first use settles");
+    handle.join().expect("facilitator stub exits");
+
+    let mut other_operation = request(Some(context()));
+    other_operation.reference = "operation-2".to_owned();
+    let error = adapter
+        .authorize(&other_operation)
+        .expect_err("another operation cannot reuse the nonce");
+    assert!(refused(error, X402Refusal::NonceReused));
+    assert_eq!(
+        adapter
+            .replayed_authorization_metadata(&authorization.authorization_id)
+            .expect("the owning operation replays from its journal"),
+        authorization.metadata
+    );
+}
+
+#[test]
+fn an_unavailable_clock_refuses_before_the_facilitator() {
+    let clock: Arc<dyn Clock> = Arc::new(FixedClock::new(u64::MAX));
+    let error = adapter_with(UNREACHABLE, clock, replay_store())
+        .authorize(&request(Some(context())))
+        .expect_err("no trusted time");
+    assert!(
+        matches!(error, PaymentError::Unavailable(message) if message == "x402 trusted clock is unavailable")
+    );
+}
+
+/// Trusted clock whose wall and monotonic time advance together on demand.
+struct AdvancingClock(AtomicU64);
+
+impl AdvancingClock {
+    fn starting_at(unix_secs: u64) -> Arc<Self> {
+        Arc::new(Self(AtomicU64::new(unix_secs)))
+    }
+
+    fn advance_to(&self, unix_secs: u64) {
+        self.0.store(unix_secs, Ordering::SeqCst);
+    }
+}
+
+impl Clock for AdvancingClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let unix_secs = self.0.load(Ordering::SeqCst);
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(unix_secs)?,
+            MonotonicInstant::from_nanos(unix_secs * 1_000_000_000),
+        ))
+    }
+}
+
+const SHORT_VALID_BEFORE: u64 = NOW + 100;
+/// Past the short authorization's expiry plus the replay store's grace, and
+/// still inside the long authorization's window.
+const AFTER_SHORT_RETENTION: u64 = SHORT_VALID_BEFORE + 61;
+
+fn expiring_at(valid_before: u64) -> PaymentAuthorizeRequest {
+    let mut request = request(Some(context()));
+    x402_mut(&mut request)
+        .payment_payload
+        .payload
+        .authorization
+        .valid_before = valid_before.to_string();
+    request
+}
+
+#[test]
+fn a_spent_nonce_outlives_the_expiry_it_was_signed_with() {
+    let clock = AdvancingClock::starting_at(NOW);
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock.clone()));
+    let (url, _requests, handle) = settling_facilitator(1);
+    adapter_with(&url, clock.clone(), replay.clone())
+        .authorize(&expiring_at(SHORT_VALID_BEFORE))
+        .expect("the short authorization settles");
+    handle.join().expect("facilitator stub exits");
+
+    clock.advance_to(AFTER_SHORT_RETENTION);
+    let error = adapter_with(UNREACHABLE, clock.clone(), replay.clone())
+        .authorize(&expiring_at(VALID_BEFORE))
+        .expect_err("the nonce stays spent under a later expiry");
+    assert!(refused(error, X402Refusal::NonceReused));
+
+    let (url, _requests, handle) = settling_facilitator(1);
+    let mut other = expiring_at(VALID_BEFORE);
+    x402_mut(&mut other)
+        .payment_payload
+        .payload
+        .authorization
+        .nonce = OTHER_NONCE.to_owned();
+    adapter_with(&url, clock, replay)
+        .authorize(&other)
+        .expect("a distinct nonce still settles");
+    handle.join().expect("facilitator stub exits");
+}
+
+#[test]
+fn an_uncertain_settlement_keeps_the_nonce_past_its_expiry() {
+    let clock = AdvancingClock::starting_at(NOW);
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock.clone()));
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (503, serde_json::json!({})),
+    ]);
+    let error = adapter_with(&url, clock.clone(), replay.clone())
+        .authorize(&expiring_at(SHORT_VALID_BEFORE))
+        .expect_err("settlement unavailable");
+    handle.join().expect("facilitator stub exits");
+    assert!(
+        matches!(error, PaymentError::Unavailable(message) if message == "x402 facilitator settlement is unavailable")
+    );
+
+    clock.advance_to(AFTER_SHORT_RETENTION);
+    let error = adapter_with(UNREACHABLE, clock, replay)
+        .authorize(&expiring_at(VALID_BEFORE))
+        .expect_err("a possibly broadcast nonce stays spent");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+#[test]
+fn a_full_replay_store_refuses_before_settlement() {
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(1, clock_at(NOW)));
+    let (url, requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (200, settle_success()),
+        (200, serde_json::json!({ "isValid": true })),
+    ]);
+    let adapter = adapter_with(&url, clock_at(NOW), replay);
+    adapter
+        .authorize(&request(Some(with_nonce(NONCE))))
+        .expect("the first nonce settles");
+    let error = adapter
+        .authorize(&request(Some(with_nonce(OTHER_NONCE))))
+        .expect_err("no capacity for a second nonce");
+    handle.join().expect("facilitator stub exits");
+    assert!(refused(error, X402Refusal::ReplayCapacityExhausted));
+    let paths: Vec<String> = requests
+        .iter()
+        .map(|request| request.lines().next().unwrap_or_default().to_owned())
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "POST /verify HTTP/1.1",
+            "POST /settle HTTP/1.1",
+            "POST /verify HTTP/1.1"
+        ]
+    );
 }

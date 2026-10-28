@@ -274,6 +274,11 @@ pub mod loopback {
 /// Explicitly injected clocks for runtime fixtures.
 pub mod clock;
 
+/// Raw-input decoders used only by tests stay under `test_support/`, which the
+/// trust-boundary census treats as test code.
+#[path = "test_support/duplicate_keys.rs"]
+pub mod duplicate_keys;
+
 #[cfg(test)]
 mod tests {
     use std::panic::{self, Location, UnwindSafe};

@@ -801,7 +801,8 @@ fn terminal_projection_is_atomic_replayable_and_retained() {
 }
 
 #[test]
-fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
+fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() -> Result<(), Box<dyn Error>>
+{
     let fixture = fixture();
     let begun_at = now_ms();
     let operation = finalizing_tool_operation(
@@ -811,7 +812,10 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         begun_at,
     );
     let signer = Keypair::generate();
-    let claimant = format!("kernel:{}", signer.public_key().to_hex());
+    let claimant =
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(&signer.public_key())?
+            .as_str()
+            .to_owned();
     let projection = unknown_projection_for_claimant(
         &fixture,
         &operation,
@@ -875,7 +879,10 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
         second_begun_at,
     );
     let authorized = Keypair::generate();
-    let authorized_claimant = format!("kernel:{}", authorized.public_key().to_hex());
+    let authorized_claimant =
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(&authorized.public_key())?
+            .as_str()
+            .to_owned();
     let attacker = Keypair::generate();
     let second_projection = unknown_projection_for_claimant(
         &fixture,
@@ -906,6 +913,7 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
             .expect("load after signer rejection"),
         Some(second)
     );
+    Ok(())
 }
 
 #[path = "admission_operation_store_tests/connection_recovery.rs"]

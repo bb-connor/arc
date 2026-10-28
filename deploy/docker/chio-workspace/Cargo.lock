@@ -3030,6 +3030,7 @@ dependencies = [
  "clap 4.6.0",
  "futures-util",
  "hex",
+ "jsonschema",
  "libc",
  "nix",
  "p384",
@@ -4824,6 +4825,8 @@ name = "chio-test-support"
 version = "0.1.0"
 dependencies = [
  "chio-security-types",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
@@ -4943,6 +4946,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-spec-validate",
+ "chio-test-support",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

@@ -389,7 +389,7 @@ fn supplemental_capture_missing_time_can_retry_without_state_change() {
 }
 
 #[test]
-fn legacy_increment_reverse_restores_grant_quota_and_allows_retry() {
+fn standalone_increment_reverse_restores_grant_quota_and_allows_retry() {
     let store = InMemoryBudgetStore::new();
     let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
 
@@ -400,7 +400,7 @@ fn legacy_increment_reverse_restores_grant_quota_and_allows_retry() {
 
     store
         .reverse_charge_cost(CAPABILITY_ID, GRANT_INDEX, 0)
-        .expect("reverse legacy zero-cost invocation");
+        .expect("reverse standalone zero-cost invocation");
     assert_usage(&quota_usage(&store, &key), 0, 0);
 
     assert!(store
@@ -410,7 +410,7 @@ fn legacy_increment_reverse_restores_grant_quota_and_allows_retry() {
 }
 
 #[test]
-fn denied_legacy_calls_do_not_define_quota_maxima() {
+fn denied_standalone_calls_do_not_define_quota_maxima() {
     let increment_store = InMemoryBudgetStore::new();
     let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
     assert!(!increment_store
@@ -438,7 +438,7 @@ fn denied_legacy_calls_do_not_define_quota_maxima() {
 }
 
 #[test]
-fn raw_legacy_mutations_reject_invalid_and_reserved_identities() {
+fn raw_standalone_mutations_reject_invalid_and_reserved_identities() {
     let store = InMemoryBudgetStore::new();
     assert!(matches!(
         store.try_charge_cost_with_ids(
@@ -473,7 +473,7 @@ fn raw_legacy_mutations_reject_invalid_and_reserved_identities() {
 
     assert!(store
         .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 10, None, None)
-        .expect("create unheld legacy exposure"));
+        .expect("create unheld standalone exposure"));
     assert!(matches!(
         store.reverse_charge_cost_with_ids(
             CAPABILITY_ID,
@@ -613,7 +613,7 @@ fn unstructured_rich_authorization_remains_reversible() {
 }
 
 #[test]
-fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
+fn standalone_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
     let store = InMemoryBudgetStore::new();
     let quota = grant_quota(1);
     expect_authorized(
@@ -640,19 +640,19 @@ fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
 }
 
 #[test]
-fn legacy_admission_cannot_skip_a_live_composite_quota() {
+fn standalone_admission_cannot_skip_a_live_composite_quota() {
     let store = InMemoryBudgetStore::new();
     let quotas = canonical_quotas(vec![
         grant_quota(2),
         quota(
             BudgetQuotaProfile::AggregateCapabilityInvocation,
-            "aggregate:legacy-bypass",
+            "aggregate:standalone-bypass",
             2,
         ),
     ]);
     expect_authorized(
         store
-            .authorize_budget_hold(authorize_request("legacy-bypass", quotas.clone(), 0))
+            .authorize_budget_hold(authorize_request("standalone-bypass", quotas.clone(), 0))
             .expect("authorize composite hold"),
     );
     assert!(matches!(
@@ -708,19 +708,19 @@ fn composite_admission_cannot_omit_an_existing_grant_quota() {
 }
 
 #[test]
-fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_history() {
-    let legacy_store = InMemoryBudgetStore::new();
-    assert!(legacy_store
+fn direct_standalone_authorization_inherits_standalone_quota_and_rejects_structured_history() {
+    let standalone_store = InMemoryBudgetStore::new();
+    assert!(standalone_store
         .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(2), 0, None, None)
-        .expect("define legacy quota"));
-    let mut legacy = authorize_request("legacy-quota-inheritance", Vec::new(), 0);
-    legacy.admission_binding = None;
+        .expect("define standalone quota"));
+    let mut standalone = authorize_request("standalone-quota-inheritance", Vec::new(), 0);
+    standalone.admission_binding = None;
     expect_authorized(
-        legacy_store
-            .authorize_budget_hold(legacy)
-            .expect("inherit existing legacy grant quota"),
+        standalone_store
+            .authorize_budget_hold(standalone)
+            .expect("inherit existing standalone grant quota"),
     );
-    assert_usage(&quota_usage(&legacy_store, &grant_quota(2).key), 1, 1);
+    assert_usage(&quota_usage(&standalone_store, &grant_quota(2).key), 1, 1);
 
     let structured_store = InMemoryBudgetStore::new();
     expect_authorized(
@@ -729,14 +729,14 @@ fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_hist
                 "structured-history-owner",
                 vec![quota(
                     BudgetQuotaProfile::AggregateCapabilityInvocation,
-                    "aggregate:direct-legacy-bypass",
+                    "aggregate:direct-standalone-bypass",
                     2,
                 )],
                 0,
             ))
             .expect("authorize structured history"),
     );
-    let mut bypass = authorize_request("direct-legacy-bypass", Vec::new(), 0);
+    let mut bypass = authorize_request("direct-standalone-bypass", Vec::new(), 0);
     bypass.admission_binding = None;
     assert!(matches!(
         structured_store.authorize_budget_hold(bypass),
@@ -757,12 +757,12 @@ fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_hist
 }
 
 #[test]
-fn unheld_legacy_terminals_cannot_mutate_after_structured_history() {
+fn unheld_standalone_terminals_cannot_mutate_after_structured_history() {
     let prepared_store = || {
         let store = InMemoryBudgetStore::new();
         assert!(store
             .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 10, None, None)
-            .expect("create legacy reversible charge"));
+            .expect("create standalone reversible charge"));
         expect_authorized(
             store
                 .authorize_budget_hold(authorize_request(
@@ -805,13 +805,13 @@ fn unheld_legacy_terminals_cannot_mutate_after_structured_history() {
 }
 
 #[test]
-fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
+fn standalone_admission_cannot_bypass_denied_or_reversed_composite_history() {
     let denied_store = InMemoryBudgetStore::new();
     let mut denied_request = authorize_request(
-        "legacy-after-denial",
+        "standalone-after-denial",
         vec![quota(
             BudgetQuotaProfile::AggregateCapabilityInvocation,
-            "aggregate:legacy-after-denial",
+            "aggregate:standalone-after-denial",
             1,
         )],
         1,
@@ -831,10 +831,10 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
     expect_authorized(
         reversed_store
             .authorize_budget_hold(authorize_request(
-                "legacy-after-reverse",
+                "standalone-after-reverse",
                 vec![quota(
                     BudgetQuotaProfile::AggregateCapabilityInvocation,
-                    "aggregate:legacy-after-reverse",
+                    "aggregate:standalone-after-reverse",
                     1,
                 )],
                 0,
@@ -846,8 +846,8 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
             capability_id: CAPABILITY_ID.to_string(),
             grant_index: GRANT_INDEX,
             reversed_exposure_units: 0,
-            hold_id: Some("hold:legacy-after-reverse".to_string()),
-            event_id: Some("event:legacy-after-reverse:terminal".to_string()),
+            hold_id: Some("hold:standalone-after-reverse".to_string()),
+            event_id: Some("event:standalone-after-reverse:terminal".to_string()),
             expected_cumulative_approval_state: None,
             authority: None,
         })
@@ -859,7 +859,7 @@ fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
 }
 
 #[test]
-fn no_hold_legacy_mutations_cannot_touch_live_composite_hold() {
+fn no_hold_standalone_mutations_cannot_touch_live_composite_hold() {
     let store = InMemoryBudgetStore::new();
     let quota = grant_quota(1);
     expect_authorized(
@@ -1320,7 +1320,7 @@ fn capture_event_identity_includes_trusted_time() {
 }
 
 #[test]
-fn partially_released_legacy_capture_cancels_remaining_exposure() {
+fn partially_released_standalone_capture_cancels_remaining_exposure() {
     let store = InMemoryBudgetStore::new();
     let key = BudgetQuotaKey::grant(CAPABILITY_ID, GRANT_INDEX as u32);
     assert!(store
@@ -1334,7 +1334,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
             Some("hold:partial-cancel"),
             Some("event:partial-cancel:authorize"),
         )
-        .expect("authorize legacy hold"));
+        .expect("authorize standalone hold"));
     let release = BudgetReleaseHoldRequest {
         capability_id: CAPABILITY_ID.to_string(),
         grant_index: GRANT_INDEX,
@@ -1345,7 +1345,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
     };
     store
         .release_budget_hold(release.clone())
-        .expect("partially release legacy hold");
+        .expect("partially release standalone hold");
     store
         .capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: CAPABILITY_ID.to_string(),
@@ -1355,7 +1355,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
             trusted_time: None,
             authority: None,
         })
-        .expect("capture legacy invocation");
+        .expect("capture standalone invocation");
     assert!(matches!(
         store.release_budget_hold(release),
         Err(BudgetStoreError::Invariant(_))
@@ -1369,7 +1369,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
     };
     let cancelled = match store
         .cancel_captured_before_dispatch(cancellation.clone())
-        .expect("cancel captured legacy invocation")
+        .expect("cancel captured standalone invocation")
     {
         BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(cancelled) => cancelled,
         other => panic!("expected fresh cancellation, got {other:?}"),

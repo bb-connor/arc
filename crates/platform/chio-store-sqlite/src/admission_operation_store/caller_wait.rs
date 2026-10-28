@@ -87,7 +87,8 @@ impl SqliteAdmissionOperationStore {
         }
         let nonce = execution_nonce::verify_reservation(&tx, operation)?
             .ok_or_else(|| invariant("caller wait lost its physical nonce"))?;
-        if lease.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex()) {
+        if lease.claimant_id().as_str() != execution_nonce_coordinator_id(nonce.issuer())?.as_str()
+        {
             return Err(AdmissionOperationStoreError::Fenced);
         }
         let frame = caller_dispatch_context::load(&tx, operation)?

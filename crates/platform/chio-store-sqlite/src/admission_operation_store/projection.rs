@@ -581,8 +581,8 @@ pub(super) fn verify_exact_signed_terminal_replay(
         .recovery_claim
         .as_ref()
         .ok_or(AdmissionOperationStoreError::Fenced)?;
-    let expected_claimant = format!("kernel:{}", projection.signer_key().to_hex());
-    if recovery_claim.claimant_id().as_str() != expected_claimant
+    let expected_claimant = execution_nonce_coordinator_id(projection.signer_key())?;
+    if recovery_claim.claimant_id().as_str() != expected_claimant.as_str()
         || recovery_claim.coordinator_lease_id() != &projection.context().coordinator_lease_id
         || recovery_claim.store_fence() != &projection.context().store_fence
         || stored_operation.operation != *projection.terminal_operation()

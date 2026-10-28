@@ -38,7 +38,7 @@ is a hex-encoded Ed25519 seed.
 
 | API | Enforced check or returned evidence |
 | --- | --- |
-| `canonicalize_json_str` | Parses JSON with Serde and canonicalizes the resulting value through `chio_core::canonicalize`. |
+| `canonicalize_json_str` | Bounds input to 1 MiB, refuses duplicate keys, and normalizes numeric spellings through RFC 8785 canonicalization. |
 | `verify_capability` | Returns signature validity, delegation-chain shape validity, and validity at the caller's `now` timestamp. |
 | `parse_receipt_json` | Uses `UntrustedJsonText::decode_signed` to reject duplicate members and number tokens that change representation. |
 | `verify_receipt_with_trusted_signers` | Recomputes receipt ID and action parameter hash, verifies signature, and checks membership in the supplied signer set. |

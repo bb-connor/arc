@@ -64,6 +64,7 @@ pub struct Fixture {
     pub caller_executor_key: Option<Keypair>,
     /// Real durable fixed-price local-credit rail, never external currency.
     pub local_payment_rail: bool,
+    pub signing: Option<chio_kernel::HybridSigningConfig>,
 }
 
 pub struct Runtime {
@@ -102,6 +103,7 @@ impl Fixture {
             caller_executor: None,
             caller_executor_key: None,
             local_payment_rail: false,
+            signing: None,
         };
         SqliteAuthorityStore::provision(
             fixture.database(),
@@ -132,6 +134,7 @@ impl Fixture {
             caller_executor: None,
             caller_executor_key: None,
             local_payment_rail: false,
+            signing: None,
         })
     }
 
@@ -149,10 +152,23 @@ impl Fixture {
             self.directory.path().join("locks"),
             chio_test_support::clock::clock(),
         )?;
+        let quote = b"durable-nonce-signing-quote";
+        let verifier = AcceptedSigningQuote(self.signer.public_key());
+        let authority_key = match self.signing.as_ref() {
+            Some(signing) => chio_kernel::boot::load_kernel_signing_backend_after_self_quote(
+                signing.crypto_floor,
+                self.signer.clone(),
+                signing.pq_signing_seed.as_ref(),
+                quote,
+                &verifier,
+            )?
+            .public_key()?,
+            None => self.signer.public_key(),
+        };
         let mut kernel = ChioKernel::new_with_clock(
             KernelConfig {
                 keypair: self.signer.clone(),
-                ca_public_keys: vec![self.signer.public_key()],
+                ca_public_keys: vec![authority_key.clone()],
                 max_delegation_depth: 5,
                 policy_hash: chio_core::sha256_hex(b"kernel-nonce-lifecycle-policy"),
                 allow_sampling: false,
@@ -170,6 +186,16 @@ impl Fixture {
             },
             chio_test_support::clock::clock(),
         );
+        if let Some(signing) = self.signing.as_ref() {
+            let backend = kernel.with_hybrid_signing_backend(signing, quote, &verifier)?;
+            assert_eq!(backend.public_key()?, authority_key);
+            kernel.set_capability_authority(Box::new(
+                chio_kernel::GovernedCapabilityAuthority::new(
+                    Arc::from(backend),
+                    chio_test_support::clock::clock(),
+                ),
+            ));
+        }
         let receipts = SqliteReceiptStore::open(self.directory.path().join("receipts.db"))?;
         // Match production startup: opening spawns the writer, but does not
         // publish readiness until it has verified its durable head.
@@ -355,5 +381,19 @@ impl ToolServerConnection for CountingServer {
             parking.release.notified().await;
         }
         Ok(arguments)
+    }
+}
+
+pub(super) struct AcceptedSigningQuote(pub(super) chio_core::PublicKey);
+
+impl chio_kernel::boot::KernelSelfQuoteVerifier for AcceptedSigningQuote {
+    fn verify_self_quote(
+        &self,
+        quote: &[u8],
+        classical_key: &chio_core::PublicKey,
+    ) -> chio_kernel::boot::KernelSelfQuoteOutcome {
+        assert_eq!(quote, b"durable-nonce-signing-quote");
+        assert_eq!(classical_key, &self.0);
+        chio_kernel::boot::KernelSelfQuoteOutcome::accepted()
     }
 }

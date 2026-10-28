@@ -94,11 +94,7 @@ impl<'de> Deserialize<'de> for FinancialCredentialEnvelope {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        preflight_financial_credential_value(&value).map_err(serde::de::Error::custom)?;
-        let wire: FinancialCredentialWireV1 =
-            serde_json::from_value(value).map_err(serde::de::Error::custom)?;
-        let envelope = Self::from(wire);
+        let envelope = Self::from(FinancialCredentialWireV1::deserialize(deserializer)?);
         envelope
             .validate_contract_shape()
             .map_err(serde::de::Error::custom)?;

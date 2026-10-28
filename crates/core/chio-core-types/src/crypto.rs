@@ -65,6 +65,8 @@ pub use wrapper::{
     SIGNING_WRAPPER_PREFIX,
 };
 
+pub use wire::MAX_KEY_WIRE_BYTES;
+
 /// Shared canonical JSON bytes suitable for signing and verification.
 pub type SharedCanonicalBytes = SharedCanonicalBytesInner<CanonicalBytes<CanonicalJsonWitness>>;
 

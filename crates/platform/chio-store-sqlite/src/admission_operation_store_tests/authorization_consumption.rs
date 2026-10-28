@@ -25,8 +25,12 @@ struct Candidate {
 fn signer() -> Keypair {
     Keypair::from_seed(&[0x71; 32])
 }
-fn claimant() -> String {
-    format!("kernel:{}", signer().public_key().to_hex())
+fn claimant() -> Result<String, Box<dyn Error>> {
+    Ok(
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(&signer().public_key())?
+            .as_str()
+            .to_owned(),
+    )
 }
 
 fn candidate(
@@ -358,7 +362,7 @@ fn substituted(
 fn signed_authorization_consumption_rejects_substitutions_and_reopens_exactly() -> AnchoredTestResult
 {
     let fixture = fixture();
-    let candidate = candidate(&fixture, "primary", now_ms(), &claimant())?;
+    let candidate = candidate(&fixture, "primary", now_ms(), &claimant()?)?;
     let before = terminal_counts(&fixture)?;
     for variant in 0..8 {
         let altered = substituted(&candidate, variant)?;
@@ -450,11 +454,11 @@ fn authorization_consumption_refuses_other_claimants_and_double_consumption_atom
 ) -> AnchoredTestResult {
     let fixture = fixture();
     let at = now_ms();
-    let first = candidate(&fixture, "first", at, &claimant())?;
+    let first = candidate(&fixture, "first", at, &claimant()?)?;
     fixture
         .store
         .commit_signed_terminal_projection(&first.envelope)?;
-    let second = candidate(&fixture, "second", at, &claimant())?;
+    let second = candidate(&fixture, "second", at, &claimant()?)?;
     assert_eq!(
         first
             .envelope

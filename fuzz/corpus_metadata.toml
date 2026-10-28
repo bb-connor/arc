@@ -1107,6 +1107,54 @@ sha256    = "3bb2fb507e390be6cde44195dda32bb545a10c7ebb9ea90696e3074a60f1b506"
 source    = "hand_curated_coverage"
 
 [[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/duplicate-key.bin"
+sha256    = "4b91b3bd6bddc70029d62a190838884e30a2ac1c466492593ff5f0492353d8af"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/non-canonical-number.bin"
+sha256    = "f35a8dd690f9500f583f5088958fa095ab8745f812fe19c03ccfb90ef2472226"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/tampered-parameters-mandate.bin"
+sha256    = "fc26624f80da20cf9afb6ab78399f35f8b07b992755ffeaf2316e9572c14d6a2"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/truncated.bin"
+sha256    = "4c67db2ff219b3c09962299b6afde3e0963eb6bcb78b4000488b5863da113f3d"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/valid-dispatch.bin"
+sha256    = "47b9d6dd653ed22c90cf674732d05363651486bbbeed2d8d81706286e2de0058"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/valid-intent-resigned.bin"
+sha256    = "da760c9c1953d04c6c743086dd88996485ebcccdc63171fe65bf78f9e1379a94"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/wrong-action-hash-dispatch.bin"
+sha256    = "3c6db0564df049ce178a83c4ff9eb56f756e2880829d01d72f8d1eee00943e5c"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "commerce_receipt_verify"
+path      = "fuzz/corpus/commerce_receipt_verify/wrong-action-hash-unsigned.bin"
+sha256    = "0e3defc0031ed999b6572b9c1714ddd5ff3211eb0e59ab5144f61424515b28dd"
+source    = "hand_curated_coverage"
+
+[[seed]]
 target    = "peers_lock_decode"
 path      = "fuzz/corpus/peers_lock_decode/shipped-lockfile.toml"
 sha256    = "bf45f4bddd95878227a056415a50fbae6198e4f803c4cf823d4efca0d4ed5c08"

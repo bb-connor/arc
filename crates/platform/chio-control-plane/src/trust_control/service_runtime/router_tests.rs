@@ -38,6 +38,10 @@ mod behavioral_signing_custody;
 #[path = "router_tests/federation_reputation_trust.rs"]
 mod federation_reputation_trust;
 
+#[cfg(unix)]
+#[path = "router_tests/passport_revocation_feed.rs"]
+mod passport_revocation_feed;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),
@@ -61,6 +65,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         verifier_policies_file: None,
         verifier_challenge_db_path: None,
         passport_statuses_file: None,
+        revocation_partners_file: None,
         passport_issuance_offers_file: None,
         certification_registry_file: None,
         certification_discovery_file: None,
@@ -87,6 +92,8 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
+        passport_revocation_oracle: None,
+        partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
         receipt_store: None,
         receipt_query_snapshots: None,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
@@ -300,15 +307,15 @@ fn fiscal_marketplace_credit_limit_rejects_client_trust_claims() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
+async fn standalone_holds_use_exact_versioned_rich_lifecycle(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use chio_security_types::clock::{
         Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
     };
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    struct LegacyBudgetClock(AtomicU64);
-    impl Clock for LegacyBudgetClock {
+    struct StandaloneBudgetClock(AtomicU64);
+    impl Clock for StandaloneBudgetClock {
         fn read(&self) -> Result<ClockReading, ClockError> {
             let seconds = self.0.load(Ordering::SeqCst);
             Ok(ClockReading::new(
@@ -323,9 +330,9 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
     }
 
     let temp = crate::durable_admission::private_tempdir()?;
-    let clock = Arc::new(LegacyBudgetClock(AtomicU64::new(1_000)));
+    let clock = Arc::new(StandaloneBudgetClock(AtomicU64::new(1_000)));
     let sqlite = Arc::new(SqliteBudgetStore::open_with_clock(
-        temp.path().join("legacy-budget.sqlite3"),
+        temp.path().join("standalone-budget.sqlite3"),
         clock.clone(),
     )?);
     let mut state = metrics_state("service-secret");
@@ -339,7 +346,7 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         let store = build_remote_budget_store(&url, "service-secret")?;
         let authorize = |hold_id: &str| {
             store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                capability_id: "legacy-rich".to_string(),
+                capability_id: "standalone-rich".to_string(),
                 grant_index: 0,
                 max_invocations: None,
                 invocation_quotas: Vec::new(),
@@ -354,21 +361,21 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             })
         };
 
-        let capture_hold = "legacy-capture";
+        let capture_hold = "standalone-capture";
         let BudgetAuthorizeHoldDecision::Authorized(authorized) = authorize(capture_hold)? else {
-            return Err(std::io::Error::other("legacy capture hold was not authorized").into());
+            return Err(std::io::Error::other("standalone capture hold was not authorized").into());
         };
         assert!(authorized.admission_binding.is_none());
         let authorization_usage = store
-            .get_usage("legacy-rich", 0)?
+            .get_usage("standalone-rich", 0)?
             .ok_or_else(|| std::io::Error::other("authorization usage was not cached"))?;
         let authorization_projection = sqlite
-            .usage_projection_for_event_id("legacy-capture:authorize")?
+            .usage_projection_for_event_id("standalone-capture:authorize")?
             .ok_or_else(|| std::io::Error::other("authorization projection was not durable"))?;
         assert_eq!(authorization_projection.updated_at, 1_000);
         clock.0.store(1_002, Ordering::SeqCst);
         let capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "legacy-rich".to_string(),
+            capability_id: "standalone-rich".to_string(),
             grant_index: 0,
             hold_id: capture_hold.to_string(),
             event_id: format!("{capture_hold}:capture-invocation"),
@@ -387,14 +394,14 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert_eq!(capture.invocation_state, BudgetInvocationState::Captured);
         assert_eq!(
             capture.metadata.event_id.as_deref(),
-            Some("legacy-capture:capture-invocation")
+            Some("standalone-capture:capture-invocation")
         );
         let capture_commit = capture
             .metadata
             .budget_commit_index
             .ok_or_else(|| std::io::Error::other("capture omitted commit"))?;
         let capture_usage = store
-            .get_usage("legacy-rich", 0)?
+            .get_usage("standalone-rich", 0)?
             .ok_or_else(|| std::io::Error::other("capture usage was not cached"))?;
         assert_eq!(capture_usage.seq, authorization_usage.seq);
         assert_eq!(capture_usage.updated_at, authorization_usage.updated_at);
@@ -402,19 +409,19 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert_eq!(authorization_usage, authorization_projection);
         assert_eq!(capture_usage, authorization_projection);
         let capture_event = sqlite
-            .mutation_event_for_event_id("legacy-capture:capture-invocation")?
+            .mutation_event_for_event_id("standalone-capture:capture-invocation")?
             .ok_or_else(|| std::io::Error::other("capture event was not durable"))?;
         assert_eq!(capture_event.recorded_at, 1_002);
         assert_eq!(capture_event.event_seq, capture_commit);
         assert_eq!(capture_event.usage_seq, Some(authorization_projection.seq));
 
-        let release_hold = "legacy-release";
+        let release_hold = "standalone-release";
         assert!(matches!(
             authorize(release_hold)?,
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
         let release = store.release_budget_hold(BudgetReleaseHoldRequest {
-            capability_id: "legacy-rich".to_string(),
+            capability_id: "standalone-rich".to_string(),
             grant_index: 0,
             released_exposure_units: 25,
             hold_id: Some(release_hold.to_string()),
@@ -424,13 +431,13 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert!(release.admission_binding.is_none());
         assert_eq!(release.exposure_units, 25);
 
-        let reverse_hold = "legacy-reverse";
+        let reverse_hold = "standalone-reverse";
         assert!(matches!(
             authorize(reverse_hold)?,
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
         let reverse = store.reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: "legacy-rich".to_string(),
+            capability_id: "standalone-rich".to_string(),
             grant_index: 0,
             reversed_exposure_units: 100,
             hold_id: Some(reverse_hold.to_string()),
@@ -441,13 +448,13 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
         assert!(reverse.admission_binding.is_none());
         assert_eq!(reverse.invocation_state, BudgetInvocationState::Reversed);
 
-        let reconcile_hold = "legacy-reconcile";
+        let reconcile_hold = "standalone-reconcile";
         assert!(matches!(
             authorize(reconcile_hold)?,
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
         store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "legacy-rich".to_string(),
+            capability_id: "standalone-rich".to_string(),
             grant_index: 0,
             hold_id: reconcile_hold.to_string(),
             event_id: format!("{reconcile_hold}:capture-invocation"),
@@ -455,7 +462,7 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
             authority: None,
         })?;
         let reconcile = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-            capability_id: "legacy-rich".to_string(),
+            capability_id: "standalone-rich".to_string(),
             grant_index: 0,
             exposed_cost_units: 100,
             realized_spend_units: 75,
@@ -715,7 +722,7 @@ async fn trust_control_metrics_accepts_valid_service_token() {
 }
 
 #[tokio::test]
-async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
+async fn v1_lifecycle_uses_joint_store_when_standalone_handle_is_mismatched(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     crate::create_private_directory(temp.path())?;
@@ -728,11 +735,11 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
         &lock_root,
         chio_test_support::clock::clock(),
     )?);
-    let legacy = Arc::new(SqliteBudgetStore::open(
-        temp.path().join("legacy-budget.sqlite3"),
+    let standalone = Arc::new(SqliteBudgetStore::open(
+        temp.path().join("standalone-budget.sqlite3"),
     )?);
-    let legacy_revocations = Arc::new(SqliteRevocationStore::open(
-        temp.path().join("legacy-revocations.sqlite3"),
+    let standalone_revocations = Arc::new(SqliteRevocationStore::open(
+        temp.path().join("standalone-revocations.sqlite3"),
     )?);
     let fence = joint.mutation_fence();
     let authority = BudgetEventAuthority {
@@ -777,8 +784,8 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
 
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(joint.clone());
-    state.budget_store = Some(legacy.clone());
-    state.revocation_store = Some(legacy_revocations.clone());
+    state.budget_store = Some(standalone.clone());
+    state.revocation_store = Some(standalone_revocations.clone());
     state
         .revocation_store()
         .map_err(|_| std::io::Error::other("joint revocation store was unavailable"))?
@@ -790,7 +797,7 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
             .revoked
     );
     assert!(
-        !legacy_revocations
+        !standalone_revocations
             .observe_revocation("joint-revocation")?
             .revoked
     );
@@ -831,7 +838,7 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
             .and_then(|authority| authority.budget_commit_index),
         Some(event_commit)
     );
-    assert!(legacy.get_usage(capability_id, 0)?.is_none());
+    assert!(standalone.get_usage(capability_id, 0)?.is_none());
     assert_eq!(
         joint_budget
             .get_usage(capability_id, 0)?

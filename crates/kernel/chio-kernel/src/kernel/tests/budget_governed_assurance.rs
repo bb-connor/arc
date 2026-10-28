@@ -1156,6 +1156,8 @@ fn governed_x402_without_a_presented_payment_denies_before_any_rail_call() {
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
+            kernel.authority_clock(),
+            std::sync::Arc::new(crate::InMemoryExecutionNonceStore::default()),
         )
         .expect("valid facilitator")
         .with_timeout(Duration::from_millis(50)),

@@ -43,6 +43,7 @@ chio-a2a-adapter = { path = "../crates/protocol/chio-a2a-adapter", features = ["
 chio-acp-edge = { path = "../crates/protocol/chio-acp-edge", features = ["fuzz"] }
 chio-anchor = { path = "../crates/economy/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/trust/chio-attest-verify" }
+chio-commerce-order = { path = "../crates/platform/chio-commerce-order", features = ["fuzz"] }
 chio-config = { path = "../crates/platform/chio-config", features = ["fuzz"] }
 chio-core = { path = "../crates/core/chio-core" }
 # No `fuzz` feature on chio-core-types or chio-manifest; both are pure-serde
@@ -282,6 +283,13 @@ bench = false
 [[bin]]
 name = "rollback_anchor_slots"
 path = "fuzz_targets/rollback_anchor_slots.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "commerce_receipt_verify"
+path = "fuzz_targets/commerce_receipt_verify.rs"
 test = false
 doc = false
 bench = false

@@ -29,7 +29,9 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         let lease = command.recovery_lease();
-        if lease.claimant_id().as_str() != format!("kernel:{}", issuance.issuer().to_hex()) {
+        if lease.claimant_id().as_str()
+            != execution_nonce_coordinator_id(issuance.issuer())?.as_str()
+        {
             return Err(invariant(
                 "nonce issuer does not match the qualified coordinator",
             ));

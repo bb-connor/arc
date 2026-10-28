@@ -37,6 +37,15 @@ pub fn public_key_from_seed_ed25519(seed_hex: &str) -> Result<String> {
         .to_hex())
 }
 
+fn json_document(input: &str) -> Result<serde_json::Value> {
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        input.as_bytes(),
+        crate::MAX_JSON_INPUT_BYTES,
+    )
+    .and_then(|text| text.decode_document())
+    .map_err(|error| chio_core::Error::UntrustedInput(error.into()).into())
+}
+
 /// Sign the signing wrapper of the canonical form of `input_json` under
 /// `schema_id`; an id outside the signed-artifact registry is refused.
 pub fn sign_wrapped_json_ed25519(
@@ -45,7 +54,7 @@ pub fn sign_wrapped_json_ed25519(
     seed_hex: &str,
 ) -> Result<WrappedJsonSignature> {
     let canonical =
-        chio_core::canonical::CanonicalBytes::from_value(&serde_json::from_str(input_json)?)?;
+        chio_core::canonical::CanonicalBytes::from_value(&json_document(input_json)?)?;
     let keypair = chio_core::Keypair::from_seed_hex(seed_hex)?;
     let signature = keypair.sign_wrapped(schema_id, &canonical)?;
     let canonical_json = String::from_utf8(canonical.into_vec())
@@ -66,7 +75,7 @@ pub fn verify_wrapped_json(
     public_key_hex: &str,
     signature_hex: &str,
 ) -> Result<()> {
-    let value: serde_json::Value = serde_json::from_str(input_json)?;
+    let value = json_document(input_json)?;
     let public_key = chio_core::PublicKey::from_hex(public_key_hex)?;
     let signature = chio_core::Signature::from_hex(signature_hex)?;
     chio_core::crypto::verify_wrapped(&public_key, schema_id, &value, &signature)?;

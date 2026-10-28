@@ -2592,7 +2592,7 @@ request presenting that nonce registers its provider attempt against a
 caller-report transport, acquires the executable hold, decides cumulative
 approval and reserves the nonce, and stops in `ReadyToDispatch` instead of
 preparing capture. The reserving receipt carries the retained nonce and names
-the hold reserved and no tool dispatched; a legacy hold stamp is never applied
+the hold reserved and no tool dispatched; a standalone hold stamp is never applied
 to a retained nonce. The reconcile is the same operation's second half: the
 kernel resolves the reserved operation from the request the nonce binds,
 rebuilds the execution request from the retained original, refuses arguments

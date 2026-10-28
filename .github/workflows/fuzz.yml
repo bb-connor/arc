@@ -146,6 +146,7 @@ jobs:
           - underwriting_policy_input
           - revocation_oracle_merkle
           - rollback_anchor_slots
+          - commerce_receipt_verify
           - peers_lock_decode
           - fuzz_tool_action
     steps:

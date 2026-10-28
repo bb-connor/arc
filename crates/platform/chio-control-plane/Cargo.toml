@@ -126,6 +126,7 @@ chio-link = { workspace = true }
 chio-mcp-edge = { workspace = true }
 chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support", "admission-test-support", "security-admission-test-support"] }
 chio-test-support = { workspace = true }
+jsonschema = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }

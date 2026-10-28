@@ -1,6 +1,9 @@
 //! Real kernel strict-nonce preflight and execution against the SQLite admission store.
 #[path = "execution_nonce_kernel_lifecycle/security_binding.rs"]
 mod security_binding;
+#[cfg(feature = "pq")]
+#[path = "execution_nonce_kernel_lifecycle/signing_identity.rs"]
+mod signing_identity;
 #[path = "execution_nonce_kernel_lifecycle/support.rs"]
 mod support;
 

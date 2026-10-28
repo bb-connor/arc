@@ -29,7 +29,7 @@ pub(crate) const PORTABLE_ISSUER_FETCH_PERMITS: usize = 16;
 /// fixed pool below bounds those workers independently of the waiting callers.
 const PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const PORTABLE_ISSUER_FETCH_READ_TIMEOUT: Duration = Duration::from_secs(5);
-const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Fetch workers, and fetches that may queue behind them. A started fetch cannot
 /// be cancelled, so a peer trickling its TLS handshake holds one worker for as
@@ -49,7 +49,7 @@ pub(crate) fn portable_issuer_fetch_lane() -> Arc<tokio::sync::Semaphore> {
     Arc::clone(&PORTABLE_ISSUER_FETCH_LANE)
 }
 
-static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|| {
+pub(super) static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|| {
     BoundedWorkerPool::new(PORTABLE_ISSUER_FETCH_WORKERS, PORTABLE_ISSUER_FETCH_WORKERS)
 });
 
@@ -57,14 +57,14 @@ static PORTABLE_ISSUER_FETCH_POOL: LazyLock<BoundedWorkerPool> = LazyLock::new(|
 /// before submitting the fetch, and every blocking phase samples only the time
 /// left before it.
 #[derive(Clone, Copy)]
-struct PortableFetchDeadline(Instant);
+pub(crate) struct PortableFetchDeadline(Instant);
 
 impl PortableFetchDeadline {
-    fn start() -> Result<Self, CliError> {
+    pub(crate) fn start() -> Result<Self, CliError> {
         Self::starting_at(Instant::now())
     }
 
-    fn starting_at(start: Instant) -> Result<Self, CliError> {
+    pub(super) fn starting_at(start: Instant) -> Result<Self, CliError> {
         start
             .checked_add(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT)
             .map(Self)
@@ -72,7 +72,7 @@ impl PortableFetchDeadline {
     }
 
     /// The time left, sampled now. A passed deadline refuses the next phase.
-    fn remaining(&self) -> Result<Duration, CliError> {
+    pub(super) fn remaining(&self) -> Result<Duration, CliError> {
         self.0
             .checked_duration_since(Instant::now())
             .filter(|left| !left.is_zero())
@@ -89,7 +89,7 @@ fn portable_fetch_deadline_exceeded() -> CliError {
 /// work back to the pool. The caller waits only until the deadline and accepts
 /// only an outcome observed before it; a fetch still running then keeps its
 /// worker until it returns.
-fn run_portable_fetch<T>(
+pub(super) fn run_portable_fetch<T>(
     pool: &BoundedWorkerPool,
     deadline: PortableFetchDeadline,
     fetch: impl FnOnce(PortableFetchDeadline) -> Result<T, CliError> + Send + 'static,
@@ -313,14 +313,9 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
     clock_now: u64,
 ) -> Result<PassportLifecyclePlan, CliError> {
     if let Some(path) = config.passport_statuses_file.as_deref() {
-        let registry = PassportStatusRegistry::load(path)?;
-        let resolution = registry.resolve_at(passport_id, clock_now);
-        crate::passport_revocation::check_registered_passport_revocation(
-            path,
-            &registry,
-            &resolution,
-        )?;
-        return Ok(PassportLifecyclePlan::Resolved(Some(resolution)));
+        return Ok(PassportLifecyclePlan::Resolved(Some(
+            resolve_registered_lifecycle(path, passport_id, clock_now)?,
+        )));
     }
     let Some(status_ref) = status_ref else {
         return Ok(PassportLifecyclePlan::Resolved(None));
@@ -347,6 +342,53 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
     ))
 }
 
+fn resolve_registered_lifecycle(
+    path: &Path,
+    passport_id: &str,
+    now: u64,
+) -> Result<PassportLifecycleResolution, CliError> {
+    let registry = PassportStatusRegistry::load(path)?;
+    let resolution = registry.resolve_at(passport_id, now);
+    crate::passport_revocation::check_registered_passport_revocation(path, &registry, &resolution)?;
+    Ok(resolution)
+}
+
+/// Judge an OID4VP lifecycle answer again at the door's acceptance instant.
+/// A local registry is resolved again at `accept_now`. A remote answer holds
+/// until `requested_at` plus the cache TTL that the signed status reference
+/// grants, and a reference without a TTL grants none.
+pub(crate) fn recheck_oid4vp_passport_lifecycle(
+    config: &TrustServiceConfig,
+    passport_id: &str,
+    status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
+    lifecycle: Option<PassportLifecycleResolution>,
+    requested_at: u64,
+    accept_now: u64,
+) -> Result<Option<PassportLifecycleResolution>, CliError> {
+    if let Some(path) = config.passport_statuses_file.as_deref() {
+        return resolve_registered_lifecycle(path, passport_id, accept_now).map(Some);
+    }
+    let Some(status_ref) = status_ref else {
+        return Ok(lifecycle);
+    };
+    let held_until = status_ref
+        .distribution
+        .cache_ttl_secs
+        .and_then(|ttl| requested_at.checked_add(ttl))
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "OID4VP passport status reference grants no cache TTL for its remote lifecycle"
+                    .to_string(),
+            )
+        })?;
+    if accept_now > held_until {
+        return Err(CliError::cli_other_error(
+            "remote passport lifecycle is older than its cache TTL at acceptance".to_string(),
+        ));
+    }
+    Ok(lifecycle)
+}
+
 /// Build the strict HTTPS egress contract for a portable-issuer or lifecycle
 /// fetch. HTTPS is required and loopback, link-local, unique-local and other
 /// private or special-use targets are denied, so an attacker-chosen URL cannot
@@ -370,7 +412,7 @@ fn strict_portable_fetch_contract(
 /// Resolve a host once, check every resolved address against the strict policy,
 /// and return the exact checked addresses. Pinning these into the fetch agent's
 /// resolver closes the validate-then-re-resolve gap that DNS rebinding exploits.
-fn pin_checked_https_addrs<R>(
+pub(super) fn pin_checked_https_addrs<R>(
     contract: &HttpEgressContract,
     url: &Url,
     resolve: R,
@@ -405,7 +447,7 @@ where
     Ok(checked)
 }
 
-fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
+pub(super) fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
     (host, port).to_socket_addrs().map(|iter| iter.collect())
 }
 
@@ -416,7 +458,7 @@ fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>
 /// connect stage, which ureq otherwise times from its own start.
 /// `require_https` enforces HTTPS on the one production transport; the
 /// loopback test seam supplies plaintext.
-fn build_portable_fetch_agent(
+pub(crate) fn build_portable_fetch_agent(
     pinned: Vec<SocketAddr>,
     require_https: bool,
     deadline: &PortableFetchDeadline,
@@ -436,7 +478,7 @@ fn build_portable_fetch_agent(
 
 /// Map a transport error to a fail-closed message that never echoes the fetched
 /// body or any resolved internal address back to the caller.
-fn portable_fetch_transport_error(endpoint: &str, error: ureq::Error) -> CliError {
+pub(super) fn portable_fetch_transport_error(endpoint: &str, error: ureq::Error) -> CliError {
     match error {
         ureq::Error::Status(status, _response) => {
             CliError::cli_other_error(format!("{endpoint} returned HTTP {status}"))

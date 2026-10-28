@@ -5,6 +5,7 @@ use crate::settlement_proof::{
     public_settlement_witness_body_hash, verify_public_settlement_proof,
     PublicSettlementWitnessMode,
 };
+use chio_test_support::duplicate_keys::assert_repeated_member_refused;
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -421,4 +422,14 @@ fn public_settlement_proof_requires_verifier_time_for_live_dispute_snapshot() {
         Err(Web3ContractError::InvalidProof(message))
             if message.contains("public settlement dispute verifier time missing")
     ));
+}
+
+#[test]
+fn web3_anchor_inclusion_proof_refuses_a_repeated_key_in_its_chain_anchor() {
+    let proof = sample_anchor_inclusion_proof();
+    let document = serde_json::to_string(&proof)
+        .unwrap_or_else(|error| panic!("serialize sample anchor inclusion proof: {error}"));
+    let anchor = serde_json::to_string(&proof.chain_anchor)
+        .unwrap_or_else(|error| panic!("serialize sample chain anchor: {error}"));
+    assert_repeated_member_refused::<crate::anchors::AnchorInclusionProof>(&document, &anchor);
 }

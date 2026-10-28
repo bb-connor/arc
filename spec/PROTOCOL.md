@@ -5046,6 +5046,96 @@ Portable lifecycle resolution itself remains Chio-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
+Trust-control also publishes its passport revocation set to federation
+partners. Revoking a passport writes one leaf for the passport and one leaf for
+each credential digest its lifecycle record lists, in one oracle transaction,
+before the lifecycle registry is written:
+
+- `GET /v1/public/passport/revocations/root` returns a
+  `chio.trust.passport-revocation-root.v1` document whose `signedRoot` is the
+  oracle's `SignedEpochRoot`, signed with the trust-control authority key over
+  the `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
+  the signing time and its `signer_id` is the authority public key in hex
+- `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
+  `chio.trust.passport-revocation-leaves.v1` page of the leaves with a sequence
+  number above `after`, in insertion order, at most 256 leaves and 512 KiB;
+  each leaf carries `seq`, `kind` (`passport` or `credential`) and `subject`
+  (the passport id or the credential digest), and `after` is required
+- every integer in both documents is at most 2^53 - 1; a cursor above that
+  bound, a missing cursor, or any other query member is refused as a client
+  error
+- the publisher signs the root of one oracle snapshot, and refuses to sign
+  when the oracle file is missing, when that snapshot lacks the passport key
+  or any credential key of a passport the lifecycle registry records as
+  revoked, or when the authority clock reads earlier than the oracle's last
+  commit; it refuses a page that would carry a leaf of any other kind
+- both reads share the bounded public passport admission lane and refuse at
+  capacity instead of queueing
+
+An operator mirrors the revocation feeds of the federation partners it lists
+in an operator-local `chio.revocation-partner-registry.v1` registry:
+
+- each entry carries `partnerId` (1 to 64 bytes of lowercase ASCII letters,
+  digits, `-` or `_`, equal to its map key), `issuer` (an `https` URL without
+  userinfo, query, fragment or trailing slash), `authorityPublicKey` (the key
+  that signs the partner's revocation roots), `issuerPublicKeys` (1 to 8
+  distinct keys the partner signs native passport credentials under,
+  including the authority key and any retired key whose credentials are still
+  presented) and `revocationFreshnessTtlSeconds` (1 to 300)
+- the registry is refused whole when any entry is invalid, when two entries
+  name one issuer under case-insensitive scheme and host, default port
+  elision and trailing path slashes, or when one key appears in two entries
+- a native credential binds to the partner one of whose `issuerPublicKeys`
+  has the credential issuer DID as its `did:chio`
+- each partner's mirror is a revocation oracle beside the registry; its leaf
+  count is its cursor
+- a sync fetches the signed root, verifies it against the pinned authority
+  key, then fetches leaf pages after the mirror's leaf count; every page must
+  echo the requested `after` and carry leaves whose `seq` values continue the
+  mirror by one each; a partner more than 65,536 leaves ahead is refused,
+  and at most 65,536 leaves are staged and applied in one sync, so leaves a
+  final page carries past the signed root's leaf count are dropped
+- every request of one sync is bounded by the time left before the sync's
+  single deadline, and the mirror commits only after the last fetch, at a
+  time read after it, and only when the fetch finished before that deadline;
+  a fetch abandoned at the deadline never writes the mirror
+- the mirror accepts the signed root only when the rebuilt root, epoch and
+  leaf count equal it; a root that does not verify, is dated more than 5
+  seconds ahead, rolls back the accepted epoch or signing time, or signs a
+  second root for an accepted epoch is refused, and a refused sync leaves the
+  mirror unchanged
+- the mirror records a refused root that rolls back, re-signs an accepted
+  epoch, or does not match its leaves, once per distinct signed root (keyed
+  by the SHA-256 of its canonical JSON), up to 256 records, and refuses any
+  further conflicting root once that bound is reached
+- a mirror whose accepted root is older than the TTL, holds no verified
+  root, or whose tree differs from its accepted root is stale and refuses
+- a mirror refuses a passport when it holds the passport leaf or the
+  credential leaf of any credential digest checked with it
+
+Every passport door (the service and public challenge verifications, the
+OID4VP direct post and federated issuance) consults the partner mirrors when
+the operator configures a partner registry:
+
+- the door re-reads the registry on every admission and refuses when it is
+  missing or invalid
+- a native passport is matched to every partner one of whose
+  `issuerPublicKeys` signed one of its credentials, and is checked by its
+  passport id and by the digest of each credential that partner signed; a
+  portable credential is matched by its `iss` and checked by its passport id
+- before its acceptance instant the door syncs every matched mirror that is
+  not fresh, and refuses when a sync fails
+- after the last network wait the door reads its clock once and, at that one
+  instant, revalidates the presentation, the challenge or request window, the
+  lifecycle state and, for federated issuance, the delegation policy and
+  parent capability bounds, then requires every matched mirror to be fresh
+  and to hold none of the passport keys before it consumes the challenge or
+  request
+- the OID4VP door resolves a local lifecycle registry again at that instant;
+  a remote lifecycle answer holds only until the time sampled before the
+  partner sync plus the `cache_ttl_secs` of the credential's signed status
+  reference, and a reference without a TTL is refused
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 

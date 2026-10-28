@@ -226,10 +226,7 @@ async fn held_verification(
     let verification = tokio::spawn({
         let lane = Arc::clone(&lane);
         let state = holders.state.clone();
-        let clock_now = holders.now;
-        async move {
-            verify_public_passport_challenge_in_lane(&lane, state, submission, clock_now).await
-        }
+        async move { verify_public_passport_challenge_in_lane(&lane, state, submission).await }
     });
     tokio::time::timeout(HANG_GUARD, opened.recv())
         .await
@@ -250,7 +247,6 @@ fn next_verification_polled_once(
         lane,
         holders.state.clone(),
         holders.submission(challenge_id),
-        holders.now,
     )
     .now_or_never()
     .test_unwrap()

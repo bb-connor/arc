@@ -90,6 +90,8 @@ mod cluster_and_reports_tests {
             fiscal_runtime: None,
             budget_store,
             revocation_store,
+            passport_revocation_oracle: None,
+            partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
             receipt_store,
             receipt_query_snapshots: None,
             receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),

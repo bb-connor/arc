@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-trust/v1/passport-revocation-leaves.schema.json",
+  "title": "Chio Passport Revocation Leaves Page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "after", "leaves"],
+  "properties": {
+    "schema": { "const": "chio.trust.passport-revocation-leaves.v1" },
+    "after": { "$ref": "#/$defs/jsonSafeCount" },
+    "leaves": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "kind", "subject"],
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "kind": { "enum": ["passport", "credential"] },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "x-maxUtf8Bytes": 4096
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "jsonSafeCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

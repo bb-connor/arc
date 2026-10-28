@@ -221,7 +221,10 @@ fn signed_unknown_projection(
     incident_id: &str,
     at: u64,
 ) -> AnchoredTestResult<(AdmissionRecoveryLease, SignedAdmissionTerminalProjectionV1)> {
-    let claimant = format!("kernel:{}", signer.public_key().to_hex());
+    let claimant =
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(&signer.public_key())?
+            .as_str()
+            .to_owned();
     let lease = claim(fixture, operation, &claimant, at);
     let envelope =
         signed_unknown_projection_for_lease(fixture, operation, signer, &lease, incident_id, at)?;

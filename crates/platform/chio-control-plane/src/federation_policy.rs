@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::CliError;
 
+const MAX_REGISTRY_BYTES: usize = 64 * 1024 * 1024;
+
 pub const FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA: &str =
     "chio.permissionless-federation-policy.v1";
 pub const FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION: &str =
@@ -123,10 +125,10 @@ impl Default for FederationAdmissionPolicyRegistry {
 
 impl FederationAdmissionPolicyRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded_with_limit(path, MAX_REGISTRY_BYTES) {
             Ok(bytes) => {
                 let mut registry: Self =
-                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_REGISTRY_BYTES)
                         .and_then(|input| input.decode_signed())?;
                 if registry.version != FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION {
                     return Err(CliError::cli_other_error(format!(

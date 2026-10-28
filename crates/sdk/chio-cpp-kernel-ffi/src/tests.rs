@@ -613,3 +613,155 @@ fn ffi_abi_version_is_one() {
     let value: serde_json::Value = serde_json::from_str(&info).unwrap();
     assert_eq!(value["abi_version"], 1);
 }
+
+const REPEATED_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+
+fn repeat_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member},{member}"), 1)
+}
+
+fn assert_signed_input_refused<T: std::fmt::Debug>(
+    result: Result<T, KernelFfiError>,
+    context: &str,
+) {
+    match result {
+        Err(KernelFfiError::InvalidJson(message)) => {
+            assert_eq!(message, format!("{context}: {REPEATED_KEY}"));
+        }
+        other => panic!("{context}: expected InvalidJson, got {other:?}"),
+    }
+}
+
+#[test]
+fn entry_points_refuse_a_repeated_key_in_the_original_json() {
+    let token_id = r#""id":"cap-1""#;
+    let envelope = evaluate_envelope("echo");
+    evaluate_json_str(&envelope).unwrap();
+    assert_signed_input_refused(
+        evaluate_json_str(&repeat_member(&envelope, token_id)),
+        "evaluate request",
+    );
+
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_at(&subject, &issuer, 0, 10);
+    let token_json = serde_json::to_string(&capability).unwrap();
+    let authority = issuer.public_key().to_hex();
+    verify_capability_json_str(&token_json, &authority, 0).unwrap();
+    assert_signed_input_refused(
+        verify_capability_json_str(&repeat_member(&token_json, token_id), &authority, 0),
+        "capability token",
+    );
+
+    let context = json!({
+        "token": capability,
+        "trusted_issuers": [authority],
+        "now_secs": 0,
+    })
+    .to_string();
+    verify_capability_with_context_json_str(&context).unwrap();
+    assert_signed_input_refused(
+        verify_capability_with_context_json_str(&repeat_member(&context, token_id)),
+        "verify capability request",
+    );
+
+    let keypair = Keypair::generate();
+    let body_json = make_receipt_body_json(&keypair, sha256_hex(b"{}"));
+    let receipt_id = r#""id":"rcpt-cpp-1""#;
+    sign_receipt_relaying_trusted_body_json_str(&body_json, &keypair.seed_hex()).unwrap();
+    assert_signed_input_refused(
+        sign_receipt_relaying_trusted_body_json_str(
+            &repeat_member(&body_json, receipt_id),
+            &keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+    assert_signed_input_refused(
+        sign_receipt_json_str(
+            &repeat_member(&body_json, receipt_id),
+            &hex::encode(b"{}"),
+            &keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+}
+
+fn exponent_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member}e0"), 1)
+}
+
+#[test]
+fn signed_entry_points_refuse_a_non_canonical_number() {
+    let envelope = evaluate_envelope("echo");
+    let issued_at = format!(r#""issued_at":{ISSUED_AT}"#);
+    evaluate_json_str(&envelope).unwrap();
+    for number in ["1e-07", "1.0E-7"] {
+        let member = r#""msg":"hello""#;
+        assert_eq!(envelope.matches(member).count(), 1);
+        let arguments = envelope.replacen(member, &format!(r#""threshold":{number}"#), 1);
+        evaluate_json_str(&arguments).expect("unsigned argument exponent is accepted");
+    }
+    assert_signed_input_refused(
+        evaluate_json_str(&exponent_member(&envelope, &issued_at)),
+        "evaluate request",
+    );
+
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_at(&subject, &issuer, 0, 10);
+    let token_json = serde_json::to_string(&capability).unwrap();
+    let authority = issuer.public_key().to_hex();
+    assert_signed_input_refused(
+        verify_capability_json_str(
+            &exponent_member(&token_json, r#""expires_at":10"#),
+            &authority,
+            0,
+        ),
+        "capability token",
+    );
+    let context = json!({
+        "token": capability,
+        "trusted_issuers": [authority],
+        "now_secs": 5,
+    })
+    .to_string();
+    verify_capability_with_context_json_str(&context).unwrap();
+    assert_signed_input_refused(
+        verify_capability_with_context_json_str(&exponent_member(&context, r#""now_secs":5"#)),
+        "verify capability request",
+    );
+
+    let keypair = Keypair::generate();
+    let body_json = make_receipt_body_json(&keypair, sha256_hex(b"{}"));
+    let timestamp = format!(r#""timestamp":{ISSUED_AT}"#);
+    sign_receipt_relaying_trusted_body_json_str(&body_json, &keypair.seed_hex()).unwrap();
+    assert_signed_input_refused(
+        sign_receipt_relaying_trusted_body_json_str(
+            &exponent_member(&body_json, &timestamp),
+            &keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+    assert_signed_input_refused(
+        sign_receipt_json_str(
+            &exponent_member(&body_json, &timestamp),
+            &hex::encode(b"{}"),
+            &keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+}
+
+#[test]
+fn json_entry_points_refuse_input_over_the_bound() {
+    let oversized = " ".repeat(MAX_JSON_INPUT_BYTES + 1);
+    match evaluate_json_str(&oversized) {
+        Err(KernelFfiError::InvalidJson(message)) => assert_eq!(
+            message,
+            "evaluate request: urn:chio:error:attest:signed-json-too-large"
+        ),
+        other => panic!("expected InvalidJson, got {other:?}"),
+    }
+}

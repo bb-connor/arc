@@ -1974,6 +1974,19 @@ codes:
       - chio-quarantine
       - chio-control-plane
 
+  - urn: "urn:chio:error:kernel:response-executor-store-retired"
+    domain: kernel
+    severity: error
+    summary: "Response refused: response executor store retired."
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry."
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-STORE-RETIRED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-security-types
+      - chio-quarantine
+      - chio-control-plane
+
   - urn: "urn:chio:error:kernel:response-executor-work-mismatch"
     domain: kernel
     severity: error

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "durable_admission/nonce_signing_identity.rs"]
+mod nonce_signing_identity;
+
 #[path = "durable_admission/cleanup_fault_ownership.rs"]
 mod cleanup_fault_ownership;
 #[path = "durable_admission/configuration.rs"]
