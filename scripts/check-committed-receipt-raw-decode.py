@@ -25,7 +25,7 @@ with the duplicate-refusing reader that produced it. The script checks itself
 against fixture trees on every run before it scans the workspace.
 
 Every production workspace member is scanned: `crates/` and each other
-top-level member directory except `bench`, `examples` and `tests`. A renamed
+declared member directory except `bench`, `examples` and `tests`. A renamed
 import (`use path::ChioReceipt as Receipt`) is read as an alias.
 
 The scan resolves lexical crate/module paths, type aliases and imports before
@@ -435,10 +435,27 @@ STATIC_ITEM = re.compile(r"\b(?:static|const)\s+(?:mut\s+)?(\w+)\s*:\s*([^=;]+?)
 LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
 
 
+def production_cfg(expression: str):
+    expression = expression.strip()
+    if expression == "test":
+        return False
+    match = re.fullmatch(r"(all|any|not)\((.*)\)", expression, re.S)
+    if not match:
+        return None
+    values = [production_cfg(part) for part in _resolution.split_arguments(match.group(2))]
+    if match.group(1) == "not":
+        return not values[0] if len(values) == 1 and values[0] is not None else None
+    if match.group(1) == "all":
+        return False if False in values else True if all(value is True for value in values) else None
+    return True if True in values else False if all(value is False for value in values) else None
+
+
 def without_test_items(code: str) -> str:
     """Blank every `#[cfg(test)]` item in code whose comments and literals are masked."""
     output = list(code)
-    for match in re.finditer(r"#\[cfg\(test\)\]", code):
+    for match in re.finditer(r"#\[cfg\((.*?)\)\]", code, re.S):
+        if production_cfg(match.group(1)) is not False:
+            continue
         start = match.end()
         prefix = re.match(r"\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?", code[start:])
         fragment = start + prefix.end()
@@ -469,18 +486,18 @@ NONPRODUCTION_ROOTS = frozenset({"bench", "examples", "tests"})
 
 
 def production_roots(root: Path) -> list[str]:
-    """Top-level directories that hold production workspace members."""
+    """Production crates and the declared non-crate workspace member directories."""
     roots = {"crates"}
     manifest = root / "Cargo.toml"
     if manifest.is_file():
         members = tomllib.loads(manifest.read_text(encoding="utf-8")).get("workspace", {}).get("members", [])
-        roots |= {member.split("/")[0] for member in members} - NONPRODUCTION_ROOTS
+        roots |= {path.relative_to(root).as_posix() for member in members if member.split("/")[0] not in NONPRODUCTION_ROOTS | {"crates"} for path in root.glob(member) if path.is_dir()}
     return sorted(roots)
 
 
 def production_files(root: Path) -> list[tuple[str, str]]:
     files = []
-    paths = sorted(path for top in production_roots(root) for path in (root / top).rglob("*"))
+    paths = sorted({path for top in production_roots(root) for path in (root / top).rglob("*")})
     for path in paths:
         rel = path.relative_to(root).as_posix()
         if path.suffix not in {".rs", ".inc"} or not _gate.production(path) or "examples" in rel.split("/") or path.name == "fuzz.rs":
@@ -496,7 +513,7 @@ def production_files(root: Path) -> list[tuple[str, str]]:
             if path.is_file() and path.suffix in {".rs", ".inc"} and path.resolve().is_relative_to(root.resolve()):
                 seen.add(child)
                 files.append((child, without_test_items(_lexer.blank_rust_noise(path.read_text(encoding="utf-8")))))
-    return files
+    return _resolution.production_module_files(root, files, SimpleNamespace(**globals()))
 
 
 @functools.lru_cache(maxsize=64)
@@ -724,7 +741,10 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases
             else:
                 yield match.start(), None, kind
     for match in TRAIT_CALL.finditer(fn_code, body_start):
-        yield match.start(), match.group(1) or match.group(2), "text"
+        target = match.group(1)
+        if target is None and match.group(2):
+            target = re.sub(r"\s*::\s*deserialize\s*\($", "", match.group()).strip()
+        yield match.start(), target, "text"
     for match in DOCUMENT_CALL.finditer(fn_code, body_start):
         start = receiver_start(fn_code, match.start())
         after = fn_code[match.end():].lstrip()
@@ -847,10 +867,17 @@ def in_deserialize_impl(code: str, offset: int) -> bool:
 def scan(root: Path) -> list[str]:
     files = production_files(root)
     strict = _resolution.TypeResolver(root, files, SimpleNamespace(**globals()))
-    helpers = generic_raw_helpers(files)
+    decoded_files = []
+    for rel, code in files:
+        output = list(code)
+        for match in re.finditer(r"\bmacro_rules!\s*\w+\s*\{", code):
+            end = _contracts.closing(code, match.end() - 1, "{", "}")
+            output[match.start():end] = " " * (end - match.start())
+        decoded_files.append((rel, "".join(output)))
+    helpers = generic_raw_helpers(decoded_files)
     aliases = {rel: raw_aliases(code) for rel, code in files}
     findings = []
-    for rel, code in files:
+    for rel, code in decoded_files:
         for row in _contracts.functions(code):
             owner = row[0]
             fn_code = _contracts.owner_code(code, row)
