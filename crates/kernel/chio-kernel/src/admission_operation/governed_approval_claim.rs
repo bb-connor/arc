@@ -9,10 +9,11 @@ use chio_core::capability::governance::{GovernedApprovalDecision, GovernedApprov
 use serde::{Deserialize, Serialize};
 
 pub const MAX_GOVERNED_APPROVAL_CLAIM_EPISODES: usize = 128;
+pub const MAX_GOVERNED_APPROVAL_AUTHORITY_CAPACITY: u64 = 65_536;
 const MAX_UNIX_SECS: u64 = 9_007_199_254_740;
 const MAX_APPROVAL_TTL_SECS: u64 = 3600;
 
-/// Independently configured migration generation, not an authority credential.
+/// Independently configured authority generation, not an authority credential.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GovernedApprovalAuthorityBindingV1 {
@@ -34,6 +35,51 @@ impl GovernedApprovalAuthorityBindingV1 {
     }
     pub fn expectation_id(&self) -> &AdmissionIdentifier {
         &self.expectation_id
+    }
+}
+
+/// Durable readback of an operator-installed approval authority. It names the
+/// destination store that owns the claims and bounds their live capacity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GovernedApprovalAuthorityInstallV1 {
+    binding: GovernedApprovalAuthorityBindingV1,
+    destination_store_uuid: String,
+    capacity: u64,
+    installed_at_unix_ms: u64,
+}
+
+impl GovernedApprovalAuthorityInstallV1 {
+    pub fn new(
+        binding: GovernedApprovalAuthorityBindingV1,
+        destination_store_uuid: String,
+        capacity: u64,
+        installed_at_unix_ms: u64,
+    ) -> Result<Self, Error> {
+        if destination_store_uuid.is_empty()
+            || capacity == 0
+            || capacity > MAX_GOVERNED_APPROVAL_AUTHORITY_CAPACITY
+            || installed_at_unix_ms > MAX_UNIX_SECS * 1000
+        {
+            return Err(invalid("invalid approval authority install"));
+        }
+        Ok(Self {
+            binding,
+            destination_store_uuid,
+            capacity,
+            installed_at_unix_ms,
+        })
+    }
+    pub fn binding(&self) -> &GovernedApprovalAuthorityBindingV1 {
+        &self.binding
+    }
+    pub fn destination_store_uuid(&self) -> &str {
+        &self.destination_store_uuid
+    }
+    pub fn capacity(&self) -> u64 {
+        self.capacity
+    }
+    pub fn installed_at_unix_ms(&self) -> u64 {
+        self.installed_at_unix_ms
     }
 }
 
@@ -99,10 +145,8 @@ impl GovernedApprovalCredentialV1 {
         if self.expires_at_unix_secs > MAX_UNIX_SECS
             || self.expires_at_unix_secs <= self.issued_at_unix_secs
             || self.expires_at_unix_secs - self.issued_at_unix_secs > MAX_APPROVAL_TTL_SECS
-            || self.subject_id.as_str()
-                == super::governed_approval_replay::LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT
         {
-            return Err(invalid("invalid approval lifetime or reserved subject"));
+            return Err(invalid("invalid approval lifetime"));
         }
         Ok(())
     }

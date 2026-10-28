@@ -13,38 +13,19 @@ fn add_approval(route: &mut Route, request: &mut ToolCallRequest) -> AnchoredTes
     route
         .kernel
         .set_governed_approval_policy(tenant_id.into(), vec![route.signer.public_key()])?;
-    let path = route.fixture._temp.path().join("composed-approval.db");
-    drop(crate::SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 16)?);
-    let source = Arc::new(crate::SqliteGovernedApprovalReplaySource::open(&path)?);
-    let authority = identifier("authority", "composed-approval");
-    let expected = route.fixture.store.expect_governed_approval_replay_source(
-        &identifier("source", "composed-approval-source"),
-        &authority,
-        source.as_ref(),
+    let binding = GovernedApprovalAuthorityBindingV1::new(
+        identifier("authority", "composed-approval"),
+        identifier("expectation", "composed-approval-generation"),
+    );
+    route.fixture.store.install_governed_approval_authority(
+        &binding,
+        16,
         &route.fixture.fence,
         now_ms(),
     )?;
-    let imported = route.fixture.store.import_governed_approval_replay_source(
-        &authority,
-        expected.expectation_id(),
-        source.as_ref(),
-        &route.fixture.fence,
-        now_ms(),
-    )?;
-    let binding =
-        GovernedApprovalAuthorityBindingV1::new(authority, imported.expectation_id().clone());
-    route
-        .fixture
-        .store
-        .activate_governed_approval_replay_source(
-            &binding,
-            source.as_ref(),
-            &route.fixture.fence,
-            now_ms(),
-        )?;
     route
         .kernel
-        .set_operation_owned_governed_approval_source(binding, source)?;
+        .set_operation_owned_governed_approval_authority(binding)?;
     let mut body = request.capability.body();
     for grant in &mut body.scope.grants {
         grant

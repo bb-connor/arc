@@ -50,15 +50,7 @@ pub(super) fn configure_original_selection(
         ));
     }
     if let Some(binding) = profile.approval() {
-        kernel.set_operation_owned_governed_approval_source(
-            binding.clone(),
-            Arc::new(
-                chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-                    witness.directory.join("native-approval.db"),
-                    witness.clock(),
-                )?,
-            ),
-        )?;
+        kernel.set_operation_owned_governed_approval_authority(binding.clone())?;
     }
     if let Some(binding) = profile.dpop() {
         kernel.set_operation_owned_dpop_authority(binding.clone())?;

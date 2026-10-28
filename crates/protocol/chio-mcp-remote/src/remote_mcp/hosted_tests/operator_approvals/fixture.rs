@@ -71,33 +71,14 @@ capabilities:
     let authority = runtime.local_authority_store().ok_or("local authority")?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
-    let replay = directory.join("approval-replay.sqlite3");
-    drop(chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_capacity(&replay, 128)?);
-    let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open(&replay)?;
-    let authority_id = AdmissionIdentifier::try_new("approval_authority", "mcp-operator")?;
-    let source_id = AdmissionIdentifier::try_new("approval_source", "mcp-replay")?;
-    let now = config.clock.millis()?;
-    let expected = store.expect_governed_approval_replay_source(
-        &source_id,
-        &authority_id,
-        &source,
-        &fence,
-        now,
-    )?;
-    let imported = store.import_governed_approval_replay_source(
-        &authority_id,
-        expected.expectation_id(),
-        &source,
-        &fence,
-        now,
-    )?;
-    let binding =
-        GovernedApprovalAuthorityBindingV1::new(authority_id, imported.expectation_id().clone());
-    store.activate_governed_approval_replay_source(&binding, &source, &fence, now)?;
+    let binding = GovernedApprovalAuthorityBindingV1::new(
+        AdmissionIdentifier::try_new("approval_authority", "mcp-operator")?,
+        AdmissionIdentifier::try_new("expectation_id", "mcp-operator-generation")?,
+    );
+    store.install_governed_approval_authority(&binding, 128, &fence, config.clock.millis()?)?;
     config.approval = Some(RemoteApprovalConfig {
         tenant_id: "ap23-mcp-tenant".into(),
         approvers: vec![approver.public_key()],
-        replay_source_path: replay,
         binding,
     });
     Ok(config)

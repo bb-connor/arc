@@ -1,8 +1,7 @@
-//! Explicit operator approval principals and previously activated replay custody.
+//! Explicit operator approval principals and a previously installed approval authority.
 
 use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::Path;
 
 use chio_core::PublicKey;
 use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
@@ -11,13 +10,12 @@ use serde::{Deserialize, Serialize};
 use crate::CliError;
 
 /// Public pins only. Signing stays with the external operator, and loading this
-/// document never imports or activates a replay authority.
+/// document never installs an approval authority.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteApprovalConfig {
     pub tenant_id: String,
     pub approvers: Vec<PublicKey>,
-    pub replay_source_path: PathBuf,
     pub binding: GovernedApprovalAuthorityBindingV1,
 }
 
@@ -45,13 +43,8 @@ pub(super) fn configure(
     kernel
         .set_governed_approval_policy(config.tenant_id.clone(), config.approvers.clone())
         .map_err(config_error)?;
-    let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-        &config.replay_source_path,
-        kernel.authority_clock(),
-    )
-    .map_err(config_error)?;
     kernel
-        .set_operation_owned_governed_approval_source(config.binding.clone(), Arc::new(source))
+        .set_operation_owned_governed_approval_authority(config.binding.clone())
         .map_err(config_error)
 }
 

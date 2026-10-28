@@ -1,5 +1,4 @@
 -- Approval claims share the admission authority and its participant commit chain.
--- Historical source markers remain in the separate, permanent migration import.
 CREATE TABLE IF NOT EXISTS governed_approval_replay_claim_episodes (
     operation_id TEXT NOT NULL CHECK (
         typeof(operation_id) = 'text'
@@ -30,7 +29,7 @@ CREATE TABLE IF NOT EXISTS governed_approval_replay_claim_episodes (
     PRIMARY KEY (operation_id, episode_id),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
     FOREIGN KEY (approval_authority_id)
-        REFERENCES governed_approval_replay_migration_expectations(approval_authority_id)
+        REFERENCES governed_approval_replay_authorities(approval_authority_id)
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS governed_approval_replay_claim_resources (

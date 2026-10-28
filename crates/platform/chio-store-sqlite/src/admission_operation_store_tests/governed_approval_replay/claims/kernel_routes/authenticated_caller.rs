@@ -72,10 +72,7 @@ fn authenticated_caller_start_retains_approval_without_legacy_replay_or_reacquis
     )?;
     let mut reopened = kernel_recovery::kernel_with_signer(&route.fixture, route.signer.clone())?;
     reopened.set_caller_executor(executor)?;
-    reopened.set_operation_owned_governed_approval_source(
-        route.binding.clone(),
-        route.source.clone(),
-    )?;
+    reopened.set_operation_owned_governed_approval_authority(route.binding.clone())?;
     reopened.set_execution_nonce_store(
         config.clone(),
         Box::new(chio_kernel::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),

@@ -9,14 +9,10 @@ use crate::admission_operation::governed_approval_claim::{
     GovernedApprovalClaimIntentV1, GovernedApprovalClaimPhase, GovernedApprovalClaimReferenceV1,
     GovernedApprovalCredentialV1,
 };
-use crate::admission_operation::governed_approval_replay::{
-    GovernedApprovalReplaySourcePort, GovernedApprovalReplaySourceSnapshot,
-};
 use crate::admission_operation::AdmissionRecoveryLease;
 
 pub(crate) struct GovernedApprovalAuthority {
     binding: GovernedApprovalAuthorityBindingV1,
-    source: Arc<dyn GovernedApprovalReplaySourcePort>,
 }
 
 impl ChioKernel {
@@ -28,59 +24,48 @@ impl ChioKernel {
             .map(|authority| &authority.binding)
     }
 
-    /// Install an explicitly activated approval source. This performs no import,
-    /// activation or legacy history reset. Once configured, presented single
-    /// approvals require operation-owned custody; the legacy store is not used.
-    pub fn set_operation_owned_governed_approval_source(
+    /// Bind this kernel to an operator-installed approval authority. The
+    /// destination store must already hold the exact install; this never
+    /// creates one. Once configured, presented single approvals require
+    /// operation-owned custody.
+    pub fn set_operation_owned_governed_approval_authority(
         &mut self,
         binding: GovernedApprovalAuthorityBindingV1,
-        source: Arc<dyn GovernedApprovalReplaySourcePort>,
     ) -> Result<(), KernelError> {
-        let authority = GovernedApprovalAuthority { binding, source };
-        self.verify_governed_approval_source(&authority)?;
+        let authority = GovernedApprovalAuthority { binding };
+        self.verify_governed_approval_authority(&authority)?;
         self.governed_approval_authority = Some(authority);
         Ok(())
     }
 
-    pub(crate) fn verify_configured_governed_approval_source(&self) -> Result<(), KernelError> {
+    pub(crate) fn verify_configured_governed_approval_authority(&self) -> Result<(), KernelError> {
         let authority = self
             .governed_approval_authority
             .as_ref()
-            .ok_or_else(|| error("operation-owned approval source is not configured"))?;
-        self.verify_governed_approval_source(authority).map(|_| ())
+            .ok_or_else(|| error("operation-owned approval authority is not configured"))?;
+        self.verify_governed_approval_authority(authority)
     }
 
-    fn verify_governed_approval_source(
+    fn verify_governed_approval_authority(
         &self,
         authority: &GovernedApprovalAuthority,
-    ) -> Result<GovernedApprovalReplaySourceSnapshot, KernelError> {
+    ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
-        let snapshot = {
-            let _guard = runtime.lock_mutations()?;
-            let now = runtime.refresh_trusted_time(0)?;
-            let snapshot = store_call("activation", || {
-                runtime.store.load_governed_approval_activation(
-                    &authority.binding,
-                    &runtime.fence,
-                    now,
-                )
-            })?;
-            if snapshot.approval_authority_id()
-                != authority.binding.approval_authority_id().as_str()
-                || snapshot.destination_authority_id() != runtime.fence.store_uuid
-            {
-                return Err(error(
-                    "approval activation changed its configured authority",
-                ));
-            }
-            snapshot
-        };
-        // The backend may perform I/O or reenter the destination. Never hold
-        // the mutation sequencer while verifying the actual sealed source.
-        store_call("source verification", || {
-            authority.source.verify_exact(&snapshot)
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(0)?;
+        let install = store_call("authority", || {
+            runtime
+                .store
+                .load_governed_approval_authority(&authority.binding, &runtime.fence, now)
         })?;
-        Ok(snapshot)
+        if install.binding() != &authority.binding
+            || install.destination_store_uuid() != runtime.fence.store_uuid
+        {
+            return Err(error(
+                "approval authority install differs from its configured binding",
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn claim_prepared_governed_approval(

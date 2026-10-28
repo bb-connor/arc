@@ -47,8 +47,7 @@ fn real_budget_authorization_checks_new_authority_but_acknowledges_expired_histo
 ) -> AnchoredTestResult {
     for already_authorized in [false, true] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, mut credential) = setup(&fixture, "real-budget-authorization")?;
         let expires = now_ms() / 1000 + 60;
         credential.expires_at_unix_secs = expires;
@@ -105,8 +104,7 @@ fn real_capture_checks_new_authority_but_acknowledges_expired_dispatch_history(
 ) -> AnchoredTestResult {
     for already_captured in [false, true] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, mut credential) = setup(&fixture, "real-budget-capture")?;
         let expires = now_ms() / 1000 + 60;
         credential.expires_at_unix_secs = expires;

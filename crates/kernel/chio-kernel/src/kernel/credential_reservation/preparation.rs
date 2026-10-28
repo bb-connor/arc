@@ -230,7 +230,7 @@ impl ChioKernel {
             ));
         }
         if approval_intent_hash.is_some() && self.governed_approval_authority.is_some() {
-            self.verify_configured_governed_approval_source()?;
+            self.verify_configured_governed_approval_authority()?;
         } else if approval_intent_hash.is_some() && self.approval_replay_store.is_none() {
             return Err(KernelError::GovernedTransactionDenied(
                 "approval replay store not configured; denying as fail-closed".to_string(),

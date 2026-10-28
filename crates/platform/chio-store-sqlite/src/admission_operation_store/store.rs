@@ -6,7 +6,6 @@ use chio_kernel::admission_operation::governed_approval_claim::{
     GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimHistoryV1,
     GovernedApprovalClaimIntentV1, GovernedApprovalClaimReferenceV1,
 };
-use chio_kernel::admission_operation::governed_approval_replay::GovernedApprovalReplaySourceSnapshot;
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantAuthorityBindingV1, RuntimeParticipantClaimHistoryV1,
     RuntimeParticipantClaimIntentV1, RuntimeParticipantClaimReferenceV1,
@@ -319,13 +318,16 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
     > {
         Self::load_dpop_replay_claim_history(self, operation_id, fence, now)
     }
-    fn load_governed_approval_activation(
+    fn load_governed_approval_authority(
         &self,
         binding: &GovernedApprovalAuthorityBindingV1,
         fence: &StoreMutationFence,
         now: u64,
-    ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
-        Self::load_governed_approval_activation(self, binding, fence, now)
+    ) -> Result<
+        chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityInstallV1,
+        AdmissionOperationStoreError,
+    >{
+        Self::load_governed_approval_authority(self, binding, fence, now)
     }
     fn claim_governed_approval(
         &self,
