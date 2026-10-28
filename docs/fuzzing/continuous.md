@@ -59,9 +59,21 @@ per budget envelope:
   shared ledger (`GH_FUZZ_BUDGET_LEDGER`, kept in the Actions cache) that
   holds the executed seconds of completed runs; each check queries only runs
   the ledger has not seen.
-- PR-time CFLite budget checks are advisory when the shared trailing window is
-  already over cap. The PR still runs changed-target sampling, but shared
-  budget exhaustion does not block unrelated merge readiness.
+- Named exception `cflite-pr-evidence`: the `cflite_pr.yml` budget step sets
+  `GH_FUZZ_BUDGET_CAP_EXCEPTION=cflite-pr-evidence`, so a `cflite` overrun is
+  reported (the gate prints an `EXCEPTION cflite-pr-evidence` line) and the
+  PR still runs changed-target sampling. PR fuzzing is per-PR evidence, its
+  minutes still count toward the window, and `cflite_batch.yml` enforces the
+  cap. The exception is valid only with `GH_FUZZ_BUDGET_SCOPE=cflite`; no other
+  lane has one.
+- GitHub rate limits (HTTP 403, 429) and server errors (HTTP 5xx) are retried
+  for three attempts, honouring `Retry-After` and `X-RateLimit-Reset`
+  (otherwise 1s then 2s). A required wait over 600s or a third failure leaves
+  the usage unverified, which fails a capped envelope (exit 2); the mutation
+  envelope reports it as unverified.
+- Each budget step restores the ledger before the check and saves it with
+  `if: always()`, and the gate writes the runs it validated even when it
+  fails, so a failed or rate-limited check does not lose its progress.
 - The nightly `cflite_batch.yml` rotation and the `fuzz.yml` matrix hard halt
   at their caps. The trailing window drops runs older than 30 days, so a halted
   lane resumes once its usage is back under the cap.

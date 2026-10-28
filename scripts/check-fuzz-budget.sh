@@ -21,17 +21,26 @@
 # A capped envelope at or over its cap fails the gate, and an API error,
 # truncated listing or unregistered workflow in a capped envelope fails it
 # closed. The mutation envelope only reports: its usage, or the reason it is
-# unverified, is printed and never changes the exit code. cap_mode defaults to
-# "fail"; set GH_FUZZ_BUDGET_CAP_MODE=warn only for advisory lanes.
+# unverified, is printed and never changes the exit code.
+#
+# Rate limits (HTTP 403 or 429) and server errors (HTTP 5xx) are retried up to
+# three attempts, waiting for Retry-After, then X-RateLimit-Reset when the
+# rate limit is exhausted, then 1s and 2s. A wait longer than 600s, or a third
+# failure, ends the check as unverified (exit 2 in a capped envelope).
+#
+# GH_FUZZ_BUDGET_CAP_EXCEPTION=cflite-pr-evidence is the one cap exception:
+# cflite_pr reports a cflite overrun without failing, because PR fuzzing is
+# per-PR evidence whose minutes still count toward the window while
+# cflite_batch enforces the cap. It is valid only with GH_FUZZ_BUDGET_SCOPE=cflite.
 #
 # Usage:
 #   scripts/check-fuzz-budget.sh                      # default repo: backbay-labs/chio
 #   scripts/check-fuzz-budget.sh OWNER/REPO
 #   GH_FUZZ_BUDGET_SCOPE=cflite scripts/check-fuzz-budget.sh   # cflite|native|mutation|all
 #   GH_FUZZ_BUDGET_LEDGER=/path/ledger.json scripts/check-fuzz-budget.sh
-#   GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn scripts/check-fuzz-budget.sh
 #   GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE=warn scripts/check-fuzz-budget.sh
-#   GH_FUZZ_BUDGET_CAP_MODE=warn scripts/check-fuzz-budget.sh
+#   GH_FUZZ_BUDGET_SCOPE=cflite GH_FUZZ_BUDGET_CAP_EXCEPTION=cflite-pr-evidence \
+#       scripts/check-fuzz-budget.sh
 #
 # GH_FUZZ_BUDGET_LEDGER names a JSON file that caches the executed seconds of
 # completed run attempts, so repeated invocations only query jobs for runs the
@@ -88,9 +97,23 @@ require gh
 require jq
 require date
 
-rate_limit_mode="${GH_FUZZ_BUDGET_RATE_LIMIT_MODE:-fail}"
 missing_workflow_mode="${GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE:-fail}"
-cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-fail}"
+cap_exception="${GH_FUZZ_BUDGET_CAP_EXCEPTION:-}"
+case "${cap_exception}" in
+    "") ;;
+    cflite-pr-evidence)
+        if [[ "${SCOPE}" != "cflite" ]]; then
+            err "fuzz-budget: GH_FUZZ_BUDGET_CAP_EXCEPTION=cflite-pr-evidence only applies to GH_FUZZ_BUDGET_SCOPE=cflite"
+            exit 2
+        fi
+        ;;
+    *)
+        err "fuzz-budget: unknown GH_FUZZ_BUDGET_CAP_EXCEPTION: ${cap_exception}"
+        exit 2
+        ;;
+esac
+API_ATTEMPTS=3
+API_MAX_WAIT_SECONDS=600
 
 now_epoch="$(date -u +%s)"
 since_epoch=$(( now_epoch - WINDOW_DAYS * 86400 ))
@@ -136,7 +159,23 @@ cflite_window_start() {
 since="$(iso_utc "${since_epoch}")"
 
 work="$(mktemp -d)"
-trap 'rm -rf "${work}"' EXIT
+# shellcheck disable=SC2317  # invoked from the EXIT trap
+# write_ledger: merges the validated completed runs of this invocation into the
+# ledger, also when the check stops early, so later checks resume from them.
+write_ledger() {
+    if [[ -z "${LEDGER}" || ! -f "${work}/ledger-out.ndjson" ]]; then
+        return 0
+    fi
+    local ledger_tmp="${LEDGER}.tmp.$$"
+    jq -s --arg repo "${REPO}" --arg since "${since}" \
+        --slurpfile previous "${work}/ledger-in.json" \
+        '{repo: $repo,
+          runs: (($previous[0]
+                  | with_entries(select(.value.created >= $since)))
+                 + from_entries)}' "${work}/ledger-out.ndjson" >"${ledger_tmp}" \
+        && mv "${ledger_tmp}" "${LEDGER}"
+}
+trap 'write_ledger; rm -rf "${work}"' EXIT
 
 ledger_in="${work}/ledger-in.json"
 printf '{}' >"${ledger_in}"
@@ -154,32 +193,57 @@ fi
 ledger_out="${work}/ledger-out.ndjson"
 : >"${ledger_out}"
 
-# api_get PATH OUTPUT_FILE: paginated GET. Returns 0 on success, 3 when the
-# API reports a missing resource, 4 when rate limited, and exits 2 otherwise.
-api_get() {
-    local path="$1" output="$2" api_error="${work}/api-error"
-    if gh api --paginate "${path}" >"${output}" 2>"${api_error}"; then
-        return 0
-    fi
-    local error_text
-    error_text="$(cat "${api_error}")"
-    if grep -Eq 'HTTP 404|Not Found' <<<"${error_text}"; then
-        return 3
-    fi
-    if grep -Eiq 'rate limit exceeded|HTTP 403' <<<"${error_text}"; then
-        return 4
-    fi
-    err "fuzz-budget: GitHub API failed for ${path}: ${error_text}"
-    exit 2
+# response_header FILE NAME: value of the last NAME header in an --include dump.
+response_header() {
+    grep -i "^$2:" "$1" | tail -n 1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '\r' || true
 }
 
-rate_limited() {
-    err "fuzz-budget: GitHub API rate limited while checking $1; budget usage is unverified"
-    if [[ "${rate_limit_mode}" == "warn" ]]; then
-        err "fuzz-budget: continuing because GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn"
-        return 0
-    fi
-    exit 2
+# api_get PATH OUTPUT_FILE: paginated GET of the response bodies. Returns 0 on
+# success and 3 when the resource does not exist. Rate limits and server
+# errors are retried; anything else, or exhausted retries, exits 2.
+api_get() {
+    local path="$1" output="$2" raw="${work}/api-raw" api_error="${work}/api-error"
+    local attempt status wait retry_after remaining reset
+    for (( attempt = 1; ; attempt++ )); do
+        if gh api --include --paginate "${path}" >"${raw}" 2>"${api_error}"; then
+            awk '/^HTTP\/[0-9.]+ [0-9]+/ { headers = 1; next }
+                 headers && /^\r?$/ { headers = 0; next }
+                 !headers { print }' "${raw}" >"${output}"
+            return 0
+        fi
+        status="$(sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' "${raw}" | tail -n 1)"
+        if [[ -z "${status}" ]]; then
+            status="$(sed -n 's/.*(HTTP \([0-9][0-9][0-9]\)).*/\1/p' "${api_error}" | tail -n 1)"
+        fi
+        if [[ "${status}" == "404" ]]; then
+            return 3
+        fi
+        if ! [[ "${status}" =~ ^(403|429|5[0-9][0-9])$ ]]; then
+            err "fuzz-budget: GitHub API failed for ${path}: $(cat "${api_error}")"
+            exit 2
+        fi
+        if (( attempt >= API_ATTEMPTS )); then
+            err "fuzz-budget: GitHub API still failing (HTTP ${status}) after ${API_ATTEMPTS} attempts for ${path}; budget usage is unverified"
+            exit 2
+        fi
+        retry_after="$(response_header "${raw}" retry-after)"
+        remaining="$(response_header "${raw}" x-ratelimit-remaining)"
+        reset="$(response_header "${raw}" x-ratelimit-reset)"
+        if [[ "${retry_after}" =~ ^[0-9]+$ ]]; then
+            wait="${retry_after}"
+        elif [[ "${remaining}" == "0" && "${reset}" =~ ^[0-9]+$ ]]; then
+            wait=$(( reset - $(date -u +%s) + 1 ))
+            (( wait < 1 )) && wait=1
+        else
+            wait=$(( 1 << (attempt - 1) ))
+        fi
+        if (( wait > API_MAX_WAIT_SECONDS )); then
+            err "fuzz-budget: GitHub API (HTTP ${status}) asks for a ${wait}s wait, longer than ${API_MAX_WAIT_SECONDS}s, for ${path}; budget usage is unverified"
+            exit 2
+        fi
+        err "fuzz-budget: GitHub API returned HTTP ${status} for ${path}; retrying in ${wait}s (attempt ${attempt} of ${API_ATTEMPTS})"
+        sleep "${wait}"
+    done
 }
 
 # list_runs WORKFLOW FROM_ISO TO_ISO OUTPUT_FILE: writes one run per line.
@@ -260,10 +324,6 @@ measure_workflows() {
             fi
             exit 2
         fi
-        if [[ "${status}" -eq 4 ]]; then
-            rate_limited "${wf}"
-            continue
-        fi
 
         workflow_seconds=0
         run_count=0
@@ -279,11 +339,6 @@ measure_workflows() {
                 status=0
                 api_get "repos/${REPO}/actions/runs/${run_id}/jobs?filter=all&per_page=100" \
                     "${jobs}" || status=$?
-                if [[ "${status}" -eq 4 ]]; then
-                    rate_limited "${wf}"
-                    workflow_seconds=-1
-                    break
-                fi
                 if [[ "${status}" -ne 0 ]]; then
                     err "fuzz-budget: jobs for ${wf} run ${run_id} are missing"
                     exit 2
@@ -323,7 +378,9 @@ measure_workflows() {
                 # completed, its completion) time. A job never assigned to a
                 # runner consumes nothing, which is only consistent with it
                 # never running: cancelled, skipped or failed before
-                # assignment, or still waiting for a runner.
+                # assignment (GitHub still stamps started_at and
+                # completed_at on those), or queued, waiting or pending with
+                # no completion time.
                 if ! violation="$(jq -rs --arg run_status "${run_status}" '
                     def text_or_null: type == "string" or type == "null";
                     [[.[].jobs[]] | unique_by(.id)[]
@@ -343,6 +400,13 @@ measure_workflows() {
                        elif .status == "completed"
                             and ([.conclusion] | inside(["cancelled", "skipped", "failure"]) | not)
                        then "unassigned job \(.id) concluded \(.conclusion)"
+                       elif .status != "completed"
+                            and ([.status] | inside(["queued", "waiting", "pending"]) | not)
+                       then "unassigned job \(.id) is \(.status)"
+                       elif .status == "completed" and .completed_at == null
+                       then "unassigned job \(.id) completed without a completion time"
+                       elif .status != "completed" and .completed_at != null
+                       then "unassigned job \(.id) is \(.status) but has a completion time"
                        else empty end
                     ] | first // "ok"' "${jobs}" 2>/dev/null)" || [[ -z "${violation}" ]]; then
                     err "fuzz-budget: malformed jobs listing for ${wf} run ${run_id}"
@@ -376,9 +440,6 @@ measure_workflows() {
             | select(.created_at >= $window)
             | [.id, (.run_attempt // 1), .status, .created_at, (.conclusion // "")]
             | @tsv' "${runs}")
-        if [[ "${workflow_seconds}" -lt 0 ]]; then
-            continue
-        fi
         printf 'fuzz-budget: workflow=%s runs=%d queried=%d executed=%d min\n' \
             "${wf}" "${run_count}" "${queried}" "$(( (workflow_seconds + 59) / 60 ))"
         total_seconds=$(( total_seconds + workflow_seconds ))
@@ -426,20 +487,9 @@ for envelope in "${ENVELOPES[@]}"; do
     fi
 done
 
-if [[ -n "${LEDGER}" ]]; then
-    ledger_tmp="${LEDGER}.tmp.$$"
-    jq -s --arg repo "${REPO}" --arg since "${since}" \
-        --slurpfile previous "${ledger_in}" \
-        '{repo: $repo,
-          runs: (($previous[0]
-                  | with_entries(select(.value.created >= $since)))
-                 + from_entries)}' "${ledger_out}" >"${ledger_tmp}"
-    mv "${ledger_tmp}" "${LEDGER}"
-fi
-
 if (( over_cap )); then
-    if [[ "${cap_mode}" == "warn" ]]; then
-        err "fuzz-budget: continuing because GH_FUZZ_BUDGET_CAP_MODE=warn"
+    if [[ "${cap_exception}" == "cflite-pr-evidence" ]]; then
+        printf '%s\n' "fuzz-budget: EXCEPTION cflite-pr-evidence: cflite envelope over cap; PR fuzzing is per-PR evidence, its minutes still count toward the window, and cflite_batch enforces the cap"
         exit 0
     fi
     exit 1

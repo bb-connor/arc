@@ -15,9 +15,9 @@ import sys
 
 workflows = Path(sys.argv[1]).resolve().parent
 expected_steps = {
-    "cflite_pr.yml": [("cflite", "warn")],
-    "cflite_batch.yml": [("cflite", "fail")],
-    "fuzz.yml": [("native", "fail")],
+    "cflite_pr.yml": [("cflite", "cflite-pr-evidence")],
+    "cflite_batch.yml": [("cflite", None)],
+    "fuzz.yml": [("native", None)],
     "mutants.yml": [("mutation", None), ("mutation", None)],
     "mutants-fuzz-cocoverage.yml": [("mutation", None)],
     "proof-mutants.yml": [("mutation", None)],
@@ -32,13 +32,23 @@ for name, expected in expected_steps.items():
     observed = []
     for block in steps:
         scope = re.search(r"GH_FUZZ_BUDGET_SCOPE: (\S+)", block)
-        mode = re.search(r"GH_FUZZ_BUDGET_CAP_MODE: (\S+)", block)
-        observed.append((scope and scope.group(1), mode and mode.group(1)))
-        for removed in ("GH_FUZZ_BUDGET_WORKFLOWS", "GH_FUZZ_BUDGET_MINUTES"):
+        exception = re.search(r"GH_FUZZ_BUDGET_CAP_EXCEPTION: (\S+)", block)
+        observed.append((scope and scope.group(1), exception and exception.group(1)))
+        for removed in (
+            "GH_FUZZ_BUDGET_WORKFLOWS",
+            "GH_FUZZ_BUDGET_MINUTES",
+            "GH_FUZZ_BUDGET_CAP_MODE",
+            "GH_FUZZ_BUDGET_RATE_LIMIT_MODE",
+        ):
             if removed in block:
                 raise SystemExit(f"{name} budget step still sets {removed}")
         if "GH_FUZZ_BUDGET_LEDGER:" not in block:
             raise SystemExit(f"{name} budget step must use the shared ledger")
+    if text.count("uses: actions/cache/restore@") != len(steps):
+        raise SystemExit(f"{name} must restore the ledger before each budget step")
+    saves = re.findall(r"name: Save fuzz budget ledger\n        if: (always\(\)[^\n]*)", text)
+    if len(saves) != len(steps):
+        raise SystemExit(f"{name} must save the ledger with if: always() after each budget step")
     if observed != expected:
         raise SystemExit(f"{name} budget steps {observed} != {expected}")
 
@@ -83,7 +93,7 @@ if '--config "crates/${{ matrix.package }}/mutants.toml"' in mutants_text:
 
 PY
 
-if ! grep -q "PR-time CFLite budget checks are advisory" "${DOCS}"; then
+if ! grep -q "Named exception \`cflite-pr-evidence\`" "${DOCS}"; then
   echo "FAIL: docs/fuzzing/continuous.md must describe PR CFLite advisory behavior" >&2
   exit 1
 fi
@@ -102,8 +112,11 @@ from pathlib import Path
 import sys
 
 script = Path(sys.argv[1]).read_text(encoding="utf-8")
-if 'cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-fail}"' not in script:
-    raise SystemExit("fuzz budget cap mode must default to fail")
+for removed in ("GH_FUZZ_BUDGET_CAP_MODE", "GH_FUZZ_BUDGET_RATE_LIMIT_MODE"):
+    if removed in script:
+        raise SystemExit(f"fuzz budget gate must not read {removed}")
+if "cflite-pr-evidence" not in script or "API_ATTEMPTS=3" not in script:
+    raise SystemExit("fuzz budget gate must declare its cap exception and retry bound")
 if 'missing_workflow_mode="${GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE:-fail}"' not in script:
     raise SystemExit("missing workflow mode must default to fail")
 if "workflow ${wf} is not registered yet; counting 0 minutes" in script:

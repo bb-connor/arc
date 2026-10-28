@@ -24,10 +24,11 @@ ENVELOPES = {
 NOW = int(time.time())
 
 FAKE_GH = r"""#!/usr/bin/env python3
-import os, re, sys
+import json, os, re, sys
 from pathlib import Path
 fixtures = Path(os.environ["FAKE_GH_DIR"])
 path = sys.argv[-1]
+include = "--include" in sys.argv
 with open(fixtures / "calls.log", "a", encoding="utf-8") as log:
     log.write(path + "\n")
 listing = re.match(r"repos/[^/]+/[^/]+/actions/workflows/([^/]+)/runs\?created=([^&]+)&", path)
@@ -39,15 +40,32 @@ elif jobs:
 else:
     sys.stderr.write("unexpected path " + path + "\n")
     sys.exit(1)
-error = fixtures / (name + ".err")
-if error.exists():
-    sys.stderr.write(error.read_text())
-    sys.exit(1)
+
+
+def respond(status, headers, body):
+    if include:
+        lines = [f"HTTP/2.0 {status} X"] + [f"{key}: {value}" for key, value in headers.items()]
+        sys.stdout.write("\n".join(lines) + "\n\n")
+    sys.stdout.write(body)
+    if status >= 400:
+        sys.stderr.write(f"gh: request failed (HTTP {status})\n")
+        sys.exit(1)
+    sys.exit(0)
+
+
+sequence = fixtures / (name + ".seq")
+if sequence.exists():
+    responses = json.loads(sequence.read_text())
+    counter = fixtures / (name + ".n")
+    served = int(counter.read_text()) if counter.exists() else 0
+    if served < len(responses):
+        counter.write_text(str(served + 1))
+        response = responses[served]
+        respond(response["status"], response.get("headers", {}), response.get("body", "{}"))
 body = fixtures / (name + ".json")
 if not body.exists():
-    sys.stderr.write("gh: Not Found (HTTP 404)\n")
-    sys.exit(1)
-sys.stdout.write(body.read_text())
+    respond(404, {}, '{"message": "Not Found"}')
+respond(200, {"X-Ratelimit-Remaining": "4999"}, body.read_text())
 """
 
 
@@ -128,8 +146,11 @@ class Case:
     def epoch(self, text: str) -> None:
         (self.dir / "tree/fuzz/cflite-budget-epoch").write_text(text)
 
-    def error(self, name: str, text: str) -> None:
-        (self.dir / f"{name}.err").write_text(text)
+    def responses(self, name: str, *responses: dict) -> None:
+        (self.dir / f"{name}.seq").write_text(json.dumps(list(responses)))
+
+    def error(self, name: str, status: int, headers: dict | None = None, times: int = 3) -> None:
+        self.responses(name, *[{"status": status, "headers": headers or {}}] * times)
 
     def calls(self) -> list[str]:
         log = self.dir / "calls.log"
@@ -230,7 +251,7 @@ def mutation_lanes_are_reported_not_capped() -> None:
 def mutation_errors_do_not_fail_the_gate() -> None:
     case = Case()
     case.listing([run(24, NOW - 600, NOW - 300)], workflow="proof-mutants.yml")
-    case.error("jobs-24", "gh: Server Error (HTTP 502)\n")
+    case.error("jobs-24", 502)
     case.quiet("mutation", "cflite", "native")
     expect(case.check("mutation"), 0, "envelope=mutation usage is unverified")
     result = case.check("all")
@@ -298,18 +319,35 @@ def unknown_scope_fails_closed() -> None:
     expect(case.check("everything"), 2, "unknown GH_FUZZ_BUDGET_SCOPE: everything")
 
 
-def cap_warn_mode_reports_overrun() -> None:
+def cflite_pr_exception_is_named_and_scoped() -> None:
     case = Case()
     start = NOW - 86400
     case.listing([run(2, start, start + 1860)], workflow="cflite_pr.yml")
     case.jobs(2, [job(start, start + 1800 * 60, "runner")])
-    case.quiet("cflite")
+    case.quiet("cflite", "native")
+    exception = {"GH_FUZZ_BUDGET_CAP_EXCEPTION": "cflite-pr-evidence"}
+    result = case.check("cflite", **exception)
     expect(
-        case.check("cflite", GH_FUZZ_BUDGET_CAP_MODE="warn"),
+        result,
         0,
         "HALT - envelope=cflite used 1800 min >= cap 1800 min",
-        "continuing because GH_FUZZ_BUDGET_CAP_MODE=warn",
+        "EXCEPTION cflite-pr-evidence: cflite envelope over cap; PR fuzzing is per-PR "
+        "evidence, its minutes still count toward the window, and cflite_batch enforces the cap",
     )
+    expect(case.check("cflite"), 1, "HALT - envelope=cflite")
+    expect(case.check("cflite", GH_FUZZ_BUDGET_CAP_MODE="warn"), 1, "HALT - envelope=cflite")
+    expect(case.check("native", **exception), 2, "only applies to GH_FUZZ_BUDGET_SCOPE=cflite")
+    expect(case.check("all", **exception), 2, "only applies to GH_FUZZ_BUDGET_SCOPE=cflite")
+    expect(
+        case.check("cflite", GH_FUZZ_BUDGET_CAP_EXCEPTION="warn"),
+        2,
+        "unknown GH_FUZZ_BUDGET_CAP_EXCEPTION: warn",
+    )
+    under = Case()
+    under.quiet("cflite")
+    result = under.check("cflite", **exception)
+    expect(result, 0, "used=0 min")
+    assert "EXCEPTION" not in result.stdout + result.stderr, result
 
 
 def running_job_counts_until_now() -> None:
@@ -348,23 +386,103 @@ def short_listing_fails_closed() -> None:
     expect(case.check(), 2, "returned 1 of 2 runs")
 
 
+def timed_check(case: Case, scope: str = "native", **env: str) -> tuple[subprocess.CompletedProcess[str], float]:
+    began = time.monotonic()
+    result = case.check(scope, **env)
+    return result, time.monotonic() - began
+
+
 def jobs_api_failure_fails_closed() -> None:
     case = Case()
     case.listing([run(8, NOW - 600, NOW - 300)])
-    case.error("jobs-8", "gh: Server Error (HTTP 502)\n")
+    case.error("jobs-8", 400, times=1)
     expect(case.check(), 2, "GitHub API failed")
+    assert sum("/runs/8/jobs" in call for call in case.calls()) == 1, case.calls()
 
 
-def jobs_rate_limit_follows_mode() -> None:
+def retry_after_is_honoured() -> None:
     case = Case()
-    case.listing([run(9, NOW - 600, NOW - 300)])
-    case.error("jobs-9", "gh: API rate limit exceeded (HTTP 403)\n")
-    expect(case.check(), 2, "rate limited while checking fuzz.yml")
-    expect(
-        case.check(GH_FUZZ_BUDGET_RATE_LIMIT_MODE="warn"),
-        0,
-        "continuing because GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn",
+    start = NOW - 86400
+    case.listing([run(60, start, start + 600)])
+    case.jobs(60, [job(start, start + 600, "runner")])
+    case.responses("jobs-60", {"status": 429, "headers": {"Retry-After": "2"}})
+    result, elapsed = timed_check(case)
+    expect(result, 0, "used=10 min", "HTTP 429", "retrying in 2s (attempt 1 of 3)")
+    assert elapsed >= 2, elapsed
+    assert sum("/runs/60/jobs" in call for call in case.calls()) == 2, case.calls()
+
+
+def rate_limit_reset_is_honoured() -> None:
+    case = Case()
+    start = NOW - 86400
+    case.listing([run(61, start, start + 600)])
+    case.jobs(61, [job(start, start + 600, "runner")])
+    reset = int(time.time()) + 2
+    case.responses(
+        "jobs-61",
+        {"status": 403, "headers": {"X-Ratelimit-Remaining": "0", "X-Ratelimit-Reset": str(reset)}},
     )
+    result, elapsed = timed_check(case)
+    expect(result, 0, "used=10 min", "HTTP 403")
+    assert time.time() >= reset and elapsed >= 1, elapsed
+
+
+def transient_server_errors_retry() -> None:
+    case = Case()
+    start = NOW - 86400
+    case.listing([run(62, start, start + 600)])
+    case.jobs(62, [job(start, start + 600, "runner")])
+    case.responses("jobs-62", {"status": 502}, {"status": 503})
+    expect(case.check(), 0, "used=10 min", "retrying in 1s (attempt 1 of 3)", "retrying in 2s (attempt 2 of 3)")
+    assert sum("/runs/62/jobs" in call for call in case.calls()) == 3, case.calls()
+    listing = Case()
+    listing.listing([run(63, start, start + 600)])
+    listing.jobs(63, [job(start, start + 600, "runner")])
+    listing.responses("runs-fuzz.yml", {"status": 500})
+    expect(listing.check(), 0, "used=10 min")
+
+
+def exhausted_retries_fail_closed() -> None:
+    start = NOW - 86400
+    for status, headers in [
+        (502, {}),
+        (429, {"Retry-After": "1"}),
+        (403, {"X-Ratelimit-Remaining": "0", "X-Ratelimit-Reset": str(int(time.time()))}),
+    ]:
+        case = Case()
+        case.listing([run(64, start, start + 600)])
+        case.error("jobs-64", status, headers)
+        for env in [{}, {"GH_FUZZ_BUDGET_RATE_LIMIT_MODE": "warn"}]:
+            (case.dir / "jobs-64.n").unlink(missing_ok=True)
+            expect(case.check(**env), 2, f"still failing (HTTP {status}) after 3 attempts")
+        assert sum("/runs/64/jobs" in call for call in case.calls()) == 6, case.calls()
+        case.listing([run(65, start, start + 600)], workflow="mutants.yml")
+        case.error("jobs-65", status, headers)
+        case.quiet("mutation")
+        expect(case.check("mutation"), 0, "envelope=mutation usage is unverified")
+
+
+def excessive_wait_fails_closed() -> None:
+    case = Case()
+    start = NOW - 86400
+    case.listing([run(66, start, start + 600)])
+    case.error("jobs-66", 429, {"Retry-After": "3600"})
+    result, elapsed = timed_check(case)
+    expect(result, 2, "asks for a 3600s wait, longer than 600s")
+    assert elapsed < 30, elapsed
+    assert sum("/runs/66/jobs" in call for call in case.calls()) == 1, case.calls()
+
+
+def failed_check_keeps_validated_ledger_entries() -> None:
+    case = Case()
+    start = NOW - 86400
+    case.listing([run(67, start, start + 600), run(68, start, start + 600)])
+    case.jobs(67, [job(start, start + 600, "runner")])
+    case.error("jobs-68", 502)
+    ledger = case.dir / "ledger.json"
+    expect(case.check(GH_FUZZ_BUDGET_LEDGER=str(ledger)), 2, "after 3 attempts")
+    written = json.loads(ledger.read_text())
+    assert list(written["runs"]) == ["67:1"], written
 
 
 def invalid_job_listings_fail_closed() -> None:
@@ -388,7 +506,7 @@ def invalid_job_listings_fail_closed() -> None:
         before = json.dumps({"repo": REPO, "runs": {}})
         ledger.write_text(before)
         expect(case.check(GH_FUZZ_BUDGET_LEDGER=str(ledger)), 2, needle, "fuzz.yml run 40")
-        assert ledger.read_text() == before, ledger.read_text()
+        assert json.loads(ledger.read_text()) == json.loads(before), ledger.read_text()
 
 
 def jobs_without_accounting_fields_fail_closed() -> None:
@@ -412,6 +530,68 @@ def jobs_without_accounting_fields_fail_closed() -> None:
         case.raw_jobs(51, {"total_count": 1, "jobs": [broken]})
         case.quiet("mutation")
         expect(case.check("mutation"), 0, needle, "envelope=mutation usage is unverified")
+
+
+def unfinished_unassigned_jobs_need_a_waiting_status() -> None:
+    start = NOW - 600
+    for status, code in [("queued", 0), ("waiting", 0), ("pending", 0), ("in_progress", 2), ("requested", 2)]:
+        case = Case()
+        case.listing([run(55, start, start + 5, status="in_progress")])
+        unassigned = {
+            "id": 1,
+            "status": status,
+            "conclusion": None,
+            "runner_name": None,
+            "started_at": None,
+            "completed_at": None,
+        }
+        case.raw_jobs(55, {"total_count": 1, "jobs": [unassigned]})
+        result = case.check()
+        if code == 0:
+            expect(result, 0, "runs=1 queried=1 executed=0 min")
+        else:
+            expect(result, 2, f"unassigned job 1 is {status}")
+
+
+def unassigned_job_timestamps_must_show_it_never_ran() -> None:
+    start = NOW - 600
+    root_review_payload = {
+        "total_count": 1,
+        "jobs": [
+            {
+                "id": 1,
+                "status": "in_progress",
+                "runner_name": None,
+                "started_at": iso(start),
+                "completed_at": None,
+                "conclusion": None,
+            }
+        ],
+    }
+    queued_but_completed = {
+        "id": 1,
+        "status": "queued",
+        "runner_name": None,
+        "started_at": iso(start),
+        "completed_at": iso(start + 60),
+        "conclusion": None,
+    }
+    cancelled_without_end = dict(job(start, start + 60, None), id=1, completed_at=None)
+    for payload, needle in [
+        (root_review_payload, "unassigned job 1 is in_progress"),
+        ({"total_count": 1, "jobs": [queued_but_completed]}, "unassigned job 1 is queued but has a completion time"),
+        ({"total_count": 1, "jobs": [cancelled_without_end]}, "unassigned job 1 completed without a completion time"),
+    ]:
+        case = Case()
+        case.listing([run(56, start, start + 5, status="in_progress")])
+        if payload["jobs"][0]["status"] == "completed":
+            case.listing([run(56, start, start + 120, conclusion="cancelled")])
+        case.raw_jobs(56, payload)
+        expect(case.check(), 2, needle)
+    queued = Case()
+    queued.listing([run(57, start, start + 5, status="in_progress")])
+    queued.raw_jobs(57, {"total_count": 1, "jobs": [dict(queued_but_completed, completed_at=None)]})
+    expect(queued.check(), 0, "runs=1 queried=1 executed=0 min")
 
 
 def never_started_jobs_count_zero() -> None:
@@ -549,18 +729,25 @@ CASES = [
     old_cflite_epoch_keeps_thirty_day_window,
     native_window_ignores_cflite_epoch,
     bad_cflite_epoch_fails_closed,
-    cap_warn_mode_reports_overrun,
+    cflite_pr_exception_is_named_and_scoped,
     running_job_counts_until_now,
     large_window_is_listed_by_day,
     truncated_day_fails_closed,
     short_listing_fails_closed,
     jobs_api_failure_fails_closed,
-    jobs_rate_limit_follows_mode,
+    retry_after_is_honoured,
+    rate_limit_reset_is_honoured,
+    transient_server_errors_retry,
+    exhausted_retries_fail_closed,
+    excessive_wait_fails_closed,
+    failed_check_keeps_validated_ledger_entries,
     missing_workflow_fails_closed,
     invalid_job_listings_fail_closed,
     paginated_jobs_sum_across_pages,
     jobs_without_accounting_fields_fail_closed,
     never_started_jobs_count_zero,
+    unfinished_unassigned_jobs_need_a_waiting_status,
+    unassigned_job_timestamps_must_show_it_never_ran,
     cancelled_run_without_jobs_counts_zero,
     invalid_mutation_listing_is_not_cached,
     ledger_skips_completed_runs,
