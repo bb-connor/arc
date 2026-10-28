@@ -1,4 +1,4 @@
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, Signature};
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
 use chio_core::receipt::evidence::{
@@ -1327,20 +1327,49 @@ fn trusted_proof_verification_rejects_invalid_checkpoint_signature() {
     );
 }
 
+fn flip_checkpoint_signature_byte(package: &mut MercuryProofPackage) -> u64 {
+    let checkpoint = &mut package.chio_bundle.checkpoints[0];
+    let mut bytes = checkpoint.signature.to_bytes();
+    bytes[0] ^= 0x01;
+    checkpoint.signature = Signature::from_bytes(&bytes);
+    checkpoint.body.checkpoint_seq
+}
+
 #[test]
-fn untrusted_proof_verification_rejects_forged_checkpoint_signature() {
+fn untrusted_proof_verification_rejects_flipped_checkpoint_signature() {
     let mut package = full_trusted_sample_package();
-    package.chio_bundle.checkpoints[0].signature = Keypair::generate().sign(b"forged");
+    flip_checkpoint_signature_byte(&mut package);
 
     let error = package
         .verify(1_775_137_923)
-        .expect_err("forged checkpoint signature");
+        .expect_err("flipped checkpoint signature");
 
-    assert!(
-        error
-            .to_string()
-            .contains("checkpoint transparency verification failed"),
-        "unexpected error: {error}"
+    assert_eq!(
+        error,
+        MercuryContractError::Validation(format!(
+            "checkpoint transparency verification failed: {}",
+            CheckpointError::InvalidSignature
+        ))
+    );
+}
+
+#[test]
+fn chio_bundle_verification_rejects_flipped_checkpoint_signature() {
+    let mut package = full_trusted_sample_package();
+    let checkpoint_seq = flip_checkpoint_signature_byte(&mut package);
+
+    let error = verify_chio_bundle(
+        &package.chio_bundle,
+        &package.publication_profile,
+        package.checkpoint_transparency.as_ref(),
+    )
+    .expect_err("flipped checkpoint signature");
+
+    assert_eq!(
+        error,
+        MercuryContractError::Validation(format!(
+            "checkpoint signature verification failed: {checkpoint_seq}"
+        ))
     );
 }
 
