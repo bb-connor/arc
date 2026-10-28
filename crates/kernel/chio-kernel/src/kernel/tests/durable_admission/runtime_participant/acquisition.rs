@@ -145,8 +145,13 @@ impl RuntimeAdmissionHook for ClaimingVerifier {
 }
 
 fn exercise(mode: ClaimMode, allowed: bool) {
+    exercise_at(mode, allowed, current_unix_timestamp_ms());
+}
+
+fn exercise_at(mode: ClaimMode, allowed: bool, now: u64) -> Option<String> {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("runtime-claim-boundary");
+    kernel.clock = Arc::new(chio_security_types::clock::FixedClock::from_millis(now));
     let verifier = Arc::new(ClaimingVerifier(RuntimeParticipantAuthorityBindingV1::new(
         AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
         AdmissionIdentifier::try_new("source", "test-source").expect("source"),
@@ -166,7 +171,6 @@ fn exercise(mode: ClaimMode, allowed: bool) {
         request.model_metadata.as_ref(),
     )
     .expect("matching");
-    let now = current_unix_timestamp_ms();
     let mut admission = kernel
         .begin_durable_tool_admission(&request, &matching, now)
         .expect("begin")
@@ -214,6 +218,15 @@ fn exercise(mode: ClaimMode, allowed: bool) {
             assert_eq!(state.release_calls, usize::from(!allowed));
         }
     }
+    let episode = store
+        .runtime_recovery
+        .0
+        .lock()
+        .expect("fixture")
+        .history
+        .as_ref()
+        .and_then(|history| history.first())
+        .map(|entry| entry.intent.episode_id().as_str().to_owned());
     // A callback panic must not poison the mutation sequencer or hide custody
     // behind the old operation version. Normal recovery remains usable.
     compensate(&kernel, &store).expect("recover after hook completion");
@@ -222,6 +235,7 @@ fn exercise(mode: ClaimMode, allowed: bool) {
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    episode
 }
 
 #[test]
@@ -562,4 +576,17 @@ fn operation_owned_deny_with_scalar_metadata_is_refused_and_released() {
         NON_OBJECT_REFUSAL,
         None,
     );
+}
+
+#[test]
+fn runtime_episode_ids_follow_injected_ids_and_fixed_clock() {
+    let now = current_unix_timestamp_ms();
+    let run = || {
+        let _ids = crate::scope_receipt_ids_for_current_thread([]);
+        let first = exercise_at(ClaimMode::Normal, true, now).expect("first episode");
+        let second = exercise_at(ClaimMode::Normal, true, now).expect("second episode");
+        assert_ne!(first, second);
+        (first, second)
+    };
+    assert_eq!(run(), run());
 }
