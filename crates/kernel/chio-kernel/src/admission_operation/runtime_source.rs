@@ -4,8 +4,10 @@ use chio_core::crypto::sha256_hex;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_RUNTIME_SOURCE_BYTES: usize = 4096;
-const SOURCE_SCHEMA: &str = "chio.runtime-source-qualification.v1";
-const SOURCE_DOMAIN: &[u8] = b"chio.runtime-source-qualification.v1\0";
+use chio_core_types::runtime_source::{
+    RUNTIME_SOURCE_QUALIFICATION_DOMAIN as SOURCE_DOMAIN,
+    RUNTIME_SOURCE_QUALIFICATION_SCHEMA as SOURCE_SCHEMA,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
