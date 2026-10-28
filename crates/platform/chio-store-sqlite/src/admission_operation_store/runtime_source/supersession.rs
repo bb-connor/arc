@@ -56,24 +56,41 @@ pub(super) fn load_all(
     records: &[RuntimeSourceRecordV1],
 ) -> Result<Vec<Supersession>, String> {
     let mut statement = connection.prepare(
-        "SELECT prior_runtime_authority_id, replacement_runtime_authority_id,
+        "SELECT
+         CASE WHEN typeof(prior_runtime_authority_id) = 'text'
+                   AND octet_length(prior_runtime_authority_id) BETWEEN 1 AND 2048
+                   AND instr(prior_runtime_authority_id, char(0)) = 0
+              THEN prior_runtime_authority_id ELSE NULL END,
+         CASE WHEN typeof(replacement_runtime_authority_id) = 'text'
+                   AND octet_length(replacement_runtime_authority_id) BETWEEN 1 AND 2048
+                   AND instr(replacement_runtime_authority_id, char(0)) = 0
+              THEN replacement_runtime_authority_id ELSE NULL END,
          CASE WHEN typeof(canonical_supersession) = 'blob' AND length(canonical_supersession) BETWEEN 1 AND 8192
-              THEN canonical_supersession ELSE NULL END, record_digest
+              THEN canonical_supersession ELSE NULL END,
+         CASE WHEN typeof(record_digest) = 'text' AND length(record_digest) = 64
+                   AND octet_length(record_digest) <= 128 AND instr(record_digest, char(0)) = 0
+                   AND record_digest NOT GLOB '*[^0-9a-f]*'
+              THEN record_digest ELSE NULL END
          FROM runtime_source_supersessions ORDER BY prior_runtime_authority_id",
     ).map_err(|error| error.to_string())?;
     let rows = statement
         .query_map([], |row| {
             Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Vec<u8>>(2)?,
-                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<Vec<u8>>>(2)?,
+                row.get::<_, Option<String>>(3)?,
             ))
         })
         .map_err(|error| error.to_string())?;
     let mut result = Vec::new();
     for row in rows {
         let (prior_id, replacement_id, bytes, digest) = row.map_err(|error| error.to_string())?;
+        let (Some(prior_id), Some(replacement_id), Some(bytes), Some(digest)) =
+            (prior_id, replacement_id, bytes, digest)
+        else {
+            return Err("runtime source supersession violates storage bounds".into());
+        };
         let record: Supersession = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 8192)
             .and_then(|input| input.decode_canonical())
             .map_err(|error| error.to_string())?;
