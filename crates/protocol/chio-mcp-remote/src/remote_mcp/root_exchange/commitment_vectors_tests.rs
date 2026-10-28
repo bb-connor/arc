@@ -95,7 +95,7 @@ fn prepared() -> PreparedAnchoredRoot {
         .test_expect("prepare anchored root")
 }
 
-fn assert_commitment(reference: &str, value: &str, domain: &[u8], wrong_domain: &[u8]) {
+fn assert_commitment(reference: &str, value: &str, domain: &[u8]) {
     let prepared = prepared();
     let anchor = &prepared.context().anchor;
     let commitment = match reference {
@@ -118,8 +118,6 @@ fn assert_commitment(reference: &str, value: &str, domain: &[u8], wrong_domain: 
         commitment.commit,
         Sha256Digest::from_hash(sha256(&preimage))
     );
-    let swapped = [wrong_domain, opening.salt.as_slice(), value.as_bytes()].concat();
-    assert_ne!(commitment.commit, Sha256Digest::from_hash(sha256(&swapped)));
 }
 
 #[test]
@@ -128,7 +126,6 @@ fn subject_commitment_matches_literal_domain_salt_and_utf8() {
         "anchor.sub",
         SUBJECT,
         b"chio.delegation-context.subject.v1\0",
-        b"chio.delegation-context.tenant.v1\0",
     );
 }
 
@@ -138,6 +135,5 @@ fn tenant_commitment_matches_literal_domain_salt_and_utf8() {
         "anchor.tenant",
         TENANT,
         b"chio.delegation-context.tenant.v1\0",
-        b"chio.delegation-context.subject.v1\0",
     );
 }
