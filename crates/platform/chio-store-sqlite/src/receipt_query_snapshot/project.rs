@@ -78,8 +78,17 @@ impl SignedToolProjection {
         let cost = receipt_cost_projection(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let lineage_row = if attribution.subject_key.is_none() || attribution.issuer_key.is_none() {
-            SqliteReceiptStore::get_lineage_on_connection(lineage, &receipt.capability_id)
-                .map_err(capability_lineage_store_error)?
+            SqliteReceiptStore::get_lineage_on_connection(lineage, &receipt.capability_id).map_err(
+                |error| match error {
+                    chio_kernel::CapabilityLineageError::Sqlite(error) => {
+                        crate::capability_lineage::lineage_reader_error(
+                            error,
+                            &receipt.capability_id,
+                        )
+                    }
+                    other => capability_lineage_store_error(other),
+                },
+            )?
         } else {
             None
         };

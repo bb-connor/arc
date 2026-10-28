@@ -443,7 +443,9 @@ pub(super) fn lineage(
                             crate::capability_lineage::snapshot_from_row,
                         )
                         .map(Some)
-                        .map_err(|error| refused_by_reader(error, &capability));
+                        .map_err(|error| {
+                            crate::capability_lineage::lineage_reader_error(error, &capability)
+                        });
                 }
                 let snapshot = live
                     .query_row(
@@ -554,21 +556,6 @@ fn lineage_validation_error(error: ReceiptStoreError) -> ReceiptStoreError {
             metadata_refusal(INVALID_LINEAGE_METADATA)
         }
         other => other,
-    }
-}
-
-/// A lineage row the canonical local reader refuses, for a capability with a
-/// held receipt that takes its attribution from it. The reason is the one the
-/// extension reports for the same row.
-fn refused_by_reader(error: rusqlite::Error, capability: &str) -> ReceiptStoreError {
-    match error {
-        rusqlite::Error::FromSqlConversionFailure(..)
-        | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..)
-        | rusqlite::Error::Utf8Error(..) => invalid(format!(
-            "capability lineage of {capability} is refused by the local reader: {error}"
-        )),
-        other => other.into(),
     }
 }
 

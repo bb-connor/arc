@@ -1,3 +1,7 @@
+mod refusal;
+
+pub(crate) use refusal::{lineage_reader_error, LineageReaderRefusal};
+
 use chio_core::capability::token::CapabilityToken;
 pub use chio_kernel::capability_lineage::{
     CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
@@ -40,10 +44,7 @@ pub(crate) fn validate_snapshot_from_row(
         rusqlite::Error::FromSqlConversionFailure(
             signed_capability_column,
             Type::Text,
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                error.to_string(),
-            )),
+            Box::new(error),
         )
     })?;
     Ok(snapshot)
