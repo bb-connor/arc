@@ -78,7 +78,7 @@ def main() -> None:
                 },
             )
             if "result" not in response:
-                raise RuntimeError(f"tools/call failed: {response.get(error)}")
+                raise RuntimeError(f"tools/call failed: {response.get('error')}")
             verified = verify_mcp_result(
                 response["result"],
                 trusted_signers=[kernel_public_key],
@@ -89,7 +89,7 @@ def main() -> None:
             )
             if not verified.allowed or verified.tool_error:
                 raise RuntimeError(
-                    f"Chio did not complete echo_text (receipt {verified.receipt[id]})"
+                    f"Chio did not complete echo_text (receipt {verified.receipt['id']})"
                 )
             verified_receipts.append(verified.receipt)
             output = verified.output if isinstance(verified.output, dict) else {}

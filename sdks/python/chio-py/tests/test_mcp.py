@@ -21,7 +21,7 @@ ARGS = {"message": "Hello 世界", "threshold": 0.000001}
 OUTPUT = {"content": [{"type": "text", "text": "actual signed output"}]}
 
 
-def signed_receipt(*, verdict, request_id, arguments, content_hash):
+def signed_receipt(*, verdict, request_id, arguments, content_hash, admission=None):
     receipt = {
         "timestamp": 1800000000,
         "capability_id": "cap-1",
@@ -42,6 +42,8 @@ def signed_receipt(*, verdict, request_id, arguments, content_hash):
         "kernel_key": KEY,
         "metadata": {"receipt_context": {"request_id": request_id}},
     }
+    if admission is not None:
+        receipt["metadata"]["admission_operation"] = admission
     if verdict == "deny":
         receipt["decision"]["reason"] = "budget exhausted"
     receipt["id"] = _content_addressed_receipt_id(receipt)
@@ -51,7 +53,9 @@ def signed_receipt(*, verdict, request_id, arguments, content_hash):
     return receipt
 
 
-def tool_result(*, verdict="allow", request_id="request-1", arguments=None):
+def tool_result(
+    *, verdict="allow", request_id="request-1", arguments=None, admission=None
+):
     arguments = deepcopy(ARGS if arguments is None else arguments)
     output = deepcopy(OUTPUT) if verdict == "allow" else None
     receipt = signed_receipt(
@@ -59,6 +63,7 @@ def tool_result(*, verdict="allow", request_id="request-1", arguments=None):
         request_id=request_id,
         arguments=arguments,
         content_hash=sha256_hex_utf8(canonicalize_json(output)),
+        admission=admission,
     )
     return {
         "content": [{"type": "text", "text": "unsigned display content"}],
@@ -120,6 +125,7 @@ def test_a_verified_denial_has_no_output():
         "none_with_output",
         "receipt",
         "denied_value",
+        "allowed_as_none",
     ],
 )
 def test_missing_or_tampered_evidence_fails_closed(change):
@@ -148,11 +154,45 @@ def test_missing_or_tampered_evidence_fails_closed(change):
         evidence["outputKind"] = "none"
     elif change == "receipt":
         evidence["receipt"] = None
+    elif change == "allowed_as_none":
+        evidence["outputKind"] = "none"
+        evidence["output"] = None
     else:
         result = tool_result(verdict="deny")
         result["_meta"]["chioEvidence"]["outputKind"] = "value"
     with pytest.raises(McpEvidenceError):
         verify(result)
+
+
+def completed_admission(**changes):
+    admission = {
+        "schema": "chio.admission-receipt.v1",
+        "request_id": "request-1",
+        "projected_state": "completed",
+        "projected_dispatch_state": "terminal",
+        "tool_outcome_id": "outcome-1",
+    }
+    return {**admission, **changes}
+
+
+def test_a_completed_signed_admission_is_accepted():
+    result = verify(tool_result(admission=completed_admission()))
+    assert result.output == OUTPUT
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"schema": "chio.admission-receipt.v2"},
+        {"request_id": "replayed-other-request"},
+        {"projected_state": "dispatching"},
+        {"projected_dispatch_state": "pending"},
+        {"tool_outcome_id": None},
+    ],
+)
+def test_an_incomplete_signed_admission_yields_no_output(changes):
+    with pytest.raises(McpEvidenceError):
+        verify(tool_result(admission=completed_admission(**changes)))
 
 
 def test_unsigned_projection_cannot_stand_in_for_evidence():

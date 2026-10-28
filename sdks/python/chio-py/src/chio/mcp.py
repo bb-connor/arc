@@ -61,7 +61,11 @@ def verify_mcp_result(
     """Verify signer, mediation, invocation identity and output commitment.
 
     ``request_id`` is the ``_meta.chioRequestId`` the caller sent. Streamed
-    results, pending approvals and incomplete calls fail closed.
+    results, pending approvals and incomplete calls fail closed. An allowed
+    result must carry a ``"value"`` output whose canonical hash matches the
+    signed ``content_hash``, and a signed admission projection, when present,
+    must be completed and terminal. The receipt's ``capability_id`` is not
+    bound to any caller grant: the pinned kernel key is the only authority.
     """
     try:
         evidence = result["_meta"]["chioEvidence"]
@@ -99,13 +103,22 @@ def verify_mcp_result(
         verdict = report["decision"]
         if verdict not in {"allow", "deny"}:
             raise McpEvidenceError("tool invocation did not complete")
+        if (kind == "value") != (verdict == "allow"):
+            raise McpEvidenceError("output kind does not match the signed decision")
         if kind == "value":
-            if verdict != "allow":
-                raise McpEvidenceError("a denied call cannot carry a value output")
             if sha256_hex_utf8(canonicalize_json(output)) != receipt["content_hash"]:
                 raise McpEvidenceError(
                     "tool output does not match its signed commitment"
                 )
+            admission = receipt["metadata"].get("admission_operation")
+            if admission is not None and (
+                admission["schema"] != "chio.admission-receipt.v1"
+                or admission["request_id"] != request_id
+                or admission["projected_state"] != "completed"
+                or admission["projected_dispatch_state"] != "terminal"
+                or not isinstance(admission["tool_outcome_id"], str)
+            ):
+                raise McpEvidenceError("signed admission did not complete")
         return VerifiedMcpResult(receipt=receipt, output=output)
     except McpEvidenceError:
         raise
