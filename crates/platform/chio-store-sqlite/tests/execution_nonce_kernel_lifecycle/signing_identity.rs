@@ -2,6 +2,7 @@ use super::*;
 use chio_core::receipt::crypto_floor::ReceiptCryptoFloor;
 use chio_core::SigningAlgorithm;
 use chio_kernel::{HybridSigningConfig, KernelCryptoFloor};
+use std::sync::Arc;
 
 fn durable_nonce_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
     let mut fixture = Fixture::new()?;
@@ -84,4 +85,72 @@ fn durable_hybrid_nonce_survives_restart_and_completes() -> TestResult {
 #[test]
 fn durable_pq_required_nonce_survives_restart_and_completes() -> TestResult {
     durable_nonce_lifecycle_under(KernelCryptoFloor::PqRequired)
+}
+
+#[test]
+fn changed_receipt_backend_refuses_before_durable_nonce_mutation() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.signing = Some(HybridSigningConfig {
+        crypto_floor: KernelCryptoFloor::PqRequired,
+        pq_signing_seed: Some([77; 32]),
+    });
+    let mut runtime = fixture.open()?;
+    let request = fixture.request(&runtime, "changed-durable-signing")?;
+    assert!(request.capability.verify_signature()?);
+    let original_key = runtime.kernel.receipt_signing_public_key()?;
+    let changed = HybridSigningConfig {
+        crypto_floor: KernelCryptoFloor::PqRequired,
+        pq_signing_seed: Some([78; 32]),
+    };
+    let kernel = Arc::get_mut(&mut runtime.kernel).ok_or("unique kernel")?;
+    kernel.with_hybrid_signing_backend(
+        &changed,
+        b"durable-nonce-signing-quote",
+        &support::AcceptedSigningQuote(fixture.signer.public_key()),
+    )?;
+    assert_ne!(kernel.receipt_signing_public_key()?, original_key);
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .err()
+        .ok_or("changed backend admitted nonce")?;
+    assert!(
+        matches!(
+            error,
+            chio_kernel::KernelError::AdmissionRecovery(ref recovery)
+                if matches!(recovery.as_ref(), chio_kernel::admission_operation::AdmissionRecoveryError::Item {
+                    kind: chio_kernel::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                    detail,
+                } if detail == "durable admission signing identity changed")
+        ),
+        "{error}"
+    );
+    assert!(operation_state(&fixture, &request.request_id)?.is_none());
+    for table in [
+        "admission_nonce_preflight_holds",
+        "admission_execution_nonce_issuances",
+        "admission_execution_nonce_reservations",
+        "budget_authorization_holds",
+    ] {
+        assert_eq!(count_rows(&fixture, table)?, 0);
+    }
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    let kernel = Arc::get_mut(&mut runtime.kernel).ok_or("unique kernel")?;
+    kernel.with_hybrid_signing_backend(
+        fixture.signing.as_ref().ok_or("original signing config")?,
+        b"durable-nonce-signing-quote",
+        &support::AcceptedSigningQuote(fixture.signer.public_key()),
+    )?;
+    let nonce = preflight(&runtime, &request)?;
+    let (operation_id, _) =
+        operation_state(&fixture, &request.request_id)?.ok_or("nonce operation")?;
+    let operation_id =
+        chio_kernel::admission_operation::AdmissionOperationId::from_persisted(operation_id)?;
+    chio_kernel::admission_operation::verify_operation_execution_nonce_at(
+        &nonce,
+        &operation_id,
+        &original_key,
+        &nonce.nonce.bound_to,
+        nonce.nonce.issued_at,
+    )?;
+    Ok(())
 }

@@ -629,3 +629,6 @@ fn durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts() -> 
 fn durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity() -> TestResult {
     issuance::contenders_share_one_identity()
 }
+
+#[path = "execution_nonce/issuer_encoding.rs"]
+mod issuer_encoding;

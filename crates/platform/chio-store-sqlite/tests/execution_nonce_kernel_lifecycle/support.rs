@@ -384,7 +384,7 @@ impl ToolServerConnection for CountingServer {
     }
 }
 
-struct AcceptedSigningQuote(chio_core::PublicKey);
+pub(super) struct AcceptedSigningQuote(pub(super) chio_core::PublicKey);
 
 impl chio_kernel::boot::KernelSelfQuoteVerifier for AcceptedSigningQuote {
     fn verify_self_quote(
