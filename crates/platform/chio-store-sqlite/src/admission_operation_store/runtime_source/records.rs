@@ -83,10 +83,14 @@ pub(in crate::admission_operation_store) fn verify_all_records(
          WHERE typeof(canonical_source) <> 'blob' OR length(canonical_source) NOT BETWEEN 1 AND 4096
             OR typeof(runtime_authority_id) <> 'text' OR octet_length(runtime_authority_id) NOT BETWEEN 1 AND 2048
             OR typeof(source_id) <> 'text' OR octet_length(source_id) NOT BETWEEN 1 AND 2048
-            OR typeof(qualification_id) <> 'text' OR octet_length(qualification_id) <> 64
+            OR typeof(qualification_id) <> 'text' OR length(qualification_id) <> 64
+            OR octet_length(qualification_id) > 128 OR instr(qualification_id, char(0)) <> 0
+            OR qualification_id GLOB '*[^0-9a-f]*'
             OR typeof(destination_store_uuid) <> 'text' OR octet_length(destination_store_uuid) NOT BETWEEN 1 AND 512
             OR typeof(store_lease_id) <> 'text' OR octet_length(store_lease_id) NOT BETWEEN 1 AND 512
-            OR typeof(record_digest) <> 'text' OR octet_length(record_digest) <> 64
+            OR typeof(record_digest) <> 'text' OR length(record_digest) <> 64
+            OR octet_length(record_digest) > 128 OR instr(record_digest, char(0)) <> 0
+            OR record_digest GLOB '*[^0-9a-f]*'
             OR typeof(observed_at_unix_ms) <> 'integer' OR observed_at_unix_ms NOT BETWEEN 0 AND 9007199254740991
             OR typeof(store_owner_epoch) <> 'integer' OR store_owner_epoch <= 0)",
         [], |row| row.get(0),
