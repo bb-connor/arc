@@ -1353,6 +1353,7 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::indexed_bundle::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::retained_policy::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::venue_policy_for_admission::from_wire",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs::decode_cached_terminal::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_canonical_request::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_submission::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::finalize_delivery::from_wire",
@@ -18358,6 +18359,7 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::indexed_bundle::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::retained_policy::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_filing_resolver.rs::venue_policy_for_admission::from_wire#1::decode_signed",
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs::decode_cached_terminal::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_canonical_request::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_submission::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs::finalize_delivery::from_wire#1::decode_signed",
@@ -19923,6 +19925,9 @@
       "indexed_bundle::original-json-reader::UntrustedJsonText",
       "retained_policy::original-json-reader::UntrustedJsonText",
       "venue_policy_for_admission::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs": [
+      "decode_cached_terminal::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs": [
       "handle_submit_verified_fix::shared-reader::crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs::parse_submission",
