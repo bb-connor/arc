@@ -316,3 +316,44 @@ fn missing_supersession_cannot_reactivate_source_authority() -> Result<(), Box<d
     );
     Ok(())
 }
+
+#[test]
+fn qualification_history_ceiling_refuses_before_decoding_rows() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    let connection = fixture.store.connection()?;
+    connection.execute_batch(
+        "WITH RECURSIVE numbers(value) AS (
+            VALUES(1) UNION ALL SELECT value + 1 FROM numbers WHERE value < 1153
+         ) INSERT INTO runtime_source_qualifications
+         (runtime_authority_id, source_id, qualification_id, destination_store_uuid,
+          canonical_source, observed_at_unix_ms, store_lease_id, store_owner_epoch, record_digest)
+         SELECT 'runtime-' || value, 'source-' || value, printf('%064x', value),
+                'destination', X'00', 0, 'lease', 1, printf('%064x', value) FROM numbers;",
+    )?;
+    assert_eq!(
+        crate::admission_operation_store::runtime_source::verify_all_records(&connection),
+        Err("runtime source qualification history capacity exceeded".into()),
+    );
+    Ok(())
+}
+
+#[test]
+fn supersession_history_ceiling_refuses_before_decoding_rows() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    let connection = fixture.store.connection()?;
+    connection.execute_batch(
+        "PRAGMA foreign_keys = OFF;
+         WITH RECURSIVE numbers(value) AS (
+            VALUES(1) UNION ALL SELECT value + 1 FROM numbers WHERE value < 1025
+         ) INSERT INTO runtime_source_supersessions
+         (prior_runtime_authority_id, replacement_runtime_authority_id,
+          canonical_supersession, record_digest)
+         SELECT 'prior-' || value, 'replacement-' || value, X'00', printf('%064x', value)
+         FROM numbers;",
+    )?;
+    assert_eq!(
+        crate::admission_operation_store::runtime_source::verify_all_records(&connection),
+        Err("runtime source supersession history capacity exceeded".into()),
+    );
+    Ok(())
+}
