@@ -425,6 +425,145 @@ class TypeResolutionTests(unittest.TestCase):
         })
         self.assertEqual(findings, [])
 
+    def raw_decodes(self, source, extra=None):
+        files = {"crates/demo/src/lib.rs": source}
+        files.update(extra or {})
+        return [finding for finding in self.findings(files) if ": raw " in finding]
+
+    def test_serde_json_submodule_aliases_are_raw_decodes(self):
+        for source in [
+            "use serde_json::de as json_de; fn bad(s: &str) { json_de::from_str::<ChioReceipt>(s); }",
+            "use serde_json::{de as json_de, Value}; fn bad(s: &str) -> Result<ChioReceipt, E> { json_de::from_str(s) }",
+            "use serde_json::value as json_value; fn bad(v: Value) { json_value::from_value::<ChioReceipt>(v); }",
+            "use serde_json::de; fn bad(s: &[u8]) { de::from_slice::<ChioReceipt>(s); }",
+            "use serde_json as json; use json::de as nested; fn bad(s: &str) { nested::from_str::<ChioReceipt>(s); }",
+            "use serde_json::de::Deserializer as Stream; fn bad(s: &str) { Stream::from_str(s).into_iter::<ChioReceipt>(); }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_serde_json_submodule_alias_reaches_child_modules(self):
+        findings = self.raw_decodes("use serde_json::de as json_de; mod child { use super::*; fn bad(s: &str) { json_de::from_str::<ChioReceipt>(s); } }")
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad", findings[0])
+
+    def test_other_crate_submodule_alias_is_not_a_raw_decode(self):
+        self.assertEqual(self.raw_decodes("use toml::de as toml_de; fn good(s: &str) { toml_de::from_str::<ChioReceipt>(s); }"), [])
+
+    def test_placeholder_targets_take_the_contextual_type(self):
+        for source in [
+            "fn bad(d: D) -> Result<Option<ChioReceipt>, E> { <Option<_> as Deserialize>::deserialize(d) }",
+            "fn bad(d: D) -> Result<Option<ChioReceipt>, E> { let r = <Option<_>>::deserialize(d)?; Ok(r) }",
+            "fn bad(s: &str) -> Result<Vec<ChioReceipt>, E> { serde_json::from_str::<Vec<_>>(s) }",
+            "fn bad(s: &str) { let r: Vec<ChioReceipt> = serde_json::from_str::<Vec<_>>(s).unwrap_or_default(); }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_placeholder_target_of_a_plain_type_is_allowed(self):
+        self.assertEqual(self.raw_decodes("fn good(s: &str) -> Result<Vec<u32>, E> { serde_json::from_str::<Vec<_>>(s) }"), [])
+
+    def test_placeholder_target_without_context_is_refused(self):
+        findings = self.findings({"crates/demo/src/lib.rs": "fn unknown(s: &str) { consume(serde_json::from_str::<Vec<_>>(s)); }"})
+        self.assertEqual(findings, ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str::<Vec<_>>(s)"])
+
+    def test_tail_match_and_if_decodes_take_the_return_type(self):
+        for source in [
+            "fn bad(s: &str, a: bool) -> Result<ChioReceipt, E> { match a { true => serde_json::from_str(s), false => Err(e()) } }",
+            "fn bad(s: &str, a: bool) -> Result<ChioReceipt, E> { match a { true => { check(); serde_json::from_str(s) } false => Err(e()) } }",
+            "fn bad(s: &str, a: bool) -> Result<ChioReceipt, E> { if a { serde_json::from_str(s) } else { Err(e()) } }",
+            "fn bad(s: &str, a: u8) -> Result<ChioReceipt, E> { if a == 0 { Err(e()) } else if a == 1 { serde_json::from_str(s) } else { Err(e()) } }",
+            "fn bad(s: &str, a: Option<u8>) -> Result<ChioReceipt, E> { if let Some(_) = a { match a { _ => serde_json::from_str(s) } } else { Err(e()) } }",
+            "fn bad(s: &str, a: bool) -> Result<ChioReceipt, E> { let r = if a { serde_json::from_str(s)? } else { return Err(e()) }; Ok(r) }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_tail_match_of_a_plain_type_is_allowed(self):
+        self.assertEqual(self.raw_decodes("fn good(s: &str, a: bool) -> Result<u32, E> { match a { true => serde_json::from_str(s), false => Ok(0) } }"), [])
+
+    def test_inferred_decode_without_a_known_target_is_refused(self):
+        findings = self.findings({"crates/demo/src/lib.rs": "fn unknown(s: &str) { let r = serde_json::from_str(s).unwrap(); consume(r); }"})
+        self.assertEqual(findings, ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"])
+
+    def test_inferred_decode_allowlist_requires_a_reason(self):
+        files = {"crates/demo/src/lib.rs": "fn unknown(s: &str) { let r = serde_json::from_str(s).unwrap(); consume(r); }"}
+        key = ("crates/demo/src/lib.rs", "unknown", "serde_json::from_str(s)")
+        try:
+            GATE.ALLOWED_INFERRED[key] = " "
+            self.assertEqual(len(self.findings(files)), 1)
+            GATE.ALLOWED_INFERRED[key] = "consume takes a plain Settings value."
+            self.assertEqual(self.findings(files), [])
+            files["crates/demo/src/lib.rs"] = "fn unknown(s: &str) {}"
+            self.assertEqual(self.findings(files), ["crates/demo/src/lib.rs::unknown: inferred decode allowance serde_json::from_str(s) matched no call"])
+        finally:
+            GATE.ALLOWED_INFERRED.pop(key, None)
+
+    def test_renamed_axum_extractors_are_refused(self):
+        for source in [
+            "use axum::Json as Payload; async fn bad(Payload(r): Payload<ChioReceipt>) {}",
+            "use axum::extract::{Json as Body, State}; async fn bad(State(s): State<u32>, Body(r): Body<ChioReceipt>) {}",
+            "use axum::extract::Query as Params; async fn bad(Params(r): Params<ChioReceipt>) {}",
+            "use axum::Json as Payload; async fn bad(req: Request, st: &S) { let Payload(r): Payload<ChioReceipt> = Payload::from_request(req, st).await.unwrap(); }",
+            "use axum::Json as Payload; async fn bad(req: Request, st: &S) { let r = Payload::<ChioReceipt>::from_request(req, st).await; }",
+            "use axum as web; async fn bad(web::Json(r): web::Json<ChioReceipt>) {}",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_renamed_axum_extractor_of_a_plain_type_is_allowed(self):
+        self.assertEqual(self.raw_decodes("use axum::Json as Payload; async fn good(Payload(r): Payload<u32>) {}"), [])
+
+    def test_macro_expanded_decodes_take_the_invocation_types(self):
+        for source in [
+            "macro_rules! decoder { ($name:ident, $ty:ty) => { fn $name(s: &str) -> $ty { serde_json::from_str(s).unwrap() } }; } decoder!(bad, ChioReceipt);",
+            "macro_rules! decoder { ($name:ident, $ty:ty) => { fn $name(s: &str) { serde_json::from_str::<$ty>(s); } }; } decoder!(bad, ChioReceipt);",
+            "struct Envelope { receipt: ChioReceipt } macro_rules! decoder { ($ty:ty) => { fn bad(s: &str) { serde_json::from_str::<Vec<$ty>>(s); } }; } decoder!(Envelope);",
+            "macro_rules! decoder { ($ty:ty) => { fn bad(d: D) -> Result<$ty, E> { <$ty>::deserialize(d) } }; } decoder!(ChioReceipt);",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_expression_macro_decodes_are_refused_at_each_expansion(self):
+        for source in [
+            "macro_rules! decode_receipt { ($raw:expr) => { serde_json::from_str::<ChioReceipt>($raw) }; }",
+            "macro_rules! decode { ($ty:ty, $raw:expr) => { serde_json::from_str::<$ty>($raw) }; } fn bad(s: &str) { let _ = decode!(ChioReceipt, s); }",
+            "macro_rules! decode { ($raw:expr) => { serde_json::from_str($raw) }; } fn bad(s: &str) -> Result<ChioReceipt, E> { decode!(s) }",
+            "macro_rules! decode { ($raw:expr) => {{ let r = serde_json::from_str($raw)?; r }}; } fn bad(s: &str) -> Result<(), E> { let r: ChioReceipt = decode!(s); Ok(()) }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_expression_macro_decodes_of_plain_types_are_allowed(self):
+        for source in [
+            "macro_rules! decode { ($ty:ty, $raw:expr) => { serde_json::from_str::<$ty>($raw) }; } fn good(s: &str) { let _ = decode!(u32, s); }",
+            "macro_rules! decode { ($raw:expr) => { serde_json::from_str($raw) }; } fn good(s: &str) -> Result<u32, E> { decode!(s) }",
+            "macro_rules! decode { ($ty:ty, $raw:expr) => { serde_json::from_str::<$ty>($raw) }; }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), [], source)
+
+    def test_tail_match_scrutinee_decode_takes_the_return_type(self):
+        for source in [
+            "fn bad(s: &str) -> Result<ChioReceipt, E> { match serde_json::from_str(s) { Ok(r) => Ok(r), Err(e) => Err(wrap(e)) } }",
+            "fn bad(s: &str) -> Option<ChioReceipt> { if let Ok(r) = serde_json::from_str(s) { Some(r) } else { None } }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+
+    def test_macro_expanded_decode_in_another_file_is_refused(self):
+        findings = self.raw_decodes(
+            "#[macro_use] mod macros; mod user;",
+            {
+                "crates/demo/src/macros.rs": "macro_rules! decoder { ($ty:ty) => { fn decoded(s: &str) -> $ty { serde_json::from_str(s).unwrap() } }; }",
+                "crates/demo/src/user.rs": "decoder!(ChioReceipt);",
+            },
+        )
+        self.assertEqual(len(findings), 1, findings)
+
+    def test_macro_expanded_decode_of_a_plain_type_is_allowed(self):
+        self.assertEqual(self.raw_decodes("macro_rules! decoder { ($name:ident, $ty:ty) => { fn $name(s: &str) { serde_json::from_str::<$ty>(s); } }; } decoder!(good, u32);"), [])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
