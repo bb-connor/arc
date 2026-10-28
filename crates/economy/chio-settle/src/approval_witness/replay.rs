@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use chio_security_types::clock::ClockError;
 
-use super::{refused, valid_identifier};
+use super::{clock_error, refused, valid_identifier};
 use crate::SettlementError;
 
 const DEFAULT_CAPACITY: usize = 65_536;
@@ -73,14 +73,14 @@ impl ApprovalReplayStore for InMemoryApprovalReplayStore {
             return Err(refused("settlement replay identity malformed"));
         }
         if expires_at_unix_ms <= now_unix_ms {
-            return Err(ClockError::Expired.into());
+            return Err(clock_error(ClockError::Expired));
         }
         let mut state = self
             .state
             .lock()
             .map_err(|_| refused("settlement replay store unavailable"))?;
         if now_unix_ms < state.high_water {
-            return Err(ClockError::WallClockRegression.into());
+            return Err(clock_error(ClockError::WallClockRegression));
         }
         state.high_water = now_unix_ms;
         state.entries.retain(|_, expiry| *expiry > now_unix_ms);

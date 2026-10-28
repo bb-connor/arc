@@ -189,8 +189,6 @@ pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, Settl
 
 #[derive(Debug, thiserror::Error)]
 pub enum SettlementError {
-    #[error("settlement clock failed: {0}")]
-    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("invalid settlement input: {0}")]
     Input(#[from] chio_core::canonical::SharedUntrustedJsonError),
     #[error("settlement file read failed")]

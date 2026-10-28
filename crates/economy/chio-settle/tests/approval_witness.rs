@@ -223,10 +223,7 @@ fn expired_witness_is_refused_at_artifact_issuance() {
     let f = Fixture::new();
     let witness = f.witness();
     f.clock.0.store(200, Ordering::SeqCst);
-    assert!(matches!(
-        f.x402(witness),
-        Err(SettlementError::Clock(ClockError::Expired))
-    ));
+    verification_refused(f.x402(witness), "urn:chio:error:kernel:clock-expired");
 }
 
 #[test]
@@ -400,8 +397,8 @@ fn a_regressing_clock_cannot_extend_a_witness() {
     let f = Fixture::new();
     let witness = f.witness();
     f.clock.0.store(99, Ordering::SeqCst);
-    assert!(matches!(
+    verification_refused(
         f.x402(witness),
-        Err(SettlementError::Clock(ClockError::WallClockRegression))
-    ));
+        "urn:chio:error:kernel:clock-wall-clock-regression",
+    );
 }

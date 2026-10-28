@@ -39,13 +39,15 @@ impl VerifiedApproval {
     }
 
     pub(crate) fn check_time(&mut self) -> Result<(), SettlementError> {
-        self.deadline.remaining(self.clock.read()?)?;
+        self.deadline
+            .remaining(self.clock.read().map_err(clock_error)?)
+            .map_err(clock_error)?;
         Ok(())
     }
 
     pub(crate) fn consume(mut self) -> Result<(), SettlementError> {
-        let now = self.clock.read()?;
-        self.deadline.remaining(now)?;
+        let now = self.clock.read().map_err(clock_error)?;
+        self.deadline.remaining(now).map_err(clock_error)?;
         match self.replay.record_if_fresh(
             &self.request_id,
             &self.intent_hash,
@@ -94,16 +96,17 @@ pub fn verify_governed_approval(
     let lifetime = token
         .expires_at
         .checked_sub(token.issued_at)
-        .ok_or(chio_security_types::clock::ClockError::InvalidWindow)?;
+        .ok_or_else(|| clock_error(chio_security_types::clock::ClockError::InvalidWindow))?;
     if lifetime > MAX_APPROVAL_TTL_SECONDS {
         return Err(refused("settlement approval lifetime exceeds 3600 seconds"));
     }
-    let expires_at = UnixMillis::from_secs(token.expires_at)?;
+    let expires_at = UnixMillis::from_secs(token.expires_at).map_err(clock_error)?;
     let deadline = AuthorityDeadline::new(
-        UnixMillis::from_secs(token.issued_at)?,
+        UnixMillis::from_secs(token.issued_at).map_err(clock_error)?,
         expires_at,
-        clock.read()?,
-    )?;
+        clock.read().map_err(clock_error)?,
+    )
+    .map_err(clock_error)?;
     let value = intent
         .context
         .as_ref()
@@ -183,4 +186,8 @@ fn valid_identifier(value: &str) -> bool {
 
 fn refused(reason: &str) -> SettlementError {
     SettlementError::Verification(reason.to_string())
+}
+
+fn clock_error(error: chio_security_types::clock::ClockError) -> SettlementError {
+    refused(error.code())
 }
