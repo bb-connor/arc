@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chio_core::credit::SignedCapitalExecutionInstruction;
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::governance::{
@@ -83,10 +84,19 @@ fn exercise(data: &[u8]) -> bool {
         matches!(verify(&corrupted), Err(SettlementError::Verification(reason))
         if reason == "settlement approval signature invalid")
     );
-    let dispatch: Web3SettlementDispatchArtifact = serde_json::from_str(include_str!(
+    let mut dispatch: Web3SettlementDispatchArtifact = serde_json::from_str(include_str!(
         "../../../docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
     ))
     .unwrap_or_else(|error| panic!("checked-in dispatch fixture: {error}"));
+    let mut body = dispatch.capital_instruction.body.clone();
+    body.query.capability_id = Some("settlement-capability".to_owned());
+    dispatch.capital_instruction =
+        SignedCapitalExecutionInstruction::sign(body, &Keypair::from_seed(&[93; 32]))
+            .unwrap_or_else(|error| panic!("fixed capital signer: {error}"));
+    assert!(dispatch
+        .capital_instruction
+        .verify_signature()
+        .unwrap_or_else(|error| panic!("generated capital signature: {error}")));
     let tokens = vec![binding.token_symbol.clone()];
     let prepared = build_x402_payment_requirements(
         &dispatch,

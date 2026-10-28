@@ -18,6 +18,9 @@ use chio_settle::{
 };
 use chio_test_support::prelude::*;
 
+#[path = "support/dispatch.rs"]
+mod dispatch_support;
+
 struct TestClock(AtomicU64);
 
 impl Clock for TestClock {
@@ -37,17 +40,14 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let dispatch: Web3SettlementDispatchArtifact = serde_json::from_str(include_str!(
-            "../../../../docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
-        ))
-        .test_unwrap();
+        let dispatch = dispatch_support::fixture();
         let capability_id = dispatch
             .capital_instruction
             .body
             .query
             .capability_id
             .clone()
-            .unwrap_or_else(|| dispatch.dispatch_id.clone());
+            .test_unwrap();
         Self {
             approver: Keypair::from_seed(&[71; 32]),
             subject: Keypair::from_seed(&[72; 32]),
@@ -300,12 +300,12 @@ fn dispatch_identity_comparison_does_not_trim_the_live_identity() {
 fn x402_refuses_missing_capability_identity_without_consuming() {
     let mut f = Fixture::new();
     f.binding.capability_id = f.dispatch.dispatch_id.clone();
-    f.dispatch.capital_instruction.body.query.capability_id = None;
+    dispatch_support::set_capability(&mut f.dispatch, None);
     assert!(
         matches!(f.x402(f.witness()), Err(SettlementError::InvalidBinding(reason))
         if reason == "x402 capability identity is missing")
     );
-    f.dispatch.capital_instruction.body.query.capability_id = Some(f.binding.capability_id.clone());
+    dispatch_support::set_capability(&mut f.dispatch, Some(f.binding.capability_id.clone()));
     f.x402(f.witness()).test_unwrap();
 }
 
@@ -313,12 +313,12 @@ fn x402_refuses_missing_capability_identity_without_consuming() {
 fn circle_refuses_missing_capability_identity_without_consuming() {
     let mut f = Fixture::new();
     f.binding.capability_id = f.dispatch.dispatch_id.clone();
-    f.dispatch.capital_instruction.body.query.capability_id = None;
+    dispatch_support::set_capability(&mut f.dispatch, None);
     assert!(
         matches!(f.circle(f.witness()), Err(SettlementError::InvalidBinding(reason))
         if reason == "circle capability identity is missing")
     );
-    f.dispatch.capital_instruction.body.query.capability_id = Some(f.binding.capability_id.clone());
+    dispatch_support::set_capability(&mut f.dispatch, Some(f.binding.capability_id.clone()));
     f.circle(f.witness()).test_unwrap();
 }
 

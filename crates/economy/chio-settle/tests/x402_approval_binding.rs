@@ -11,12 +11,11 @@ use chio_test_support::prelude::*;
 #[path = "support/approval.rs"]
 mod approval_support;
 
+#[path = "support/dispatch.rs"]
+mod dispatch_support;
+
 fn fixture() -> (Web3SettlementDispatchArtifact, ApprovalBinding) {
-    // This is a synthetic requirements fixture. No rail or payment service is invoked.
-    let dispatch: Web3SettlementDispatchArtifact = serde_json::from_str(include_str!(
-        "../../../../docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
-    ))
-    .test_unwrap();
+    let dispatch = dispatch_support::fixture();
     let binding = ApprovalBinding {
         schema: "chio.settlement-binding.v1".to_string(),
         chain_id: 8453,
@@ -32,7 +31,7 @@ fn fixture() -> (Web3SettlementDispatchArtifact, ApprovalBinding) {
             .query
             .capability_id
             .clone()
-            .unwrap_or_else(|| dispatch.dispatch_id.clone()),
+            .test_unwrap(),
     };
     (dispatch, binding)
 }

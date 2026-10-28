@@ -119,7 +119,7 @@ pub fn build_x402_payment_requirements(
             .query
             .capability_id
             .clone()
-            .unwrap_or_else(|| dispatch.dispatch_id.clone()),
+            .test_unwrap(),
         amount_minor_units: dispatch.settlement_amount.units,
         currency: dispatch.settlement_amount.currency.clone(),
         settlement_mode,
@@ -271,6 +271,9 @@ use crate as settle_api;
 #[cfg(test)]
 #[path = "../tests/support/approval.rs"]
 mod approval_support;
+#[cfg(test)]
+#[path = "../tests/support/dispatch.rs"]
+mod dispatch_support;
 
 #[cfg(test)]
 mod tests {
@@ -285,10 +288,7 @@ mod tests {
     use chio_test_support::prelude::*;
 
     fn sample_dispatch() -> Web3SettlementDispatchArtifact {
-        serde_json::from_str(include_str!(
-            "../../../../docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
-        ))
-        .test_unwrap()
+        super::dispatch_support::fixture()
     }
 
     fn binding_for_dispatch(dispatch: &Web3SettlementDispatchArtifact) -> ApprovalBinding {
@@ -307,7 +307,7 @@ mod tests {
                 .query
                 .capability_id
                 .clone()
-                .unwrap_or_else(|| dispatch.dispatch_id.clone()),
+                .test_unwrap(),
         }
     }
 
