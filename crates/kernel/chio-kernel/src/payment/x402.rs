@@ -231,6 +231,17 @@ struct X402AuthorizationIdentity {
     valid_before: u64,
 }
 
+impl X402AuthorizationIdentity {
+    /// Single-use key of the EIP-3009 authorization: the token contract
+    /// tracks `(authorizer, nonce)`, scoped here by network and asset.
+    fn replay_key(&self) -> String {
+        format!(
+            "{X402_AUTHORIZATION_ID_PREFIX}/{}/{}/{}/{}",
+            self.network, self.asset, self.from, self.nonce
+        )
+    }
+}
+
 impl fmt::Display for X402AuthorizationIdentity {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -384,7 +395,8 @@ impl X402PaymentAdapter {
         &self,
         request: &PaymentAuthorizeRequest,
         context: &X402PaymentContext,
-    ) -> Result<X402AuthorizationIdentity, X402Refusal> {
+        now: u64,
+    ) -> Result<(X402AuthorizationIdentity, u64), X402Refusal> {
         if !request.reference_is_durable {
             return Err(X402Refusal::DurableReferenceRequired);
         }
@@ -421,7 +433,10 @@ impl X402PaymentAdapter {
         ) else {
             return Err(X402Refusal::MalformedAuthorization);
         };
-        if valid_after >= valid_before || !signature_is_well_formed(&payload.payload.signature) {
+        if valid_after >= valid_before
+            || i64::try_from(valid_before).is_err()
+            || !signature_is_well_formed(&payload.payload.signature)
+        {
             return Err(X402Refusal::MalformedAuthorization);
         }
         if to != self.rail.pay_to {
@@ -438,13 +453,51 @@ impl X402PaymentAdapter {
         if valid_before > authority_expires_at {
             return Err(X402Refusal::OutlivesAuthority);
         }
-        Ok(X402AuthorizationIdentity {
+        check_window(now, valid_after, valid_before)?;
+        let identity = X402AuthorizationIdentity {
             network: self.rail.network.as_str().to_owned(),
             asset: self.rail.asset.clone(),
             from,
             nonce,
             valid_before,
-        })
+        };
+        Ok((identity, valid_after))
+    }
+
+    fn now_unix_secs(&self) -> Result<u64, PaymentError> {
+        self.clock
+            .unix_millis()
+            .map(|now| now.as_secs())
+            .map_err(|_| PaymentError::Unavailable("x402 trusted clock is unavailable".to_owned()))
+    }
+
+    fn ensure_unspent(&self, identity: &X402AuthorizationIdentity) -> Result<(), PaymentError> {
+        match self.replay.is_consumed(&identity.replay_key()) {
+            Ok(false) => Ok(()),
+            Ok(true) => Err(X402Refusal::NonceReused.into()),
+            Err(_) => Err(replay_store_unavailable()),
+        }
+    }
+
+    /// Consumes the authorization key. Called after `/verify` with a fresh
+    /// clock reading, because the verification round trip may cross the
+    /// authorization's expiry.
+    fn spend(
+        &self,
+        identity: &X402AuthorizationIdentity,
+        valid_after: u64,
+    ) -> Result<(), PaymentError> {
+        check_window(self.now_unix_secs()?, valid_after, identity.valid_before)?;
+        let valid_before = i64::try_from(identity.valid_before)
+            .map_err(|_| X402Refusal::MalformedAuthorization)?;
+        match self
+            .replay
+            .reserve_until(&identity.replay_key(), valid_before)
+        {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(X402Refusal::NonceReused.into()),
+            Err(_) => Err(replay_store_unavailable()),
+        }
     }
 
     fn verify(&self, body: &X402FacilitatorRequest<'_>) -> Result<(), X402Refusal> {
@@ -556,13 +609,16 @@ impl PaymentAdapter for X402PaymentAdapter {
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError> {
         let context = request.x402.as_ref().ok_or(X402Refusal::PaymentMissing)?;
-        let identity = self.check_payment(request, context)?;
+        let (identity, valid_after) =
+            self.check_payment(request, context, self.now_unix_secs()?)?;
+        self.ensure_unspent(&identity)?;
         let body = X402FacilitatorRequest {
             x402_version: X402_VERSION,
             payment_payload: &context.payment_payload,
             payment_requirements: &context.payment_requirements,
         };
         self.verify(&body)?;
+        self.spend(&identity, valid_after)?;
         let settled = self.settle(&body, &identity)?;
         let authorization_id = settled.to_string();
         if !payment_identifier_is_valid(&authorization_id) {
@@ -675,6 +731,22 @@ struct X402SettleResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     transaction: Option<String>,
     network: String,
+}
+
+/// EIP-3009 `transferWithAuthorization` requires `now > validAfter` and
+/// `now < validBefore`, in Unix seconds.
+fn check_window(now: u64, valid_after: u64, valid_before: u64) -> Result<(), X402Refusal> {
+    if now <= valid_after {
+        return Err(X402Refusal::NotYetValid { now, valid_after });
+    }
+    if now >= valid_before {
+        return Err(X402Refusal::Expired { now, valid_before });
+    }
+    Ok(())
+}
+
+fn replay_store_unavailable() -> PaymentError {
+    PaymentError::Unavailable("x402 replay store is unavailable".to_owned())
 }
 
 fn canonical_digest<T: Serialize>(value: &T) -> Result<String, PaymentError> {
