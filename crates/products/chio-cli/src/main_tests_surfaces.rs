@@ -651,40 +651,17 @@ fn chio_runtime_dispatch_uses_chio_command_types() {
 }
 
 #[test]
-fn public_chio_runtime_pheromone_query_errors_use_chio_boundary() -> Result<(), Box<dyn Error>> {
-    let tempdir = tempfile::tempdir()?;
-    let query_report = tempdir.path().join("pheromone-query-report.json");
-    let store = tempdir.path().join("runtime-admission-store.json");
-    let report = tempdir.path().join("runtime-admission-report.json");
-    std::fs::write(&query_report, "{}")?;
-
-    let error = cmd_chio_runtime_admit(
-        &fixture_path("runtime-spine/request.json"),
-        &fixture_path("runtime-spine/profile.json"),
-        &fixture_path("runtime-spine/bundle.json"),
-        None,
-        None,
-        Some(&query_report),
-        None,
-        None,
-        None,
-        None,
-        &store,
-        1_766_000_000_500,
-        &report,
-    )
-    .expect_err("invalid public Chio pheromone query report must fail before admission");
-    let rendered = render_error_json(&error)?;
-    let rendered_text = rendered.to_string();
-    assert!(
-        rendered_text.contains("Chio runtime pheromone query report"),
-        "public runtime error should describe the Chio query-report boundary: {rendered_text}"
-    );
-
-    let runtime_admission = include_str!("cli/chio/dispatch/runtime/admission.rs");
-    assert!(!runtime_admission.contains("Chio signed pheromone query report parse"));
-
-    Ok(())
+fn retired_standalone_runtime_commands_refuse() {
+    for arguments in [
+        vec!["chio", "runtime", "admit"],
+        vec!["chio", "runtime", "pheromone", "evaluate"],
+    ] {
+        let error = match parse_cli(arguments) {
+            Err(error) => error,
+            Ok(_) => panic!("retired command must refuse"),
+        };
+        assert_eq!(error.kind(), clap::error::ErrorKind::InvalidSubcommand);
+    }
 }
 
 #[test]
