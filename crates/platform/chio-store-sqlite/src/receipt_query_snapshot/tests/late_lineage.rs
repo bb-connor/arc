@@ -847,3 +847,79 @@ fn captured_lineage_reinsert_extension_first_keeps_request_refusal() {
 fn captured_lineage_reinsert_valid_control_keeps_export_readable() {
     captured_lineage_reinsert(false, false);
 }
+
+fn refused_lineage_subject_stays_invalid(captured: bool) {
+    let fixture = Fixture::new(4);
+    if captured {
+        record_lineage(&fixture);
+    }
+    record_signed_lineage(&fixture, OTHER, &holder());
+    fixture.append(&spec(0, CAPABILITY, None));
+    fixture.flush();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            recertify_interval: Duration::from_secs(3_600),
+            invalid_retry_backoff: Duration::from_secs(600),
+            ..config()
+        },
+    );
+    service.pause_extension_for_test(true);
+    assert!(service.wait_for_paused_extension_for_test(Duration::from_secs(60)));
+    let query = ReceiptQuery {
+        agent_subject: Some(late_subject()),
+        ..admin(100)
+    };
+    assert_eq!(
+        service.query_receipts(&query).unwrap().total_count,
+        u64::from(captured)
+    );
+    if !captured {
+        record_lineage(&fixture);
+    }
+    let mut connection = rusqlite::Connection::open(&fixture.live).unwrap();
+    let transaction = connection.transaction().unwrap();
+    transaction
+        .execute_batch(
+            "CREATE TEMP TABLE reinsert_lineage AS SELECT * FROM capability_lineage;
+             DELETE FROM capability_lineage WHERE capability_id = 'cap-late';
+             INSERT INTO capability_lineage SELECT * FROM reinsert_lineage WHERE capability_id = 'cap-late';",
+        )
+        .unwrap();
+    let subject = if captured {
+        Keypair::from_seed(&[0x63; 32]).public_key().to_hex()
+    } else {
+        late_subject()
+    };
+    assert_eq!(
+        transaction
+            .execute(
+                "UPDATE capability_lineage SET grants_json = 'x', subject_key = ?1 WHERE capability_id = ?2",
+                params![subject, CAPABILITY],
+            )
+            .unwrap(),
+        1
+    );
+    transaction.commit().unwrap();
+    service.pause_extension_for_test(false);
+    let state = wait_for(&service, "refused lineage subject", |state| {
+        matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+    });
+    let ReceiptQuerySnapshotState::Invalid { reason } = state else {
+        unreachable!()
+    };
+    assert!(
+        matches!(service.query_receipts(&admin(100)), Err(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(actual))) if actual == reason)
+    );
+    service.shutdown();
+}
+
+#[test]
+fn captured_lineage_reinsert_changed_subject_still_invalidates() {
+    refused_lineage_subject_stays_invalid(true);
+}
+
+#[test]
+fn captured_lineage_reinsert_unknown_subject_is_never_filled_from_refused_metadata() {
+    refused_lineage_subject_stays_invalid(false);
+}
