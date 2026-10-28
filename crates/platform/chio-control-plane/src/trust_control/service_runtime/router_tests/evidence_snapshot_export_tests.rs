@@ -233,35 +233,52 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     Ok(())
 }
 
-#[tokio::test]
-async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenants() -> TestResult {
+const REFUSED_LINEAGE: &str = "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-bad-signed', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')";
+
+/// A tenant-a receipt of `cap-bad-signed`, with signed attribution when
+/// `signed`, and a tenant-b receipt without signed attribution, of
+/// `cap-bad-signed` when `shared` and of another capability otherwise; a
+/// ready snapshot and a router state with both tenant tokens.
+async fn refused_lineage_router(
+    signed: bool,
+    shared: bool,
+    config: ReceiptQuerySnapshotConfig,
+) -> Result<
+    (
+        tempfile::TempDir,
+        std::path::PathBuf,
+        Arc<ReceiptQuerySnapshots>,
+        TrustServiceState,
+    ),
+    Box<dyn std::error::Error>,
+> {
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("receipts.db");
     let store = Arc::new(SqliteReceiptStore::open(&path)?);
     let signer = Keypair::from_seed(&[43; 32]);
     let template = super::receipt_store_ownership_tests::signed_receipt(&signer)?.body();
-    for (id, tenant, capability) in [
-        ("bad-a", "tenant-a", "cap-bad-signed"),
-        ("plain-b", "tenant-b", "cap-plain"),
+    let other = if shared {
+        "cap-bad-signed"
+    } else {
+        "cap-plain"
+    };
+    for (id, tenant, capability, attributed) in [
+        ("bad-a", "tenant-a", "cap-bad-signed", signed),
+        ("plain-b", "tenant-b", other, false),
     ] {
         let mut body = template.clone();
         body.id = id.into();
         body.tenant_id = Some(tenant.into());
         body.capability_id = capability.into();
+        if attributed {
+            body.metadata = Some(json!({
+                "attribution": {"subject_key": "signed-subject", "issuer_key": "signed-issuer", "delegation_depth": 0}
+            }));
+        }
         store.append_chio_receipt(&ChioReceipt::sign(body, &signer)?)?;
     }
-    let snapshots = Arc::new(ReceiptQuerySnapshots::start(
-        Arc::clone(&store),
-        ReceiptQuerySnapshotConfig::default(),
-    )?);
+    let snapshots = Arc::new(ReceiptQuerySnapshots::start(Arc::clone(&store), config)?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
-    let connection = rusqlite::Connection::open(&path)?;
-    let inserted = connection.execute(
-        "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap-bad-signed', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')",
-        [],
-    );
-    assert_eq!(inserted?, 1);
-    drop(connection);
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
@@ -273,6 +290,56 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
         .config
         .tenant_read_tokens
         .insert("tenant-b".into(), "tenant-b-secret".into());
+    Ok((directory, path, snapshots, state))
+}
+
+fn insert_refused_lineage(path: &std::path::Path) -> TestResult {
+    let connection = rusqlite::Connection::open(path)?;
+    assert_eq!(connection.execute(REFUSED_LINEAGE, [])?, 1);
+    Ok(())
+}
+
+/// Wait until an extension cycle that began after this call has completed:
+/// the second change of the observation time, as cycles run one at a time.
+/// Returns early when the snapshot leaves `Ready`.
+async fn await_extension_cycle(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+    tokio::task::spawn_blocking(move || {
+        let observed =
+            |status: &chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotStatus| {
+                status
+                    .watermark
+                    .as_ref()
+                    .map(|watermark| watermark.observed_at_unix_ms)
+            };
+        let mut seen = observed(&snapshots.status());
+        let mut changes = 0;
+        // A hang guard, not an extension cadence requirement.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        while changes < 2 {
+            let status = snapshots.status();
+            if status.state != ReceiptQuerySnapshotState::Ready {
+                return;
+            }
+            let current = observed(&status);
+            if current != seen {
+                changes += 1;
+                seen = current;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "no extension cycle completed"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    })
+    .await?;
+    Ok(())
+}
+
+async fn assert_typed_refusal_keeps_other_tenants(
+    snapshots: &ReceiptQuerySnapshots,
+    state: TrustServiceState,
+) -> TestResult {
     let (status, body) = export(state.clone()).await?;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert_eq!(body["code"], "receipt_query_export_refused");
@@ -289,8 +356,113 @@ async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenant
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
     assert_eq!(response.status(), StatusCode::OK);
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_signed_lineage_is_a_typed_refusal_without_dropping_other_tenants() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        refused_lineage_router(true, false, ReceiptQuerySnapshotConfig::default()).await?;
+    insert_refused_lineage(&path)?;
+    assert_typed_refusal_keeps_other_tenants(&snapshots, state).await?;
     snapshots.shutdown();
     Ok(())
+}
+
+#[tokio::test]
+async fn invalid_signed_lineage_seen_by_extension_first_is_the_same_typed_refusal() -> TestResult {
+    let (_directory, path, snapshots, state) =
+        refused_lineage_router(true, false, ReceiptQuerySnapshotConfig::default()).await?;
+    insert_refused_lineage(&path)?;
+    await_extension_cycle(Arc::clone(&snapshots)).await?;
+    assert_typed_refusal_keeps_other_tenants(&snapshots, state).await?;
+    snapshots.shutdown();
+    Ok(())
+}
+
+#[tokio::test]
+async fn refused_lineage_of_unattributed_receipts_fails_the_snapshot_after_extension() -> TestResult
+{
+    let (_directory, path, snapshots, state) =
+        refused_lineage_router(false, false, ReceiptQuerySnapshotConfig::default()).await?;
+    insert_refused_lineage(&path)?;
+    await_extension_cycle(Arc::clone(&snapshots)).await?;
+    assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
+}
+
+const READER_REFUSAL_BODY: &str = "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token";
+
+async fn assert_reader_refusal_fails_the_snapshot(
+    snapshots: &ReceiptQuerySnapshots,
+    state: TrustServiceState,
+) -> TestResult {
+    let (status, body) = export(state).await?;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(body["code"], "receipt_query_snapshot_invalid");
+    assert_eq!(body["error"], READER_REFUSAL_BODY);
+    assert_eq!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid {
+            reason: READER_REFUSAL_BODY
+                .trim_start_matches("receipt query snapshot failed authentication: ")
+                .into()
+        }
+    );
+    snapshots.shutdown();
+    Ok(())
+}
+
+/// Wait until the extension cycle that follows publication has completed.
+/// With a one-hour tick the next cycle cannot start before the test ends.
+async fn await_first_extension_cycle(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+    tokio::task::spawn_blocking(move || {
+        let observed =
+            |status: &chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotStatus| {
+                status
+                    .watermark
+                    .as_ref()
+                    .map(|watermark| watermark.observed_at_unix_ms)
+            };
+        let published = observed(&snapshots.status());
+        // A hang guard, not an extension cadence requirement.
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        while observed(&snapshots.status()) == published {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the first extension cycle never completed"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    })
+    .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn refused_lineage_shared_with_unattributed_receipts_fails_the_snapshot_when_export_reads_it_first(
+) -> TestResult {
+    let (_directory, path, snapshots, state) = refused_lineage_router(
+        true,
+        true,
+        ReceiptQuerySnapshotConfig {
+            extension_tick: Duration::from_secs(3_600),
+            ..ReceiptQuerySnapshotConfig::default()
+        },
+    )
+    .await?;
+    await_first_extension_cycle(Arc::clone(&snapshots)).await?;
+    insert_refused_lineage(&path)?;
+    assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
+}
+
+#[tokio::test]
+async fn refused_lineage_shared_with_unattributed_receipts_fails_the_snapshot_after_extension(
+) -> TestResult {
+    let (_directory, path, snapshots, state) =
+        refused_lineage_router(true, true, ReceiptQuerySnapshotConfig::default()).await?;
+    insert_refused_lineage(&path)?;
+    await_extension_cycle(Arc::clone(&snapshots)).await?;
+    assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
 }
 
 #[tokio::test]
@@ -480,20 +652,26 @@ async fn earlier_lineage_refusal_does_not_mask_a_later_attribution_change_over_h
 }
 
 #[tokio::test]
-async fn non_utf8_unattributed_lineage_column_returns_typed_refusal() -> TestResult {
+async fn non_utf8_lineage_issuer_of_unsigned_receipts_returns_snapshot_invalid() -> TestResult {
     let (_directory, path, snapshots, state) =
         signed_lineage_router(&[("cap-signed", 100)]).await?;
     edit_lineage(&path, "UPDATE capability_lineage SET issuer_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap-signed'")?;
     let (status, body) = export(state.clone()).await?;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
-    assert_eq!(body["code"], "receipt_query_export_refused");
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert_eq!(body["code"], "receipt_query_snapshot_invalid");
     assert_eq!(
         body["error"],
-        "receipt evidence export refused: capability lineage row contains invalid metadata"
+        "receipt query snapshot failed authentication: capability lineage of cap-signed is refused by the local reader: invalid utf-8 sequence of 1 bytes from index 0 at index 2"
     );
     assert!(body.get("bundle").is_none(), "{body}");
-    assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
-    assert_eq!(tenant_b_export_status(state).await?, StatusCode::OK);
+    assert!(matches!(
+        snapshots.status().state,
+        ReceiptQuerySnapshotState::Invalid { .. }
+    ));
+    assert_eq!(
+        tenant_b_export_status(state).await?,
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
     snapshots.shutdown();
     Ok(())
 }

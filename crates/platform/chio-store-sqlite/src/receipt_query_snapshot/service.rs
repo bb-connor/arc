@@ -1553,6 +1553,26 @@ impl ReceiptQuerySnapshots {
         self.inner.wake();
     }
 
+    /// True once a paused extension has finished its last cycle.
+    pub(super) fn extension_parked_for_test(&self) -> bool {
+        self.inner.extension_parked.load(Ordering::SeqCst)
+    }
+
+    /// Wait until an extension cycle has covered capability lineage through
+    /// `rowid`; the timeout only bounds a hung test.
+    pub(super) fn wait_for_lineage_through_for_test(&self, rowid: i64, timeout: Duration) -> bool {
+        let Ok((published, _)) = self.inner.ready() else {
+            return false;
+        };
+        let Ok(owned) = published.owned.lock() else {
+            return false;
+        };
+        published
+            .changed
+            .wait_timeout_while(owned, timeout, |owned| owned.lineage_rowid < rowid)
+            .is_ok_and(|(owned, _)| owned.lineage_rowid >= rowid)
+    }
+
     pub(super) fn invalidate_for_test(&self, reason: &str) {
         self.inner.invalidate(reason);
     }

@@ -730,3 +730,151 @@ fn oversized_subject_is_rejected_from_its_record_header() {
         "{oversized_steps} {exact_steps} {differs_steps}"
     );
 }
+
+const REFUSED_LINEAGE: &str = "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')";
+const READER_REFUSAL: &str = "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap claims signed-token provenance without a signed token";
+const REQUEST_REFUSAL: &str =
+    "capability lineage cap claims signed-token provenance without a signed token";
+
+/// Receipts of `cap`, one per `(tenant, signed)` entry with signed
+/// attribution when `signed`, a ready snapshot and no lineage row.
+fn lineage_fixture(
+    receipts: &[(&str, bool)],
+) -> (
+    tempfile::TempDir,
+    Arc<SqliteReceiptStore>,
+    Arc<ReceiptQuerySnapshots>,
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let store = Arc::new(SqliteReceiptStore::open(directory.path().join("live.db")).unwrap());
+    for (index, (tenant, signed)) in (0_u64..).zip(receipts) {
+        let mut body =
+            receipt_with_ts_and_tenant(&format!("r-{index}"), "cap", 100 + index, Some(tenant))
+                .body();
+        if *signed {
+            body.metadata = Some(serde_json::json!({
+                "attribution": {"subject_key": "signed-subject", "issuer_key": "signed-issuer", "delegation_depth": 0}
+            }));
+        }
+        store
+            .append_chio_receipt_returning_seq(
+                &chio_core::receipt::body::ChioReceipt::sign(body, &evidence_receipt_keypair())
+                    .unwrap(),
+            )
+            .unwrap();
+    }
+    store.flush_receipt_writes().unwrap();
+    let snapshots = Arc::new(
+        ReceiptQuerySnapshots::start(Arc::clone(&store), ReceiptQuerySnapshotConfig::default())
+            .unwrap(),
+    );
+    wait_until_ready(&snapshots);
+    (directory, store, snapshots)
+}
+
+/// Pause extension and wait until no cycle is in flight.
+fn park_extension(snapshots: &ReceiptQuerySnapshots) {
+    snapshots.pause_extension_for_test(true);
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    while !snapshots.extension_parked_for_test() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the extension never parked"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn insert_refused_lineage(directory: &tempfile::TempDir) -> i64 {
+    let connection = rusqlite::Connection::open(directory.path().join("live.db")).unwrap();
+    assert_eq!(connection.execute(REFUSED_LINEAGE, []).unwrap(), 1);
+    connection.last_insert_rowid()
+}
+
+fn export_error(snapshots: &ReceiptQuerySnapshots) -> ReceiptQuerySnapshotError {
+    match snapshots
+        .build_evidence_export_bundle_with_transparency(&EvidenceExportQuery::tenant_scoped("a"))
+    {
+        Err(EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(error))) => error,
+        other => panic!("expected a snapshot outcome, got {other:?}"),
+    }
+}
+
+#[test]
+fn refused_lineage_of_unattributed_receipts_fails_the_snapshot_in_either_order() {
+    let refused = ReceiptQuerySnapshotState::Invalid {
+        reason: READER_REFUSAL.into(),
+    };
+    let (directory, _store, snapshots) = lineage_fixture(&[("a", false), ("a", false)]);
+    park_extension(&snapshots);
+    insert_refused_lineage(&directory);
+    assert_eq!(
+        export_error(&snapshots),
+        ReceiptQuerySnapshotError::Invalid(READER_REFUSAL.into())
+    );
+    assert_eq!(snapshots.status().state, refused);
+    snapshots.shutdown();
+
+    let (directory, _store, snapshots) = lineage_fixture(&[("a", false), ("a", false)]);
+    insert_refused_lineage(&directory);
+    let status = snapshots.wait_for_recovery(Duration::from_secs(60), |status| {
+        status.state != ReceiptQuerySnapshotState::Ready
+    });
+    assert_eq!(status.state, refused);
+    assert_eq!(
+        export_error(&snapshots),
+        ReceiptQuerySnapshotError::Invalid(READER_REFUSAL.into())
+    );
+    snapshots.shutdown();
+}
+
+#[test]
+fn refused_lineage_of_signed_receipts_is_a_request_refusal_in_either_order() {
+    for extension_first in [false, true] {
+        let (directory, _store, snapshots) = lineage_fixture(&[("a", true), ("a", true)]);
+        if !extension_first {
+            park_extension(&snapshots);
+        }
+        let rowid = insert_refused_lineage(&directory);
+        if extension_first {
+            assert!(
+                snapshots.wait_for_lineage_through_for_test(rowid, Duration::from_secs(60)),
+                "{:?}",
+                snapshots.status().state
+            );
+        }
+        assert_eq!(
+            export_error(&snapshots),
+            ReceiptQuerySnapshotError::ExportRefused(REQUEST_REFUSAL.into())
+        );
+        assert_eq!(snapshots.status().state, ReceiptQuerySnapshotState::Ready);
+        snapshots.shutdown();
+    }
+}
+
+#[test]
+fn refused_lineage_fails_the_snapshot_for_signed_receipts_when_another_tenant_depends_on_it() {
+    let refused = ReceiptQuerySnapshotState::Invalid {
+        reason: READER_REFUSAL.into(),
+    };
+    for extension_first in [false, true] {
+        let (directory, _store, snapshots) = lineage_fixture(&[("a", true), ("b", false)]);
+        if extension_first {
+            insert_refused_lineage(&directory);
+            let status = snapshots.wait_for_recovery(Duration::from_secs(60), |status| {
+                status.state != ReceiptQuerySnapshotState::Ready
+            });
+            assert_eq!(status.state, refused);
+        } else {
+            park_extension(&snapshots);
+            insert_refused_lineage(&directory);
+        }
+        assert_eq!(
+            export_error(&snapshots),
+            ReceiptQuerySnapshotError::Invalid(READER_REFUSAL.into()),
+            "extension first: {extension_first}"
+        );
+        assert_eq!(snapshots.status().state, refused);
+        snapshots.shutdown();
+    }
+}

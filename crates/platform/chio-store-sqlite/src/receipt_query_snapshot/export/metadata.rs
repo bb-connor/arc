@@ -29,7 +29,9 @@ const CHUNK: i64 = 128;
 
 /// Mutable export metadata may be unusable without contradicting anything the
 /// owned snapshot authenticated. Refuse this request without dropping serving
-/// custody for other tenants, as the local full export reader does.
+/// custody for other tenants, as the local full export reader does. A local
+/// lineage row is such metadata only while every held receipt of its
+/// capability carries a signed subject.
 fn metadata_refusal(reason: impl Into<String>) -> ReceiptStoreError {
     ReceiptQuerySnapshotError::ExportRefused(reason.into()).into()
 }
@@ -400,6 +402,12 @@ pub(super) fn lineage(
             }
             // Only selected capabilities carry captured attribution.
             let expected_subject = expected.get(&capability).and_then(Option::as_deref);
+            // The extension's predicate: a held receipt of the capability
+            // without a signed subject takes its attribution from this row.
+            let depends = lease.read(|db| {
+                db.holds_unsigned_subject(&capability)
+                    .map_err(snapshot_error)
+            })?;
             let snapshot = live_read(lease, |live| {
                 let source = lineage_source(live, &capability)?;
                 // Recheck in this read transaction, before the byte allowance
@@ -423,12 +431,23 @@ pub(super) fn lineage(
                     length,
                     "capability lineage bytes",
                 )?)?;
+                let select = format!(
+                    "SELECT {LINEAGE_COLUMNS} FROM {} WHERE capability_id = ?1 AND rowid = ?2",
+                    source.table()
+                );
+                if matches!(source, LineageSource::Local(_)) && depends {
+                    return live
+                        .query_row(
+                            &select,
+                            params![capability, source.rowid()],
+                            crate::capability_lineage::snapshot_from_row,
+                        )
+                        .map(Some)
+                        .map_err(|error| refused_by_reader(error, &capability));
+                }
                 let snapshot = live
                     .query_row(
-                        &format!(
-                            "SELECT {LINEAGE_COLUMNS} FROM {} WHERE capability_id = ?1 AND rowid = ?2",
-                            source.table()
-                        ),
+                        &select,
                         params![capability, source.rowid()],
                         crate::capability_lineage::snapshot_columns_from_row,
                     )
@@ -535,6 +554,21 @@ fn lineage_validation_error(error: ReceiptStoreError) -> ReceiptStoreError {
             metadata_refusal(INVALID_LINEAGE_METADATA)
         }
         other => other,
+    }
+}
+
+/// A lineage row the canonical local reader refuses, for a capability with a
+/// held receipt that takes its attribution from it. The reason is the one the
+/// extension reports for the same row.
+fn refused_by_reader(error: rusqlite::Error, capability: &str) -> ReceiptStoreError {
+    match error {
+        rusqlite::Error::FromSqlConversionFailure(..)
+        | rusqlite::Error::InvalidColumnType(..)
+        | rusqlite::Error::IntegralValueOutOfRange(..)
+        | rusqlite::Error::Utf8Error(..) => invalid(format!(
+            "capability lineage of {capability} is refused by the local reader: {error}"
+        )),
+        other => other.into(),
     }
 }
 
