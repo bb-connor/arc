@@ -217,6 +217,7 @@ async fn drive(
             journal.fail_dependents()?;
             let snapshots = journal.snapshots()?;
             let stopping = plan.failure_policy == FailurePolicy::Stop && journal.has_stop_failure(&snapshots, &cancelled)?;
+            let draining = !cancelled.is_empty();
             if snapshots.iter().any(|s| s.state == "failed") {
                 let finishing_failed = active_ids.iter().any(|index| snapshots.iter().any(|snapshot| snapshot.process == journal.workers[*index].process && snapshot.state == "failed"));
                 if stopping && !finishing_failed {
@@ -232,6 +233,7 @@ async fn drive(
                 }
             }
             if snapshots.iter().all(|s| s.state == "completed") && active.is_empty() { return journal.check_publication(); }
+            if draining && active.is_empty() { return Err(error("run worker was cancelled")); }
             let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
             let mut ready = ready_indices(active.len(), plan.max_parallel, journal.workers.len(), |index| {
                 let worker = &journal.workers[index];
@@ -253,7 +255,7 @@ async fn drive(
             for snapshot in &snapshots {
                 *root_attempts.entry(journal.root(&snapshot.process).to_owned()).or_default() += snapshot.attempts;
             }
-            while !stopping && active.len() < plan.max_parallel {
+            while !stopping && !draining && active.len() < plan.max_parallel {
                 let Some(position) = (0..ready.len()).min_by_key(|&position| {
                     let root = journal.root(&journal.workers[ready[position]].process);
                     (root_active.get(root).copied().unwrap_or(0), root_attempts.get(root).copied().unwrap_or(0), ready[position])
