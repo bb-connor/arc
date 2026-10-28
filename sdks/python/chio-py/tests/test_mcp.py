@@ -224,3 +224,11 @@ def test_session_does_not_retry_an_uncertain_effect():
     with pytest.raises(TimeoutError):
         asyncio.run(session.call_tool("echo", ARGS))
     assert invoke.await_count == 1
+
+
+def test_the_mcp_client_session_accepts_request_meta():
+    import inspect
+
+    from mcp import ClientSession
+
+    assert "meta" in inspect.signature(ClientSession.call_tool).parameters
