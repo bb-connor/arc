@@ -13,10 +13,9 @@ pub enum ReplayNamespace {
     Assertion(AnchorKind),
     /// A `private_key_jwt` client assertion.
     ClientAssertion,
-    /// A local access token consumed by an RFC 8693 re-exchange; apart from
-    /// the token's own issuance key, so issuance and one re-exchange both
-    /// succeed.
-    LocalReExchange,
+    /// A local authorization code redeemed for its root; apart from the
+    /// issued token's `jti`, which its one re-exchange spends.
+    LocalAsIssue,
 }
 
 impl ReplayNamespace {
@@ -25,7 +24,7 @@ impl ReplayNamespace {
         match self {
             Self::Assertion(kind) => kind.as_str(),
             Self::ClientAssertion => "client_assertion",
-            Self::LocalReExchange => "chio_local_as.re_exchange",
+            Self::LocalAsIssue => "chio_local_as_issue",
         }
     }
 }

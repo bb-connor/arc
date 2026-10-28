@@ -6,6 +6,7 @@ use chio_core::root_authority::{HolderClass, Identifier, JwsAlgorithm, Sha256Dig
 use serde_json::{Map, Value};
 
 use super::replay::ReplayKey;
+use crate::ChioSenderConstraintClaims;
 
 /// The JWS members of a verified assertion.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +45,9 @@ pub struct AnchorEvidence {
     pub(super) scope_bound: Option<ChioScope>,
     /// The holder class the input names; any other holder refuses.
     pub(super) holder: Option<HolderClass>,
+    /// The sender constraint (`cnf`) the input is bound to, which the
+    /// access token issued for the root carries.
+    pub(super) sender_constraint: Option<ChioSenderConstraintClaims>,
 }
 
 impl AnchorEvidence {
@@ -70,5 +74,15 @@ impl AnchorEvidence {
     #[must_use]
     pub fn artifact_digest(&self) -> Option<&Sha256Digest> {
         self.artifact_digest.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn claim(&self, name: &str) -> Option<&Value> {
+        self.claims.get(name)
+    }
+
+    #[must_use]
+    pub fn sender_constraint(&self) -> Option<&ChioSenderConstraintClaims> {
+        self.sender_constraint.as_ref()
     }
 }

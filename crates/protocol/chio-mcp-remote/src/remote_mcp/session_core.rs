@@ -949,12 +949,14 @@ struct AuthorizationCodeGrant {
     sender_constraint: Option<ChioSenderConstraintClaims>,
 }
 
+/// The sender constraint (`cnf`) of a local access token, read through the
+/// closed confirmation profile.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(
     rename_all = "camelCase",
     try_from = "sender_constraint::ConfirmationWire"
 )]
-struct ChioSenderConstraintClaims {
+pub struct ChioSenderConstraintClaims {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",

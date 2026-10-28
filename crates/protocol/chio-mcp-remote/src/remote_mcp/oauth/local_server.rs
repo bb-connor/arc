@@ -1,4 +1,5 @@
 use super::*;
+use crate::root_exchange::kinds::local_as::{CodeRedemption, RedeemedCode};
 
 struct TokenResponseInput {
     subject: String,
@@ -9,6 +10,7 @@ struct TokenResponseInput {
     transaction_context: Option<GovernedAuthorizationTransactionContext>,
     sender_constraint: Option<ChioSenderConstraintClaims>,
     grant_type: Option<String>,
+    issued_at: u64,
 }
 
 struct SignedAccessTokenInput<'a> {
@@ -19,6 +21,7 @@ struct SignedAccessTokenInput<'a> {
     authorization_details: Option<&'a [GovernedAuthorizationDetail]>,
     transaction_context: Option<&'a GovernedAuthorizationTransactionContext>,
     sender_constraint: Option<&'a ChioSenderConstraintClaims>,
+    issued_at: u64,
 }
 
 /// Bounds a deadline-keyed store: drops expired entries and refuses a new
@@ -315,6 +318,17 @@ impl LocalAuthorizationServer {
         headers: SenderRequest<'_>,
         form: TokenRequestForm,
     ) -> Result<Value, Response> {
+        self.redeem_authorization_code(headers, form)
+            .map(|(response, _)| response)
+    }
+
+    /// Redeem an authorization code: the token response and the redeemed
+    /// code it was issued from, which carries the code's sender constraint.
+    pub(super) fn redeem_authorization_code(
+        &self,
+        headers: SenderRequest<'_>,
+        form: TokenRequestForm,
+    ) -> Result<(Value, RedeemedCode), Response> {
         let code = form.code.as_deref().ok_or_else(|| {
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
@@ -408,19 +422,45 @@ impl LocalAuthorizationServer {
             response.extensions_mut().insert(Arc::new(error));
             response
         })?;
+        let issued_at = reading.unix_millis().as_secs();
+        let token_exp = issued_at
+            .checked_add(self.access_token_ttl_secs)
+            .filter(|expiry| *expiry > issued_at)
+            .ok_or_else(|| clock::rejection(ClockError::Overflow))?;
+        let redeemed = RedeemedCode::from_redemption(CodeRedemption {
+            code,
+            issuer: &self.issuer,
+            subject: &grant.subject,
+            client_id: &grant.client_id,
+            redirect_uri,
+            resource: &resource,
+            scopes: &grant.scopes,
+            sender_constraint: grant.sender_constraint.as_ref(),
+            issued_at,
+            code_expires_at: grant.expires_at,
+            token_exp,
+        })
+        .map_err(|_| {
+            oauth_token_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                OAuthError::ServerError,
+                "authorization code redemption does not canonicalize",
+            )
+        })?;
         let response = self.issue_token_response(TokenResponseInput {
-            subject: grant.subject.clone(),
-            client_id: grant.client_id.clone(),
-            resource,
-            scopes: grant.scopes.clone(),
+            subject: redeemed.subject().to_owned(),
+            client_id: redeemed.client_id().to_owned(),
+            resource: redeemed.resource().to_owned(),
+            scopes: redeemed.scopes().to_vec(),
             authorization_details: grant.authorization_details.clone(),
             transaction_context: grant.transaction_context.clone(),
-            sender_constraint: grant.sender_constraint.clone(),
+            sender_constraint: redeemed.sender_constraint().cloned(),
             grant_type: Some("authorization_code".to_string()),
+            issued_at: redeemed.issued_at(),
         })?;
 
         codes.remove(code);
-        Ok(response)
+        Ok((response, redeemed))
     }
 
     pub(super) fn exchange_subject_token(
@@ -506,6 +546,7 @@ impl LocalAuthorizationServer {
             transaction_context,
             sender_constraint: claims.cnf.clone(),
             grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
+            issued_at: self.clock.seconds().map_err(clock::rejection)?,
         })?;
         Ok(response)
     }
@@ -579,6 +620,7 @@ impl LocalAuthorizationServer {
             authorization_details: input.authorization_details.as_deref(),
             transaction_context: input.transaction_context.as_ref(),
             sender_constraint: input.sender_constraint.as_ref(),
+            issued_at: input.issued_at,
         })?;
         Ok(json!({
             "access_token": access_token,
@@ -591,7 +633,7 @@ impl LocalAuthorizationServer {
     }
 
     fn sign_access_token(&self, input: SignedAccessTokenInput<'_>) -> Result<String, Response> {
-        let now = self.clock.seconds().map_err(clock::rejection)?;
+        let now = input.issued_at;
         let expires_at = now
             .checked_add(self.access_token_ttl_secs)
             .filter(|expiry| *expiry > now)
