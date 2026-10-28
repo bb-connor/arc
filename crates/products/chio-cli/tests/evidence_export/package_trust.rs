@@ -260,7 +260,10 @@ pub(super) fn verify_remote_import_boundary(
         .send()
         .test_unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(response.text().test_unwrap().contains("verification"));
+    assert_eq!(
+        response.json::<serde_json::Value>().test_unwrap(),
+        json!({ "error": "urn:chio:error:attest:signed-json-invalid-shape" })
+    );
 
     let mut forged = request.clone();
     forged["package"]["bundle"]["toolReceipts"] = json!([]);
