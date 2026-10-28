@@ -1,6 +1,7 @@
-use chio_quarantine::{GroupingKey, RuleLimits, TemporalRule};
+use chio_core_types::canonical::UntrustedJsonError;
+use chio_quarantine::{GroupingKey, RuleError, RuleLimits, TemporalRule};
 
-fn parse(input: &str) -> Result<TemporalRule, chio_quarantine::RuleError> {
+fn parse(input: &str) -> Result<TemporalRule, RuleError> {
     TemporalRule::parse_json(input.as_bytes(), &RuleLimits::default())
 }
 
@@ -61,29 +62,153 @@ fn valid_two_stage_and_multi_stage_rules_preserve_order_and_canonical_version() 
     assert_eq!(names, vec!["first", "second", "third"]);
 }
 
+type RefusalCase = (&'static str, &'static str, fn(&RuleError) -> bool);
+
 #[test]
 fn invalid_stage_graph_timing_fields_kinds_and_cardinality_reject_at_load_time() {
-    let invalid = [
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"missing","within_ms":1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low","after":"b","within_ms":1},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"b","within_ms":1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":0}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":-1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":18446744073709551616}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":86400001}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low","regex":".*"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"a","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"not_a_kind","minimum_severity":"low"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":0,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1025,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"unbounded_field","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1024,"max_partial_matches_per_group":1024,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
-        r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"unexpected":true,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+    let invalid: [RefusalCase; 19] = [
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[]}"#,
+            "EmptyStages",
+            |error| matches!(error, RuleError::EmptyStages),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"missing","within_ms":1}]}"#,
+            "InvalidPredecessor",
+            |error| matches!(error, RuleError::InvalidPredecessor),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low","after":"b","within_ms":1},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
+            "InvalidFirstStageTiming",
+            |error| matches!(error, RuleError::InvalidFirstStageTiming),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"b","within_ms":1}]}"#,
+            "InvalidPredecessor",
+            |error| matches!(error, RuleError::InvalidPredecessor),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a"}]}"#,
+            "MissingWindow",
+            |error| matches!(error, RuleError::MissingWindow),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":0}]}"#,
+            "InvalidWindow",
+            |error| matches!(error, RuleError::InvalidWindow),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":-1}]}"#,
+            "Parse(UntrustedJsonError::Decode(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::Decode(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":18446744073709551616}]}"#,
+            "Parse(UntrustedJsonError::SignedInput(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::SignedInput(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":86400001}]}"#,
+            "InvalidWindow",
+            |error| matches!(error, RuleError::InvalidWindow),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low","regex":".*"}]}"#,
+            "Parse(UntrustedJsonError::Decode(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::Decode(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"a","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
+            "DuplicateStage",
+            |error| matches!(error, RuleError::DuplicateStage),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"not_a_kind","minimum_severity":"low"}]}"#,
+            "Parse(UntrustedJsonError::Decode(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::Decode(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":0,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+            "InvalidGroupBound",
+            |error| matches!(error, RuleError::InvalidGroupBound),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1025,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+            "InvalidGroupBound",
+            |error| matches!(error, RuleError::InvalidGroupBound),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"unbounded_field","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+            "Parse(UntrustedJsonError::Decode(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::Decode(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1024,"max_partial_matches_per_group":1024,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#,
+            "StateEstimateExceeded",
+            |error| matches!(error, RuleError::StateEstimateExceeded),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"unexpected":true,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+            "Parse(UntrustedJsonError::Decode(_))",
+            |error| matches!(error, RuleError::Parse(UntrustedJsonError::Decode(_))),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":0,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"}]}"#,
+            "InvalidPartialBound",
+            |error| matches!(error, RuleError::InvalidPartialBound),
+        ),
+        (
+            r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":1,"max_partial_matches_per_group":1,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","within_ms":1}]}"#,
+            "MissingPredecessor",
+            |error| matches!(error, RuleError::MissingPredecessor),
+        ),
     ];
 
-    for document in invalid {
-        assert!(parse(document).is_err(), "invalid rule loaded: {document}");
+    for (document, expected, refused_by) in invalid {
+        match parse(document) {
+            Err(error) => assert!(
+                refused_by(&error),
+                "expected {expected}, got {error:?} for {document}"
+            ),
+            Ok(_) => panic!("invalid rule loaded: {document}"),
+        }
+    }
+}
+
+const TWO_STAGE: &str = r#"{"rule_id":"r","policy_version":"p","group_by":"session_id","max_groups":4294967295,"max_partial_matches_per_group":4294967295,"allow_event_reuse":false,"stages":[{"name":"a","event_kind":"credential_access","minimum_severity":"low"},{"name":"b","event_kind":"egress_attempt","minimum_severity":"low","after":"a","within_ms":1}]}"#;
+
+fn limits(max_stages: usize, max_groups: u32, max_state_entries: u64) -> RuleLimits {
+    RuleLimits::new(max_stages, 86_400_000, max_groups, max_state_entries)
+        .unwrap_or_else(|error| panic!("valid limits rejected: {error}"))
+}
+
+#[test]
+fn stage_count_above_the_configured_limit_is_refused() {
+    let refused = TemporalRule::parse_json(TWO_STAGE.as_bytes(), &limits(1, u32::MAX, u64::MAX));
+    assert!(
+        matches!(refused, Err(RuleError::TooManyStages)),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn state_estimate_overflow_is_refused_before_the_limit_comparison() {
+    let refused = TemporalRule::parse_json(TWO_STAGE.as_bytes(), &limits(32, u32::MAX, u64::MAX));
+    assert!(
+        matches!(refused, Err(RuleError::StateEstimateOverflow)),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn zero_rule_limits_are_refused() {
+    for (max_stages, max_window_ms, max_groups, max_state_entries) in
+        [(0, 1, 1, 1), (1, 0, 1, 1), (1, 1, 0, 1), (1, 1, 1, 0)]
+    {
+        let refused = RuleLimits::new(max_stages, max_window_ms, max_groups, max_state_entries);
+        assert!(
+            matches!(refused, Err(RuleError::InvalidLimits)),
+            "{refused:?}"
+        );
     }
 }
