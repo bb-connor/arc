@@ -32,7 +32,8 @@ fn durable_nonce_identity_below_floor_refuses_attachment() {
 }
 
 #[test]
-fn durable_nonce_identity_readable_classical_signer_attaches() -> TestResult {
+fn durable_nonce_identity_readable_classical_signer_attaches(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let fence = admission_test_fence();
     let store = Arc::new(TestAdmissionOperationStore::new(fence.clone()));
