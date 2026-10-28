@@ -1,6 +1,6 @@
 //! JWKS document admission.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -33,7 +33,8 @@ struct JwksDocument {
 
 /// Decode a fetched JWKS document into its admitted keys, ordered by `kid`.
 ///
-/// A key is dropped when it does not decode as a public [`Jwk`], declares a
+/// A key is dropped when it does not decode as a public [`Jwk`] once its
+/// `key_ops` and `x5u` members are checked ([`external_jwk`]), declares a
 /// `use` other than `sig`, declares an `alg` its key type cannot carry, is
 /// an RSA key with a modulus below [`MIN_RSA_MODULUS_BITS`], or has no
 /// verification material the exchange can use ([`VerifyingKey::from_jwk`]:
@@ -60,9 +61,33 @@ pub fn admit_jwks_document(bytes: &[u8]) -> Result<Vec<Jwk>, JwksDocumentError> 
             .keys
             .iter()
             .filter(|value| entry_kid(value).is_some_and(|kid| kid_entries.get(kid) == Some(&1)))
-            .filter_map(|value| <Jwk as Deserialize>::deserialize(value).ok())
+            .filter_map(external_jwk)
             .collect(),
     )
+}
+
+/// Decode one published key. The RFC 7517 members `key_ops` and `x5u` are
+/// checked and left out of the [`Jwk`]: `key_ops` must be an array of
+/// distinct strings that lists `verify`, and `x5u` must be a string, which
+/// is never fetched. Every other member, private key material included,
+/// must be one [`Jwk`] admits.
+fn external_jwk(value: &Value) -> Option<Jwk> {
+    let mut members = value.as_object()?.clone();
+    if let Some(operations) = members.remove("key_ops") {
+        let mut listed = BTreeSet::new();
+        for operation in operations.as_array()? {
+            if !listed.insert(operation.as_str()?) {
+                return None;
+            }
+        }
+        if !listed.contains("verify") {
+            return None;
+        }
+    }
+    if let Some(location) = members.remove("x5u") {
+        location.as_str()?;
+    }
+    <Jwk as Deserialize>::deserialize(Value::Object(members)).ok()
 }
 
 /// Apply the per-key checks and the set bounds to decoded keys. A `kid`
