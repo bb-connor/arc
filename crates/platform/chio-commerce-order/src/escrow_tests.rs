@@ -130,6 +130,7 @@ fn reservation_body(
         order_id: context.order_id.clone(),
         token_offer_id: token.id.clone(),
         token_offer_sha256: canonical_sha256(token).test_expect("offer digest"),
+        depositor_account: context.buyer_subject.clone(),
         reserved_amount: amount,
     }
 }
@@ -392,10 +393,51 @@ fn accept_denies_buyer_subject_the_buyer_did_not_sign() {
     );
 }
 
+/// Mallory holds her own offer token and signs her own acceptance naming
+/// Alice's account; the reservation authority reserved Mallory's funds, so the
+/// signed depositor binds the key to its account and the lock is refused.
+#[test]
+fn accept_denies_own_token_and_acceptance_naming_another_buyer_account() {
+    let mut fixture = AcceptFixture::new();
+    let mallory = keypair(4);
+    fixture.acceptor = mallory.public_key();
+    fixture.buyer = mallory;
+    fixture.token = sign_token(
+        &fixture.issuer,
+        &fixture.acceptor,
+        vec![grant(Some(usd(4200)))],
+    );
+    let mut reservation = reservation_body(&fixture.context, &fixture.token, usd(4200));
+    reservation.depositor_account = "buyer:mallory".to_string();
+    fixture.resign_reservation(reservation);
+    fixture.resign_acceptance(acceptance_body(
+        &fixture.context,
+        &fixture.token,
+        ACCEPTED_AT,
+    ));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ReservationUnbound("depositor_account"))
+    );
+}
+
+#[test]
+fn accept_denies_acceptance_time_before_offer_validity() {
+    let mut fixture = AcceptFixture::new();
+    fixture.resign_acceptance(acceptance_body(&fixture.context, &fixture.token, 50));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::OfferOutsideValidityWindow)
+    );
+}
+
 #[test]
 fn accept_denies_acceptance_bound_to_other_order_material() {
-    let mutations: [Mutation<CommerceEscrowAcceptance>; 4] = [
+    let mutations: [Mutation<CommerceEscrowAcceptance>; 5] = [
         ("order_id", |body| body.order_id = "order-other".to_string()),
+        ("buyer_subject", |body| {
+            body.buyer_subject = "buyer:mallory".to_string()
+        }),
         ("quote_sha256", |body| {
             body.quote_sha256 = OTHER_HEX64.to_string()
         }),
@@ -531,8 +573,11 @@ fn accept_denies_reservation_without_id() {
 
 #[test]
 fn accept_denies_reservation_bound_to_other_order_or_offer() {
-    let mutations: [Mutation<CommerceReservationReceipt>; 3] = [
+    let mutations: [Mutation<CommerceReservationReceipt>; 4] = [
         ("order_id", |body| body.order_id = "order-other".to_string()),
+        ("depositor_account", |body| {
+            body.depositor_account = "buyer:mallory".to_string()
+        }),
         ("token_offer_id", |body| {
             body.token_offer_id = "offer-token-other".to_string()
         }),
