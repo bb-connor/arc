@@ -134,7 +134,7 @@ fn fixture() -> (ChioKernel, Arc<TestAdmissionOperationStore>, Arc<AtomicU64>) {
         episode_id: episode.clone(),
         runtime_authority_id: AdmissionIdentifier::try_new("runtime", "test-runtime")
             .expect("runtime"),
-        expectation_id: AdmissionIdentifier::try_new("source", "test-source").expect("source"),
+        qualification_id: AdmissionIdentifier::try_new("source", "test-source").expect("source"),
         request_binding_hash: operation.binding().request_binding_hash().clone(),
         grant_index: 0,
         phase: RuntimeParticipantPhase::Dispatch,
