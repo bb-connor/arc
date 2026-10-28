@@ -322,7 +322,8 @@ fn qualification_history_ceiling_refuses_before_decoding_rows() -> Result<(), Bo
     let fixture = fixture();
     let connection = fixture.store.connection()?;
     connection.execute_batch(
-        "WITH RECURSIVE numbers(value) AS (
+        "PRAGMA foreign_keys = OFF;
+         WITH RECURSIVE numbers(value) AS (
             VALUES(1) UNION ALL SELECT value + 1 FROM numbers WHERE value < 1153
          ) INSERT INTO runtime_source_qualifications
          (runtime_authority_id, source_id, qualification_id, destination_store_uuid,
