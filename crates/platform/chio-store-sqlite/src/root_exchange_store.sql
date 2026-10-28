@@ -38,7 +38,8 @@ CREATE TABLE root_exchange_replay (
     namespace TEXT NOT NULL CHECK (
         namespace IN (
             'oauth_id_jag', 'entra_jwt', 'entra_agent_id', 'oidc_jwt', 'oauth_introspection',
-            'chio_local_as', 'chio_operator_key', 'operator_static_bearer', 'client_assertion'
+            'chio_local_as', 'chio_operator_key', 'operator_static_bearer',
+            'chio_local_as_issue', 'client_assertion'
         )
     ),
     bound_at INTEGER NOT NULL CHECK (
@@ -84,12 +85,10 @@ CREATE TABLE root_exchange_roots (
         AND instr(subject_tag, char(0)) = 0 AND octet_length(subject_tag) <= 256
         AND subject_tag NOT GLOB '*[^0-9a-f]*'
     ),
-    tenant_tag TEXT CHECK (
-        tenant_tag IS NULL OR (
-            typeof(tenant_tag) = 'text' AND length(tenant_tag) = 64
-            AND instr(tenant_tag, char(0)) = 0 AND octet_length(tenant_tag) <= 256
-            AND tenant_tag NOT GLOB '*[^0-9a-f]*'
-        )
+    tenant_tag TEXT NOT NULL CHECK (
+        typeof(tenant_tag) = 'text' AND length(tenant_tag) = 64
+        AND instr(tenant_tag, char(0)) = 0 AND octet_length(tenant_tag) <= 256
+        AND tenant_tag NOT GLOB '*[^0-9a-f]*'
     ),
     replay_key_digest TEXT NOT NULL CHECK (
         typeof(replay_key_digest) = 'text' AND length(replay_key_digest) = 64

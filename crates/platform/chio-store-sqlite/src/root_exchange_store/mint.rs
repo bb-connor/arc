@@ -11,8 +11,9 @@ use super::projection::{insert_root_row, read_root_row, required_root, RootRow};
 use super::reads::{retain_identity, retain_policy, retain_snapshot};
 use super::{
     canonical_blob, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintOutcome,
-    MintRequest, MintRequestRefusal, MintRevocationCheck, MintRevocationRefusal, Mutation, Result,
-    RevocationCandidate, RootExchangeStoreError, SqliteRootExchangeStore, StoredRoot,
+    MintReplayNamespace, MintRequest, MintRequestRefusal, MintRevocationCheck,
+    MintRevocationRefusal, Mutation, Result, RevocationCandidate, RootExchangeStoreError,
+    SqliteRootExchangeStore, StoredRoot,
 };
 
 impl SqliteRootExchangeStore {
@@ -185,11 +186,19 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if snapshot_digest != anchor.key_snapshot_digest {
         return Err(refuse(MintRequestRefusal::KeySnapshotMismatch));
     }
-    if anchor
-        .artifact_digest
-        .is_some_and(|digest| digest != request.artifact_digest)
+    match (anchor.kind.is_jws_verified(), anchor.artifact_digest) {
+        (true, Some(digest)) if digest != request.artifact_digest => {
+            return Err(refuse(MintRequestRefusal::ArtifactMismatch));
+        }
+        (true, Some(_)) | (false, None) => {}
+        (true, None) | (false, Some(_)) => {
+            return Err(refuse(MintRequestRefusal::ArtifactDigestPresence));
+        }
+    }
+    if request.replay_namespace == MintReplayNamespace::LocalAsIssue
+        && anchor.kind != AnchorKind::ChioLocalAs
     {
-        return Err(refuse(MintRequestRefusal::ArtifactMismatch));
+        return Err(refuse(MintRequestRefusal::ReplayNamespaceKind));
     }
     if !request.tag_candidates.contains(&request.tags) {
         return Err(refuse(MintRequestRefusal::TagsNotLoaded));
@@ -237,9 +246,10 @@ fn check_openings(request: &MintRequest<'_>) -> Result<()> {
     Ok(())
 }
 
-/// The root a live replay binding names, when it was minted for the same
-/// client, artifact and request. Any other live binding is a replay. An
-/// expired binding is deleted so the key binds again.
+/// The root a live replay binding names, when a bearer-intake request
+/// presents the same client, artifact and request. An explicit exchange is
+/// single use, so any live binding refuses it. An expired binding is deleted
+/// so the key binds again.
 fn live_replay_root(
     tx: &Transaction<'_>,
     request: &MintRequest<'_>,
@@ -264,6 +274,9 @@ fn live_replay_root(
         )
         .map_err(sqlite_error)?;
         return Ok(None);
+    }
+    if request.bearer.is_none() {
+        return Err(RootExchangeStoreError::AssertionReplay);
     }
     let capability_id = capability_id.ok_or(RootExchangeStoreError::AssertionReplay)?;
     let row = read_root_row(tx, &capability_id)?.ok_or_else(|| {
@@ -376,7 +389,10 @@ fn bind_replay(tx: &Transaction<'_>, request: &MintRequest<'_>, now: u64) -> Res
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
             digest_column(&request.context.anchor.replay_key_digest),
-            request.context.anchor.kind.as_str(),
+            match request.replay_namespace {
+                MintReplayNamespace::AnchorKind => request.context.anchor.kind.as_str(),
+                MintReplayNamespace::LocalAsIssue => "chio_local_as_issue",
+            },
             sql_u64(now)?,
             sql_u64(request.replay_retain_until)?,
             request.root.id,

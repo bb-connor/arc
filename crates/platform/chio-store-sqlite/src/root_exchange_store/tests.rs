@@ -10,7 +10,7 @@ use super::{canonical_blob, RootExchangeStoreError, RootTags};
 
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-const DELEGATION_CONTEXT_DIGEST_DOMAIN: &[u8] = b"chio.delegation-context.v1\0";
+use chio_core::capability::anchor::DELEGATION_CONTEXT_DIGEST_DOMAIN;
 
 fn digest(byte: u8) -> Sha256Digest {
     Sha256Digest::from_bytes([byte; 32])
