@@ -178,9 +178,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
           GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
-          GH_FUZZ_BUDGET_WORKFLOWS: mutants.yml,mutants-fuzz-cocoverage.yml,proof-mutants.yml
-          GH_FUZZ_BUDGET_MINUTES: 48000
+          GH_FUZZ_BUDGET_SCOPE: mutation
         run: ./scripts/check-fuzz-budget.sh "${{ github.repository }}"
 
       - name: Install pinned mutation and proof tools

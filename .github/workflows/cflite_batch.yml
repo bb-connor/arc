@@ -2,7 +2,8 @@
 #
 # Rotates one fuzz target per night through the in-tree targets enumerated
 # in fuzz/target-map.toml, 30 minutes per run. Budget-checked against the
-# 1,800 min/30d cap before each rotation step.
+# ClusterFuzzLite envelope (cflite_pr + cflite_batch, 1,800 runner-min/30d)
+# before each rotation step.
 #
 # Storage backend: backbay-labs/chio-fuzz-corpus sibling private repo, wired as a
 # FUZZ_CORPUS_PAT-backed `storage-repo` action input when the secret is
@@ -52,12 +53,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
           GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_CAP_MODE: fail
+          GH_FUZZ_BUDGET_SCOPE: cflite
         run: |
           set -euo pipefail
-          # Cap is advisory (CAP_MODE=warn): this cron's own runs count
-          # toward the trailing 30-day window, so a hard halt would not
-          # clear on its own. The script emits used/cap/remaining.
+          # Hard halt at the ClusterFuzzLite cap. The trailing window drops
+          # runs older than 30 days, so the rotation resumes once usage is
+          # back under the cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
 
   rotate:

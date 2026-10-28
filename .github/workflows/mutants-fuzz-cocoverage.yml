@@ -116,13 +116,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
           GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
           set -euo pipefail
-          # Cocoverage runs share the 1,800 min/30d envelope with
-          # cflite_*.yml and fuzz.yml. Cap is advisory (CAP_MODE=warn):
-          # these runs count toward the window they gate, so a hard halt
-          # would not clear on its own. The script emits used/cap/remaining.
+          # Mutation lanes are reported, not capped: the gate prints the
+          # mutation envelope's runner minutes and cannot fail this job.
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
             scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
