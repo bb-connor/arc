@@ -674,6 +674,31 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(self.raw_decodes("struct Envelope<T> { payload: T } fn bad(s: &str) { serde_json::from_str::<Envelope<ChioReceipt>>(s); }")), 1)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": "struct Envelope<'a> { payload: &'a str } fn good(s: &str) -> usize { match serde_json::from_str(s) { Ok(Envelope { payload }) => payload.len(), Err(_) => 0 } }"}), [])
 
+    def test_generic_impl_targets_keep_their_named_strict_parts(self):
+        for body in [
+            "struct Holder<T>(T); impl<T: DeserializeOwned> Holder<T> { fn bad(s: &str) { let _ = serde_json::from_str::<(ChioReceipt, T)>(s); } }",
+            "struct Holder<T>(T); impl<T: DeserializeOwned> Holder<T> { fn bad(s: &str) { let _ = serde_json::from_str::<((u8, T), Vec<ChioReceipt>)>(s); } }",
+            "struct Holder<T> { item: T, receipt: ChioReceipt } impl<T: DeserializeOwned> Holder<T> { fn bad(s: &str) -> Result<Self, E> { serde_json::from_str(s) } }",
+        ]:
+            with self.subTest(body=body):
+                findings = self.findings({"crates/demo/src/lib.rs": body})
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn("::bad: raw decode serde_json::from_str", findings[0])
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "struct Holder<T> { item: T } impl<T: DeserializeOwned> Holder<T> { fn good(s: &str) -> Result<Self, E> { serde_json::from_str(s) } fn pair(s: &str) { let _ = serde_json::from_str::<(u8, T)>(s); } }"}), [])
+
+    def test_unit_variant_patterns_do_not_name_generic_or_external_types(self):
+        stamp = "fn stamp(r: ChioReceipt) -> u64 { r.timestamp } "
+        inferred = ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"]
+        for body in [
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Option::None) => 0, Ok(Some(r)) => stamp(r), Err(_) => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(std::option::Option::None) => 0, Ok(Some(r)) => stamp(r), Err(_) => 0 } }",
+            "enum Slot<T> { Full(T), Empty } fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Slot::Empty) => 0, Ok(Slot::Full(r)) => stamp(r), Err(_) => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(either::Either::Left(r)) => stamp(r), _ => 0 } }",
+        ]:
+            with self.subTest(body=body):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": stamp + body}), inferred)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "enum Mode { On, Off } fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Mode::On) => 1, Ok(Mode::Off) => 0, Err(_) => 0 } }"}), [])
+
     def test_complete_scrutinee_patterns_name_the_target(self):
         marker = "struct Marker { n: u64 } "
         for body, expected in [
