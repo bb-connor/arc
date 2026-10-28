@@ -268,7 +268,7 @@ measure_workflows() {
         workflow_seconds=0
         run_count=0
         queried=0
-        while IFS=$'\t' read -r run_id attempt run_status created; do
+        while IFS=$'\t' read -r run_id attempt run_status created conclusion; do
             run_count=$(( run_count + 1 ))
             key="${run_id}:${attempt}"
             cached="$(jq -r --arg key "${key}" '.[$key].seconds // empty' "${ledger_in}")"
@@ -289,8 +289,37 @@ measure_workflows() {
                     exit 2
                 fi
                 queried=$(( queried + 1 ))
+                # Every page must be a jobs envelope with the same numeric
+                # total_count, and the unique job ids across pages must
+                # account for all of them before any time is summed or cached.
+                if ! listed="$(jq -rs '
+                    if length > 0
+                       and all(.[]; type == "object"
+                           and (.total_count | type) == "number"
+                           and (.jobs | type) == "array"
+                           and all(.jobs[]; type == "object" and (.id | type) == "number"))
+                       and ([.[].total_count] | unique | length) == 1
+                    then "\(.[0].total_count) \([.[].jobs[].id] | unique | length)"
+                    else "malformed" end' "${jobs}" 2>/dev/null)" \
+                    || ! [[ "${listed}" =~ ^([0-9]+)\ ([0-9]+)$ ]]; then
+                    err "fuzz-budget: malformed jobs listing for ${wf} run ${run_id}"
+                    exit 2
+                fi
+                declared="${BASH_REMATCH[1]}"
+                returned="${BASH_REMATCH[2]}"
+                if [[ "${returned}" != "${declared}" ]]; then
+                    err "fuzz-budget: jobs listing for ${wf} run ${run_id} returned ${returned} of ${declared} jobs"
+                    exit 2
+                fi
+                # A run cancelled before its jobs were created, or one whose
+                # workflow file failed to start, has no jobs and no runner time.
+                if [[ "${declared}" == "0" && "${conclusion}" != "cancelled" \
+                    && "${conclusion}" != "startup_failure" ]]; then
+                    err "fuzz-budget: ${wf} run ${run_id} lists no jobs (conclusion: ${conclusion:-none})"
+                    exit 2
+                fi
                 if ! run_seconds="$(jq -s --argjson now "${now_epoch}" \
-                    '[.[].jobs[]?
+                    '[[.[].jobs[]] | unique_by(.id)[]
                       | select((.runner_name // "") != "" and .started_at != null)
                       | (if .completed_at == null then $now
                          else (.completed_at | fromdateiso8601) end)
@@ -311,7 +340,8 @@ measure_workflows() {
             workflow_seconds=$(( workflow_seconds + run_seconds ))
         done < <(jq -rs --arg window "${window}" 'unique_by(.id) | .[]
             | select(.created_at >= $window)
-            | [.id, (.run_attempt // 1), .status, .created_at] | @tsv' "${runs}")
+            | [.id, (.run_attempt // 1), .status, .created_at, (.conclusion // "")]
+            | @tsv' "${runs}")
         if [[ "${workflow_seconds}" -lt 0 ]]; then
             continue
         fi

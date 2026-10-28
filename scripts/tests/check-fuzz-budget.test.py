@@ -55,11 +55,19 @@ def iso(epoch: int) -> str:
     return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def run(run_id: int, start: int, end: int, status: str = "completed", attempt: int = 1) -> dict:
+def run(
+    run_id: int,
+    start: int,
+    end: int,
+    status: str = "completed",
+    attempt: int = 1,
+    conclusion: str | None = "success",
+) -> dict:
     return {
         "id": run_id,
         "run_attempt": attempt,
         "status": status,
+        "conclusion": conclusion if status == "completed" else None,
         "created_at": iso(start),
         "run_started_at": iso(start),
         "updated_at": iso(end),
@@ -108,7 +116,12 @@ class Case:
                     self.listing([], workflow=workflow)
 
     def jobs(self, run_id: int, jobs: list[dict]) -> None:
-        (self.dir / f"jobs-{run_id}.json").write_text(json.dumps({"jobs": jobs}))
+        numbered = [dict(job, id=run_id * 1000 + index) for index, job in enumerate(jobs)]
+        self.raw_jobs(run_id, {"total_count": len(numbered), "jobs": numbered})
+
+    def raw_jobs(self, run_id: int, *pages: object) -> None:
+        text = "".join(json.dumps(page) for page in pages)
+        (self.dir / f"jobs-{run_id}.json").write_text(text)
 
     def epoch(self, text: str) -> None:
         (self.dir / "tree/fuzz/cflite-budget-epoch").write_text(text)
@@ -352,6 +365,70 @@ def jobs_rate_limit_follows_mode() -> None:
     )
 
 
+def invalid_job_listings_fail_closed() -> None:
+    start = NOW - 86400
+    one = dict(job(start, start + 60, "runner"), id=1)
+    for pages, needle in [
+        (({"total_count": 2, "jobs": [one]},), "returned 1 of 2 jobs"),
+        (({"total_count": 1, "jobs": []},), "returned 0 of 1 jobs"),
+        (({},), "malformed jobs listing"),
+        (({"total_count": 1},), "malformed jobs listing"),
+        (({"total_count": 1, "jobs": {"id": 1}},), "malformed jobs listing"),
+        (({"total_count": "1", "jobs": [one]},), "malformed jobs listing"),
+        (({"total_count": 1, "jobs": [dict(one, id=None)]},), "malformed jobs listing"),
+        (({"total_count": 2, "jobs": [one]}, {"total_count": 2, "jobs": [one]}), "returned 1 of 2 jobs"),
+        (({"total_count": 2, "jobs": [one]}, {"total_count": 3, "jobs": []}), "malformed jobs listing"),
+    ]:
+        case = Case()
+        case.listing([run(40, start, start + 60)])
+        case.raw_jobs(40, *pages)
+        ledger = case.dir / "ledger.json"
+        before = json.dumps({"repo": REPO, "runs": {}})
+        ledger.write_text(before)
+        expect(case.check(GH_FUZZ_BUDGET_LEDGER=str(ledger)), 2, needle, "fuzz.yml run 40")
+        assert ledger.read_text() == before, ledger.read_text()
+
+
+def paginated_jobs_sum_across_pages() -> None:
+    start = NOW - 86400
+    case = Case()
+    case.listing([run(41, start, start + 60)])
+    first = dict(job(start, start + 1800, "runner"), id=1)
+    second = dict(job(start, start + 1800, "runner"), id=2)
+    case.raw_jobs(41, {"total_count": 2, "jobs": [first]}, {"total_count": 2, "jobs": [second]})
+    expect(case.check(), 0, "runs=1 queried=1 executed=60 min")
+
+
+def cancelled_run_without_jobs_counts_zero() -> None:
+    start = NOW - 86400
+    case = Case()
+    case.listing([run(42, start, start + 5, conclusion="cancelled")])
+    case.raw_jobs(42, {"total_count": 0, "jobs": []})
+    expect(case.check(), 0, "runs=1 queried=1 executed=0 min")
+    case.listing([run(42, start, start + 5, conclusion="success")])
+    expect(case.check(), 2, "fuzz.yml run 42 lists no jobs")
+
+
+def invalid_mutation_listing_is_not_cached() -> None:
+    start = NOW - 86400
+    case = Case()
+    case.listing(
+        [run(43, start, start + 60), run(44, start, start + 60)], workflow="mutants.yml"
+    )
+    case.jobs(43, [job(start, start + 600, "runner")])
+    case.raw_jobs(44, {"total_count": 2, "jobs": [dict(job(start, start + 60, "runner"), id=9)]})
+    case.quiet("mutation")
+    ledger = case.dir / "ledger.json"
+    expect(
+        case.check("mutation", GH_FUZZ_BUDGET_LEDGER=str(ledger)),
+        0,
+        "returned 1 of 2 jobs",
+        "envelope=mutation usage is unverified",
+    )
+    written = json.loads(ledger.read_text())
+    assert list(written["runs"]) == ["43:1"], written
+
+
 def missing_workflow_fails_closed() -> None:
     case = Case()
     expect(case.check(), 2, "workflow fuzz.yml is not registered")
@@ -444,6 +521,10 @@ CASES = [
     jobs_api_failure_fails_closed,
     jobs_rate_limit_follows_mode,
     missing_workflow_fails_closed,
+    invalid_job_listings_fail_closed,
+    paginated_jobs_sum_across_pages,
+    cancelled_run_without_jobs_counts_zero,
+    invalid_mutation_listing_is_not_cached,
     ledger_skips_completed_runs,
     foreign_ledger_is_ignored,
     malformed_ledger_is_ignored,
