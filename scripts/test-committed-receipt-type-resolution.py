@@ -164,6 +164,74 @@ class TypeResolutionTests(unittest.TestCase):
         })
         self.assertTrue(any("unresolved" in finding and "missing::ReceiptWrapper" in finding for finding in findings), findings)
 
+    def test_shared_include_keeps_each_including_namespace(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": 'mod strict { struct Member { receipt: ChioReceipt } include!("shared.rs"); fn bad(s: &str) { serde_json::from_str::<Wrapper>(s); } } mod plain { struct Member { n: u32 } include!("shared.rs"); fn good(s: &str) { serde_json::from_str::<Wrapper>(s); } }',
+            "crates/demo/src/shared.rs": "struct Wrapper { member: Member }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad", findings[0])
+
+    def test_test_only_field_does_not_erase_following_production_code(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "struct Envelope { receipt: ChioReceipt, #[cfg(test)] probe: Option<u32>, } fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding and "::bad" in finding for finding in findings), findings)
+
+    def test_local_named_type_macro_preserves_receipt_fields(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! envelope { ($name:ident) => { pub struct $name { receipt: ChioReceipt } }; } envelope!(Wrapped); fn bad(s: &str) { serde_json::from_str::<Wrapped>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_multiple_cyclic_globs_do_not_hide_a_later_export(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "mod first { use super::*; pub struct Plain {} } mod second { pub struct Wrapper { receipt: ChioReceipt } } pub use first::*; pub use second::*; mod consumer { use super::*; struct Envelope { item: Wrapper } fn bad(s: &str) { serde_json::from_str::<Envelope>(s); } }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
+    def test_middle_tuple_variant_field_remains_strict(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "enum Envelope { Item(u32, ChioReceipt, u32), Empty } fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+
+    def test_lowercase_unresolved_type_is_reported(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "struct Envelope { item: missing_type }",
+        })
+        self.assertTrue(any("unresolved" in finding and "missing_type" in finding for finding in findings), findings)
+
+    def test_unresolved_path_requires_a_nonempty_allow_reason(self):
+        key = ("crates/demo/src/lib.rs", "missing_type")
+        files = {key[0]: "struct Envelope { item: missing_type }"}
+        try:
+            GATE.ALLOWED_TYPE_PATHS[key] = ""
+            self.assertTrue(self.findings(files))
+            GATE.ALLOWED_TYPE_PATHS[key] = "Fixture-only opaque scalar supplied by an external generator."
+            self.assertEqual(self.findings(files), [])
+        finally:
+            GATE.ALLOWED_TYPE_PATHS.pop(key, None)
+
+    def test_unresolved_include_is_reported(self):
+        findings = self.findings({"crates/demo/src/lib.rs": 'include!(concat!(env!("OUT_DIR"), "/unknown.rs"));'})
+        self.assertTrue(any("include source" in finding for finding in findings), findings)
+
+    def test_generated_mirror_prefix_is_excluded(self):
+        findings = self.findings({
+            "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs": "struct Envelope { item: missing_type, receipt: ChioReceipt } fn mirror(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertEqual(findings, [])
+
+    def test_test_only_enum_variant_preserves_following_types(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "enum Mode { Live, #[cfg(test)] Test(u32), } struct Envelope { receipt: ChioReceipt } fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertTrue(any("raw decode" in finding for finding in findings), findings)
+        self.assertFalse(any("unresolved" in finding for finding in findings), findings)
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
