@@ -412,27 +412,10 @@ async fn assert_reader_refusal_fails_the_snapshot(
     Ok(())
 }
 
-/// Wait until the extension cycle that follows publication has completed.
-/// With a one-hour tick the next cycle cannot start before the test ends.
-async fn await_first_extension_cycle(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+async fn pause_extension(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
     tokio::task::spawn_blocking(move || {
-        let observed =
-            |status: &chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotStatus| {
-                status
-                    .watermark
-                    .as_ref()
-                    .map(|watermark| watermark.observed_at_unix_ms)
-            };
-        let published = observed(&snapshots.status());
-        // A hang guard, not an extension cadence requirement.
-        let deadline = std::time::Instant::now() + Duration::from_secs(60);
-        while observed(&snapshots.status()) == published {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the first extension cycle never completed"
-            );
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        snapshots.pause_extension_for_test(true);
+        assert!(snapshots.wait_for_paused_extension_for_test(Duration::from_secs(60)));
     })
     .await?;
     Ok(())
@@ -450,7 +433,7 @@ async fn refused_lineage_shared_with_unattributed_receipts_fails_the_snapshot_wh
         },
     )
     .await?;
-    await_first_extension_cycle(Arc::clone(&snapshots)).await?;
+    pause_extension(Arc::clone(&snapshots)).await?;
     insert_refused_lineage(&path)?;
     assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
 }

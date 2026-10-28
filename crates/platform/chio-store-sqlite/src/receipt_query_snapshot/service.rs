@@ -647,9 +647,9 @@ pub(super) struct Inner {
     /// Epoch of the latest transition to Invalid.
     last_invalid_epoch: AtomicU64,
     last_recertification_ms: AtomicU64,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "receipt-query-test-support"))]
     pause_extension: AtomicBool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "receipt-query-test-support"))]
     extension_parked: AtomicBool,
     /// Whether a lineage was published since the walker's last integrity
     /// failure.
@@ -703,9 +703,9 @@ impl ReceiptQuerySnapshots {
             epoch: AtomicU64::new(0),
             last_invalid_epoch: AtomicU64::new(0),
             last_recertification_ms: AtomicU64::new(0),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "receipt-query-test-support"))]
             pause_extension: AtomicBool::new(false),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "receipt-query-test-support"))]
             extension_parked: AtomicBool::new(false),
             published_since_failure: AtomicBool::new(false),
             #[cfg(test)]
@@ -1454,13 +1454,13 @@ fn serve(
                 "receipt writer head is poisoned".into(),
             ));
         }
-        #[cfg(test)]
+        #[cfg(any(test, feature = "receipt-query-test-support"))]
         if inner.pause_extension.load(Ordering::SeqCst) {
             inner.extension_parked.store(true, Ordering::SeqCst);
             inner.sleep(inner.config.extension_tick);
             continue;
         }
-        #[cfg(test)]
+        #[cfg(any(test, feature = "receipt-query-test-support"))]
         inner.extension_parked.store(false, Ordering::SeqCst);
         published.hold(|owned| owned.db.increase_quota(inner.requested_quota()))?;
         match extend_cycle(ctx, published, &|| inner.now_ms()) {
@@ -1548,11 +1548,6 @@ impl ReceiptQuerySnapshots {
         started
     }
 
-    pub(super) fn pause_extension_for_test(&self, paused: bool) {
-        self.inner.pause_extension.store(paused, Ordering::SeqCst);
-        self.inner.wake();
-    }
-
     /// True once a paused extension has finished its last cycle.
     pub(super) fn extension_parked_for_test(&self) -> bool {
         self.inner.extension_parked.load(Ordering::SeqCst)
@@ -1571,17 +1566,6 @@ impl ReceiptQuerySnapshots {
             .changed
             .wait_timeout_while(owned, timeout, |owned| owned.lineage_rowid < rowid)
             .is_ok_and(|(owned, _)| owned.lineage_rowid >= rowid)
-    }
-
-    pub(super) fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
-        let started = Instant::now();
-        while !self.inner.extension_parked.load(Ordering::SeqCst) {
-            if started.elapsed() >= timeout {
-                return false;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        true
     }
 
     pub(super) fn invalidate_for_test(&self, reason: &str) {
@@ -1760,5 +1744,24 @@ pub(super) mod head_hook {
         if let Some(mut hook) = hook {
             hook();
         }
+    }
+}
+
+#[cfg(any(test, feature = "receipt-query-test-support"))]
+impl ReceiptQuerySnapshots {
+    pub fn pause_extension_for_test(&self, paused: bool) {
+        self.inner.pause_extension.store(paused, Ordering::SeqCst);
+        self.inner.wake();
+    }
+
+    pub fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
+        let started = Instant::now();
+        while !self.inner.extension_parked.load(Ordering::SeqCst) {
+            if started.elapsed() >= timeout {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        true
     }
 }
