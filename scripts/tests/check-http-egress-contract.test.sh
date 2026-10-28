@@ -582,6 +582,40 @@ pub fn fetch(urls: &[&str]) {
 }
 EOF
 
+http_client_case ureq_crate_qualified_alias crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    crate::Http::new()
+}
+EOF
+http_client_case ureq_qualified_type_path crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    <ureq::Agent>::new()
+}
+EOF
+http_client_case ureq_qualified_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = ureq::Agent;
+
+pub fn agent() -> Http {
+    <Http>::new()
+}
+EOF
+http_client_case ureq_trait_qualified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn builder() -> ureq::AgentBuilder {
+    <ureq::AgentBuilder as Default>::default()
+}
+EOF
+http_client_case ureq_self_qualified_alias crates/chio-fake/src/lib.rs <<'EOF'
+mod transport {
+    pub use ureq::Agent as Http;
+}
+
+pub fn agent() -> ureq::Agent {
+    self::transport::Http::new()
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
@@ -593,7 +627,10 @@ for expectation in \
     reject:ureq_self_rename reject:ureq_extern_crate accept:ureq_rename_classified \
     accept:ureq_type_only reject:ureq_alias_declared_after_use \
     reject:ureq_constructor_split_across_lines reject:ureq_absolute_path \
-    reject:ureq_type_alias reject:ureq_function_reference; do
+    reject:ureq_type_alias reject:ureq_function_reference \
+    reject:ureq_crate_qualified_alias reject:ureq_qualified_type_path \
+    reject:ureq_qualified_type_alias reject:ureq_trait_qualified \
+    reject:ureq_self_qualified_alias; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
