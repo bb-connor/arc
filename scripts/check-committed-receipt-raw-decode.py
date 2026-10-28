@@ -461,16 +461,28 @@ def without_test_items(code: str) -> str:
         fragment = start + prefix.end()
         item = re.match(r"(?:async\s+|unsafe\s+)?(?:fn|mod|struct|enum|impl|trait|type|const|static|use)\b", code[fragment:])
         if not item:
-            end = fragment
-            depth = 0
-            while end < len(code):
-                char = code[end]
-                if depth == 0 and char in ",;}":
-                    end += char in ",;"
-                    break
-                depth += char in "<([{"
-                depth -= char in ">)]}" and depth > 0
-                end += 1
+            macro = re.match(r"(?:::\s*)?\w+(?:\s*::\s*\w+)*\s*!\s*([({\[])", code[fragment:])
+            if macro:
+                opening = fragment + macro.end() - 1
+                delimiter = code[opening]
+                end = _contracts.closing(code, opening, delimiter, {"(": ")", "[": "]", "{": "}"}[delimiter])
+                trailing = re.match(r"\s*;", code[end:])
+                if trailing:
+                    end += trailing.end()
+            else:
+                end = fragment
+                depth = 0
+                while end < len(code):
+                    char = code[end]
+                    if depth == 0 and char in ",;}":
+                        end += char in ",;"
+                        break
+                    if char == "}" and depth == 1:
+                        end += 1
+                        break
+                    depth += char in "([{"
+                    depth -= char in ")]}" and depth > 0
+                    end += 1
             output[match.start():end] = " " * (end - match.start())
             continue
         while start < len(code) and code[start] not in "{;":
@@ -744,6 +756,8 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases
         target = match.group(1)
         if target is None and match.group(2):
             target = re.sub(r"\s*::\s*deserialize\s*\($", "", match.group()).strip()
+            if match.start() > 0 and fn_code[match.start() - 1] == "$":
+                target = "$" + target
         yield match.start(), target, "text"
     for match in DOCUMENT_CALL.finditer(fn_code, body_start):
         start = receiver_start(fn_code, match.start())
@@ -867,13 +881,44 @@ def in_deserialize_impl(code: str, offset: int) -> bool:
 def scan(root: Path) -> list[str]:
     files = production_files(root)
     strict = _resolution.TypeResolver(root, files, SimpleNamespace(**globals()))
-    decoded_files = []
+    decoded_files = files
+    templates = {}
     for rel, code in files:
-        output = list(code)
+        spans = []
         for match in re.finditer(r"\bmacro_rules!\s*\w+\s*\{", code):
             end = _contracts.closing(code, match.end() - 1, "{", "}")
-            output[match.start():end] = " " * (end - match.start())
-        decoded_files.append((rel, "".join(output)))
+            body = code[match.end():end]
+            definitions = {}
+            for definition in TYPE_DEFINITION.finditer(body):
+                opening = definition.end() - 1
+                closing = _contracts.closing(body, opening, body[opening], {"(": ")", "{": "}"}[body[opening]])
+                fields = body[opening:closing]
+                if definition.group().startswith("enum"):
+                    fields = strict.enum_fields(fields)
+                fields = re.sub(r"\bpub(?:\([^)]*\))?\s+", "", fields)
+                fields = re.sub(r"\b\w+\s*:(?!:)", "", fields)
+                definitions[definition.group(1)] = fields
+            for alias in re.finditer(r"\btype\s+(\w+)\s*=([^;]+);", body):
+                definitions[alias.group(1)] = alias.group(2)
+            spans.append((match.start(), end, definitions))
+        templates[rel] = spans
+
+    def mentions_target(target, rel, offset):
+        for start, end, definitions in templates[rel]:
+            if start <= offset < end:
+                def expand(text, seen=frozenset()):
+                    text = re.sub(r"\$crate\b", "crate", text)
+                    text = re.sub(r"\$\w+", "()", text)
+                    def replace(match):
+                        name = match.group()
+                        if name not in definitions:
+                            return name
+                        return "()" if name in seen else "(" + expand(definitions[name], seen | {name}) + ")"
+                    return _resolution.PATH.sub(replace, text)
+                target = expand(target)
+                break
+        return strict.mentions(target, rel, offset)
+
     helpers = generic_raw_helpers(decoded_files)
     aliases = {rel: raw_aliases(code) for rel, code in files}
     findings = []
@@ -885,7 +930,7 @@ def scan(root: Path) -> list[str]:
             arguments = fn_code[arguments_start:_contracts.closing(fn_code, arguments_start)]
             for match in EXTRACTOR.finditer(arguments):
                 target, _ = angle_argument(arguments, match.end() - 1)
-                if strict.mentions(target, rel, row[1]):
+                if mentions_target(target, rel, row[1]):
                     findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor", "text"))
             body_start = row[2] - row[1]
             for match in FROM_REQUEST.finditer(fn_code, body_start):
@@ -893,7 +938,7 @@ def scan(root: Path) -> list[str]:
                 statement = fn_code[statement_start:match.start()] + " " + let_annotation(fn_code, match.start())
                 for extractor in BODY_EXTRACTOR.finditer(statement):
                     target, _ = angle_argument(statement, extractor.end() - 1)
-                    if strict.mentions(target, rel, row[1] + match.start()):
+                    if mentions_target(target, rel, row[1] + match.start()):
                         findings.append((rel, owner, call_text(fn_code, match.start()), "extractor", "text"))
                         break
             if owner.split("#")[0] == "deserialize" and in_deserialize_impl(code, row[1]):
@@ -904,7 +949,7 @@ def scan(root: Path) -> list[str]:
                 target = targets(fn_code, offset, explicit, returns)
                 if self_type:
                     target = re.sub(r"\bSelf\b", self_type, target)
-                if strict.mentions(target, rel, row[1] + offset):
+                if mentions_target(target, rel, row[1] + offset):
                     findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
         rows = _contracts.functions(code)
         for item in STATIC_ITEM.finditer(code):
@@ -913,7 +958,7 @@ def scan(root: Path) -> list[str]:
             initializer = code[item.start():statement_end(code, item.end())]
             for offset, explicit, kind in decode_sites(initializer, item.end() - item.start(), helpers.get(crate_of(rel), {}), aliases[rel]):
                 target = explicit if explicit is not None else item.group(2)
-                if strict.mentions(target, rel, item.start() + offset):
+                if mentions_target(target, rel, item.start() + offset):
                     findings.append((rel, f"static {item.group(1)}", call_text(initializer, offset), "decode", kind))
     errors = [f"{rel}: unresolved type path {path}" for rel, path in sorted(strict.unresolved)]
     remaining = list(findings)
