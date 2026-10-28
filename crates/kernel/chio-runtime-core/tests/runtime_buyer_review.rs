@@ -74,6 +74,27 @@ fn buyer_attestation_packet_preserves_verified_lineage_boundary_without_acceptin
 }
 
 #[test]
+fn buyer_packet_rejects_mismatched_cross_boundary_admission_report_digest(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut packet, lineage, continuation, admission, bilateral) = buyer_fixture()?;
+    let baseline =
+        verify_buyer_attestation_packet(&packet, &lineage, &continuation, &admission, &bilateral)?;
+    assert_eq!(
+        baseline.failure_code.as_deref(),
+        Some("chio_buyer_packet_dsse_unresolved")
+    );
+    packet.cross_boundary_admission_report_sha256 = "0".repeat(64);
+    let refused =
+        verify_buyer_attestation_packet(&packet, &lineage, &continuation, &admission, &bilateral)?;
+    assert!(!refused.accepted);
+    assert_eq!(
+        refused.failure_code.as_deref(),
+        Some("chio_buyer_packet_hash_mismatch")
+    );
+    Ok(())
+}
+
+#[test]
 fn buyer_hash_only_packet_rejects_unresolved_dsse_hash() -> Result<(), Box<dyn std::error::Error>> {
     let (mut packet, lineage, continuation, admission, bilateral) = buyer_fixture()?;
     packet.bilateral_dsse_sha256 = "f".repeat(64);

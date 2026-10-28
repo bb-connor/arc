@@ -175,7 +175,17 @@ mod tests {
             parity.runtime_verifier_report_sha256
         );
         assert!(read_baseline(&out)?.report.accepted);
-        let first = out.join("same-source-first");
+        let first = root.join("expected-output");
+        fs::create_dir(&first).map_err(io_error)?;
+        for entry in fs::read_dir(&out).map_err(io_error)? {
+            let entry = entry.map_err(io_error)?;
+            assert!(
+                entry.file_type().map_err(io_error)?.is_file(),
+                "fixture generator emitted a non-file artifact: {}",
+                entry.file_name().to_string_lossy()
+            );
+            fs::copy(entry.path(), first.join(entry.file_name())).map_err(io_error)?;
+        }
         compare_generated_files(&first, &out)?;
         fs::write(out.join("proof-package.json"), b"tampered").map_err(io_error)?;
         assert!(matches!(compare_generated_files(&first, &out),
