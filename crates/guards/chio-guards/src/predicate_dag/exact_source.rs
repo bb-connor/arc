@@ -25,6 +25,12 @@ pub enum AtomPredicate {
     ArgumentKind { key: String, kind: JsonKind },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ExactPredicateSourceError {
+    #[error("exact predicate source has {count} predicates; at most {max} atoms are addressable")]
+    TooManyPredicates { count: usize, max: usize },
+}
+
 /// Scores atom `i` as `1.0` when predicate `i` holds and `0.0` otherwise.
 /// Every score is attested.
 #[derive(Clone, Debug)]
@@ -33,15 +39,23 @@ pub struct ExactPredicateSource {
 }
 
 impl ExactPredicateSource {
-    pub fn new(predicates: Vec<AtomPredicate>) -> Self {
-        Self { predicates }
+    /// Refuses more than `MAX_ATOMS` predicates, so `provided_atoms` names
+    /// exactly one atom per predicate.
+    pub fn new(predicates: Vec<AtomPredicate>) -> Result<Self, ExactPredicateSourceError> {
+        if predicates.len() > MAX_ATOMS {
+            return Err(ExactPredicateSourceError::TooManyPredicates {
+                count: predicates.len(),
+                max: MAX_ATOMS,
+            });
+        }
+        Ok(Self { predicates })
     }
 }
 
 impl ScoreSource for ExactPredicateSource {
     fn provided_atoms(&self) -> [u64; ATOM_WORDS] {
         let mut words = [0u64; ATOM_WORDS];
-        for atom in 0..self.predicates.len().min(MAX_ATOMS) {
+        for atom in 0..self.predicates.len() {
             if let Some(word) = words.get_mut(atom / 64) {
                 *word |= 1u64 << (atom % 64);
             }
@@ -50,9 +64,6 @@ impl ScoreSource for ExactPredicateSource {
     }
 
     fn scores(&self, ctx: &GuardContext) -> Result<Scores, ScoreError> {
-        if self.predicates.len() > MAX_ATOMS {
-            return Err(ScoreError::Malformed);
-        }
         let arguments = ctx.request.arguments.as_object();
         let scores = self
             .predicates

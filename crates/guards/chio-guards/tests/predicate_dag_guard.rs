@@ -12,14 +12,14 @@ use chio_core::receipt::metadata::{
 };
 use chio_fixed::Q16_16;
 use chio_guards::{
-    AtomPredicate, DecisionModelBinding, DecisionModelLoadError, ExactPredicateSource, JsonKind,
-    PredicateDagGuard, ScoreError, ScoreSource, Scores,
+    AtomPredicate, DecisionModelBinding, DecisionModelLoadError, ExactPredicateSource,
+    ExactPredicateSourceError, JsonKind, PredicateDagGuard, ScoreError, ScoreSource, Scores,
 };
 use chio_kernel::{
     ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, ToolCallRequest,
     ToolServerConnection, Verdict,
 };
-use chio_predicate_dag::{RulePolarity, ATOM_WORDS};
+use chio_predicate_dag::{RulePolarity, ATOM_WORDS, MAX_ATOMS};
 use chio_security_types::work::{VerificationBudget, WorkBudgetError};
 use chio_weights::{ModelCard, StringSet, VerifiedModelCard};
 use chrono::{TimeZone, Utc};
@@ -100,10 +100,13 @@ fn binding() -> DecisionModelBinding {
 /// Atom 0: the call carries a `path` argument. Atom 1: the tool is
 /// `delete_file`.
 fn exact_source() -> Box<dyn ScoreSource> {
-    Box::new(ExactPredicateSource::new(vec![
-        AtomPredicate::ArgumentPresent("path".into()),
-        AtomPredicate::ToolName("delete_file".into()),
-    ]))
+    Box::new(
+        ExactPredicateSource::new(vec![
+            AtomPredicate::ArgumentPresent("path".into()),
+            AtomPredicate::ToolName("delete_file".into()),
+        ])
+        .unwrap(),
+    )
 }
 
 struct FixedScores(Result<Scores, ScoreError>, usize);
@@ -417,13 +420,16 @@ fn a_budget_above_the_schedule_is_charged_exactly_once() {
 #[test]
 fn exact_predicates_read_argument_types_without_copying_values() {
     let bytes = artifact(2, &[(0, RulePolarity::Deny)]);
-    let source = Box::new(ExactPredicateSource::new(vec![
-        AtomPredicate::ArgumentKind {
-            key: "path".into(),
-            kind: JsonKind::String,
-        },
-        AtomPredicate::ServerId("srv".into()),
-    ]));
+    let source = Box::new(
+        ExactPredicateSource::new(vec![
+            AtomPredicate::ArgumentKind {
+                key: "path".into(),
+                kind: JsonKind::String,
+            },
+            AtomPredicate::ServerId("srv".into()),
+        ])
+        .unwrap(),
+    );
     let guard = load(&bytes, source, 1_000).unwrap();
     assert_eq!(
         decide(&guard, "write_file", serde_json::json!({"path": "/x"})).verdict,
@@ -572,4 +578,45 @@ fn load_never_stages_the_schedule_storage_on_the_stack() {
         .join()
         .unwrap();
     assert!(loaded);
+}
+
+fn argument_predicates(count: usize) -> Vec<AtomPredicate> {
+    (0..count)
+        .map(|index| AtomPredicate::ArgumentPresent(format!("key-{index}")))
+        .collect()
+}
+
+#[test]
+fn an_exact_source_with_more_predicates_than_max_atoms_is_refused() {
+    let refused = ExactPredicateSource::new(argument_predicates(MAX_ATOMS + 1));
+    assert!(matches!(
+        refused,
+        Err(ExactPredicateSourceError::TooManyPredicates { count, max })
+            if count == MAX_ATOMS + 1 && max == MAX_ATOMS
+    ));
+}
+
+#[test]
+fn an_exact_source_with_max_atoms_predicates_loads_and_evaluates() {
+    let atoms = u16::try_from(MAX_ATOMS).unwrap();
+    let bytes = artifact(atoms, &[(0, RulePolarity::Deny)]);
+    let source = Box::new(ExactPredicateSource::new(argument_predicates(MAX_ATOMS)).unwrap());
+    let guard = load(&bytes, source, 100_000).unwrap();
+    assert_eq!(
+        decide(&guard, "write_file", serde_json::json!({})).verdict,
+        Verdict::Allow
+    );
+    assert_eq!(
+        decide(&guard, "write_file", serde_json::json!({"key-0": 1})).verdict,
+        Verdict::Deny
+    );
+}
+
+#[test]
+fn an_exact_source_with_more_predicates_than_the_artifact_atoms_is_refused_at_load() {
+    let source = Box::new(ExactPredicateSource::new(argument_predicates(3)).unwrap());
+    assert!(matches!(
+        load(&deny_on_path(), source, 1_000),
+        Err(DecisionModelLoadError::SourceCoverage { atoms: 2 })
+    ));
 }

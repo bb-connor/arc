@@ -117,8 +117,9 @@ pub use post_invocation::{
     PostInvocationPipeline, PostInvocationVerdict, SanitizerHook,
 };
 pub use predicate_dag::{
-    AtomPredicate, DecisionModelBinding, DecisionModelLoadError, ExactPredicateSource, JsonKind,
-    PredicateDagGuard, ScoreError, ScoreSource, Scores, PREDICATE_DAG_GUARD_NAME,
+    AtomPredicate, DecisionModelBinding, DecisionModelLoadError, ExactPredicateSource,
+    ExactPredicateSourceError, JsonKind, PredicateDagGuard, ScoreError, ScoreSource, Scores,
+    PREDICATE_DAG_GUARD_NAME,
 };
 pub use prompt_injection::{
     Detection as PromptInjectionDetection, PromptInjectionConfig, PromptInjectionGuard,

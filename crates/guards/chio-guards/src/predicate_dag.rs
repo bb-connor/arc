@@ -5,7 +5,7 @@
 mod exact_source;
 mod load;
 
-pub use exact_source::{AtomPredicate, ExactPredicateSource, JsonKind};
+pub use exact_source::{AtomPredicate, ExactPredicateSource, ExactPredicateSourceError, JsonKind};
 pub use load::{DecisionModelBinding, DecisionModelLoadError};
 
 use chio_core::receipt::metadata::{
