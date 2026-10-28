@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{CompileError, PipelineBuilder};
@@ -95,12 +94,8 @@ pub(super) fn jailbreak_config_from(
         config.threshold = (capped as f32) / 100.0;
     }
 
-    // `warn_threshold` has no dedicated field on Chio's `JailbreakGuardConfig`;
-    // the guard emits advisory signals based on detector-level statistical
-    // thresholds. We accept the HushSpec value for schema compatibility but
-    // do not wire it in here -- if the warn value would exceed the configured
-    // block threshold we conservatively ignore it rather than fail closed,
-    // clamping partial overlays on merge.
+    // `JailbreakGuardConfig` has no warn threshold; `warn_threshold` does not
+    // affect the compiled guard.
     let _ = jb.warn_threshold;
 
     if let Some(max_bytes) = jb.max_input_bytes {
@@ -123,18 +118,13 @@ fn threat_intel_guard_from(
 
     let resolved_pattern_db_path = resolve_policy_asset_path(pattern_db_path, source_dir);
 
-    let pattern_db_json = fs::read_to_string(&resolved_pattern_db_path).map_err(|error| {
-        CompileError::Invalid(format!(
-            "failed to read detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
-            resolved_pattern_db_path.display()
-        ))
-    })?;
-    let pattern_db = EmbeddingAnomalyPatternDb::from_json(&pattern_db_json).map_err(|error| {
-        CompileError::Invalid(format!(
-            "invalid detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
-            resolved_pattern_db_path.display()
-        ))
-    })?;
+    let pattern_db = EmbeddingAnomalyPatternDb::from_json_file(&resolved_pattern_db_path)
+        .map_err(|error| {
+            CompileError::Invalid(format!(
+                "invalid detection.threat_intel.pattern_db '{pattern_db_path}' (resolved to '{}'): {error}",
+                resolved_pattern_db_path.display()
+            ))
+        })?;
 
     let mut config = EmbeddingAnomalyConfig::default();
     if let Some(similarity_threshold) = threat_intel.similarity_threshold {

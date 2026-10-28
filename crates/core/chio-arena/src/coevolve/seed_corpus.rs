@@ -26,7 +26,7 @@
 //! arena bundle writer.
 
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use chio_core::crypto::sha256_hex;
@@ -41,6 +41,8 @@ pub const DEFAULT_FUZZ_ARTIFACTS_DIR: &str = "fuzz/artifacts";
 pub const DEFAULT_REPLAY_ATTACK_DIR: &str = "tests/replay/fixtures/replay_attack";
 /// Default tampered-signature family directory.
 pub const DEFAULT_TAMPERED_SIGNATURE_DIR: &str = "tests/replay/fixtures/tampered_signature";
+/// Maximum size in bytes of a single seed artifact.
+pub const MAX_SEED_ARTIFACT_BYTES: usize = 1024 * 1024;
 
 /// Sources searched by the seed corpus loader. Callers (typically the
 /// driver) construct the sources with [`SeedCorpusSources::default`] and
@@ -162,6 +164,20 @@ pub enum SeedCorpusError {
         #[source]
         source: io::Error,
     },
+    /// An artifact path did not open as a regular file.
+    #[error("seed artifact {path} is not a regular file")]
+    NotRegularFile {
+        /// Offending path.
+        path: PathBuf,
+    },
+    /// An artifact exceeds [`MAX_SEED_ARTIFACT_BYTES`].
+    #[error("seed artifact {path} exceeds {limit} bytes")]
+    TooLarge {
+        /// Offending path.
+        path: PathBuf,
+        /// Byte limit that was exceeded.
+        limit: usize,
+    },
 }
 
 /// Load every artifact from the configured sources. Missing source
@@ -217,10 +233,7 @@ fn load_directory(
     }
     entries.sort();
     for path in entries {
-        let bytes = fs::read(&path).map_err(|source| SeedCorpusError::Io {
-            path: path.clone(),
-            source,
-        })?;
+        let bytes = read_seed_artifact(&path)?;
         let size_bytes = bytes.len() as u64;
         let sha256 = sha256_hex(&bytes);
         out.push(SeedArtifact {
@@ -231,4 +244,73 @@ fn load_directory(
         });
     }
     Ok(())
+}
+
+fn read_seed_artifact(path: &Path) -> Result<Vec<u8>, SeedCorpusError> {
+    let io_error = |source: io::Error| SeedCorpusError::Io {
+        path: path.to_path_buf(),
+        source,
+    };
+    let too_large = || SeedCorpusError::TooLarge {
+        path: path.to_path_buf(),
+        limit: MAX_SEED_ARTIFACT_BYTES,
+    };
+    let file = fs::File::open(path).map_err(io_error)?;
+    let metadata = file.metadata().map_err(io_error)?;
+    if !metadata.is_file() {
+        return Err(SeedCorpusError::NotRegularFile {
+            path: path.to_path_buf(),
+        });
+    }
+    let limit = u64::try_from(MAX_SEED_ARTIFACT_BYTES).unwrap_or(u64::MAX);
+    if metadata.len() > limit {
+        return Err(too_large());
+    }
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(io_error)?;
+    if bytes.len() > MAX_SEED_ARTIFACT_BYTES {
+        return Err(too_large());
+    }
+    Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn artifact_at_byte_limit_is_read() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("crash.bin");
+        let bytes = vec![7u8; MAX_SEED_ARTIFACT_BYTES];
+        fs::write(&path, &bytes)?;
+        assert_eq!(read_seed_artifact(&path)?, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_over_byte_limit_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("crash.bin");
+        fs::write(&path, vec![7u8; MAX_SEED_ARTIFACT_BYTES + 1])?;
+        let error = read_seed_artifact(&path).err();
+        assert!(
+            matches!(&error, Some(SeedCorpusError::TooLarge { path: refused, limit: MAX_SEED_ARTIFACT_BYTES }) if *refused == path),
+            "unexpected result: {error:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn artifact_directory_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let error = read_seed_artifact(dir.path()).err();
+        assert!(
+            matches!(&error, Some(SeedCorpusError::NotRegularFile { path }) if path == dir.path()),
+            "unexpected result: {error:?}"
+        );
+        Ok(())
+    }
 }

@@ -15,6 +15,9 @@ use std::path::PathBuf;
 #[path = "tests/guard_api_key.rs"]
 mod guard_api_key;
 
+#[path = "tests/threat_intel.rs"]
+mod threat_intel;
+
 const EXAMPLE_POLICY: &str = r#"
 kernel:
   max_capability_ttl: 3600
@@ -1745,50 +1748,6 @@ extensions:
     requirement.validate().test_unwrap();
 
     std::fs::remove_dir_all(policy_dir).test_unwrap();
-}
-
-#[test]
-fn load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes() {
-    let policy_dir = std::env::temp_dir().join(format!(
-        "chio-hushspec-asset-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .test_unwrap()
-            .as_millis()
-    ));
-    std::fs::create_dir_all(&policy_dir).test_unwrap();
-    let pattern_db = policy_dir.join("pattern-db.json");
-    let policy_path = policy_dir.join("policy.yaml");
-
-    std::fs::write(&pattern_db, sample_threat_intel_pattern_db("first")).test_unwrap();
-    std::fs::write(
-        &policy_path,
-        r#"
-hushspec: "0.1.0"
-rules:
-  tool_access:
-    enabled: true
-    default: block
-    allow:
-      - read_file
-extensions:
-  detection:
-    threat_intel:
-      enabled: true
-      pattern_db: "pattern-db.json"
-"#,
-    )
-    .test_unwrap();
-
-    let first = load_policy(&policy_path).test_unwrap();
-    std::fs::write(&pattern_db, sample_threat_intel_pattern_db("second")).test_unwrap();
-    let second = load_policy(&policy_path).test_unwrap();
-
-    assert_ne!(first.identity.source_hash, second.identity.source_hash);
-    assert_ne!(first.identity.runtime_hash, second.identity.runtime_hash);
-
-    let _ = std::fs::remove_dir_all(policy_dir);
 }
 
 #[test]
