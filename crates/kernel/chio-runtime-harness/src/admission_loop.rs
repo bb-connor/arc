@@ -6,6 +6,7 @@ use crate::scenario::RuntimeLoopbackStep;
 use crate::treaty::RuntimeLoopbackTreatyContext;
 use crate::RuntimeLoopbackError;
 
+#[derive(Clone)]
 pub(crate) struct RuntimeLoopbackAdmissionOutput {
     pub(crate) accepted: bool,
     pub(crate) failure_code: Option<String>,
