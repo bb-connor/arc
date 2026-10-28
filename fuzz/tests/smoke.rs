@@ -10,7 +10,7 @@
 //!
 //! The harness panics if a corpus directory is missing, unreadable, or empty
 //! - a renamed directory or typo'd target name would otherwise produce a
-//! silent vacuous pass without feeding any bytes through the entry point.
+//!   silent vacuous pass without feeding any bytes through the entry point.
 //!
 //! The inventory tests below keep this honest: every cargo-fuzz binary must
 //! appear in the scheduled workflow matrix, and every scheduled target must
