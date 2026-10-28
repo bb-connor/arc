@@ -447,6 +447,133 @@ fn ipv6_neighbours_of_the_embedding_prefixes_stay_global() {
     }
 }
 
+#[test]
+fn single_endpoint_admits_only_its_own_scheme_and_authority() {
+    let contract = HttpEgressContract::single_endpoint(
+        "passport-document",
+        "https://Verifier.Example./v1/request",
+        4096,
+    )
+    .expect("public https endpoint");
+    assert_eq!(
+        contract.allowed_schemes,
+        BTreeSet::from(["https".to_string()])
+    );
+    assert_eq!(
+        contract.allowed_authority_set,
+        BTreeSet::from(["verifier.example".to_string()])
+    );
+    assert!(contract.deny_loopback);
+    assert!(contract.deny_link_local);
+    assert!(contract.deny_ipv6_ula);
+    assert_eq!(contract.max_redirect_chain, 0);
+    assert_eq!(contract.max_response_bytes, 4096);
+    assert_eq!(
+        contract
+            .enforce_url("https://other.example/v1/request", 0)
+            .expect_err("second authority"),
+        HttpEgressError::AuthorityDenied {
+            authority: "other.example".to_string()
+        }
+    );
+    assert_eq!(
+        contract
+            .enforce_url("https://verifier.example/v1/next", 1)
+            .expect_err("redirect hop"),
+        HttpEgressError::RedirectLimitExceeded {
+            observed: 1,
+            max: 0
+        }
+    );
+
+    let with_port = HttpEgressContract::single_endpoint(
+        "passport-document",
+        "https://verifier.example:8443/",
+        1,
+    )
+    .expect("explicit port");
+    assert_eq!(
+        with_port.allowed_authority_set,
+        BTreeSet::from(["verifier.example:8443".to_string()])
+    );
+}
+
+#[test]
+fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
+    for url in [
+        "http://127.0.0.1:9/document",
+        "http://localhost:9/document",
+        "http://[::1]:9/document",
+    ] {
+        let contract = HttpEgressContract::single_endpoint("passport-document", url, 1).expect(url);
+        assert!(!contract.deny_loopback, "{url}");
+    }
+    let contract =
+        HttpEgressContract::single_endpoint("passport-document", "http://127.0.0.1:9/", 1)
+            .expect("loopback");
+    assert_eq!(
+        contract
+            .enforce_url("http://127.0.0.1:10/", 0)
+            .expect_err("second loopback authority"),
+        HttpEgressError::AuthorityDenied {
+            authority: "127.0.0.1:10".to_string()
+        }
+    );
+    for (url, scheme) in [
+        ("http://verifier.example/", "http"),
+        ("http://10.0.0.1/", "http"),
+        ("ftp://127.0.0.1/", "ftp"),
+    ] {
+        assert_eq!(
+            HttpEgressContract::single_endpoint("passport-document", url, 1),
+            Err(HttpEgressError::SchemeDenied {
+                scheme: scheme.to_string()
+            }),
+            "{url}"
+        );
+    }
+}
+
+#[test]
+fn single_endpoint_refuses_non_public_literals_and_userinfo() {
+    for (url, refusal) in [
+        (
+            "https://10.0.0.1/",
+            HttpEgressError::PrivateNetworkDenied {
+                host: "10.0.0.1".to_string(),
+            },
+        ),
+        (
+            "https://169.254.169.254/latest/meta-data",
+            HttpEgressError::LinkLocalDenied {
+                host: "169.254.169.254".to_string(),
+            },
+        ),
+        (
+            "https://[fd00::1]/",
+            HttpEgressError::Ipv6UlaDenied {
+                host: "fd00::1".to_string(),
+            },
+        ),
+        (
+            "https://[64:ff9b::a9fe:a9fe]/",
+            HttpEgressError::PrivateNetworkDenied {
+                host: "64:ff9b::a9fe:a9fe".to_string(),
+            },
+        ),
+        (
+            "https://user@verifier.example/",
+            HttpEgressError::UserinfoDenied,
+        ),
+    ] {
+        assert_eq!(
+            HttpEgressContract::single_endpoint("passport-document", url, 1),
+            Err(refusal),
+            "{url}"
+        );
+    }
+}
+
 #[cfg(all(test, feature = "reqwest-egress"))]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod reqwest_egress_tests {
