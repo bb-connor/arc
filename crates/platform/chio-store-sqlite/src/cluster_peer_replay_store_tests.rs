@@ -136,3 +136,56 @@ fn a_dropped_table_refuses_reads_and_advances() {
         ClusterPeerReplayStoreError::Sqlite(_)
     ));
 }
+
+fn seed_raw_row(dir: &tempfile::TempDir, node_id_sql: &str, issued_at_sql: &str) {
+    SqliteClusterPeerReplayStore::open(store_path(dir))
+        .test_unwrap()
+        .advance(NODE_B, 100)
+        .test_unwrap();
+    let raw = Connection::open(store_path(dir)).test_unwrap();
+    raw.execute_batch("PRAGMA ignore_check_constraints = ON;")
+        .test_unwrap();
+    raw.execute(
+        &format!(
+            "INSERT INTO cluster_peer_replay_high_water (node_id, issued_at) VALUES ({node_id_sql}, {issued_at_sql})"
+        ),
+        [],
+    )
+    .test_unwrap();
+}
+
+#[test]
+fn oversized_undecodable_node_id_refuses_on_open_before_it_is_read() {
+    let dir = tempfile::tempdir().test_unwrap();
+    seed_raw_row(&dir, "CAST(zeroblob(1048576) || x'ff' AS TEXT)", "1");
+    assert!(matches!(
+        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        ClusterPeerReplayStoreError::InvalidRow
+    ));
+}
+
+#[test]
+fn oversized_node_id_refuses_on_open() {
+    let dir = tempfile::tempdir().test_unwrap();
+    seed_raw_row(&dir, "printf('%.*c', 1048576, 'n')", "1");
+    assert!(matches!(
+        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        ClusterPeerReplayStoreError::InvalidRow
+    ));
+}
+
+#[test]
+fn a_valid_store_reopens_after_corrupt_row_controls() {
+    let dir = tempfile::tempdir().test_unwrap();
+    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    store.advance(&"n".repeat(MAX_NODE_ID_BYTES), 1).test_unwrap();
+    drop(store);
+    assert_eq!(
+        SqliteClusterPeerReplayStore::open(store_path(&dir))
+            .test_unwrap()
+            .high_waters()
+            .test_unwrap()
+            .len(),
+        1
+    );
+}
