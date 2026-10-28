@@ -56,3 +56,11 @@ Files: store-sqlite/tests/execution_nonce_kernel_lifecycle.rs and its support mo
 - [ ] Self-review producer/trust-root/caller closure, explicit SHA push, draft PR and lead review. Coverage LAST is lead-owned.
 
 Self-review: all five review-focus cases are assigned. The source map includes both tables, both readers, all ownership comparisons and three caller checks. Public setup error callers and exact gate inventories must be enumerated before editing; no existing test names are renamed.
+
+## Pre-flight ruling: shared coordinator claimant closure
+
+The coordinator claimant authorizes terminal projection and economic staging as well as nonce ownership. The original five-check inventory was incomplete. Task2 must also update `admission_operation_store/caller_wait.rs`, `projection.rs`, both checks in `participant.rs`, and both checks in `economic_state_cache.rs`. The control-plane producer `economic_admission_cancellation.rs` and corresponding store/kernel/control-plane fixtures must use the same derived claimant. Keep receipt authority IDs, receipt namespaces and swarm kernel IDs unchanged: they are separate identities, not admission recovery claimants.
+
+Task1 consumes the authenticated frozen receipt identity so panic, unreadable identity and below-floor keys refuse before runtime installation. Add a specific AdmissionOperationError setup variant; do not misclassify these as canonical JSON failures. Existing API result type remains unchanged.
+
+Verification expands to terminal replay, economic cancellation/staging and caller wait, including classical valid controls. The cost of missing this closure is failure of ordinary durable terminal completion; all production claimant comparisons must be inventoried before implementation. Evidence: nonce-durable-pq/claimant-callers.txt and attachment-callers.txt.
