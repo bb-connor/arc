@@ -68,6 +68,14 @@ pub enum RootExchangeStoreError {
     },
     #[error("delegation context {digest} is absent")]
     DelegationContextMissing { digest: Sha256Digest },
+    #[error("live replay binding {replay_key_digest} is missing before its retention ends")]
+    ReplayBindingMissing { replay_key_digest: Sha256Digest },
+    #[error("live replay binding {replay_key_digest} differs from its recorded binding")]
+    ReplayBindingMismatch { replay_key_digest: Sha256Digest },
+    #[error("live bearer mapping {token_digest} is missing before its retention ends")]
+    BearerMappingMissing { token_digest: Sha256Digest },
+    #[error("live bearer mapping {token_digest} differs from its recorded mapping")]
+    BearerMappingMismatch { token_digest: Sha256Digest },
     #[error("root opening {salt_ref} of {capability_id} is erased")]
     RootOpeningErased {
         capability_id: String,
@@ -179,6 +187,14 @@ pub enum RootExchangeIntegrityError {
     RootWithoutGlobalCommit { capability_id: String },
     #[error("anchored root {capability_id} differs from its authorization projection")]
     RootTampered { capability_id: String },
+    #[error("live replay binding {replay_key_digest} is missing before its retention ends")]
+    ReplayBindingMissing { replay_key_digest: Sha256Digest },
+    #[error("live replay binding {replay_key_digest} differs from its recorded binding")]
+    ReplayBindingMismatch { replay_key_digest: Sha256Digest },
+    #[error("live bearer mapping {token_digest} is missing before its retention ends")]
+    BearerMappingMissing { token_digest: Sha256Digest },
+    #[error("live bearer mapping {token_digest} differs from its recorded mapping")]
+    BearerMappingMismatch { token_digest: Sha256Digest },
     #[error("root opening of {capability_id} has no anchored root")]
     OpeningWithoutRoot { capability_id: String },
     #[error("retained {kind} bytes differ from their digest")]
@@ -562,3 +578,6 @@ mod tests;
 
 #[cfg(test)]
 mod recovery_tests;
+
+#[cfg(test)]
+mod binding_tests;

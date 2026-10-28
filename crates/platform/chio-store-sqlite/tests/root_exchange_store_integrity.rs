@@ -7,7 +7,7 @@
 mod support;
 
 use chio_store_sqlite::root_exchange_store::{
-    RetainedArtifact, RootExchangeIntegrityError as I, RootExchangeStoreError as E,
+    BearerMapping, RetainedArtifact, RootExchangeIntegrityError as I, RootExchangeStoreError as E,
 };
 use chio_store_sqlite::serving_owner::SqliteServingOwnerError;
 use chio_store_sqlite::SchemaVersionError;
@@ -347,5 +347,147 @@ fn foreign_catalog_layout_refuses_open() -> TestResult {
         })?;
         assert_eq!(roots, 1, "{sql}");
     }
+    Ok(())
+}
+
+fn digest_of(byte: u8) -> chio_core::root_authority::Sha256Digest {
+    support::digest(byte)
+}
+
+#[test]
+fn unexpired_client_assertion_replay_deletion_refuses_open() -> TestResult {
+    let env = Env::new()?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 60, &env.fence, env.at(NOW))?;
+    let (fixture, reopened) = env.tamper_and_reopen(None, "DELETE FROM root_exchange_replay;")?;
+    assert_eq!(
+        reopened,
+        I::ReplayBindingMissing {
+            replay_key_digest: digest_of(0x55)
+        }
+    );
+    assert_eq!(support::open_refusal(&fixture)?, reopened);
+    Ok(())
+}
+
+#[test]
+fn unexpired_mint_replay_deletion_refuses_open() -> TestResult {
+    let env = minted_env()?;
+    let (_, reopened) = env.tamper_and_reopen(None, "DELETE FROM root_exchange_replay;")?;
+    assert_eq!(
+        reopened,
+        I::ReplayBindingMissing {
+            replay_key_digest: digest_of(0x11)
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn unexpired_bearer_mapping_deletion_refuses_open() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let (_, reopened) = env.tamper_and_reopen(None, "DELETE FROM root_exchange_bearer_tokens;")?;
+    assert_eq!(
+        reopened,
+        I::BearerMappingMissing {
+            token_digest: digest_of(0x44)
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn rewritten_live_replay_binding_refuses_open() -> TestResult {
+    let env = Env::new()?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 60, &env.fence, env.at(NOW))?;
+    let (_, reopened) = env.tamper_and_reopen(
+        Some("root_exchange_replay_immutable"),
+        "UPDATE root_exchange_replay SET retain_until = retain_until + 1000;",
+    )?;
+    assert_eq!(
+        reopened,
+        I::ReplayBindingMismatch {
+            replay_key_digest: digest_of(0x55)
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn forged_live_replay_binding_refuses_open() -> TestResult {
+    let env = Env::new()?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 60, &env.fence, env.at(NOW))?;
+    let (_, reopened) = env.tamper_and_reopen(
+        None,
+        &format!(
+            "INSERT INTO root_exchange_replay VALUES ('{}', 'client_assertion', {NOW}, {}, NULL);",
+            hex(0x56),
+            NOW + 60
+        ),
+    )?;
+    assert_eq!(
+        reopened,
+        I::ReplayBindingMismatch {
+            replay_key_digest: digest_of(0x56)
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn pruned_expired_bindings_and_mappings_reopen_clean() -> TestResult {
+    let env = Env::new()?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 60, &env.fence, env.at(NOW))?;
+    let mut case = Case::static_bearer("cap-1")?;
+    case.expires_at = NOW + 50;
+    case.replay_retain_until = NOW + 110;
+    case.bearer = Some(BearerMapping {
+        token_digest: digest_of(0x44),
+        retain_until: NOW + 110,
+    });
+    env.minted(&case, &Admit, NOW)?;
+    env.store.prune_expired(&env.fence, env.at(NOW + 110))?;
+    let fixture = env.fixture;
+    drop(env.store);
+    drop(env.owner);
+    let owner = fixture.open()?;
+    let store = owner.root_exchange_store();
+    let fence = store.mutation_fence();
+    store.bind_client_assertion(
+        &digest_of(0x55),
+        NOW + 200,
+        &fence,
+        fixture.at(support::ms(NOW + 111)),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn rebind_after_expiry_reopens_clean() -> TestResult {
+    let env = Env::new()?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 60, &env.fence, env.at(NOW))?;
+    env.store
+        .bind_client_assertion(&digest_of(0x55), NOW + 200, &env.fence, env.at(NOW + 60))?;
+    let fixture = env.fixture;
+    drop(env.store);
+    drop(env.owner);
+    let owner = fixture.open()?;
+    let store = owner.root_exchange_store();
+    assert_eq!(
+        store
+            .bind_client_assertion(
+                &digest_of(0x55),
+                NOW + 300,
+                &store.mutation_fence(),
+                fixture.at(support::ms(NOW + 61))
+            )
+            .err(),
+        Some(E::AssertionReplay)
+    );
     Ok(())
 }
