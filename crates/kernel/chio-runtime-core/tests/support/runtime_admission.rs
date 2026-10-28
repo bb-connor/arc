@@ -37,14 +37,13 @@ pub(super) use chio_swarm_authority::{
 };
 pub(super) use runtime_api::{
     compute_ladder_intersection, runtime_admission_bundle_sha256, runtime_peer_weights_sha256,
-    sign_runtime_admission_report, tool_args_sha256, verify_signed_runtime_admission_report,
-    BilateralInvocation, ChioRuntimeAdmissionHook, CrossKernelContinuation,
-    InMemoryRuntimeAdmissionStore, ReceiptLineageBundle, ReceiptLineageStatement,
-    RuntimeAdmissionBundle, RuntimeAdmissionInput, RuntimeAdmissionProfile, RuntimeAdmissionStore,
-    RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory, RuntimePheromonePolicy,
-    RuntimePheromonePolicyRule, RuntimeRequestBinding, RuntimeTrustFloorEntry,
-    RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundle, SignedRuntimePheromoneQueryReport,
-    SqliteRuntimeOrchestrationStore, TreatyRuntimeArtifactRecord, TreatyScope,
+    tool_args_sha256, verify_signed_runtime_admission_report, BilateralInvocation,
+    ChioRuntimeAdmissionHook, CrossKernelContinuation, InMemoryRuntimeAdmissionStore,
+    ReceiptLineageBundle, ReceiptLineageStatement, RuntimeAdmissionBundle, RuntimeAdmissionProfile,
+    RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory,
+    RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
+    RuntimeTrustFloorEntry, RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundle,
+    SignedRuntimePheromoneQueryReport, SqliteRuntimeOrchestrationStore, TreatyScope,
     CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
     CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
     CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
@@ -66,7 +65,7 @@ pub(super) use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime
 #[path = "../runtime_admission/swarm_fixtures.rs"]
 pub(super) mod swarm_fixtures;
 pub(super) use swarm_fixtures::{
-    canonical_test_hash, issue_root, retained_swarm_graphs, runtime_swarm_continuation,
+    canonical_test_hash, issue_root, runtime_swarm_continuation,
     runtime_swarm_join_parent_set_hash, runtime_swarm_revocation_root,
     runtime_swarm_route_plan_receipt, runtime_swarm_scope, runtime_swarm_terminal_graph_receipt,
     runtime_swarm_witness_chain, swarm_witness_issuer, swarm_witness_keypair,
