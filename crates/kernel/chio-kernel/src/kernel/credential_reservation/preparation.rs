@@ -144,14 +144,8 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             ));
         }
         if let Some(grant) = &self.input.request.declassification_grant {
-            // Issuer trust, policy and consumption remain the live flow
-            // resolver's responsibility. A signature alone grants no release.
-            if !grant
-                .verify_integrity_embedded_key()
-                .map_err(|error| invalid(&error.to_string()))?
-            {
-                return Err(invalid("declassification signature is invalid"));
-            }
+            // The grant expiry only shortens the deadline. The flow resolver
+            // authenticates the issuer before any release is consumed.
             deadline = deadline.min(millis(grant.body().expires_at_unix_seconds())?);
         }
         Ok(deadline)

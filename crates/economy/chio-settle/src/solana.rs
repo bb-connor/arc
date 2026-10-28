@@ -7,7 +7,7 @@ use chio_core::web3::identity::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::config::SettlementEvidenceConfig;
+use crate::config::{SettlementEvidenceConfig, SettlementKernelAuthority};
 use crate::{SettlementCommitment, SettlementError};
 
 pub const SOLANA_ED25519_PROGRAM_ID: &str = "Ed25519SigVerify111111111111111111111111111";
@@ -23,6 +23,8 @@ pub struct SolanaSettlementConfig {
     pub token_minor_unit_decimals: u8,
     #[serde(default)]
     pub evidence_substrate: SettlementEvidenceConfig,
+    /// Kernel keys whose signed receipts may authorize a Solana release.
+    pub kernel_authority: SettlementKernelAuthority,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,11 +90,20 @@ pub struct CommitmentConsistencyReport {
     pub overall_consistent: bool,
 }
 
+/// The receipt kernel key must be a configured trusted settlement kernel key,
+/// and the binding certificate must name that same key, so the binding is
+/// rooted in the trusted kernel set rather than in its own signer.
 pub fn verify_solana_binding_and_receipt(
     chain_id: &str,
+    kernel_authority: &SettlementKernelAuthority,
     receipt: &ChioReceipt,
     binding: &SignedWeb3IdentityBinding,
 ) -> Result<(), SettlementError> {
+    if !kernel_authority.trusts(&receipt.kernel_key) {
+        return Err(SettlementError::Verification(
+            "receipt kernel_key is not a trusted settlement kernel key".to_string(),
+        ));
+    }
     verify_web3_identity_binding(binding)
         .map_err(|error| SettlementError::InvalidBinding(error.to_string()))?;
     if !binding
@@ -147,7 +158,12 @@ pub fn prepare_solana_settlement(
             "solana settlement config is incomplete".to_string(),
         ));
     }
-    verify_solana_binding_and_receipt(&config.chain_id, &request.receipt, &request.binding)?;
+    verify_solana_binding_and_receipt(
+        &config.chain_id,
+        &config.kernel_authority,
+        &request.receipt,
+        &request.binding,
+    )?;
     for (value, field) in [
         (request.payer_address.as_str(), "payer_address"),
         (request.beneficiary_address.as_str(), "beneficiary_address"),
@@ -217,6 +233,7 @@ pub fn prepare_solana_settlement(
 impl SolanaSettlementConfig {
     pub fn validate(&self) -> Result<(), SettlementError> {
         self.evidence_substrate.validate()?;
+        self.kernel_authority.validate()?;
         Ok(())
     }
 }
@@ -331,6 +348,9 @@ mod tests {
                 chio_minor_unit_decimals: 2,
                 token_minor_unit_decimals: 6,
                 evidence_substrate: SettlementEvidenceConfig::default(),
+                kernel_authority: SettlementKernelAuthority {
+                    trusted_keys: vec![keypair.public_key()],
+                },
             },
             SolanaSettlementRequest {
                 dispatch_id: "dispatch-sol-1".to_string(),
@@ -355,6 +375,29 @@ mod tests {
         let prepared = prepare_solana_settlement(&config, &request).test_unwrap();
         assert_eq!(prepared.settlement_amount_minor_units, 1_250_000);
         assert_eq!(prepared.ed25519_program_id, SOLANA_ED25519_PROGRAM_ID);
+    }
+
+    #[test]
+    fn solana_path_rejects_receipt_from_untrusted_kernel() {
+        let (mut config, request) = sample_request();
+        config.kernel_authority.trusted_keys = vec![Keypair::from_seed(&[0x51; 32]).public_key()];
+
+        let error = prepare_solana_settlement(&config, &request).test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "verification error: receipt kernel_key is not a trusted settlement kernel key"
+        );
+    }
+
+    #[test]
+    fn solana_path_refuses_empty_kernel_authority() {
+        let (mut config, request) = sample_request();
+        config.kernel_authority.trusted_keys.clear();
+
+        let error = prepare_solana_settlement(&config, &request).test_unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("kernel_authority.trusted_keys must name at least one kernel key"));
     }
 
     #[test]

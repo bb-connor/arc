@@ -379,6 +379,10 @@ pub struct VerifiedFiscalCharter {
 }
 
 impl VerifiedFiscalCharter {
+    /// Verifies the charter under its own signer key. Trust in that key comes
+    /// from the caller: a charter is current only when its digest is pinned by
+    /// the local genesis policy or by a rotation proposal whose digest, which
+    /// covers the successor `signer_key`, reached the current charter quorum.
     pub fn verify(signed: SignedFiscalCharter) -> Result<Self, FiscalError> {
         signed.body.validate()?;
         if !signed
