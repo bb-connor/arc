@@ -1501,7 +1501,6 @@ fn ensure_source_runtime_regeneration_records_bind_workflow_steps(
                 format!("proof-room.runtime-regeneration.source-record-step-unbound: {step_index}")
             })?;
         for field in [
-            "admissionReceiptSha256",
             "toolReceiptSha256",
             "bilateralDsseSha256",
             "workflowStepSha256",

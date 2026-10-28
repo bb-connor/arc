@@ -20,7 +20,7 @@ bundles, treaty evidence and atomic trust-floor transitions. Swarm admission als
 requires the qualified graph issuer and pinned witness keys.
 
 The runtime harness records the signed kernel receipt as its admission artifact.
-Workflow and proof-source records bind `admissionReceiptSha256`. Cross-boundary
+Step and proof-source records bind `toolReceiptSha256`. Cross-boundary
 treaty reports retain their separate report digests.
 
 See [the source contract](../chio-runtime-core/RUNTIME_SOURCE.md) for physical

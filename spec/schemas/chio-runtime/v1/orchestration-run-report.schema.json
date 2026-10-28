@@ -52,7 +52,6 @@
         "admissionId": { "type": "string", "minLength": 1 },
         "state": { "type": "string", "pattern": "^[a-z0-9_]+$" },
         "destructive": { "type": "boolean" },
-        "admissionReceiptSha256": { "$ref": "#/$defs/sha256" },
         "toolReceiptSha256": { "$ref": "#/$defs/sha256" },
         "leaseId": { "type": "string", "minLength": 1 }
       }

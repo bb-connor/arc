@@ -477,8 +477,7 @@ fn runtime_proof_source_records_match_steps(
     }
     steps.iter().all(|step| {
         records_by_step.get(&step.step_index).is_some_and(|record| {
-            record.admission_receipt_sha256 == step.admission_receipt_sha256
-                && record.tool_receipt_sha256 == step.tool_receipt_sha256
+            record.tool_receipt_sha256 == step.tool_receipt_sha256
                 && record.bilateral_dsse_sha256 == step.bilateral_dsse_sha256
                 && record.workflow_step_sha256 == step.workflow_step_sha256
         })
