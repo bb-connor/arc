@@ -45,8 +45,7 @@ impl InMemoryBudgetStoreInner {
         }
         if self.has_composite_history(capability_id, grant_index) {
             return Err(BudgetStoreError::Invariant(
-                "standalone invocation admission cannot bypass composite budget history"
-                    .to_string(),
+                "standalone invocation admission cannot bypass composite budget history".to_string(),
             ));
         }
         let invocation_quota_usages_before = quota
@@ -208,10 +207,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn try_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
@@ -236,10 +232,7 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
-    )]
+    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
     fn try_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
