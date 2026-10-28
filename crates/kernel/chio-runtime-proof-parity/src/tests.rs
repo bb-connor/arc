@@ -229,7 +229,7 @@ fn runtime_regeneration_artifacts(
     let workflow_receipt_sha256 = test_canonical_value_sha256(&workflow_receipt);
     let mut source_record = serde_json::json!({
         "stepIndex": 0,
-        "admissionReportSha256": "1".repeat(64),
+        "admissionReceiptSha256": "1".repeat(64),
         "toolReceiptSha256": "2".repeat(64),
         "bilateralDsseSha256": "3".repeat(64),
         "workflowStepSha256": "4".repeat(64)
@@ -262,7 +262,7 @@ fn runtime_regeneration_artifacts(
     if let Some(step_index) = options.workflow_step_record_index {
         workflow_report["stepEvidence"] = serde_json::json!([{
             "stepIndex": step_index,
-            "admissionReportSha256": "1".repeat(64),
+            "admissionReceiptSha256": "1".repeat(64),
             "toolReceiptSha256": "2".repeat(64),
             "bilateralDsseSha256": "3".repeat(64),
             "workflowStepSha256": "4".repeat(64)

@@ -119,7 +119,7 @@ fn runtime_regenerate_check_refuses_package_byte_tamper() {
     let mut bytes = std::fs::read(&path).test_expect("read package");
     bytes.push(b' ');
     std::fs::write(&path, bytes).test_expect("write package");
-    assert_failure(&check(root.path()), "runtime fixture bundle integrity:");
+    assert_failure(&check(root.path()), "runtime fixture bundle integrity: proof-room.runtime-regeneration.hash-mismatch: runtime-proof-package:");
 }
 
 #[test]
