@@ -7,7 +7,6 @@ use super::{
     validate_injected_joint_authority_store, ReceiptWriterStartup, SqliteAuthorityStore,
     SqliteReceiptStore, TrustServiceConfig,
 };
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -92,9 +91,7 @@ fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         listen: "127.0.0.1:0"
             .parse()
             .unwrap_or_else(|error| panic!("fixed loopback address must parse: {error}")),
-        service_token: "service-token".to_string(),
-        tenant_read_tokens: BTreeMap::new(),
-        authority_workload_token: None,
+        access: crate::trust_control::caller_credentials::tests::test_access("service-token"),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
@@ -120,7 +117,6 @@ fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         advertise_url: None,
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
@@ -508,7 +504,6 @@ mod snapshot_recovery {
         config.authority_seed_path = Some(fixture.directory.path().join("seed"));
         config.authority_keyring_receipt_anchor_root =
             Some(fixture.directory.path().join("anchors"));
-        config.authority_workload_token = Some("startup-recovery-test-workload".to_owned());
         let error = tokio::time::timeout(
             Duration::from_secs(30),
             super::super::serve_async(config, None, None, None, None, None, None),

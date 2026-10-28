@@ -56,6 +56,7 @@ pub(crate) fn dispatch_mcp(
     budget_db: Option<PathBuf>,
     session_db: Option<PathBuf>,
     control_url: Option<String>,
+    control_internal_url: Option<String>,
     control_token: Option<String>,
     control_authority_public_key: Option<chio_core::PublicKey>,
     control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
@@ -105,6 +106,7 @@ pub(crate) fn dispatch_mcp(
             budget_db.as_deref(),
             session_db.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
         ),
         McpCommands::ServeHttp {
@@ -202,6 +204,7 @@ pub(crate) fn dispatch_mcp(
             session_db.as_deref(),
             resume_hmac_keyring.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
             control_authority_public_key.as_ref(),
             &control_authority_trusted_public_keys,

@@ -245,7 +245,6 @@ use chio_store_sqlite::{
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
-use subtle::ConstantTimeEq;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
@@ -297,6 +296,8 @@ use crate::{
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
 mod budget_handlers;
+#[path = "trust_control/caller_credentials.rs"]
+pub mod caller_credentials;
 #[path = "trust_control/capital_and_liability.rs"]
 mod capital_and_liability;
 #[path = "trust_control/certification_handlers.rs"]
@@ -308,6 +309,8 @@ pub mod cluster;
 mod cluster_and_reports;
 #[path = "trust_control/config_and_public.rs"]
 mod config_and_public;
+#[path = "trust_control/credential_roles.rs"]
+pub mod credential_roles;
 #[path = "trust_control/credit_and_loss.rs"]
 mod credit_and_loss;
 #[path = "trust_control/finding_challenge_coordinator.rs"]
@@ -370,6 +373,8 @@ pub(crate) mod report_validation;
 pub mod reports;
 #[path = "trust_control/risk_finance_handlers.rs"]
 mod risk_finance_handlers;
+#[path = "trust_control/route_authorization.rs"]
+pub mod route_authorization;
 #[path = "trust_control/service_runtime.rs"]
 pub mod service_runtime;
 #[path = "trust_control/service_types.rs"]
@@ -416,6 +421,7 @@ pub(crate) use self::finding_status_handlers::*;
 // The evidenced-rail seam is part of the finding lane's deployment
 // surface: the dispute-fee charge takes it by injection exactly as the
 // admission and participation charges do.
+pub(crate) use self::caller_credentials::Scope;
 pub use self::finding_handlers::{
     FindingRailInstruction, FindingRailObservation, FindingRailObserver, VenueLedgerRailObserver,
 };

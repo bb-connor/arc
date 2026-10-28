@@ -2,11 +2,9 @@ use super::*;
 
 pub(crate) async fn handle_internal_cluster_status(
     State(state): State<TrustServiceState>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_STATUS_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref(), Scope::ClusterReplicate) {
         return response;
     }
 
@@ -133,14 +131,14 @@ pub(crate) fn build_cluster_state(
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<Option<Arc<Mutex<ClusterRuntimeState>>>, CliError> {
     config.validate()?;
-    if !config.peer_urls.is_empty() && config.authority_seed_path.is_some() {
+    if config.is_clustered() && config.authority_seed_path.is_some() {
         return Err(CliError::cli_other_error(
             "clustered trust control requires --authority-db instead of --authority-seed-file"
                 .to_string(),
         ));
     }
 
-    if config.peer_urls.is_empty() {
+    if !config.is_clustered() {
         return Ok(None);
     }
 
@@ -152,7 +150,7 @@ pub(crate) fn build_cluster_state(
         config.allow_local_peer_urls,
     )?;
     let mut peers = HashMap::new();
-    for peer_url in &config.peer_urls {
+    for peer_url in &config.peer_urls() {
         let peer_url = normalize_cluster_config_url(peer_url, config.allow_local_peer_urls)?;
         if peer_url != self_url {
             peers.insert(peer_url, PeerSyncState::default());

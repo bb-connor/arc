@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 #[path = "support/trust_health.rs"]
 mod trust_health;
 
@@ -75,8 +78,8 @@ fn spawn_trust_service(
         "serve",
         "--listen",
         &listen.to_string(),
-        "--service-token",
-        service_token,
+        "--access-config",
+        &trust_access::write_access_config(service_token, &[]),
         "--enterprise-providers-file",
         enterprise_providers_file
             .to_str()

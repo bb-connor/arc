@@ -17,10 +17,13 @@ For example, with existing operator-managed certificate and key files:
 ```sh
 chmod 600 /run/chio/tls/key.pem
 chio trust serve --listen 0.0.0.0:8940 \
+  --access-config /etc/chio/trust-access.toml \
   --tls-cert /run/chio/tls/chain.pem --tls-key /run/chio/tls/key.pem
 ```
 
-Set `CHIO_TRUST_SERVICE_TOKEN` separately in the service's credential environment.
+The access configuration holds credential digests, never secrets; see
+[Trust-Control Access Configuration](../reference/TRUST_CONTROL_ACCESS.md).
+Trust control applies the same TLS identity to its internal listener.
 Normal service-specific policy, manifest, store and authority configuration still
 applies. The private key must be an existing regular owner-only file, singly
 linked and opened without following symlinks on Unix. It is bounded at 64 KiB;

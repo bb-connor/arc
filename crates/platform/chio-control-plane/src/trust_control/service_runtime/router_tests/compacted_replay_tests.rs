@@ -131,15 +131,15 @@ impl Host {
         state.revocation_store = Some(Arc::new(authority.revocation_store()));
         state.joint_authority_store = Some(authority);
         let fault = Arc::new(AtomicU8::new(0));
-        let router = crate::trust_control::service_runtime::router::build_router(state).layer(
-            from_fn_with_state(
+        let router = crate::trust_control::service_runtime::router::build_router(state.clone())
+            .merge(crate::trust_control::service_runtime::router::build_internal_router(state))
+            .layer(from_fn_with_state(
                 ReplyFault {
                     mode: fault.clone(),
                     signer: runtime.kernel_keypair(),
                 },
                 fault_reply,
-            ),
-        );
+            ));
         let executor = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
@@ -250,7 +250,12 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
     } else {
         host.compact(&database, outcome.raw_output_digest().as_str())?;
     }
-    let remote = DurableAdmissionRuntime::open_remote(&database, &host.url, "payload-rpc-secret")?;
+    let remote = DurableAdmissionRuntime::open_remote(
+        &database,
+        &host.url,
+        &host.url,
+        "payload-rpc-secret",
+    )?;
     let recovered = configured_kernel(&remote, calls.clone())?;
     let before = head(&database)?;
     host.fault.store(mode, Ordering::SeqCst);
@@ -398,11 +403,17 @@ fn compacted_payload_rpc_cold_reopen_replays_original_receipt_without_effects() 
         .mutation_fence();
     assert_eq!(reopened_fence.store_uuid, fence.store_uuid);
     assert!(reopened_fence.owner_epoch > fence.owner_epoch);
-    let remote = DurableAdmissionRuntime::open_remote(&database, &host.url, "payload-rpc-secret")?;
+    let remote = DurableAdmissionRuntime::open_remote(
+        &database,
+        &host.url,
+        &host.url,
+        "payload-rpc-secret",
+    )?;
     assert!(remote.local_authority_store().is_none());
     let recovered = configured_kernel(&remote, calls.clone())?;
     let ports =
         crate::trust_control::service_runtime::remote_admission::build_remote_admission_stores(
+            &host.url,
             &host.url,
             "payload-rpc-secret",
             remote.kernel_keypair(),

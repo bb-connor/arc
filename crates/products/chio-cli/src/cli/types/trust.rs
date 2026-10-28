@@ -10,36 +10,17 @@ pub(crate) enum TrustCommands {
         #[arg(long, default_value = "127.0.0.1:8940")]
         listen: SocketAddr,
 
-        /// Bearer token required for trust-control service requests.
-        ///
-        /// Prefer `CHIO_TRUST_SERVICE_TOKEN` over `--service-token` so the
-        /// secret is not visible to other users via `ps`/`/proc`.
-        #[arg(long, env = "CHIO_TRUST_SERVICE_TOKEN", hide_env_values = true)]
-        service_token: String,
-
-        /// Tenant-scoped read token mapping in `tenant_id=token` form. Repeat
-        /// for multiple tenants. Requests presenting one of these tokens are
-        /// confined to reading the matching tenant's receipts; the
-        /// `--service-token` retains administrative cross-tenant access.
-        #[arg(long = "tenant-read-token", value_name = "TENANT=TOKEN")]
-        tenant_read_tokens: Vec<String>,
-
-        /// Bearer token accepted only for capability-authority status and issuance.
-        ///
-        /// Keep this distinct from the administrative service token and from
-        /// every edge service or session bearer.
-        #[arg(
-            long,
-            env = "CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN",
-            hide_env_values = true
-        )]
-        authority_workload_token: Option<String>,
+        /// Trust-control access configuration (TOML): the deployment, the
+        /// internal listener, scoped caller credentials and pinned cluster
+        /// peers. Check it with `chio trust config check`.
+        #[arg(long, value_name = "PATH")]
+        access_config: PathBuf,
 
         /// Witnessed authority-key transparency runtime configuration.
         ///
         /// This requires the global `--authority-seed-file`, `--receipt-db`,
-        /// `--authority-keyring-receipt-anchor-root`, and
-        /// `--authority-workload-token` options. Startup also requires all
+        /// `--authority-keyring-receipt-anchor-root`, and a deployment
+        /// credential holding `capabilities:issue`. Startup also requires all
         /// configured witness and audit services to prove readiness.
         #[arg(long)]
         authority_keyring_config: Option<PathBuf>,
@@ -60,10 +41,6 @@ pub(crate) enum TrustCommands {
         /// Public base URL this trust-control node advertises to peers and clients.
         #[arg(long)]
         advertise_url: Option<String>,
-
-        /// Peer trust-control base URL. Repeat for multiple peers.
-        #[arg(long = "peer-url")]
-        peer_urls: Vec<String>,
 
         /// Allow loopback/private cluster peer URLs for local development only.
         #[arg(long, default_value_t = false)]
@@ -178,6 +155,11 @@ pub(crate) enum TrustCommands {
         roster_policy_file: Option<PathBuf>,
     },
 
+    /// Check a trust-control access configuration or write one credential entry.
+    Config {
+        #[command(subcommand)]
+        command: TrustConfigCommands,
+    },
     /// Manage enterprise federation provider-admin records.
     Provider {
         #[command(subcommand)]
@@ -1569,5 +1551,47 @@ pub(crate) enum TrustUnderwritingAppealCommands {
         /// Optional replacement decision ID when an appeal resolution references a superseding artifact.
         #[arg(long)]
         replacement_decision_id: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum TrustConfigCommands {
+    /// Validate an access configuration and print its credentials (never
+    /// secrets), scopes, tenant authorities and pinned peers.
+    Check {
+        /// Access configuration file (TOML).
+        #[arg(long, value_name = "PATH")]
+        access_config: PathBuf,
+    },
+    /// Print one `[[credentials]]` entry whose `secret_sha256` is the digest
+    /// of the secret read from a file or an environment variable.
+    Credential {
+        /// Credential id.
+        #[arg(long)]
+        id: String,
+        /// Role preset that sets the kind and scopes: `kernel-host`,
+        /// `operator`, `authority-workload` or `tenant-reader` (with
+        /// `--tenant`).
+        #[arg(long, value_name = "ROLE")]
+        role: Option<String>,
+        /// `caller` or `deployment`, for a credential without a role.
+        #[arg(long, required_unless_present = "role", conflicts_with = "role")]
+        kind: Option<String>,
+        /// Deployment the credential belongs to.
+        #[arg(long)]
+        deployment: String,
+        /// File holding the secret (one trailing newline is removed).
+        #[arg(long, value_name = "PATH", conflicts_with = "secret_env")]
+        secret_file: Option<PathBuf>,
+        /// Environment variable holding the secret.
+        #[arg(long, value_name = "NAME")]
+        secret_env: Option<String>,
+        /// Scope to grant; with `--role`, a scope beyond the preset. Repeat
+        /// for several.
+        #[arg(long = "scope")]
+        scopes: Vec<String>,
+        /// Limit the credential to one tenant instead of the deployment.
+        #[arg(long)]
+        tenant: Option<String>,
     },
 }

@@ -564,9 +564,7 @@ fn market_state(
     let config = TrustServiceConfig {
         transport: Default::default(),
         listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-        service_token: SERVICE_TOKEN.to_string(),
-        tenant_read_tokens: std::collections::BTreeMap::new(),
-        authority_workload_token: None,
+        access: crate::trust_control::caller_credentials::tests::test_access(SERVICE_TOKEN),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
@@ -592,7 +590,6 @@ fn market_state(
         advertise_url: None,
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: std::time::Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,

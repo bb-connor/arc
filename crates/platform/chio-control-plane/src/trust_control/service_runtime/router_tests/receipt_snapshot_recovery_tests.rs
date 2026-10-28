@@ -62,10 +62,11 @@ async fn quota_bound(seed: u8) -> Result<QuotaBound, Box<dyn std::error::Error>>
         "{status:?}"
     );
     let mut state = metrics_state("snapshot-secret");
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-read-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-read-secret")],
+    );
     state.config.receipt_db_path = Some(path.clone());
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
@@ -346,19 +347,18 @@ async fn operator_recovery_refuses_missing_wrong_and_tenant_tokens_before_readin
         });
         (Body::from_stream(stream), polls)
     };
-    for credential in [
-        None,
-        Some("Bearer forged-snapshot-secret"),
-        Some("Bearer tenant-read-secret"),
-        Some("Basic snapshot-secret"),
+    for (credential, refusal) in [
+        (None, StatusCode::UNAUTHORIZED),
+        (
+            Some("Bearer forged-snapshot-secret"),
+            StatusCode::UNAUTHORIZED,
+        ),
+        (Some("Bearer tenant-read-secret"), StatusCode::FORBIDDEN),
+        (Some("Basic snapshot-secret"), StatusCode::UNAUTHORIZED),
     ] {
         let (body, polls) = counted();
         let (status, response) = recover(&node.state, credential, body).await?;
-        assert_eq!(
-            status,
-            StatusCode::UNAUTHORIZED,
-            "{credential:?}: {response}"
-        );
+        assert_eq!(status, refusal, "{credential:?}: {response}");
         assert_eq!(polls.load(Ordering::SeqCst), 0, "{credential:?}");
     }
     assert_unchanged(&node.snapshots.recovery_status(), 0);

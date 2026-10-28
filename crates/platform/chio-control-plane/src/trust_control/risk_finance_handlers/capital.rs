@@ -39,7 +39,7 @@ pub(crate) async fn handle_issue_capital_execution_instruction(
     headers: HeaderMap,
     Json(request): Json<CapitalExecutionInstructionRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -69,7 +69,7 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
     headers: HeaderMap,
     Json(request): Json<CapitalAllocationDecisionRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 

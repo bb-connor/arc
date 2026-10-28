@@ -8,7 +8,6 @@ use chio_credentials::{
     AttestationWindow, ChioCredentialEvidence, PassportPresentationVerification,
     PassportVerifierPolicy,
 };
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -202,9 +201,7 @@ fn service_config(
     TrustServiceConfig {
         transport: Default::default(),
         listen,
-        service_token: TOKEN.to_string(),
-        tenant_read_tokens: BTreeMap::new(),
-        authority_workload_token: None,
+        access: crate::trust_control::caller_credentials::tests::test_access(TOKEN),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: Some(revocation_db_path),
@@ -230,7 +227,6 @@ fn service_config(
         advertise_url: None,
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,

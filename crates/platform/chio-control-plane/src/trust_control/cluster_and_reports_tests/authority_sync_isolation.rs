@@ -97,37 +97,37 @@ impl ServedPeer {
         let served_authority_snapshot_override = authority_snapshot_override.clone();
         let cluster_status_override = Arc::new(std::sync::Mutex::new(None::<Value>));
         let served_cluster_status_override = cluster_status_override.clone();
-        let cluster_status = move |state: State<TrustServiceState>, headers: HeaderMap| {
-            let status_override = served_cluster_status_override.clone();
-            async move {
-                let status = status_override.lock().test_unwrap().clone();
-                match status {
-                    Some(status) => Json(status).into_response(),
-                    None => handle_internal_cluster_status(state, headers).await,
+        let cluster_status =
+            move |state: State<TrustServiceState>, grant: Option<axum::Extension<RouteGrant>>| {
+                let status_override = served_cluster_status_override.clone();
+                async move {
+                    let status = status_override.lock().test_unwrap().clone();
+                    match status {
+                        Some(status) => Json(status).into_response(),
+                        None => handle_internal_cluster_status(state, grant).await,
+                    }
                 }
-            }
-        };
-        let cluster_snapshot = move |state: State<TrustServiceState>, headers: HeaderMap| {
-            let unavailable = served_snapshot_unavailable.clone();
-            async move {
-                if unavailable.load(Ordering::SeqCst) {
-                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, "snapshot unavailable")
-                } else {
-                    handle_internal_cluster_snapshot(state, headers).await
+            };
+        let cluster_snapshot =
+            move |state: State<TrustServiceState>, grant: Option<axum::Extension<RouteGrant>>| {
+                let unavailable = served_snapshot_unavailable.clone();
+                async move {
+                    if unavailable.load(Ordering::SeqCst) {
+                        plain_http_error(StatusCode::SERVICE_UNAVAILABLE, "snapshot unavailable")
+                    } else {
+                        handle_internal_cluster_snapshot(state, grant).await
+                    }
                 }
-            }
-        };
+            };
         let gated_authority_snapshot =
-            move |state: State<TrustServiceState>, headers: HeaderMap| {
+            move |state: State<TrustServiceState>, grant: Option<axum::Extension<RouteGrant>>| {
                 let gate = gate.clone();
                 let unavailable = served_authority_snapshot_unavailable.clone();
                 let snapshot_override = served_authority_snapshot_override.clone();
                 async move {
-                    if let Err(response) = validate_cluster_peer_auth(
-                        &headers,
-                        &state.config,
-                        INTERNAL_AUTHORITY_SNAPSHOT_PATH,
-                    ) {
+                    if let Err(response) =
+                        require_peer_grant(grant.as_ref(), Scope::ClusterReplicate)
+                    {
                         return response;
                     }
                     if unavailable.load(Ordering::SeqCst) {
@@ -143,12 +143,16 @@ impl ServedPeer {
                     if let Some(snapshot) = snapshot {
                         return Json(snapshot).into_response();
                     }
-                    handle_internal_authority_snapshot(state, headers).await
+                    handle_internal_authority_snapshot(state, grant).await
                 }
             };
-        let router = axum::Router::new()
-            .route(AUTHORITY_PATH, get(handle_authority_status))
+        let public = axum::Router::new().route(AUTHORITY_PATH, get(handle_authority_status));
+        let internal = axum::Router::new()
             .route(INTERNAL_CLUSTER_STATUS_PATH, get(cluster_status))
+            .route(
+                INTERNAL_AUTHORITY_STATUS_PATH,
+                get(handle_internal_authority_status),
+            )
             .route(INTERNAL_CLUSTER_SNAPSHOT_PATH, get(cluster_snapshot))
             .route(
                 INTERNAL_AUTHORITY_SNAPSHOT_PATH,
@@ -157,8 +161,8 @@ impl ServedPeer {
             .route(
                 INTERNAL_REVOCATIONS_DELTA_PATH,
                 get(handle_internal_revocations_delta),
-            )
-            .with_state(state.clone());
+            );
+        let router = with_route_table(&state, public, internal);
         listener.set_nonblocking(true).test_unwrap();
         let (shutdown, stopped) = tokio::sync::oneshot::channel::<()>();
         let server = std::thread::spawn(move || {
@@ -603,8 +607,12 @@ fn clustered_startup_refuses_an_unpinned_authority_database() {
     let authority_db_path = directory.path().join("authority.sqlite3");
     drop(SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap());
     let mut config = base_config();
-    config.advertise_url = Some("https://node-a".to_string());
-    config.peer_urls = vec!["https://node-b".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut config,
+        "token",
+        "https://node-a",
+        &["https://node-b"],
+    );
     config.authority_db_path = Some(authority_db_path.clone());
 
     let error = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
@@ -616,7 +624,7 @@ fn clustered_startup_refuses_an_unpinned_authority_database() {
 
     // A single node replicates no signed authority, so it needs no anchor.
     let mut standalone = config.clone();
-    standalone.peer_urls.clear();
+    standalone.access = crate::trust_control::caller_credentials::tests::test_access("token");
     assert!(build_cluster_state(
         &standalone,
         standalone.listen,

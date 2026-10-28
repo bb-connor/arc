@@ -46,9 +46,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),
         listen: "127.0.0.1:0".parse().test_unwrap(),
-        service_token: service_token.to_string(),
-        tenant_read_tokens: BTreeMap::new(),
-        authority_workload_token: None,
+        access: crate::trust_control::caller_credentials::tests::test_access(service_token),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
@@ -74,7 +72,6 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         advertise_url: None,
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
@@ -137,7 +134,7 @@ async fn admission_authority_authenticates_before_reading_the_body(
         ))?;
     let response = tokio::time::timeout(
         Duration::from_secs(1),
-        super::build_router(metrics_state("service-secret")).oneshot(request),
+        super::build_internal_router(metrics_state("service-secret")).oneshot(request),
     )
     .await??;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -505,8 +502,12 @@ async fn versioned_rich_lifecycle_does_not_mutate_peer_cluster_follower(
     ));
     let mut state = metrics_state("service-secret");
     state.budget_store = Some(sqlite.clone());
-    state.config.advertise_url = Some("http://127.0.0.1:3200".to_string());
-    state.config.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut state.config,
+        "service-secret",
+        "http://127.0.0.1:3200",
+        &["http://127.0.0.1:3300"],
+    );
     state.cluster = crate::trust_control::cluster::build_cluster_state(
         &state.config,
         state.config.listen,
@@ -561,8 +562,12 @@ async fn joint_authority_refuses_peer_cluster_replication() -> Result<(), Box<dy
     let fence = authority.mutation_fence();
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(authority);
-    state.config.advertise_url = Some("http://127.0.0.1:3200".to_string());
-    state.config.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut state.config,
+        "service-secret",
+        "http://127.0.0.1:3200",
+        &["http://127.0.0.1:3300"],
+    );
     state.cluster = crate::trust_control::cluster::build_cluster_state(
         &state.config,
         state.config.listen,
@@ -1017,7 +1022,12 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
     };
     let state = || {
         let mut state = metrics_state("secret");
-        state.config.authority_workload_token = Some("workload-secret".into());
+        state.config.access =
+            crate::trust_control::caller_credentials::tests::test_access_with_roles(
+                "secret",
+                Some("workload-secret"),
+                &[],
+            );
         state
     };
     let build = || apply_server_hygiene(super::build_router(state()), &hygiene);
@@ -1070,6 +1080,10 @@ mod receipt_query_snapshot_tests;
 
 #[path = "router_tests/evidence_snapshot_export_tests.rs"]
 mod evidence_snapshot_export_tests;
+#[path = "router_tests/listener_split_tests.rs"]
+mod listener_split_tests;
+#[path = "router_tests/tenant_scoped_routes_tests.rs"]
+mod tenant_scoped_routes_tests;
 
 #[path = "router_tests/registry_revocation_capacity.rs"]
 mod registry_revocation_capacity;

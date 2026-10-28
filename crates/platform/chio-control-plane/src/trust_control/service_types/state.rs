@@ -147,7 +147,8 @@ pub struct TrustControlClient {
 
 #[derive(Clone)]
 pub(crate) struct ClusterPeerClientAuth {
-    pub(crate) node_id: Arc<str>,
+    pub(crate) access: Arc<crate::trust_control::caller_credentials::TrustAccess>,
+    pub(crate) recipient: Arc<str>,
 }
 
 pub(crate) struct RemoteCapabilityAuthority {
@@ -182,8 +183,15 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
-    pub(crate) recovery_fence: Option<chio_kernel::admission_operation::StoreMutationFence>,
+    pub(crate) recovery: Option<BudgetRecoveryAuthority>,
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), CachedBudgetUsage>>,
+}
+
+/// The admission authority a remote budget store recovers retained holds
+/// from: a client of the trust-control internal listener and the pinned fence.
+pub(crate) struct BudgetRecoveryAuthority {
+    pub(crate) client: TrustControlClient,
+    pub(crate) fence: chio_kernel::admission_operation::StoreMutationFence,
 }
 
 /// Fields actually observed at this usage sequence. Legacy mutation responses

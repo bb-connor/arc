@@ -6,7 +6,7 @@ pub(crate) async fn handle_underwriting_policy_input(
     Query(query): Query<UnderwritingPolicyInputQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -147,7 +147,7 @@ pub(crate) async fn handle_query_underwriting_decisions(
     Query(query): Query<UnderwritingDecisionQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -167,7 +167,7 @@ pub(crate) async fn handle_issue_underwriting_decision(
     headers: HeaderMap,
     Json(request): Json<UnderwritingDecisionIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -175,7 +175,9 @@ pub(crate) async fn handle_issue_underwriting_decision(
     // follower can be stale or in fallback, so governed issuance must run on the
     // elected leader before resolution, signing, or persistence.
     if state.fiscal_runtime.is_some() {
-        match forward_post_to_leader(&state, UNDERWRITING_DECISION_ISSUE_PATH, &request).await {
+        match forward_post_to_leader(&state, &headers, UNDERWRITING_DECISION_ISSUE_PATH, &request)
+            .await
+        {
             Ok(Some(response)) => return response,
             Ok(None) => {}
             Err(response) => return response,
@@ -213,7 +215,7 @@ pub(crate) async fn handle_create_underwriting_appeal(
     headers: HeaderMap,
     Json(request): Json<UnderwritingAppealCreateRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -238,7 +240,7 @@ pub(crate) async fn handle_resolve_underwriting_appeal(
     headers: HeaderMap,
     Json(request): Json<UnderwritingAppealResolveRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 

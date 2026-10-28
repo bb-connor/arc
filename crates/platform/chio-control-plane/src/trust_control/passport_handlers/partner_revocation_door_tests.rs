@@ -360,7 +360,7 @@ impl Door {
     }
 
     async fn service_door(&self, request: VerifyPassportChallengeRequest) -> Response {
-        handle_verify_passport_challenge(State(self.state()), service_headers(self), Json(request))
+        handle_verify_passport_challenge(State(self.state()), service_headers(), Json(request))
             .await
     }
 
@@ -415,12 +415,9 @@ fn issued_credential(
     .test_unwrap()
 }
 
-fn service_headers(door: &Door) -> HeaderMap {
+fn service_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {}", door.config.service_token)).test_unwrap(),
-    );
+    headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
     headers
 }
 
@@ -531,7 +528,7 @@ async fn the_federated_issue_door_refuses_a_partner_revoked_passport() {
         upstream_capability_id: None,
     };
     let response =
-        handle_federated_issue(State(door.state()), service_headers(&door), Json(request)).await;
+        handle_federated_issue(State(door.state()), service_headers(), Json(request)).await;
     let passport_id = passport_artifact_id(&passport).test_unwrap();
     assert_refused(response, revoked(PARTNER, &passport_id)).await;
 }
@@ -788,7 +785,7 @@ async fn the_production_door_syncs_only_over_the_strict_transport() {
     let state = state_with(door.config.clone(), door.clock.clone());
     let response = handle_verify_passport_challenge(
         State(state),
-        service_headers(&door),
+        service_headers(),
         Json(door.service_request(&passport, &challenge)),
     )
     .await;
@@ -1046,7 +1043,7 @@ async fn a_live_delegation_policy_issues_through_the_partner_door() {
     );
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
-        service_headers(&door),
+        service_headers(),
         Json(request),
     )
     .await;
@@ -1070,7 +1067,7 @@ async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue
     );
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
-        service_headers(&door),
+        service_headers(),
         Json(request),
     )
     .await;
@@ -1119,7 +1116,7 @@ async fn a_live_parent_snapshot_issues_through_the_partner_door() {
     let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
-        service_headers(&door),
+        service_headers(),
         Json(request),
     )
     .await;
@@ -1135,7 +1132,7 @@ async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume
     let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
-        service_headers(&door),
+        service_headers(),
         Json(request),
     )
     .await;

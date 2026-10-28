@@ -205,6 +205,9 @@ pub struct RemoteServeHttpConfig {
     /// Explicit operator principals and activated native approval replay custody.
     pub approval: Option<RemoteApprovalConfig>,
     pub control_url: Option<String>,
+    /// Trust-control internal listener base URL; durable admission reaches
+    /// the admission authority through it.
+    pub control_internal_url: Option<String>,
     pub control_token: Option<String>,
     /// Dedicated trust-control bearer used only for remote capability issuance.
     pub remote_authority_workload_token: Option<String>,

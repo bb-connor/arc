@@ -69,10 +69,11 @@ enum RemoteAdmissionError {
 
 pub(crate) fn build_remote_admission_stores(
     control_url: &str,
+    control_internal_url: &str,
     control_token: &str,
     signer: Keypair,
 ) -> Result<RemoteAdmissionStores, CliError> {
-    let client = build_client(control_url, control_token)?;
+    let client = build_client(control_internal_url, control_token)?;
     let request = AdmissionAuthorityRequest::new(
         None,
         AdmissionAuthorityAction::Status,
@@ -88,6 +89,7 @@ pub(crate) fn build_remote_admission_stores(
     })?;
     let budget = super::budget::build_shared_remote_budget_store(
         control_url,
+        control_internal_url,
         control_token,
         status.fence.clone(),
     )?;

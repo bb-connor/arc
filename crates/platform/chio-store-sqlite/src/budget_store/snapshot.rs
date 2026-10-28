@@ -3,10 +3,7 @@ use super::*;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{PublicKey, Signature};
 use chio_core::sha256_hex;
-use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
-use subtle::ConstantTimeEq;
 
 const BUDGET_ANCHOR_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -119,19 +116,24 @@ pub fn budget_snapshot_anchor_chain_digest(
     Ok(sha256_hex(&bytes))
 }
 
-pub fn budget_snapshot_anchor_authenticator(
-    service_token: &str,
+fn budget_snapshot_anchor_authenticator_body(
     chain: &[SignedBudgetSnapshotAnchorCommitment],
-) -> Result<String, BudgetStoreError> {
-    let bytes = canonical_json_bytes(&AnchorAuthenticatorBody {
-        scheme: "chio.cluster-budget-anchor-auth.v1",
+) -> Result<Vec<u8>, BudgetStoreError> {
+    canonical_json_bytes(&AnchorAuthenticatorBody {
+        scheme: "chio.cluster-budget-anchor-signature.v1",
         chain,
     })
-    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-    let mut authenticator = Hmac::<Sha256>::new_from_slice(service_token.as_bytes())
-        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
-    authenticator.update(&bytes);
-    Ok(hex::encode(authenticator.finalize().into_bytes()))
+    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))
+}
+
+/// The leader node's Ed25519 signature over the anchor chain, as hex. A
+/// follower verifies it under the elected leader's pinned node key.
+pub fn budget_snapshot_anchor_authenticator(
+    leader_node_key: &chio_core::crypto::Keypair,
+    chain: &[SignedBudgetSnapshotAnchorCommitment],
+) -> Result<String, BudgetStoreError> {
+    let bytes = budget_snapshot_anchor_authenticator_body(chain)?;
+    Ok(leader_node_key.sign(&bytes).to_hex())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -301,7 +303,7 @@ impl SqliteBudgetStore {
         provenance: &BudgetSnapshotAnchorProvenance,
         expected_leader_url: &str,
         expected_election_term: u64,
-        cluster_service_token: &str,
+        leader_node_key: &PublicKey,
     ) -> Result<(), BudgetStoreError> {
         const OPERATION: &str = "verified budget snapshot import";
         self.require_standalone_mutation(OPERATION)?;
@@ -310,7 +312,7 @@ impl SqliteBudgetStore {
             provenance,
             expected_leader_url,
             expected_election_term,
-            cluster_service_token,
+            leader_node_key,
         )?;
         let validated = Self::validate_budget_snapshot_in_isolation(snapshot)?;
         let batch = BudgetImportBatch {
@@ -880,11 +882,10 @@ fn verify_budget_snapshot_anchor_provenance<'a>(
     provenance: &'a BudgetSnapshotAnchorProvenance,
     expected_leader_url: &str,
     expected_election_term: u64,
-    cluster_service_token: &str,
+    leader_node_key: &PublicKey,
 ) -> Result<&'a BudgetSnapshotAnchorCommitment, BudgetStoreError> {
     if expected_leader_url.is_empty()
         || expected_election_term == 0
-        || cluster_service_token.is_empty()
         || provenance.chain.is_empty()
         || provenance.schema != "chio.budget-snapshot-anchor-provenance.v1"
     {
@@ -892,14 +893,11 @@ fn verify_budget_snapshot_anchor_provenance<'a>(
             "budget snapshot anchor provenance trust context is incomplete".to_string(),
         ));
     }
-    let expected_authenticator =
-        budget_snapshot_anchor_authenticator(cluster_service_token, &provenance.chain)?;
-    if !bool::from(
-        provenance
-            .cluster_authenticator
-            .as_bytes()
-            .ct_eq(expected_authenticator.as_bytes()),
-    ) {
+    let authenticated = Signature::from_hex(&provenance.cluster_authenticator)
+        .ok()
+        .zip(budget_snapshot_anchor_authenticator_body(&provenance.chain).ok())
+        .is_some_and(|(signature, body)| leader_node_key.verify_strict(&body, &signature));
+    if !authenticated {
         return Err(BudgetStoreError::Invariant(
             "budget snapshot anchor provenance cluster authentication failed".to_string(),
         ));

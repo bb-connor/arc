@@ -3,8 +3,12 @@ use super::*;
 #[test]
 fn build_cluster_state_validates_inputs_and_normalizes_peers() {
     let mut invalid = base_config();
-    invalid.advertise_url = Some("http://127.0.0.1:3200".to_string());
-    invalid.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut invalid,
+        "token",
+        "http://127.0.0.1:3200",
+        &["http://127.0.0.1:3300"],
+    );
     invalid.authority_seed_path = Some(unique_temp_path("authority", "seed"));
 
     let error = build_cluster_state(&invalid, invalid.listen, chio_test_support::clock::clock())
@@ -33,12 +37,11 @@ fn build_cluster_state_validates_inputs_and_normalizes_peers() {
     .is_none());
 
     let mut config = base_config();
-    config.advertise_url = Some("http://127.0.0.1:3200/".to_string());
-    config.peer_urls = vec![
-        "http://127.0.0.1:3200/".to_string(),
-        " http://127.0.0.1:3300/ ".to_string(),
-        "http://127.0.0.1:3300".to_string(),
-    ];
+    crate::trust_control::caller_credentials::tests::set_test_peers(
+        &mut config,
+        "http://127.0.0.1:3200/",
+        &["http://127.0.0.1:3200/", " http://127.0.0.1:3300/ "],
+    );
 
     let cluster = build_cluster_state(&config, config.listen, chio_test_support::clock::clock())
         .test_unwrap()
