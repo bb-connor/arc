@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use chio_core::crypto::Keypair;
 use chio_core::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 use chio_core::receipt::authoritative_spend::BudgetAuthorityReceiptRef;

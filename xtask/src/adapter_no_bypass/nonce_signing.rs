@@ -1,9 +1,9 @@
 //! Execution nonces carry the kernel's boot-selected receipt signature.
 //!
 //! Every production nonce mint call and every `SignedExecutionNonce` literal in
-//! adapter and kernel sources must sit at a registered site. Kernel mint sites
-//! pass the receipt signing backend, and both constructors sign through a
-//! `SigningBackend` rather than a raw keypair. This is a source contract check;
+//! adapter, kernel and control-plane sources must sit at a registered site.
+//! Kernel mint sites pass the receipt signing backend, and every constructor
+//! signs through a `SigningBackend` rather than a raw keypair. This is a source contract check;
 //! the owning kernel tests establish the signed artifacts under every floor.
 
 use std::collections::BTreeMap;
@@ -15,6 +15,10 @@ use syn::visit::Visit;
 use super::{collect_rust_sources, source, test_only, FunctionFacts, FunctionVisitor};
 
 const KERNEL_SOURCE_ROOT: &str = "crates/kernel/chio-kernel/src";
+const CONTROL_PLANE_SOURCE_ROOT: &str = "crates/platform/chio-control-plane/src";
+const SOURCE_ROOTS: &[&str] = &[KERNEL_SOURCE_ROOT, CONTROL_PLANE_SOURCE_ROOT];
+const VERIFIED_FIX_SOURCE: &str =
+    "crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs";
 const EXECUTION_NONCE_SOURCE: &str = "crates/kernel/chio-kernel/src/execution_nonce.rs";
 const MINT_FUNCTIONS: &[&str] = &[
     "mint_execution_nonce",
@@ -75,6 +79,11 @@ const CONSTRUCTOR_SITES: &[ConstructorSite] = &[
         function: "AdmissionExecutionNonceReservationV1::mint_for_operation",
         backend_signer: "sign_bytes_with_identity",
     },
+    ConstructorSite {
+        path: VERIFIED_FIX_SOURCE,
+        function: "signed_nonce",
+        backend_signer: "sign_canonical_with_backend_for_identity",
+    },
 ];
 
 type FileFunctions = Vec<(String, FunctionFacts)>;
@@ -82,7 +91,9 @@ type Census = BTreeMap<String, FileFunctions>;
 
 pub(super) fn validate(root: &Path, adapter_sources: &[String]) -> Result<(), String> {
     let mut sources = adapter_sources.to_vec();
-    collect_rust_sources(root, &root.join(KERNEL_SOURCE_ROOT), &mut sources)?;
+    for source_root in SOURCE_ROOTS {
+        collect_rust_sources(root, &root.join(source_root), &mut sources)?;
+    }
     sources.sort();
     sources.dedup();
     validate_census(&census(root, &sources)?)
@@ -295,6 +306,14 @@ mod tests {
                 }"
                 .to_owned(),
             ),
+            (
+                VERIFIED_FIX_SOURCE,
+                "fn signed_nonce(receipt: &ChioReceipt, kernel: &dyn SigningBackend) {
+                    let (outcome, _) = sign_canonical_with_backend_for_identity(kernel, &receipt.kernel_key, &nonce)?;
+                    Ok(SignedExecutionNonce { signature: outcome.signature, nonce })
+                }"
+                .to_owned(),
+            ),
         ]
     }
 
@@ -318,7 +337,9 @@ mod tests {
     fn workspace_nonce_signing_sites_are_registered() -> Result<(), String> {
         let root = workspace_root().map_err(|error| error.to_string())?;
         let mut sources = Vec::new();
-        collect_rust_sources(&root, &root.join(KERNEL_SOURCE_ROOT), &mut sources)?;
+        for source_root in SOURCE_ROOTS {
+            collect_rust_sources(&root, &root.join(source_root), &mut sources)?;
+        }
         validate_census(&census(&root, &sources)?)
     }
 
@@ -434,6 +455,50 @@ mod tests {
             Err(format!(
                 "execution nonce constructor does not sign through a SigningBackend: {path}::AdmissionExecutionNonceReservationV1::mint_for_operation\n\
                  execution nonce constructor signs with a raw keypair: {path}::AdmissionExecutionNonceReservationV1::mint_for_operation"
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn control_plane_authoring_nonce_signed_with_a_raw_keypair_is_refused() -> Result<(), String>
+    {
+        let census = census_with(
+            &[],
+            Some((
+                4,
+                "fn signed_nonce(receipt: &ChioReceipt, kernel: &Keypair) {
+                    Ok(SignedExecutionNonce { signature: kernel.sign(&canonical_json_bytes(&nonce)?), nonce })
+                }",
+            )),
+        )?;
+        assert_eq!(
+            validate_census(&census),
+            Err(format!(
+                "execution nonce constructor does not sign through a SigningBackend: {VERIFIED_FIX_SOURCE}::signed_nonce\n\
+                 execution nonce constructor signs with a raw keypair: {VERIFIED_FIX_SOURCE}::signed_nonce"
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unregistered_control_plane_nonce_literal_is_refused() -> Result<(), String> {
+        let path = "crates/platform/chio-control-plane/src/trust_control/finding_operator_bundle.rs";
+        let census = census_with(
+            &[(
+                path,
+                "fn reissue(backend: &dyn SigningBackend) {
+                    let (signature, _) = sign_canonical_with_backend(backend, &nonce)?;
+                    Ok(SignedExecutionNonce { nonce, signature })
+                }",
+            )],
+            None,
+        )?;
+        assert_eq!(
+            validate_census(&census),
+            Err(format!(
+                "unregistered SignedExecutionNonce construction in {path}::reissue"
             ))
         );
         Ok(())
