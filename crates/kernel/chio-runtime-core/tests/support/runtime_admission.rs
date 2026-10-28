@@ -17,7 +17,7 @@ pub(super) use chio_core_types::receipt::{
 pub(super) use chio_federation::{
     bilateral_dsse::sign_chio_bilateral_dsse_envelope,
     bilateral_dsse::BilateralPredicateExtensions, bilateral_dsse::CapabilityLeaseRef,
-    bilateral_dsse::DsseEnvelope, bilateral_dsse::GovernanceReceiptRef, bilateral_dsse::HashRecord,
+    bilateral_dsse::GovernanceReceiptRef, bilateral_dsse::HashRecord,
     bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,
     bilateral_dsse::TreatyBindingRef, bilateral_dsse::PAYLOAD_TYPE_IN_TOTO,
 };
@@ -38,16 +38,16 @@ pub(super) use chio_swarm_authority::{
 pub(super) use runtime_api::{
     compute_ladder_intersection, runtime_admission_bundle_sha256, runtime_peer_weights_sha256,
     tool_args_sha256, BilateralInvocation, ChioRuntimeAdmissionHook, CrossKernelContinuation,
-    InMemoryRuntimeAdmissionStore, ReceiptLineageBundle, ReceiptLineageStatement,
-    RuntimeAdmissionBundle, RuntimeAdmissionProfile, RuntimeAdmissionStore, RuntimePeerWeight,
-    RuntimePeerWeights, RuntimePheromoneAdvisory, RuntimePheromonePolicy,
-    RuntimePheromonePolicyRule, RuntimeRequestBinding, RuntimeTrustFloorEntry,
-    RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundle, SignedRuntimePheromoneQueryReport,
-    SqliteRuntimeOrchestrationStore, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
-    CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
-    CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
-    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
-    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    ReceiptLineageBundle, ReceiptLineageStatement, RuntimeAdmissionBundle, RuntimeAdmissionProfile,
+    RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory,
+    RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
+    RuntimeTrustFloorEntry, RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundle,
+    SignedRuntimePheromoneQueryReport, SqliteRuntimeOrchestrationStore, TreatyScope,
+    CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
+    CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
+    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
 pub(super) use std::io;
 
