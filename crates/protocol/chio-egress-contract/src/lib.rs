@@ -14,7 +14,7 @@ use url::{Host, Url};
 
 mod allowance;
 pub use allowance::{
-    private_network_allowance_digest, IpCidr, PrivateNetworkAllowance,
+    private_network_allowance_digest, EgressAllowanceSet, IpCidr, PrivateNetworkAllowance,
     PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
     MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX, PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
 };
@@ -206,6 +206,26 @@ impl HttpEgressContract {
     /// Digest of this contract's private network allowances.
     pub fn private_network_allowance_digest(&self) -> Result<String, HttpEgressError> {
         private_network_allowance_digest(&self.private_network_allowances)
+    }
+
+    /// Replace this contract's allowances with the entries of `allowances`
+    /// that pin one of its authorities. A bare authority stands for port 443,
+    /// the only scheme an allowance permits. The result is checked when the
+    /// contract is prepared.
+    #[must_use]
+    pub fn with_private_network_allowances(mut self, allowances: &EgressAllowanceSet) -> Self {
+        let mut pinned = BTreeSet::new();
+        for authority in &self.allowed_authority_set {
+            let Ok(url) = Url::parse(&format!("https://{authority}/")) else {
+                continue;
+            };
+            let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+                continue;
+            };
+            pinned.extend(allowances.for_endpoint(host, port));
+        }
+        self.private_network_allowances = pinned;
+        self
     }
 
     /// Validate this raw contract and return an immutable enforcement handle.

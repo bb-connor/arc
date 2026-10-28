@@ -2,7 +2,10 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chio_egress_contract::{private_network_allowance_digest, PrivateNetworkAllowance};
+use chio_egress_contract::{
+    private_network_allowance_digest, EgressAllowanceSet, PrivateNetworkAllowance,
+    PrivateNetworkAllowanceError,
+};
 use chio_security_types::clock::FixedClock;
 
 use crate::payment::{
@@ -21,8 +24,12 @@ fn allowance(host: &str, port: u16, cidr: &str) -> PrivateNetworkAllowance {
     }
 }
 
-fn blackhole_allowance() -> BTreeSet<PrivateNetworkAllowance> {
-    BTreeSet::from([allowance("10.255.255.254", 9, "10.255.255.254/32")])
+fn set(entries: &[PrivateNetworkAllowance]) -> EgressAllowanceSet {
+    EgressAllowanceSet::new(entries.iter().cloned()).expect("valid allowance set")
+}
+
+fn blackhole_allowance() -> EgressAllowanceSet {
+    set(&[allowance("10.255.255.254", 9, "10.255.255.254/32")])
 }
 
 fn authorize_request() -> PaymentAuthorizeRequest {
@@ -51,10 +58,7 @@ fn x402_rail() -> X402RailConfig {
     .expect("valid rail")
 }
 
-fn x402_at(
-    url: &str,
-    allowances: &BTreeSet<PrivateNetworkAllowance>,
-) -> Result<X402PaymentAdapter, PaymentError> {
+fn x402_at(url: &str, allowances: &EgressAllowanceSet) -> Result<X402PaymentAdapter, PaymentError> {
     X402PaymentAdapter::new(
         url,
         x402_rail(),
@@ -95,7 +99,7 @@ fn unlisted_private_rail_is_refused() {
         "{error:?}"
     );
 
-    let other_host = BTreeSet::from([allowance("10.255.255.253", 9, "10.255.255.253/32")]);
+    let other_host = set(&[allowance("10.255.255.253", 9, "10.255.255.253/32")]);
     let error = x402_at(BLACKHOLE_RAIL, &other_host).expect_err("allowance for another host");
     assert!(
         is_rail_error(&error, "payment rail egress denied"),
@@ -105,7 +109,7 @@ fn unlisted_private_rail_is_refused() {
 
 #[test]
 fn rail_takes_only_its_own_allowance() {
-    let mixed = BTreeSet::from([
+    let mixed = set(&[
         allowance("facilitator.vpc.internal", 8443, "10.20.0.0/24"),
         allowance("other.vpc.internal", 8443, "10.30.0.0/24"),
         allowance("facilitator.vpc.internal", 9443, "10.40.0.0/24"),
@@ -130,7 +134,7 @@ fn rail_takes_only_its_own_allowance() {
 
 #[test]
 fn plaintext_rail_cannot_carry_an_allowance() {
-    let allowances = BTreeSet::from([allowance("localhost", 8080, "10.20.0.0/24")]);
+    let allowances = set(&[allowance("localhost", 8080, "10.20.0.0/24")]);
     let error = AcpPaymentAdapter::new("http://localhost:8080")
         .with_private_network_allowances(&allowances)
         .expect_err("http rail with an allowance");
@@ -142,20 +146,33 @@ fn plaintext_rail_cannot_carry_an_allowance() {
 
 #[test]
 fn metadata_or_broad_allowance_is_refused_at_load() {
-    for cidr in ["100.100.0.0/16", "169.254.169.0/24", "10.0.0.0/8"] {
-        let allowances = BTreeSet::from([allowance("facilitator.vpc.internal", 8443, cidr)]);
-        let error = x402_at("https://facilitator.vpc.internal:8443", &allowances)
-            .expect_err("allowance must be refused at load");
-        assert!(
-            is_rail_error(&error, "payment rail egress allowance is invalid"),
-            "{cidr}: {error:?}"
-        );
-        let error = AcpPaymentAdapter::new("https://facilitator.vpc.internal:8443")
-            .with_private_network_allowances(&allowances)
-            .expect_err("allowance must be refused at load");
-        assert!(
-            is_rail_error(&error, "payment rail egress allowance is invalid"),
-            "{cidr}: {error:?}"
+    for (cidr, expected) in [
+        (
+            "100.100.0.0/16",
+            PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
+                cidr: "100.100.0.0/16".to_owned(),
+                reserved: "100.100.100.200/32".to_owned(),
+            },
+        ),
+        (
+            "169.254.169.0/24",
+            PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
+                cidr: "169.254.169.0/24".to_owned(),
+                reserved: "169.254.0.0/16".to_owned(),
+            },
+        ),
+        (
+            "10.0.0.0/8",
+            PrivateNetworkAllowanceError::CidrTooBroad {
+                cidr: "10.0.0.0/8".to_owned(),
+                min_prefix: 16,
+            },
+        ),
+    ] {
+        assert_eq!(
+            EgressAllowanceSet::new([allowance("facilitator.vpc.internal", 8443, cidr)]),
+            Err(expected),
+            "{cidr}"
         );
     }
 }

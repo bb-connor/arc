@@ -6,11 +6,10 @@ use std::time::Duration;
 use chio_core::{canonical_json_bytes, sha256};
 #[cfg(test)]
 use chio_core::{capability::scope::MonetaryAmount, receipt::economics::SettlementStatus};
-pub use chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST;
 use chio_egress_contract::{
     BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
-    PrivateNetworkAllowance,
 };
+pub use chio_egress_contract::{EgressAllowanceSet, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
@@ -255,7 +254,7 @@ impl AcpPaymentAdapter {
     /// its own `host:port`. The rail URL and allowance are checked here.
     pub fn with_private_network_allowances(
         mut self,
-        allowances: &BTreeSet<PrivateNetworkAllowance>,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self, PaymentError> {
         let egress = PaymentRailEgress::for_rail(&self.base_url, allowances)?;
         payment_rail_contract(&self.base_url, &self.authorize_path, None, &egress)?;
@@ -1688,7 +1687,7 @@ mod tests {
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
-            &std::collections::BTreeSet::new(),
+            &crate::payment::EgressAllowanceSet::default(),
             std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(0)),
             std::sync::Arc::new(crate::InMemoryExecutionNonceStore::default()),
         )

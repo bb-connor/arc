@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use chio_egress_contract::{
-    private_network_allowance_digest, PrivateNetworkAllowance,
+    private_network_allowance_digest, EgressAllowanceSet, PrivateNetworkAllowance,
     EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
 };
 use url::{Host, Url};
@@ -33,7 +33,7 @@ impl PaymentRailEgress {
     /// other destinations are not this rail's.
     pub(crate) fn for_rail(
         base_url: &str,
-        allowances: &BTreeSet<PrivateNetworkAllowance>,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self, PaymentError> {
         let invalid_url = || PaymentError::RailError("payment rail URL is invalid".to_owned());
         let parsed = Url::parse(base_url).map_err(|_| invalid_url())?;
@@ -45,11 +45,7 @@ impl PaymentRailEgress {
                 .map_or_else(|| address.to_string(), |mapped| mapped.to_string()),
         };
         let port = parsed.port_or_known_default().ok_or_else(invalid_url)?;
-        let allowances: BTreeSet<_> = allowances
-            .iter()
-            .filter(|entry| entry.host == host && entry.port == port)
-            .cloned()
-            .collect();
+        let allowances = allowances.for_endpoint(&host, port);
         let digest = private_network_allowance_digest(&allowances).map_err(|_| {
             PaymentError::RailError("payment rail egress allowance is invalid".to_owned())
         })?;

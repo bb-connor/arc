@@ -20,13 +20,12 @@
 //! operator. A facilitator `settlement_pending` answer is outcome-unknown and
 //! carries the broadcast transaction so the operator can reconcile on chain.
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256};
-use chio_egress_contract::PrivateNetworkAllowance;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
@@ -383,7 +382,7 @@ impl X402PaymentAdapter {
     pub fn new(
         facilitator_url: impl Into<String>,
         rail: X402RailConfig,
-        allowances: &BTreeSet<PrivateNetworkAllowance>,
+        allowances: &EgressAllowanceSet,
         clock: Arc<dyn Clock>,
         replay: Arc<dyn ExecutionNonceStore>,
     ) -> Result<Self, PaymentError> {

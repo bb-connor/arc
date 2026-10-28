@@ -359,6 +359,62 @@ fn validate_cidr(cidr: &IpCidr) -> Result<(), PrivateNetworkAllowanceError> {
     Ok(())
 }
 
+/// An operator's declared allowances, each entry validated on its own and no
+/// two for the same `host:port`. A contract takes only the entries for its own
+/// authorities (see `HttpEgressContract::with_private_network_allowances`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct EgressAllowanceSet {
+    allow: BTreeSet<PrivateNetworkAllowance>,
+}
+
+impl EgressAllowanceSet {
+    pub fn new(
+        entries: impl IntoIterator<Item = PrivateNetworkAllowance>,
+    ) -> Result<Self, PrivateNetworkAllowanceError> {
+        let mut allow = BTreeSet::new();
+        let mut seen = BTreeSet::new();
+        for entry in entries {
+            validate_allowance(&entry)?;
+            if !seen.insert((entry.host.clone(), entry.port)) {
+                return Err(PrivateNetworkAllowanceError::DuplicateAllowance {
+                    host: entry.host,
+                    port: entry.port,
+                });
+            }
+            allow.insert(entry);
+        }
+        Ok(Self { allow })
+    }
+
+    #[must_use]
+    pub fn entries(&self) -> &BTreeSet<PrivateNetworkAllowance> {
+        &self.allow
+    }
+
+    /// The entries that pin `host:port`. `host` is matched in normalized form.
+    #[must_use]
+    pub fn for_endpoint(&self, host: &str, port: u16) -> BTreeSet<PrivateNetworkAllowance> {
+        let host = allowance_host(host);
+        self.allow
+            .iter()
+            .filter(|entry| entry.host == host && entry.port == port)
+            .cloned()
+            .collect()
+    }
+}
+
+impl<'de> Deserialize<'de> for EgressAllowanceSet {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Document {
+            allow: Vec<PrivateNetworkAllowance>,
+        }
+        let document = Document::deserialize(deserializer)?;
+        Self::new(document.allow).map_err(serde::de::Error::custom)
+    }
+}
+
 /// Normalized host form used to match an allowance: lowercase DNS name
 /// without a trailing dot, dotted IPv4, or IPv6 without brackets.
 pub(crate) fn allowance_host(host: &str) -> String {
