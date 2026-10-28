@@ -38,7 +38,11 @@ fn staged() -> MutexGuard<'static, Staged> {
     }
 }
 
-pub(super) fn stage(wrapper: &[u8; super::SIGNING_WRAPPER_LEN], schema_id: &str, canonical_body: &[u8]) {
+pub(super) fn stage(
+    wrapper: &[u8; super::SIGNING_WRAPPER_LEN],
+    schema_id: &str,
+    canonical_body: &[u8],
+) {
     if std::env::var_os(CAPTURE_DIR_ENV).is_none_or(|dir| dir.is_empty()) {
         return;
     }
