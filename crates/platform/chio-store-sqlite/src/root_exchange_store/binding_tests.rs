@@ -2,8 +2,7 @@
 //! connection, which no data-version check sees: the next admission of the
 //! same key refuses. Every refusal is pinned to its exact error.
 
-#[path = "../../tests/root_exchange_support/mod.rs"]
-mod support;
+use super::support;
 
 use super::RootExchangeStoreError as E;
 use support::{digest, Admit, Case, Env, TestResult, NOW};

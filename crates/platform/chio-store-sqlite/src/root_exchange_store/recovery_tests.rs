@@ -1,8 +1,7 @@
 //! Outcome-unknown anchor syncs and crashes between a mint's commit, its
 //! anchor sync and its response. Every refusal is pinned to its exact error.
 
-#[path = "../../tests/root_exchange_support/mod.rs"]
-mod support;
+use super::support;
 
 use rusqlite::Transaction;
 
