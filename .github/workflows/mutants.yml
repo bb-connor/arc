@@ -172,10 +172,19 @@ jobs:
           set -euo pipefail
           bash scripts/check-mutants-rationale.sh
 
+      - name: Restore fuzz budget ledger
+        if: steps.select.outputs.selected == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
+
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.select.outputs.selected == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
           GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
           GH_FUZZ_BUDGET_CAP_MODE: fail
           GH_FUZZ_BUDGET_WORKFLOWS: mutants.yml,mutants-fuzz-cocoverage.yml,proof-mutants.yml
@@ -383,10 +392,19 @@ jobs:
           set -euo pipefail
           bash scripts/check-mutants-rationale.sh
 
+      - name: Restore fuzz budget ledger
+        if: steps.forced.outputs.skip == 'false'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
+
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
           GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
           # Hosted nightly sweeps share the 1,800 min/30d envelope with the
           # fuzz lanes. When the cap is hit the sweep must still run so that
