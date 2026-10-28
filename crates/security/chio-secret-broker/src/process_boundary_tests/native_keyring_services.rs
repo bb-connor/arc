@@ -18,39 +18,33 @@ pub(super) fn backend(seed: u8) -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[seed; 32]))
 }
 
-pub(super) fn policy_document() -> KeyLogPolicyDocument {
-    KeyLogPolicyDocument {
+fn public_key_hex(seed: u8) -> TestResult<String> {
+    Ok(backend(seed).public_key()?.to_hex())
+}
+
+pub(super) fn policy_document() -> TestResult<KeyLogPolicyDocument> {
+    Ok(KeyLogPolicyDocument {
         schema: chio_keyring::KEY_LOG_POLICY_DOCUMENT_SCHEMA.into(),
         log_id: "log.native.broker".into(),
         authority_id: "authority.native.broker".into(),
-        bootstrap_public_key: backend(230).public_key().unwrap().to_hex(),
-        operator_public_key: backend(231).public_key().unwrap().to_hex(),
+        bootstrap_public_key: public_key_hex(230)?,
+        operator_public_key: public_key_hex(231)?,
         witness_roster_id: "witnesses.native.broker".into(),
         witness_public_keys: (0..3_u8)
-            .map(|i| {
-                (
-                    format!("witness.{i}"),
-                    backend(240 + i).public_key().unwrap().to_hex(),
-                )
-            })
-            .collect(),
+            .map(|i| Ok((format!("witness.{i}"), public_key_hex(240 + i)?)))
+            .collect::<TestResult<_>>()?,
         recovery_policy_id: "recovery.native.broker".into(),
         recovery_public_keys: BTreeMap::new(),
         recovery_threshold: 0,
         artifact_time_public_keys: BTreeMap::from([(
             "clock.native.broker".into(),
-            backend(233).public_key().unwrap().to_hex(),
+            public_key_hex(233)?,
         )]),
         auditor_public_keys: (0..2_u8)
-            .map(|i| {
-                (
-                    format!("audit.{i}"),
-                    backend(250 + i).public_key().unwrap().to_hex(),
-                )
-            })
-            .collect(),
+            .map(|i| Ok((format!("audit.{i}"), public_key_hex(250 + i)?)))
+            .collect::<TestResult<_>>()?,
         max_checkpoint_future_skew_millis: 60_000,
-    }
+    })
 }
 
 fn spawn_service(variable: &str, config: &Path) -> TestResult<ManagedChild> {

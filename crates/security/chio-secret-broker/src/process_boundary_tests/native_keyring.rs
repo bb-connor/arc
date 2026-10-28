@@ -44,7 +44,7 @@ impl KeyringDelivery {
         let directory = fs::canonicalize(directory)?.join("keyring");
         fs::create_dir(&directory)?;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
-        let document = services::policy_document();
+        let document = services::policy_document()?;
         write_private(
             &directory.join("policy.json"),
             &canonical_json_bytes(&document)?,
