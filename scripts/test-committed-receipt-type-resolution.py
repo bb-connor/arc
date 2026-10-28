@@ -635,6 +635,12 @@ class TypeResolutionTests(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), [])
 
+    def test_and_then_closure_body_takes_the_chain_type(self):
+        source = "fn {name}(m: Option<Value>) -> Result<(), E> {{ let r: {ty} = m\n        .ok_or(e())\n        .and_then(|value| serde_json::from_value(value).map_err(wrap))?; Ok(()) }}"
+        self.assertEqual(len(self.raw_decodes(source.format(name="bad", ty="ChioReceipt"))), 1)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": source.format(name="good", ty="u64")}), [])
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "fn unknown(m: Option<Value>) -> Result<(), E> { let r: u64 = m.ok_or(e()).and_then(|value| serde_json::from_value(value).map(stamp))?; Ok(()) }"}), ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_value(value)"])
+
     def test_extractor_alias_chains_resolve_before_filtering(self):
         local = "mod input { pub struct Bounded<T>(pub T); impl<S, T> FromRequest<S> for Bounded<T> where T: DeserializeOwned { type Rejection = E; async fn from_request(request: Request, state: &S) -> Result<Self,E> { let bytes=read(request); serde_json::from_slice(&bytes).map(Self).map_err(wrap) } } } "
         for prefix in [
