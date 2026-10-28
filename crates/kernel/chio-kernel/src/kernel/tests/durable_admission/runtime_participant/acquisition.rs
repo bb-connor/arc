@@ -149,9 +149,11 @@ fn exercise(mode: ClaimMode, allowed: bool) {
 }
 
 fn exercise_at(mode: ClaimMode, allowed: bool, now: u64) -> Option<String> {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("runtime-claim-boundary");
-    kernel.clock = Arc::new(chio_security_types::clock::FixedClock::from_millis(now));
+    let (mut kernel, request, store, invocations) = durable_admission_fixture_with_clock(
+        "runtime-claim-boundary",
+        vec![make_grant("durable-server", "mutate")],
+        Arc::new(chio_security_types::clock::FixedClock::from_millis(now)),
+    );
     let verifier = Arc::new(ClaimingVerifier(RuntimeParticipantAuthorityBindingV1::new(
         AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
         AdmissionIdentifier::try_new("source", "test-source").expect("source"),
