@@ -60,49 +60,60 @@ fn drain_batch_error_uses_point_reads_for_healthy_claims() -> TestResult {
 }
 
 #[test]
-fn drain_short_batch_refuses_every_claim_without_hook_or_point_fallback() -> TestResult {
-    let harness = recording_harness(
-        ClaimMode::Claim,
-        RouteMode::Contract,
-        HookBehavior::Accepted,
-    );
-    seed(&harness, 2)?;
-    harness.store.state().batch_mode = BatchMode::Short;
-    assert_eq!(harness.kernel.drain_settlement_attempts(2)?.completed, 2);
-    assert_eq!(harness.hook.calls(), 0);
-    let state = harness.store.state();
-    assert_eq!(state.batch_sizes, [2]);
-    assert_eq!(state.point_reads, 0);
-    assert_eq!(state.inputs.len(), 2);
-    for input in &state.inputs {
-        assert!(matches!(input, SettlementRoutingInput::Permanent { reason }
-            if *reason == SettlementFailureReason::from_detail(
-                SettlementFailureCode::InvalidObservation,
-                "settlement receipt batch length does not match the claimed rows")));
+fn drain_malformed_batches_fall_back_to_verified_point_reads() -> TestResult {
+    for mode in [
+        BatchMode::Short,
+        BatchMode::Reversed,
+        BatchMode::WrongTime,
+        BatchMode::MissingFirst,
+    ] {
+        let harness = recording_harness(
+            ClaimMode::Claim,
+            RouteMode::Contract,
+            HookBehavior::Accepted,
+        );
+        seed(&harness, 2)?;
+        harness.store.state().batch_mode = mode;
+        assert_eq!(harness.kernel.drain_settlement_attempts(2)?.completed, 2);
+        assert_eq!(harness.hook.calls(), 2);
+        let state = harness.store.state();
+        assert_eq!(state.batch_sizes, [2]);
+        assert!(state.point_reads > 0);
+        assert_eq!(
+            state.inputs,
+            [
+                SettlementRoutingInput::Accepted,
+                SettlementRoutingInput::Accepted
+            ]
+        );
+        assert!(state.attempts.is_empty());
     }
     Ok(())
 }
 
 #[test]
-fn drain_reordered_batch_refuses_misassociated_receipts() -> TestResult {
-    let harness = recording_harness(
+fn drain_install_refuses_missing_current_key_without_replacing_runtime() -> TestResult {
+    let mut harness = recording_harness(
         ClaimMode::Claim,
         RouteMode::Contract,
         HookBehavior::Accepted,
     );
-    seed(&harness, 2)?;
-    harness.store.state().batch_mode = BatchMode::Reversed;
-    assert_eq!(harness.kernel.drain_settlement_attempts(2)?.completed, 2);
-    assert_eq!(harness.hook.calls(), 0);
-    let state = harness.store.state();
-    assert_eq!(state.point_reads, 0);
-    assert_eq!(state.inputs.len(), 2);
-    for input in &state.inputs {
-        assert!(matches!(input, SettlementRoutingInput::Permanent { reason }
-            if *reason == SettlementFailureReason::from_detail(
-                SettlementFailureCode::InvalidObservation,
-                "stored receipt does not match the claimed settlement row")));
-    }
+    let historical = Keypair::from_seed(&[116; 32]);
+    let result = harness.kernel.set_settlement_observer_runtime(
+        harness.hook.clone(),
+        harness.store.clone(),
+        RetryPolicy::default(),
+        crate::SettlementDrainTrust::from(historical.public_key()),
+    );
+    assert!(matches!(
+        result,
+        Err(KernelError::SettlementConfiguration(
+            crate::SettlementRuntimeConfigError::MissingCurrentReceiptKey
+        ))
+    ));
+    seed(&harness, 1)?;
+    assert_eq!(harness.kernel.drain_settlement_attempts(1)?.completed, 1);
+    assert_eq!(harness.hook.calls(), 1);
     Ok(())
 }
 
@@ -192,7 +203,8 @@ fn drain_trust_replacement_does_not_retain_the_previous_signer() -> TestResult {
         HookBehavior::Accepted,
     );
     let historical = Keypair::from_seed(&[114; 32]);
-    trust(&mut harness, vec![historical.public_key()])?;
+    let current = harness.keypair.public_key();
+    trust(&mut harness, vec![current, historical.public_key()])?;
     let current = harness.keypair.public_key();
     trust(&mut harness, vec![current])?;
     seed_receipt(&harness, &positive_receipt(&historical, 1))?;
@@ -213,7 +225,8 @@ fn drain_trusted_historical_key_does_not_accept_an_invalid_signature() -> TestRe
         HookBehavior::Accepted,
     );
     let historical = Keypair::from_seed(&[115; 32]);
-    trust(&mut harness, vec![historical.public_key()])?;
+    let current = harness.keypair.public_key();
+    trust(&mut harness, vec![current, historical.public_key()])?;
     let mut receipt = positive_receipt(&historical, 1);
     receipt.signature = historical.sign(b"not the receipt signing body");
     seed_receipt(&harness, &receipt)?;
@@ -234,7 +247,13 @@ fn drain_refuses_mismatched_claim_time_before_the_hook() -> TestResult {
         HookBehavior::Accepted,
     );
     seed(&harness, 1)?;
-    harness.store.state().batch_mode = BatchMode::WrongTime;
+    {
+        let mut state = harness.store.state();
+        state.batch_mode = BatchMode::Error;
+        for receipt in state.receipts.values_mut() {
+            receipt.timestamp += 1;
+        }
+    }
     assert_eq!(harness.kernel.drain_settlement_attempts(1)?.completed, 1);
     assert_eq!(harness.hook.calls(), 0);
     assert!(
@@ -253,11 +272,20 @@ fn drain_missing_receipt_does_not_block_a_healthy_neighbor() -> TestResult {
         HookBehavior::Accepted,
     );
     seed(&harness, 2)?;
-    harness.store.state().batch_mode = BatchMode::MissingFirst;
+    {
+        let mut state = harness.store.state();
+        let first = state
+            .receipts
+            .keys()
+            .min()
+            .cloned()
+            .ok_or("missing seeded receipt")?;
+        state.receipts.remove(&first);
+    }
     assert_eq!(harness.kernel.drain_settlement_attempts(2)?.completed, 2);
     assert_eq!(harness.hook.calls(), 1);
     let state = harness.store.state();
-    assert_eq!(state.point_reads, 0);
+    assert_eq!(state.point_reads, 1);
     assert!(
         matches!(&state.inputs[..], [SettlementRoutingInput::Permanent { reason }, SettlementRoutingInput::Accepted]
         if *reason == SettlementFailureReason::from_detail(SettlementFailureCode::InvalidObservation,

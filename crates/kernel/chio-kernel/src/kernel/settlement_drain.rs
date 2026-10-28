@@ -49,19 +49,18 @@ impl ChioKernel {
                 .map(|store| store.load_chio_receipts(&ids));
             for (index, claim) in chunk.iter().enumerate() {
                 let status = match &receipts {
-                    Some(Ok(receipts)) if receipts.len() != chunk.len() => {
-                        SettlementObserverStatus::hook_failed(
-                            &SettlementHookError::InvalidObservation(
-                                "settlement receipt batch length does not match the claimed rows"
-                                    .to_string(),
-                            ),
-                        )
+                    Some(Ok(receipts)) if receipts.len() == chunk.len() => {
+                        match receipts.get(index).and_then(Option::as_ref) {
+                            Some(receipt)
+                                if receipt.id == claim.receipt_id
+                                    && receipt.timestamp == claim.finalized_at =>
+                            {
+                                self.loaded_settlement_status(claim, Ok(Some(receipt)))
+                            }
+                            _ => self.drained_settlement_status(claim),
+                        }
                     }
-                    Some(Ok(receipts)) => self.loaded_settlement_status(
-                        claim,
-                        Ok(receipts.get(index).and_then(Option::as_ref)),
-                    ),
-                    Some(Err(_)) | None => self.drained_settlement_status(claim),
+                    _ => self.drained_settlement_status(claim),
                 };
                 let completion = runtime
                     .complete_claim(

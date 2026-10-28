@@ -52,15 +52,18 @@ The trusted runtime supplies the receipt keys; never derive this set from an
 untrusted receipt or an unauthenticated history. `SettlementDrainTrust::new`
 requires one to 64 distinct full public keys, including any historical signers
 that may have pending work. Empty or duplicate sets are refused. There is no
-default set or implicit insertion of the current key. For a runtime that trusts
+default set or implicit insertion of the current key. Installation refuses a set
+without the current kernel receipt key with `MissingCurrentReceiptKey`, leaving
+the installed runtime unchanged. For a runtime that trusts
 only its current key, pass `SettlementDrainTrust::from(kernel.public_key())`
 explicitly. Reinstallation replaces the set. Fresh observations still trust
 only the current kernel key.
 
 The drain loads receipts in batches of at most 256, checks exact response length
 and each claimed receipt ID and timestamp, and retains per-claim completion CAS.
-A batch error falls back to point reads so a failed row does not prevent healthy
-claims from completing. Signature verification remains mandatory. A store that
+A batch error or length mismatch falls back to point reads for the chunk.
+A missing or misassociated batch entry falls back to a point read for that claim.
+Only the individually loaded receipt can establish a permanent association refusal. Signature verification remains mandatory. A store that
 implements optimized batch reads can share integrity verification within one
 immutable snapshot; the default trait implementation still uses point reads.
 

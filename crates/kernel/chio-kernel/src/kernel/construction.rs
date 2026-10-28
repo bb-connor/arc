@@ -1144,6 +1144,9 @@ impl ChioKernel {
         retry_policy: chio_settle::RetryPolicy,
         drain_trust: crate::SettlementDrainTrust,
     ) -> Result<(), KernelError> {
+        if !drain_trust.keys().contains(&self.public_key()) {
+            return Err(crate::SettlementRuntimeConfigError::MissingCurrentReceiptKey.into());
+        }
         let runtime = crate::settlement_routing::SettlementObserverRuntime::new(
             hook,
             outcome_store,
