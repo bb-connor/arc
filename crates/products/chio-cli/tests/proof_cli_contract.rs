@@ -14,3 +14,6 @@ mod serve;
 mod support;
 #[path = "proof_cli_contract/verify.rs"]
 mod verify;
+
+#[path = "proof_cli_contract/runtime_regenerate.rs"]
+mod runtime_regenerate;
