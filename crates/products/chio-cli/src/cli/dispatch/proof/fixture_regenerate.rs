@@ -175,10 +175,6 @@ struct ProofFixtureRegenerateReport {
     changed: Vec<String>,
 }
 
-/// Rewrites every catalog fixture under `root` as the output of
-/// `chio proof fixture generate`. Fixtures derive from one another, so passes
-/// repeat until one changes nothing. With `check`, a single pass runs and any
-/// fixture that would change is an error.
 pub(super) fn regenerate_proof_fixtures(
     root: &Path,
     check: bool,
@@ -276,19 +272,30 @@ fn regenerate_pass(
 ) -> Result<Vec<String>, CliError> {
     let mut changed = Vec::new();
     for descriptor in descriptors {
+        let source_bound = fixture_runtime_check::is_source_bound_runtime_fixture(descriptor)?;
+        let target = root.join(installed_fixture_path(descriptor));
+        if source_bound && check {
+            fixture_runtime_check::verify_committed_runtime_fixture(&target)?;
+            continue;
+        }
         let work = tempfile::tempdir_in(staging)?;
         let _replay_store = EnvVarOverride::set(
             AGENT_WEB_REPLAY_STORE_PATH_ENV,
             work.path().join("agent-web-replay.sqlite"),
         );
-        let out = work.path().join(&descriptor.id);
-        let target = root.join(installed_fixture_path(descriptor));
+        let out = if source_bound {
+            staging.join("qualified-runtime-generation")
+        } else {
+            work.path().join(&descriptor.id)
+        };
         let layout = if target.join("manifest.json").is_file() {
             FixtureLayout::Sealed
         } else {
             FixtureLayout::Unsealed
         };
-        materialize_proof_fixture(descriptor, &out, layout)?;
+        if !source_bound || !path_exists_or_is_symlink(&out)? {
+            materialize_proof_fixture(descriptor, &out, layout)?;
+        }
         if directory_contents(&out)? != directory_contents(&target)? {
             changed.push(installed_fixture_path(descriptor).to_string());
             if !check {
