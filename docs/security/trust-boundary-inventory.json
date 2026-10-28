@@ -24205,6 +24205,9 @@
       "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/proof_package.rs::proof_package_from_json",
       "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/report.rs::verifier_report_from_json",
       "read_parity_report::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_runtime_check.rs": [
+      "verify_committed_runtime_fixture::shared-reader::crates/trust/chio-attest-buyer/src/api.rs::verify_proof_package_json"
     ]
   },
   "retired_direct_readers": {
