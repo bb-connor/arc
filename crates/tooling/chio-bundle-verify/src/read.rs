@@ -127,7 +127,11 @@ pub fn read_bytes(root: &Path, name: &str) -> Result<Vec<u8>, BundleVerifyError>
 /// Decode `bytes` as `T`, refusing input the typed form would drop or
 /// rewrite (unknown members at any level, explicit nulls for omitted
 /// members), through the shared lossless decoder.
-pub fn decode_strict<T>(what: &str, bytes: &[u8]) -> Result<T, BundleVerifyError>
+pub fn decode_strict<T>(
+    what: &str,
+    type_name: &'static str,
+    bytes: &[u8],
+) -> Result<T, BundleVerifyError>
 where
     T: DeserializeOwned + Serialize,
 {
@@ -136,24 +140,35 @@ where
     let value: serde_json::Value = text
         .decode_signed()
         .map_err(|error| BundleVerifyError::signed_json(what, error))?;
-    chio_security_types::strict_serde::lossless(value, serde_json::from_value::<T>, |typed: &T| {
-        serde_json::to_value(typed)
-    })
+    chio_security_types::strict_serde::lossless(
+        value,
+        type_name,
+        serde_json::from_value::<T>,
+        |typed: &T| serde_json::to_value(typed),
+    )
     .map_err(|error| {
         BundleVerifyError::schema(format!("{what} does not match its schema: {error}"))
     })
 }
 
 /// Read and strictly decode one JSON file.
-pub fn read_json<T>(root: &Path, name: &str) -> Result<T, BundleVerifyError>
+pub fn read_json<T>(
+    root: &Path,
+    name: &str,
+    type_name: &'static str,
+) -> Result<T, BundleVerifyError>
 where
     T: DeserializeOwned + Serialize,
 {
-    decode_strict(name, &read_bytes(root, name)?)
+    decode_strict(name, type_name, &read_bytes(root, name)?)
 }
 
 /// Read and strictly decode one NDJSON file; blank lines are skipped.
-pub fn read_ndjson<T>(root: &Path, name: &str) -> Result<Vec<T>, BundleVerifyError>
+pub fn read_ndjson<T>(
+    root: &Path,
+    name: &str,
+    type_name: &'static str,
+) -> Result<Vec<T>, BundleVerifyError>
 where
     T: DeserializeOwned + Serialize,
 {
@@ -163,6 +178,6 @@ where
     })?;
     text.lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| decode_strict(name, line.as_bytes()))
+        .map(|line| decode_strict(name, type_name, line.as_bytes()))
         .collect()
 }
