@@ -74,3 +74,40 @@ fn runtime_regenerate_check_refuses_package_byte_tamper() {
     std::fs::write(&path, bytes).test_expect("write package");
     assert_failure(&check(root.path()), "runtime fixture bundle integrity:");
 }
+
+#[test]
+fn runtime_regenerate_check_refuses_invalid_workflow_signature() {
+    let root = runtime_root();
+    let path = root.path().join(RELATIVE).join("proof-room-bundle/proof-package.json");
+    let mut package: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read package")).test_expect("package JSON");
+    package["workflowReceipt"]["signature"] = serde_json::json!("00".repeat(64));
+    std::fs::write(&path, serde_json::to_vec(&package).test_expect("encode package")).test_expect("write package");
+    assert_failure(&check(root.path()), "runtime fixture proof rejected: workflow");
+}
+
+#[test]
+fn runtime_regenerate_check_refuses_descriptor_scope_drift() {
+    for (field, value) in [("kind", "negative-transaction-passport"), ("path", "fixtures/proof-room/elsewhere")] {
+        let root = runtime_root();
+        let path = root.path().join("catalog.json");
+        let mut catalog: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read catalog")).test_expect("catalog JSON");
+        catalog["fixtures"][0][field] = serde_json::json!(value);
+        std::fs::write(&path, serde_json::to_vec(&catalog).test_expect("encode catalog")).test_expect("write catalog");
+        assert_failure(&check(root.path()), "runtime fixture descriptor mismatch: recursive-runtime-swarm");
+    }
+}
+
+#[test]
+fn runtime_regenerate_converges_with_one_qualified_generation() {
+    let root = runtime_root();
+    copy_dir_all(
+        &workspace_root().join("fixtures/proof-room/swarm-authority"),
+        &root.path().join("swarm-authority"),
+    ).test_expect("copy runtime inputs");
+    let output = chio(&["proof", "fixture", "regenerate", "--root", &utf8_path(root.path()), "--json"]);
+    assert_success(&output);
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).test_expect("report JSON");
+    assert_eq!(report["passes"], 2);
+    assert_eq!(report["changed"], serde_json::json!([RELATIVE]));
+    assert_success(&check(root.path()));
+}
