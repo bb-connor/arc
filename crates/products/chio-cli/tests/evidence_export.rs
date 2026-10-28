@@ -28,6 +28,9 @@ use reqwest::blocking::Client;
 #[path = "evidence_export/package_trust.rs"]
 mod package_trust;
 
+#[path = "evidence_export/required_columns.rs"]
+mod required_columns;
+
 fn fixture_keypair() -> Keypair {
     Keypair::from_seed(&[87; 32])
 }
@@ -990,6 +993,13 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         String::from_utf8_lossy(&verify.stderr)
     );
 
+    required_columns::verify_remote_required_columns(
+        &client,
+        &base_url,
+        service_token,
+        &output_dir,
+        &receipt_db_path,
+    );
     package_trust::verify_remote_import_boundary(
         &client,
         &base_url,
