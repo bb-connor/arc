@@ -236,3 +236,49 @@ fn requalification_survives_reopen_with_retained_prior_source() -> Result<(), Bo
     assert_eq!(source_count(&store), 2);
     Ok(())
 }
+
+#[test]
+fn corrupted_supersession_columns_refuse_before_unbounded_reads() -> Result<(), Box<dyn Error>> {
+    for column in [
+        "prior_runtime_authority_id",
+        "replacement_runtime_authority_id",
+        "record_digest",
+    ] {
+        for value in [
+            rusqlite::types::Value::Text("x".repeat(8193)),
+            rusqlite::types::Value::Text("valid\0hidden".into()),
+            rusqlite::types::Value::Blob(vec![b'x'; 32]),
+        ] {
+            let fixture = fixture();
+            let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+            replace(
+                &fixture,
+                &prior,
+                &Source::new(&fixture, Behavior::Normal),
+                &fixture.fence,
+            )?;
+            let connection = fixture.store.connection()?;
+            crate::admission_operation_store::verify_runtime_source_projection_coverage(
+                &connection,
+            )?;
+            connection.execute_batch(
+                "PRAGMA ignore_check_constraints = ON;
+                 PRAGMA foreign_keys = OFF;
+                 DROP TRIGGER runtime_source_supersessions_no_update;",
+            )?;
+            connection.execute(
+                &format!("UPDATE runtime_source_supersessions SET {column} = ?1"),
+                [value],
+            )?;
+            let result =
+                crate::admission_operation_store::verify_runtime_source_projection_coverage(
+                    &connection,
+                );
+            assert!(matches!(result,
+                Err(crate::serving_owner::SqliteServingOwnerError::Invalid(detail))
+                if detail == "runtime source qualification integrity: runtime source supersession violates storage bounds"
+            ));
+        }
+    }
+    Ok(())
+}
