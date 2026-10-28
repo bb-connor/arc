@@ -29,39 +29,42 @@ fn open_anchored_session(kernel: &ChioKernel, agent: &Keypair) -> SessionId {
     session_id
 }
 
+fn parent_body(
+    kernel_key: chio_core::PublicKey,
+    decision: Decision,
+    metadata: Option<serde_json::Value>,
+) -> ChioReceiptBody {
+    ChioReceiptBody {
+        id: "rc-parent-session-anchor".to_string(),
+        timestamp: PARENT_TIMESTAMP,
+        capability_id: "cap-parent-session-anchor".to_string(),
+        tool_server: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        action: ToolCallAction::from_parameters(serde_json::json!({ "stage": "parent" })).unwrap(),
+        decision: Some(decision),
+        receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
+        boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
+        observation_outcome: None,
+        tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
+        redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
+        actor_chain: Vec::new(),
+        content_hash: chio_core::crypto::sha256_hex(br#"{"ok":true}"#),
+        policy_hash: "policy-parent-session-anchor".to_string(),
+        evidence: Vec::new(),
+        metadata,
+        trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+        tenant_id: None,
+        kernel_key,
+        bbs_projection_version: None,
+    }
+}
+
 fn signed_parent(
     signer: &Keypair,
     decision: Decision,
     metadata: Option<serde_json::Value>,
 ) -> ChioReceipt {
-    ChioReceipt::sign(
-        ChioReceiptBody {
-            id: "rc-parent-session-anchor".to_string(),
-            timestamp: PARENT_TIMESTAMP,
-            capability_id: "cap-parent-session-anchor".to_string(),
-            tool_server: "srv-echo".to_string(),
-            tool_name: "delegate".to_string(),
-            action: ToolCallAction::from_parameters(serde_json::json!({ "stage": "parent" }))
-                .unwrap(),
-            decision: Some(decision),
-            receipt_kind: chio_core::receipt::kinds::ReceiptKind::MediatedDecision,
-            boundary_class: chio_core::receipt::kinds::BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: chio_core::receipt::kinds::ToolOrigin::CallerExecuted,
-            redaction_mode: chio_core::receipt::kinds::RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: chio_core::crypto::sha256_hex(br#"{"ok":true}"#),
-            policy_hash: "policy-parent-session-anchor".to_string(),
-            evidence: Vec::new(),
-            metadata,
-            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-            tenant_id: None,
-            kernel_key: signer.public_key(),
-            bbs_projection_version: None,
-        },
-        signer,
-    )
-    .unwrap()
+    ChioReceipt::sign(parent_body(signer.public_key(), decision, metadata), signer).unwrap()
 }
 
 fn receipt_hash(receipt: &ChioReceipt) -> String {
@@ -191,33 +194,71 @@ fn persisted_parent_from_this_kernel_continues_with_its_own_anchor() {
     );
 }
 
-/// A peer kernel key published in the trust-control authority set is trusted
-/// to sign a persisted parent.
+/// The kernel trusts its receipt-signing backend key, not the classical
+/// capability-authority key, once a separate receipt backend is installed.
 #[test]
-fn persisted_parent_from_a_trust_control_kernel_key_continues() {
-    let parent_kernel = make_kernel(make_config());
-    let agent = make_keypair();
-    let parent_session = open_anchored_session(&parent_kernel, &agent);
-    let anchor = session_anchor_of(&parent_kernel, &parent_session);
-    let (mut child_kernel, _) = echo_kernel();
-    child_kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
-        parent_kernel.config.keypair.clone(),
-    )));
-    let parent = signed_parent(
-        &parent_kernel.config.keypair,
-        Decision::Allow,
-        Some(serde_json::json!({ "session_anchor": anchor_block(&anchor) })),
+fn persisted_parent_signed_by_a_replacement_receipt_backend_continues() {
+    let (mut kernel, agent) = echo_kernel();
+    let authority =
+        crate::kernel::signing_authority::KernelSigningAuthority::classical(&Keypair::generate());
+    kernel.signing_task = Arc::new(
+        kernel
+            .signing_task
+            .reconfigured_with_backend(authority.backend.clone()),
     );
+    kernel.signing_authority = authority;
+    let receipt_key = kernel.receipt_signing_public_key().unwrap();
+    assert_ne!(receipt_key, kernel.config.keypair.public_key());
+    let session_id = open_anchored_session(&kernel, &agent);
+    let anchor = session_anchor_of(&kernel, &session_id);
+    let parent = ChioReceipt::sign_with_backend(
+        parent_body(
+            receipt_key,
+            Decision::Allow,
+            Some(serde_json::json!({ "session_anchor": anchor_block(&anchor) })),
+        ),
+        kernel.signing_authority.backend.as_ref(),
+    )
+    .unwrap();
     let response = continue_from_persisted_parent(Continuation {
-        kernel: &child_kernel,
-        token_signer: &parent_kernel.config.keypair,
+        kernel: &kernel,
+        token_signer: &kernel.config.keypair,
         agent: &agent,
-        capability: delegate_capability(&child_kernel, &agent),
+        capability: delegate_capability(&kernel, &agent),
         parent: &parent,
         token_anchor: anchor,
         parent_receipt_hash: Some(receipt_hash(&parent)),
     });
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+}
+
+/// A key trusted only as a capability issuer cannot sign a persisted parent.
+#[test]
+fn persisted_parent_signed_by_a_capability_authority_key_is_refused() {
+    let issuer = make_keypair();
+    let agent = make_keypair();
+    let (mut kernel, _) = echo_kernel();
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(issuer.clone())));
+    let session_id = open_anchored_session(&kernel, &agent);
+    let anchor = session_anchor_of(&kernel, &session_id);
+    let parent = signed_parent(
+        &issuer,
+        Decision::Allow,
+        Some(serde_json::json!({ "session_anchor": anchor_block(&anchor) })),
+    );
+    let response = continue_from_persisted_parent(Continuation {
+        kernel: &kernel,
+        token_signer: &issuer,
+        agent: &agent,
+        capability: delegate_capability(&kernel, &agent),
+        parent: &parent,
+        token_anchor: anchor,
+        parent_receipt_hash: Some(receipt_hash(&parent)),
+    });
+    assert_denied(
+        &response,
+        "governed call_chain continuation parent receipt signer is not trusted",
+    );
 }
 
 /// A receipt that verifies only under its own embedded key is not a trusted
