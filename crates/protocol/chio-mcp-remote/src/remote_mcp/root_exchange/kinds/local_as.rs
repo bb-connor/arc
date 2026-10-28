@@ -322,6 +322,7 @@ pub fn verify_issue(
     let mut claims = Map::new();
     claims.insert("iss".to_owned(), Value::String(code.issuer.clone()));
     claims.insert("sub".to_owned(), Value::String(code.subject.clone()));
+    claims.insert("aud".to_owned(), Value::String(code.resource.clone()));
     claims.insert(
         "client_id".to_owned(),
         Value::String(code.client_id.clone()),
