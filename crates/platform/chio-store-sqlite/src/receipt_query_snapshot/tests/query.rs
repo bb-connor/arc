@@ -9,6 +9,7 @@ use chio_kernel::ReceiptStoreError;
 use super::super::db::{ProjectedToolRow, SnapshotBatch, SnapshotDb, SnapshotDbError};
 use super::super::pass::build_snapshot;
 use super::super::query::select;
+use super::capacity::StepCounter;
 use super::support::{context, limits, per_call, target, Fixture, Spec};
 
 const STEPS: u64 = 10_000_000;
@@ -468,6 +469,57 @@ fn a_changed_unsigned_subject_is_reported_as_drift() {
     let second = db.refresh_subject("cap-1", "lineage-b", 0, 100).unwrap();
     assert_eq!(second, Err(1));
     assert_eq!(count_rows(&db), before);
+}
+
+#[test]
+fn unsigned_subject_lookup_is_constant_work_over_a_signed_history() {
+    // The query work budget floor. One export spends several such reads.
+    const BUDGET: u64 = 1_000;
+    let mut db = SnapshotDb::open_memory(512 * 1024 * 1024).unwrap();
+    let hot = |seq: i64, signed: bool| {
+        let mut row = synthetic(seq, 0);
+        row.capability = "cap-hot".into();
+        row.subject = signed.then(|| "subject-signed".to_string());
+        row.subject_signed = signed;
+        row
+    };
+    for chunk in 0..10_i64 {
+        db.commit(&SnapshotBatch {
+            tools: (chunk * 2_000 + 1..=(chunk + 1) * 2_000)
+                .map(|seq| hot(seq, true))
+                .collect(),
+            ..SnapshotBatch::default()
+        })
+        .unwrap();
+    }
+    let (held, steps) = db
+        .count_steps_for_test(|db| db.holds_unsigned_subject("cap-hot").unwrap())
+        .unwrap();
+    assert!(!held);
+    assert!(
+        steps < BUDGET,
+        "an all-signed history spent {steps} VM steps"
+    );
+
+    db.commit(&SnapshotBatch {
+        tools: vec![hot(20_001, false)],
+        ..SnapshotBatch::default()
+    })
+    .unwrap();
+    let (held, steps) = db
+        .count_steps_for_test(|db| db.holds_unsigned_subject("cap-hot").unwrap())
+        .unwrap();
+    assert!(held);
+    assert!(
+        steps < BUDGET,
+        "one unsigned receipt spent {steps} VM steps"
+    );
+
+    let counter = StepCounter::install(&db);
+    let refreshed = db.refresh_subject("cap-hot", "lineage-subject", 0, 1_024);
+    let steps = counter.finish(&db);
+    assert_eq!(refreshed.unwrap(), Ok(vec![20_001]));
+    assert!(steps < BUDGET, "the lineage refresh spent {steps} VM steps");
 }
 
 #[test]
