@@ -1953,16 +1953,27 @@ context. A ledger is `locked` from `settlement_packet_assembled` through
 states MUST NOT pin a digest. An order in `failed_closed` may retain either the
 `locked` or the `released` pinned ledger, and pins no digest when the order has
 no escrow. A ledger is locked only against a
+`chio.commerce.escrow-acceptance.v1` signed by the offer token subject and a
 `chio.commerce.reservation-receipt.v1` that a pinned reservation authority
-signed for the order and the exact offer token, and released only against a
+signed for the order, the exact offer token and the depositor account, and
+released only against a
 matched capital execution instruction that a pinned execution authority signed
 over the depositor's reserve for the ledger amount, beneficiary, and settlement
 reconciliation reference. The order context presented at release MUST carry
 every accepted order context field unchanged except `id`, `issued_at`,
-`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`. The buyer
-named in the order context at lock time is not authenticated by any signed
-artifact; release binds the depositor to the signed execution instruction's
-`subject_key`, and only that binding authenticates the buyer.
+`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`.
+
+The acceptance binds `order_id`, `quote_sha256` (which covers the quote amount
+and currency), `buyer_subject`, the offer token id and canonical digest, and
+`accepted_at`. Lock refuses, in order, an unsupported acceptance schema, an
+acceptance signer other than the offer token subject, an invalid acceptance
+signature, any bound field that differs from the order context or offer token,
+and an `accepted_at` outside the offer token validity window. The reservation
+receipt's `depositor_account` MUST equal the order `buyer_subject`, which the
+acceptance also binds. The reservation authority's signature over it ties the
+accepting key to the account the lock debits, so an offer subject cannot sign
+for another buyer's account. Release additionally binds the depositor to the
+signed execution instruction's `subject_key`.
 
 Commerce verification fails closed on currency drift, amount drift,
 merchant/provider mismatch, untrusted provider evidence, expired or overused

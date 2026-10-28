@@ -130,7 +130,24 @@ fn reservation_body(
         order_id: context.order_id.clone(),
         token_offer_id: token.id.clone(),
         token_offer_sha256: canonical_sha256(token).test_expect("offer digest"),
+        depositor_account: context.buyer_subject.clone(),
         reserved_amount: amount,
+    }
+}
+
+fn acceptance_body(
+    context: &CommerceOrderContext,
+    token: &CapabilityToken,
+    accepted_at: u64,
+) -> CommerceEscrowAcceptance {
+    CommerceEscrowAcceptance {
+        schema: COMMERCE_ESCROW_ACCEPTANCE_SCHEMA_ID.to_string(),
+        order_id: context.order_id.clone(),
+        quote_sha256: context.quote_sha256.clone(),
+        buyer_subject: context.buyer_subject.clone(),
+        token_offer_id: token.id.clone(),
+        token_offer_sha256: canonical_sha256(token).test_expect("offer digest"),
+        accepted_at,
     }
 }
 
@@ -146,10 +163,10 @@ struct AcceptFixture {
     acceptor: PublicKey,
     token: CapabilityToken,
     context: CommerceOrderContext,
+    acceptance: SignedCommerceEscrowAcceptance,
     reservation: SignedCommerceReservationReceipt,
     trusted_reservation: Vec<PublicKey>,
     settlement: CommerceSettlementDispatch,
-    accepted_at: u64,
 }
 
 impl AcceptFixture {
@@ -164,6 +181,7 @@ impl AcceptFixture {
             reservation_body(&context, &token, usd(4200)),
             &reservation_authority,
         );
+        let acceptance = sign(acceptance_body(&context, &token, ACCEPTED_AT), &buyer);
         Self {
             trusted_reservation: vec![reservation_authority.public_key()],
             buyer,
@@ -173,10 +191,14 @@ impl AcceptFixture {
             acceptor,
             token,
             context,
+            acceptance,
             reservation,
             settlement: dispatch(),
-            accepted_at: ACCEPTED_AT,
         }
+    }
+
+    fn resign_acceptance(&mut self, body: CommerceEscrowAcceptance) {
+        self.acceptance = sign(body, &self.buyer);
     }
 
     fn resign_reservation(&mut self, body: CommerceReservationReceipt) {
@@ -186,14 +208,14 @@ impl AcceptFixture {
     fn reissue_token(&mut self, grants: Vec<ToolGrant>) {
         self.token = sign_token(&self.issuer, &self.acceptor, grants);
         self.resign_reservation(reservation_body(&self.context, &self.token, usd(4200)));
+        self.resign_acceptance(acceptance_body(&self.context, &self.token, ACCEPTED_AT));
     }
 
     fn accept(&self) -> Result<AcceptedEscrow, CommerceOrderError> {
         accept(CommerceEscrowAcceptRequest {
             order_context: &self.context,
             token_offer: &self.token,
-            acceptor: &self.acceptor,
-            accepted_at: self.accepted_at,
+            acceptance: &self.acceptance,
             reservation: &self.reservation,
             trusted_reservation_authorities: &self.trusted_reservation,
             settlement: self.settlement.clone(),
@@ -296,7 +318,7 @@ fn accept_denies_forged_offer_signature() {
 #[test]
 fn accept_denies_offer_outside_validity_window() {
     let mut fixture = AcceptFixture::new();
-    fixture.accepted_at = 20_000;
+    fixture.resign_acceptance(acceptance_body(&fixture.context, &fixture.token, 20_000));
     assert_eq!(
         fixture.denial(),
         escrow(CommerceEscrowError::OfferOutsideValidityWindow)
@@ -323,13 +345,120 @@ fn accept_denies_self_issued_offer() {
 }
 
 #[test]
-fn accept_denies_acceptor_other_than_subject() {
+fn accept_denies_acceptance_signed_by_other_than_offer_subject() {
     let mut fixture = AcceptFixture::new();
-    fixture.acceptor = keypair(3).public_key();
+    fixture.acceptance = sign(
+        acceptance_body(&fixture.context, &fixture.token, ACCEPTED_AT),
+        &keypair(3),
+    );
     assert_eq!(
         fixture.denial(),
         escrow(CommerceEscrowError::AcceptorNotSubject)
     );
+}
+
+#[test]
+fn accept_denies_forged_acceptance_signature() {
+    let mut fixture = AcceptFixture::new();
+    fixture.acceptance.body.accepted_at = ACCEPTED_AT + 1;
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::AcceptanceSignatureInvalid)
+    );
+}
+
+#[test]
+fn accept_denies_unsupported_acceptance_schema() {
+    let mut fixture = AcceptFixture::new();
+    let mut body = acceptance_body(&fixture.context, &fixture.token, ACCEPTED_AT);
+    body.schema = "chio.commerce.escrow-acceptance.v2".to_string();
+    fixture.resign_acceptance(body);
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::AcceptanceSchemaUnsupported(
+            "chio.commerce.escrow-acceptance.v2".to_string()
+        ))
+    );
+}
+
+/// The buyer subject is not covered by the quote digest, so only the buyer's
+/// signed acceptance can name the account the lock debits.
+#[test]
+fn accept_denies_buyer_subject_the_buyer_did_not_sign() {
+    let mut fixture = AcceptFixture::new();
+    fixture.context.buyer_subject = "buyer:mallory".to_string();
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::AcceptanceUnbound("buyer_subject"))
+    );
+}
+
+/// Mallory holds her own offer token and signs her own acceptance naming
+/// Alice's account; the reservation authority reserved Mallory's funds, so the
+/// signed depositor binds the key to its account and the lock is refused.
+#[test]
+fn accept_denies_own_token_and_acceptance_naming_another_buyer_account() {
+    let mut fixture = AcceptFixture::new();
+    let mallory = keypair(4);
+    fixture.acceptor = mallory.public_key();
+    fixture.buyer = mallory;
+    fixture.token = sign_token(
+        &fixture.issuer,
+        &fixture.acceptor,
+        vec![grant(Some(usd(4200)))],
+    );
+    let mut reservation = reservation_body(&fixture.context, &fixture.token, usd(4200));
+    reservation.depositor_account = "buyer:mallory".to_string();
+    fixture.resign_reservation(reservation);
+    fixture.resign_acceptance(acceptance_body(
+        &fixture.context,
+        &fixture.token,
+        ACCEPTED_AT,
+    ));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ReservationUnbound("depositor_account"))
+    );
+}
+
+#[test]
+fn accept_denies_acceptance_time_before_offer_validity() {
+    let mut fixture = AcceptFixture::new();
+    fixture.resign_acceptance(acceptance_body(&fixture.context, &fixture.token, 50));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::OfferOutsideValidityWindow)
+    );
+}
+
+#[test]
+fn accept_denies_acceptance_bound_to_other_order_material() {
+    let mutations: [Mutation<CommerceEscrowAcceptance>; 5] = [
+        ("order_id", |body| body.order_id = "order-other".to_string()),
+        ("buyer_subject", |body| {
+            body.buyer_subject = "buyer:mallory".to_string()
+        }),
+        ("quote_sha256", |body| {
+            body.quote_sha256 = OTHER_HEX64.to_string()
+        }),
+        ("token_offer_id", |body| {
+            body.token_offer_id = "offer-token-other".to_string()
+        }),
+        ("token_offer_sha256", |body| {
+            body.token_offer_sha256 = OTHER_HEX64.to_string()
+        }),
+    ];
+    for (field, mutate) in mutations {
+        let mut fixture = AcceptFixture::new();
+        let mut body = acceptance_body(&fixture.context, &fixture.token, ACCEPTED_AT);
+        mutate(&mut body);
+        fixture.resign_acceptance(body);
+        assert_eq!(
+            fixture.denial(),
+            escrow(CommerceEscrowError::AcceptanceUnbound(field)),
+            "{field}"
+        );
+    }
 }
 
 #[test]
@@ -444,8 +573,11 @@ fn accept_denies_reservation_without_id() {
 
 #[test]
 fn accept_denies_reservation_bound_to_other_order_or_offer() {
-    let mutations: [Mutation<CommerceReservationReceipt>; 3] = [
+    let mutations: [Mutation<CommerceReservationReceipt>; 4] = [
         ("order_id", |body| body.order_id = "order-other".to_string()),
+        ("depositor_account", |body| {
+            body.depositor_account = "buyer:mallory".to_string()
+        }),
         ("token_offer_id", |body| {
             body.token_offer_id = "offer-token-other".to_string()
         }),
@@ -529,6 +661,11 @@ fn accept_denies_buyer_paying_itself() {
         &fixture.context,
         &fixture.token,
         usd(4200),
+    ));
+    fixture.resign_acceptance(acceptance_body(
+        &fixture.context,
+        &fixture.token,
+        ACCEPTED_AT,
     ));
     assert_eq!(
         fixture.denial(),

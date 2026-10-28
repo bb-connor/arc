@@ -61,8 +61,14 @@ pub enum CommerceEscrowError {
     OfferOutsideValidityWindow,
     #[error("offer token is issued by its own subject")]
     OfferSelfIssued,
-    #[error("acceptor is not the offer token subject")]
+    #[error("escrow acceptance is not signed by the offer token subject")]
     AcceptorNotSubject,
+    #[error("unsupported escrow acceptance schema: {0}")]
+    AcceptanceSchemaUnsupported(String),
+    #[error("escrow acceptance signature is invalid")]
+    AcceptanceSignatureInvalid,
+    #[error("escrow acceptance {0} does not match the order offer")]
+    AcceptanceUnbound(&'static str),
     #[error("offer liability is invalid: {0}")]
     OfferLiabilityInvalid(&'static str),
     #[error("offer liability currency does not match the quote currency")]

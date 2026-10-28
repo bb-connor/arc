@@ -12,3 +12,4 @@ pub const COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID: &str =
 pub const COMMERCE_ORDER_PASSPORT_SCHEMA_ID: &str = "chio.commerce.order-passport.v1";
 pub const COMMERCE_ESCROW_LEDGER_SCHEMA_ID: &str = "chio.commerce.escrow-ledger.v1";
 pub const COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID: &str = "chio.commerce.reservation-receipt.v1";
+pub const COMMERCE_ESCROW_ACCEPTANCE_SCHEMA_ID: &str = "chio.commerce.escrow-acceptance.v1";

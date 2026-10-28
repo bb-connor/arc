@@ -242,11 +242,13 @@ fn expected_commerce(error: &chio_commerce_order::CommerceOrderError) -> i32 {
 fn expected_commerce_escrow(error: &chio_commerce_order::CommerceEscrowError) -> i32 {
     use chio_commerce_order::CommerceEscrowError as E;
     match error {
-        E::LedgerSchemaUnsupported(_) | E::ReservationSchemaUnsupported(_) | E::Canonicalization(_) => {
-            SCHEMA
-        }
+        E::LedgerSchemaUnsupported(_)
+        | E::ReservationSchemaUnsupported(_)
+        | E::AcceptanceSchemaUnsupported(_)
+        | E::Canonicalization(_) => SCHEMA,
         E::AcceptanceDigestMismatch
         | E::OfferSignatureInvalid
+        | E::AcceptanceSignatureInvalid
         | E::ReservationSignatureInvalid
         | E::SettlementSignatureInvalid
         | E::ExecutionSignatureInvalid => INTEGRITY,
@@ -254,6 +256,7 @@ fn expected_commerce_escrow(error: &chio_commerce_order::CommerceEscrowError) ->
         | E::OfferOutsideValidityWindow
         | E::OfferSelfIssued
         | E::AcceptorNotSubject
+        | E::AcceptanceUnbound(_)
         | E::OfferLiabilityInvalid(_)
         | E::LiabilityCurrencyMismatch
         | E::LiabilityQuoteMismatch
@@ -329,6 +332,9 @@ fn every_commerce_variant_has_its_exit_class() {
         E::CoverageFailed(text()),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerSchemaUnsupported(text())),
         E::Escrow(chio_commerce_order::CommerceEscrowError::Canonicalization(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSchemaUnsupported(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSignatureInvalid),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceUnbound("buyer_subject")),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceDigestMismatch),
         E::Escrow(chio_commerce_order::CommerceEscrowError::SettlementSignatureInvalid),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerMissing),
