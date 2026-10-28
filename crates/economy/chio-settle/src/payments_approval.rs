@@ -19,7 +19,9 @@ impl ApprovalBinding {
             .query
             .capability_id
             .as_deref()
-            .unwrap_or(&dispatch.dispatch_id);
+            .ok_or_else(|| {
+                SettlementError::InvalidBinding(format!("{lane} capability identity is missing"))
+            })?;
         if self.capability_id != capability_id {
             return Err(SettlementError::InvalidBinding(format!(
                 "{lane} capability mismatch"

@@ -44,7 +44,9 @@ Both `build_x402_payment_requirements` and `evaluate_circle_nanopayment`
 consume the resulting opaque `VerifiedApproval`. They refuse contract-pinned
 bindings because these projections express token symbols only. x402 keeps
 rail tokens separate from the settlement currency; Circle requires them to
-match. Invalid lane inputs do not consume the approval.
+match. Both lanes require an explicit dispatch capability id. A missing id
+is refused without consuming the approval, even when the signed capability
+id equals the dispatch id. Invalid lane inputs do not consume the approval.
 
 The integrating runtime supplies the trusted clock and one shared
 `ApprovalReplayStore` across both lanes. `InMemoryApprovalReplayStore` is
