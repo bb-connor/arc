@@ -700,6 +700,35 @@ class TypeResolutionTests(unittest.TestCase):
                 self.assertEqual(self.findings({"crates/demo/Cargo.toml": manifest, "crates/demo/src/lib.rs": stamp + body}), inferred)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": "enum Mode { On, Off } fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Mode::On) => 1, Ok(Mode::Off) => 0, Err(_) => 0 } }"}), [])
 
+    def test_generic_exemption_requires_a_target_tied_to_the_parameter(self):
+        normalize = "fn normalize_receipt(r: ChioReceipt) -> ChioReceipt { r } "
+        for body in [
+            "pub fn unknown<T: DeserializeOwned>(s: &str) -> Result<ChioReceipt, serde_json::Error> { serde_json::from_str(s).map(normalize_receipt) }",
+            "pub fn unknown<T: DeserializeOwned>(s: &str) -> Option<T> { let r = serde_json::from_str(s).unwrap(); consume(normalize_receipt(r)); None }",
+            "struct Holder<T>(T); impl<T: DeserializeOwned> Holder<T> { fn unknown(s: &str) -> Result<ChioReceipt, serde_json::Error> { serde_json::from_str(s).map(normalize_receipt) } }",
+        ]:
+            with self.subTest(body=body):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": normalize + body}), ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"])
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "pub fn good<T: DeserializeOwned>(s: &str) -> Result<T, serde_json::Error> { serde_json::from_str(s) } fn caller(s: &str) -> Result<u32, serde_json::Error> { good(s) }"}), [])
+
+    def test_module_alias_qualifiers_resolve_before_associated_helper_lookup(self):
+        helper = "mod input { pub fn decode<T: DeserializeOwned>(s: &str) -> Result<T, E> { serde_json::from_str(s) } } "
+        for alias in ["use crate::input as Input; ", "use self::input as In; ", "use crate::input as Input; use Input as Wire; "]:
+            name = alias.split(" as ")[-1].rstrip("; ")
+            with self.subTest(alias=alias):
+                findings = self.findings({"crates/demo/src/lib.rs": helper + alias + "fn bad(s: &str) -> Result<ChioReceipt, E> { " + name + "::decode(s) }"})
+                self.assertEqual(findings, ["crates/demo/src/lib.rs::bad: raw decode " + name + "::decode(s)"])
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + alias + "fn good(s: &str) -> Result<u32, E> { " + name + "::decode(s) }"}), [])
+
+    def test_macro_invocations_end_at_their_matching_delimiter(self):
+        decode = "macro_rules! decode { ($s:expr) => { serde_json::from_str($s) }; } "
+        for invocation in ["decode!(s)", "decode! { s }", "decode![s]", "decode! {\n s \n}"]:
+            with self.subTest(invocation=invocation):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": decode + "fn good(s: &str) -> Result<u32, serde_json::Error> { " + invocation + " }"}), [])
+                findings = self.findings({"crates/demo/src/lib.rs": decode + "fn bad(s: &str) -> Result<ChioReceipt, serde_json::Error> { " + invocation + " }"})
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn("::bad: raw decode serde_json::from_str($s) via decode!", findings[0])
+
     def test_complete_scrutinee_patterns_name_the_target(self):
         marker = "struct Marker { n: u64 } "
         for body, expected in [
