@@ -25,6 +25,14 @@ const ASSEMBLE_RECEIPT_REF: &str = "receipt-settlement-assemble-commerce-001";
 const DISPATCH_RECEIPT_REF: &str = "receipt-settlement-dispatch-commerce-001";
 const ACCEPTED_AT: u64 = 500;
 
+fn merchant() -> Keypair {
+    Keypair::from_seed(&[41u8; 32])
+}
+
+fn commerce_payment_signer() -> Keypair {
+    Keypair::from_seed(&[7u8; 32])
+}
+
 fn usd(units: u64) -> MonetaryAmount {
     MonetaryAmount {
         units,
@@ -100,7 +108,7 @@ fn replay_through_settlement_dispatch(bundle: &mut CommerceOrderVerificationBund
 /// into the bundle: the accepted context advanced to `settlement_dispatched`,
 /// the signed settlement packet body, and the locked ledger bytes.
 fn lock_escrow(bundle: &mut CommerceOrderVerificationBundle) -> AcceptedEscrow {
-    let issuer = Keypair::from_seed(&[41u8; 32]);
+    let issuer = merchant();
     let buyer = Keypair::from_seed(&[42u8; 32]);
     let reservation_authority = Keypair::from_seed(&[43u8; 32]);
     let settlement_authority = Keypair::from_seed(&[44u8; 32]);
@@ -170,8 +178,134 @@ fn ledger_bytes(ledger: &CommerceEscrowLedger) -> Vec<u8> {
     chio_core_types::canonical_json_bytes(ledger).test_expect("ledger canonicalizes")
 }
 
-fn escrow_backed_bundle() -> (CommerceOrderVerificationBundle, AcceptedEscrow) {
+fn json_value(bytes: &[u8]) -> serde_json::Value {
+    serde_json::from_slice(bytes).test_expect("fixture artifact parses")
+}
+
+fn json_bytes(value: &serde_json::Value) -> Vec<u8> {
+    serde_json::to_vec(value).test_expect("fixture artifact serializes")
+}
+
+fn quote_sha256(context: &chio_commerce_order::CommerceOrderContext) -> String {
+    let binding = serde_json::json!({
+        "amount_minor": context.quote_amount_minor,
+        "currency": context.quote_currency,
+        "merchant_subject": context.merchant_subject,
+        "order_id": context.order_id,
+        "quote_id": context.quote_id,
+    });
+    sha256_hex(&chio_core_types::canonical_json_bytes(&binding).test_expect("quote canonicalizes"))
+}
+
+fn merchant_protocol_payload_bytes(
+    merchant_subject: &str,
+    protocol: &str,
+    purpose: &str,
+) -> Vec<u8> {
+    let payload = serde_json::json!({
+        "schema": chio_commerce_order::COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID,
+        "protocol": protocol,
+        "purpose": purpose,
+        "order_id": "order-commerce-001",
+        "amount_minor": 4200,
+        "currency": "USD",
+        "merchant_subject": merchant_subject,
+    });
+    chio_core_types::canonical_json_bytes(&payload).test_expect("payload canonicalizes")
+}
+
+/// The offline PSP order with its merchant replaced by the offer-issuing
+/// merchant key, `did:chio:<key hex>`: the quote digest, protocol payloads,
+/// mandate ledger, signed payment lifecycle and signed provider trust evidence
+/// are rebuilt for that merchant and repinned in the order context.
+fn merchant_keyed_bundle(merchant_key: &PublicKey) -> CommerceOrderVerificationBundle {
     let mut bundle = load_bundle("offline-psp-valid");
+    let merchant_subject = format!("did:chio:{}", merchant_key.to_hex());
+    let context = &mut bundle.order_context;
+    context.merchant_subject = merchant_subject.clone();
+    context.quote_sha256 = quote_sha256(context);
+    let quote = context.quote_sha256.clone();
+
+    for payload in &mut bundle.mandate_protocol_payloads {
+        payload.payload_bytes =
+            merchant_protocol_payload_bytes(&merchant_subject, &payload.protocol, &payload.purpose);
+    }
+    let payload_digest = |protocol: &str, purpose: &str| {
+        let payload = bundle
+            .mandate_protocol_payloads
+            .iter()
+            .find(|payload| payload.protocol == protocol && payload.purpose == purpose)
+            .test_expect("mandate protocol payload exists");
+        sha256_hex(&payload.payload_bytes)
+    };
+    let mut mandate = json_value(&bundle.mandate_ledger_bytes);
+    mandate["merchant_subject"] = serde_json::json!(merchant_subject);
+    mandate["quote_sha256"] = serde_json::json!(quote);
+    for (field, protocol, purpose) in [
+        ("ap2_checkout_mandate_hash", "ap2", "checkout_mandate"),
+        ("ap2_payment_mandate_hash", "ap2", "payment_mandate"),
+        (
+            "acp_delegated_payment_token_hash",
+            "acp-commerce",
+            "delegated_payment_token",
+        ),
+        (
+            "x402_payment_requirements_hash",
+            "x402",
+            "payment_requirements",
+        ),
+    ] {
+        mandate[field] = serde_json::json!(payload_digest(protocol, purpose));
+    }
+    for projection in mandate["protocol_projections"]
+        .as_array_mut()
+        .test_expect("mandate protocol projections")
+    {
+        let protocol = projection["protocol"]
+            .as_str()
+            .test_expect("projection protocol");
+        let purpose = projection["purpose"]
+            .as_str()
+            .test_expect("projection purpose");
+        projection["digest"] = serde_json::json!(payload_digest(protocol, purpose));
+    }
+    bundle.mandate_ledger_bytes = json_bytes(&mandate);
+
+    let mut payment = json_value(&bundle.payment_lifecycle_bytes);
+    payment["merchant_subject"] = serde_json::json!(merchant_subject);
+    payment["quote_sha256"] = serde_json::json!(quote);
+    payment
+        .as_object_mut()
+        .test_expect("payment lifecycle object")
+        .remove("signature");
+    let (signature, _) = commerce_payment_signer()
+        .sign_canonical(&payment)
+        .test_expect("payment lifecycle signs");
+    payment["signature"] = serde_json::json!(signature.to_hex());
+    bundle.payment_lifecycle_bytes = json_bytes(&payment);
+
+    let rebind_provider_trust = |bytes: &[u8]| {
+        let mut value = json_value(bytes);
+        value["provider_subject"] = serde_json::json!(merchant_subject);
+        sign_provider_trust_value(&mut value);
+        json_bytes(&value)
+    };
+    bundle.provider_passport_bytes = rebind_provider_trust(&bundle.provider_passport_bytes);
+    bundle.reputation_snapshot_bytes = rebind_provider_trust(&bundle.reputation_snapshot_bytes);
+    bundle.federation_trust_bundle_bytes =
+        rebind_provider_trust(&bundle.federation_trust_bundle_bytes);
+
+    let context = &mut bundle.order_context;
+    context.mandate_ledger_sha256 = sha256_hex(&bundle.mandate_ledger_bytes);
+    context.payment_lifecycle_sha256 = sha256_hex(&bundle.payment_lifecycle_bytes);
+    context.provider_passport_sha256 = sha256_hex(&bundle.provider_passport_bytes);
+    context.reputation_snapshot_sha256 = sha256_hex(&bundle.reputation_snapshot_bytes);
+    context.federation_trust_bundle_sha256 = sha256_hex(&bundle.federation_trust_bundle_bytes);
+    bundle
+}
+
+fn escrow_backed_bundle() -> (CommerceOrderVerificationBundle, AcceptedEscrow) {
+    let mut bundle = merchant_keyed_bundle(&merchant().public_key());
     replay_through_settlement_dispatch(&mut bundle);
     let accepted = lock_escrow(&mut bundle);
     (bundle, accepted)
