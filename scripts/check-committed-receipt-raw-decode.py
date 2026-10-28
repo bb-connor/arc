@@ -22,7 +22,9 @@ value-preserving flows: `Ok`/`Some`/`Box::new` wrappers, `?`, `.await` and
 error- or option-adapting methods, the tail of an `if` branch, `match` arm,
 block or `and_then` closure, and an unannotated `let` binding the function
 returns. A `match` or `if let` scrutinee takes the types its arm patterns
-name, or the construct's own context when every value-carrying arm forwards
+name when some arm constrains every position and names no type whose type
+parameters the pattern leaves uninferred (otherwise a pattern that names no
+strict type leaves the target inferred), or the construct's own context when every value-carrying arm forwards
 the value unchanged; a closure that consumes the value gives its annotated
 parameter type. A `_` placeholder in a target is completed by that context. A decode
 whose target is neither named nor completed by context is refused as inferred
@@ -949,17 +951,72 @@ def block_tail(body: str) -> str:
     return body[last + 1:].strip()
 
 
-def pattern_types(pattern: str) -> list[str]:
-    """Types a struct or tuple-struct pattern names, with an enum variant read as its enum."""
-    found = []
-    for match in re.finditer(r"(?<![\w:])((?:\w+\s*::\s*)*[A-Z]\w*)\s*[({]", pattern):
-        path = [part.strip() for part in match.group(1).split("::")]
-        if path[-1] in {"Ok", "Err", "Some", "None"}:
-            continue
-        if len(path) > 1 and path[-2][:1].isupper():
-            path = path[:-1]
-        found.append("::".join(path))
-    return found
+PARTIAL = "?"
+PATTERN = "!"
+
+
+def pattern_type(path: str) -> str:
+    """The type a pattern path names, with an enum variant read as its enum."""
+    parts = [part.strip() for part in path.split("::")]
+    if len(parts) > 1 and parts[-2][:1].isupper():
+        parts = parts[:-1]
+    return "::".join(parts)
+
+
+def top_level_split(text: str, separator: str) -> list[str]:
+    """`text` split at each `separator` outside brackets."""
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(text):
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == separator and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return [part.strip() for part in parts if part.strip()]
+
+
+def pattern_info(pattern: str) -> tuple[bool, list[str]]:
+    """Whether a pattern constrains the complete type it matches, and the types it names.
+
+    A struct or tuple-struct pattern names its type even with `..`; `Ok`/`Some`
+    wrappers, `&`, `name @` and or-patterns pass through; a tuple is complete
+    only when every position is; a slice when any element is; a binding, `_`,
+    a rest `..` or a bare unit name constrains nothing."""
+    pattern = pattern.strip().lstrip("|").strip()
+    alternatives = top_level_split(pattern, "|")
+    if len(alternatives) > 1:
+        infos = [pattern_info(alternative) for alternative in alternatives]
+        return any(complete for complete, _ in infos), [kind for _, kinds in infos for kind in kinds]
+    bound = re.fullmatch(r"(?:ref\s+)?(?:mut\s+)?[a-z_]\w*\s*@\s*(.+)", pattern, re.S)
+    if bound:
+        return pattern_info(bound.group(1))
+    if pattern.startswith("&"):
+        return pattern_info(re.sub(r"^&\s*(?:mut\s+)?", "", pattern))
+    if re.fullmatch(r"-?\d[\w.]*|true|false|b?\"[^\"]*\"|b?'[^']*'", pattern):
+        return True, []
+    if pattern[:1] in "([" and _contracts.closing(pattern, 0, pattern[0], ")" if pattern[0] == "(" else "]") == len(pattern):
+        inner = pattern[1:-1]
+        elements = _resolution.split_arguments(inner)
+        if pattern[0] == "(" and len(elements) == 1 and not inner.rstrip().endswith(","):
+            return pattern_info(elements[0])
+        rest = [element for element in elements if re.fullmatch(r"(?:[a-z_]\w*\s*@\s*)?\.\.", element.strip())]
+        infos = [pattern_info(element) for element in elements if element not in rest]
+        kinds = [kind for _, found in infos for kind in found]
+        if pattern[0] == "[":
+            return any(complete for complete, _ in infos), kinds
+        return bool(infos) and not rest and all(complete for complete, _ in infos), kinds
+    call = re.match(r"((?:\w+\s*::\s*)*[A-Za-z_]\w*)\s*([({])", pattern)
+    if call and _contracts.closing(pattern, call.end() - 1, call.group(2), ")" if call.group(2) == "(" else "}") == len(pattern):
+        path = call.group(1)
+        if call.group(2) == "(" and path.split("::")[-1].strip() in {"Ok", "Some"}:
+            return pattern_info(pattern[call.end():-1])
+        if path.split("::")[-1].strip()[:1].isupper():
+            return True, [pattern_type(path)]
+        return False, []
+    if re.fullmatch(r"(?:\w+\s*::\s*)+[A-Z]\w*", pattern):
+        return True, [pattern_type(pattern)]
+    return False, []
 
 
 def identity_arm(pattern: str, value: str) -> bool:
@@ -1055,10 +1112,13 @@ def flow(fn_code: str, start: int, end: int, returns, depth: int = 0) -> str:
                 arms = [(pattern.group(1) if pattern else "", block_tail(fn_code[row[3] + 1:pairs[row[3]]]))]
             else:
                 return ""
-            named = [kind for pattern, _ in arms for kind in pattern_types(pattern)]
-            if named:
-                return "(" + ", ".join(named) + ")"
             carrying = [(pattern, value) for pattern, value in arms if not VALUELESS_ARM.match(pattern)]
+            infos = [pattern_info(pattern) for pattern, _ in carrying]
+            named = [kind for _, kinds in infos for kind in kinds]
+            if any(complete for complete, _ in infos):
+                return PATTERN + "(" + ", ".join(named) + ")"
+            if named:
+                return PARTIAL + "(" + ", ".join(named) + ")"
             if carrying and all(identity_arm(pattern, value) for pattern, value in carrying):
                 return flow(fn_code, row[0], row[1], returns, depth + 1)
             return ""
@@ -1244,6 +1304,8 @@ def targets(fn_code: str, offset: int, explicit, returns: str) -> str:
         return explicit
     context = contextual_target(fn_code, offset, returns)
     if explicit is not None:
+        if context[:1] in {PARTIAL, PATTERN}:
+            return context[0] + f"({explicit}, {context[1:]})"
         return f"({explicit}, {context})" if context else ""
     return context
 
@@ -1486,14 +1548,25 @@ def scan(root: Path) -> list[str]:
 
     findings, inferred = [], []
 
+    def names_generic(text, rel, offset):
+        """Whether a pattern names a type with type parameters, which a pattern leaves uninferred."""
+        return any(
+            entry[3]
+            for match in _resolution.PATH.finditer(text)
+            for key in resolve_path(match.group(), rel, offset)
+            for entry in strict.definitions.get(key, ())
+        )
+
     def record(rel, owner, call, kind, target, offset):
         expansion, macro = expanded(target, rel, offset)
         if macro and CAPTURE.search(expansion):
             for invocation_rel, invocation_offset, text in invoked_with_strict(macro):
                 findings.append((invocation_rel, owner_at(invocation_rel, invocation_offset, f"{macro}!")[0], f"{call} via {text}", "decode", kind))
+        partial = target[:1] == PARTIAL or target[:1] == PATTERN and names_generic(target[1:], rel, offset)
+        target = target[1:] if target[:1] in {PARTIAL, PATTERN} else target
         if mentions_target(target, rel, offset):
             findings.append((rel, owner, call, "decode", kind))
-        elif not target:
+        elif partial or not target:
             inferred.append((rel, owner, call))
 
     helpers, definitions = generic_raw_helpers(files, resolver, aliases)
