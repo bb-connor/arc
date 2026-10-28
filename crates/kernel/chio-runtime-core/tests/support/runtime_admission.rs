@@ -1,25 +1,28 @@
-use chio_core_types::capability::attenuation::{compute_attenuation_witness, scope_hash};
-use chio_core_types::capability::{
+use super::runtime_api;
+pub(super) use chio_core_types::capability::attenuation::{
+    compute_attenuation_witness, scope_hash,
+};
+pub(super) use chio_core_types::capability::{
     governance::GovernedTransactionIntent,
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey};
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_core_types::receipt::{
+pub(super) use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey};
+pub(super) use chio_core_types::receipt::lineage::SignedExportEnvelope;
+pub(super) use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::BoundaryClass, kinds::ReceiptKind, kinds::RedactionMode, kinds::ToolOrigin,
     kinds::TrustLevel, metadata::ActorRef,
 };
-use chio_federation::{
+pub(super) use chio_federation::{
     bilateral_dsse::sign_chio_bilateral_dsse_envelope,
     bilateral_dsse::BilateralPredicateExtensions, bilateral_dsse::CapabilityLeaseRef,
     bilateral_dsse::DsseEnvelope, bilateral_dsse::GovernanceReceiptRef, bilateral_dsse::HashRecord,
     bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,
     bilateral_dsse::TreatyBindingRef, bilateral_dsse::PAYLOAD_TYPE_IN_TOTO,
 };
-use chio_kernel::{RuntimeAdmissionContext, ToolCallRequest};
-use chio_swarm_authority::{
+pub(super) use chio_kernel::{RuntimeAdmissionContext, ToolCallRequest};
+pub(super) use chio_swarm_authority::{
     sign_swarm_continuation_token, sign_swarm_delegation_witness_hop, sign_swarm_join_receipt,
     sign_swarm_revocation_epoch, sign_swarm_route_plan_receipt, sign_swarm_task_graph,
     sign_swarm_terminal_graph_receipt, verify_swarm_authority_bundle, SwarmAuthorityBundle,
@@ -32,7 +35,7 @@ use chio_swarm_authority::{
     CHIO_SWARM_REVOCATION_EPOCH_SCHEMA, CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA,
     CHIO_SWARM_TASK_GRAPH_SCHEMA, CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA,
 };
-use runtime_api::{
+pub(super) use runtime_api::{
     compute_ladder_intersection, runtime_admission_bundle_sha256, runtime_peer_weights_sha256,
     sign_runtime_admission_report, tool_args_sha256, verify_signed_runtime_admission_report,
     BilateralInvocation, ChioRuntimeAdmissionHook, CrossKernelContinuation,
@@ -48,21 +51,21 @@ use runtime_api::{
     CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
     CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
-use std::io;
+pub(super) use std::io;
 
-use runtime_api::ChioRuntimeError;
+pub(super) use runtime_api::ChioRuntimeError;
 
 #[path = "treaty.rs"]
-mod treaty_support;
-use treaty_support::{treaty_action_class, treaty_manifest, treaty_scope};
+pub(super) mod treaty_support;
+pub(super) use treaty_support::{treaty_action_class, treaty_manifest, treaty_scope};
 
 #[path = "../runtime_admission/swarm_request_support.rs"]
-mod swarm_request_support;
-use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime_context};
+pub(super) mod swarm_request_support;
+pub(super) use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime_context};
 
 #[path = "../runtime_admission/swarm_fixtures.rs"]
-mod swarm_fixtures;
-use swarm_fixtures::{
+pub(super) mod swarm_fixtures;
+pub(super) use swarm_fixtures::{
     canonical_test_hash, issue_root, retained_swarm_graphs, runtime_swarm_continuation,
     runtime_swarm_join_parent_set_hash, runtime_swarm_revocation_root,
     runtime_swarm_route_plan_receipt, runtime_swarm_scope, runtime_swarm_terminal_graph_receipt,
@@ -70,13 +73,13 @@ use swarm_fixtures::{
     trusted_swarm_witness_keys, IssuedGraphs,
 };
 
-fn emit_threat_matrix_code(code: &str) {
+pub(super) fn emit_threat_matrix_code(code: &str) {
     if std::env::var_os("CHIO_THREAT_MATRIX_EMIT_CODE").is_some() {
         println!("CHIO_THREAT_MATRIX_CODE={code}");
     }
 }
 
-fn profile() -> RuntimeAdmissionProfile {
+pub(super) fn profile() -> RuntimeAdmissionProfile {
     RuntimeAdmissionProfile {
         schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.to_string(),
         profile_id: "profile-live-spine".to_string(),
@@ -87,7 +90,9 @@ fn profile() -> RuntimeAdmissionProfile {
     }
 }
 
-fn capability(capability_id: &str) -> Result<CapabilityToken, Box<dyn std::error::Error>> {
+pub(super) fn capability(
+    capability_id: &str,
+) -> Result<CapabilityToken, Box<dyn std::error::Error>> {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     Ok(CapabilityToken::sign(
@@ -118,7 +123,7 @@ fn capability(capability_id: &str) -> Result<CapabilityToken, Box<dyn std::error
     )?)
 }
 
-fn binding() -> RuntimeRequestBinding {
+pub(super) fn binding() -> RuntimeRequestBinding {
     RuntimeRequestBinding {
         request_id: "req-live-destructive".to_string(),
         capability_id: "cap-live-1".to_string(),
@@ -130,7 +135,7 @@ fn binding() -> RuntimeRequestBinding {
     }
 }
 
-fn bundle() -> RuntimeAdmissionBundle {
+pub(super) fn bundle() -> RuntimeAdmissionBundle {
     RuntimeAdmissionBundle {
         schema: CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA.to_string(),
         admission_id: "adm-live-1".to_string(),
@@ -146,7 +151,7 @@ fn bundle() -> RuntimeAdmissionBundle {
     }
 }
 
-fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {
+pub(super) fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {
     vec![RuntimeTrustedVerifierKey {
         verifier_id: "did:chio:buyer-verifier".to_string(),
         key_id: "verifier-key-1".to_string(),
@@ -157,7 +162,10 @@ fn trusted_keys(verifier: &Keypair) -> Vec<RuntimeTrustedVerifierKey> {
     }]
 }
 
-fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVerifierTrustBundle {
+pub(super) fn trust_body(
+    version: u64,
+    previous_hash_sha256: Option<String>,
+) -> RuntimeVerifierTrustBundle {
     RuntimeVerifierTrustBundle {
         schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.to_string(),
         verifier_id: "did:chio:buyer-verifier".to_string(),
@@ -173,7 +181,7 @@ fn trust_body(version: u64, previous_hash_sha256: Option<String>) -> RuntimeVeri
     }
 }
 
-fn advisory(strength: f64) -> RuntimePheromoneAdvisory {
+pub(super) fn advisory(strength: f64) -> RuntimePheromoneAdvisory {
     RuntimePheromoneAdvisory {
         source_report_sha256: "1".repeat(64),
         accepted: true,
@@ -187,7 +195,7 @@ fn advisory(strength: f64) -> RuntimePheromoneAdvisory {
     }
 }
 
-fn policy(peer_weights_sha256: String) -> RuntimePheromonePolicy {
+pub(super) fn policy(peer_weights_sha256: String) -> RuntimePheromonePolicy {
     RuntimePheromonePolicy {
         schema: CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA.to_string(),
         policy_id: "policy-runtime-risk".to_string(),
@@ -214,7 +222,7 @@ fn policy(peer_weights_sha256: String) -> RuntimePheromonePolicy {
     }
 }
 
-fn peer_weights() -> RuntimePeerWeights {
+pub(super) fn peer_weights() -> RuntimePeerWeights {
     RuntimePeerWeights {
         schema: CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA.to_string(),
         verifier_id: "did:chio:buyer-verifier".to_string(),
@@ -229,7 +237,7 @@ fn peer_weights() -> RuntimePeerWeights {
     }
 }
 
-type SignedPolicyInputs = (
+pub(super) type SignedPolicyInputs = (
     SignedExportEnvelope<RuntimeVerifierTrustBundle>,
     Vec<RuntimeTrustedVerifierKey>,
     SignedRuntimePheromoneQueryReport,
@@ -237,7 +245,7 @@ type SignedPolicyInputs = (
     SignedExportEnvelope<RuntimePeerWeights>,
 );
 
-fn query_report_body(advisory: RuntimePheromoneAdvisory) -> serde_json::Value {
+pub(super) fn query_report_body(advisory: RuntimePheromoneAdvisory) -> serde_json::Value {
     serde_json::json!({
         "schema": "chio.pheromone.query-report.v1",
         "accepted": advisory.accepted,
@@ -252,7 +260,7 @@ fn query_report_body(advisory: RuntimePheromoneAdvisory) -> serde_json::Value {
     })
 }
 
-fn signed_query_report(
+pub(super) fn signed_query_report(
     advisory: RuntimePheromoneAdvisory,
     verifier: &Keypair,
 ) -> Result<SignedRuntimePheromoneQueryReport, Box<dyn std::error::Error>> {
@@ -262,7 +270,9 @@ fn signed_query_report(
     )?)
 }
 
-fn signed_policy_inputs(strength: f64) -> Result<SignedPolicyInputs, Box<dyn std::error::Error>> {
+pub(super) fn signed_policy_inputs(
+    strength: f64,
+) -> Result<SignedPolicyInputs, Box<dyn std::error::Error>> {
     let verifier = Keypair::generate();
     let signed_trust = SignedExportEnvelope::sign(trust_body(1, None), &verifier)?;
     let weights = peer_weights();
@@ -280,23 +290,23 @@ fn signed_policy_inputs(strength: f64) -> Result<SignedPolicyInputs, Box<dyn std
 }
 
 #[derive(Clone)]
-struct TreatyRuntimeFixture {
-    treaty_scope: TreatyScope,
-    treaty_scope_sha256: String,
-    ladder_intersection: runtime_api::LadderIntersection,
-    ladder_intersection_sha256: String,
-    continuation: CrossKernelContinuation,
-    continuation_sha256: String,
-    lineage_bundle: ReceiptLineageBundle,
-    lineage_bundle_sha256: String,
-    bilateral_invocation: BilateralInvocation,
-    bilateral_invocation_sha256: String,
-    bilateral_dsse_id: String,
-    bilateral_dsse: chio_federation::bilateral_dsse::DsseEnvelope,
-    bilateral_dsse_sha256: String,
+pub(super) struct TreatyRuntimeFixture {
+    pub(super) treaty_scope: TreatyScope,
+    pub(super) treaty_scope_sha256: String,
+    pub(super) ladder_intersection: runtime_api::LadderIntersection,
+    pub(super) ladder_intersection_sha256: String,
+    pub(super) continuation: CrossKernelContinuation,
+    pub(super) continuation_sha256: String,
+    pub(super) lineage_bundle: ReceiptLineageBundle,
+    pub(super) lineage_bundle_sha256: String,
+    pub(super) bilateral_invocation: BilateralInvocation,
+    pub(super) bilateral_invocation_sha256: String,
+    pub(super) bilateral_dsse_id: String,
+    pub(super) bilateral_dsse: chio_federation::bilateral_dsse::DsseEnvelope,
+    pub(super) bilateral_dsse_sha256: String,
 }
 
-fn allow_policy_evaluation_summary() -> PolicyEvaluationSummary {
+pub(super) fn allow_policy_evaluation_summary() -> PolicyEvaluationSummary {
     PolicyEvaluationSummary {
         server_a_verdict: PolicyVerdict {
             verdict: "allow".to_string(),
@@ -314,7 +324,7 @@ fn allow_policy_evaluation_summary() -> PolicyEvaluationSummary {
     }
 }
 
-fn unanimous_deny_policy_evaluation_summary() -> PolicyEvaluationSummary {
+pub(super) fn unanimous_deny_policy_evaluation_summary() -> PolicyEvaluationSummary {
     PolicyEvaluationSummary {
         server_a_verdict: PolicyVerdict {
             verdict: "deny".to_string(),
@@ -332,11 +342,11 @@ fn unanimous_deny_policy_evaluation_summary() -> PolicyEvaluationSummary {
     }
 }
 
-fn treaty_runtime_fixture() -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
+pub(super) fn treaty_runtime_fixture() -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
     treaty_runtime_fixture_with_policy(allow_policy_evaluation_summary())
 }
 
-fn treaty_runtime_fixture_with_policy(
+pub(super) fn treaty_runtime_fixture_with_policy(
     policy_evaluation_summary: PolicyEvaluationSummary,
 ) -> Result<TreatyRuntimeFixture, Box<dyn std::error::Error>> {
     treaty_runtime_fixture_with_signers(
@@ -346,7 +356,7 @@ fn treaty_runtime_fixture_with_policy(
     )
 }
 
-fn treaty_runtime_fixture_with_signers(
+pub(super) fn treaty_runtime_fixture_with_signers(
     policy_evaluation_summary: PolicyEvaluationSummary,
     signer_a: Keypair,
     signer_b: Keypair,
@@ -553,7 +563,7 @@ fn treaty_runtime_fixture_with_signers(
     })
 }
 
-fn insert_treaty_runtime_fixture(
+pub(super) fn insert_treaty_runtime_fixture(
     store: &SqliteRuntimeOrchestrationStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -590,7 +600,7 @@ fn insert_treaty_runtime_fixture(
     Ok(())
 }
 
-fn insert_in_memory_treaty_runtime_fixture(
+pub(super) fn insert_in_memory_treaty_runtime_fixture(
     store: &InMemoryRuntimeAdmissionStore,
     fixture: &TreatyRuntimeFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -627,7 +637,7 @@ fn insert_in_memory_treaty_runtime_fixture(
     Ok(())
 }
 
-fn deny_policy_bilateral_dsse(
+pub(super) fn deny_policy_bilateral_dsse(
     envelope: &DsseEnvelope,
 ) -> Result<DsseEnvelope, Box<dyn std::error::Error>> {
     let (mut statement, _) = envelope.decode_statement()?;
@@ -648,7 +658,7 @@ fn deny_policy_bilateral_dsse(
     })
 }
 
-fn treaty_runtime_context(fixture: &TreatyRuntimeFixture) -> serde_json::Value {
+pub(super) fn treaty_runtime_context(fixture: &TreatyRuntimeFixture) -> serde_json::Value {
     serde_json::json!({
         "treatyScopeId": fixture.treaty_scope.treaty_id,
         "treatyScopeSha256": fixture.treaty_scope_sha256,
@@ -674,7 +684,7 @@ fn treaty_runtime_context(fixture: &TreatyRuntimeFixture) -> serde_json::Value {
     })
 }
 
-fn treaty_runtime_request(
+pub(super) fn treaty_runtime_request(
     args: serde_json::Value,
     bundle_hash: String,
     treaty_context: serde_json::Value,
@@ -721,7 +731,7 @@ fn treaty_runtime_request(
     Ok(request)
 }
 
-fn swarm_route_metadata() -> serde_json::Value {
+pub(super) fn swarm_route_metadata() -> serde_json::Value {
     serde_json::json!({
         "route": {
             "bridge": "mcp",
@@ -731,7 +741,7 @@ fn swarm_route_metadata() -> serde_json::Value {
     })
 }
 
-fn runtime_swarm_bundle(
+pub(super) fn runtime_swarm_bundle(
     stale_continuation: bool,
 ) -> Result<SwarmAuthorityBundle, Box<dyn std::error::Error>> {
     let parent_scope = runtime_swarm_scope(3);

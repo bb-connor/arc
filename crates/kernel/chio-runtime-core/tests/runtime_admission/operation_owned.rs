@@ -342,3 +342,6 @@ fn owned_runtime_denies_wrong_physical_source() -> TestResult {
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
+
+#[path = "operation_owned/revalidation.rs"]
+mod revalidation;
