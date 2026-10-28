@@ -232,6 +232,14 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertTrue(any("raw decode" in finding for finding in findings), findings)
         self.assertFalse(any("unresolved" in finding for finding in findings), findings)
 
+    def test_binary_crate_roots_keep_crate_paths_and_namespaces(self):
+        findings = self.findings({
+            "crates/demo/src/bin/strict.rs": "mod model { pub struct Envelope { receipt: ChioReceipt } } fn bad(s: &str) { serde_json::from_str::<crate::model::Envelope>(s); }",
+            "crates/demo/src/bin/plain.rs": "mod model { pub struct Envelope { n: u32 } } fn good(s: &str) { serde_json::from_str::<crate::model::Envelope>(s); }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad", findings[0])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
