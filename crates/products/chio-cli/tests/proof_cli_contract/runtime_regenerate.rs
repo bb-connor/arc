@@ -9,7 +9,8 @@ fn runtime_root() -> tempfile::TempDir {
     copy_dir_all(
         &workspace_root().join("fixtures/proof-room").join(RELATIVE),
         &root.path().join(RELATIVE),
-    ).test_expect("copy runtime fixture");
+    )
+    .test_expect("copy runtime fixture");
     let catalog = serde_json::json!({
         "schema": "chio.proof-room.fixture-root-catalog.v1",
         "fixtures": [{
@@ -18,13 +19,24 @@ fn runtime_root() -> tempfile::TempDir {
             "description": "Runtime fixture"
         }]
     });
-    std::fs::write(root.path().join("catalog.json"), serde_json::to_vec(&catalog).test_expect("catalog JSON"))
-        .test_expect("write catalog");
+    std::fs::write(
+        root.path().join("catalog.json"),
+        serde_json::to_vec(&catalog).test_expect("catalog JSON"),
+    )
+    .test_expect("write catalog");
     root
 }
 
 fn check(root: &Path) -> std::process::Output {
-    chio(&["proof", "fixture", "regenerate", "--root", &utf8_path(root), "--check", "--json"])
+    chio(&[
+        "proof",
+        "fixture",
+        "regenerate",
+        "--root",
+        &utf8_path(root),
+        "--check",
+        "--json",
+    ])
 }
 
 #[test]
@@ -32,7 +44,8 @@ fn runtime_regenerate_check_verifies_committed_source_without_creating_a_store()
     let root = runtime_root();
     let output = check(root.path());
     assert_success(&output);
-    let report: serde_json::Value = serde_json::from_slice(&output.stdout).test_expect("report JSON");
+    let report: serde_json::Value =
+        serde_json::from_slice(&output.stdout).test_expect("report JSON");
     assert_eq!(report["passes"], 1);
     assert_eq!(report["changed"], serde_json::json!([]));
 }
@@ -40,35 +53,69 @@ fn runtime_regenerate_check_verifies_committed_source_without_creating_a_store()
 #[test]
 fn runtime_regenerate_check_refuses_missing_proof_package() {
     let root = runtime_root();
-    std::fs::remove_file(root.path().join(RELATIVE).join("proof-room-bundle/proof-package.json"))
-        .test_expect("remove package");
-    assert_failure(&check(root.path()), "runtime fixture missing required file: proof-package.json");
+    std::fs::remove_file(
+        root.path()
+            .join(RELATIVE)
+            .join("proof-room-bundle/proof-package.json"),
+    )
+    .test_expect("remove package");
+    assert_failure(
+        &check(root.path()),
+        "runtime fixture missing required file: proof-package.json",
+    );
 }
 
 #[test]
 fn runtime_regenerate_check_refuses_report_mismatch() {
     let root = runtime_root();
-    let path = root.path().join(RELATIVE).join("proof-room-bundle/verifier-report.json");
-    let mut report: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read report")).test_expect("report JSON");
+    let path = root
+        .path()
+        .join(RELATIVE)
+        .join("proof-room-bundle/verifier-report.json");
+    let mut report: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).test_expect("read report"))
+            .test_expect("report JSON");
     report["accepted"] = serde_json::json!(false);
-    std::fs::write(&path, serde_json::to_vec(&report).test_expect("encode report")).test_expect("write report");
-    assert_failure(&check(root.path()), "runtime fixture verifier report mismatch");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&report).test_expect("encode report"),
+    )
+    .test_expect("write report");
+    assert_failure(
+        &check(root.path()),
+        "runtime fixture verifier report mismatch",
+    );
 }
 
 #[test]
 fn runtime_regenerate_check_refuses_report_schema_drift() {
     let root = runtime_root();
-    let path = root.path().join(RELATIVE).join("proof-room-bundle/verifier-report.json");
-    let mut report: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read report")).test_expect("report JSON");
+    let path = root
+        .path()
+        .join(RELATIVE)
+        .join("proof-room-bundle/verifier-report.json");
+    let mut report: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).test_expect("read report"))
+            .test_expect("report JSON");
     report["schema"] = serde_json::json!("chio.attest.verifier-report.v2");
-    std::fs::write(&path, serde_json::to_vec(&report).test_expect("encode report")).test_expect("write report");
-    assert_failure(&check(root.path()), "runtime fixture schema mismatch: verifier-report.json");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&report).test_expect("encode report"),
+    )
+    .test_expect("write report");
+    assert_failure(
+        &check(root.path()),
+        "runtime fixture schema mismatch: verifier-report.json",
+    );
 }
 
 #[test]
 fn runtime_regenerate_check_refuses_package_byte_tamper() {
     let root = runtime_root();
-    let path = root.path().join(RELATIVE).join("proof-room-bundle/proof-package.json");
+    let path = root
+        .path()
+        .join(RELATIVE)
+        .join("proof-room-bundle/proof-package.json");
     let mut bytes = std::fs::read(&path).test_expect("read package");
     bytes.push(b' ');
     std::fs::write(&path, bytes).test_expect("write package");
@@ -78,22 +125,46 @@ fn runtime_regenerate_check_refuses_package_byte_tamper() {
 #[test]
 fn runtime_regenerate_check_refuses_invalid_workflow_signature() {
     let root = runtime_root();
-    let path = root.path().join(RELATIVE).join("proof-room-bundle/proof-package.json");
-    let mut package: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read package")).test_expect("package JSON");
+    let path = root
+        .path()
+        .join(RELATIVE)
+        .join("proof-room-bundle/proof-package.json");
+    let mut package: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).test_expect("read package"))
+            .test_expect("package JSON");
     package["workflowReceipt"]["signature"] = serde_json::json!("00".repeat(64));
-    std::fs::write(&path, serde_json::to_vec(&package).test_expect("encode package")).test_expect("write package");
-    assert_failure(&check(root.path()), "runtime fixture proof rejected: workflow");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&package).test_expect("encode package"),
+    )
+    .test_expect("write package");
+    assert_failure(
+        &check(root.path()),
+        "runtime fixture proof rejected: workflow",
+    );
 }
 
 #[test]
 fn runtime_regenerate_check_refuses_descriptor_scope_drift() {
-    for (field, value) in [("kind", "negative-transaction-passport"), ("path", "fixtures/proof-room/elsewhere")] {
+    for (field, value) in [
+        ("kind", "negative-transaction-passport"),
+        ("path", "fixtures/proof-room/elsewhere"),
+    ] {
         let root = runtime_root();
         let path = root.path().join("catalog.json");
-        let mut catalog: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).test_expect("read catalog")).test_expect("catalog JSON");
+        let mut catalog: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).test_expect("read catalog"))
+                .test_expect("catalog JSON");
         catalog["fixtures"][0][field] = serde_json::json!(value);
-        std::fs::write(&path, serde_json::to_vec(&catalog).test_expect("encode catalog")).test_expect("write catalog");
-        assert_failure(&check(root.path()), "runtime fixture descriptor mismatch: recursive-runtime-swarm");
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&catalog).test_expect("encode catalog"),
+        )
+        .test_expect("write catalog");
+        assert_failure(
+            &check(root.path()),
+            "runtime fixture descriptor mismatch: recursive-runtime-swarm",
+        );
     }
 }
 
@@ -103,10 +174,19 @@ fn runtime_regenerate_converges_with_one_qualified_generation() {
     copy_dir_all(
         &workspace_root().join("fixtures/proof-room/swarm-authority"),
         &root.path().join("swarm-authority"),
-    ).test_expect("copy runtime inputs");
-    let output = chio(&["proof", "fixture", "regenerate", "--root", &utf8_path(root.path()), "--json"]);
+    )
+    .test_expect("copy runtime inputs");
+    let output = chio(&[
+        "proof",
+        "fixture",
+        "regenerate",
+        "--root",
+        &utf8_path(root.path()),
+        "--json",
+    ]);
     assert_success(&output);
-    let report: serde_json::Value = serde_json::from_slice(&output.stdout).test_expect("report JSON");
+    let report: serde_json::Value =
+        serde_json::from_slice(&output.stdout).test_expect("report JSON");
     assert_eq!(report["passes"], 2);
     assert_eq!(report["changed"], serde_json::json!([RELATIVE]));
     assert_success(&check(root.path()));
