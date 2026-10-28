@@ -3311,12 +3311,12 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "290345bebbd5f22a4c83d9229cf3b12d94239bfcf256b471f964bd99365dca82"
+normalized_sha256 = "35f873142270e4e2fcbc16e571dc4cce6bad1d82267ce5ba33f600c3841877cb"
 symbol_sha256 = [
   { symbol = "initialize_admission_operation_schema", sha256 = "ebd2cb5a37b5f7db5413af942a400d657699644f83a857aed134b53bcad5188f" },
   { symbol = "verify_admission_operation_invariants", sha256 = "86c004ee3c7f6a900f895ab3573f31644434a1e3d34c9ed2d9adf321a2b381b1" },
   { symbol = "verify_admission_operation_schema", sha256 = "de79fa606f610563a0562aed2211835a119a6aa2884d339b24ab66b70cbeab86" },
-  { symbol = "admission_operation_schema_catalog", sha256 = "4a8cba51f37d8fc12954a905486130a1e772b734099c64a6ee56cd23a8f239fb" },
+  { symbol = "admission_operation_schema_catalog", sha256 = "1540d2a73d631dd29867dc5d3b0433b811be2d746a1c148bf43d05b276e45391" },
 ]
 
 [[mirror]]
@@ -3700,9 +3700,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/execution_nonce/issuance.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::issue_nonce"]
-normalized_sha256 = "a7d5e809f260097433ed26bbcb01bbe26dd1ff2108d2f0c6aae0bfe33d38ab25"
+normalized_sha256 = "7ecaa14b96dc5dd253cea2e0c9c88b6668a986f31a33bd01880b7e22dbee001d"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::issue_nonce", sha256 = "0178026eea9093e18441f360497f5ca93b3ea9890aacabff05e5727e59c2165e" },
+  { symbol = "SqliteAdmissionOperationStore::issue_nonce", sha256 = "6d406b4ae3a701cca3c6a2ed4d39dc3398017765ce48343867ed1b5f00121f78" },
 ]
 
 [[mirror]]
