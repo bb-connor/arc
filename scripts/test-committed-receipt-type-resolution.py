@@ -645,6 +645,36 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(self.raw_decodes(document)), 1)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": "fn unknown(m: Option<Value>) -> Result<(), E> { let r: u64 = m.ok_or(e()).and_then(|value| serde_json::from_value(value).map(stamp))?; Ok(()) }"}), ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_value(value)"])
 
+    def test_partial_scrutinee_patterns_do_not_name_the_whole_target(self):
+        marker = "struct Marker { n: u64 } fn stamp(r: ChioReceipt) -> u64 { r.timestamp } "
+        inferred = ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"]
+        for body in [
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok((Marker { .. }, r)) => stamp(r), Err(_) => 0 } }",
+            "fn unknown(s: &str) -> u64 { if let Ok((Marker { .. }, r)) = serde_json::from_str(s) { stamp(r) } else { 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(((Marker { .. }, _), Marker { n })) => n, Err(_) => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Some((Marker { n }, r))) => n + stamp(r), _ => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok((Marker { n }, ..)) => n, Err(_) => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok([first, ..]) => stamp(first), _ => 0 } }",
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok((ref m @ Marker { .. }, ref r)) => m.n + stamp(r.clone()), Err(_) => 0 } }",
+        ]:
+            with self.subTest(body=body):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": marker + body}), inferred)
+
+    def test_complete_scrutinee_patterns_name_the_target(self):
+        marker = "struct Marker { n: u64 } "
+        for body, expected in [
+            ("fn bad(s: &str) -> u64 { match serde_json::from_str(s) { Ok((Marker { n }, ChioReceipt { timestamp, .. })) => n + timestamp, Err(_) => 0 } }", 1),
+            ("fn bad(s: &str) -> u64 { match serde_json::from_str(s) { Ok((Marker { .. }, r)) => 0, Ok((_, ChioReceipt { timestamp, .. })) => timestamp, Err(_) => 0 } }", 1),
+            ("fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Marker { n }) => n, Err(_) => 0 } }", 0),
+            ("fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok((Marker { n }, Marker { .. })) => n, Err(_) => 0 } }", 0),
+            ("fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Some(m @ Marker { .. })) => m.n, _ => 0 } }", 0),
+            ("fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok([Marker { n }, ..]) => n, _ => 0 } }", 0),
+        ]:
+            with self.subTest(body=body):
+                findings = self.findings({"crates/demo/src/lib.rs": marker + body})
+                self.assertEqual(len(findings), expected, findings)
+                self.assertTrue(all(": raw decode " in finding for finding in findings), findings)
+
     def test_extractor_alias_chains_resolve_before_filtering(self):
         local = "mod input { pub struct Bounded<T>(pub T); impl<S, T> FromRequest<S> for Bounded<T> where T: DeserializeOwned { type Rejection = E; async fn from_request(request: Request, state: &S) -> Result<Self,E> { let bytes=read(request); serde_json::from_slice(&bytes).map(Self).map_err(wrap) } } } "
         for prefix in [
