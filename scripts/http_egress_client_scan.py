@@ -50,7 +50,7 @@ UNSCANNED_PACKAGES = frozenset(
 DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 USE_STATEMENT = re.compile(r"\b(pub(?:\([^)]*\))?\s+)?use\s+([^;]*);", re.S)
 EXTERN_CRATE = re.compile(r"\bextern\s+crate\s+([A-Za-z_]\w*)\s+as\s+([A-Za-z_]\w*)\s*;")
-QUALIFIED_TYPE_PATH = re.compile(r"<([^<>]*)>\s*::\s*\w+")
+QUALIFIED_TYPE_PATH = re.compile(r"(?<![\w:])<\s*([\w:\s]+?)\s*(?:>\s*::|\bas\b)")
 TYPE_ALIAS = re.compile(r"\btype\s+([A-Za-z_]\w*)\s*(?:<[^=;]*>)?\s*=\s*([^;]+);")
 
 
