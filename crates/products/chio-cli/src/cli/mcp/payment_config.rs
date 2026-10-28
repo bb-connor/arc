@@ -53,18 +53,21 @@ impl PaymentAdapterConfig {
     /// an unrecognized value would otherwise silently mask a misconfigured
     /// real payment rail.
     pub fn from_env() -> Result<Option<Self>, String> {
-        let kind = match std::env::var("CHIO_PAYMENT_ADAPTER") {
-            Ok(value) => value,
-            Err(_) => return Ok(None),
+        Self::from_lookup(|name| std::env::var(name).ok())
+    }
+
+    /// [`Self::from_env`] over an explicit variable lookup.
+    fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Option<Self>, String> {
+        let Some(kind) = lookup("CHIO_PAYMENT_ADAPTER") else {
+            return Ok(None);
         };
-        let base_url = std::env::var("CHIO_PAYMENT_BASE_URL").unwrap_or_default();
-        let bearer_token = std::env::var("CHIO_PAYMENT_BEARER_TOKEN").ok();
+        let base_url = lookup("CHIO_PAYMENT_BASE_URL").unwrap_or_default();
+        let bearer_token = lookup("CHIO_PAYMENT_BEARER_TOKEN");
         match kind.as_str() {
             "sim" | "" => Ok(None),
             "http-x402" => {
-                let required = |name: &str| {
-                    std::env::var(name).map_err(|_| format!("http-x402 requires {name}"))
-                };
+                let required =
+                    |name: &str| lookup(name).ok_or_else(|| format!("http-x402 requires {name}"));
                 let network = X402Network::allowlisted(&required("CHIO_PAYMENT_X402_NETWORK")?)
                     .map_err(|error| format!("CHIO_PAYMENT_X402_NETWORK: {error}"))?;
                 let token_decimals = required("CHIO_PAYMENT_X402_TOKEN_DECIMALS")?
@@ -260,6 +263,13 @@ mod tests {
             "file:",
             "file:?cache=shared",
             "file:#fragment",
+            "file://",
+            "file://localhost",
+            "file://LOCALHOST",
+            "file://?cache=shared",
+            "file://localhost?mode=rwc",
+            "file://localhost#fragment",
+            "file://example.com/var/lib/chio/x402-replay.sqlite3",
         ] {
             assert_eq!(
                 durable_replay_db_path(path),
@@ -276,8 +286,39 @@ mod tests {
             "x402-replay.sqlite3",
             "file:/var/lib/chio/x402-replay.sqlite3",
             "file:x402-replay.sqlite3?mode=rwc",
+            "file:///var/lib/chio/x402-replay.sqlite3",
+            "file://localhost/var/lib/chio/x402-replay.sqlite3",
         ] {
             assert_eq!(durable_replay_db_path(path), Ok(path), "{path:?}");
+        }
+    }
+
+    #[test]
+    fn http_x402_refuses_a_non_durable_replay_store_at_load() {
+        let variables = |replay_db: &'static str| {
+            move |name: &str| {
+                match name {
+                    "CHIO_PAYMENT_ADAPTER" => Some("http-x402"),
+                    "CHIO_PAYMENT_BASE_URL" => Some("https://facilitator.example"),
+                    "CHIO_PAYMENT_X402_NETWORK" => Some("eip155:84532"),
+                    "CHIO_PAYMENT_X402_ASSET" => Some("0x036cbd53842c5426634e7929541ec2318f3dcf7e"),
+                    "CHIO_PAYMENT_X402_TOKEN_SYMBOL" => Some("USDC"),
+                    "CHIO_PAYMENT_X402_TOKEN_DECIMALS" => Some("6"),
+                    "CHIO_PAYMENT_X402_PAY_TO" => Some("0x2000000000000000000000000000000000000002"),
+                    "CHIO_PAYMENT_X402_REPLAY_DB" => Some(replay_db),
+                    _ => None,
+                }
+                .map(str::to_owned)
+            }
+        };
+        for (replay_db, refusal) in [
+            ("", X402ReplayStorePathError::Empty),
+            (":memory:", X402ReplayStorePathError::NonDurable),
+            ("file://localhost", X402ReplayStorePathError::NonDurable),
+        ] {
+            let error = PaymentAdapterConfig::from_lookup(variables(replay_db))
+                .test_expect_err("a non-durable replay store is refused at load");
+            assert_eq!(error, format!("CHIO_PAYMENT_X402_REPLAY_DB: {refusal}"));
         }
     }
 }
