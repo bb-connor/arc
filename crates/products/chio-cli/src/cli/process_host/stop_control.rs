@@ -6,6 +6,7 @@
 //! it. Both paths drive the same durable stop chain.
 
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use chio_kernel::stop::{
@@ -116,6 +117,20 @@ pub(super) struct ControlServer {
     socket: PathBuf,
 }
 
+fn validate_token_destination(path: &Path) -> std::io::Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err(std::io::Error::from_raw_os_error(libc::ELOOP))
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            Err(std::io::Error::other("input must be a regular file"))
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 impl ControlServer {
     /// Bind the socket and write a fresh token. Call only under the host lease.
     pub(super) fn bind(lease: &Lease) -> Result<Self, CliError> {
@@ -129,10 +144,25 @@ impl ControlServer {
         let mut bytes = [0_u8; 32];
         OsRng.try_fill_bytes(&mut bytes).map_err(error)?;
         let token = hex::encode(bytes);
-        let mut file = crate::input::create_regular(&directory.join(TOKEN_FILE))?;
-        file.set_len(0)?;
+        let token_path = directory.join(TOKEN_FILE);
+        validate_token_destination(&token_path)?;
+        let mut file = tempfile::Builder::new()
+            .prefix(".control-token-")
+            .make_in(directory, crate::input::create_new_regular)?;
+        let metadata = file.as_file().metadata()?;
+        if !metadata.is_file()
+            || metadata.nlink() != 1
+            || metadata.uid() != rustix::process::geteuid().as_raw()
+            || metadata.mode() & 0o077 != 0
+        {
+            return Err(error(
+                "control token must be a private regular file owned by the host",
+            ));
+        }
         file.write_all(token.as_bytes())?;
-        file.sync_all()?;
+        file.as_file().sync_all()?;
+        lease.directory.validate_path_identity()?;
+        file.persist(&token_path).map_err(|failure| failure.error)?;
         let listener = UnixListener::bind(&socket)?;
         lease.directory.validate_path_identity()?;
         Ok(Self {

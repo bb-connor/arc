@@ -90,10 +90,10 @@ pub(crate) fn open_regular(path: &Path) -> Result<std::fs::File, std::io::Error>
 }
 
 #[cfg(unix)]
-pub(crate) fn create_regular(path: &Path) -> Result<std::fs::File, std::io::Error> {
+pub(crate) fn create_new_regular(path: &Path) -> Result<std::fs::File, std::io::Error> {
     use std::os::unix::fs::OpenOptionsExt;
     let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).mode(0o600);
+    options.write(true).create_new(true).mode(0o600);
     open_regular_options(path, options)
 }
 
