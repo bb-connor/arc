@@ -52185,6 +52185,448 @@ pub mod receipt_admission_metadata {
         }
     }
 }
+pub mod receipt_decision_model_witness {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioDecisionModelWitnessReceiptMetadata`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json",
+    ///  "title": "Chio Decision Model Witness Receipt Metadata",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact_digest",
+    ///    "evaluation",
+    ///    "model_card_digest",
+    ///    "outcome",
+    ///    "schema",
+    ///    "work_ops"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "evaluation": {
+    ///      "enum": [
+    ///        "evaluated",
+    ///        "fallback"
+    ///      ]
+    ///    },
+    ///    "fallback_reason": {
+    ///      "enum": [
+    ///        "empty_proposal",
+    ///        "proposal_infeasible",
+    ///        "scorer_error",
+    ///        "work_exhausted",
+    ///        "policy_unavailable"
+    ///      ]
+    ///    },
+    ///    "model_card_digest": {
+    ///      "$ref": "#/$defs/digest"
+    ///    },
+    ///    "outcome": {
+    ///      "enum": [
+    ///        "allow",
+    ///        "hold",
+    ///        "deny"
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.decision-model-witness.v1"
+    ///    },
+    ///    "work_ops": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioDecisionModelWitnessReceiptMetadata {
+        pub artifact_digest: Digest,
+        pub evaluation: ChioDecisionModelWitnessReceiptMetadataEvaluation,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub fallback_reason:
+            ::std::option::Option<ChioDecisionModelWitnessReceiptMetadataFallbackReason>,
+        pub model_card_digest: Digest,
+        pub outcome: ChioDecisionModelWitnessReceiptMetadataOutcome,
+        pub schema: ::serde_json::Value,
+        pub work_ops: u32,
+    }
+    impl ::std::convert::From<&ChioDecisionModelWitnessReceiptMetadata>
+        for ChioDecisionModelWitnessReceiptMetadata
+    {
+        fn from(value: &ChioDecisionModelWitnessReceiptMetadata) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioDecisionModelWitnessReceiptMetadataEvaluation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "evaluated",
+    ///    "fallback"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDecisionModelWitnessReceiptMetadataEvaluation {
+        #[serde(rename = "evaluated")]
+        Evaluated,
+        #[serde(rename = "fallback")]
+        Fallback,
+    }
+    impl ::std::convert::From<&Self> for ChioDecisionModelWitnessReceiptMetadataEvaluation {
+        fn from(value: &ChioDecisionModelWitnessReceiptMetadataEvaluation) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDecisionModelWitnessReceiptMetadataEvaluation {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Evaluated => f.write_str("evaluated"),
+                Self::Fallback => f.write_str("fallback"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDecisionModelWitnessReceiptMetadataEvaluation {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "evaluated" => Ok(Self::Evaluated),
+                "fallback" => Ok(Self::Fallback),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDecisionModelWitnessReceiptMetadataEvaluation {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataEvaluation
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataEvaluation
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioDecisionModelWitnessReceiptMetadataFallbackReason`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "empty_proposal",
+    ///    "proposal_infeasible",
+    ///    "scorer_error",
+    ///    "work_exhausted",
+    ///    "policy_unavailable"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDecisionModelWitnessReceiptMetadataFallbackReason {
+        #[serde(rename = "empty_proposal")]
+        EmptyProposal,
+        #[serde(rename = "proposal_infeasible")]
+        ProposalInfeasible,
+        #[serde(rename = "scorer_error")]
+        ScorerError,
+        #[serde(rename = "work_exhausted")]
+        WorkExhausted,
+        #[serde(rename = "policy_unavailable")]
+        PolicyUnavailable,
+    }
+    impl ::std::convert::From<&Self> for ChioDecisionModelWitnessReceiptMetadataFallbackReason {
+        fn from(value: &ChioDecisionModelWitnessReceiptMetadataFallbackReason) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDecisionModelWitnessReceiptMetadataFallbackReason {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EmptyProposal => f.write_str("empty_proposal"),
+                Self::ProposalInfeasible => f.write_str("proposal_infeasible"),
+                Self::ScorerError => f.write_str("scorer_error"),
+                Self::WorkExhausted => f.write_str("work_exhausted"),
+                Self::PolicyUnavailable => f.write_str("policy_unavailable"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDecisionModelWitnessReceiptMetadataFallbackReason {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "empty_proposal" => Ok(Self::EmptyProposal),
+                "proposal_infeasible" => Ok(Self::ProposalInfeasible),
+                "scorer_error" => Ok(Self::ScorerError),
+                "work_exhausted" => Ok(Self::WorkExhausted),
+                "policy_unavailable" => Ok(Self::PolicyUnavailable),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDecisionModelWitnessReceiptMetadataFallbackReason {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataFallbackReason
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataFallbackReason
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioDecisionModelWitnessReceiptMetadataOutcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "allow",
+    ///    "hold",
+    ///    "deny"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioDecisionModelWitnessReceiptMetadataOutcome {
+        #[serde(rename = "allow")]
+        Allow,
+        #[serde(rename = "hold")]
+        Hold,
+        #[serde(rename = "deny")]
+        Deny,
+    }
+    impl ::std::convert::From<&Self> for ChioDecisionModelWitnessReceiptMetadataOutcome {
+        fn from(value: &ChioDecisionModelWitnessReceiptMetadataOutcome) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioDecisionModelWitnessReceiptMetadataOutcome {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Allow => f.write_str("allow"),
+                Self::Hold => f.write_str("hold"),
+                Self::Deny => f.write_str("deny"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioDecisionModelWitnessReceiptMetadataOutcome {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "allow" => Ok(Self::Allow),
+                "hold" => Ok(Self::Hold),
+                "deny" => Ok(Self::Deny),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioDecisionModelWitnessReceiptMetadataOutcome {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataOutcome
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioDecisionModelWitnessReceiptMetadataOutcome
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Digest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod receipt_delivery_contract {
     /// Error types.
     pub mod error {

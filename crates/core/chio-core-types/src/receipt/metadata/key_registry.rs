@@ -10,10 +10,10 @@
 use alloc::format;
 
 use super::{
-    BUDGET_AUTHORITY_METADATA_KEY, CHANNEL_METADATA_KEY, DELIVERY_CONTRACT_METADATA_KEY,
-    DELIVERY_CONTRACT_SCHEMA, FINANCIAL_METADATA_KEY, FINDING_DELIVERY_METADATA_KEY,
-    FINDING_DELIVERY_SCHEMA, FINDING_RECOVERY_METADATA_KEY, FINDING_RECOVERY_SCHEMA,
-    GOVERNED_TRANSACTION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY, CHANNEL_METADATA_KEY, DECISION_MODEL_WITNESS_METADATA_KEY,
+    DECISION_MODEL_WITNESS_SCHEMA, DELIVERY_CONTRACT_METADATA_KEY, DELIVERY_CONTRACT_SCHEMA,
+    FINANCIAL_METADATA_KEY, FINDING_DELIVERY_METADATA_KEY, FINDING_DELIVERY_SCHEMA,
+    FINDING_RECOVERY_METADATA_KEY, FINDING_RECOVERY_SCHEMA, GOVERNED_TRANSACTION_METADATA_KEY,
 };
 use crate::error::{Error, Result};
 use crate::receipt::signing::{
@@ -223,6 +223,13 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         CommittedSafe,
         None,
         "Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths.",
+    ),
+    spec(
+        DECISION_MODEL_WITNESS_METADATA_KEY,
+        ChioInternal,
+        CommittedSafe,
+        Some(DECISION_MODEL_WITNESS_SCHEMA),
+        "Decision-model witness: model card and artifact digests, outcome (the verdict class), evaluated-or-fallback tag, closed fallback reason and the model-constant work count. No argument, result, atom or rule selection, or margin. Read by the kernel's replay path and the offline verifier.",
     ),
     spec(
         "findingDenial",
