@@ -50,6 +50,8 @@ pub enum ExecutorError {
     StaleLease,
     #[error("response execution store failed: {0}")]
     Store(#[source] PortError),
+    #[error("response execution store is retired")]
+    StoreRetired,
     #[error("response state machine failed: {0}")]
     StateMachine(#[from] StateMachineError),
     #[error("scheduled work does not match the response plan")]

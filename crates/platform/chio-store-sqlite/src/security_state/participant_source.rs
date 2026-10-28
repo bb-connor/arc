@@ -81,7 +81,7 @@ pub struct SqliteSecurityParticipantSource {
 
 pub(super) fn ensure_legacy_writable(connection: &Connection) -> PortResult<()> {
     if schema::has_evidence(connection).map_err(|_| PortError::integrity_failure())? {
-        return Err(PortError::conflict());
+        return Err(PortError::retired());
     }
     Ok(())
 }

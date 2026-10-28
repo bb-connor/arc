@@ -398,10 +398,7 @@ impl ResponseSchedulerStore for SchedulerStore {
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
         let state = self.state()?;
         if state.retired {
-            return Err(PortError::new(
-                chio_security_types::ports::PortErrorKind::Conflict,
-                ErrorCode::new("store.retired")?,
-            ));
+            return Err(PortError::retired());
         }
         if state.work.as_ref() == Some(work) {
             Ok(())
@@ -1471,7 +1468,7 @@ fn scheduler_reports_a_retired_store_instead_of_a_lost_lease() {
 
     let outcome = scheduler.process(&live, 1_050);
     assert!(
-        matches!(outcome, Err(SchedulerError::Store(ref error)) if error.code().as_str() == "store.retired"),
+        matches!(outcome, Err(SchedulerError::Store(ref error)) if *error == PortError::retired()),
         "{outcome:?}"
     );
     assert_eq!(executor.calls(), 0);

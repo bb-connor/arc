@@ -2150,6 +2150,19 @@ pub const KERNEL_RESPONSE_EXECUTOR_STALE_LEASE: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
 };
 
+pub const KERNEL_RESPONSE_EXECUTOR_STORE_RETIRED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:response-executor-store-retired",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Response refused: response executor store retired.",
+    help: "Inspect the named rule and durable evidence; never bypass the refusal or widen authority on retry.",
+    string_code: "CHIO-KERNEL-RESPONSE-EXECUTOR-STORE-RETIRED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-security-types", "chio-quarantine", "chio-control-plane"],
+};
+
 pub const KERNEL_RESPONSE_EXECUTOR_WORK_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:response-executor-work-mismatch",
     domain: Domain::Kernel,
@@ -4151,6 +4164,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_RESPONSE_EXECUTOR_INVALID_EFFECT_RESULT,
     KERNEL_RESPONSE_EXECUTOR_RECEIPT_LINEAGE_MISMATCH,
     KERNEL_RESPONSE_EXECUTOR_STALE_LEASE,
+    KERNEL_RESPONSE_EXECUTOR_STORE_RETIRED,
     KERNEL_RESPONSE_EXECUTOR_WORK_MISMATCH,
     KERNEL_RESPONSE_PLAN_AFFECTED_IDS,
     KERNEL_RESPONSE_PLAN_AFFECTED_SET_HASH,

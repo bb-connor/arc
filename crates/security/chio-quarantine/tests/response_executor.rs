@@ -509,10 +509,7 @@ impl ResponseSchedulerStore for CrashStore {
 
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
         if self.retired.load(Ordering::Acquire) {
-            return Err(PortError::new(
-                PortErrorKind::Conflict,
-                chio_security_types::ports::ErrorCode::new("store.retired")?,
-            ));
+            return Err(PortError::retired());
         }
         let current = self
             .durable_work

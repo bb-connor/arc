@@ -56,11 +56,7 @@ fn sealed_current_source_import_retains_exact_rows_and_seal() -> AnchoredTestRes
     let error = crate::SqliteSecurityStateStore::open(&path)
         .err()
         .ok_or("sealed source was reopened as a writable serving store")?;
-    assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::Conflict
-    );
-    assert_eq!(error.code().as_str(), "store.conflict");
+    assert_eq!(error, chio_security_types::ports::PortError::retired());
     drop(source);
     let reopened = SqliteSecurityParticipantSource::open(&path)?;
     reopened.verify_seal(expected.snapshot())?;

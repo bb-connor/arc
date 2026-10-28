@@ -1,4 +1,5 @@
 use super::*;
+use chio_security_types::ports::PortError;
 use chio_store_sqlite::security_state::{
     SecurityParticipantSourceBinding, SqliteSecurityParticipantSource,
 };
@@ -29,8 +30,9 @@ fn superseded_lease_on_a_writable_store_is_a_conflict() {
         store.validate_lease(&superseded),
         "superseded lease validated",
     );
+    assert_eq!(error, PortError::conflict());
     assert_eq!(error.kind(), PortErrorKind::Conflict);
-    assert_eq!(error.code().as_str(), "store.conflict");
+    assert!(!error.is_retired());
 }
 
 #[test]
@@ -63,7 +65,11 @@ fn live_lease_on_a_sealed_store_is_refused_as_retired() {
         .seal_exact(&expected)
         .unwrap_or_else(|error| panic!("participant source seal failed: {error}"));
 
-    let error = rejected(store.validate_lease(&work), "sealed store validated a lease");
+    let error = rejected(
+        store.validate_lease(&work),
+        "sealed store validated a lease",
+    );
+    assert_eq!(error, PortError::retired());
     assert_eq!(error.kind(), PortErrorKind::Conflict);
-    assert_eq!(error.code().as_str(), "store.retired");
+    assert!(error.is_retired());
 }

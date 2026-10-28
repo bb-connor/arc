@@ -1,5 +1,5 @@
 use super::*;
-use chio_security_types::ports::PortErrorKind;
+use chio_security_types::ports::{PortError, PortErrorKind};
 
 #[test]
 fn sealed_source_refuses_legacy_writers_as_retired() -> TestResult {
@@ -13,7 +13,8 @@ fn sealed_source_refuses_legacy_writers_as_retired() -> TestResult {
     let refusal = super::super::ensure_legacy_writable(&Connection::open(&path)?)
         .err()
         .ok_or("sealed source accepted a legacy writer")?;
+    assert_eq!(refusal, PortError::retired());
     assert_eq!(refusal.kind(), PortErrorKind::Conflict);
-    assert_eq!(refusal.code().as_str(), "store.retired");
+    assert!(refusal.is_retired());
     Ok(())
 }

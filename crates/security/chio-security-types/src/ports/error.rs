@@ -3,6 +3,8 @@ use alloc::string::ToString;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 
+const STORE_RETIRED: &str = "store.retired";
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PortErrorKind {
@@ -66,6 +68,21 @@ impl PortError {
             PortErrorKind::Conflict,
             ErrorCode("store.conflict".to_string()),
         )
+    }
+
+    /// A write-sealed store refuses every operation under its own rule, so a
+    /// permanent retirement is never confused with a lost compare-and-swap.
+    #[must_use]
+    pub fn retired() -> Self {
+        Self::new(
+            PortErrorKind::Conflict,
+            ErrorCode(STORE_RETIRED.to_string()),
+        )
+    }
+
+    #[must_use]
+    pub fn is_retired(&self) -> bool {
+        self.kind == PortErrorKind::Conflict && self.code.as_str() == STORE_RETIRED
     }
 
     #[must_use]

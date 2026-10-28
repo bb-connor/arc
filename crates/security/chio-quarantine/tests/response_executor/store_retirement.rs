@@ -10,6 +10,7 @@ fn live_lease_on_a_retired_store_is_refused_as_store_retired() {
     harness.store.retire();
 
     let error = expect_err(executor.execute(&planned, &live, 110));
+    assert!(matches!(error, ExecutorError::StoreRetired), "{error:?}");
     assert_eq!(
         error.code(),
         "urn:chio:error:kernel:response-executor-store-retired"

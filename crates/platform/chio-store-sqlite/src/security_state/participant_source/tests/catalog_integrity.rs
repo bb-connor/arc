@@ -18,7 +18,7 @@ fn current_source_retains_its_seal_and_rows_across_reopen() -> TestResult {
     let error = SqliteSecurityStateStore::open(&path)
         .err()
         .ok_or("sealed source accepted a writer")?;
-    assert_eq!(error, chio_security_types::ports::PortError::conflict());
+    assert_eq!(error, chio_security_types::ports::PortError::retired());
     drop(source);
     let reopened = SqliteSecurityParticipantSource::open(&path)?;
     reopened.verify_seal(&expected)?;
