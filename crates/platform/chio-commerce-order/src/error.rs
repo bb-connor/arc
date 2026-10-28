@@ -61,6 +61,8 @@ pub enum CommerceEscrowError {
     OfferOutsideValidityWindow,
     #[error("offer token is issued by its own subject")]
     OfferSelfIssued,
+    #[error("offer token issuer is not the order merchant key")]
+    OfferIssuerNotMerchant,
     #[error("escrow acceptance is not signed by the offer token subject")]
     AcceptorNotSubject,
     #[error("unsupported escrow acceptance schema: {0}")]

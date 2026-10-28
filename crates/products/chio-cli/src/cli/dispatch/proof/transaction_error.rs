@@ -254,6 +254,7 @@ fn commerce_escrow_error_spec(
         Error::AcceptStateNotAllowed(_)
         | Error::OfferOutsideValidityWindow
         | Error::OfferSelfIssued
+        | Error::OfferIssuerNotMerchant
         | Error::AcceptorNotSubject
         | Error::AcceptanceUnbound(_)
         | Error::OfferLiabilityInvalid(_)
