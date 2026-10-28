@@ -105,3 +105,47 @@ fn governed_denial_display_preserves_the_real_signed_receipt() {
     assert_eq!(result["content"], expected["content"]);
     assert_eq!(result["structuredContent"], expected["structuredContent"]);
 }
+
+#[test]
+fn typed_governed_failure_notifications_project_generic_text() {
+    let _metrics_guard = metrics_test_guard();
+    let mut edge = make_edge_with_config(10, true);
+    let error = KernelError::GovernedTransactionDenied("Bearer secret-token".to_string());
+    let outcome =
+        edge.tool_call_error_outcome(&SessionId::new("notification-projection"), error, None);
+    let notifications = edge.take_pending_notifications();
+    assert_eq!(
+        notifications,
+        vec![json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/message",
+            "params": {
+                "level": "error",
+                "logger": "chio.mcp.tools",
+                "data": {"event": "tool_failed", "error": "Governed transaction denied"},
+            },
+        })]
+    );
+    let ToolCallEdgeOutcome::Result(result) = outcome else {
+        panic!("governed denial did not produce a tool result");
+    };
+    assert_eq!(result, governed_error_result());
+}
+
+#[test]
+fn other_failure_notifications_preserve_their_error_text() {
+    let _metrics_guard = metrics_test_guard();
+    let mut edge = make_edge_with_config(10, true);
+    let error =
+        KernelError::InvalidConstraint("governed transaction denied: arbitrary".to_string());
+    let expected = error.to_string();
+    let outcome = edge.tool_call_error_outcome(&SessionId::new("other-notification"), error, None);
+    let notifications = edge.take_pending_notifications();
+    assert_eq!(notifications.len(), 1);
+    assert_eq!(notifications[0]["params"]["data"]["error"], expected);
+    let ToolCallEdgeOutcome::Result(result) = outcome else {
+        panic!("constraint refusal did not produce a tool result");
+    };
+    assert_eq!(result["content"][0]["text"], expected);
+    assert!(result.get("structuredContent").is_none());
+}
