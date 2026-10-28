@@ -562,7 +562,6 @@ fn chio_federation_treaty_handlers_do_not_call_historical_runtime_directly() {
 fn chio_runtime_dispatch_handlers_do_not_call_historical_runtime_directly() {
     let runtime_modules = [
         include_str!("cli/chio/dispatch/runtime.rs"),
-        include_str!("cli/chio/dispatch/runtime/admission.rs"),
         include_str!("cli/chio/dispatch/runtime/io.rs"),
         include_str!("cli/chio/dispatch/runtime/loopback.rs"),
         include_str!("cli/chio/dispatch/runtime/ops.rs"),
@@ -573,18 +572,6 @@ fn chio_runtime_dispatch_handlers_do_not_call_historical_runtime_directly() {
     for module in runtime_modules {
         assert!(!module.contains("chio_runtime_core::"));
     }
-}
-
-#[test]
-fn chio_runtime_active_subject_namespaces_are_chio_native() {
-    let runtime_admission = include_str!("cli/chio/dispatch/runtime/admission.rs");
-    let chio_namespace = format!("{}.{}", "chio", "runtime");
-    let expected_assignment = format!("subject_class_namespace: \"{chio_namespace}\".to_string()");
-
-    assert!(
-            runtime_admission.contains(&expected_assignment),
-            "active Chio runtime admission dispatch tests must exercise the Chio runtime subject namespace"
-        );
 }
 
 #[test]
