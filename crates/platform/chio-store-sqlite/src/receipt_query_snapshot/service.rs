@@ -1726,6 +1726,25 @@ impl ReceiptQuerySnapshots {
     }
 }
 
+#[cfg(any(test, feature = "receipt-query-test-support"))]
+impl ReceiptQuerySnapshots {
+    pub fn pause_extension_for_test(&self, paused: bool) {
+        self.inner.pause_extension.store(paused, Ordering::SeqCst);
+        self.inner.wake();
+    }
+
+    pub fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
+        let started = Instant::now();
+        while !self.inner.extension_parked.load(Ordering::SeqCst) {
+            if started.elapsed() >= timeout {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        true
+    }
+}
+
 /// Test-only interleaving point between the two reads of a head observation.
 #[cfg(test)]
 pub(super) mod head_hook {
@@ -1744,24 +1763,5 @@ pub(super) mod head_hook {
         if let Some(mut hook) = hook {
             hook();
         }
-    }
-}
-
-#[cfg(any(test, feature = "receipt-query-test-support"))]
-impl ReceiptQuerySnapshots {
-    pub fn pause_extension_for_test(&self, paused: bool) {
-        self.inner.pause_extension.store(paused, Ordering::SeqCst);
-        self.inner.wake();
-    }
-
-    pub fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
-        let started = Instant::now();
-        while !self.inner.extension_parked.load(Ordering::SeqCst) {
-            if started.elapsed() >= timeout {
-                return false;
-            }
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        true
     }
 }
