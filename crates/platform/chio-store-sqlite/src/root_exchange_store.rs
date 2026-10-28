@@ -388,7 +388,7 @@ impl SqliteRootExchangeStore {
         verify_active_owner(&tx, &self.serving_owner, None).map_err(unavailable)?;
         self.serving_owner
             .verify_authority_anchor(&tx)
-            .map_err(unavailable)?;
+            .map_err(owner_error)?;
         read(&tx)
     }
 
@@ -411,15 +411,14 @@ impl SqliteRootExchangeStore {
             return Ok(value);
         }
         tx.commit().map_err(|error| {
-            RootExchangeStoreError::Unavailable(
+            owner_error(
                 self.serving_owner
-                    .outcome_unknown(format!("sqlite root exchange commit is unknown: {error}"))
-                    .to_string(),
+                    .outcome_unknown(format!("sqlite root exchange commit is unknown: {error}")),
             )
         })?;
         self.serving_owner
             .sync_authority_anchor(&connection)
-            .map_err(unavailable)?;
+            .map_err(owner_error)?;
         Ok(value)
     }
 
@@ -436,7 +435,7 @@ impl SqliteRootExchangeStore {
         verify_active_owner(tx, &self.serving_owner, Some(fence)).map_err(unavailable)?;
         self.serving_owner
             .verify_authority_anchor(tx)
-            .map_err(unavailable)?;
+            .map_err(owner_error)?;
         verify_trusted_time(tx, trusted_now_unix_ms, &self.serving_owner).map_err(unavailable)?;
         let (value, change) = apply(tx, trusted_now_unix_ms / 1000)?;
         let Some(change) = change else {
@@ -451,7 +450,7 @@ impl SqliteRootExchangeStore {
                 schema::PROJECTION_KEY,
                 sequence,
             )
-            .map_err(unavailable)?;
+            .map_err(owner_error)?;
         Ok((value, true))
     }
 }
@@ -533,6 +532,17 @@ fn stored_u64(value: i64) -> Result<u64> {
 
 fn sqlite_error(error: rusqlite::Error) -> RootExchangeStoreError {
     RootExchangeStoreError::Unavailable(error.to_string())
+}
+
+/// An outcome-unknown owner error stays outcome-unknown; any other is
+/// unavailability.
+fn owner_error(error: SqliteServingOwnerError) -> RootExchangeStoreError {
+    match error {
+        SqliteServingOwnerError::OutcomeUnknown(detail) => {
+            RootExchangeStoreError::OutcomeUnknown(detail)
+        }
+        other => RootExchangeStoreError::Unavailable(other.to_string()),
+    }
 }
 
 fn unavailable(error: impl std::fmt::Display) -> RootExchangeStoreError {
