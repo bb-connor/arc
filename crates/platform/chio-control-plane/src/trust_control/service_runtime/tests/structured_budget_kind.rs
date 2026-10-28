@@ -9,17 +9,18 @@ fn standalone_hold_projection_kind_round_trips() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
-fn retired_hold_projection_kind_is_refused() {
+fn retired_hold_projection_kind_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let result = serde_json::from_str::<StructuredBudgetProjectionKindView>(
         "\"legacy_hold\"",
     );
     let Err(error) = result else {
-        panic!("retired projection kind was accepted");
+        return Err("retired projection kind was accepted".into());
     };
     assert_eq!(
         error.to_string(),
         "unknown variant `legacy_hold`, expected `standalone_hold` or `admission_operation` at line 1 column 13"
     );
+    Ok(())
 }
 
 #[test]
