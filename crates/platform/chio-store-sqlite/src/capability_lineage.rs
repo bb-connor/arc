@@ -42,7 +42,7 @@ pub(crate) fn validate_snapshot_from_row(
         rusqlite::Error::FromSqlConversionFailure(
             signed_capability_column,
             Type::Text,
-            Box::new(error),
+            Box::new(chio_kernel::ReceiptStoreError::from(error)),
         )
     })?;
     Ok(snapshot)
