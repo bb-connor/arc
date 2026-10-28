@@ -11,6 +11,7 @@ SPEC = importlib.util.spec_from_file_location(
 GATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GATE)
 GATE.ALLOWED = ()
+GATE.ALLOWED_INFERRED = {}
 
 
 class TypeResolutionTests(unittest.TestCase):
