@@ -114,6 +114,7 @@ struct ScriptedSync {
     clock: Arc<StepClock>,
     advance_ms: u64,
     published: Mutex<BTreeMap<String, (SignedEpochRoot, PassportRevocationLeavesPage)>>,
+    during: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     calls: AtomicUsize,
 }
 
@@ -123,8 +124,15 @@ impl ScriptedSync {
             clock,
             advance_ms,
             published: Mutex::new(BTreeMap::new()),
+            during: Mutex::new(None),
             calls: AtomicUsize::new(0),
         })
+    }
+
+    /// Runs `event` inside the next sync, as a change that lands while the
+    /// door waits on the network.
+    fn during(&self, event: impl FnOnce() + Send + 'static) {
+        *self.during.lock().test_unwrap() = Some(Box::new(event));
     }
 
     fn publish(&self, partner_id: &str, feed: (SignedEpochRoot, PassportRevocationLeavesPage)) {
@@ -148,6 +156,9 @@ impl PartnerMirrorSync for ScriptedSync {
     ) -> Result<EpochRoot, PartnerRevocationError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.clock.advance(self.advance_ms);
+        if let Some(event) = self.during.lock().test_unwrap().take() {
+            event();
+        }
         let published = self
             .published
             .lock()
@@ -289,12 +300,16 @@ impl Door {
     }
 
     fn passport(&self, issuers: &[&Keypair]) -> AgentPassport {
+        self.passport_until(issuers, VALID_UNTIL)
+    }
+
+    fn passport_until(&self, issuers: &[&Keypair], valid_until: u64) -> AgentPassport {
         let holder_did = chio_did::DidChio::from_public_key(self.holder.public_key())
             .test_unwrap()
             .to_string();
         let credentials = issuers
             .iter()
-            .map(|issuer| issued_credential(issuer, &self.holder))
+            .map(|issuer| issued_credential(issuer, &self.holder, valid_until))
             .collect();
         build_agent_passport(&holder_did, credentials).test_unwrap()
     }
@@ -368,7 +383,11 @@ impl Door {
     }
 }
 
-fn issued_credential(issuer: &Keypair, holder: &Keypair) -> chio_credentials::ReputationCredential {
+fn issued_credential(
+    issuer: &Keypair,
+    holder: &Keypair,
+    valid_until: u64,
+) -> chio_credentials::ReputationCredential {
     issue_reputation_credential(
         issuer,
         chio_reputation::compute_local_scorecard(
@@ -391,7 +410,7 @@ fn issued_credential(issuer: &Keypair, holder: &Keypair) -> chio_credentials::Re
             runtime_attestation: None,
         },
         VALID_FROM,
-        VALID_UNTIL,
+        valid_until,
     )
     .test_unwrap()
 }
@@ -780,4 +799,143 @@ async fn the_production_door_syncs_only_over_the_strict_transport() {
         body.contains(&format!("partner `{PARTNER}` revocation feed fetch failed")),
         "{body}"
     );
+}
+
+/// The OID4VP response of `door`'s holder presenting `passport` to a fresh
+/// verifier request.
+fn oid4vp_submission(door: &Door, passport: &AgentPassport) -> (Oid4vpRequestObject, String) {
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        passport,
+        ADVERTISE_URL,
+        &door.authority,
+        BASE_UNIX_SECS,
+        None,
+    )
+    .test_unwrap();
+    let request = register_request(&door.config, Vec::new(), BASE_UNIX_SECS);
+    let response =
+        respond_to_oid4vp_request(&door.holder, &envelope.compact, &request, BASE_UNIX_SECS)
+            .test_unwrap();
+    (request, response)
+}
+
+fn oid4vp_request_status(door: &Door, request: &Oid4vpRequestObject) -> String {
+    Oid4vpVerifierTransactionStore::open(
+        configured_verifier_challenge_db_path(&door.config).test_unwrap(),
+    )
+    .test_unwrap()
+    .snapshot(&request.jti, BASE_UNIX_SECS)
+    .test_unwrap()
+    .transaction
+    .status
+    .label()
+    .to_owned()
+}
+
+#[tokio::test]
+async fn an_oid4vp_credential_that_expires_during_the_partner_sync_is_refused() {
+    let door = Door::new(10_000);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport_until(&[&door.authority], BASE_UNIX_SECS + 5);
+    let (request, response_jwt) = oid4vp_submission(&door, &passport);
+
+    let response = handle_public_submit_oid4vp_response(
+        State(door.state()),
+        Form(Oid4vpDirectPostForm {
+            response: response_jwt,
+        }),
+    )
+    .await;
+    let (status, body) = response_parts(response).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(door.sync.calls(), 1);
+    assert_ne!(oid4vp_request_status(&door, &request), "consumed");
+}
+
+#[tokio::test]
+async fn a_locally_revoked_oid4vp_passport_during_the_partner_sync_is_refused() {
+    let mut door = Door::new(1_000);
+    let statuses = door.dir.path().join("passport-statuses.json");
+    door.config.passport_statuses_file = Some(statuses.clone());
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let record = PassportStatusRegistry::update(&statuses, |registry| {
+        registry.publish(&passport, BASE_UNIX_SECS - 60, Default::default())
+    })
+    .test_unwrap();
+    let passport_id = record.passport_id.clone();
+    door.sync.during(move || {
+        crate::passport_revocation::revoke_passport_status(
+            &statuses,
+            &passport_id,
+            Some("revoked while the door synced"),
+            Some(BASE_UNIX_SECS - 30),
+            BASE_UNIX_SECS,
+        )
+        .test_unwrap();
+    });
+    let (request, response_jwt) = oid4vp_submission(&door, &passport);
+
+    let response = handle_public_submit_oid4vp_response(
+        State(door.state()),
+        Form(Oid4vpDirectPostForm {
+            response: response_jwt,
+        }),
+    )
+    .await;
+    let (status, body) = response_parts(response).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert!(body.contains("revoked"), "{body}");
+    assert_eq!(door.sync.calls(), 1);
+    assert_ne!(oid4vp_request_status(&door, &request), "consumed");
+}
+
+#[tokio::test]
+async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue() {
+    let door = Door::new(30_000);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let challenge = door.challenge(None, VALID_FROM, VALID_UNTIL);
+    let signer = Keypair::generate();
+    let body = FederatedDelegationPolicyBody {
+        schema: FEDERATED_DELEGATION_POLICY_SCHEMA.to_owned(),
+        issuer: ADVERTISE_URL.to_owned(),
+        partner: PARTNER.to_owned(),
+        verifier: ADVERTISE_URL.to_owned(),
+        signer_public_key: signer.public_key(),
+        created_at: BASE_UNIX_SECS - 10,
+        expires_at: BASE_UNIX_SECS + 10,
+        ttl_seconds: 60,
+        scope: chio_core::capability::scope::ChioScope::default(),
+        purpose: None,
+        parent_capability_id: None,
+    };
+    let (signature, _) = signer.sign_canonical(&body).test_unwrap();
+    let request = FederatedIssueRequest {
+        presentation: respond_to_passport_presentation_challenge(
+            &door.holder,
+            &passport,
+            &challenge,
+            PRESENTED_AT,
+        )
+        .test_unwrap(),
+        expected_challenge: challenge,
+        capability: crate::policy::DefaultCapability {
+            scope: chio_core::capability::scope::ChioScope::default(),
+            ttl: 60,
+        },
+        admission_policy: None,
+        enterprise_identity: None,
+        delegation_policy: Some(FederatedDelegationPolicyDocument { body, signature }),
+        upstream_capability_id: None,
+    };
+    let response =
+        handle_federated_issue(State(door.state()), service_headers(&door), Json(request)).await;
+    let (status, body) = response_parts(response).await;
+    assert!(status.is_client_error(), "{status} {body}");
+    assert!(
+        body.contains("federated delegation policy has expired"),
+        "{body}"
+    );
+    assert_eq!(door.sync.calls(), 1);
 }

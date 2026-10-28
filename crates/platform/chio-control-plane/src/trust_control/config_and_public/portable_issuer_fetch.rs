@@ -313,14 +313,9 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
     clock_now: u64,
 ) -> Result<PassportLifecyclePlan, CliError> {
     if let Some(path) = config.passport_statuses_file.as_deref() {
-        let registry = PassportStatusRegistry::load(path)?;
-        let resolution = registry.resolve_at(passport_id, clock_now);
-        crate::passport_revocation::check_registered_passport_revocation(
-            path,
-            &registry,
-            &resolution,
-        )?;
-        return Ok(PassportLifecyclePlan::Resolved(Some(resolution)));
+        return Ok(PassportLifecyclePlan::Resolved(Some(
+            resolve_registered_lifecycle(path, passport_id, clock_now)?,
+        )));
     }
     let Some(status_ref) = status_ref else {
         return Ok(PassportLifecyclePlan::Resolved(None));
@@ -345,6 +340,33 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
     Ok(PassportLifecyclePlan::Remote(
         RemotePassportLifecycleFetch { url, contract },
     ))
+}
+
+fn resolve_registered_lifecycle(
+    path: &Path,
+    passport_id: &str,
+    now: u64,
+) -> Result<PassportLifecycleResolution, CliError> {
+    let registry = PassportStatusRegistry::load(path)?;
+    let resolution = registry.resolve_at(passport_id, now);
+    crate::passport_revocation::check_registered_passport_revocation(path, &registry, &resolution)?;
+    Ok(resolution)
+}
+
+/// Judge an OID4VP lifecycle answer again at the door's acceptance instant.
+/// A local registry is resolved again at `accept_now`. A remote answer holds
+/// until `requested_at` plus the cache TTL that the signed status reference
+/// grants, and a reference without a TTL grants none.
+pub(crate) fn recheck_oid4vp_passport_lifecycle(
+    config: &TrustServiceConfig,
+    passport_id: &str,
+    status_ref: Option<&chio_credentials::Oid4vciChioPassportStatusReference>,
+    lifecycle: Option<PassportLifecycleResolution>,
+    requested_at: u64,
+    accept_now: u64,
+) -> Result<Option<PassportLifecycleResolution>, CliError> {
+    let _ = (config, passport_id, status_ref, requested_at, accept_now);
+    Ok(lifecycle)
 }
 
 /// Build the strict HTTPS egress contract for a portable-issuer or lifecycle

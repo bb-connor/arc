@@ -1357,6 +1357,23 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(verification) => verification,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     };
+    match recheck_oid4vp_passport_lifecycle(
+        &state.config,
+        &verified.passport_id,
+        verified.passport_status.as_ref(),
+        lifecycle,
+        verify_now,
+        accept_now,
+    ) {
+        Ok(Some(lifecycle)) if lifecycle.state != PassportLifecycleState::Active => {
+            return plain_http_error(
+                StatusCode::FORBIDDEN,
+                &passport_lifecycle_reason(&lifecycle),
+            );
+        }
+        Ok(_) => {}
+        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    }
     if let Err(error) = partner_door.admit(accept_unix_ms) {
         return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
