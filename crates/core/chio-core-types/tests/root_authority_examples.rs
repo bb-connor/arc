@@ -21,11 +21,11 @@ const REJECTIONS: &[(&str, &str)] = &[
     ),
     (
         "delegation-context.claim-commitment-padding.json",
-        "data did not match any variant of untagged enum LosslessTarget",
+        "data did not match any variant of untagged enum ClaimValue",
     ),
     (
         "delegation-context.claim-wrong-type.json",
-        "data did not match any variant of untagged enum LosslessTarget",
+        "data did not match any variant of untagged enum ClaimValue",
     ),
     (
         "delegation-context.claims-padding.json",
