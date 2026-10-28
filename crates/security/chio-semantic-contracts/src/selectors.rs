@@ -1,11 +1,11 @@
 //! Flat typed payload selectors and label-preserving field projection.
 use crate::work::units;
-use crate::VerificationBudget;
 use alloc::vec::Vec;
 use chio_security_types::recovery::{ContractError, NonEmptyBoundedList, SemanticFieldId};
 use chio_security_types::semantic::{
     SemanticFieldV1, SemanticPayloadV1, SemanticSelectorV1, SemanticValueV1,
 };
+use chio_security_types::work::VerificationBudget;
 
 pub const MAX_PROJECTED_FIELDS: usize = 8;
 

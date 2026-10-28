@@ -1,6 +1,5 @@
 //! The resolved precedence of package and operator selectors for one route.
 use crate::work::units;
-use crate::VerificationBudget;
 use alloc::{collections::BTreeSet, vec::Vec};
 use chio_security_types::flow::InformationLabel;
 use chio_security_types::recovery::{
@@ -12,6 +11,7 @@ use chio_security_types::semantic::{
     SemanticChannelRuleV1, SemanticOperationContractV1, SemanticPrerequisiteRequirementV1,
     SemanticReviewedOverrideV1, SemanticRouteV1, SemanticSelectorV1, SemanticWithheldStatusV1,
 };
+use chio_security_types::work::VerificationBudget;
 use serde::{Deserialize, Serialize};
 
 /// Every use requires independently fresh capability, policy, flow,

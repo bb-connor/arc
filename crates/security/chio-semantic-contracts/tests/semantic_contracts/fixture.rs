@@ -14,6 +14,7 @@ use chio_security_types::recovery::{
     ProtectedText, ProviderAccountId, ProviderId, ProviderResourceId, RecoveryScopeV1,
     RecoveryTenantId, RequestId, RequestNamespaceDigest, SafeInteger, SemanticDestinationId,
     SemanticFactId, SemanticFieldId, SemanticOperationId, SemanticPackageId, StepId, VersionV1,
+    MAX_RECOVERY_VERIFICATION_WORK,
 };
 use chio_security_types::semantic::{
     ScopedEndorsementV1, SemanticAclCursorV1, SemanticAclPaginationV1, SemanticActionV1,
@@ -25,10 +26,10 @@ use chio_security_types::semantic::{
     SemanticPlanStepV1, SemanticPlanV1, SemanticRouteV1, SemanticSelectorV1, SemanticValueV1,
     SemanticWithheldStatusV1,
 };
+use chio_security_types::work::VerificationBudget;
 use chio_semantic_contracts::{
     compile_semantic_registry, verify_semantic_invocation, CompiledSemanticRegistryV1,
-    ExposedSemanticToolV1, SemanticInvocationExpectationV1, VerificationBudget,
-    VerifiedSemanticInvocationV1,
+    ExposedSemanticToolV1, SemanticInvocationExpectationV1, VerifiedSemanticInvocationV1,
 };
 
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -349,7 +350,7 @@ impl SemanticFixture {
             &self.operator.public_key(),
             &[self.publisher.public_key()],
             exposed,
-            &mut VerificationBudget::new(4096)?,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
         )
     }
 
@@ -382,7 +383,7 @@ impl SemanticFixture {
             &self.compiled()?,
             invocation,
             expected,
-            &mut VerificationBudget::new(4096)?,
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
         )
     }
 

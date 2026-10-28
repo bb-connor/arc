@@ -189,7 +189,11 @@ fn projection_removes_exact_fields_without_mutating_source_or_influence() -> Tes
     let fields = f.package.body().operations.as_slice()[0]
         .projection_fields
         .as_slice();
-    let output = project_semantic_fields(&f.payload, fields, &mut VerificationBudget::new(4096)?)?;
+    let output = project_semantic_fields(
+        &f.payload,
+        fields,
+        &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?,
+    )?;
     assert_eq!(output.fields.as_slice().len(), 1);
     assert!(!chio_core_types::canonical_json_string(&output)?.contains("private-canary"));
     assert_ne!(
@@ -201,7 +205,7 @@ fn projection_removes_exact_fields_without_mutating_source_or_influence() -> Tes
         (project_semantic_fields(
             &f.payload,
             &[SemanticFieldId::new("missing")?],
-            &mut VerificationBudget::new(4096)?
+            &mut VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)?
         ))
         .err(),
         Some(ContractError::MissingDependency)

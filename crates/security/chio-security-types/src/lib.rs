@@ -36,6 +36,7 @@ pub mod response_state;
 pub mod schema;
 pub mod semantic;
 pub mod strict_serde;
+pub mod work;
 
 pub use response_dispatch::DispatchRejection;
 pub use response_execution::{

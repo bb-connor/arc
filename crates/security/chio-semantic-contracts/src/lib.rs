@@ -60,4 +60,3 @@ pub use verification::{
     VerifiedSemanticInvocationV1, MAX_ACL_PAGES, MAX_OBSERVED_FACTS, MAX_PROVIDER_VERSION_BYTES,
     MAX_REQUIRED_ANNOTATIONS,
 };
-pub use work::VerificationBudget;

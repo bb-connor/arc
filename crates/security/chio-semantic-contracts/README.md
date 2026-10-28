@@ -7,10 +7,10 @@ materialization and execution belong to the owning deployment and kernel compone
 
 - `validate_dependency_graph` orders at most 16 steps with at most 16 dependencies each,
   deterministically by readiness and then opaque step identifier. One shared,
-  irreversible `VerificationBudget` charges the bounded sort, every edge lookup, every
-  indexed update and every ready-step search before the work runs. Missing
-  dependencies, duplicate identities, cycles, unsafe cost arithmetic and exhaustion
-  refuse. A validated graph is not a reviewed action or a permit.
+  irreversible `chio_security_types::work::VerificationBudget` charges the bounded sort,
+  every edge lookup, every indexed update and every ready-step search before the work
+  runs. Missing dependencies, duplicate identities, cycles, unsafe cost arithmetic and
+  exhaustion refuse. A validated graph is not a reviewed action or a permit.
 - `EffectContractV1` permits one submission under the original native operation with
   automatic retries disabled and no provider deduplication assumed. Lookup finality and
   the 1 to 16 effect cardinality are explicit metadata the operator verifies.
