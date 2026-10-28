@@ -407,13 +407,6 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         "Unsalted domain hash over the raw tenant and action ids.",
     ),
     spec(
-        "active_defense_backfill_v1",
-        ChioInternal,
-        Unsafe,
-        None,
-        "Active-defense migration marker with unaudited contents.",
-    ),
-    spec(
         "scimLifecycle",
         ChioInternal,
         Unsafe,

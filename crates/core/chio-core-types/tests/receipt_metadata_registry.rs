@@ -118,10 +118,6 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
         "response_simulation_evidence_id",
         Registered(ChioInternal, Unsafe),
     ),
-    (
-        "active_defense_backfill_v1",
-        Registered(ChioInternal, Unsafe),
-    ),
     ("scimLifecycle", Registered(ChioInternal, Unsafe)),
     ("mercury", Registered(ChioInternal, Unsafe)),
     ("authorizationContext", Registered(ChioInternal, Unsafe)),

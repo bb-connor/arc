@@ -1,11 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
-use chio_core::receipt::decision::{Decision, ToolCallAction};
-use chio_core::receipt::kinds::{
-    BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
-};
-use chio_core::{sha256_hex, Keypair};
+use chio_core::Keypair;
 use chio_manifest::{
     sign_manifest, DeclassificationPurpose, LatencyHint, ToolAnnotations, ToolDefinition,
     ToolFlowDeclaration, ToolManifest, TOOL_MANIFEST_SCHEMA,
@@ -86,77 +81,13 @@ fn base_input(signer: &Keypair) -> ShadowMigrationInput {
             key_id: "manifest-key".to_string(),
             public_key: signer.public_key(),
         }],
-        receipt_public_keys: Vec::new(),
         manifests: vec![signed_registration(
             signer,
             "registry.one",
             Some(ToolFlowDeclaration::public_egress()),
         )],
         backfill_targets: Vec::new(),
-        backfill_receipts: Vec::new(),
         shadow_observations: Vec::new(),
-    }
-}
-
-fn backfill_evidence(
-    manifest_digest: String,
-    session_id: &str,
-    pre_enablement_session_closed: bool,
-) -> BackfillEvidence {
-    BackfillEvidence {
-        schema: BACKFILL_EVIDENCE_SCHEMA.to_string(),
-        manifest_registry_id: "registry.one".to_string(),
-        manifest_digest,
-        tenant_id: "tenant.one".to_string(),
-        principal_id: "principal.one".to_string(),
-        lineage_id: "lineage.one".to_string(),
-        session_id: session_id.to_string(),
-        isolation_epoch_id: "epoch.one".to_string(),
-        principal_label: InformationLabel::bottom(),
-        lineage_label: InformationLabel::bottom(),
-        session_label: InformationLabel::bottom(),
-        context_generation: 7,
-        pre_enablement_session_closed,
-    }
-}
-
-fn signed_backfill_receipt(
-    signer: &Keypair,
-    evidence: BackfillEvidence,
-) -> RegisteredBackfillReceipt {
-    let mut metadata = serde_json::Map::new();
-    metadata.insert(
-        BACKFILL_METADATA_KEY.to_string(),
-        serde_json::to_value(evidence).test_expect("backfill evidence value"),
-    );
-    let body = ChioReceiptBody {
-        id: String::new(),
-        timestamp: 1_720_000_000,
-        capability_id: "cap.one".to_string(),
-        tool_server: "server.one".to_string(),
-        tool_name: "send".to_string(),
-        action: ToolCallAction::from_parameters(serde_json::json!({"value": 1}))
-            .test_expect("action"),
-        decision: Some(Decision::Allow),
-        receipt_kind: ReceiptKind::MediatedDecision,
-        boundary_class: BoundaryClass::Prevent,
-        observation_outcome: None,
-        tool_origin: ToolOrigin::CallerExecuted,
-        redaction_mode: RedactionMode::None,
-        actor_chain: Vec::new(),
-        content_hash: sha256_hex(b"fixture-output"),
-        policy_hash: sha256_hex(b"fixture-policy"),
-        evidence: Vec::new(),
-        metadata: Some(serde_json::Value::Object(metadata)),
-        trust_level: TrustLevel::Mediated,
-        tenant_id: Some("tenant.one".to_string()),
-        kernel_key: signer.public_key(),
-        bbs_projection_version: None,
-    };
-    let receipt = ChioReceipt::sign(body, signer).test_expect("sign receipt");
-    RegisteredBackfillReceipt {
-        registered_key_id: "receipt-key".to_string(),
-        receipt: serde_json::to_value(receipt).test_expect("receipt value"),
     }
 }
 
@@ -199,7 +130,6 @@ fn rejects_the_old_manifest_shape_under_the_current_id_even_when_signed() {
             key_id: "manifest-key".to_string(),
             public_key: signer.public_key(),
         }],
-        receipt_public_keys: Vec::new(),
         manifests: vec![ManifestRegistration {
             registry_id: "registry.old-shape".to_string(),
             registered_key_id: "manifest-key".to_string(),
@@ -220,7 +150,6 @@ fn rejects_the_old_manifest_shape_under_the_current_id_even_when_signed() {
             server_runtime: ServerRuntimeInventory::Managed,
         }],
         backfill_targets: Vec::new(),
-        backfill_receipts: Vec::new(),
         shadow_observations: Vec::new(),
     };
 
@@ -283,83 +212,6 @@ fn reports_egress_adapter_purpose_credential_and_cage_findings() {
     assert_eq!(report.direct_credential_grants.len(), 1);
     assert_eq!(report.native_cage_inventory.len(), 1);
     assert!(report.native_cage_inventory[0].selected_for_cage);
-}
-
-#[test]
-fn backfill_requires_pinned_receipts_and_verified_manifest_evidence() {
-    let manifest_signer = key(4);
-    let receipt_signer = key(5);
-    let mut input = base_input(&manifest_signer);
-    let source_digest = chio_core::sha256_hex(
-        &chio_core::canonical_json_bytes(&input.manifests[0].signed_envelope.manifest)
-            .test_expect("manifest canonical bytes"),
-    );
-    input.receipt_public_keys.push(RegisteredPublicKey {
-        key_id: "receipt-key".to_string(),
-        public_key: receipt_signer.public_key(),
-    });
-    input.backfill_targets = vec![BackfillTarget {
-        tenant_id: "tenant.one".to_string(),
-        principal_id: "principal.one".to_string(),
-        lineage_id: "lineage.one".to_string(),
-        session_id: "session.pre-enablement".to_string(),
-        isolation_epoch_id: "epoch.one".to_string(),
-    }];
-    input.backfill_receipts.push(signed_backfill_receipt(
-        &receipt_signer,
-        backfill_evidence(source_digest, "session.pre-enablement", true),
-    ));
-
-    let report = build_shadow_migration_report(input.clone()).test_expect("verified backfill");
-    assert_eq!(report.backfill.principal_records_from_verified_evidence, 1);
-    assert_eq!(report.backfill.principal_records_assigned_top, 0);
-    assert!(report.backfill.sessions[0].pre_enablement_session_closed);
-
-    let mut wrong_key = input;
-    wrong_key.receipt_public_keys[0].public_key = key(6).public_key();
-    assert!(build_shadow_migration_report(wrong_key).is_err());
-}
-
-#[test]
-fn pre_enablement_session_without_evidence_assigns_top_and_preserves_principal_knowledge() {
-    let manifest_signer = key(7);
-    let receipt_signer = key(8);
-    let mut input = base_input(&manifest_signer);
-    let source_digest = chio_core::sha256_hex(
-        &chio_core::canonical_json_bytes(&input.manifests[0].signed_envelope.manifest)
-            .test_expect("manifest canonical bytes"),
-    );
-    input.receipt_public_keys.push(RegisteredPublicKey {
-        key_id: "receipt-key".to_string(),
-        public_key: receipt_signer.public_key(),
-    });
-    input.backfill_targets = vec![
-        BackfillTarget {
-            tenant_id: "tenant.one".to_string(),
-            principal_id: "principal.one".to_string(),
-            lineage_id: "lineage.one".to_string(),
-            session_id: "session.verified".to_string(),
-            isolation_epoch_id: "epoch.one".to_string(),
-        },
-        BackfillTarget {
-            tenant_id: "tenant.one".to_string(),
-            principal_id: "principal.one".to_string(),
-            lineage_id: "lineage.one".to_string(),
-            session_id: "session.unknown".to_string(),
-            isolation_epoch_id: "epoch.one".to_string(),
-        },
-    ];
-    input.backfill_receipts.push(signed_backfill_receipt(
-        &receipt_signer,
-        backfill_evidence(source_digest, "session.verified", true),
-    ));
-
-    let report = build_shadow_migration_report(input).test_expect("conservative backfill");
-    assert_eq!(report.backfill.principals.len(), 1);
-    assert_eq!(report.backfill.principals[0].label, InformationLabel::Top);
-    assert!(report.backfill.principals[0].assigned_top_due_to_missing_evidence);
-    assert_eq!(report.backfill.sessions.len(), 2);
-    assert_eq!(report.backfill.session_records_assigned_top, 1);
 }
 
 #[test]
@@ -492,4 +344,29 @@ fn every_backfill_target_is_assigned_top_with_no_evidence_fields() {
             }],
         })
     );
+}
+
+#[test]
+fn sessions_of_one_principal_and_lineage_share_one_record_each() {
+    let mut input = base_input(&key(13));
+    input.backfill_targets = ["session.one", "session.two"]
+        .into_iter()
+        .map(|session_id| BackfillTarget {
+            tenant_id: "tenant.one".to_string(),
+            principal_id: "principal.one".to_string(),
+            lineage_id: "lineage.one".to_string(),
+            session_id: session_id.to_string(),
+            isolation_epoch_id: "epoch.one".to_string(),
+        })
+        .collect();
+
+    let report = build_shadow_migration_report(input).test_expect("backfill report");
+    assert_eq!(report.backfill.principals.len(), 1);
+    assert_eq!(report.backfill.principals[0].label, InformationLabel::Top);
+    assert_eq!(report.backfill.sessions.len(), 2);
+    assert!(report
+        .backfill
+        .sessions
+        .iter()
+        .all(|session| session.label == InformationLabel::Top));
 }

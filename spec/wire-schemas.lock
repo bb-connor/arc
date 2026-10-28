@@ -55,11 +55,6 @@ files = ["crates/protocol/chio-a2a-adapter/src/lib.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.active-defense.backfill-evidence.v1"
-files = ["crates/products/chio-cli/src/active_defense_migration.rs"]
-first_seen = "6a12a69155"
-
-[[schema]]
 value = "chio.active-defense.deployment-config.v1"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
 first_seen = "28d826e3e6"

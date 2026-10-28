@@ -1608,7 +1608,6 @@ unsupported schema versions fail closed.
 | `active_defense_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant id and plan identifiers. |
 | `occurred_at_unix_ms` | Chio signer | committed-safe |  | Active-defense event time, bound by the lineage ingest and the native evidence reader. |
 | `response_simulation_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant and action ids. |
-| `active_defense_backfill_v1` | Chio signer | unsafe |  | Active-defense migration marker with unaudited contents. |
 | `scimLifecycle` | Chio signer | unsafe |  | SCIM provider, user ids, user names, principal, subject key and entitlements. |
 | `mercury` | Chio signer | unsafe |  | Raw business identifiers such as account and desk. |
 | `authorizationContext` | Chio signer | unsafe |  | Wall request actor and requested domains. |
