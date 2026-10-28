@@ -331,65 +331,56 @@ attested. This preserves the integrity of cross-protocol claims.
 
 ### 8.1 Kernel-Backed ReceiptSigner
 
+The crate ships `KernelReceiptSigner`. It signs each ACP audit entry into a Chio receipt, appends the receipt to a `ReceiptStore`, and produces a Merkle checkpoint every `checkpoint_batch_size` receipts; a batch size of 0 disables checkpointing. A checkpoint failure after a committed append is recorded in `checkpoint_health()` and does not fail the signed receipt.
+
 ```rust
+use std::sync::Arc;
+
+use chio_acp_proxy::{AcpClock, KernelReceiptSigner};
 use chio_core::crypto::Keypair;
-use chio_core::receipt::{ChioReceipt, ChioReceiptBody, Decision, ToolCallAction};
-use chio_core::crypto::sha256_hex;
-use chio_acp_proxy::{AcpReceiptRequest, ReceiptSigner, ReceiptSignError};
 
-pub struct KernelReceiptSigner {
-    keypair: Keypair,
-    policy_hash: String,
-    capability_id: String,
-}
+let clock = AcpClock::new(Arc::clone(&clock_source));
+let signer = KernelReceiptSigner::new(
+    keypair,           // Keypair: signs every receipt
+    "acp-server",      // server id the receipts are issued under
+    receipt_store,     // Box<dyn ReceiptStore>
+    64,                // checkpoint_batch_size (0 disables checkpointing)
+    clock.clone(),
+);
+```
 
-impl ReceiptSigner for KernelReceiptSigner {
+A custom signer implements the `ReceiptSigner` trait instead:
+
+```rust
+pub trait ReceiptSigner: Send + Sync {
     fn sign_acp_receipt(
         &self,
-        req: &AcpReceiptRequest,
-    ) -> Result<ChioReceipt, ReceiptSignError> {
-        let action = ToolCallAction {
-            parameters: serde_json::json!({
-                "tool_call_id": req.tool_call_id,
-                "scope": format!("{:?}", req.scope_context),
-            }),
-            parameter_hash: sha256_hex(req.tool_call_id.as_bytes()),
-        };
-        let body = ChioReceiptBody {
-            id: format!("rcpt-acp-{}", uuid::Uuid::now_v7()),
-            timestamp: current_unix_secs(),
-            capability_id: self.capability_id.clone(),
-            tool_server: req.server_id.clone(),
-            tool_name: req.tool_name.clone(),
-            action,
-            decision: Decision::Allow,
-            content_hash: req.content_hash.clone(),
-            policy_hash: self.policy_hash.clone(),
-            evidence: Vec::new(),
-            metadata: Some(serde_json::json!({
-                "protocol": "acp",
-                "session_id": req.session_id,
-            })),
-            kernel_key: self.keypair.public_key(),
-        };
-        ChioReceipt::sign(body, &self.keypair)
-            .map_err(|e| ReceiptSignError::Internal(e.to_string()))
-    }
+        request: &AcpReceiptRequest,
+    ) -> Result<ChioReceipt, ReceiptSignError>;
 }
 ```
 
 ### 8.2 Constructing the Proxy
 
 ```rust
-let signer = Box::new(KernelReceiptSigner::new(keypair, policy_hash, cap_id));
-let checker = Box::new(KernelCapabilityChecker::new(/* ... */));
+use chio_acp_proxy::{AcpAttestationMode, AcpProxy, AcpProxyConfig, KernelCapabilityChecker};
+
+let checker = KernelCapabilityChecker::new(kernel, "acp-server", manifest_registry)?;
 
 let config = AcpProxyConfig::new("claude-code", public_key_hex)
+    .with_server_id("acp-server")
     .with_allowed_path_prefix("/home/dev/project")
     .with_allowed_command("cargo");
 
-// With kernel integration:
-let proxy = AcpProxy::start_with_kernel(config, signer, checker)?;
+// With kernel integration. The signer and the proxy share one AcpClock, whose
+// clones share one monotonic fence.
+let proxy = AcpProxy::start_with_kernel(
+    config,
+    Some(Box::new(signer)),
+    Some(Box::new(checker)),
+    AcpAttestationMode::Required,
+    clock,
+)?;
 
 // Without kernel (unsigned standalone mode only; outside full attestation claims):
 // let proxy = AcpProxy::start(config)?;
