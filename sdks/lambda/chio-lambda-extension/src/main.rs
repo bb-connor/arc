@@ -563,6 +563,8 @@ fn build_response(status: StatusCode, bytes: Vec<u8>) -> Response<Full<Bytes>> {
 
 #[cfg(test)]
 mod tests {
+    mod numeric;
+
     use super::*;
     use crate::observation_store::{StoreError, StoreFuture};
     use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
