@@ -733,6 +733,14 @@ impl ChioKernel {
                     "projected receipt has no canonical signing nonce".to_owned(),
                 )
             })?;
+        let expected_non_admission_metadata = crate::receipt_support::bind_decision_model_witness(
+            expected_non_admission_metadata,
+            tool_return
+                .raw
+                .pre_invocation_guard_output()
+                .witness
+                .as_ref(),
+        )?;
         let expected_metadata = merge_metadata_objects(
             merge_metadata_objects(
                 expected_non_admission_metadata,
