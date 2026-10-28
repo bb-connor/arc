@@ -161,7 +161,7 @@ constructs a deliberately isolated kernel.
   redirects, and bound response bodies before parsing.
 - Production settlement hook (observer slot): a reconciling `SettlementHook` in
   `chio-settle` (`ops.rs`) that `configure_settlement` installs through
-  the paired `set_settlement_observer_runtime(hook, outcome_store, retry_policy)`
+  the paired `set_settlement_observer_runtime(hook, outcome_store, retry_policy, drain_trust)`
   API. Its `observe` classifies the observation and returns
   `Accepted`/`Retryable`/`Permanent`, doing only bounded local work. A hook-level
   `Skipped` is invalid because the kernel invokes it only for a positive

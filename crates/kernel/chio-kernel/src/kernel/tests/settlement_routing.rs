@@ -22,6 +22,8 @@ mod settlement_routing_tests {
 
     use super::*;
 
+    mod drain_tests;
+
     const STORE_BINDING: SettlementStoreBinding = SettlementStoreBinding::from_digest([17; 32]);
 
     #[derive(Clone, Copy)]
@@ -35,12 +37,29 @@ mod settlement_routing_tests {
     enum RouteMode {
         Contract,
         Error,
+        LostLease,
+    }
+
+    #[derive(Clone, Copy)]
+    enum BatchMode {
+        Normal,
+        Error,
+        Short,
+        Reversed,
+        WrongTime,
+        MissingFirst,
     }
 
     struct RoutingStoreState {
         receipts: HashMap<String, ChioReceipt>,
         attempts: HashMap<String, PendingSettlementObservation>,
         inputs: Vec<SettlementRoutingInput>,
+        batch_mode: BatchMode,
+        batch_sizes: Vec<usize>,
+        point_reads: usize,
+        point_failure: Option<String>,
+        point_missing: Option<String>,
+        point_wrong_time: bool,
         plain_appends: usize,
         atomic_appends: usize,
         timed_atomic_appends: usize,
@@ -60,6 +79,12 @@ mod settlement_routing_tests {
                 receipts: HashMap::new(),
                 attempts: HashMap::new(),
                 inputs: Vec::new(),
+                batch_mode: BatchMode::Normal,
+                batch_sizes: Vec::new(),
+                point_reads: 0,
+                point_failure: None,
+                point_missing: None,
+                point_wrong_time: false,
                 plain_appends: 0,
                 atomic_appends: 0,
                 timed_atomic_appends: 0,
@@ -122,7 +147,59 @@ mod settlement_routing_tests {
             &self,
             receipt_id: &str,
         ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
-            Ok(self.state().receipts.get(receipt_id).cloned())
+            let mut state = self.state();
+            state.point_reads += 1;
+            if state.point_failure.as_deref() == Some(receipt_id) {
+                return Err(ReceiptStoreError::Conflict(
+                    "forced point failure".to_owned(),
+                ));
+            }
+            if state.point_missing.as_deref() == Some(receipt_id) {
+                return Ok(None);
+            }
+            let mut receipt = state.receipts.get(receipt_id).cloned();
+            if state.point_wrong_time {
+                if let Some(receipt) = receipt.as_mut() {
+                    receipt.timestamp += 1;
+                }
+            }
+            Ok(receipt)
+        }
+
+        fn load_chio_receipts(
+            &self,
+            receipt_ids: &[&str],
+        ) -> Result<Vec<Option<ChioReceipt>>, ReceiptStoreError> {
+            assert!(receipt_ids.len() <= 256);
+            let mut state = self.state();
+            state.batch_sizes.push(receipt_ids.len());
+            if matches!(state.batch_mode, BatchMode::Error) {
+                return Err(ReceiptStoreError::Conflict(
+                    "forced batch failure".to_owned(),
+                ));
+            }
+            let mut receipts: Vec<_> = receipt_ids
+                .iter()
+                .map(|id| state.receipts.get(*id).cloned())
+                .collect();
+            match state.batch_mode {
+                BatchMode::Short => {
+                    receipts.pop();
+                }
+                BatchMode::Reversed => receipts.reverse(),
+                BatchMode::WrongTime => {
+                    for receipt in receipts.iter_mut().flatten() {
+                        receipt.timestamp += 1;
+                    }
+                }
+                BatchMode::MissingFirst => {
+                    if let Some(receipt) = receipts.first_mut() {
+                        *receipt = None;
+                    }
+                }
+                BatchMode::Normal | BatchMode::Error => {}
+            }
+            Ok(receipts)
         }
 
         fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
@@ -221,12 +298,20 @@ mod settlement_routing_tests {
 
         fn claim_due(
             &self,
-            _worker_id: &str,
-            _now_ms: u64,
-            _lease_ms: u64,
-            _limit: usize,
+            worker_id: &str,
+            now_ms: u64,
+            lease_ms: u64,
+            limit: usize,
         ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError> {
-            Ok(Vec::new())
+            let mut ids: Vec<_> = self.state().attempts.keys().cloned().collect();
+            ids.sort();
+            ids.into_iter()
+                .take(limit)
+                .filter_map(|id| {
+                    self.claim_receipt(&id, worker_id, now_ms, lease_ms)
+                        .transpose()
+                })
+                .collect()
         }
 
         fn record_claimed_outcome(
@@ -242,6 +327,11 @@ mod settlement_routing_tests {
             if matches!(state.route_mode, RouteMode::Error) {
                 return Err(SettlementRouteError::Backend {
                     detail: "forced route failure".to_string(),
+                });
+            }
+            if matches!(state.route_mode, RouteMode::LostLease) {
+                return Err(SettlementRouteError::Conflict {
+                    detail: "forced lost lease".to_owned(),
                 });
             }
             match outcome {
@@ -428,9 +518,12 @@ mod settlement_routing_tests {
     ) {
         attach_store(kernel, store);
         let outcome_store: Arc<dyn SettlementOutcomeStore> = store.clone();
-        if let Err(error) =
-            kernel.set_settlement_observer_runtime(hook, outcome_store, RetryPolicy::default())
-        {
+        if let Err(error) = kernel.set_settlement_observer_runtime(
+            hook,
+            outcome_store,
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        ) {
             panic!("test settlement runtime installation failed: {error}");
         }
     }

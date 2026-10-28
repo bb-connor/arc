@@ -762,7 +762,7 @@ The hook contract is that a hook never mutates receipt rows or receipt bytes.
 `settlement_reconciliations` and closure rows are sidecar tables in the receipt
 database written through the serving writer.
 
-`ChioKernel::install_settlement_ledger(outcome_store, retry_policy)` builds the
+`ChioKernel::install_settlement_ledger(outcome_store, retry_policy, drain_trust)` builds the
 hook and installs it through `set_settlement_observer_runtime`. `chio api protect`
 installs the ledger whenever it configures a payment adapter, and its startup
 refuses when the install fails (no atomic projection support, store binding
