@@ -283,7 +283,35 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     pub settlement_authority: &'a Keypair,
 }
 
-/// Output of [`accept`].
+/// Output of [`accept`], the only way to obtain one. [`release`] relies on
+/// its contents being exactly what `accept` produced, so callers can read but
+/// never rewrite or assemble an accepted escrow.
+///
+/// ```compile_fail
+/// fn clear_requirements(accepted: &mut chio_commerce_order::AcceptedEscrow) {
+///     accepted.updated_context.coverage_requirement = None;
+///     accepted.updated_context.trust_market_requirement = None;
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use chio_commerce_order::{
+///     AcceptedEscrow, CommerceEscrowLedger, CommerceOrderContext, CommerceSettlementPacket,
+/// };
+/// use chio_core_types::receipt::lineage::SignedExportEnvelope;
+/// fn forge(
+///     ledger: CommerceEscrowLedger,
+///     settlement_packet: SignedExportEnvelope<CommerceSettlementPacket>,
+///     updated_context: CommerceOrderContext,
+/// ) -> AcceptedEscrow {
+///     AcceptedEscrow {
+///         ledger,
+///         settlement_packet,
+///         escrow_digest: String::new(),
+///         updated_context,
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct AcceptedEscrow {
     /// Locked ledger.

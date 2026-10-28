@@ -801,7 +801,10 @@ fn execution_body() -> CapitalExecutionInstructionArtifact {
 
 impl ReleaseFixture {
     fn new() -> Self {
-        let accept = AcceptFixture::new();
+        Self::from_accept(AcceptFixture::new())
+    }
+
+    fn from_accept(accept: AcceptFixture) -> Self {
         let acceptance = accept.accept().test_expect("accept succeeds");
         let mut advanced = acceptance.updated_context.clone();
         advanced.current_state = "settlement_observed".to_string();
@@ -1179,6 +1182,23 @@ fn release_binds_every_context_field_it_does_not_advance() {
             "{field}"
         );
     }
+}
+
+#[test]
+fn release_keeps_the_requirements_the_acceptance_bound() {
+    let mut accept = AcceptFixture::new();
+    accept.context.coverage_requirement = Some(coverage_requirement());
+    accept.context.trust_market_requirement = Some(trust_market_requirement());
+    let fixture = ReleaseFixture::from_accept(accept);
+    let released = fixture.release().test_expect("release succeeds");
+    assert_eq!(
+        released.updated_context.coverage_requirement,
+        Some(coverage_requirement())
+    );
+    assert_eq!(
+        released.updated_context.trust_market_requirement,
+        Some(trust_market_requirement())
+    );
 }
 
 #[test]
