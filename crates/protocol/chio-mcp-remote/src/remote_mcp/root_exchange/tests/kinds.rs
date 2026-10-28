@@ -5,7 +5,8 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue};
 
 use super::*;
 use crate::root_exchange::kinds::local_as::{
-    LocalAuthorizationServer, PresentedSender, ReExchangeRequest, SubjectRoot, LOCAL_AS_ISSUER,
+    LocalAuthorizationServer, PresentedSender, ReExchangeRequest, RedeemedCode, SubjectRoot,
+    LOCAL_AS_ISSUER,
 };
 use crate::root_exchange::kinds::oauth_introspection::TokenIntrospector;
 use crate::root_exchange::kinds::operator_key::{
@@ -18,6 +19,7 @@ use crate::root_exchange::kinds::{
 use crate::root_exchange::{
     AnchorEvidence, ReplayNamespace, RootExchangeConfigError, SenderConstraintFailure,
 };
+use crate::{ChioSenderConstraintClaims, SenderRequest, TransportIdentity};
 use chio_core::capability::anchor::AnchorKind;
 use chio_core::root_authority::HttpsUrl;
 
@@ -270,6 +272,68 @@ fn no_headers() -> HeaderMap {
     HeaderMap::new()
 }
 
+const AUTHORIZATION_CODE: &str = "code-1";
+
+fn constraint(cnf: Value) -> ChioSenderConstraintClaims {
+    serde_json::from_value(cnf).unwrap()
+}
+
+/// The members of a redeemed code; `issue` borrows them into a
+/// [`RedeemedCode`].
+struct CodeFixture {
+    code: String,
+    code_expires_at: u64,
+    subject: String,
+    client_id: String,
+    resource: String,
+    scopes: Vec<String>,
+    sender_constraint: Option<ChioSenderConstraintClaims>,
+    token_exp: u64,
+}
+
+fn code_fixture() -> CodeFixture {
+    CodeFixture {
+        code: AUTHORIZATION_CODE.to_owned(),
+        code_expires_at: NOW + 60,
+        subject: "local-user".to_owned(),
+        client_id: CLIENT_ID.to_owned(),
+        resource: RESOURCE.to_owned(),
+        scopes: vec!["mcp:invoke".to_owned(), "mcp:read".to_owned()],
+        sender_constraint: None,
+        token_exp: NOW + 300,
+    }
+}
+
+fn issue_with(
+    edit_code: impl FnOnce(&mut CodeFixture),
+    sender: SenderRequest<'_>,
+) -> Result<AnchorEvidence, RootExchangeError> {
+    let key = local_keypair().public_key();
+    let mut fixture = code_fixture();
+    edit_code(&mut fixture);
+    local_as::verify_issue(
+        &local_server(&key),
+        RedeemedCode {
+            code: &fixture.code,
+            code_expires_at: fixture.code_expires_at,
+            subject: &fixture.subject,
+            client_id: &fixture.client_id,
+            resource: &fixture.resource,
+            scopes: &fixture.scopes,
+            sender_constraint: fixture.sender_constraint.as_ref(),
+            token_exp: fixture.token_exp,
+            request_digest: Sha256Digest::from_hash(sha256(b"code-exchange")),
+        },
+        PresentedSender::from(sender),
+        NOW,
+    )
+}
+
+fn issue(edit_code: impl FnOnce(&mut CodeFixture)) -> Result<AnchorEvidence, RootExchangeError> {
+    let headers = no_headers();
+    issue_with(edit_code, SenderRequest::from(&headers))
+}
+
 fn operator_body(edit_request: impl FnOnce(&mut Value)) -> Vec<u8> {
     let mut request = json!({
         "request_id": "req-1",
@@ -376,13 +440,7 @@ async fn every_kind_reaches_the_same_prepare() {
             vec!["search", "get", "update"],
         ),
         (
-            local_as::verify(
-                &local_server(&local_key),
-                &local_token(&local_claims()),
-                PresentedSender::from(crate::SenderRequest::from(&headers)),
-                NOW,
-            )
-            .unwrap(),
+            issue(|_| {}).unwrap(),
             AnchorKind::ChioLocalAs,
             LOCAL_AS_ISSUER,
             vec!["search", "get", "update"],
@@ -823,13 +881,7 @@ fn local_token_confirmation_is_read_strictly() {
         b64(&local_keypair().sign(input.as_bytes()).to_bytes())
     );
     let verify = |token: &str| {
-        local_as::verify(
-            &local_server(&key),
-            token,
-            PresentedSender::from(crate::SenderRequest::from(&headers)),
-            NOW,
-        )
-        .unwrap_err()
+        reexchange_from(&local_server(&key), token, SenderRequest::from(&headers)).unwrap_err()
     };
     let error = verify(&token);
     assert_eq!(error, RootExchangeError::MalformedJws("payload"));
@@ -1012,13 +1064,7 @@ fn local_token_refusals() {
         ),
     ];
     for (server, token, headers, expected) in cases {
-        let error = local_as::verify(
-            &server,
-            &token,
-            PresentedSender::from(crate::SenderRequest::from(headers)),
-            NOW,
-        )
-        .unwrap_err();
+        let error = reexchange_from(&server, &token, SenderRequest::from(headers)).unwrap_err();
         assert_eq!(error, expected);
         refusal_code(&error, OAuthErrorCode::InvalidGrant);
     }
@@ -1041,9 +1087,8 @@ fn reexchange_to(
     root_scope: Option<&ChioScope>,
 ) -> Result<AnchorEvidence, RootExchangeError> {
     let key = local_keypair().public_key();
-    let subject_scope = ceiling();
     let headers = no_headers();
-    local_as::verify_reexchange(
+    reexchange_request(
         &local_server(&key),
         token,
         ReExchangeRequest {
@@ -1053,13 +1098,51 @@ fn reexchange_to(
             root_scope,
             request_digest: Sha256Digest::from_hash(sha256(b"re-exchange")),
         },
+        SenderRequest::from(&headers),
+    )
+}
+
+fn reexchange_from(
+    server: &LocalAuthorizationServer<'_>,
+    token: &str,
+    sender: SenderRequest<'_>,
+) -> Result<AnchorEvidence, RootExchangeError> {
+    reexchange_request(
+        server,
+        token,
+        ReExchangeRequest {
+            scope: None,
+            resource: None,
+            client_id: None,
+            root_scope: None,
+            request_digest: Sha256Digest::from_hash(sha256(b"re-exchange")),
+        },
+        sender,
+    )
+}
+
+fn reexchange_request(
+    server: &LocalAuthorizationServer<'_>,
+    token: &str,
+    request: ReExchangeRequest<'_>,
+    sender: SenderRequest<'_>,
+) -> Result<AnchorEvidence, RootExchangeError> {
+    let subject_scope = ceiling();
+    local_as::verify_reexchange(
+        server,
+        token,
+        request,
         SubjectRoot {
             scope: &subject_scope,
             assertion_exp: NOW + 200,
         },
-        PresentedSender::from(crate::SenderRequest::from(&headers)),
+        PresentedSender::from(sender),
         NOW,
     )
+}
+
+fn mtls_sender(thumbprint: &str) -> TransportIdentity {
+    TransportIdentity::for_tests(Some(thumbprint), None)
 }
 
 #[test]
@@ -1118,44 +1201,210 @@ fn local_reexchange_widening_refuses() {
 }
 
 #[test]
-fn local_reexchange_spends_its_own_key_and_inherits_the_assertion_expiry() {
-    let exchange = every_kind();
-    let token = local_token(&local_claims());
-    let key = local_keypair().public_key();
-    let headers = no_headers();
-    let issued = local_as::verify(
-        &local_server(&key),
-        &token,
-        PresentedSender::from(crate::SenderRequest::from(&headers)),
-        NOW,
+fn local_issue_replay_key_is_the_authorization_code_digest() {
+    let issued = issue(|_| {}).unwrap();
+    let code_digest = Sha256Digest::from_hash(sha256(AUTHORIZATION_CODE.as_bytes()));
+    assert_eq!(
+        issued.replay_key(),
+        &ReplayKey {
+            namespace: ReplayNamespace::LocalAsIssue,
+            issuer: LOCAL_AS_ISSUER.to_owned(),
+            id: code_digest.to_bare_hex(),
+        }
+    );
+    assert_eq!(
+        issued.replay_key().namespace.as_str(),
+        "chio_local_as_issue"
+    );
+    assert_eq!(issued.artifact_digest(), Some(&code_digest));
+    assert_eq!(issued.token_exp(), NOW + 300);
+    assert_eq!(issued.principal, "local-user");
+    assert_eq!(issued.tenant, AS_ISSUER);
+    assert_eq!(issued.scope_values, ["mcp:invoke", "mcp:read"]);
+    assert_ne!(
+        issued.replay_key(),
+        issue(|code| code.code = "code-2".to_owned())
+            .unwrap()
+            .replay_key()
+    );
+}
+
+#[test]
+fn local_reexchange_replay_key_is_the_subject_jti() {
+    let narrowed = reexchange(
+        &local_token(&local_claims()),
+        Some(&["mcp:read".to_owned()]),
+        Some(RESOURCE),
+        None,
     )
     .unwrap();
-    let narrowed =
-        reexchange(&token, Some(&["mcp:read".to_owned()]), Some(RESOURCE), None).unwrap();
     assert_eq!(
-        issued.replay_key().namespace,
-        ReplayNamespace::Assertion(AnchorKind::ChioLocalAs)
+        narrowed.replay_key(),
+        &ReplayKey {
+            namespace: ReplayNamespace::Assertion(AnchorKind::ChioLocalAs),
+            issuer: LOCAL_AS_ISSUER.to_owned(),
+            id: "local-1".to_owned(),
+        }
     );
-    assert_eq!(
-        narrowed.replay_key().namespace,
-        ReplayNamespace::LocalReExchange
-    );
-    assert_eq!(issued.replay_key().id, narrowed.replay_key().id);
-    assert_ne!(issued.replay_key().digest(), narrowed.replay_key().digest());
-    assert_eq!(issued.token_exp(), NOW + 300);
+    assert_eq!(narrowed.replay_key().namespace.as_str(), "chio_local_as");
     assert_eq!(narrowed.token_exp(), NOW + 200);
+}
 
+#[test]
+fn local_issue_and_reexchange_spend_apart_and_a_second_reexchange_refuses() {
+    let exchange = every_kind();
     let replay = MemoryReplay::default();
     let issued = exchange
-        .prepare(issued, None, None, NOW, &entropy())
+        .prepare(issue(|_| {}).unwrap(), None, None, NOW, &entropy())
         .unwrap();
     exchange.spend_replay_key(&issued, &replay, NOW).unwrap();
-    let narrowed = exchange
-        .prepare(narrowed, None, None, NOW, &entropy())
-        .unwrap();
-    assert_eq!(narrowed.anchor().assertion_exp, NOW + 200);
-    assert!(narrowed.expires_at() <= NOW + 200);
-    exchange.spend_replay_key(&narrowed, &replay, NOW).unwrap();
+    let token = local_token(&local_claims());
+    let narrowed = || {
+        exchange
+            .prepare(
+                reexchange(&token, Some(&["mcp:read".to_owned()]), Some(RESOURCE), None).unwrap(),
+                None,
+                None,
+                NOW,
+                &entropy(),
+            )
+            .unwrap()
+    };
+    let first = narrowed();
+    assert_eq!(first.anchor().assertion_exp, NOW + 200);
+    assert!(first.expires_at() <= NOW + 200);
+    exchange.spend_replay_key(&first, &replay, NOW).unwrap();
+    assert_eq!(
+        exchange
+            .spend_replay_key(&narrowed(), &replay, NOW)
+            .unwrap_err(),
+        RootExchangeError::AssertionReplay
+    );
+    assert_eq!(
+        exchange
+            .spend_replay_key(&issued, &replay, NOW)
+            .unwrap_err(),
+        RootExchangeError::AssertionReplay
+    );
+}
+
+#[test]
+fn sender_bound_code_issue_carries_cnf_to_the_issued_token() {
+    let bound = constraint(json!({ "x5t#S256": "cert-thumbprint" }));
+    let transport = mtls_sender("cert-thumbprint");
+    let headers = no_headers();
+    let issued = issue_with(
+        |code| code.sender_constraint = Some(bound.clone()),
+        SenderRequest::from_extension(&headers, Some(&transport)),
+    )
+    .unwrap();
+    assert_eq!(issued.sender_constraint(), Some(&bound));
+    assert_eq!(issue(|_| {}).unwrap().sender_constraint(), None);
+}
+
+#[test]
+fn sender_bound_reexchange_carries_cnf_to_the_issued_token() {
+    let key = local_keypair().public_key();
+    let token = local_token(&with_cnf(json!({ "x5t#S256": "cert-thumbprint" })));
+    let transport = mtls_sender("cert-thumbprint");
+    let headers = no_headers();
+    let narrowed = reexchange_from(
+        &local_server(&key),
+        &token,
+        SenderRequest::from_extension(&headers, Some(&transport)),
+    )
+    .unwrap();
+    assert_eq!(
+        narrowed.sender_constraint(),
+        Some(&constraint(json!({ "x5t#S256": "cert-thumbprint" })))
+    );
+    assert_eq!(
+        reexchange(&local_token(&local_claims()), None, None, None)
+            .unwrap()
+            .sender_constraint(),
+        None
+    );
+}
+
+#[test]
+fn local_issue_refusals() {
+    let mtls = || Some(constraint(json!({ "x5t#S256": "cert-thumbprint" })));
+    let headers = no_headers();
+    let mut dpop = HeaderMap::new();
+    dpop.insert(
+        HeaderName::from_static(crate::DPOP_HEADER),
+        HeaderValue::from_static("proof"),
+    );
+    let other_cert = mtls_sender("other-thumbprint");
+    let cases: Vec<(
+        Box<dyn FnOnce(&mut CodeFixture)>,
+        SenderRequest<'_>,
+        RootExchangeError,
+        OAuthErrorCode,
+    )> = vec![
+        (
+            Box::new(|code| code.code_expires_at = NOW),
+            SenderRequest::from(&headers),
+            RootExchangeError::AssertionExpired,
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(|code| code.token_exp = NOW),
+            SenderRequest::from(&headers),
+            RootExchangeError::ClaimInvalid("exp"),
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(|code| code.code = String::new()),
+            SenderRequest::from(&headers),
+            RootExchangeError::MalformedRequest("code"),
+            OAuthErrorCode::InvalidRequest,
+        ),
+        (
+            Box::new(|code| code.code = "code\0".to_owned()),
+            SenderRequest::from(&headers),
+            RootExchangeError::MalformedRequest("code"),
+            OAuthErrorCode::InvalidRequest,
+        ),
+        (
+            Box::new(|code| code.subject = String::new()),
+            SenderRequest::from(&headers),
+            RootExchangeError::ClaimInvalid("sub"),
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(move |code| code.sender_constraint = mtls()),
+            SenderRequest::from(&headers),
+            RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::Mtls),
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(move |code| code.sender_constraint = mtls()),
+            SenderRequest::from_extension(&headers, Some(&other_cert)),
+            RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::Mtls),
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(|code| {
+                code.sender_constraint =
+                    Some(constraint(json!({ "chioSenderKey": "ab".repeat(32) })));
+            }),
+            SenderRequest::from(&headers),
+            RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::DpopUnavailable),
+            OAuthErrorCode::InvalidGrant,
+        ),
+        (
+            Box::new(|_| {}),
+            SenderRequest::from(&dpop),
+            RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::DpopUnavailable),
+            OAuthErrorCode::InvalidGrant,
+        ),
+    ];
+    for (edit_code, sender, expected, code) in cases {
+        let error = issue_with(edit_code, sender).unwrap_err();
+        assert_eq!(error, expected);
+        refusal_code(&error, code);
+    }
 }
 
 #[test]
@@ -1330,15 +1579,7 @@ fn local_rule(edit_rule: impl FnOnce(&mut Value)) -> RootExchange {
 }
 
 fn local_evidence() -> AnchorEvidence {
-    let key = local_keypair().public_key();
-    let headers = no_headers();
-    local_as::verify(
-        &local_server(&key),
-        &local_token(&local_claims()),
-        PresentedSender::from(crate::SenderRequest::from(&headers)),
-        NOW,
-    )
-    .unwrap()
+    issue(|_| {}).unwrap()
 }
 
 fn recorded_scope(prepared: &PreparedAnchoredRoot) -> Vec<&str> {
