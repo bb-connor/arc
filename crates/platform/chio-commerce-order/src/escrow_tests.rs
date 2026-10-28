@@ -188,7 +188,7 @@ impl AcceptFixture {
         self.resign_reservation(reservation_body(&self.context, &self.token, usd(4200)));
     }
 
-    fn accept(&self) -> Result<CommerceEscrowAcceptance, CommerceOrderError> {
+    fn accept(&self) -> Result<AcceptedEscrow, CommerceOrderError> {
         accept(CommerceEscrowAcceptRequest {
             order_context: &self.context,
             token_offer: &self.token,
@@ -727,7 +727,7 @@ fn verifier_binds_ledger_status_to_order_state() {
 struct ReleaseFixture {
     settlement_authority: Keypair,
     execution_authority: Keypair,
-    acceptance: CommerceEscrowAcceptance,
+    acceptance: AcceptedEscrow,
     advanced: CommerceOrderContext,
     execution: SignedCapitalExecutionInstruction,
     released_at: u64,
@@ -821,7 +821,7 @@ impl ReleaseFixture {
 
     fn release(&self) -> Result<CommerceEscrowRelease, CommerceOrderError> {
         release(CommerceEscrowReleaseRequest {
-            acceptance: &self.acceptance,
+            acceptance: self.acceptance.clone(),
             advanced_context: &self.advanced,
             execution: &self.execution,
             released_at: self.released_at,

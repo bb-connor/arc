@@ -18,7 +18,7 @@ mod receipt_action_hash_tests;
 
 pub use error::{CommerceEscrowError, CommerceOrderError};
 pub use escrow::{
-    accept, release, CommerceEscrowAcceptRequest, CommerceEscrowAcceptance, CommerceEscrowLedger,
+    accept, release, AcceptedEscrow, CommerceEscrowAcceptRequest, CommerceEscrowLedger,
     CommerceEscrowLeg, CommerceEscrowLegKind, CommerceEscrowRelease, CommerceEscrowReleaseRequest,
     CommerceEscrowStatus, CommerceReservationReceipt, CommerceSettlementDispatch,
     SignedCommerceReservationReceipt, COMMERCE_ESCROW_CUSTODY_ACCOUNT,

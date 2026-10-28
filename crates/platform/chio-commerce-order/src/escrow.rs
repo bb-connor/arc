@@ -285,7 +285,7 @@ pub struct CommerceEscrowAcceptRequest<'a> {
 
 /// Output of [`accept`].
 #[derive(Debug, Clone)]
-pub struct CommerceEscrowAcceptance {
+pub struct AcceptedEscrow {
     /// Locked ledger.
     pub ledger: CommerceEscrowLedger,
     /// `updated_context.settlement_packet_sha256` is the sha256 of the
@@ -299,7 +299,8 @@ pub struct CommerceEscrowAcceptance {
 
 /// Inputs to [`release`].
 pub struct CommerceEscrowReleaseRequest<'a> {
-    pub acceptance: &'a CommerceEscrowAcceptance,
+    /// Consumed: one acceptance backs one release.
+    pub acceptance: AcceptedEscrow,
     /// The same order advanced to a settlement-reconciliation predecessor
     /// state. Its order, party, quote, settlement, and escrow fields must equal
     /// the accepted context.
@@ -334,7 +335,7 @@ pub struct CommerceEscrowRelease {
 /// fully reserved in the quote currency.
 pub fn accept(
     request: CommerceEscrowAcceptRequest<'_>,
-) -> Result<CommerceEscrowAcceptance, CommerceOrderError> {
+) -> Result<AcceptedEscrow, CommerceOrderError> {
     let context = request.order_context;
     context.validate_shape()?;
     crate::verify_quote_digest(context)?;
@@ -387,7 +388,7 @@ pub fn accept(
     updated_context.settlement_packet_sha256 = settlement_packet_sha256;
     updated_context.current_state = SETTLEMENT_PACKET_ASSEMBLED_STATE.to_string();
 
-    Ok(CommerceEscrowAcceptance {
+    Ok(AcceptedEscrow {
         ledger,
         settlement_packet,
         escrow_digest,
@@ -413,7 +414,7 @@ pub fn accept(
 pub fn release(
     request: CommerceEscrowReleaseRequest<'_>,
 ) -> Result<CommerceEscrowRelease, CommerceOrderError> {
-    let acceptance = request.acceptance;
+    let acceptance = &request.acceptance;
     let accepted = &acceptance.updated_context;
     acceptance.ledger.validate()?;
     if acceptance.ledger.digest()? != acceptance.escrow_digest {
