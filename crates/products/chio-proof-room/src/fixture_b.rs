@@ -332,6 +332,8 @@ pub(crate) fn embedded_commerce_order_bundle(
     } else {
         None
     };
+    let escrow_ledger_bytes =
+        embedded_commerce_escrow_ledger_bytes(&graph.nodes, artifacts, &order_context)?;
 
     Ok(chio_commerce_order::CommerceOrderVerificationBundle {
         order_context,
@@ -345,7 +347,7 @@ pub(crate) fn embedded_commerce_order_bundle(
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
-        escrow_ledger_bytes: None,
+        escrow_ledger_bytes,
         verified_trust_market_context: verified_trust_market_context.cloned(),
         trusted_event_authority_receipt_kernel_keys:
             crate::commerce_trusted_event_authority_receipt_kernel_keys_from_env()?,
@@ -354,6 +356,60 @@ pub(crate) fn embedded_commerce_order_bundle(
         trusted_risk_comptroller_signer_keys:
             crate::enterprise_trusted_risk_comptroller_signer_keys_from_env()?,
     })
+}
+
+/// The escrow ledger that `order_context.escrow_digest` pins: none without a
+/// pin, otherwise the single escrow ledger node whose schema and graph digest
+/// check and whose canonical digest equals the pin.
+fn embedded_commerce_escrow_ledger_bytes(
+    nodes: &[ProofRoomEmbeddedEvidenceNode],
+    artifacts: &BTreeMap<String, Vec<u8>>,
+    order_context: &chio_commerce_order::CommerceOrderContext,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(pinned) = order_context.escrow_digest.as_deref() else {
+        return Ok(None);
+    };
+    let candidates = embedded_artifact_nodes_by_role(nodes, "commerce-escrow-ledger");
+    if candidates.is_empty() {
+        return Err(format!(
+            "missing commerce escrow ledger for pinned digest {pinned}"
+        ));
+    }
+    let mut selected = Vec::new();
+    for node in candidates {
+        let bytes = embedded_artifact_node_bytes(
+            node,
+            artifacts,
+            chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            "commerce",
+        )?;
+        let ledger: chio_commerce_order::CommerceEscrowLedger = crate::input::decode(&bytes)
+            .map_err(|error| {
+                format!(
+                    "commerce escrow ledger JSON invalid for {}: {error}",
+                    node.path
+                )
+            })?;
+        let digest = ledger.digest().map_err(|error| {
+            format!(
+                "commerce escrow ledger {} is not canonical: {error}",
+                node.path
+            )
+        })?;
+        if digest == pinned {
+            selected.push(bytes);
+        }
+    }
+    let mut selected = selected.into_iter();
+    match (selected.next(), selected.next()) {
+        (Some(bytes), None) => Ok(Some(bytes)),
+        (None, _) => Err(format!(
+            "no commerce escrow ledger matches pinned digest {pinned}"
+        )),
+        (Some(_), Some(_)) => Err(format!(
+            "multiple commerce escrow ledgers match pinned digest {pinned}"
+        )),
+    }
 }
 
 fn embedded_commerce_event_authority_receipts(
