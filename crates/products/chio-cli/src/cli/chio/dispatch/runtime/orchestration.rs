@@ -67,7 +67,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_plan(
                 admission_id: step.admission_id.clone(),
                 state: step.state.clone(),
                 destructive: false,
-                admission_receipt_sha256: None,
                 tool_receipt_sha256: None,
                 lease_id: None,
             })
@@ -185,7 +184,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
             admission_id: step.admission_id,
             state: status.to_string(),
             destructive: step.destructive,
-            admission_receipt_sha256: Some(step.admission_receipt_sha256),
             tool_receipt_sha256: Some(step.tool_receipt_sha256),
             lease_id: step.lease_id,
         };

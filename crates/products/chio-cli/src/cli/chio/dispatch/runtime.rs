@@ -197,7 +197,6 @@ mod chio_orchestration_cli_tests {
             canonical_sha256_json(&verifier_report, "test verifier report hash")?;
         let source_record = chio_runtime::RuntimeProofSourceRecord {
             step_index: 0,
-            admission_receipt_sha256: fixed_hash('1'),
             tool_receipt_sha256: fixed_hash('2'),
             bilateral_dsse_sha256: fixed_hash('3'),
             workflow_step_sha256: fixed_hash('4'),
@@ -221,13 +220,11 @@ mod chio_orchestration_cli_tests {
             accepted: true,
             failure_code: None,
             generated_at_unix_ms,
-            admission_receipt_sha256: fixed_hash('6'),
             evidence_paths: vec!["proof-package.json".to_string()],
             step_evidence: vec![chio_runtime::RuntimeStepEvidence {
                 schema: chio_runtime::CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
                 step_index: 0,
                 admission_id: "adm-runtime-cli-0".to_string(),
-                admission_receipt_sha256: source_record.admission_receipt_sha256.clone(),
                 tool_receipt_id: format!("receipt-{run_id}"),
                 tool_receipt_sha256: source_record.tool_receipt_sha256.clone(),
                 output_sha256: fixed_hash('7'),
@@ -272,7 +269,6 @@ mod chio_orchestration_cli_tests {
         fs::create_dir_all(dir)?;
         let source_record = chio_runtime::RuntimeProofSourceRecord {
             step_index: 0,
-            admission_receipt_sha256: fixed_hash('1'),
             tool_receipt_sha256: fixed_hash('2'),
             bilateral_dsse_sha256: fixed_hash('3'),
             workflow_step_sha256: fixed_hash('4'),
@@ -297,13 +293,11 @@ mod chio_orchestration_cli_tests {
             accepted: true,
             failure_code: None,
             generated_at_unix_ms,
-            admission_receipt_sha256: fixed_hash('6'),
             evidence_paths: vec!["proof-regeneration-report.json".to_string()],
             step_evidence: vec![chio_runtime::RuntimeStepEvidence {
                 schema: chio_runtime::CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
                 step_index: 0,
                 admission_id: "adm-runtime-cli-0".to_string(),
-                admission_receipt_sha256: source_record.admission_receipt_sha256,
                 tool_receipt_id: format!("receipt-{run_id}"),
                 tool_receipt_sha256: source_record.tool_receipt_sha256,
                 output_sha256: fixed_hash('7'),

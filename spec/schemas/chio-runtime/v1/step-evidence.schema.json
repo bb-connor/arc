@@ -8,7 +8,6 @@
     "schema",
     "stepIndex",
     "admissionId",
-    "admissionReceiptSha256",
     "toolReceiptId",
     "toolReceiptSha256",
     "outputSha256",
@@ -21,10 +20,6 @@
     "schema": { "const": "chio.runtime.step-evidence.v1" },
     "stepIndex": { "type": "integer", "minimum": 0 },
     "admissionId": { "type": "string", "minLength": 1 },
-    "admissionReceiptSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
     "toolReceiptId": { "type": "string", "minLength": 1 },
     "toolReceiptSha256": {
       "type": "string",

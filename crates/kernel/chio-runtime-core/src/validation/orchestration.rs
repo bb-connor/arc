@@ -373,10 +373,6 @@ pub(crate) fn validate_runtime_orchestration_step_state(
     )?;
     validate_state_label(&state.state, "runtime_orchestration_step_invalid_state")?;
     ensure_optional_sha256(
-        state.admission_receipt_sha256.as_deref(),
-        "runtime_orchestration_step_invalid_admission_hash",
-    )?;
-    ensure_optional_sha256(
         state.tool_receipt_sha256.as_deref(),
         "runtime_orchestration_step_invalid_receipt_hash",
     )?;
