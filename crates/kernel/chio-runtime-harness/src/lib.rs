@@ -19,6 +19,7 @@
 mod admission_loop;
 mod buyer_closure;
 mod evidence_io;
+mod fixture_generation;
 mod kernel;
 mod proof_assembly;
 mod proof_parity;
@@ -27,6 +28,8 @@ mod treaty;
 
 use std::fs;
 use std::path::Path;
+
+pub use fixture_generation::generate_runtime_loopback_fixture;
 
 use admission_loop::execute_runtime_admission_loop;
 use evidence_io::read_utf8_json_file;
@@ -74,8 +77,11 @@ pub fn run_runtime_loopback_scenario(
         store_dir,
         now_unix_ms,
         out_dir,
-        static_package,
-        static_report,
+        StaticProofBaseline {
+            package: static_package,
+            report: static_report,
+        },
+        false,
     )
 }
 
@@ -101,8 +107,11 @@ pub fn run_runtime_loopback_scenario_with_static_artifacts(
         store_dir,
         now_unix_ms,
         out_dir,
-        static_package,
-        static_report,
+        StaticProofBaseline {
+            package: static_package,
+            report: static_report,
+        },
+        false,
     )
 }
 
@@ -111,8 +120,8 @@ fn run_runtime_loopback_scenario_with_static_baseline(
     store_dir: &Path,
     now_unix_ms: u64,
     out_dir: &Path,
-    static_package: chio_attest_buyer_core::proof_package::ChioProofPackage,
-    static_report: chio_attest_buyer_core::report::VerifierReport,
+    static_baseline: StaticProofBaseline,
+    generate_fixture: bool,
 ) -> Result<(), RuntimeLoopbackError> {
     // Deterministic fixture runs share one artificial store and lease identity.
     // Keep their process-local operation ownership disjoint even when callers
@@ -221,17 +230,25 @@ fn run_runtime_loopback_scenario_with_static_baseline(
 
     let admission =
         execute_runtime_admission_loop(&steps, &authority, &receipt_store, now_unix_ms, out_dir)?;
-    assemble_runtime_loopback_outputs(
-        &run_id,
-        &steps,
-        out_dir,
-        now_unix_ms,
-        admission,
-        StaticProofBaseline {
-            package: static_package,
-            report: static_report,
-        },
-    )
+    if generate_fixture {
+        fixture_generation::assemble_qualified_fixture(
+            &run_id,
+            &steps,
+            out_dir,
+            now_unix_ms,
+            admission,
+            static_baseline,
+        )
+    } else {
+        assemble_runtime_loopback_outputs(
+            &run_id,
+            &steps,
+            out_dir,
+            now_unix_ms,
+            admission,
+            static_baseline,
+        )
+    }
 }
 
 fn create_private_directory(path: &Path) -> std::io::Result<()> {
@@ -334,7 +351,7 @@ mod tests {
         })
     }
 
-    fn write_executable_scenario(
+    pub(super) fn write_executable_scenario(
         source: &Path,
         destination: &Path,
     ) -> Result<(), crate::RuntimeLoopbackError> {
