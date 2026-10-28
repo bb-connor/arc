@@ -461,8 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn control_plane_authoring_nonce_signed_with_a_raw_keypair_is_refused() -> Result<(), String>
-    {
+    fn control_plane_authoring_nonce_signed_with_a_raw_keypair_is_refused() -> Result<(), String> {
         let census = census_with(
             &[],
             Some((
@@ -484,7 +483,8 @@ mod tests {
 
     #[test]
     fn unregistered_control_plane_nonce_literal_is_refused() -> Result<(), String> {
-        let path = "crates/platform/chio-control-plane/src/trust_control/finding_operator_bundle.rs";
+        let path =
+            "crates/platform/chio-control-plane/src/trust_control/finding_operator_bundle.rs";
         let census = census_with(
             &[(
                 path,
