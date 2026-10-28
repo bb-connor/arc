@@ -141,7 +141,7 @@ Clustered nodes authenticate to each other with Ed25519 signatures. Each request
 - the HTTP method, path, and query
 - the SHA-256 of the raw request body
 - a single-use 32-byte nonce
-- `issued_at`, accepted within 60 seconds
+- `issued_at`, accepted from 60 seconds behind to 5 seconds ahead of the receiver clock
 - the sender's term
 
 The receiver checks the deployment and recipient against its own configuration.
@@ -150,6 +150,14 @@ or another deployment, a stale `issued_at`, and a key that is not pinned in its
 `[[cluster.peers]]`. It remembers each nonce until its `issued_at` leaves the
 window, holds at most 65,536 of them, and refuses every new peer request with
 503 while that store is full.
+
+Nonces live in memory. A restarted receiver refuses every peer request issued
+at or before its start time plus 5 seconds, so no request an earlier process
+accepted is admitted again, including one issued in the restart second or
+dated ahead of the receiver clock. Peers are refused for the first 6 seconds
+after a receiver starts, and a peer whose clock lags the receiver by L seconds
+for L seconds more. This holds while the receiver clock does not step backward
+across a restart.
 
 Followers forward writes to the leader with the caller's own bearer secret, so
 the leader applies the caller's credential, scopes, and tenant authority.

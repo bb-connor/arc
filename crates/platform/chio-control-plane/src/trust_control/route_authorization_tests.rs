@@ -16,7 +16,7 @@ use super::super::caller_credentials::tests::{
 };
 use super::super::caller_credentials::{
     sign_cluster_peer_request, AuthenticatedPeer, PeerAddressing, TrustAccess, TrustAccessConfig,
-    CLUSTER_PEER_SIGNATURE_SCHEME,
+    CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS, CLUSTER_PEER_SIGNATURE_SCHEME,
 };
 use super::*;
 
@@ -299,11 +299,22 @@ fn mounted_router(authorizer: RouteAuthorizer) -> Router {
     ))
 }
 
+/// A receiver whose nonce cache started a full freshness window before `NOW`.
 fn authorizer_for(listener: Listener, text: &str) -> RouteAuthorizer {
     let config = TrustAccessConfig::from_toml_str(text).test_unwrap();
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
-    RouteAuthorizer::new(listener, Arc::new(access), Arc::new(FixedClock::new(NOW)))
+    let nonces = PeerNonceCache::new(Some(started_before_now()), access.peers().iter().count());
+    RouteAuthorizer::with_nonce_cache(
+        listener,
+        Arc::new(access),
+        Arc::new(FixedClock::new(NOW)),
+        nonces,
+    )
+}
+
+fn started_before_now() -> i64 {
+    i64::try_from(NOW).test_unwrap() - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS
 }
 
 fn fixture() -> Fixture {
@@ -1061,7 +1072,7 @@ fn mounted_with_nonce_capacity(listener: Listener, text: &str, capacity: usize) 
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = PeerNonceCache::with_capacity(
-        Some(i64::try_from(NOW).test_unwrap()),
+        Some(started_before_now()),
         access.peers().iter().count(),
         capacity,
     );
@@ -1137,6 +1148,27 @@ async fn peer_headers_are_checked_before_the_body_is_read() {
     .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(body.contains(UNAUTHENTICATED_PEER), "{body}");
+}
+
+#[tokio::test]
+async fn peer_request_signed_at_the_authorizer_start_refuses_as_stale() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let config = TrustAccessConfig::from_toml_str(&fixture_config(&node_b, &node_c)).test_unwrap();
+    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let internal = mounted_router(RouteAuthorizer::new(
+        Listener::Internal,
+        Arc::new(access),
+        Arc::new(FixedClock::new(NOW)),
+    ));
+    let rule = peer_row("/v1/internal/cluster/status");
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        body.contains("cluster peer signature is outside the freshness window"),
+        "{body}"
+    );
 }
 
 #[tokio::test]

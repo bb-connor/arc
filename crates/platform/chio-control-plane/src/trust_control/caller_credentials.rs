@@ -31,9 +31,15 @@ use super::{
 /// recipient node id.
 pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-signature.v1";
 
-/// A peer request is fresh only within this many seconds of the highest
-/// receiver time its nonce cache has observed.
-pub const CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS: i64 = 60;
+/// A peer request is fresh only while its `issued_at` is at most this many
+/// seconds before the highest receiver time its nonce cache has observed.
+pub const CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS: i64 = 60;
+
+/// A peer request is fresh only while its `issued_at` is at most this many
+/// seconds after the highest receiver time its nonce cache has observed. A
+/// restarted receiver refuses every request issued at or before its start
+/// plus this lead.
+pub const CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS: i64 = 5;
 
 /// Header carrying the lowercase hex SHA-256 of the request body (of the
 /// empty body when there is none).
@@ -1104,14 +1110,24 @@ fn is_lowercase_hex_32(value: &str) -> bool {
 /// Remembers each `(node id, nonce)` an accepted peer request used, and
 /// decides which issue times are fresh.
 ///
-/// The acceptance window is `[earliest, high_water + MAX_SKEW]`, where
-/// `high_water` is the highest receiver time the cache has observed and
-/// `earliest = max(start, high_water - MAX_SKEW)`. `start` is the receiver
-/// time at which the cache began remembering nonces. An entry is pruned only
-/// once its issue time is below `earliest`, so every request the window
-/// admits is checked against every nonce that request could reuse: a backward
-/// clock step never reopens a pruned nonce, and a request issued before this
-/// cache existed (a nonce a previous process held) is refused as stale.
+/// The acceptance window is `[earliest, high_water + MAX_LEAD]`, where
+/// `high_water` is the highest receiver time the cache has observed,
+/// `earliest = max(start + MAX_LEAD + 1, high_water - MAX_AGE)` and `start`
+/// is the receiver time at which the cache began remembering nonces. Both
+/// bounds only rise. An entry is pruned only once its issue time is below
+/// `earliest`, so every request the window admits is checked against every
+/// nonce that request could reuse, and a backward clock step never reopens a
+/// pruned nonce.
+///
+/// Restart invariant: a cache admits no request that an earlier cache on the
+/// same receiver accepted. An earlier cache accepted only issue times at or
+/// below its own `high_water + MAX_LEAD`, and its `high_water` is at or below
+/// this cache's `start` while the receiver clock does not step backward across
+/// the restart. This cache refuses every issue time at or below
+/// `start + MAX_LEAD`, including a request issued in the restart second and a
+/// future-dated request an earlier cache accepted. The cost is that a
+/// restarted receiver refuses every peer for its first `MAX_LEAD + 1`
+/// seconds, and a peer whose clock lags by `L` seconds for `L` more.
 ///
 /// The cache holds at most `CLUSTER_PEER_NONCE_CACHE_CAPACITY` entries and
 /// each pinned peer at most an equal share of them. A full cache or a full
@@ -1134,17 +1150,21 @@ struct NonceState {
 
 impl NonceState {
     /// Fold `now_secs` into the high-water time and return the inclusive
-    /// acceptance window, pruning every entry below its lower bound.
+    /// acceptance window, pruning every entry below its lower bound. The
+    /// window is empty until the receiver time passes `start + MAX_LEAD`.
     fn observe(&mut self, now_secs: i64) -> (i64, i64) {
         self.high_water = self.high_water.max(now_secs);
         let start = *self.start.get_or_insert(now_secs);
-        let earliest = start.max(
-            self.high_water
-                .saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS),
-        );
+        let earliest = start
+            .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS)
+            .saturating_add(1)
+            .max(
+                self.high_water
+                    .saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
+            );
         let latest = self
             .high_water
-            .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS);
+            .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS);
         while let Some((issued_at, _, _)) = self.by_expiry.first() {
             if *issued_at >= earliest {
                 break;

@@ -401,7 +401,7 @@ const NODE_B: &str = "https://node-b.example:9101";
 const NODE_C: &str = "https://node-c.example:9101";
 
 fn nonce_cache() -> PeerNonceCache {
-    PeerNonceCache::new(Some(ISSUED_AT), 1)
+    PeerNonceCache::new(Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS), 1)
 }
 
 fn status_target() -> PeerRequestTarget<'static> {
@@ -631,7 +631,7 @@ fn peer_nonce_cache_refuses_when_full() {
         "cluster peer replay cache cannot admit another request"
     );
     assert_eq!(full.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let after_window = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS + 1;
+    let after_window = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS + 1;
     let later = signed_peer_headers(&keypair, NODE_B, &target, after_window, None);
     access
         .peers
@@ -1195,17 +1195,124 @@ fn peer_replay_after_restart_refuses() {
             .test_unwrap_err(),
         PeerAuthError::Stale
     );
-    let fresh = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT + 5, None);
+    let first_fresh = ISSUED_AT + 3 + CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS + 1;
+    let in_lead = signed_peer_headers(&keypair, NODE_B, &target, first_fresh - 1, None);
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &in_lead,
+                &target,
+                first_fresh,
+                Scope::ClusterReplicate,
+                &restarted,
+            )
+            .test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+    let fresh = signed_peer_headers(&keypair, NODE_B, &target, first_fresh, None);
     access
         .peers
         .verify(
             &fresh,
             &target,
-            ISSUED_AT + 5,
+            first_fresh,
             Scope::ClusterReplicate,
             &restarted,
         )
         .test_unwrap();
+}
+
+#[test]
+fn peer_replay_in_the_restart_second_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = status_target();
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    let before_restart = nonce_cache();
+    access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &before_restart,
+        )
+        .test_unwrap();
+    let restarted = PeerNonceCache::new(Some(ISSUED_AT), 1);
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &headers,
+                &target,
+                ISSUED_AT,
+                Scope::ClusterReplicate,
+                &restarted,
+            )
+            .test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+}
+
+#[test]
+fn peer_future_dated_replay_after_restart_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = status_target();
+    let before_restart = nonce_cache();
+    let led = signed_peer_headers(
+        &keypair,
+        NODE_B,
+        &target,
+        ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS,
+        None,
+    );
+    access
+        .peers
+        .verify(
+            &led,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &before_restart,
+        )
+        .test_unwrap();
+    let restarted = PeerNonceCache::new(Some(ISSUED_AT + 1), 1);
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &led,
+                &target,
+                ISSUED_AT + 1,
+                Scope::ClusterReplicate,
+                &restarted,
+            )
+            .test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+    let far_ahead = signed_peer_headers(
+        &keypair,
+        NODE_B,
+        &target,
+        ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS + 1,
+        None,
+    );
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &far_ahead,
+                &target,
+                ISSUED_AT,
+                Scope::ClusterReplicate,
+                &before_restart,
+            )
+            .test_unwrap_err(),
+        PeerAuthError::Stale
+    );
 }
 
 #[test]
@@ -1286,7 +1393,7 @@ fn peer_replay_at_the_window_boundary_refuses() {
             &nonces,
         )
         .test_unwrap();
-    let at_boundary = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS;
+    let at_boundary = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS;
     assert_eq!(
         access
             .peers
@@ -1327,7 +1434,7 @@ fn peer_nonce_quota_keeps_other_peers_admitted() {
     )))
     .test_unwrap();
     let target = status_target();
-    let nonces = PeerNonceCache::new(Some(ISSUED_AT), 2);
+    let nonces = PeerNonceCache::new(Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS), 2);
     for index in 0..CLUSTER_PEER_NONCE_CACHE_CAPACITY / 2 {
         nonces
             .record(NODE_B, &format!("{index:064x}"), ISSUED_AT, ISSUED_AT)

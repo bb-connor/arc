@@ -383,7 +383,8 @@ impl std::fmt::Debug for RouteAuthorizer {
 
 impl RouteAuthorizer {
     /// The peer nonce cache starts at the receiver time read here, so a peer
-    /// request issued before this authorizer existed refuses as stale.
+    /// request issued at or before that time plus
+    /// `CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS` refuses as stale.
     #[must_use]
     pub fn new(listener: Listener, access: Arc<TrustAccess>, clock: Arc<dyn Clock>) -> Self {
         let nonces = PeerNonceCache::new(unix_secs(clock.as_ref()), access.peers().iter().count());
