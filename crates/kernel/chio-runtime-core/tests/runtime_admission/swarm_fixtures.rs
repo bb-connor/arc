@@ -230,7 +230,7 @@ pub(super) fn runtime_swarm_revocation_root(
 #[derive(Debug)]
 pub(super) struct RetainedSwarmGraphs(Vec<SwarmAuthorityBundle>);
 
-impl chio_runtime_core::SwarmGraphSource for RetainedSwarmGraphs {
+impl runtime_api::SwarmGraphSource for RetainedSwarmGraphs {
     fn swarm_graph(
         &self,
         graph_id: &str,
@@ -268,7 +268,7 @@ impl std::fmt::Debug for IssuedGraphs {
     }
 }
 
-impl chio_runtime_core::SwarmGraphSource for IssuedGraphs {
+impl runtime_api::SwarmGraphSource for IssuedGraphs {
     fn swarm_graph(
         &self,
         graph_id: &str,
