@@ -31,21 +31,29 @@ invocation. There is no long-running Mercury admission service in this crate.
 
 ## Data and control flow
 
-`build_proof_package` constructs an `EvidenceVerificationPolicy` from supplied
-kernel keys, loads a verified export summary, validates bundle manifests, and
-calls `MercuryProofPackage::build`. The export command invokes `verify` before
-writing the resulting JSON. Current builds produce proof-package v2.
+`build_proof_package` verifies the export through `chio-bundle-verify` against
+the `--trust` file, validates bundle manifests, and
+calls `MercuryProofPackage::build`. The export command invokes
+`verify_with_trusted_kernel_keys` against the trust file's kernel keys before
+writing the resulting `chio.mercury.proof_package.v1` JSON. The trust file may
+pin only roles Mercury enforces: `trusted_kernel_key_set` refuses
+`checkpoint_keys`, `checkpoint_trust_anchor` and `required_columns`.
 
-`cmd_mercury_verify` decodes a package and dispatches on the current proof or
-inquiry schema. Core validation accepts legacy proof identities, but this
-command only dispatches the current proof schema and inquiry v1 schema.
-Its verification report describes package integrity without external trusted
-kernel authority. The CLI has no trusted-key option on this command.
+`cmd_mercury_verify` decodes a package and dispatches on the
+`chio.mercury.proof_package.v1` or `chio.mercury.inquiry_package.v1` schema.
+It verifies with `verify_with_trusted_kernel_keys` against the kernel keys
+pinned in the required `--trust` file, as `inquiry export` does for its input
+proof package and the derived inquiry package.
 
 `export_mercury_run` writes input events, opens `receipts.sqlite3`, records a
 capability snapshot, signs receipts, and seals their canonical bytes into a
 checkpoint. It exports the store through the control plane, then writes proof
-and optional inquiry packages alongside verification reports.
+and optional inquiry packages alongside verification reports. Both packages are
+verified against the run's own kernel key, which the same process generated and
+signed every receipt with; the run paths record it as `kernelPublicKey`, and the
+downstream review, governance, assurance, OEM and trust-network exports carry
+that key in memory through their summaries and pin it. It is never read from a
+package or from a file in the output tree.
 
 `export_pilot_scenario` generates primary and rollback runs.
 `export_supervised_live_capture` validates the caller's capture and invokes
@@ -61,8 +69,11 @@ is constructed from fixture events. This path does not perform an external tool
 call or prove kernel admission. Capture gate approval and health information
 are validated declarations supplied in the input.
 
-`read_json_file` uses duplicate-aware signed decoding on the original input.
-It first calls `fs::read`, so this helper places no size bound on allocation.
+Each synthetic receipt signs a reference to every bundle manifest packaged for
+its run, so the trusted verify finds signed coverage for each packaged manifest.
+
+`read_json_file` uses duplicate-aware signed decoding on the original input
+and reads at most one byte past `MAX_JSON_INPUT_BYTES` (16 MiB) before refusing.
 `bundle_manifest_file_name` rejects separators, colons, control characters,
 padded IDs, and dot segments before creating filenames for multiple manifests.
 

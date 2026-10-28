@@ -2606,6 +2606,7 @@ dependencies = [
  "chio-core-types",
  "chio-cross-protocol",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-manifest",
  "chio-security-types",
  "serde",
@@ -2690,6 +2691,7 @@ dependencies = [
  "chio-core",
  "chio-egress-contract",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-metrics-spec",
  "chio-security-types",
  "chio-spec-validate",
@@ -2940,6 +2942,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bundle-verify"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-errors",
+ "chio-kernel-core",
+ "chio-security-types",
+ "chio-test-support",
+ "clap 4.6.0",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "chio-cage"
 version = "0.1.0"
 dependencies = [
@@ -3011,6 +3029,7 @@ dependencies = [
  "chio-attest-buyer-core",
  "chio-attest-loopback",
  "chio-attest-verify",
+ "chio-bundle-verify",
  "chio-cage",
  "chio-commerce-order",
  "chio-conformance",
@@ -3036,6 +3055,7 @@ dependencies = [
  "chio-hosted-mcp",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-lineage",
  "chio-listing",
@@ -3252,6 +3272,7 @@ dependencies = [
  "chio-agent-web-interop",
  "chio-anchor",
  "chio-appraisal",
+ "chio-bundle-verify",
  "chio-commerce-order",
  "chio-conformance",
  "chio-core",
@@ -3277,6 +3298,7 @@ dependencies = [
  "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-link",
  "chio-log-redact",
@@ -3820,6 +3842,7 @@ dependencies = [
  "chio-finding",
  "chio-finding-verifier",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-open-market",
  "serde",
  "serde_json",
@@ -3961,6 +3984,7 @@ dependencies = [
  "chio-finding",
  "chio-fiscal",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-revocation-oracle",
  "hex",
  "serde",
@@ -4574,11 +4598,14 @@ dependencies = [
 name = "chio-mercury"
 version = "0.1.0"
 dependencies = [
+ "chio-bundle-verify",
  "chio-control-plane",
  "chio-core-types",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-mercury-core",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "clap 4.6.0",
  "serde",
@@ -4591,6 +4618,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-kernel",
+ "chio-kernel-core",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -4822,6 +4850,7 @@ dependencies = [
  "chio-cage-plan",
  "chio-core-types",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
@@ -5257,6 +5286,7 @@ dependencies = [
  "chio-federation",
  "chio-finding",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-link",
  "chio-open-market",
  "chio-security-types",

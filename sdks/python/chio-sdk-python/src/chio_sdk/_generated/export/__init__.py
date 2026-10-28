@@ -1,0 +1,23 @@
+# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.
+#
+# Source: spec/schemas/chio-wire/v1/**/*.schema.json
+# Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
+# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
+#
+# Manual edits will be overwritten by the next regeneration; the
+# spec-drift CI lane enforces this header on every file
+# under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
+
+from __future__ import annotations
+
+from .bundle_verify_report_schema import ChioBundleVerifyReport, Column, ColumnResult, Columns, EvidenceClass, ExitClass, ReceiptReport
+
+__all__ = [
+    "ChioBundleVerifyReport",
+    "Column",
+    "ColumnResult",
+    "Columns",
+    "EvidenceClass",
+    "ExitClass",
+    "ReceiptReport",
+]

@@ -17,10 +17,10 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::merkle::leaf_hash;
 use chio_core::Keypair;
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_consistency_proof, build_checkpoint_with_previous,
-    checkpoint_body_sha256, checkpoint_chain_leaf_hash, checkpoint_chain_root,
-    verify_checkpoint_consistency_proof,
+use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_consistency_proof, checkpoint_body_sha256, checkpoint_chain_leaf_hash,
+    checkpoint_chain_root, verify_checkpoint_consistency_proof,
 };
 
 #[test]

@@ -31,8 +31,9 @@
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
       },
-      "minItems": 1,
-      "maxItems": 64
+      "minItems": 0,
+      "maxItems": 64,
+      "description": "Keys that may sign anchored roots."
     },
     "root_policy_keys": {
       "type": "array",
@@ -40,8 +41,9 @@
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
       },
-      "minItems": 1,
-      "maxItems": 64
+      "minItems": 0,
+      "maxItems": 64,
+      "description": "Keys that may sign root policies."
     },
     "idp_keys": {
       "type": "object",
@@ -79,6 +81,10 @@
       },
       "maxItems": 64
     },
+    "checkpoint_trust_anchor": {
+      "$ref": "#/$defs/CheckpointTrustAnchorBinding",
+      "description": "The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews."
+    },
     "required_columns": {
       "type": "array",
       "uniqueItems": true,
@@ -93,6 +99,85 @@
         ]
       },
       "maxItems": 5
+    }
+  },
+  "$defs": {
+    "CheckpointTrustAnchorBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publicationIdentity",
+        "trustAnchorIdentity",
+        "trustAnchorRef",
+        "signerCertRef",
+        "publicationProfileVersion"
+      ],
+      "properties": {
+        "publicationIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "identity"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local_log",
+                "transparency_service",
+                "immutable_record",
+                "chain_anchor"
+              ]
+            },
+            "identity": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        },
+        "trustAnchorIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "identity"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "operator_root",
+                "did",
+                "x509_root",
+                "transparency_root",
+                "chain_root"
+              ]
+            },
+            "identity": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        },
+        "trustAnchorRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "signerCertRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "publicationProfileVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
     }
   }
 }

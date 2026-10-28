@@ -1,21 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core::receipt::checkpoint::is_supported_checkpoint_schema;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    EvidenceExportBundle, EvidenceExportQuery, EvidenceTransparencyClaims,
+};
 use chio_core::receipt::{
     body::ChioReceipt,
     decision::Decision,
     kinds::{ReceiptKind, TrustLevel},
 };
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_kernel::checkpoint::{
+use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
+use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
+use chio_kernel_core::evidence_verify::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
-    CheckpointTransparencySummary,
-};
-use chio_kernel::evidence_export::{
-    build_evidence_transparency_claims, EvidenceExportBundle, EvidenceExportQuery,
-    EvidenceTransparencyClaims,
-};
-use chio_kernel::{
-    is_supported_checkpoint_schema, verify_checkpoint_signature, ReceiptReadBoundary,
 };
 use serde::{Deserialize, Serialize};
 
@@ -1221,8 +1221,8 @@ fn verify_mercury_kernel_authority(
     for record in &bundle.tool_receipts {
         let kernel_key = record.receipt.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "tool receipt {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "tool receipt {}",
                 record.receipt.id
             )));
         }
@@ -1230,8 +1230,8 @@ fn verify_mercury_kernel_authority(
     for record in &bundle.child_receipts {
         let kernel_key = record.receipt.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "child receipt {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "child receipt {}",
                 record.receipt.id
             )));
         }
@@ -1239,8 +1239,8 @@ fn verify_mercury_kernel_authority(
     for checkpoint in &bundle.checkpoints {
         let kernel_key = checkpoint.body.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "checkpoint {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "checkpoint {}",
                 checkpoint.body.checkpoint_seq
             )));
         }

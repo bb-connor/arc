@@ -326,6 +326,8 @@ jobs:
           run_gate python3 scripts/tests/check-enterprise-subject-census.test.py
           run_gate python3 scripts/check-security-clocks.py
           run_gate python3 scripts/tests/check-security-clocks.test.py
+          run_gate bash -c "cargo metadata --format-version 1 --locked > \"\$RUNNER_TEMP/offline-verifier-metadata.json\" && python3 scripts/check-offline-verifier-deps.py --metadata \"\$RUNNER_TEMP/offline-verifier-metadata.json\""
+          run_gate python3 scripts/tests/check-offline-verifier-deps.test.py
           run_gate python3 scripts/check-escape-hatches.py
           run_gate python3 scripts/tests/check-escape-hatches.test.py
           run_gate python3 scripts/check-trust-boundaries.py

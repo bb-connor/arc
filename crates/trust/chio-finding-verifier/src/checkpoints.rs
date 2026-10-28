@@ -11,12 +11,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core_types::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_finding::{
     verify_signed_authority_status, FindingAuthorityKeyPolicy, FindingChallengeVerifierProfile,
 };
-use chio_kernel::checkpoint::{
+use chio_kernel_core::evidence_verify::{
     checkpoint_log_id, validate_checkpoint, verify_checkpoint_transparency_records,
-    CheckpointTransparencySummary, KernelCheckpoint,
 };
 
 use crate::verify::{policy_covers, FindingCheckpointSignerStatusTrust, ResolvedReceiptEvidence};
@@ -377,7 +377,8 @@ mod tests {
     use chio_finding::{
         FindingAuthorityKeyPolicy, FindingAuthorityStatus, FINDING_AUTHORITY_STATUS_SCHEMA_V1,
     };
-    use chio_kernel::checkpoint::{build_checkpoint, verify_checkpoint_signature};
+    use chio_kernel::checkpoint::build_checkpoint;
+    use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
 
     use crate::verify::FindingCheckpointSignerStatusTrust;
 

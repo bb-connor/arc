@@ -1,10 +1,9 @@
 //! Anchoring rules for checkpoint-chain consistency proofs.
-//!
-//! Split from `checkpoint.rs` to keep that module inside the production file
-//! size limit enforced by `scripts/check-rust-file-hygiene.py`.
 
-use chio_core::hashing::Hash;
-use chio_core::merkle::MerkleProof;
+use alloc::format;
+
+use chio_core_types::hashing::Hash;
+use chio_core_types::merkle::MerkleProof;
 
 use super::{checkpoint_chain_root, CheckpointError, KernelCheckpoint};
 

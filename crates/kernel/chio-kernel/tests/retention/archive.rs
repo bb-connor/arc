@@ -3,7 +3,7 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::Signature;
 use chio_core::receipt::body::ChioReceipt;
-use chio_kernel::checkpoint::KernelCheckpoint;
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 

@@ -17,7 +17,9 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::GuardDenied("original capability snapshot is absent".into())
             })?;
-        snapshot.validate()?;
+        snapshot
+            .validate()
+            .map_err(crate::receipt_store::ReceiptStoreError::from)?;
         let capability = snapshot.signed_capability.ok_or_else(|| {
             KernelError::GuardDenied(
                 "capability liveness requires original signed token evidence".into(),

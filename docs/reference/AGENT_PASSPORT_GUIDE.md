@@ -456,7 +456,8 @@ chio \
   --control-url https://trust.example.com \
   --control-token <service-token> \
   evidence import \
-  --input upstream-evidence-package
+  --input upstream-evidence-package \
+  --trust verifier-trust.json
 
 chio trust federated-delegation-policy-create \
   --output delegation-policy.json \

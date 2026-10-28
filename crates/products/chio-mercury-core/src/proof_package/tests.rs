@@ -1,5 +1,10 @@
 use chio_core::crypto::Keypair;
 use chio_core::merkle::MerkleTree;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::evidence::{
+    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
+    EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, checkpoint::CheckpointPublicationIdentity,
     checkpoint::CheckpointPublicationIdentityKind,
@@ -8,14 +13,10 @@ use chio_core::receipt::{
     lineage::ChildRequestReceipt, lineage::ChildRequestReceiptBody,
 };
 use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
-    build_trust_anchored_checkpoint_publication, checkpoint_chain_leaf_hash,
-    validate_checkpoint_transparency, CheckpointTransparencySummary,
-};
-use chio_kernel::evidence_export::{
-    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
-    EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+use chio_kernel_core::evidence_verify::{
+    build_inclusion_proof, build_trust_anchored_checkpoint_publication, checkpoint_chain_leaf_hash,
+    validate_checkpoint_transparency,
 };
 
 use crate::fixtures::{sample_mercury_bundle_manifest, sample_mercury_receipt_metadata};
@@ -1068,7 +1069,10 @@ fn proof_package_requires_explicitly_trusted_mercury_signers() {
         .verify_with_trusted_kernel_keys(1_775_137_901, &untrusted_keys)
         .expect_err("self-signed untrusted receipt");
     assert!(
-        error.to_string().contains("untrusted Mercury kernel key"),
+        matches!(
+            &error,
+            MercuryContractError::UntrustedKernelKey(subject) if subject.starts_with("tool receipt ")
+        ),
         "unexpected error: {error}"
     );
 

@@ -1325,7 +1325,7 @@ fn extract_guard_name(message: &str) -> Option<String> {
 }
 
 fn scope_from_capability_snapshot(
-    snapshot: &crate::capability_lineage::CapabilitySnapshot,
+    snapshot: &chio_core::receipt::evidence::CapabilitySnapshot,
 ) -> Result<ChioScope, KernelError> {
     chio_core::canonical::UntrustedJsonText::from_wire(
         snapshot.grants_json.as_bytes(),

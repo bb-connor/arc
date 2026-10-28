@@ -2893,6 +2893,123 @@ codes:
       - chio-store-sqlite
       - chio-active-response-authority
 
+  - urn: "urn:chio:error:attest:bundle-envelope-invalid"
+    domain: attest
+    severity: error
+    summary: "The evidence bundle export envelope is missing, malformed, wrongly signed, or does not commit to its manifest and payload."
+    help: "Re-export the bundle from the provider and verify it against the kernel key pinned in the trust file."
+    string_code: "CHIO-ATTEST-BUNDLE-ENVELOPE-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-file-hash-mismatch"
+    domain: attest
+    severity: error
+    summary: "An evidence bundle file is missing, unsafe to read, or differs from its manifest digest or length, or the inventory is not exact."
+    help: "Obtain an unmodified copy of the bundle; do not edit files after export."
+    string_code: "CHIO-ATTEST-BUNDLE-FILE-HASH-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-signature-invalid"
+    domain: attest
+    severity: error
+    summary: "A receipt, checkpoint or policy signature in the evidence bundle does not verify under a pinned key."
+    help: "Check that the trust file pins the provider kernel keys and that the bundle was not altered."
+    string_code: "CHIO-ATTEST-BUNDLE-SIGNATURE-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-evidence-inconsistent"
+    domain: attest
+    severity: error
+    summary: "Signed parts of the evidence bundle contradict each other: counts, scope, checkpoint chain, inclusion proofs, transparency claims or disclosure notice."
+    help: "Treat the bundle as tampered or mis-exported and request a fresh export."
+    string_code: "CHIO-ATTEST-BUNDLE-EVIDENCE-INCONSISTENT"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-schema-invalid"
+    domain: attest
+    severity: error
+    summary: "An evidence bundle file does not decode under its strict schema."
+    help: "Re-export the bundle with a matching Chio version; unknown or dropped members are refused."
+    string_code: "CHIO-ATTEST-BUNDLE-SCHEMA-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-trust-invalid"
+    domain: attest
+    severity: error
+    summary: "The verifier trust file fails to load under chio.verifier-trust.v1."
+    help: "Fix the trust file: schema const, key bounds, unique keys, no weak keys, no key in two roles."
+    string_code: "CHIO-ATTEST-BUNDLE-TRUST-INVALID"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-trust-missing"
+    domain: attest
+    severity: error
+    summary: "A signer the evidence bundle needs is not pinned in the verifier trust file."
+    help: "Pin the kernel key that signed the bundle in the trust file, obtained independently of the bundle."
+    string_code: "CHIO-ATTEST-BUNDLE-TRUST-MISSING"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-feature-unsupported"
+    domain: attest
+    severity: error
+    summary: "The evidence bundle or the trust file needs a feature this verifier does not support."
+    help: "Use a verifier that supports the feature, or remove it from the trust file requirements."
+    string_code: "CHIO-ATTEST-BUNDLE-FEATURE-UNSUPPORTED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
+  - urn: "urn:chio:error:attest:bundle-required-column-unverified"
+    domain: attest
+    severity: error
+    summary: "A report column the trust file requires is not verified for some receipt."
+    help: "Inspect the report to see which column and receipt fell short of verified."
+    string_code: "CHIO-ATTEST-BUNDLE-REQUIRED-COLUMN-UNVERIFIED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-bundle-verify
+      - chio-cli
+      - chio-control-plane
+
   - urn: "urn:chio:error:kernel:receipt-read-context-missing"
     domain: kernel
     severity: error

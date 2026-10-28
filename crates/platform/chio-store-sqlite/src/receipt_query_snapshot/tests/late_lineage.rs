@@ -750,7 +750,8 @@ const REFUSED_CAPTURED_LINEAGE: &str = "capability lineage of cap-late is refuse
 const REFUSED_REBUILT_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input";
 
 fn captured_lineage_reinsert(malformed: bool, export_first: bool) {
-    use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportQuery};
+    use chio_core::receipt::evidence::EvidenceExportQuery;
+    use chio_kernel::evidence_export::EvidenceExportError;
     use chio_kernel::ReceiptQuerySnapshotError;
 
     let fixture = Fixture::new(4);
@@ -939,7 +940,7 @@ fn captured_lineage_reinsert_unknown_subject_is_never_filled_from_refused_metada
 }
 
 fn captured_lineage_recertification_and_restart(malformed: bool) {
-    use chio_kernel::evidence_export::EvidenceExportQuery;
+    use chio_core::receipt::evidence::EvidenceExportQuery;
     let fixture = Fixture::new(4);
     record_lineage(&fixture);
     fixture.append(&spec(0, CAPABILITY, None));

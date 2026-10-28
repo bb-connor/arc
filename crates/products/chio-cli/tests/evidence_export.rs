@@ -28,6 +28,9 @@ use reqwest::blocking::Client;
 #[path = "evidence_export/package_trust.rs"]
 mod package_trust;
 
+#[path = "evidence_export/required_columns.rs"]
+mod required_columns;
+
 fn fixture_keypair() -> Keypair {
     Keypair::from_seed(&[87; 32])
 }
@@ -60,6 +63,31 @@ fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
         .expect("system time before unix epoch")
         .as_nanos();
     std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
+}
+
+/// A `chio.verifier-trust.v1` file pinning `kernel_keys` and, when given, a
+/// checkpoint trust anchor.
+fn trust_file(kernel_keys: &[String], anchor: Option<serde_json::Value>) -> PathBuf {
+    let path = unique_path("verifier-trust", ".json");
+    let mut trust = serde_json::json!({
+        "schema": "chio.verifier-trust.v1",
+        "kernel_keys": kernel_keys,
+        "exchange_keys": [],
+        "root_policy_keys": [],
+    });
+    if let Some(anchor) = anchor {
+        trust["checkpoint_trust_anchor"] = anchor;
+    }
+    fs::write(
+        &path,
+        serde_json::to_vec(&trust).expect("encode trust file"),
+    )
+    .expect("write trust file");
+    path
+}
+
+fn fixture_trust_file() -> PathBuf {
+    trust_file(&[fixture_keypair().public_key().to_hex()], None)
 }
 
 fn workspace_root() -> PathBuf {
@@ -419,8 +447,8 @@ capabilities:
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
-        .arg("--trusted-kernel-pubkey")
-        .arg(fixture_keypair().public_key().to_hex())
+        .arg("--trust")
+        .arg(fixture_trust_file())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -583,8 +611,8 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
-        .arg("--trusted-kernel-pubkey")
-        .arg(fixture_keypair().public_key().to_hex())
+        .arg("--trust")
+        .arg(fixture_trust_file())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -705,8 +733,8 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
                 .expect("imported receipt db path"),
             "evidence",
             "import",
-            "--trusted-kernel-pubkey",
-            &fixture_keypair().public_key().to_hex(),
+            "--trust",
+            fixture_trust_file().to_str().expect("trust file path"),
             "--input",
             output_dir.to_str().expect("evidence output path"),
         ])
@@ -951,8 +979,8 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
-        .arg("--trusted-kernel-pubkey")
-        .arg(fixture_keypair().public_key().to_hex())
+        .arg("--trust")
+        .arg(fixture_trust_file())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -965,6 +993,13 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
         String::from_utf8_lossy(&verify.stderr)
     );
 
+    required_columns::verify_remote_required_columns(
+        &client,
+        &base_url,
+        service_token,
+        &output_dir,
+        &receipt_db_path,
+    );
     package_trust::verify_remote_import_boundary(
         &client,
         &base_url,
@@ -1054,8 +1089,8 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
-        .arg("--trusted-kernel-pubkey")
-        .arg(fixture_keypair().public_key().to_hex())
+        .arg("--trust")
+        .arg(fixture_trust_file())
         .arg("--input")
         .arg(&output_dir)
         .output()
@@ -1223,8 +1258,8 @@ fn tenant_evidence_export_omits_cross_tenant_metadata() {
         .current_dir(workspace_root())
         .arg("evidence")
         .arg("verify")
-        .arg("--trusted-kernel-pubkey")
-        .arg(fixture_keypair().public_key().to_hex())
+        .arg("--trust")
+        .arg(fixture_trust_file())
         .arg("--input")
         .arg(&output_dir)
         .output()

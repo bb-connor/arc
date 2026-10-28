@@ -22,7 +22,7 @@ sys.modules[_lexer_spec.name] = _lexer
 _lexer_spec.loader.exec_module(_lexer)
 
 CORE = "crates/core/chio-core-types/src/"
-CHECKPOINT = "crates/kernel/chio-kernel/src/checkpoint.rs"
+CHECKPOINT = "crates/core/chio-core-types/src/receipt/checkpoint.rs"
 EFFECT = "crates/security/chio-security-types/src/response.rs"
 MCP_INBOX = "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs"
 SUPPORT_PATHS = (CHECKPOINT, EFFECT, MCP_INBOX)

@@ -8,7 +8,8 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
-use chio_kernel::{CapabilitySnapshot, CapabilitySnapshotProvenance, ReceiptStore};
+use chio_core::receipt::evidence::{CapabilitySnapshot, CapabilitySnapshotProvenance};
+use chio_kernel::ReceiptStore;
 use chio_store_sqlite::SqliteReceiptStore;
 
 pub(crate) fn make_capability_token(

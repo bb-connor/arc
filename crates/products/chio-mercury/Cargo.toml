@@ -15,15 +15,20 @@ name = "mercury"
 path = "src/main.rs"
 
 [dependencies]
+chio-bundle-verify = { workspace = true }
 chio-control-plane = { workspace = true }
 chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
+chio-kernel-core = { workspace = true }
 chio-mercury-core = { workspace = true }
 chio-store-sqlite = { workspace = true }
 chrono = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+chio-test-support = { workspace = true }
 
 [lints.clippy]
 undocumented_unsafe_blocks = "deny"

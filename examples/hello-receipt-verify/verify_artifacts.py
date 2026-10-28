@@ -102,6 +102,13 @@ def validate_manifest_files(package_dir: Path, manifest: dict[str, Any]) -> int:
     return len(files)
 
 
+def pinned_kernel_keys() -> list[str]:
+    trust = load_json(Path(__file__).resolve().parent / "verifier-trust.json")
+    keys = trust.get("kernel_keys")
+    require(isinstance(keys, list) and bool(keys), "verifier-trust.json must pin kernel_keys")
+    return keys
+
+
 def validate_record_count(manifest: dict[str, Any], key: str, actual: int) -> None:
     counts = require_object(manifest, "counts", "manifest")
     require(counts.get(key) == actual, f"manifest counts.{key} must be {actual}")
@@ -130,7 +137,12 @@ def validate_package(package_dir: Path) -> dict[str, Any]:
         "manifest schema drifted",
     )
     file_count = validate_manifest_files(package_dir, manifest)
-    require(file_count >= 8, "minimal evidence package must cover all fixture files")
+    require(file_count == 13, "minimal evidence package must cover all 13 payload files")
+    envelope = load_json(package_dir / "export-envelope.json")
+    require(
+        envelope.get("signerKey") in pinned_kernel_keys(),
+        "export envelope signer must be a kernel key pinned in verifier-trust.json",
+    )
 
     query = load_json(package_dir / "query.json")
     require(manifest.get("query") == query, "manifest query must match query.json")
@@ -189,12 +201,16 @@ def validate_package(package_dir: Path) -> dict[str, Any]:
             "grants": [
                 {
                     "server_id": "*",
-                    "tool_name": "read_file",
+                    "tool_name": "*",
                     "operations": ["invoke"],
                 }
             ]
         },
         "lineage grants_json drifted",
+    )
+    require(
+        receipt.get("kernel_key") in pinned_kernel_keys(),
+        "receipt kernel_key must be a kernel key pinned in verifier-trust.json",
     )
 
     attribution = require_object(
@@ -239,6 +255,15 @@ def validate_verify_output(root: Path, manifest_file_count: int) -> None:
         claim_boundary.get("schema") == "chio.evidence_transparency_claims.v1",
         "claim boundary schema drifted",
     )
+    require(verify.get("requiredColumns") == [], "verify.json requiredColumns drifted")
+    columns = verify.get("columns")
+    require(
+        isinstance(columns, list) and len(columns) == 1,
+        "verify.json must report columns for exactly one receipt",
+    )
+    receipt_columns = require_object(columns[0], "columns", "verify.json columns[0]")
+    decision = require_object(receipt_columns, "decision", "verify.json columns[0].columns")
+    require(decision.get("class") == "verified", "verify.json decision column must be verified")
 
 
 def validate_tamper_error(root: Path) -> None:
@@ -247,16 +272,18 @@ def validate_tamper_error(root: Path) -> None:
         require(stdout.read_text(encoding="utf-8").strip() == "", "tamper stdout must be empty")
     payload = load_json(root / "tamper-err.json")
     require(
-        payload.get("code") == "urn:chio:error:attest:provenance-missing",
+        payload.get("code") == "urn:chio:error:attest:bundle-file-hash-mismatch",
         "tamper error code drifted",
     )
-    message = require_string(payload, "message", "tamper-err.json")
-    require("hash mismatch" in message and "query.json" in message, "tamper error message drifted")
+    require(
+        payload.get("message") == "evidence package file hash mismatch for query.json",
+        "tamper error message drifted",
+    )
     context = require_object(payload, "context", "tamper-err.json")
     require(context.get("domain") == "attest", "tamper error domain drifted")
     require(context.get("severity") == "error", "tamper error severity drifted")
     require(
-        context.get("string_code") == "CHIO-ATTEST-PROVENANCE-MISSING",
+        context.get("string_code") == "CHIO-ATTEST-BUNDLE-FILE-HASH-MISMATCH",
         "tamper error string_code drifted",
     )
 

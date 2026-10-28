@@ -5,23 +5,66 @@ use super::utils::*;
 pub(crate) fn build_proof_package(
     input: &Path,
     bundle_manifest_paths: &[PathBuf],
-    trusted_kernel_keys: &[String],
+    trust: &chio_core::root_authority::VerifierTrust,
 ) -> Result<MercuryProofPackage, CliError> {
-    let verification =
-        evidence_export::EvidenceVerificationPolicy::from_cli(trusted_kernel_keys, None)?;
-    let verified = evidence_export::load_verified_evidence_package_summary(input, &verification)?;
+    let verified = evidence_export::load_verified_evidence_package(input, trust)?;
     let bundle_manifests = load_bundle_manifests(bundle_manifest_paths)?;
     MercuryProofPackage::build(
-        verified.bundle,
-        verified.manifest_hash,
-        verified.manifest_schema,
-        verified.exported_at,
+        verified.package.bundle,
+        verified.manifest_sha256,
+        verified.package.manifest.schema,
+        verified.package.manifest.exported_at,
         unix_now(),
         MercuryPublicationProfile::pilot_default(),
-        verified.transparency,
+        Some(verified.transparency),
         bundle_manifests,
     )
     .map_err(|error| CliError::Other(error.to_string()))
+}
+
+/// The kernel keys a Mercury verdict pins. Mercury enforces `kernel_keys`
+/// only, so a trust file that sets a member the bundle verifier would also
+/// enforce (`checkpoint_keys`, `checkpoint_trust_anchor`, `required_columns`)
+/// is refused: a Mercury verdict never accepts what `chio-verify` refuses
+/// with the same file.
+pub(crate) fn trusted_kernel_key_set(
+    trust: &chio_core::root_authority::VerifierTrust,
+) -> Result<BTreeSet<String>, CliError> {
+    let unenforced = [
+        ("checkpoint_keys", !trust.checkpoint_keys.is_empty()),
+        (
+            "checkpoint_trust_anchor",
+            trust.checkpoint_trust_anchor.is_some(),
+        ),
+        ("required_columns", !trust.required_columns.is_empty()),
+    ];
+    if let Some((member, _)) = unenforced.into_iter().find(|(_, set)| *set) {
+        return Err(chio_bundle_verify::BundleVerifyError::unsupported(format!(
+            "Mercury enforces only `kernel_keys`; the trust file sets `{member}`"
+        ))
+        .into());
+    }
+    Ok(trust
+        .kernel_keys
+        .iter()
+        .map(chio_core::crypto::PublicKey::to_hex)
+        .collect())
+}
+
+/// A failed trusted Mercury verification. An unpinned signer carries the
+/// bundle verifier's `bundle-trust-missing` code.
+pub(crate) fn mercury_verify_error(error: chio_mercury_core::MercuryContractError) -> CliError {
+    match error {
+        chio_mercury_core::MercuryContractError::UntrustedKernelKey(_) => {
+            chio_bundle_verify::BundleVerifyError::trust_missing(error.to_string()).into()
+        }
+        error => CliError::Other(error.to_string()),
+    }
+}
+
+/// The single kernel key a pipeline run generated and signed every receipt with.
+pub(crate) fn run_kernel_key_set(kernel_public_key: &str) -> BTreeSet<String> {
+    BTreeSet::from([kernel_public_key.to_string()])
 }
 
 pub(crate) fn build_inquiry_package(
@@ -85,6 +128,7 @@ pub(crate) fn pilot_capability_with_id(
 pub(crate) fn pilot_receipt(
     step: &MercuryPilotStep,
     capability_id: &str,
+    bundle_refs: &[MercuryBundleReference],
     kernel_keypair: &Keypair,
 ) -> Result<ChioReceipt, CliError> {
     let action = ToolCallAction::from_parameters(serde_json::json!({
@@ -94,11 +138,12 @@ pub(crate) fn pilot_receipt(
         "stage": serde_json::to_value(step.metadata.chronology.stage)?,
         "toolName": step.tool_name,
     }))?;
-    let metadata = step
-        .metadata
+    let mut mercury_metadata = step.metadata.clone();
+    mercury_metadata.bundle_refs = bundle_refs.to_vec();
+    let metadata = mercury_metadata
         .into_receipt_metadata_value()
         .map_err(|error| CliError::Other(error.to_string()))?;
-    let content_hash = sha256_hex(&canonical_json_bytes(&step.metadata)?);
+    let content_hash = sha256_hex(&canonical_json_bytes(&mercury_metadata)?);
     ChioReceipt::sign(
         ChioReceiptBody {
             id: step.receipt_id.clone(),
@@ -132,7 +177,13 @@ pub(crate) fn populate_mercury_receipt_store(
     receipt_db: &Path,
     capability_id: &str,
     steps: &[MercuryPilotStep],
+    bundle_manifests: &[MercuryBundleManifest],
 ) -> Result<Keypair, CliError> {
+    let bundle_refs = bundle_manifests
+        .iter()
+        .map(MercuryBundleReference::from_manifest)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| CliError::Other(error.to_string()))?;
     let store = SqliteReceiptStore::open(receipt_db)?;
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -145,7 +196,7 @@ pub(crate) fn populate_mercury_receipt_store(
     let mut start_seq = None;
     let mut end_seq = None;
     for step in steps {
-        let receipt = pilot_receipt(step, capability_id, &kernel_keypair)?;
+        let receipt = pilot_receipt(step, capability_id, &bundle_refs, &kernel_keypair)?;
         let seq = store.append_chio_receipt_returning_seq(&receipt)?;
         if start_seq.is_none() {
             start_seq = Some(seq);

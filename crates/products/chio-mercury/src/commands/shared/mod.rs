@@ -11,9 +11,9 @@ pub(super) use builders::{
     build_controlled_adoption_profile, build_embedded_oem_profile, build_governance_review_package,
     build_inquiry_package, build_proof_package, build_reference_distribution_profile,
     build_release_readiness_profile, build_trust_network_profile,
-    collect_assurance_investigation_inputs, populate_mercury_receipt_store,
-    write_verification_report, AssurancePackageArgs, AssuranceReviewPackageArgs,
-    GovernanceReviewPackageArgs,
+    collect_assurance_investigation_inputs, mercury_verify_error, populate_mercury_receipt_store,
+    run_kernel_key_set, trusted_kernel_key_set, write_verification_report, AssurancePackageArgs,
+    AssuranceReviewPackageArgs, GovernanceReviewPackageArgs,
 };
 pub(super) use population_configs::assurance_suite_population_configs;
 pub(super) use types::{

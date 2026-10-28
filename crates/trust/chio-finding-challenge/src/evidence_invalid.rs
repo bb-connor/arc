@@ -37,7 +37,7 @@ use chio_finding_verifier::{
     verify_checkpoint_membership, verify_receipt_strict, ReceiptStrictError,
     ResolvedReceiptEvidence,
 };
-use chio_kernel::checkpoint::checkpoint_log_id;
+use chio_kernel_core::evidence_verify::checkpoint_log_id;
 
 use crate::evaluate::EvaluationContext;
 use crate::input::{

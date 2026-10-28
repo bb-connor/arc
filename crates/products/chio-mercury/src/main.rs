@@ -150,11 +150,19 @@ enum Commands {
         command: PortfolioRevenueBoundaryCommands,
     },
 
-    /// Verify a `Proof Package v1` or `Inquiry Package v1`.
+    /// Verify a `Proof Package v1` or `Inquiry Package v1` against the kernel
+    /// keys pinned in a trust file.
     Verify {
         /// Input JSON file containing a MERCURY package.
         #[arg(long)]
         input: PathBuf,
+
+        /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
+        /// keys the package must be signed by.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
+        #[arg(long)]
+        trust: PathBuf,
 
         /// Include the verification steps in human-readable output.
         #[arg(long, default_value_t = false)]
@@ -170,9 +178,12 @@ enum ProofCommands {
         #[arg(long)]
         input: PathBuf,
 
-        /// Independently trusted kernel public key for the input evidence package.
-        #[arg(long, required = true)]
-        trusted_kernel_pubkey: Vec<String>,
+        /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
+        /// keys of the input evidence package.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
+        #[arg(long)]
+        trust: PathBuf,
 
         /// Output JSON file for the MERCURY proof package.
         #[arg(long)]
@@ -191,6 +202,13 @@ enum InquiryCommands {
         /// Input JSON file containing a MERCURY proof package.
         #[arg(long)]
         input: PathBuf,
+
+        /// The verifier-owned `chio.verifier-trust.v1` file pinning the kernel
+        /// keys the package must be signed by.
+        /// Mercury enforces `kernel_keys` and refuses a file that sets
+        /// `checkpoint_keys`, `checkpoint_trust_anchor` or `required_columns`.
+        #[arg(long)]
+        trust: PathBuf,
 
         /// Output JSON file for the MERCURY inquiry package.
         #[arg(long)]
@@ -554,24 +572,26 @@ fn run(cli: Cli) -> Result<(), chio_control_plane::CliError> {
                 input,
                 output,
                 bundle_manifest,
-                trusted_kernel_pubkey,
+                trust,
             } => commands::cmd_mercury_proof_export(
                 &input,
                 &output,
                 &bundle_manifest,
-                &trusted_kernel_pubkey,
+                &trust,
                 cli.json,
             ),
         },
         Commands::Inquiry { command } => match command {
             InquiryCommands::Export {
                 input,
+                trust,
                 output,
                 audience,
                 redaction_profile,
                 verifier_equivalent,
             } => commands::cmd_mercury_inquiry_export(
                 &input,
+                &trust,
                 &output,
                 &audience,
                 redaction_profile.as_deref(),
@@ -736,9 +756,11 @@ fn run(cli: Cli) -> Result<(), chio_control_plane::CliError> {
                 commands::cmd_mercury_portfolio_revenue_boundary_validate(&output, cli.json)
             }
         },
-        Commands::Verify { input, explain } => {
-            commands::cmd_mercury_verify(&input, cli.json, explain)
-        }
+        Commands::Verify {
+            input,
+            trust,
+            explain,
+        } => commands::cmd_mercury_verify(&input, &trust, cli.json, explain),
     }
 }
 

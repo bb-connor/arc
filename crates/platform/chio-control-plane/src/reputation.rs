@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use chio_core::receipt::evidence::CapabilitySnapshot;
 use chio_core::PublicKey;
 use chio_credentials::{
     evaluate_agent_passport, verify_agent_passport, verify_signed_passport_verifier_policy,
@@ -8,8 +9,7 @@ use chio_credentials::{
 };
 use chio_did::DidChio;
 use chio_kernel::{
-    BehavioralFeedReputationSummary, CapabilitySnapshot, SharedEvidenceQuery,
-    SharedEvidenceReferenceReport,
+    BehavioralFeedReputationSummary, SharedEvidenceQuery, SharedEvidenceReferenceReport,
 };
 use chio_reputation::{
     build_imported_reputation_signal, CapabilityLineageRecord, CapabilityLineageScopeJsonInput,

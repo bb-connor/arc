@@ -12,20 +12,23 @@ use chio_core::receipt::{
 };
 use chio_kernel::build_checkpoint;
 use chio_mercury_core::{
-    sample_mercury_bundle_manifest, sample_mercury_receipt_metadata, MercurySupervisedLiveCapture,
-    MercurySupervisedLiveCoverageState, MercurySupervisedLiveHealthStatus,
-    MercurySupervisedLiveInterruptKind, MercurySupervisedLiveInterruption,
-    MercurySupervisedLiveMode,
+    sample_mercury_bundle_manifest, sample_mercury_receipt_metadata, MercuryBundleReference,
+    MercurySupervisedLiveCapture, MercurySupervisedLiveCoverageState,
+    MercurySupervisedLiveHealthStatus, MercurySupervisedLiveInterruptKind,
+    MercurySupervisedLiveInterruption, MercurySupervisedLiveMode,
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
 #[path = "cli/evidence_fixture.rs"]
 mod evidence_fixture;
-use evidence_fixture::{export_fixture_package, mercury_receipt_with_ts};
+use evidence_fixture::{export_fixture_package, kernel_trust_file, mercury_receipt_with_ts};
 
 #[path = "cli/signed_reader.rs"]
 mod signed_reader;
-use signed_reader::write_mercury_bundle_manifest;
+
+#[path = "cli/trust.rs"]
+mod trust;
+use trust::run_kernel_trust_file;
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()
@@ -69,141 +72,6 @@ fn write_degraded_supervised_live_capture(path: &Path) {
         serde_json::to_vec_pretty(&capture).expect("degraded supervised live capture"),
     )
     .expect("write degraded supervised live capture");
-}
-
-#[test]
-fn mercury_proof_and_inquiry_packages_export_and_verify() {
-    let receipt_db_path = unique_path("chio-mercury-proof", ".sqlite3");
-    let output_dir = unique_path("chio-mercury-proof-export", "");
-    let bundle_manifest_path = unique_path("chio-mercury-bundle", ".json");
-    let proof_package_path = unique_path("chio-mercury-proof-package", ".json");
-    let inquiry_package_path = unique_path("chio-mercury-inquiry-package", ".json");
-
-    {
-        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
-        let issuer = Keypair::from_seed(&[58; 32]);
-        let seq = store
-            .append_chio_receipt_returning_seq(&mercury_receipt_with_ts(
-                "rcpt-mercury-1",
-                "cap-mercury-proof",
-                100,
-                &issuer,
-            ))
-            .expect("append mercury receipt");
-        let canonical = store
-            .receipts_canonical_bytes_range(seq, seq)
-            .expect("canonical bytes");
-        let checkpoint = build_checkpoint(
-            1,
-            seq,
-            seq,
-            &canonical
-                .into_iter()
-                .map(|(_, bytes)| bytes)
-                .collect::<Vec<_>>(),
-            &issuer,
-        )
-        .expect("build checkpoint");
-        store
-            .store_checkpoint(&checkpoint)
-            .expect("store checkpoint");
-    }
-
-    export_fixture_package(&receipt_db_path, &output_dir);
-    write_mercury_bundle_manifest(&bundle_manifest_path);
-
-    let proof_export = Command::new(env!("CARGO_BIN_EXE_mercury"))
-        .current_dir(workspace_root())
-        .arg("proof")
-        .arg("export")
-        .arg("--trusted-kernel-pubkey")
-        .arg(Keypair::from_seed(&[58; 32]).public_key().to_hex())
-        .arg("--input")
-        .arg(&output_dir)
-        .arg("--output")
-        .arg(&proof_package_path)
-        .arg("--bundle-manifest")
-        .arg(&bundle_manifest_path)
-        .output()
-        .expect("run mercury proof export");
-    assert!(
-        proof_export.status.success(),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&proof_export.stdout),
-        String::from_utf8_lossy(&proof_export.stderr)
-    );
-
-    let proof_verify = Command::new(env!("CARGO_BIN_EXE_mercury"))
-        .current_dir(workspace_root())
-        .arg("--json")
-        .arg("verify")
-        .arg("--input")
-        .arg(&proof_package_path)
-        .output()
-        .expect("run mercury verify on proof package");
-    assert!(
-        proof_verify.status.success(),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&proof_verify.stdout),
-        String::from_utf8_lossy(&proof_verify.stderr)
-    );
-    let proof_report: serde_json::Value =
-        serde_json::from_slice(&proof_verify.stdout).expect("proof report json");
-    assert_eq!(proof_report["packageKind"], "proof");
-    assert_eq!(proof_report["workflowId"], "workflow-release-control");
-    assert_eq!(proof_report["verifierEquivalent"], false);
-
-    let inquiry_export = Command::new(env!("CARGO_BIN_EXE_mercury"))
-        .current_dir(workspace_root())
-        .arg("inquiry")
-        .arg("export")
-        .arg("--input")
-        .arg(&proof_package_path)
-        .arg("--output")
-        .arg(&inquiry_package_path)
-        .arg("--audience")
-        .arg("compliance")
-        .arg("--redaction-profile")
-        .arg("internal-default")
-        .arg("--verifier-equivalent")
-        .output()
-        .expect("run mercury inquiry export");
-    assert!(
-        inquiry_export.status.success(),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&inquiry_export.stdout),
-        String::from_utf8_lossy(&inquiry_export.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&inquiry_export.stdout).contains("verifier_equivalent: false"),
-        "stdout={}",
-        String::from_utf8_lossy(&inquiry_export.stdout)
-    );
-
-    let inquiry_verify = Command::new(env!("CARGO_BIN_EXE_mercury"))
-        .current_dir(workspace_root())
-        .arg("--json")
-        .arg("verify")
-        .arg("--input")
-        .arg(&inquiry_package_path)
-        .output()
-        .expect("run mercury verify on inquiry package");
-    assert!(
-        inquiry_verify.status.success(),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&inquiry_verify.stdout),
-        String::from_utf8_lossy(&inquiry_verify.stderr)
-    );
-    let inquiry_report: serde_json::Value =
-        serde_json::from_slice(&inquiry_verify.stdout).expect("inquiry report json");
-    assert_eq!(inquiry_report["packageKind"], "inquiry");
-    assert_eq!(inquiry_report["verifierEquivalent"], false);
-
-    let _ = fs::remove_file(receipt_db_path);
-    let _ = fs::remove_file(bundle_manifest_path);
-    let _ = fs::remove_file(proof_package_path);
-    let _ = fs::remove_file(inquiry_package_path);
-    let _ = fs::remove_dir_all(output_dir);
 }
 
 #[test]
@@ -351,12 +219,15 @@ fn mercury_supervised_live_export_preserves_source_continuity_and_verifies() {
         "workflow-release-control"
     );
 
+    let trust = run_kernel_trust_file(&output_dir.join("supervised-live-summary.json"));
     let proof_verify = Command::new(env!("CARGO_BIN_EXE_mercury"))
         .current_dir(workspace_root())
         .arg("--json")
         .arg("verify")
         .arg("--input")
         .arg(output_dir.join("proof-package.json"))
+        .arg("--trust")
+        .arg(&trust)
         .output()
         .expect("verify supervised-live proof package");
     assert!(
@@ -375,6 +246,8 @@ fn mercury_supervised_live_export_preserves_source_continuity_and_verifies() {
         .arg("verify")
         .arg("--input")
         .arg(output_dir.join("inquiry-package.json"))
+        .arg("--trust")
+        .arg(&trust)
         .output()
         .expect("verify supervised-live inquiry package");
     assert!(

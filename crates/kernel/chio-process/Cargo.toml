@@ -37,6 +37,7 @@ async-trait = { workspace = true }
 chio-store-sqlite = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+chio-kernel-core = { workspace = true }
 
 [lints]
 workspace = true
