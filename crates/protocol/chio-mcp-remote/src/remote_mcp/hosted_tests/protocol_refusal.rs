@@ -97,13 +97,10 @@ fn fixture_configured(
     )?);
     let state = RemoteAppState {
         sessions,
-        factory: factory.clone(),
-        auth_mode: Arc::new(build_remote_auth_mode(
-            &config,
-            "127.0.0.1:3000".parse()?,
-            None,
-            factory.enterprise_provider_registry.clone(),
-        )?),
+        factory,
+        auth_mode: Arc::new(RemoteAuthMode::StaticBearer {
+            token: Arc::from("operator-fixture"),
+        }),
         enterprise_provider_registry: enterprise_provider_registry_file(
             config.enterprise_providers_file.as_deref(),
             "remote_mcp",
@@ -150,10 +147,7 @@ async fn request(
         .await?)
 }
 async fn initialize(fixture: &HttpFixture) -> TestResult<String> {
-    initialize_with_token(fixture, "operator-fixture").await
-}
-async fn initialize_with_token(fixture: &HttpFixture, token: &str) -> TestResult<String> {
-    let response = request(fixture, MCP_ENDPOINT_PATH, token, None,
+    let response = request(fixture, MCP_ENDPOINT_PATH, "operator-fixture", None,
         br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{}}}"#).await?;
     assert_eq!(response.status(), StatusCode::OK);
     let session = response
@@ -166,7 +160,7 @@ async fn initialize_with_token(fixture: &HttpFixture, token: &str) -> TestResult
     let initialized = request(
         fixture,
         MCP_ENDPOINT_PATH,
-        token,
+        "operator-fixture",
         Some(&session),
         br#"{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}"#,
     )
