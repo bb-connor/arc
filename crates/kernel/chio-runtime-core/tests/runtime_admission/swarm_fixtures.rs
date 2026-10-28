@@ -227,34 +227,6 @@ pub(crate) fn runtime_swarm_revocation_root(
 
 /// Retained signed graphs served to the hook in place of the S1 issuer. Hook
 /// tests use it to present malformed or stale evidence the issuer refuses.
-#[derive(Debug)]
-pub(crate) struct RetainedSwarmGraphs(Vec<SwarmAuthorityBundle>);
-
-impl runtime_api::SwarmGraphSource for RetainedSwarmGraphs {
-    fn swarm_graph(
-        &self,
-        graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        for bundle in &self.0 {
-            if bundle.task_graph.graph_id == graph_id
-                && canonical_test_hash(&bundle.task_graph)
-                    .map_err(|error| ChioRuntimeError::Store(error.to_string()))?
-                    == graph_sha256
-            {
-                return Ok(Some(bundle.clone()));
-            }
-        }
-        Ok(None)
-    }
-}
-
-pub(crate) fn retained_swarm_graphs(
-    bundle: &SwarmAuthorityBundle,
-) -> std::sync::Arc<RetainedSwarmGraphs> {
-    std::sync::Arc::new(RetainedSwarmGraphs(vec![bundle.clone()]))
-}
-
 /// Test view of the qualified S1 issuer owned by the fixture authority.
 pub(crate) struct IssuedGraphs(
     pub(crate) chio_store_sqlite::work_graph_store::SqliteWorkGraphStore,
