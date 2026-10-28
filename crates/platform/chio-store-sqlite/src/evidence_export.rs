@@ -526,7 +526,6 @@ fn publication_core_matches(
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
 pub(crate) mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use chio_core::capability::{
         attenuation::{DelegationLink, DelegationLinkBody},
@@ -552,13 +551,7 @@ pub(crate) mod tests {
     #[path = "snapshot_tests.rs"]
     mod snapshot_tests;
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-    }
+    use chio_test_support::temp_sqlite_path;
 
     fn capability_with_id(
         id: &str,
@@ -690,7 +683,7 @@ pub(crate) mod tests {
 
     #[test]
     fn builds_bundle_with_receipts_lineage_and_proofs() {
-        let path = unique_db_path("evidence-export");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export");
         let store = SqliteReceiptStore::open(&path).unwrap();
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
@@ -759,7 +752,7 @@ pub(crate) mod tests {
 
     #[test]
     fn scoped_export_includes_checkpoint_prefix_to_genesis() {
-        let path = unique_db_path("evidence-export-checkpoint-prefix");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-checkpoint-prefix");
         let store = SqliteReceiptStore::open(&path).unwrap();
         let checkpoint_key = evidence_receipt_keypair();
 
@@ -834,8 +827,8 @@ pub(crate) mod tests {
 
     #[test]
     fn scoped_export_skips_archived_checkpoint_batches_without_selected_receipts() {
-        let path = unique_db_path("evidence-export-archived-prefix");
-        let archive = unique_db_path("evidence-export-archived-prefix-archive");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-archived-prefix");
+        let (_archive_dir, archive) = temp_sqlite_path("evidence-export-archived-prefix-archive");
         let store = SqliteReceiptStore::open(&path).unwrap();
         let checkpoint_key = evidence_receipt_keypair();
 
@@ -908,7 +901,7 @@ pub(crate) mod tests {
 
     #[test]
     fn evidence_export_requires_explicit_receipt_read_boundary() {
-        let path = unique_db_path("evidence-export-read-boundary");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-read-boundary");
         let store = SqliteReceiptStore::open(&path).unwrap();
         store
             .append_chio_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-1", 100))
@@ -924,7 +917,7 @@ pub(crate) mod tests {
 
     #[test]
     fn tenant_scoped_evidence_export_cannot_see_other_tenants() {
-        let path = unique_db_path("evidence-export-tenant");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-tenant");
         let store = SqliteReceiptStore::open(&path).unwrap();
         store
             .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
@@ -961,7 +954,7 @@ pub(crate) mod tests {
 
     #[test]
     fn tenant_scoped_evidence_export_omits_child_receipts_without_tenant_join() {
-        let path = unique_db_path("evidence-export-tenant-child");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-tenant-child");
         let store = SqliteReceiptStore::open(&path).unwrap();
         store
             .append_chio_receipt_returning_seq(&receipt_with_ts_and_tenant(
@@ -998,7 +991,7 @@ pub(crate) mod tests {
 
     #[test]
     fn omits_child_receipts_for_capability_scoped_export_without_time_window() {
-        let path = unique_db_path("evidence-export-scope");
+        let (_path_dir, path) = temp_sqlite_path("evidence-export-scope");
         let store = SqliteReceiptStore::open(&path).unwrap();
         let issuer = Keypair::generate();
         let subject = Keypair::generate();

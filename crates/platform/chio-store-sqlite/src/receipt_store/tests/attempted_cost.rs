@@ -27,7 +27,7 @@ fn projections(connection: &Connection) -> rusqlite::Result<Vec<(String, Option<
 fn attempted_projection_drift_is_rejected_by_audit_and_duplicate(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for replacement in [None, Some(0_u64.to_be_bytes().to_vec())] {
-        let path = unique_db_path("chio-attempted-drift");
+        let (_path_dir, path) = temp_sqlite_path("chio-attempted-drift");
         let receipt = attempted_receipt("attempted-drift", Some(u64::MAX))?;
         let store = SqliteReceiptStore::open(&path)?;
         store.append_chio_receipt(&receipt)?;
@@ -59,7 +59,7 @@ fn attempted_projection_drift_is_rejected_by_audit_and_duplicate(
 fn attempted_projection_constraints_reject_wrong_types_and_widths(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use rusqlite::types::Value;
-    let path = unique_db_path("chio-attempted-constraints");
+    let (_path_dir, path) = temp_sqlite_path("chio-attempted-constraints");
     let store = SqliteReceiptStore::open(&path)?;
     store.append_chio_receipt(&attempted_receipt("attempt-constraints", Some(7))?)?;
     drop(store);
@@ -88,8 +88,8 @@ fn attempted_projection_constraints_reject_wrong_types_and_widths(
 
 #[test]
 fn archive_preserves_exact_attempted_projection() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-attempted-retention");
-    let archive = unique_db_path("chio-attempted-retention-archive");
+    let (_path_dir, path) = temp_sqlite_path("chio-attempted-retention");
+    let (_archive_dir, archive) = temp_sqlite_path("chio-attempted-retention-archive");
     let archive_path = archive.to_str().ok_or("archive path is not UTF-8")?;
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(signer(&receipt_test_keypair(), 3))?;

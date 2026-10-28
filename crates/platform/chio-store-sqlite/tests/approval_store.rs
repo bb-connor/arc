@@ -5,8 +5,6 @@
 //! pending row, consumed-token registry, and resolved record must all
 //! survive the restart.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
 };
@@ -20,13 +18,7 @@ use chio_store_sqlite::SqliteApprovalStore;
 
 use chio_test_support::prelude::*;
 
-fn unique_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_unwrap()
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
     let subject = Keypair::generate();
@@ -74,7 +66,7 @@ fn sign_token(
 
 #[test]
 fn store_and_retrieve_round_trip() {
-    let path = unique_path("chio-hitl-roundtrip");
+    let (_path_dir, path) = temp_sqlite_path("chio-hitl-roundtrip");
     let store = SqliteApprovalStore::open(&path).test_unwrap();
     let r = sample_request("a-1", "h-1");
     store.store_pending(&r).test_unwrap();
@@ -192,7 +184,7 @@ fn resolve_rejects_replay() {
 
 #[test]
 fn persistence_survives_restart() {
-    let path = unique_path("chio-hitl-restart");
+    let (_path_dir, path) = temp_sqlite_path("chio-hitl-restart");
     let approver = Keypair::generate();
     let subject = Keypair::generate();
 

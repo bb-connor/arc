@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -18,13 +17,7 @@ const APPENDER_THREADS: usize = 8;
 /// the append path rather than duplicating it.
 const POPULATED_RECEIPTS: u64 = 20_000;
 
-fn unique_db_path() -> std::path::PathBuf {
-    let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(duration) => duration.as_nanos(),
-        Err(error) => fail_bench(&format!("time before epoch: {error}")),
-    };
-    std::env::temp_dir().join(format!("chio-store-receipt-write-bench-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn receipt_for_index(index: u64) -> ChioReceipt {
     let keypair = Keypair::generate();
@@ -75,7 +68,7 @@ fn bench_store_receipt_write_throughput(c: &mut Criterion) {
 }
 
 fn measure_append_throughput(c: &mut Criterion, name: &str, populate: u64) {
-    let path = unique_db_path();
+    let (_path_dir, path) = temp_sqlite_path("chio-store-receipt-write-bench");
     let store = match SqliteReceiptStore::open(&path) {
         Ok(store) => store,
         Err(error) => fail_bench(&format!("open sqlite receipt store: {error}")),

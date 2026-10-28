@@ -757,20 +757,15 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
 )]
 mod tests {
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
     use chio_core::capability::scope::{Operation, ToolGrant};
     use chio_kernel::LocalCapabilityAuthority;
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir()
-            .join(format!("{prefix}-{nonce}"))
-            .join("authority.sqlite3")
+    fn authority_db_path(prefix: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let (directory, _) = chio_test_support::temp_sqlite_path(prefix);
+        let path = directory.path().join("authority").join("authority.sqlite3");
+        (directory, path)
     }
 
     #[test]
@@ -806,7 +801,7 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_persists_and_rotates_across_handles() {
-        let path = unique_db_path("chio-authority");
+        let (_path_dir, path) = authority_db_path("chio-authority");
         let authority_a = SqliteCapabilityAuthority::open(&path).unwrap();
         let authority_b = SqliteCapabilityAuthority::open(&path).unwrap();
 
@@ -827,7 +822,7 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_issues_with_current_rotated_key() {
-        let path = unique_db_path("chio-authority-issue");
+        let (_path_dir, path) = authority_db_path("chio-authority-issue");
         let authority = SqliteCapabilityAuthority::open(&path).unwrap();
         let subject = Keypair::generate().public_key();
         let first = authority
@@ -881,8 +876,8 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_snapshot_updates_public_view_without_copying_seed() {
-        let source_path = unique_db_path("chio-authority-source");
-        let follower_path = unique_db_path("chio-authority-follower");
+        let (_source_path_dir, source_path) = authority_db_path("chio-authority-source");
+        let (_follower_path_dir, follower_path) = authority_db_path("chio-authority-follower");
         let source = SqliteCapabilityAuthority::open(&source_path).unwrap();
         let follower = SqliteCapabilityAuthority::open(&follower_path).unwrap();
 
@@ -910,7 +905,7 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_same_term_snapshot_does_not_clear_fenced_leader() {
-        let path = unique_db_path("chio-authority-fence");
+        let (_path_dir, path) = authority_db_path("chio-authority-fence");
         let authority = SqliteCapabilityAuthority::open(&path).unwrap();
 
         assert!(authority
@@ -930,7 +925,7 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_enforce_cluster_fence_rejects_stale_rotation() {
-        let path = unique_db_path("chio-authority-fence-stale-rotation");
+        let (_path_dir, path) = authority_db_path("chio-authority-fence-stale-rotation");
         let authority = SqliteCapabilityAuthority::open(&path).unwrap();
 
         assert!(authority
@@ -951,7 +946,7 @@ mod tests {
 
     #[test]
     fn sqlite_capability_authority_seed_cluster_fence_refreshes_same_term_authority_state() {
-        let path = unique_db_path("chio-authority-fence-same-term-refresh");
+        let (_path_dir, path) = authority_db_path("chio-authority-fence-same-term-refresh");
         let authority = SqliteCapabilityAuthority::open(&path).unwrap();
 
         assert!(authority

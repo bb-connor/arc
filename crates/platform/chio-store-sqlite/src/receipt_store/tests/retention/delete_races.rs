@@ -154,8 +154,8 @@ fn delete_fails_closed_when_a_dependent_row_escapes_the_copy(
     use crate::receipt_store::evidence_retention::{
         copy_archived_prefix, create_archive_schema, delete_archived_prefix_in_tx,
     };
-    let path = unique_db_path("toctou-delete");
-    let archive = unique_db_path("toctou-archive");
+    let (_path_dir, path) = temp_sqlite_path("toctou-delete");
+    let (_archive_dir, archive) = temp_sqlite_path("toctou-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::super::support::receipt_test_keypair();
 
@@ -240,9 +240,9 @@ fn delete_rechecks_archive_path_under_the_write_lock() -> Result<(), Box<dyn std
     use crate::receipt_store::evidence_retention::{
         copy_archived_prefix, create_archive_schema, delete_archived_prefix_in_tx,
     };
-    let path = unique_db_path("toctou-path-split");
-    let archive_a = unique_db_path("toctou-path-split-a");
-    let archive_b = unique_db_path("toctou-path-split-b");
+    let (_path_dir, path) = temp_sqlite_path("toctou-path-split");
+    let (_archive_a_dir, archive_a) = temp_sqlite_path("toctou-path-split-a");
+    let (_archive_b_dir, archive_b) = temp_sqlite_path("toctou-path-split-b");
     let archive_a_path = archive_a.to_str().ok_or("archive path invalid")?;
     let archive_b_path = archive_b.to_str().ok_or("archive path invalid")?;
     let keypair = super::super::support::receipt_test_keypair();

@@ -6,8 +6,6 @@
 //! survives a reopen).
 
 use std::fs;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::{
     MemoryProvenanceAppend, MemoryProvenanceStore, ProvenanceVerification, UnverifiedReason,
@@ -17,13 +15,7 @@ use chio_store_sqlite::SqliteMemoryProvenanceStore;
 
 use chio_test_support::prelude::*;
 
-fn unique_db_path(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn sample_append(key: &str, receipt: &str, when: u64) -> MemoryProvenanceAppend {
     MemoryProvenanceAppend {
@@ -205,7 +197,7 @@ fn chain_digest_is_genesis_on_empty_store() {
 
 #[test]
 fn chain_persists_across_reopen() {
-    let path = unique_db_path("chio-mem-prov");
+    let (_path_dir, path) = temp_sqlite_path("chio-mem-prov");
     let first_hash;
     let first_entry_id;
     {

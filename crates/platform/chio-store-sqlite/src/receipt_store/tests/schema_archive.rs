@@ -1,7 +1,6 @@
 use crate::receipt_store::evidence_retention;
 use chio_kernel::ReceiptStoreError;
 use chio_security_types::schema::SchemaRefusal;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn archive_schema_rejects_substituted_security_identity_guards(
@@ -23,22 +22,13 @@ fn archive_schema_rejects_substituted_security_identity_guards(
     Ok(())
 }
 
-fn unique_archive_path() -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    std::env::temp_dir().join(format!(
-        "chio-schema-stamp-archive-{}-{nonce}.sqlite3",
-        std::process::id()
-    ))
-}
+use chio_test_support::temp_sqlite_path;
 
 #[test]
 fn archive_schema_is_stamped_with_the_current_version() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::evidence_retention::create_archive_schema;
 
-    let archive = unique_archive_path();
+    let (_archive_dir, archive) = temp_sqlite_path("chio-schema-stamp-archive");
     let escaped_archive = archive
         .to_str()
         .ok_or("archive path invalid")?
@@ -101,7 +91,7 @@ fn archive_schema_refuses_an_archive_without_the_current_version(
                 store_key: "receipt".to_owned(),
             },
         };
-        let archive = unique_archive_path();
+        let (_archive_dir, archive) = temp_sqlite_path("chio-schema-stamp-archive");
         let mut creator = rusqlite::Connection::open_in_memory()?;
         creator.execute(
             "ATTACH DATABASE ?1 AS archive",
@@ -135,7 +125,7 @@ fn archive_schema_refuses_an_archive_without_the_current_version(
         let _ = std::fs::remove_file(archive);
     }
 
-    let archive = unique_archive_path();
+    let (_archive_dir, archive) = temp_sqlite_path("chio-schema-stamp-archive");
     {
         let foreign = rusqlite::Connection::open(&archive)?;
         foreign.execute_batch(&format!(
@@ -180,7 +170,7 @@ fn current_archive_schema_rejects_substituted_cost_indexes(
             "cost_currency, seq, cost_charged_be",
         ),
     ] {
-        let archive = unique_archive_path();
+        let (_archive_dir, archive) = temp_sqlite_path("chio-schema-stamp-archive");
         let mut creator = rusqlite::Connection::open_in_memory()?;
         creator.execute(
             "ATTACH DATABASE ?1 AS archive",

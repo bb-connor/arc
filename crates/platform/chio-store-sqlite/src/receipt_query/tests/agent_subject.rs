@@ -4,10 +4,10 @@ use chio_kernel::ReceiptStore;
 
 use crate::receipt_store::SqliteReceiptStore;
 
-use super::support::{make_receipt, unique_db_path};
+use super::support::{make_receipt, temp_sqlite_path};
 #[test]
 fn test_query_agent_subject_filter() {
-    let path = unique_db_path("rq-agent-subject");
+    let (_path_dir, path) = temp_sqlite_path("rq-agent-subject");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     use chio_core::capability::{
@@ -113,7 +113,7 @@ fn test_query_agent_subject_filter() {
 
 #[test]
 fn test_query_agent_subject_none_returns_all() {
-    let path = unique_db_path("rq-agent-none");
+    let (_path_dir, path) = temp_sqlite_path("rq-agent-none");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     use chio_core::capability::{
@@ -215,7 +215,7 @@ fn test_query_agent_subject_none_returns_all() {
 
 #[test]
 fn test_query_agent_subject_no_match() {
-    let path = unique_db_path("rq-agent-no-match");
+    let (_path_dir, path) = temp_sqlite_path("rq-agent-no-match");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -248,7 +248,7 @@ fn test_query_agent_subject_no_match() {
 
 #[test]
 fn test_query_agent_subject_with_outcome_filter() {
-    let path = unique_db_path("rq-agent-outcome");
+    let (_path_dir, path) = temp_sqlite_path("rq-agent-outcome");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     use chio_core::capability::{
@@ -338,7 +338,7 @@ fn test_query_agent_subject_with_outcome_filter() {
 
 #[test]
 fn test_query_agent_subject_cursor_pagination() {
-    let path = unique_db_path("rq-agent-cursor");
+    let (_path_dir, path) = temp_sqlite_path("rq-agent-cursor");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     use chio_core::capability::{

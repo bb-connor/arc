@@ -6,7 +6,7 @@
 //! never performs, so the populated state is part of the measurement rather
 //! than setup convenience.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
@@ -78,13 +78,7 @@ fn fail_bench(message: &str) -> ! {
     std::process::exit(1);
 }
 
-fn unique_db_path(prefix: &str) -> PathBuf {
-    let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(elapsed) => elapsed.as_nanos(),
-        Err(error) => fail_bench(&format!("time before epoch: {error}")),
-    };
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn now_unix_ms() -> u64 {
     let elapsed = match SystemTime::now().duration_since(UNIX_EPOCH) {
@@ -151,7 +145,7 @@ fn charge_and_release(store: &SqliteBudgetStore, index: usize) {
 }
 
 fn bench_budget_charge_release(c: &mut Criterion) {
-    let path = unique_db_path("chio-bench-budget-charge-release");
+    let (_path_dir, path) = temp_sqlite_path("chio-bench-budget-charge-release");
     let store = match SqliteBudgetStore::open(&path) {
         Ok(store) => store,
         Err(error) => fail_bench(&format!("open sqlite budget store: {error}")),
@@ -239,7 +233,7 @@ fn record_admission_operation(store: &SqliteSecurityAdmissionOperationStore, ind
 }
 
 fn bench_admission_operation_record_and_read(c: &mut Criterion) {
-    let path = unique_db_path("chio-bench-admission-operation");
+    let (_path_dir, path) = temp_sqlite_path("chio-bench-admission-operation");
     let store = match SqliteSecurityAdmissionOperationStore::open(&path) {
         Ok(store) => store,
         Err(error) => fail_bench(&format!("open sqlite admission operation store: {error}")),
@@ -495,7 +489,7 @@ fn suspension_apply_request(
 
 fn bench_security_state_denial_read(c: &mut Criterion) {
     // The security-state store refuses a shared writable parent such as /tmp.
-    let directory = unique_db_path("chio-bench-security-state-denial");
+    let (_directory_dir, directory) = temp_sqlite_path("chio-bench-security-state-denial");
     let path = directory.join("security-state.sqlite3");
     let (store, suspended) = populate_suspensions(&path);
     let tenant_id = suspension_tenant();

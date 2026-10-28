@@ -49,21 +49,10 @@ struct Fixture {
     store: SqliteReceiptStore,
     path: std::path::PathBuf,
     receipts: Vec<FixtureReceipt>,
+    _directory: tempfile::TempDir,
 }
 
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
-    }
-}
-
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time after epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn decision_for(index: usize) -> Decision {
     match index % 4 {
@@ -226,7 +215,7 @@ fn sign_fixture_receipt(index: usize, receipt: &FixtureReceipt) -> ChioReceipt {
 }
 
 fn populate(prefix: &str, receipts: Vec<FixtureReceipt>) -> Fixture {
-    let path = unique_db_path(prefix);
+    let (directory, path) = temp_sqlite_path(prefix);
     let store = SqliteReceiptStore::open(&path).test_expect("open receipt store");
     for (index, receipt) in receipts.iter().enumerate() {
         store
@@ -238,6 +227,7 @@ fn populate(prefix: &str, receipts: Vec<FixtureReceipt>) -> Fixture {
         store,
         path,
         receipts,
+        _directory: directory,
     }
 }
 

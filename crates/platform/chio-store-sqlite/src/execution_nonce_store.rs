@@ -810,15 +810,8 @@ fn now_secs() -> i64 {
 )]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-    }
+    use chio_test_support::temp_sqlite_path;
 
     #[test]
     fn fresh_nonce_is_reserved() {
@@ -869,7 +862,7 @@ mod tests {
 
     #[test]
     fn concurrent_writers_cannot_exceed_capacity() {
-        let path = unique_db_path("chio-exec-nonce-capacity-concurrent");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce-capacity-concurrent");
         let store =
             std::sync::Arc::new(SqliteExecutionNonceStore::open_with_capacity(&path, 1).unwrap());
         let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
@@ -921,7 +914,7 @@ mod tests {
 
     #[test]
     fn every_pooled_connection_has_busy_timeout() {
-        let path = unique_db_path("chio-exec-nonce-busy-timeout");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce-busy-timeout");
         let store = SqliteExecutionNonceStore::open(&path).unwrap();
         let first = store.pool.get().unwrap();
         let second = store.pool.get().unwrap();
@@ -1081,7 +1074,7 @@ mod tests {
 
     #[test]
     fn forward_jump_is_typed_and_latched_clock_is_recoverable() {
-        let path = unique_db_path("chio-exec-nonce-high-water");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce-high-water");
         let base_time = now_secs();
         let high_water_before;
         {
@@ -1169,7 +1162,7 @@ mod tests {
 
     #[test]
     fn obsolete_schema_is_refused_without_rewriting_retained_rows() {
-        let path = unique_db_path("chio-exec-nonce-legacy-high-water");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce-legacy-high-water");
         let now = now_secs();
         {
             let conn = rusqlite::Connection::open(&path).unwrap();
@@ -1222,7 +1215,7 @@ mod tests {
 
     #[test]
     fn recovery_refuses_to_cross_a_pruned_high_water() {
-        let path = unique_db_path("chio-exec-nonce-pruned-through");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce-pruned-through");
         let base = now_secs();
         {
             let store = SqliteExecutionNonceStore::open(&path).unwrap();
@@ -1279,7 +1272,7 @@ mod tests {
 
     #[test]
     fn persists_across_reopen() {
-        let path = unique_db_path("chio-exec-nonce");
+        let (_path_dir, path) = temp_sqlite_path("chio-exec-nonce");
         let now = now_secs();
         let expires_at = now.saturating_add(120);
         {

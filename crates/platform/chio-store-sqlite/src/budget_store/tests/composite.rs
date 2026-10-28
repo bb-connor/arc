@@ -197,7 +197,7 @@ fn reopen(path: &Path) -> SqliteBudgetStore {
 
 #[test]
 fn denied_candidate_does_not_claim_the_operation_authorization_slot() {
-    let path = unique_db_path("chio-composite-denied-candidate");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-denied-candidate");
     let store = reopen(&path);
     let mut denied = authorize_request("candidate", 10, 2);
     denied.max_cost_per_invocation = Some(1);
@@ -252,7 +252,7 @@ fn budget_schema_refuses_stamp_six_without_mutation() {
 #[test]
 fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart() {
     for (id, monetary_capture) in [("reconcile", false), ("capture-spend", true)] {
-        let path = unique_db_path(&format!("chio-composite-{id}"));
+        let (_path_dir, path) = temp_sqlite_path(&format!("chio-composite-{id}"));
         let request = authorize_request(id, 10, 2);
         let store = reopen(&path);
         let authorized = store
@@ -360,7 +360,7 @@ fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart(
 
 #[test]
 fn composite_release_and_reverse_restore_durable_reservations() {
-    let path = unique_db_path("chio-composite-release-reverse");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-release-reverse");
     let store = reopen(&path);
     store
         .authorize_budget_hold(owned(&store, authorize_request("release", 10, 2)))
@@ -408,7 +408,7 @@ fn composite_release_and_reverse_restore_durable_reservations() {
 
 #[test]
 fn every_quota_participant_exhausts_atomically_and_maximum_is_immutable() {
-    let path = unique_db_path("chio-composite-quota-exhaustion");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-quota-exhaustion");
     let store = reopen(&path);
     assert!(matches!(
         store
@@ -441,7 +441,7 @@ fn every_quota_participant_exhausts_atomically_and_maximum_is_immutable() {
 
 #[test]
 fn zero_limit_aggregate_quota_persists_and_replays_a_durable_denial() {
-    let path = unique_db_path("chio-composite-zero-limit-denial");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-zero-limit-denial");
     let request = authorize_request("zero-limit", 0, 0);
     let store = reopen(&path);
     let denied = store
@@ -794,7 +794,7 @@ fn payment_journal_preserves_cancellation_constraints_and_evidence_across_restar
 #[cfg(unix)]
 #[test]
 fn provision_refuses_populated_standalone_budget_state() {
-    let path = unique_db_path("chio-composite-standalone-quota");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-standalone-quota");
     secure_create_dir_all(&path, "create standalone authority root");
     let database = path.join("authority.sqlite3");
     {
@@ -820,7 +820,7 @@ fn provision_refuses_populated_standalone_budget_state() {
 
 #[test]
 fn captured_hold_redundantly_persists_authority_time() {
-    let path = unique_db_path("chio-composite-capture-time");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-capture-time");
     let store = reopen(&path);
     store
         .authorize_budget_hold(owned(&store, authorize_request("capture-time", 0, 2)))
@@ -859,7 +859,7 @@ fn captured_hold_redundantly_persists_authority_time() {
 
 #[test]
 fn cumulative_approval_attach_is_exact_idempotent_and_survives_capture() {
-    let path = unique_db_path("chio-composite-cumulative");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-cumulative");
     let request = cumulative_request("cumulative");
     let binding = request
         .admission_binding
@@ -1001,7 +1001,7 @@ fn cumulative_approval_attach_is_exact_idempotent_and_survives_capture() {
 
 #[test]
 fn below_threshold_cumulative_operation_captures_without_attachment() {
-    let path = unique_db_path("chio-composite-cumulative-below-threshold");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-cumulative-below-threshold");
     let mut request = cumulative_request("below-threshold");
     request
         .cumulative_approval
@@ -1038,7 +1038,7 @@ fn below_threshold_cumulative_operation_captures_without_attachment() {
 
 #[test]
 fn cumulative_approval_state_flip_cannot_skip_attachment() {
-    let path = unique_db_path("chio-composite-cumulative-state-flip");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-cumulative-state-flip");
     let store = reopen(&path);
     assert!(matches!(
         store
@@ -1096,7 +1096,7 @@ fn serving_rejects_structured_hold_event_frontier_corruption() {
             "UPDATE budget_authorization_holds SET disposition = 'released'",
         ),
     ] {
-        let path = unique_db_path(&format!("chio-composite-hold-frontier-{id}"));
+        let (_path_dir, path) = temp_sqlite_path(&format!("chio-composite-hold-frontier-{id}"));
         let store = reopen(&path);
         store
             .authorize_budget_hold(owned(&store, authorize_request(id, 10, 2)))
@@ -1142,7 +1142,8 @@ fn serving_rejects_cumulative_operation_corruption_hidden_by_account_totals() {
             "#,
         ),
     ] {
-        let path = unique_db_path(&format!("chio-composite-cumulative-corrupt-{id}"));
+        let (_path_dir, path) =
+            temp_sqlite_path(&format!("chio-composite-cumulative-corrupt-{id}"));
         let store = reopen(&path);
         store
             .authorize_budget_hold(owned(&store, cumulative_request(id)))
@@ -1168,7 +1169,7 @@ fn serving_rejects_cumulative_operation_corruption_hidden_by_account_totals() {
 
 #[test]
 fn approval_vs_reversal_and_last_unit_admission_are_serialized() {
-    let path = unique_db_path("chio-composite-cas-races");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-cas-races");
     let store = reopen(&path);
     let request = cumulative_request("race");
     let binding = request.admission_binding.clone().expect("binding");
@@ -1210,7 +1211,7 @@ fn approval_vs_reversal_and_last_unit_admission_are_serialized() {
 
     let _ = fs::remove_file(&path);
 
-    let last_path = unique_db_path("chio-composite-last-unit-race");
+    let (_last_path_dir, last_path) = temp_sqlite_path("chio-composite-last-unit-race");
     let last_unit = Arc::new(reopen(&last_path));
     last_unit
         .authorize_budget_hold(owned(&last_unit, authorize_request("last-seed", 0, 2)))
@@ -1294,7 +1295,7 @@ fn supplemental_request(id: &str, expires_at: u64) -> BudgetAuthorizeHoldRequest
 
 #[test]
 fn millisecond_shaped_supplemental_expiry_is_rejected() {
-    let path = unique_db_path("chio-composite-supplemental-expiry-unit");
+    let (_path_dir, path) = temp_sqlite_path("chio-composite-supplemental-expiry-unit");
     let store = reopen(&path);
 
     let request = supplemental_request("ms-expiry", 1_767_225_600_000);

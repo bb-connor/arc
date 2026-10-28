@@ -3,7 +3,7 @@ use super::support::*;
 
 #[test]
 fn sqlite_receipt_store_persists_across_reopen() {
-    let path = unique_db_path("chio-receipts");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts");
     {
         let store = SqliteReceiptStore::open(&path).test_unwrap();
         store.append_chio_receipt(&sample_receipt()).test_unwrap();
@@ -23,7 +23,7 @@ fn sqlite_receipt_store_persists_across_reopen() {
 
 #[test]
 fn bounded_page_count_yields_full_error() {
-    let path = unique_db_path("chio-receipts-bounded-pages");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-bounded-pages");
 
     // Establish the schema and a baseline under the default (uncapped) config,
     // then measure the live page count so the cap sits just above it. The bound
@@ -86,7 +86,7 @@ fn bounded_page_count_yields_full_error() {
 
 #[test]
 fn bounded_page_count_rejects_zero_effective_mismatch() {
-    let path = unique_db_path("chio-receipts-zero-page-cap");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-zero-page-cap");
     let error = match SqliteReceiptStore::open_with_pool_config(
         &path,
         crate::SqlitePoolConfig {
@@ -106,7 +106,7 @@ fn bounded_page_count_rejects_zero_effective_mismatch() {
 
 #[test]
 fn bounded_page_count_rejects_cap_below_existing_database() {
-    let path = unique_db_path("chio-receipts-below-existing-page-cap");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-below-existing-page-cap");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let current_pages: i64 = store
         .connection()
@@ -136,7 +136,7 @@ fn bounded_page_count_rejects_cap_below_existing_database() {
 #[cfg(feature = "pq")]
 #[test]
 fn receipt_verify_accepts_hybrid_receipts_for_persistence() {
-    let path = unique_db_path("chio-receipts-hybrid");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-hybrid");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let tool_seq = store
@@ -156,7 +156,7 @@ fn receipt_verify_accepts_hybrid_receipts_for_persistence() {
 
 #[test]
 fn request_lineage_record_persistence_rejects_unsupported_schema() {
-    let path = unique_db_path("chio-request-lineage-schema");
+    let (_path_dir, path) = temp_sqlite_path("chio-request-lineage-schema");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut lineage_json = request_lineage_json("req-schema", "anchor-schema", None);
     lineage_json["schema"] = serde_json::Value::String("chio.request_lineage.v1".to_string());
@@ -184,7 +184,7 @@ fn request_lineage_record_persistence_rejects_unsupported_schema() {
 
 #[test]
 fn sqlite_receipt_store_configures_durable_pragmas() {
-    let path = unique_db_path("chio-receipts-pragmas");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-pragmas");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let connection = store.connection().test_unwrap();
 
@@ -211,7 +211,7 @@ fn sqlite_receipt_store_configures_durable_pragmas() {
 
 #[test]
 fn sqlite_receipt_store_stamps_application_id_and_current_schema_version() {
-    let path = unique_db_path("chio-receipts-schema-stamp");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-schema-stamp");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let connection = store.connection().test_unwrap();
     let app_id: i32 = connection
@@ -238,7 +238,7 @@ fn sqlite_receipt_store_stamps_application_id_and_current_schema_version() {
 #[test]
 fn receipt_store_refuses_a_schema_version_other_than_current() {
     for version in [0, 7] {
-        let path = unique_db_path("chio-receipts-schema-refused");
+        let (_path_dir, path) = temp_sqlite_path("chio-receipts-schema-refused");
         drop(SqliteReceiptStore::open(&path).test_unwrap());
         {
             let connection = rusqlite::Connection::open(&path).test_unwrap();
@@ -267,7 +267,7 @@ fn receipt_store_refuses_a_schema_version_other_than_current() {
 #[test]
 fn receipt_store_refuses_a_current_stamp_over_a_retired_table_shape(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-retired-shape");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-retired-shape");
     drop(SqliteReceiptStore::open(&path)?);
     {
         let connection = rusqlite::Connection::open(&path)?;
@@ -319,7 +319,7 @@ fn receipt_store_refuses_a_current_stamp_over_a_retired_table_shape(
 
 #[test]
 fn receipt_cost_projection_covers_full_u64_domain() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-cost-projection-domain");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cost-projection-domain");
     let store = SqliteReceiptStore::open(&path)?;
     let signed_max = u64::try_from(i64::MAX)?;
     store.append_chio_receipt(&sample_receipt_with_id("no-cost"))?;
@@ -393,7 +393,7 @@ fn receipt_cost_projection_covers_full_u64_domain() -> Result<(), Box<dyn std::e
 #[test]
 fn receipt_cost_projection_columns_reject_invalid_pairs() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-receipts-cost-projection-constraints");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cost-projection-constraints");
     drop(SqliteReceiptStore::open(&path)?);
     let mut connection = rusqlite::Connection::open(&path)?;
     let transaction = connection.transaction()?;
@@ -428,7 +428,8 @@ fn receipt_cost_projection_columns_reject_invalid_pairs() -> Result<(), Box<dyn 
 fn explicit_audit_rejects_missing_or_divergent_cost_projection(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for (suffix, replacement) in [("missing", None), ("divergent", Some(0_u64.to_be_bytes()))] {
-        let path = unique_db_path(&format!("chio-receipts-cost-projection-{suffix}"));
+        let (_path_dir, path) =
+            temp_sqlite_path(&format!("chio-receipts-cost-projection-{suffix}"));
         let store = SqliteReceiptStore::open(&path)?;
         store.append_chio_receipt(&sample_financial_receipt(suffix, u64::MAX)?)?;
         drop(store);
@@ -476,7 +477,7 @@ fn current_receipt_schema_rejects_substituted_cost_indexes(
             "cost_currency, seq, cost_charged_be",
         ),
     ] {
-        let path = unique_db_path(&format!("chio-receipts-{name}-substituted"));
+        let (_path_dir, path) = temp_sqlite_path(&format!("chio-receipts-{name}-substituted"));
         drop(SqliteReceiptStore::open(&path)?);
 
         let connection = rusqlite::Connection::open(&path)?;
@@ -504,7 +505,7 @@ fn current_receipt_schema_rejects_substituted_cost_indexes(
 #[test]
 fn current_receipt_schema_rejects_substituted_immutability_guard(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-cost-guard-substituted");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cost-guard-substituted");
     drop(SqliteReceiptStore::open(&path)?);
 
     let connection = rusqlite::Connection::open(&path)?;
@@ -535,7 +536,7 @@ fn current_receipt_schema_rejects_substituted_immutability_guard(
 
 #[test]
 fn open_refuses_foreign_database_without_switching_it_to_wal() {
-    let path = unique_db_path("chio-receipts-foreign-no-wal");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-foreign-no-wal");
 
     // A pre-existing, unrelated SQLite database on the target path, in the
     // default rollback-journal mode.
@@ -578,7 +579,7 @@ fn open_refuses_foreign_database_without_switching_it_to_wal() {
 
 #[test]
 fn open_refuses_an_unstamped_db_with_a_lookalike_receipt_table() {
-    let path = unique_db_path("chio-receipts-foreign-lookalike");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-foreign-lookalike");
 
     // An unrelated SQLite database that merely happens to carry a table named
     // `tool_receipts` with an unrelated shape (no receipt payload column).
@@ -609,7 +610,7 @@ fn open_refuses_an_unstamped_db_with_a_lookalike_receipt_table() {
 
 #[test]
 fn open_refuses_an_unstamped_db_carrying_a_receipt_payload_column() {
-    let path = unique_db_path("chio-receipts-unstamped-payload");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-unstamped-payload");
     {
         let unstamped = rusqlite::Connection::open(&path).test_unwrap();
         unstamped
@@ -637,7 +638,7 @@ fn open_refuses_an_unstamped_db_carrying_a_receipt_payload_column() {
 
 #[test]
 fn flush_receipt_writes_reports_prior_committed_entries() {
-    let path = unique_db_path("chio-receipts-flush");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-flush");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     store
@@ -667,7 +668,7 @@ fn flush_receipt_writes_reports_prior_committed_entries() {
 /// kernel owns the DB and the watchdog only reads.
 #[test]
 fn receipt_store_health_read_only_samples_a_live_store() {
-    let path = unique_db_path("chio-receipts-health-ro");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-health-ro");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     store
         .append_chio_receipt(&sample_receipt_with_id("rcpt-ro-1"))
@@ -691,7 +692,7 @@ fn receipt_store_health_read_only_samples_a_live_store() {
 /// writes.
 #[test]
 fn receipt_store_health_read_only_missing_db_reports_not_found_without_creating() {
-    let path = unique_db_path("chio-receipts-health-ro-missing");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-health-ro-missing");
     let _ = fs::remove_file(&path);
     assert!(!path.exists(), "precondition: the DB path must be absent");
 
@@ -708,7 +709,7 @@ fn receipt_store_health_read_only_missing_db_reports_not_found_without_creating(
 
 #[test]
 fn empty_store_reports_zero_committed_entry_for_operator_surfaces() {
-    let path = unique_db_path("chio-receipts-empty-operator-surfaces");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-empty-operator-surfaces");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     store
         .wait_for_writer_ready(Duration::from_secs(5))
@@ -752,7 +753,7 @@ fn empty_store_reports_zero_committed_entry_for_operator_surfaces() {
 
 #[test]
 fn checkpoint_range_requires_contiguous_claim_log() {
-    let path = unique_db_path("chio-receipts-checkpoint-gap");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-checkpoint-gap");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     store
@@ -786,7 +787,7 @@ fn checkpoint_range_requires_contiguous_claim_log() {
 
 #[test]
 fn canonical_bytes_range_rejects_partial_checkpoint_range() {
-    let path = unique_db_path("chio-receipts-partial-range");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-partial-range");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     store
@@ -817,7 +818,7 @@ fn canonical_bytes_range_rejects_partial_checkpoint_range() {
 
 #[test]
 fn open_creates_kernel_checkpoints_table() {
-    let path = unique_db_path("chio-receipts-cp-table");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-table");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     // Query the table to confirm it exists.
     let connection = store.connection().test_unwrap();
@@ -832,7 +833,7 @@ fn open_creates_kernel_checkpoints_table() {
 
 #[test]
 fn open_creates_checkpoint_publication_metadata_table() {
-    let path = unique_db_path("chio-receipts-cp-publication-table");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-publication-table");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let connection = store.connection().test_unwrap();
     let count: i64 = connection
@@ -848,7 +849,7 @@ fn open_creates_checkpoint_publication_metadata_table() {
 
 #[test]
 fn open_existing_missing_path_does_not_create_database_file() {
-    let path = unique_db_path("chio-receipts-open-existing-missing");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-open-existing-missing");
 
     let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
     assert!(matches!(
@@ -865,7 +866,7 @@ fn open_existing_missing_path_does_not_create_database_file() {
 
 #[test]
 fn open_existing_rejects_touched_empty_database_file() {
-    let path = unique_db_path("chio-receipts-open-existing-empty");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-open-existing-empty");
     fs::write(&path, "").test_unwrap();
 
     let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
@@ -885,7 +886,7 @@ fn open_existing_rejects_touched_empty_database_file() {
 
 #[test]
 fn receipt_pool_sizes_reject_zero_capacity() {
-    let path = unique_db_path("chio-receipts-zero-pool");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-zero-pool");
 
     let reader_error = match SqliteReceiptStore::open_with_pool_sizes(&path, 0, 1) {
         Ok(_) => panic!("expected zero reader pool capacity to fail"),
@@ -912,7 +913,7 @@ fn receipt_pool_sizes_reject_zero_capacity() {
 
 #[test]
 fn open_existing_refuses_missing_projection_guards_without_repair() {
-    let path = unique_db_path("chio-receipts-open-existing-guards");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-open-existing-guards");
 
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     store

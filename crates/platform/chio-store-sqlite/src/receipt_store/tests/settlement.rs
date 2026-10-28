@@ -14,7 +14,7 @@ fn attempt_count(store: &SqliteReceiptStore, receipt_id: &str) -> Result<u64, Re
 #[test]
 fn settlement_projection_binding_is_scoped_to_one_writer() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-settlement-binding");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-binding");
     let store = SqliteReceiptStore::open(&path)?;
 
     assert_eq!(
@@ -63,7 +63,7 @@ fn settlement_projection_binding_is_scoped_to_one_writer() -> Result<(), Box<dyn
 #[test]
 fn open_existing_does_not_install_missing_settlement_schema(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-open-existing");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-open-existing");
     let store = SqliteReceiptStore::open(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch("DROP TABLE settle_attempts")?;
@@ -96,7 +96,7 @@ fn open_existing_does_not_install_missing_settlement_schema(
 #[test]
 fn open_existing_does_not_reinstall_missing_settlement_guard(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-open-existing-guard");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-open-existing-guard");
     let store = SqliteReceiptStore::open(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch("DROP TRIGGER trg_settle_attempts_reject_terminal_insert")?;
@@ -129,7 +129,7 @@ fn open_existing_does_not_reinstall_missing_settlement_guard(
 #[test]
 fn open_existing_rejects_same_named_noop_settlement_guard() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-settlement-open-existing-noop-guard");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-open-existing-noop-guard");
     let store = SqliteReceiptStore::open(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch(
@@ -154,7 +154,7 @@ fn open_existing_rejects_same_named_noop_settlement_guard() -> Result<(), Box<dy
 #[test]
 fn open_existing_rejects_unconstrained_settlement_table() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-settlement-open-existing-drifted-table");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-open-existing-drifted-table");
     let store = SqliteReceiptStore::open(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch(
@@ -183,7 +183,7 @@ fn open_existing_rejects_unconstrained_settlement_table() -> Result<(), Box<dyn 
 
 #[test]
 fn open_existing_rejects_extra_settlement_trigger() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-open-existing-extra-trigger");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-open-existing-extra-trigger");
     let store = SqliteReceiptStore::open(&path)?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch(
@@ -208,7 +208,7 @@ fn open_existing_rejects_extra_settlement_trigger() -> Result<(), Box<dyn std::e
 
 #[test]
 fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-atomic-append");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-atomic-append");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id("rcpt-settlement-atomic");
     let pending = chio_kernel::PendingSettlementObservation {
@@ -304,7 +304,7 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
 #[test]
 fn duplicate_receipt_without_settlement_obligation_fails_closed(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-missing-obligation");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-missing-obligation");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id("rcpt-settlement-missing-obligation");
     let pending = chio_kernel::PendingSettlementObservation {
@@ -346,7 +346,7 @@ fn duplicate_receipt_without_settlement_obligation_fails_closed(
 #[test]
 fn atomic_receipt_append_with_timeout_returns_seq_and_seeds_attempt_zero(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-atomic-append-timeout");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-atomic-append-timeout");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id("rcpt-settlement-atomic-timeout");
     let pending = chio_kernel::PendingSettlementObservation {
@@ -530,8 +530,8 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
         RetryPolicy, SettlementOutcomeStore, SettlementRoute, SettlementRoutingInput,
     };
 
-    let path = unique_db_path("chio-settlement-retention");
-    let archive_path = unique_db_path("chio-settlement-retention-archive");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-retention");
+    let (_archive_path_dir, archive_path) = temp_sqlite_path("chio-settlement-retention-archive");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention", 1);
     let pending = chio_kernel::PendingSettlementObservation {
@@ -583,8 +583,9 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
 #[test]
 fn receipt_retention_refuses_store_without_settlement_projection(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-settlement-retention-missing");
-    let archive_path = unique_db_path("chio-settlement-retention-missing-archive");
+    let (_path_dir, path) = temp_sqlite_path("chio-settlement-retention-missing");
+    let (_archive_path_dir, archive_path) =
+        temp_sqlite_path("chio-settlement-retention-missing-archive");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention-missing", 1);
     store.append_chio_receipt_returning_seq(&receipt)?;

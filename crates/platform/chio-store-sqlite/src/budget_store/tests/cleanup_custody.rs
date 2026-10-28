@@ -46,7 +46,7 @@ fn authorized(
 
 #[test]
 fn standalone_replay_after_reopen_never_recovers_fresh_custody() -> TestResult {
-    let path = unique_db_path("chio-budget-cleanup-custody-reopen");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-cleanup-custody-reopen");
     let store = SqliteBudgetStore::open(&path)?;
     let first = authorized(&store)?;
     assert_eq!(first.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
@@ -74,7 +74,7 @@ fn standalone_replay_after_reopen_never_recovers_fresh_custody() -> TestResult {
 
 #[test]
 fn independent_connections_report_only_one_fresh_authorization() -> TestResult {
-    let path = unique_db_path("chio-budget-cleanup-custody-race");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-cleanup-custody-race");
     let stores = [
         SqliteBudgetStore::open(&path)?,
         SqliteBudgetStore::open(&path)?,

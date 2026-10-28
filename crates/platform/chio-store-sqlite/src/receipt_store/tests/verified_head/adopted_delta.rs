@@ -9,7 +9,7 @@ use super::*;
 /// stays bounded by the batch, not total history.
 #[test]
 fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-stale-head-delta");
+    let (_path_dir, path) = temp_sqlite_path("chio-stale-head-delta");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Three real receipts -> claim-log entries 1..=3.
@@ -105,7 +105,7 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
 /// so per-append cost stays bounded by the batch, not total history.
 #[test]
 fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-resync-delta");
+    let (_path_dir, path) = temp_sqlite_path("chio-resync-delta");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Three real receipts -> claim-log entries 1..=3.
@@ -185,7 +185,7 @@ fn resync_validates_adopted_delta() -> Result<(), Box<dyn std::error::Error>> {
 /// `Ok`.
 #[test]
 fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-write-resync-fail");
+    let (_path_dir, path) = temp_sqlite_path("chio-write-resync-fail");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Real receipts -> claim-log entries 1..=3, writer head at claim_log_max_seq 3.
@@ -246,7 +246,7 @@ fn write_job_response_reflects_resync_failure() -> Result<(), Box<dyn std::error
 /// cost stays bounded by the batch, not total history.
 #[test]
 fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-preval-delta");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-preval-delta");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Real receipts -> claim-log entries 1..=3, writer head at claim_log_max_seq 3.
@@ -330,7 +330,7 @@ fn writer_job_validates_adopted_delta_before_commit() -> Result<(), Box<dyn std:
 /// one row, no Ed25519) makes the column tamper fail closed.
 #[test]
 fn head_trust_checks_all_checkpoint_columns() -> Result<(), Box<dyn std::error::Error>> {
-    let (path, store, keypair) = open_seeded_store("chio-head-allcols", 3)?;
+    let (_directory, path, store, keypair) = open_seeded_store("chio-head-allcols", 3)?;
     store.create_next_receipt_checkpoint(3, &keypair)?;
     let connection = store.connection()?;
     let mut head = seed_verified_head(&connection)?;
@@ -377,7 +377,7 @@ fn head_trust_checks_all_checkpoint_columns() -> Result<(), Box<dyn std::error::
 /// delta still passes.
 #[test]
 fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-adopted-delta-gap");
+    let (_path_dir, path) = temp_sqlite_path("chio-adopted-delta-gap");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Four real, correctly-projecting receipts -> contiguous claim-log entries
@@ -440,7 +440,7 @@ fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>
 /// trustworthy.
 #[test]
 fn adopted_delta_ignores_untrusted_watermark() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-adopted-delta-bogus-watermark");
+    let (_path_dir, path) = temp_sqlite_path("chio-adopted-delta-bogus-watermark");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..4 {

@@ -133,7 +133,7 @@ fn background_build_panic_is_isolated() -> Result<(), Box<dyn std::error::Error>
 #[test]
 fn maybe_build_checkpoint_builds_one_checkpoint_per_crossed_threshold(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-threshold");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-threshold");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(signer(&keypair, 3))?;
@@ -191,7 +191,7 @@ fn maybe_build_checkpoint_builds_one_checkpoint_per_crossed_threshold(
 
 #[test]
 fn zero_max_batch_disables_background_checkpointing() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-disabled");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-disabled");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(signer(&keypair, 0))?;
@@ -212,7 +212,7 @@ fn zero_max_batch_disables_background_checkpointing() -> Result<(), Box<dyn std:
 #[test]
 fn one_big_batch_crossing_two_thresholds_builds_both_checkpoints(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-multicross");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-multicross");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(signer(&keypair, 2))?;
@@ -234,7 +234,7 @@ fn one_big_batch_crossing_two_thresholds_builds_both_checkpoints(
 #[test]
 fn background_and_writer_routed_child_appends_share_the_threshold(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-child");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-child");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(signer(&keypair, 2))?;
@@ -266,7 +266,7 @@ fn background_and_writer_routed_child_appends_share_the_threshold(
 /// chain is valid.
 #[test]
 fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-idempotent");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Seed three receipts and build checkpoint 1 (batch 1..=3): the "winner".
@@ -319,7 +319,7 @@ fn identical_background_checkpoint_is_idempotent() -> Result<(), Box<dyn std::er
 #[test]
 fn flush_report_reflects_externally_extended_checkpoint() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-flush-external-ckpt");
+    let (_path_dir, path) = temp_sqlite_path("chio-flush-external-ckpt");
     let keypair = receipt_test_keypair();
     let store_a = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -368,7 +368,7 @@ fn flush_report_reflects_externally_extended_checkpoint() -> Result<(), Box<dyn 
 #[test]
 fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-bg-adopt-external");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-adopt-external");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
@@ -442,7 +442,7 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
 /// unhealthy until the next normal append.
 #[test]
 fn successful_checkpoint_build_clears_stale_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-bg-clear-stale-error");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-clear-stale-error");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
@@ -502,7 +502,7 @@ fn successful_checkpoint_build_clears_stale_error() -> Result<(), Box<dyn std::e
 /// uncheckpointed range. A VALID external checkpoint is still reflected.
 #[test]
 fn flush_report_ignores_unverified_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-flush-ignore-forged-ckpt");
+    let (_path_dir, path) = temp_sqlite_path("chio-flush-ignore-forged-ckpt");
     let keypair = receipt_test_keypair();
     let store_a = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -560,7 +560,7 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
 
     // CONNECTED (accepted): a properly chain-connected latest checkpoint (cp2
     // linked to cp1) has its batch_end_seq reported.
-    let good_path = unique_db_path("chio-flush-connected-ckpt");
+    let (_good_path_dir, good_path) = temp_sqlite_path("chio-flush-connected-ckpt");
     let good_store = SqliteReceiptStore::open(&good_path)?;
     for i in 0..6 {
         let receipt =
@@ -582,7 +582,7 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
     // so it parses individually yet is disconnected. Its inflated batch_end_seq
     // must not be reported; the report falls back to the last chain-connected
     // checkpoint (cp1, batch_end 3).
-    let bad_path = unique_db_path("chio-flush-disconnected-ckpt");
+    let (_bad_path_dir, bad_path) = temp_sqlite_path("chio-flush-disconnected-ckpt");
     let bad_store = SqliteReceiptStore::open(&bad_path)?;
     for i in 0..6 {
         let receipt =
@@ -650,7 +650,7 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
 #[test]
 fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-flush-foreign-claim-log-ckpt");
+    let (_path_dir, path) = temp_sqlite_path("chio-flush-foreign-claim-log-ckpt");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -701,7 +701,7 @@ fn flush_report_rejects_checkpoint_foreign_to_local_claim_log(
 /// must fail closed.
 #[test]
 fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-chain-connected-gap");
+    let (_path_dir, path) = temp_sqlite_path("chio-chain-connected-gap");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Four receipts -> four single-entry checkpoints (seq 1..=4).
@@ -764,7 +764,7 @@ fn chain_connected_rejects_missing_earlier_checkpoint() -> Result<(), Box<dyn st
 /// incremental head and never walks full history.)
 #[test]
 fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-operator-reverify-chain");
+    let (_path_dir, path) = temp_sqlite_path("chio-operator-reverify-chain");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..4 {
@@ -848,7 +848,7 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
 #[test]
 fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-bg-adopt-valid-winner");
+    let (_path_dir, path) = temp_sqlite_path("chio-bg-adopt-valid-winner");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
@@ -911,7 +911,7 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     // fail-closed even though the incoming checkpoint is valid. Use a fresh DB
     // whose seq-1 slot holds a forged checkpoint (its merkle_root is over
     // unrelated bytes, so it cannot validate against the real claim-log range).
-    let bad_path = unique_db_path("chio-bg-adopt-invalid-winner");
+    let (_bad_path_dir, bad_path) = temp_sqlite_path("chio-bg-adopt-invalid-winner");
     let bad_store = SqliteReceiptStore::open(&bad_path)?;
     for i in 0..max_batch {
         let receipt =
@@ -1466,7 +1466,7 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
 /// catch-up builder at install time.
 #[test]
 fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-install-owed-ckpt");
+    let (_path_dir, path) = temp_sqlite_path("chio-install-owed-ckpt");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
@@ -1520,7 +1520,7 @@ fn install_signer_builds_owed_checkpoints() -> Result<(), Box<dyn std::error::Er
 /// mode (`install_signer_builds_owed_checkpoints`) still builds at install.
 #[test]
 fn install_catch_up_respects_deferred_validation() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-install-deferred");
+    let (_path_dir, path) = temp_sqlite_path("chio-install-deferred");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open_with_options(
         &path,
@@ -1646,7 +1646,7 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     // Barrier: an append batch crosses the checkpoint threshold and a Flush is
     // co-drained with it. When flush_receipt_writes()'s waiter returns, the due
     // checkpoint MUST already exist.
-    let path = unique_db_path("chio-flush-barrier");
+    let (_path_dir, path) = temp_sqlite_path("chio-flush-barrier");
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
     store.enable_background_checkpoints(signer(&keypair, max_batch))?;
@@ -1667,7 +1667,7 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
     // flush caller as an Err (not a silent Ok). Uses the distinct
     // FAIL_CHECKPOINT_BUILD hook (marker max_batch) so the process-global flag
     // cannot interfere with the panic-isolation test.
-    let fail_path = unique_db_path("chio-flush-barrier-fail");
+    let (_fail_path_dir, fail_path) = temp_sqlite_path("chio-flush-barrier-fail");
     let fail_store = SqliteReceiptStore::open(&fail_path)?;
     let fail_batch = test_hooks::FAIL_CHECKPOINT_BUILD_MARKER_MAX_BATCH;
     fail_store.enable_background_checkpoints(signer(&keypair, fail_batch))?;
@@ -1704,7 +1704,7 @@ fn flush_is_a_checkpoint_barrier() -> Result<(), Box<dyn std::error::Error>> {
 /// uncheckpointed until some future write.
 #[test]
 fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-reseed-owed-ckpt");
+    let (_path_dir, path) = temp_sqlite_path("chio-reseed-owed-ckpt");
     let keypair = receipt_test_keypair();
     let max_batch = 3;
     let store = SqliteReceiptStore::open(&path)?;
@@ -1802,7 +1802,7 @@ fn reseed_builds_owed_checkpoints_after_repair() -> Result<(), Box<dyn std::erro
 /// checkpoint chain actually advanced. A real later failure re-sets it.
 #[test]
 fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-manual-recovery-clear-error");
+    let (_path_dir, path) = temp_sqlite_path("chio-manual-recovery-clear-error");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let max_batch = 3;
@@ -1863,7 +1863,7 @@ fn manual_recovery_clears_stale_checkpoint_error() -> Result<(), Box<dyn std::er
 /// validation), fail-closed. A receipt-appending write still builds.
 #[test]
 fn metadata_write_does_not_checkpoint_unvalidated_data() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-metadata-defer-build");
+    let (_path_dir, path) = temp_sqlite_path("chio-metadata-defer-build");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open_with_options(
         &path,

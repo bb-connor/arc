@@ -765,7 +765,6 @@ fn now_secs() -> i64 {
 )]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn canonical_schema_fixture(
     ) -> Result<SqliteGovernedApprovalReplayStore, Box<dyn std::error::Error>> {
@@ -869,17 +868,11 @@ mod tests {
         Ok(())
     }
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-    }
+    use chio_test_support::temp_sqlite_path;
 
     #[test]
     fn committed_marker_rejects_replay_after_reopen() {
-        let path = unique_db_path("chio-approval-replay-committed");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-committed");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
             let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
@@ -899,7 +892,7 @@ mod tests {
 
     #[test]
     fn uncommitted_marker_rejects_replay_after_reopen() {
-        let path = unique_db_path("chio-approval-replay-reserved");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-reserved");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
             let store = SqliteGovernedApprovalReplayStore::open(&path).unwrap();
@@ -1047,7 +1040,7 @@ mod tests {
 
     #[test]
     fn latched_future_high_water_is_typed_recoverable_and_retains_markers() {
-        let path = unique_db_path("chio-approval-replay-high-water");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-high-water");
         let base = now_secs();
         let expiry = u64::try_from(base).unwrap().saturating_add(10_000);
         {
@@ -1109,7 +1102,7 @@ mod tests {
 
     #[test]
     fn recovery_refuses_to_cross_a_pruned_high_water() {
-        let path = unique_db_path("chio-approval-replay-pruned-through");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-pruned-through");
         let base = now_secs();
         let expiry = base.saturating_add(100);
         {
@@ -1274,7 +1267,7 @@ mod tests {
 
     #[test]
     fn reopen_rejects_capacity_below_retained_live_rows() {
-        let path = unique_db_path("chio-approval-replay-capacity-reopen");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-capacity-reopen");
         let expires_at = u64::try_from(now_secs()).unwrap().saturating_add(60);
         {
             let store = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 2).unwrap();
@@ -1295,7 +1288,7 @@ mod tests {
 
     #[test]
     fn independently_opened_handles_can_only_increase_persisted_capacity() {
-        let path = unique_db_path("chio-approval-replay-capacity-handle-mismatch");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-capacity-handle-mismatch");
         let store = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 1).unwrap();
         let larger = SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 2).unwrap();
 
@@ -1319,7 +1312,7 @@ mod tests {
 
     #[test]
     fn unstamped_replay_database_is_refused_without_adoption() {
-        let path = unique_db_path("chio-approval-replay-unstamped");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-unstamped");
         {
             let connection = Connection::open(&path).unwrap();
             connection
@@ -1351,7 +1344,7 @@ mod tests {
 
     #[test]
     fn obsolete_replay_schema_is_refused() {
-        let path = unique_db_path("chio-approval-replay-obsolete");
+        let (_path_dir, path) = temp_sqlite_path("chio-approval-replay-obsolete");
         drop(SqliteGovernedApprovalReplayStore::open(&path).unwrap());
         {
             let connection = Connection::open(&path).unwrap();
