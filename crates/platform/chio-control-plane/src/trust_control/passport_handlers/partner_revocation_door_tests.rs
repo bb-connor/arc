@@ -889,47 +889,191 @@ async fn a_locally_revoked_oid4vp_passport_during_the_partner_sync_is_refused() 
     assert_ne!(oid4vp_request_status(&door, &request), "consumed");
 }
 
-#[tokio::test]
-async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue() {
-    let door = Door::new(30_000);
-    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
-    let passport = door.passport(&[&door.authority]);
-    let challenge = door.challenge(None, VALID_FROM, VALID_UNTIL);
-    let signer = Keypair::generate();
+/// `door` with a receipt store at its acceptance clock, for the federated
+/// lanes that read imported evidence or delegation lineage.
+fn with_receipts(door: &mut Door) -> Arc<chio_store_sqlite::SqliteReceiptStore> {
+    let path = door.dir.path().join("receipts.sqlite3");
+    door.config.receipt_db_path = Some(path.clone());
+    Arc::new(
+        chio_store_sqlite::SqliteReceiptStore::open_with_clock(
+            path,
+            door.clock.clone() as Arc<dyn Clock>,
+        )
+        .test_unwrap(),
+    )
+}
+
+fn receipts_state(
+    door: &Door,
+    store: &Arc<chio_store_sqlite::SqliteReceiptStore>,
+) -> TrustServiceState {
+    let mut state = door.state();
+    state.receipt_store = Some(Arc::clone(store));
+    state
+}
+
+fn federated_request(
+    door: &Door,
+    passport: &AgentPassport,
+    challenge: &PassportPresentationChallenge,
+    ttl: u64,
+    delegation_policy: Option<FederatedDelegationPolicyDocument>,
+    upstream_capability_id: Option<String>,
+) -> FederatedIssueRequest {
+    FederatedIssueRequest {
+        presentation: respond_to_passport_presentation_challenge(
+            &door.holder,
+            passport,
+            challenge,
+            PRESENTED_AT,
+        )
+        .test_unwrap(),
+        expected_challenge: challenge.clone(),
+        capability: crate::policy::DefaultCapability {
+            scope: chio_core::capability::scope::ChioScope::default(),
+            ttl,
+        },
+        admission_policy: None,
+        enterprise_identity: None,
+        delegation_policy,
+        upstream_capability_id,
+    }
+}
+
+/// A delegation policy signed by the door's own capability authority, live
+/// from just before the acceptance clock until `expires_at`.
+fn delegation_policy(
+    door: &Door,
+    expires_at: u64,
+    parent_capability_id: Option<String>,
+) -> FederatedDelegationPolicyDocument {
     let body = FederatedDelegationPolicyBody {
         schema: FEDERATED_DELEGATION_POLICY_SCHEMA.to_owned(),
         issuer: ADVERTISE_URL.to_owned(),
         partner: PARTNER.to_owned(),
         verifier: ADVERTISE_URL.to_owned(),
-        signer_public_key: signer.public_key(),
+        signer_public_key: door.authority.public_key(),
         created_at: BASE_UNIX_SECS - 10,
-        expires_at: BASE_UNIX_SECS + 10,
+        expires_at,
         ttl_seconds: 60,
         scope: chio_core::capability::scope::ChioScope::default(),
         purpose: None,
-        parent_capability_id: None,
+        parent_capability_id,
     };
-    let (signature, _) = signer.sign_canonical(&body).test_unwrap();
-    let request = FederatedIssueRequest {
-        presentation: respond_to_passport_presentation_challenge(
-            &door.holder,
-            &passport,
-            &challenge,
-            PRESENTED_AT,
-        )
-        .test_unwrap(),
-        expected_challenge: challenge,
-        capability: crate::policy::DefaultCapability {
+    let (signature, _) = door.authority.sign_canonical(&body).test_unwrap();
+    FederatedDelegationPolicyDocument { body, signature }
+}
+
+/// Imports an upstream evidence share, shared under the door's capability
+/// authority, whose one capability, issued to the door's holder, expires at
+/// `expires_at`, and returns that capability id.
+fn import_parent(
+    door: &Door,
+    store: &chio_store_sqlite::SqliteReceiptStore,
+    expires_at: u64,
+) -> String {
+    use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+    let upstream = Keypair::generate();
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "upstream-parent".to_owned(),
+            issuer: upstream.public_key(),
+            subject: door.holder.public_key(),
             scope: chio_core::capability::scope::ChioScope::default(),
-            ttl: 60,
+            issued_at: BASE_UNIX_SECS - 100,
+            expires_at,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
-        admission_policy: None,
-        enterprise_identity: None,
-        delegation_policy: Some(FederatedDelegationPolicyDocument { body, signature }),
-        upstream_capability_id: None,
+        &upstream,
+    )
+    .test_unwrap();
+    let snapshot = chio_kernel::capability_lineage::CapabilitySnapshot {
+        capability_id: token.id.clone(),
+        subject_key: token.subject.to_hex(),
+        issuer_key: token.issuer.to_hex(),
+        issued_at: token.issued_at,
+        expires_at: token.expires_at,
+        grants_json: serde_json::to_string(&token.scope).test_unwrap(),
+        delegation_depth: 0,
+        parent_capability_id: None,
+        federated_parent_capability_id: None,
+        provenance: chio_kernel::capability_lineage::CapabilitySnapshotProvenance::SignedToken,
+        signed_capability: Some(token.clone()),
     };
-    let response =
-        handle_federated_issue(State(door.state()), service_headers(&door), Json(request)).await;
+    store
+        .import_federated_evidence_share(
+            &chio_kernel::receipt_store::FederatedEvidenceShareImport {
+                share_id: "upstream-share".to_owned(),
+                manifest_hash: "manifest-upstream-share".to_owned(),
+                exported_at: BASE_UNIX_SECS - 50,
+                issuer: "https://upstream.example".to_owned(),
+                partner: ADVERTISE_URL.to_owned(),
+                signer_public_key: door.authority.public_key().to_hex(),
+                require_proofs: true,
+                query_json: "{}".to_owned(),
+                tool_receipts: Vec::new(),
+                capability_lineage: vec![snapshot],
+            },
+        )
+        .test_unwrap();
+    token.id
+}
+
+fn active_challenge(door: &Door, challenge_id: &str) -> PassportPresentationChallenge {
+    PassportVerifierChallengeStore::open(
+        configured_verifier_challenge_db_path(&door.config).test_unwrap(),
+    )
+    .test_unwrap()
+    .fetch_active(challenge_id, BASE_UNIX_SECS)
+    .test_unwrap()
+}
+
+#[tokio::test]
+async fn a_live_delegation_policy_issues_through_the_partner_door() {
+    let mut door = Door::new(0);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let challenge = door.challenge(Some("delegation-live"), VALID_FROM, VALID_UNTIL);
+    let request = federated_request(
+        &door,
+        &passport,
+        &challenge,
+        5,
+        Some(delegation_policy(&door, BASE_UNIX_SECS + 10, None)),
+        None,
+    );
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(&door),
+        Json(request),
+    )
+    .await;
+    assert_admitted(response).await;
+}
+
+#[tokio::test]
+async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue() {
+    let mut door = Door::new(30_000);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let challenge = door.challenge(Some("delegation-expiring"), VALID_FROM, VALID_UNTIL);
+    let request = federated_request(
+        &door,
+        &passport,
+        &challenge,
+        5,
+        Some(delegation_policy(&door, BASE_UNIX_SECS + 10, None)),
+        None,
+    );
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(&door),
+        Json(request),
+    )
+    .await;
     let (status, body) = response_parts(response).await;
     assert!(status.is_client_error(), "{status} {body}");
     assert!(
@@ -937,4 +1081,70 @@ async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue
         "{body}"
     );
     assert_eq!(door.sync.calls(), 1);
+    assert_eq!(active_challenge(&door, "delegation-expiring"), challenge);
+}
+
+/// A multi-hop federated request for a 5 second child of the imported parent
+/// that expires at `parent_expires_at`, under a policy bound to that parent.
+fn multi_hop_request(
+    door: &Door,
+    store: &chio_store_sqlite::SqliteReceiptStore,
+    challenge: &PassportPresentationChallenge,
+    parent_expires_at: u64,
+) -> FederatedIssueRequest {
+    let passport = door.passport(&[&door.authority]);
+    let parent = import_parent(door, store, parent_expires_at);
+    federated_request(
+        door,
+        &passport,
+        challenge,
+        5,
+        Some(delegation_policy(
+            door,
+            BASE_UNIX_SECS + 1_000,
+            Some(parent.clone()),
+        )),
+        Some(parent),
+    )
+}
+
+#[tokio::test]
+async fn a_live_parent_snapshot_issues_through_the_partner_door() {
+    let mut door = Door::new(0);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let challenge = door.challenge(Some("parent-live"), VALID_FROM, VALID_UNTIL);
+    let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(&door),
+        Json(request),
+    )
+    .await;
+    assert_admitted(response).await;
+}
+
+#[tokio::test]
+async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume_the_challenge() {
+    let mut door = Door::new(30_000);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let challenge = door.challenge(Some("parent-expiring"), VALID_FROM, VALID_UNTIL);
+    let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(&door),
+        Json(request),
+    )
+    .await;
+    let (status, body) = response_parts(response).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert!(
+        body.contains(
+            "requested capability expires after the imported upstream capability validity window"
+        ),
+        "{body}"
+    );
+    assert_eq!(door.sync.calls(), 1);
+    assert_eq!(active_challenge(&door, "parent-expiring"), challenge);
 }
