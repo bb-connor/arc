@@ -113,13 +113,7 @@ pub fn build_x402_payment_requirements(
         pay_to: dispatch.beneficiary_address.clone(),
         accepted_tokens,
         dispatch_id: dispatch.dispatch_id.clone(),
-        capability_id: dispatch
-            .capital_instruction
-            .body
-            .query
-            .capability_id
-            .clone()
-            .test_unwrap(),
+        capability_id: approval_binding.capability_id.clone(),
         amount_minor_units: dispatch.settlement_amount.units,
         currency: dispatch.settlement_amount.currency.clone(),
         settlement_mode,
