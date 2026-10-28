@@ -56,12 +56,7 @@ pub(crate) fn assemble_qualified_fixture(
         previous_baseline,
     );
     let baseline = read_baseline(out_dir)?;
-    let parity: chio_runtime_core::RuntimeProofParityReport =
-        serde_json::from_str(&read_utf8_json_file(
-            &out_dir.join("runtime-proof-parity-report.json"),
-            "fixture parity",
-        )?)
-        .map_err(|error| RuntimeLoopbackError::message(format!("fixture parity parse: {error}")))?;
+    let parity = read_parity_report(out_dir)?;
     if !baseline.report.accepted || !parity.mismatches.is_empty() {
         return Err(RuntimeLoopbackError::message(
             "fixture baseline verification or semantics refused",
@@ -91,6 +86,18 @@ pub(crate) fn assemble_qualified_fixture(
     )?;
     assemble_runtime_loopback_outputs(run_id, steps, out_dir, now_unix_ms, admission, baseline)?;
     compare_generated_files(&first, out_dir)
+}
+
+fn read_parity_report(
+    out_dir: &Path,
+) -> Result<chio_runtime_core::RuntimeProofParityReport, RuntimeLoopbackError> {
+    let text = read_utf8_json_file(
+        &out_dir.join("runtime-proof-parity-report.json"),
+        "fixture parity",
+    )?;
+    chio_core_types::canonical::UntrustedJsonText::from_wire(text.as_bytes(), 64 * 1024 * 1024)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| RuntimeLoopbackError::message(format!("fixture parity parse: {error}")))
 }
 
 fn read_baseline(out_dir: &Path) -> Result<StaticProofBaseline, RuntimeLoopbackError> {
@@ -156,10 +163,7 @@ mod tests {
             &read_utf8_json_file(&inputs.join("proof-package.json"), "package")?,
             &read_utf8_json_file(&inputs.join("verifier-report.json"), "report")?,
         )?;
-        let parity: chio_runtime_core::RuntimeProofParityReport = serde_json::from_str(
-            &read_utf8_json_file(&out.join("runtime-proof-parity-report.json"), "parity")?,
-        )
-        .expect("parity");
+        let parity = read_parity_report(&out)?;
         assert!(parity.accepted);
         assert!(parity.mismatches.is_empty());
         assert_eq!(
@@ -174,12 +178,8 @@ mod tests {
         let first = out.join("same-source-first");
         compare_generated_files(&first, &out)?;
         fs::write(out.join("proof-package.json"), b"tampered").map_err(io_error)?;
-        assert_eq!(
-            compare_generated_files(&first, &out)
-                .expect_err("changed package")
-                .to_string(),
-            "same-source fixture output differs: proof-package.json"
-        );
+        assert!(matches!(compare_generated_files(&first, &out),
+            Err(error) if error.to_string() == "same-source fixture output differs: proof-package.json"));
         fs::remove_dir_all(root).map_err(io_error)?;
         Ok(())
     }
