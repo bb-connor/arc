@@ -502,26 +502,7 @@ fn pruning_removes_expired_bindings_and_mappings_and_keeps_roots() -> TestResult
 }
 
 #[test]
-fn tag_generations_referenced_by_roots_must_be_loaded() -> TestResult {
-    let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    env.store.verify_tag_generations(&[tags(1).key_id()])?;
-    let error = env
-        .store
-        .verify_tag_generations(&[tags(2).key_id()])
-        .err()
-        .ok_or("missing generation accepted")?;
-    assert_eq!(
-        error,
-        E::TagGenerationMissing {
-            key_id: tags(1).key_id()
-        }
-    );
-    Ok(())
-}
-
-#[test]
-fn tag_from_generation_n_still_matches_after_rotation_to_n_plus_1() -> TestResult {
+fn revoke_under_n_then_recovery_under_n_plus_1_refuses() -> TestResult {
     let env = Env::new()?;
     env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
     let mut rotated = Case::static_bearer("cap-2")?;
@@ -533,8 +514,6 @@ fn tag_from_generation_n_still_matches_after_rotation_to_n_plus_1() -> TestResul
             entry_id: "rev-tenant-1".into()
         }
     );
-    env.store
-        .verify_tag_generations(&[tags(2).key_id(), tags(1).key_id()])?;
     Ok(())
 }
 

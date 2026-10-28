@@ -29,6 +29,9 @@ mod mint;
 mod projection;
 mod reads;
 mod schema;
+mod tenant_index;
+
+pub use tenant_index::{RootTagInputs, RootTenantIndex};
 
 pub(crate) use schema::{
     initialize_root_exchange_schema, projection_reference, verify_projection_coverage,
@@ -72,6 +75,12 @@ pub enum RootExchangeStoreError {
     },
     #[error("{TAG_GENERATION_MISSING}")]
     TagGenerationMissing { key_id: Sha256Digest },
+    #[error("tenant index key {key_id} is not loaded")]
+    TenantIndexKeyUnknown { key_id: Sha256Digest },
+    #[error("root tags do not verify")]
+    TagMismatch,
+    #[error("root tag input {field} contains NUL")]
+    TagInputContainsNul { field: &'static str },
     #[error("invalid mint request: {0}")]
     InvalidMintRequest(MintRequestRefusal),
     #[error("root exchange store is unavailable: {0}")]
@@ -392,25 +401,10 @@ impl SqliteRootExchangeStore {
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
-        verify_active_owner(&tx, &self.serving_owner, Some(fence)).map_err(unavailable)?;
-        self.serving_owner
-            .verify_authority_anchor(&tx)
-            .map_err(unavailable)?;
-        verify_trusted_time(&tx, trusted_now_unix_ms, &self.serving_owner).map_err(unavailable)?;
-        let (value, change) = apply(&tx, trusted_now_unix_ms / 1000)?;
-        let Some(change) = change else {
+        let (value, changed) = self.stage(&tx, fence, trusted_now_unix_ms, apply)?;
+        if !changed {
             return Ok(value);
-        };
-        let sequence = append_event(&tx, &change)?;
-        self.serving_owner
-            .append_global_commit(
-                &tx,
-                &format!("root_exchange_{}", change.mutation.as_str()),
-                PROJECTION,
-                schema::PROJECTION_KEY,
-                sequence,
-            )
-            .map_err(unavailable)?;
+        }
         tx.commit().map_err(|error| {
             RootExchangeStoreError::Unavailable(
                 self.serving_owner
@@ -422,6 +416,38 @@ impl SqliteRootExchangeStore {
             .sync_authority_anchor(&connection)
             .map_err(unavailable)?;
         Ok(value)
+    }
+
+    /// The part of a mutation inside its transaction: the owner, anchor and
+    /// clock checks, the change, and its event and global commit. Returns
+    /// whether a change was staged.
+    fn stage<T>(
+        &self,
+        tx: &Transaction<'_>,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+        apply: impl FnOnce(&Transaction<'_>, u64) -> Result<(T, Option<Change>)>,
+    ) -> Result<(T, bool)> {
+        verify_active_owner(tx, &self.serving_owner, Some(fence)).map_err(unavailable)?;
+        self.serving_owner
+            .verify_authority_anchor(tx)
+            .map_err(unavailable)?;
+        verify_trusted_time(tx, trusted_now_unix_ms, &self.serving_owner).map_err(unavailable)?;
+        let (value, change) = apply(tx, trusted_now_unix_ms / 1000)?;
+        let Some(change) = change else {
+            return Ok((value, false));
+        };
+        let sequence = append_event(tx, &change)?;
+        self.serving_owner
+            .append_global_commit(
+                tx,
+                &format!("root_exchange_{}", change.mutation.as_str()),
+                PROJECTION,
+                schema::PROJECTION_KEY,
+                sequence,
+            )
+            .map_err(unavailable)?;
+        Ok((value, true))
     }
 }
 

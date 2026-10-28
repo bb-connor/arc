@@ -28,56 +28,84 @@ impl SqliteRootExchangeStore {
     ) -> Result<MintOutcome> {
         let checked = check_request(request, trusted_now_unix_ms / 1000)?;
         self.mutate(fence, trusted_now_unix_ms, |tx, now| {
-            if let Some(stored) = live_replay_root(tx, request, now)? {
-                recover(tx, request, revocation, &stored, now)?;
-                return Ok((MintOutcome::Recovered(stored), None));
-            }
-            if let Some(mapping) = request.bearer {
-                if let Some(stored) = live_bearer_root(tx, &mapping.token_digest, now)? {
-                    recover(tx, request, revocation, &stored, now)?;
-                    return Ok((MintOutcome::Recovered(stored), None));
-                }
-            }
-            refuse_revoked(
-                tx,
-                revocation,
-                &request.root.id,
-                checked.rule_id,
-                &request.context.anchor.replay_key_digest,
-                request,
-            )?;
-            let row = checked.row(request, now)?;
-            bind_replay(tx, request, now)?;
-            insert_root_row(tx, &row)?;
-            insert_openings(tx, request, now)?;
-            if let Some(mapping) = request.bearer {
-                tx.execute(
-                    "INSERT INTO root_exchange_bearer_tokens (token_digest, capability_id, retain_until)
-                     VALUES (?1, ?2, ?3)",
-                    params![
-                        digest_column(&mapping.token_digest),
-                        request.root.id,
-                        sql_u64(mapping.retain_until)?
-                    ],
-                )
-                .map_err(sqlite_error)?;
-            }
-            retain_policy(tx, request.root_policy.policy())?;
-            if let Some(identity) = request.provider_identity {
-                retain_identity(tx, identity)?;
-            }
-            if let Some(snapshot) = request.key_snapshot {
-                retain_snapshot(tx, snapshot)?;
-            }
-            let stored = row.verify()?;
-            let change = Change {
-                mutation: Mutation::Mint,
-                subject: row.capability_id.clone(),
-                digest: digest_column(&row.authorization_projection_digest),
-            };
-            Ok((MintOutcome::Minted(stored), Some(change)))
+            mint_transaction(tx, request, revocation, &checked, now)
         })
     }
+
+    /// The mint staged into a transaction the caller commits.
+    #[cfg(test)]
+    pub(super) fn stage_mint(
+        &self,
+        tx: &Transaction<'_>,
+        request: &MintRequest<'_>,
+        revocation: &dyn MintRevocationCheck,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(MintOutcome, bool)> {
+        let checked = check_request(request, trusted_now_unix_ms / 1000)?;
+        self.stage(tx, fence, trusted_now_unix_ms, |tx, now| {
+            mint_transaction(tx, request, revocation, &checked, now)
+        })
+    }
+}
+
+/// The mint inside its transaction: recovery of a live root, or the
+/// revocation check, the replay bind and every row of a fresh root.
+fn mint_transaction(
+    tx: &Transaction<'_>,
+    request: &MintRequest<'_>,
+    revocation: &dyn MintRevocationCheck,
+    checked: &CheckedRequest<'_>,
+    now: u64,
+) -> Result<(MintOutcome, Option<Change>)> {
+    if let Some(stored) = live_replay_root(tx, request, now)? {
+        recover(tx, request, revocation, &stored, now)?;
+        return Ok((MintOutcome::Recovered(stored), None));
+    }
+    if let Some(mapping) = request.bearer {
+        if let Some(stored) = live_bearer_root(tx, &mapping.token_digest, now)? {
+            recover(tx, request, revocation, &stored, now)?;
+            return Ok((MintOutcome::Recovered(stored), None));
+        }
+    }
+    refuse_revoked(
+        tx,
+        revocation,
+        &request.root.id,
+        checked.rule_id,
+        &request.context.anchor.replay_key_digest,
+        request,
+    )?;
+    let row = checked.row(request, now)?;
+    bind_replay(tx, request, now)?;
+    insert_root_row(tx, &row)?;
+    insert_openings(tx, request, now)?;
+    if let Some(mapping) = request.bearer {
+        tx.execute(
+            "INSERT INTO root_exchange_bearer_tokens (token_digest, capability_id, retain_until)
+             VALUES (?1, ?2, ?3)",
+            params![
+                digest_column(&mapping.token_digest),
+                request.root.id,
+                sql_u64(mapping.retain_until)?
+            ],
+        )
+        .map_err(sqlite_error)?;
+    }
+    retain_policy(tx, request.root_policy.policy())?;
+    if let Some(identity) = request.provider_identity {
+        retain_identity(tx, identity)?;
+    }
+    if let Some(snapshot) = request.key_snapshot {
+        retain_snapshot(tx, snapshot)?;
+    }
+    let stored = row.verify()?;
+    let change = Change {
+        mutation: Mutation::Mint,
+        subject: row.capability_id.clone(),
+        digest: digest_column(&row.authorization_projection_digest),
+    };
+    Ok((MintOutcome::Minted(stored), Some(change)))
 }
 
 struct CheckedRequest<'a> {
