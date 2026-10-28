@@ -181,20 +181,6 @@ pub(crate) fn unwrap_runtime<T>(
     result.map_err(ChioRuntimeError::into_runtime_core)
 }
 
-pub struct ChioRuntimeAdmissionInput<'a> {
-    pub profile: &'a RuntimeAdmissionProfile,
-    pub store: &'a dyn ChioRuntimeAdmissionStore,
-    pub admission_id: &'a str,
-    pub request: &'a RuntimeRequestBinding,
-    pub action_class_id: Option<&'a str>,
-    pub runtime_trust_input: Option<&'a SignedRuntimeVerifierTrustBundle>,
-    pub trusted_verifier_keys: &'a [RuntimeTrustedVerifierKey],
-    pub pheromone_query_report: Option<&'a SignedRuntimePheromoneQueryReport>,
-    pub runtime_pheromone_policy: Option<&'a SignedRuntimePheromonePolicy>,
-    pub runtime_peer_weights: Option<&'a SignedRuntimePeerWeights>,
-    pub now_unix_ms: u64,
-}
-
 pub fn runtime_admission_profile_from_json(
     json: &str,
 ) -> Result<RuntimeAdmissionProfile, ChioRuntimeError> {
