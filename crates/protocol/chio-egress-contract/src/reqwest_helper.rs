@@ -327,7 +327,7 @@ impl reqwest::dns::Resolve for ContractDnsResolver {
 
             let mut addrs = Vec::new();
             for mut addr in lookup {
-                if let Err(error) = contract.enforce_resolved_ip(&host, addr.ip()) {
+                if let Err(error) = contract.enforce_resolved_address_without_port(&host, addr.ip()) {
                     return Err(boxed_egress_error(error));
                 }
                 addr.set_port(0);

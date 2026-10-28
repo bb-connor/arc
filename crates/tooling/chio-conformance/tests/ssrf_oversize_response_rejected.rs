@@ -38,6 +38,7 @@ fn tight_response_size_contract() -> HttpEgressContract {
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 1024,
+        private_network_allowances: Default::default(),
     }
 }
 

@@ -440,3 +440,95 @@ fn the_first_checked_answer_is_the_only_address_dialed() {
     assert_eq!(lookups.load(Ordering::SeqCst), 1);
     handle.join().expect("server");
 }
+
+fn vpc_agent(allowances: &[(&str, u16, &str)]) -> BlockingContractAgent {
+    let contract = HttpEgressContract {
+        tenant_egress_namespace: "payment-rail".to_string(),
+        allowed_schemes: std::collections::BTreeSet::from(["https".to_string()]),
+        allowed_authority_set: std::collections::BTreeSet::from([
+            "10.255.255.254:9".to_string(),
+            "facilitator.vpc.internal:8443".to_string(),
+        ]),
+        deny_loopback: true,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 0,
+        max_response_bytes: 1024,
+        private_network_allowances: allowances
+            .iter()
+            .map(|(host, port, cidr)| crate::PrivateNetworkAllowance {
+                host: (*host).to_string(),
+                port: *port,
+                cidr: cidr.parse().expect("cidr"),
+            })
+            .collect(),
+    };
+    BlockingContractAgent::new(&contract, Duration::from_millis(300), Duration::from_secs(2))
+        .expect("agent")
+}
+
+#[test]
+fn allowed_private_literal_is_dialed() {
+    let refusal = vpc_agent(&[])
+        .get("https://10.255.255.254:9/verify")
+        .expect_err("unlisted private literal");
+    assert_eq!(
+        refusal,
+        HttpEgressError::PrivateNetworkDenied {
+            host: "10.255.255.254".to_string()
+        }
+    );
+
+    let outcome = vpc_agent(&[("10.255.255.254", 9, "10.255.255.254/32")])
+        .get("https://10.255.255.254:9/verify")
+        .expect("allowed private literal passes the contract")
+        .call();
+    assert!(
+        matches!(outcome, Err(HttpEgressError::Transport(_))),
+        "an allowed private literal reaches the socket: {outcome:?}"
+    );
+}
+
+#[test]
+fn mixed_answer_for_a_pinned_host_is_refused() {
+    let agent = vpc_agent(&[("facilitator.vpc.internal", 8443, "10.20.0.0/24")]);
+    let inside: SocketAddr = "10.20.0.5:8443".parse().expect("address");
+    assert_eq!(
+        enforce_resolved_addresses(&agent.prepared, "facilitator.vpc.internal", vec![inside]),
+        Ok(vec![inside])
+    );
+    for answer in [
+        vec![inside, "34.1.2.3:8443".parse().expect("address")],
+        vec!["34.1.2.3:8443".parse().expect("address"), inside],
+        vec![inside, "10.21.0.5:8443".parse().expect("address")],
+    ] {
+        let stray = answer
+            .iter()
+            .find(|address| **address != inside)
+            .expect("stray")
+            .ip();
+        assert_eq!(
+            enforce_resolved_addresses(&agent.prepared, "facilitator.vpc.internal", answer),
+            Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+                host: "facilitator.vpc.internal".to_string(),
+                port: 8443,
+                address: stray,
+            })
+        );
+    }
+}
+
+#[test]
+fn unlisted_private_answer_is_refused() {
+    let agent = vpc_agent(&[]);
+    assert_eq!(
+        enforce_resolved_addresses(
+            &agent.prepared,
+            "facilitator.vpc.internal",
+            vec!["10.20.0.5:8443".parse().expect("address")]
+        ),
+        Err(HttpEgressError::PrivateNetworkDenied {
+            host: "facilitator.vpc.internal resolved to 10.20.0.5".to_string()
+        })
+    );
+}

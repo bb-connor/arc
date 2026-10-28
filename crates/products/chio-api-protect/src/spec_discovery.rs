@@ -38,6 +38,7 @@ pub(crate) fn default_upstream_egress_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: DEFAULT_UPSTREAM_REDIRECT_LIMIT,
         max_response_bytes: DEFAULT_UPSTREAM_MAX_RESPONSE_BYTES,
+        private_network_allowances: Default::default(),
     };
     contract
         .validate_dispatchable_with_pinned_dns()

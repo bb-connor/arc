@@ -31,6 +31,7 @@ fn contract_for_threat_test() -> HttpEgressContract {
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 1024,
+        private_network_allowances: Default::default(),
     }
 }
 

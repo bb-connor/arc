@@ -32,10 +32,10 @@ pub(crate) fn insert_payment_journal(
             release_authority_kind, release_authority_evidence_id,
             release_authority_evidence_digest, release_authority_operation_version,
             currency, state, created_at_unix_ms, updated_at_unix_ms,
-            authorized_amount_units, authorization_attempt
+            authorized_amount_units, authorization_attempt, rail_egress_allowance_digest
         ) VALUES (
             ?1, 1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, ?9,
-            NULL, NULL, NULL, NULL, NULL, NULL, ?10, ?11, ?12, ?12, ?13, ?14
+            NULL, NULL, NULL, NULL, NULL, NULL, ?10, ?11, ?12, ?12, ?13, ?14, ?15
         )
         "#,
         params![
@@ -58,6 +58,7 @@ pub(crate) fn insert_payment_journal(
             record
                 .authorization_attempt
                 .map(payment_authorization_attempt_text),
+            &record.rail_egress_allowance_digest,
         ],
     )?;
     Ok(())
@@ -76,7 +77,8 @@ pub(crate) fn load_payment_journal(
                    release_authority_kind, release_authority_evidence_id,
                    release_authority_evidence_digest, release_authority_operation_version,
                    currency, state, created_at_unix_ms, journal_version,
-                   authorized_amount_units, authorization_attempt
+                   authorized_amount_units, authorization_attempt,
+                   rail_egress_allowance_digest
             FROM payment_journal
             WHERE operation_id = ?1
             "#,

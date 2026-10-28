@@ -24,6 +24,7 @@ fn strict_contract_excluding_ula() -> HttpEgressContract {
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 64 * 1024,
+        private_network_allowances: Default::default(),
     }
 }
 

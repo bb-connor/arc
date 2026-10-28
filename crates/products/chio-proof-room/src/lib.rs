@@ -545,6 +545,7 @@ fn public_settlement_rpc_egress_contract(url: &str) -> Result<HttpEgressContract
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1024 * 1024,
+        private_network_allowances: Default::default(),
     };
     contract.validate().map_err(|error| {
         format!(

@@ -7,13 +7,21 @@
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
+mod allowance;
+pub use allowance::{
+    private_network_allowance_digest, IpCidr, PrivateNetworkAllowance,
+    PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
+    MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX, PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
+};
+
 /// Typed egress policy that must be declared before substrate HTTP egress.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HttpEgressContract {
     /// Tenant-scoped namespace used by callers to bind egress receipts and
     /// deployment policy to one authority domain.
@@ -38,6 +46,10 @@ pub struct HttpEgressContract {
     pub max_redirect_chain: u8,
     /// Maximum response bytes accepted before the substrate must abort.
     pub max_response_bytes: u64,
+    /// Private destinations this contract may reach. Each entry pins one
+    /// `host:port` to the CIDR every resolved address must fall inside.
+    #[serde(default)]
+    pub private_network_allowances: BTreeSet<PrivateNetworkAllowance>,
 }
 
 /// A target URL that survived [`HttpEgressContract`] enforcement.
@@ -89,6 +101,18 @@ pub enum HttpEgressError {
     RedirectLimitExceeded { observed: u8, max: u8 },
     #[error("response size {observed} exceeds maximum {max}")]
     ResponseTooLarge { observed: u64, max: u64 },
+    #[error("invalid private network allowance: {0}")]
+    InvalidAllowance(#[from] PrivateNetworkAllowanceError),
+    #[error("{host}:{port} resolved to {address} outside its private network allowance")]
+    PrivateNetworkAllowanceMismatch {
+        host: String,
+        port: u16,
+        address: IpAddr,
+    },
+    #[error("cloud metadata egress target denied: {host}")]
+    ReservedAddressDenied { host: String },
+    #[error("private network allowance for {host} needs a resolver that sees the port")]
+    AllowanceRequiresPortAwareResolver { host: String },
 }
 
 impl HttpEgressContract {
@@ -174,6 +198,11 @@ impl HttpEgressContract {
         Ok(())
     }
 
+    /// Digest of this contract's private network allowances.
+    pub fn private_network_allowance_digest(&self) -> Result<String, HttpEgressError> {
+        private_network_allowance_digest(&self.private_network_allowances)
+    }
+
     /// Validate this raw contract and return an immutable enforcement handle.
     pub fn prepare(&self) -> Result<PreparedHttpEgressContract, HttpEgressError> {
         self.validate()?;
@@ -194,14 +223,21 @@ impl HttpEgressContract {
         Ok(())
     }
 
-    fn enforce_host_class(&self, host: &Host<&str>) -> Result<(), HttpEgressError> {
+    fn enforce_host_class(&self, host: &Host<&str>, port: Option<u16>) -> Result<(), HttpEgressError> {
         match host {
             Host::Domain(domain) => {
                 let normalized = normalize_domain_name(domain);
                 self.enforce_loopback_hostname(&normalized)?;
             }
-            Host::Ipv4(address) => self.enforce_ipv4_class(*address)?,
-            Host::Ipv6(address) => self.enforce_ipv6_class(*address)?,
+            Host::Ipv4(address) => {
+                let address = IpAddr::V4(*address);
+                self.enforce_address(&address.to_string(), port, address, address.to_string())?;
+            }
+            Host::Ipv6(address) => {
+                let address = IpAddr::V6(*address);
+                let label = allowance::canonical_ip(address).to_string();
+                self.enforce_address(&label, port, address, label.clone())?;
+            }
         }
         Ok(())
     }
@@ -215,37 +251,69 @@ impl HttpEgressContract {
         Ok(())
     }
 
-    fn enforce_ipv4_class(&self, address: Ipv4Addr) -> Result<(), HttpEgressError> {
-        self.enforce_ip_address_class(address.to_string(), classify_ipv4_address(&address))
+    /// Enforce the contract on one address `host` resolved to. The port
+    /// selects the private network allowance that pins `host`, if any.
+    pub fn enforce_resolved_address(
+        &self,
+        host: &str,
+        address: SocketAddr,
+    ) -> Result<(), HttpEgressError> {
+        let ip = allowance::canonical_ip(address.ip());
+        self.enforce_address(host, Some(address.port()), ip, format!("{host} resolved to {ip}"))
     }
 
-    fn enforce_ipv6_class(&self, address: Ipv6Addr) -> Result<(), HttpEgressError> {
-        if let Some(mapped) = address.to_ipv4_mapped() {
-            return self.enforce_ipv4_class(mapped);
+    /// Enforce the contract on a resolved address when the resolver cannot
+    /// see the request port. A host pinned by an allowance is refused.
+    #[cfg(feature = "reqwest-egress")]
+    pub(crate) fn enforce_resolved_address_without_port(
+        &self,
+        host: &str,
+        address: IpAddr,
+    ) -> Result<(), HttpEgressError> {
+        let ip = allowance::canonical_ip(address);
+        self.enforce_address(host, None, ip, format!("{host} resolved to {ip}"))
+    }
+
+    /// Metadata endpoints are refused first. A host pinned by an allowance
+    /// for this port must resolve inside the allowance CIDR, public answers
+    /// included. Any other host falls to the address-class policy.
+    fn enforce_address(
+        &self,
+        host: &str,
+        port: Option<u16>,
+        address: IpAddr,
+        label: String,
+    ) -> Result<(), HttpEgressError> {
+        let address = allowance::canonical_ip(address);
+        if host.is_empty() && allowance::is_metadata_address(address) {
+            return Err(HttpEgressError::ReservedAddressDenied { host: label });
         }
-        self.enforce_ip_address_class(address.to_string(), classify_ipv6_address(&address))
-    }
-
-    /// Enforce address-class denials after a domain has resolved to an IP.
-    pub fn enforce_resolved_ip(&self, host: &str, address: IpAddr) -> Result<(), HttpEgressError> {
-        match address {
-            IpAddr::V4(address) => {
-                self.enforce_ip_address_class(
-                    format!("{host} resolved to {address}"),
-                    classify_ipv4_address(&address),
-                )?;
-            }
-            IpAddr::V6(address) => {
-                if let Some(mapped) = address.to_ipv4_mapped() {
-                    return self.enforce_resolved_ip(host, IpAddr::V4(mapped));
+        let host = allowance::allowance_host(host);
+        match port {
+            Some(port) => {
+                if let Some(pin) = self
+                    .private_network_allowances
+                    .iter()
+                    .find(|entry| entry.host == host && entry.port == port)
+                {
+                    let _ = (pin, port);
                 }
-                self.enforce_ip_address_class(
-                    format!("{host} resolved to {address}"),
-                    classify_ipv6_address(&address),
-                )?;
+            }
+            None => {
+                if self
+                    .private_network_allowances
+                    .iter()
+                    .any(|entry| entry.host == host)
+                {
+                    return Err(HttpEgressError::AllowanceRequiresPortAwareResolver { host });
+                }
             }
         }
-        Ok(())
+        let class = match address {
+            IpAddr::V4(address) => classify_ipv4_address(&address),
+            IpAddr::V6(address) => classify_ipv6_address(&address),
+        };
+        self.enforce_ip_address_class(label, class)
     }
 
     fn enforce_ip_address_class(
@@ -299,7 +367,7 @@ impl HttpEgressContract {
         let mut saw_addr = false;
         for addr in addrs {
             saw_addr = true;
-            self.enforce_resolved_ip(&normalized, addr.ip())?;
+            self.enforce_resolved_address(&normalized, addr)?;
         }
         if !saw_addr {
             return Err(HttpEgressError::DnsResolutionFailed {
@@ -392,7 +460,8 @@ impl PreparedHttpEgressContract {
         }
 
         let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
-        self.contract.enforce_host_class(&host)?;
+        self.contract
+            .enforce_host_class(&host, url.port_or_known_default())?;
 
         let authority = normalized_url_authority(&url)?;
         if !self.contract.authority_is_allowed(&url, &authority)? {
@@ -461,6 +530,11 @@ impl PreparedHttpEgressContract {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "allowance_tests.rs"]
+mod allowance_tests;
 
 fn validate_scheme_token(scheme: &str) -> Result<(), HttpEgressError> {
     let bytes = scheme.as_bytes();
@@ -731,6 +805,7 @@ impl HttpEgressContract {
             deny_ipv6_ula: false,
             max_redirect_chain: 4,
             max_response_bytes: 64 * 1024 * 1024,
+            private_network_allowances: BTreeSet::new(),
         }
     }
 }

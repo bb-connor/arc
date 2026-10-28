@@ -92,7 +92,7 @@ impl PaymentAdapterConfig {
                 )
                 .map_err(|error| format!("CHIO_PAYMENT_X402_REPLAY_DB: {error}"))?;
                 let mut adapter =
-                    X402PaymentAdapter::new(base_url, rail, clock, Arc::new(replay))
+                    X402PaymentAdapter::new(base_url, rail, &std::collections::BTreeSet::new(), clock, Arc::new(replay))
                         .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token);
@@ -232,6 +232,7 @@ mod tests {
             adapter: X402PaymentAdapter::new(
                 "https://facilitator.example",
                 rail,
+                &std::collections::BTreeSet::new(),
                 crate::input::time::clock(),
                 Arc::new(chio_kernel::InMemoryExecutionNonceStore::default()),
             )
