@@ -314,15 +314,33 @@ pub struct CommerceEscrowAcceptRequest<'a> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct AcceptedEscrow {
+    ledger: CommerceEscrowLedger,
+    settlement_packet: SignedExportEnvelope<CommerceSettlementPacket>,
+    escrow_digest: String,
+    updated_context: CommerceOrderContext,
+}
+
+impl AcceptedEscrow {
     /// Locked ledger.
-    pub ledger: CommerceEscrowLedger,
-    /// `updated_context.settlement_packet_sha256` is the sha256 of the
-    /// canonical JSON of this packet body.
-    pub settlement_packet: SignedExportEnvelope<CommerceSettlementPacket>,
-    /// Digest of `ledger`, also pinned in `updated_context.escrow_digest`.
-    pub escrow_digest: String,
+    pub fn ledger(&self) -> &CommerceEscrowLedger {
+        &self.ledger
+    }
+
+    /// Signed settlement packet; `updated_context().settlement_packet_sha256`
+    /// is the sha256 of the canonical JSON of its body.
+    pub fn settlement_packet(&self) -> &SignedExportEnvelope<CommerceSettlementPacket> {
+        &self.settlement_packet
+    }
+
+    /// Digest of the ledger, also pinned in `updated_context().escrow_digest`.
+    pub fn escrow_digest(&self) -> &str {
+        &self.escrow_digest
+    }
+
     /// The order context advanced to `settlement_packet_assembled`.
-    pub updated_context: CommerceOrderContext,
+    pub fn updated_context(&self) -> &CommerceOrderContext {
+        &self.updated_context
+    }
 }
 
 /// Inputs to [`release`].
@@ -426,9 +444,11 @@ pub fn accept(
 
 /// Drains custody to the order merchant.
 ///
-/// Every binding of the public `acceptance` is re-derived: the accepted quote
-/// digest recomputes; the ledger passes [`CommerceEscrowLedger::validate`],
-/// recomputes to the pinned escrow digest, and is bound to the accepted order;
+/// The acceptance comes only from [`accept`], so its context carries the order
+/// terms and requirements that were locked. Every binding of it is still
+/// re-derived: the accepted quote digest recomputes; the ledger passes
+/// [`CommerceEscrowLedger::validate`], recomputes to the pinned escrow digest,
+/// and is bound to the accepted order;
 /// the settlement packet is signed by a pinned settlement authority, is the
 /// packet the accepted context pins, and carries the accepted packet and
 /// reconciliation references and the locked merchant, amount, currency, and
