@@ -18,7 +18,9 @@ async fn enterprise_resume_binds_only_its_provider_record() -> Result<(), Box<dy
 }
 
 async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let (directory, path) = private_test_session_database("provider-registry-binding");
+    let temp = chio_test_support::private_tempdir()?;
+    let directory = temp.path();
+    let path = directory.join("sessions.sqlite3");
     let registry_path = directory.join("enterprise-providers.json");
     write_registry(&registry_path, true);
     let mut config = test_remote_config();
@@ -29,9 +31,9 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
     )?;
     config.test_transport = Some(Arc::new(ReadOnlyTransport));
     config.session_db_path = Some(path.clone());
-    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(directory));
     config.enterprise_providers_file = Some(registry_path.clone());
-    configure_signed_manifest(&mut config, &directory);
+    configure_signed_manifest(&mut config, directory);
     let auth = if enterprise {
         let keypair = Keypair::generate();
         config.auth_token = None;
@@ -122,6 +124,5 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
     assert_eq!(cause.to_string(), expected.to_string());
 
     drop((fresh, unchanged, restored, factory));
-    std::fs::remove_dir_all(directory)?;
     Ok(())
 }
