@@ -2377,3 +2377,21 @@ mod statement_caching;
 
 #[path = "tests/capability_usage_index.rs"]
 mod capability_usage_index;
+
+#[test]
+fn budget_test_database_leaves_no_files_behind() {
+    let prefix = format!("chio-leak-probe-{}", uuid::Uuid::now_v7());
+    {
+        let path = unique_db_path(&prefix);
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        drop(store);
+    }
+    let root = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let leftovers: Vec<String> = std::fs::read_dir(&root)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(&prefix))
+        .collect();
+    assert_eq!(leftovers, Vec::<String>::new());
+}
