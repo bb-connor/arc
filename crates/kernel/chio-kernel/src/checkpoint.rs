@@ -3,6 +3,31 @@
 //! Verification, transparency derivation and issuance with caller-supplied
 //! time live in `chio_kernel_core::evidence_verify`; this module only adds
 //! the `SystemClock` reading.
+//!
+//! A predecessor must arrive as a `VerifiedCheckpoint`, which only signature
+//! verification constructs. A predecessor that was never verified does not
+//! type-check:
+//!
+//! ```compile_fail,E0308
+//! use chio_core::crypto::Keypair;
+//! use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+//! use chio_kernel_core::evidence_verify::{checkpoint_chain_leaf_hash, CheckpointError};
+//! # fn main() -> Result<(), CheckpointError> {
+//! let keypair = Keypair::generate();
+//! let first = build_checkpoint(1, 1, 1, &[b"first".to_vec()], &keypair)?;
+//! let leaf = checkpoint_chain_leaf_hash(&first.body)?;
+//! let _ = build_checkpoint_with_previous(
+//!     2,
+//!     2,
+//!     2,
+//!     &[b"second".to_vec()],
+//!     &keypair,
+//!     Some(&first),
+//!     &[leaf],
+//! )?;
+//! # Ok(())
+//! # }
+//! ```
 
 use chio_core::crypto::Keypair;
 use chio_core::hashing::Hash;

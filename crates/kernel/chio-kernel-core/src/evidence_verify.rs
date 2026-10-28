@@ -6,6 +6,16 @@
 //! clock and no I/O. Issuance time is a parameter.
 //!
 //! Statement schema: "chio.checkpoint_statement.v1"
+//!
+//! A caller cannot assert checkpoint verification by construction:
+//!
+//! ```compile_fail,E0451
+//! use chio_core_types::receipt::checkpoint::KernelCheckpoint;
+//! use chio_kernel_core::evidence_verify::VerifiedCheckpoint;
+//! fn assert_verified(checkpoint: &KernelCheckpoint) -> VerifiedCheckpoint<'_> {
+//!     VerifiedCheckpoint { checkpoint }
+//! }
+//! ```
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
