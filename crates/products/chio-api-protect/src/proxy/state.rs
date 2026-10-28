@@ -990,8 +990,11 @@ mod durability_tests {
 
     #[test]
     fn shared_evidence_store_uses_wal_and_a_healthy_writer() {
-        let mut path = std::env::temp_dir();
-        path.push(format!("chio-http-receipts-{}.db", uuid::Uuid::now_v7()));
+        let dir = tempfile::Builder::new()
+            .prefix("chio-http-receipts-")
+            .tempdir_in(std::fs::canonicalize(std::env::temp_dir()).test_unwrap())
+            .test_unwrap();
+        let path = dir.path().join("receipts.db");
         let path_str = path.to_string_lossy().into_owned();
 
         let store = SqliteReceiptStore::open(&path_str).test_unwrap();
@@ -1009,8 +1012,6 @@ mod durability_tests {
         assert!(journal_mode.eq_ignore_ascii_case("wal"));
         drop(reader);
         drop(store);
-
-        let _ = std::fs::remove_file(&path);
     }
 }
 

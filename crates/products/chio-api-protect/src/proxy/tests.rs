@@ -305,10 +305,15 @@ fn signed_approval_response_token(
     .test_unwrap()
 }
 
-fn temp_receipt_db_path() -> String {
-    let mut path = std::env::temp_dir();
-    path.push(format!("chio-api-protect-test-{}.db", uuid::Uuid::now_v7()));
-    path.to_string_lossy().to_string()
+/// A receipt database path inside a private directory that is removed on drop.
+fn temp_receipt_db_path() -> (tempfile::TempDir, String) {
+    let root = std::fs::canonicalize(std::env::temp_dir()).test_unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("chio-api-protect-test-")
+        .tempdir_in(root)
+        .test_unwrap();
+    let path = dir.path().join("receipts.db").to_string_lossy().to_string();
+    (dir, path)
 }
 
 fn with_loopback_peer(request: Request<Body>) -> Request<Body> {
@@ -1432,7 +1437,7 @@ fn parse_sidecar_operation_shorthand_read_preserves_read_scope() {
 
 #[tokio::test]
 async fn sidecar_release_persists_revocation_and_blocks_reuse() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
         vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -1491,7 +1496,6 @@ async fn sidecar_release_persists_revocation_and_blocks_reuse() {
     let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
     assert_eq!(json["message"], "capability token has been revoked");
 
-    let _ = std::fs::remove_file(&receipt_db);
     let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
@@ -1500,7 +1504,7 @@ async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
     // A sibling replica that started before the revocation keeps a stale, empty
     // in-memory set. It must still deny the released capability by reading the
     // shared durable revocation store the release path writes to.
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let routes = || {
         vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -1548,13 +1552,12 @@ async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
     let found = find_revoked_capability_id(&replica_b, None, Some("cap-revoked")).await;
     assert_eq!(found, Some("cap-revoked".to_string()));
 
-    let _ = std::fs::remove_file(&receipt_db);
     let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
 #[tokio::test]
 async fn sidecar_validate_capability_honors_a_durable_only_revocation() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
 
     // Replica B mints a token and keeps serving; its in-memory revocation set is
     // never reloaded after boot.
@@ -1616,13 +1619,12 @@ async fn sidecar_validate_capability_honors_a_durable_only_revocation() {
     assert_eq!(json["valid"], false);
     assert!(json["reason"].as_str().test_unwrap().contains("revoked"));
 
-    let _ = std::fs::remove_file(&receipt_db);
     let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
 
     let replica_b = test_state_with_receipt_db(
         Vec::new(),
@@ -1677,7 +1679,6 @@ async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
         .and_then(|v| v.as_str());
     assert_eq!(alias_outcome, Some("capability_revoked"));
 
-    let _ = std::fs::remove_file(&receipt_db);
     let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
@@ -1823,7 +1824,7 @@ async fn sidecar_release_revokes_in_process_without_a_receipt_store() {
 
 #[tokio::test]
 async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
@@ -1897,8 +1898,6 @@ async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
         .receipt_id
         .chars()
         .all(|c| c.is_ascii_hexdigit()));
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 #[tokio::test]
@@ -1977,7 +1976,7 @@ async fn sidecar_control_endpoints_reject_non_loopback_callers() {
 
 #[tokio::test]
 async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let mut state = test_state_with_receipt_db(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
@@ -2047,8 +2046,6 @@ async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
     let receipt_response =
         sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
     assert_eq!(receipt_response.status(), StatusCode::OK);
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 #[tokio::test]
@@ -2186,7 +2183,7 @@ fn sidecar_control_bearer_token_compare_is_constant_time_safe() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn proxy_handler_persists_receipts_when_receipt_db_configured() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
         vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -2219,13 +2216,11 @@ async fn proxy_handler_persists_receipts_when_receipt_db_configured() {
     let log = reloaded.receipt_log.lock().await;
     assert_eq!(log.receipts.len(), 1);
     assert!(log.receipts[0].verify_signature().test_unwrap());
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn persisted_receipts_are_visible_across_proxy_and_sidecar_flows() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let proxy_state = test_state_with_receipt_db(
         vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -2288,8 +2283,6 @@ async fn persisted_receipts_are_visible_across_proxy_and_sidecar_flows() {
     );
     let log = reloaded.receipt_log.lock().await;
     assert_eq!(log.receipts.len(), 2);
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 // -------------------------------------------------------------
@@ -2555,7 +2548,7 @@ async fn sidecar_validate_capability_refuses_token_without_schema() {
 
 #[tokio::test]
 async fn sidecar_validate_capability_reports_revoked_capability() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
@@ -2601,8 +2594,6 @@ async fn sidecar_validate_capability_reports_revoked_capability() {
     let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
     assert_eq!(json["valid"], false);
     assert!(json["reason"].as_str().test_unwrap().contains("revoked"));
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 /// Build a leaf capability token whose delegation chain records `parent_id` as
@@ -3247,7 +3238,7 @@ async fn sidecar_verify_receipt_rejects_expected_decision_mismatch() {
 
 #[tokio::test]
 async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
-    let receipt_db = temp_receipt_db_path();
+    let (_receipt_dir, receipt_db) = temp_receipt_db_path();
     let state = test_state_with_receipt_db(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
@@ -3328,8 +3319,6 @@ async fn sidecar_evaluate_tool_call_denies_revoked_capability() {
     let persisted = reloaded.tool_receipt_log.lock().await;
     assert_eq!(persisted.receipts.len(), 1);
     assert_eq!(persisted.receipts[0].id, receipt.id);
-
-    let _ = std::fs::remove_file(receipt_db);
 }
 
 #[tokio::test]

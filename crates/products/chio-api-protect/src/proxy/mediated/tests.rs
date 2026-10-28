@@ -609,26 +609,34 @@ async fn post_json_with_bearer(
     (status, json)
 }
 
+/// A private directory under the canonical temp root, removed on drop.
+fn canonical_tempdir(prefix: &str) -> tempfile::TempDir {
+    let root = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(root)
+        .unwrap()
+}
+
 /// Open a temporary receipt store backed by a fresh SQLite database.
-fn open_temp_receipt_store() -> (std::path::PathBuf, SqliteReceiptStore) {
-    let dir = std::env::temp_dir().join(format!("chio-receipt-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("receipts.sqlite");
+fn open_temp_receipt_store() -> (tempfile::TempDir, std::path::PathBuf, SqliteReceiptStore) {
+    let dir = canonical_tempdir("chio-receipt-");
+    let db = dir.path().join("receipts.sqlite");
     let store = SqliteReceiptStore::open(&db.to_string_lossy()).unwrap();
-    (db, store)
+    (dir, db, store)
 }
 
 /// A receipt store whose `append_tool_receipt` fails deterministically: the
 /// backing `chio_tool_receipts` table is dropped through a second connection to
 /// the same database, so every append errors.
-fn failing_receipt_store() -> SqliteReceiptStore {
-    let (db, store) = open_temp_receipt_store();
+fn failing_receipt_store() -> (tempfile::TempDir, SqliteReceiptStore) {
+    let (dir, db, store) = open_temp_receipt_store();
     let dropper = rusqlite::Connection::open(&db).unwrap();
     dropper
         .execute("DROP TABLE chio_tool_receipts", [])
         .unwrap();
     drop(dropper);
-    store
+    (dir, store)
 }
 
 /// A payment adapter that counts each rail action, so a test can assert a
@@ -709,12 +717,13 @@ async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservatio
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
     let cap_id = cap.id.clone();
     let cap_value = serde_json::to_value(&cap).unwrap();
+    let (_receipt_dir, failing_store) = failing_receipt_store();
     let state = mediated_test_state_inner(
         signer,
         Arc::clone(&budget),
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.to_string()),
-        Some(failing_receipt_store()),
+        Some(failing_store),
         true,
     );
     let body = serde_json::json!({
@@ -776,7 +785,7 @@ async fn mediated_receipt_persistence_success_keeps_reservation() {
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 100, "USD");
     let cap_id = cap.id.clone();
     let cap_value = serde_json::to_value(&cap).unwrap();
-    let (_db, receipt_store) = open_temp_receipt_store();
+    let (_receipt_dir, _db, receipt_store) = open_temp_receipt_store();
     let state = mediated_test_state_inner(
         signer,
         Arc::clone(&budget),
@@ -824,12 +833,13 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
     let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 1);
     let cap_id = cap.id.clone();
     let cap_value = serde_json::to_value(&cap).unwrap();
+    let (_receipt_dir, failing_store) = failing_receipt_store();
     let state = mediated_test_state_inner(
         signer,
         Arc::clone(&budget),
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.to_string()),
-        Some(failing_receipt_store()),
+        Some(failing_store),
         true,
     );
     let params = serde_json::json!({ "invoice": "inv-1" });
@@ -904,12 +914,13 @@ async fn mediated_direct_approval_rejects_before_payment_and_receipt_side_effect
         releases: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         refunds: Arc::clone(&refunds),
     };
+    let (_receipt_dir, failing_store) = failing_receipt_store();
     let state = mediated_test_state_core(
         signer,
         Arc::clone(&budget),
         Vec::new(),
         Some(MEDIATED_CONTROL_TOKEN.to_string()),
-        Some(failing_receipt_store()),
+        Some(failing_store),
         true,
         Some(Box::new(adapter)),
         None,
@@ -1093,9 +1104,8 @@ async fn mediated_open_invocation_reserve_blocks_oversubscription() {
 
 #[test]
 fn build_budget_store_local_sqlite_when_no_control_url() {
-    let dir = std::env::temp_dir().join(format!("chio-budget-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("budget.sqlite");
+    let dir = canonical_tempdir("chio-budget-");
+    let db = dir.path().join("budget.sqlite");
     let config = ProtectConfig {
         transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
@@ -1172,9 +1182,8 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
     // must get the hold-capable local SQLite store for mediation: the remote
     // store cannot persist a reserved hold, so choosing it would disable
     // mediated authorization and reconcile. Prefer the local store.
-    let dir = std::env::temp_dir().join(format!("chio-budget-both-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("budget.sqlite");
+    let dir = canonical_tempdir("chio-budget-both-");
+    let db = dir.path().join("budget.sqlite");
     let config = ProtectConfig {
         transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
@@ -1249,9 +1258,8 @@ fn load_revocation_db_ids_is_empty_without_configured_store() {
 
 #[test]
 fn load_revocation_db_ids_reads_operator_revocations() {
-    let dir = std::env::temp_dir().join(format!("chio-revocation-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("revocations.sqlite3");
+    let dir = canonical_tempdir("chio-revocation-");
+    let db = dir.path().join("revocations.sqlite3");
     let db_path = db.to_string_lossy().to_string();
 
     // Mirror `chio trust revoke --revocation-db <path>`: an operator writes
@@ -1269,9 +1277,8 @@ fn load_revocation_db_ids_reads_operator_revocations() {
 
 #[test]
 fn load_revocation_db_ids_fails_closed_on_unreadable_store() {
-    let dir = std::env::temp_dir().join(format!("chio-revocation-bad-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("not-a-db.sqlite3");
+    let dir = canonical_tempdir("chio-revocation-bad-");
+    let db = dir.path().join("not-a-db.sqlite3");
     std::fs::write(&db, b"this is not a sqlite database").unwrap();
 
     let result = load_revocation_db_ids(&revocation_db_config(Some(
@@ -1516,7 +1523,7 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     let cap_value = serde_json::to_value(&cap).unwrap();
 
     // A working receipt store so the evaluate that mints the nonce persists.
-    let (db, receipt_store) = open_temp_receipt_store();
+    let (_receipt_dir, db, receipt_store) = open_temp_receipt_store();
     let state = mediated_test_state_inner(
         signer,
         Arc::clone(&budget),
@@ -1583,7 +1590,7 @@ async fn reconcile_still_fails_closed_on_replayed_nonce_when_persistence_fails()
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 150, "USD");
     let cap_value = serde_json::to_value(&cap).unwrap();
-    let (db, receipt_store) = open_temp_receipt_store();
+    let (_receipt_dir, db, receipt_store) = open_temp_receipt_store();
     let state = mediated_test_state_inner(
         signer,
         Arc::clone(&budget),
