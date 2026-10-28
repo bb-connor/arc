@@ -983,6 +983,31 @@ fn release_denies_settlement_packet_not_pinned_by_accepted_context() {
 }
 
 #[test]
+fn release_denies_settlement_packet_for_other_economics() {
+    let mutations: [Mutation<CommerceSettlementPacket>; 4] = [
+        ("merchant_subject", |packet| {
+            packet.merchant_subject = "merchant:mallory".to_string()
+        }),
+        ("amount_minor", |packet| packet.amount_minor = 1),
+        ("currency", |packet| packet.currency = "EUR".to_string()),
+        ("quote_sha256", |packet| {
+            packet.quote_sha256 = OTHER_HEX64.to_string()
+        }),
+    ];
+    for (field, mutate) in mutations {
+        let mut fixture = ReleaseFixture::new();
+        let mut packet = fixture.acceptance.settlement_packet.body.clone();
+        mutate(&mut packet);
+        fixture.repin_packet(packet);
+        assert_eq!(
+            fixture.denial(),
+            escrow(CommerceEscrowError::SettlementPacketUnbound(field)),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn release_denies_advanced_context_that_rewrites_immutable_fields() {
     let mutations: [Mutation<CommerceOrderContext>; 12] = [
         ("order_id", |context| {

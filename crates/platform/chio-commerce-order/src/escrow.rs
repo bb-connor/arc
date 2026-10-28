@@ -400,7 +400,8 @@ pub fn accept(
 /// Every binding of the public `acceptance` is re-derived: the ledger passes
 /// [`CommerceEscrowLedger::validate`], recomputes to the pinned escrow digest,
 /// and is bound to the accepted order; the settlement packet is signed by a
-/// pinned settlement authority and is the packet the accepted context pins.
+/// pinned settlement authority, is the packet the accepted context pins, and
+/// carries the locked merchant, amount, currency, and quote digest.
 /// The advanced context must preserve the accepted context's immutable fields
 /// and be in a state that allows settlement reconciliation. The execution
 /// instruction must be signed by a pinned execution authority, validate, be a
@@ -435,9 +436,7 @@ pub fn release(
             CommerceEscrowError::SettlementPacketUnbound("settlement_packet_sha256").into(),
         );
     }
-    if packet.body.order_id != accepted.order_id {
-        return Err(CommerceEscrowError::SettlementPacketUnbound("order_id").into());
-    }
+    bind_settlement_packet(&packet.body, accepted, &acceptance.ledger)?;
 
     let advanced = request.advanced_context;
     advanced.validate_shape()?;
@@ -619,6 +618,29 @@ fn verify_reservation(
         ));
     }
     Ok(body.reserved_amount.clone())
+}
+
+/// Fields the signed settlement packet must share with the accepted context
+/// and the locked ledger.
+fn bind_settlement_packet(
+    packet: &CommerceSettlementPacket,
+    accepted: &CommerceOrderContext,
+    ledger: &CommerceEscrowLedger,
+) -> Result<(), CommerceEscrowError> {
+    let bindings = [
+        ("order_id", packet.order_id == accepted.order_id),
+        (
+            "merchant_subject",
+            packet.merchant_subject == ledger.beneficiary_account,
+        ),
+        ("amount_minor", packet.amount_minor == ledger.amount_minor),
+        ("currency", packet.currency == ledger.currency),
+        ("quote_sha256", packet.quote_sha256 == accepted.quote_sha256),
+    ];
+    match bindings.iter().find(|(_, bound)| !bound) {
+        Some((field, _)) => Err(CommerceEscrowError::SettlementPacketUnbound(field)),
+        None => Ok(()),
+    }
 }
 
 /// Fields the release context must carry unchanged from the accepted context.
