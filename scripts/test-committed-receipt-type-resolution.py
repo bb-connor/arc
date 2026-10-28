@@ -149,6 +149,21 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("::bad", findings[0])
 
+    def test_included_receipt_type_reaches_sibling_wrappers(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": 'include!("session.rs"); mod pending; mod restored;',
+            "crates/demo/src/session.rs": "pub struct RemoteSession { receipt: ChioReceipt }",
+            "crates/demo/src/pending.rs": "use super::*; struct PendingCompletion { session: RemoteSession } fn bad(s: &str) { serde_json::from_str::<PendingCompletion>(s); }",
+            "crates/demo/src/restored.rs": "use super::*; struct RestoredSession { session: RemoteSession } fn bad(s: &str) { serde_json::from_str::<RestoredSession>(s); }",
+        })
+        self.assertEqual(len(findings), 2, findings)
+
+    def test_unresolved_type_path_is_reported(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "struct Envelope { receipt: missing::ReceiptWrapper } fn bad(s: &str) { serde_json::from_str::<Envelope>(s); }",
+        })
+        self.assertTrue(any("unresolved" in finding and "missing::ReceiptWrapper" in finding for finding in findings), findings)
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
