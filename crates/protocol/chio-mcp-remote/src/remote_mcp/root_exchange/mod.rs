@@ -19,6 +19,8 @@
 
 mod claims;
 pub mod client_auth;
+#[cfg(test)]
+mod commitment_vectors_tests;
 pub mod error;
 pub mod evidence;
 pub mod exchange;
