@@ -1075,10 +1075,12 @@ async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue
     )
     .await;
     let (status, body) = response_parts(response).await;
-    assert!(status.is_client_error(), "{status} {body}");
-    assert!(
-        body.contains("federated delegation policy has expired"),
-        "{body}"
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).test_unwrap(),
+        serde_json::json!({
+            "error": "urn:chio:error:cli:other [cli:error]: federated delegation policy has expired (Preserve the original message and migrate the call site to a specific registry code when touched.)"
+        })
     );
     assert_eq!(door.sync.calls(), 1);
     assert_eq!(active_challenge(&door, "delegation-expiring"), challenge);
@@ -1139,11 +1141,11 @@ async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume
     .await;
     let (status, body) = response_parts(response).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
-    assert!(
-        body.contains(
-            "requested capability expires after the imported upstream capability validity window"
-        ),
-        "{body}"
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).test_unwrap(),
+        serde_json::json!({
+            "error": "urn:chio:error:cli:other [cli:error]: requested capability expires after the imported upstream capability validity window (Preserve the original message and migrate the call site to a specific registry code when touched.)"
+        })
     );
     assert_eq!(door.sync.calls(), 1);
     assert_eq!(active_challenge(&door, "parent-expiring"), challenge);
