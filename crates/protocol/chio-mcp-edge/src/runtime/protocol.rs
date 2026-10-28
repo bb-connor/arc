@@ -61,7 +61,8 @@ pub(super) use self::tasks::{
     task_status_message, tool_result_is_error, RequestedTask,
 };
 pub(super) use self::tool_results::{
-    kernel_response_to_tool_result, tool_error_result, KernelResponseToToolResultArgs,
+    governed_denial_tool_result, kernel_response_to_tool_result, tool_error_result,
+    KernelResponseToToolResultArgs,
 };
 
 #[cfg(test)]

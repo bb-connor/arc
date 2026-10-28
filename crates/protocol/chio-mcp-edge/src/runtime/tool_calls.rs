@@ -768,6 +768,10 @@ impl ChioMcpEdge {
                     data: Some(json!({ "elicitations": elicitations })),
                 }
             }
+            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
+                record_receipt_write_error();
+                ToolCallEdgeOutcome::Result(governed_denial_tool_result())
+            }
             other => {
                 record_receipt_write_error();
                 ToolCallEdgeOutcome::Result(tool_error_result(&other.to_string()))

@@ -47,6 +47,20 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         chio_cross_protocol::execution::pending_approval_result(verdict, output.as_ref())
     {
         json!({"content":[], "structuredContent":pending, "isError":false})
+    } else if verdict == Verdict::Deny
+        && receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_kernel/rejection_code"))
+            .and_then(Value::as_str)
+            == Some(
+                chio_kernel::KernelError::GovernedTransactionDenied(String::new())
+                    .report()
+                    .code
+                    .as_str(),
+            )
+    {
+        governed_denial_tool_result()
     } else {
         match output {
             Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),
@@ -251,6 +265,14 @@ pub(in crate::runtime) fn tool_error_result(reason: &str) -> Value {
                 "text": reason,
             }
         ],
+        "isError": true,
+    })
+}
+
+pub(in crate::runtime) fn governed_denial_tool_result() -> Value {
+    json!({
+        "content": [{"type": "text", "text": "Governed transaction denied"}],
+        "structuredContent": {"code": "governed_transaction_denied"},
         "isError": true,
     })
 }
