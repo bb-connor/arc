@@ -1,28 +1,66 @@
-//! Records every body the signing wrapper covers, for schema generation.
+//! Records every body a signer signs through the wrapper, for schema generation.
 //!
 //! Compiled only with the `wrapper-capture` feature, which no manifest
 //! enables (`scripts/check-wrapper-capture-scope.py`); the capture harness
-//! `scripts/capture-wrapper-bodies.sh` turns it on for one test run. Nothing
+//! `scripts/capture-wrapper-bodies.sh` turns it on for one test run. Building
+//! a wrapper stages its body; turning that wrapper into a signing input
+//! records it, so a wrapper built only to verify records nothing. Nothing
 //! is recorded unless `CHIO_WRAPPER_CAPTURE_DIR` is set and non-empty and the
 //! process is a cargo test binary. Each body lands once at
 //! `<dir>/<escaped schema id>/<sha256 of body>.json`; a failed write is
 //! reported on stderr and never changes the wrapper result.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::string::String;
+use std::sync::{Mutex, MutexGuard};
+use std::vec::Vec;
 
 use sha2::{Digest, Sha256};
 
 /// Environment variable naming the capture directory.
 pub const CAPTURE_DIR_ENV: &str = "CHIO_WRAPPER_CAPTURE_DIR";
 
+/// Staged bodies kept before the oldest are dropped; a wrapper is signed
+/// right after it is built, so the bound only sheds verify-only wrappers.
+const MAX_STAGED: usize = 4096;
+
+type Staged = BTreeMap<[u8; super::SIGNING_WRAPPER_LEN], (String, Vec<u8>)>;
+
+static STAGED: Mutex<Staged> = Mutex::new(BTreeMap::new());
+
+fn staged() -> MutexGuard<'static, Staged> {
+    match STAGED.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+pub(super) fn stage(wrapper: &[u8; super::SIGNING_WRAPPER_LEN], schema_id: &str, canonical_body: &[u8]) {
+    if std::env::var_os(CAPTURE_DIR_ENV).is_none_or(|dir| dir.is_empty()) {
+        return;
+    }
+    let mut staged = staged();
+    if staged.len() >= MAX_STAGED {
+        staged.clear();
+    }
+    staged.insert(*wrapper, (schema_id.into(), canonical_body.to_vec()));
+}
+
+pub(super) fn commit(wrapper: &[u8; super::SIGNING_WRAPPER_LEN]) {
+    let entry = staged().remove(wrapper);
+    if let Some((schema_id, canonical_body)) = entry {
+        record(&schema_id, &canonical_body);
+    }
+}
+
 #[allow(
     clippy::print_stderr,
     reason = "The capture harness reads failures from the test run output; the wrapper result never depends on them."
 )]
-pub(super) fn record(schema_id: &str, canonical_body: &[u8]) {
+fn record(schema_id: &str, canonical_body: &[u8]) {
     let Some(dir) = std::env::var_os(CAPTURE_DIR_ENV).filter(|dir| !dir.is_empty()) else {
         return;
     };

@@ -36,12 +36,13 @@ impl SigningWrapper {
         if !registered_wrapper_schema(schema_id) {
             return Err(Error::UnregisteredSchemaId(schema_id.to_string()));
         }
-        #[cfg(feature = "wrapper-capture")]
-        capture::record(schema_id, canonical_body.as_bytes());
-        Ok(Self(assemble_wrapper(
+        let wrapper = Self(assemble_wrapper(
             Sha256::digest(schema_id.as_bytes()).into(),
             Sha256::digest(canonical_body.as_bytes()).into(),
-        )))
+        ));
+        #[cfg(feature = "wrapper-capture")]
+        capture::stage(&wrapper.0, schema_id, canonical_body.as_bytes());
+        Ok(wrapper)
     }
 
     /// Accepts exactly 88 bytes that open with [`SIGNING_WRAPPER_PREFIX`]: the
@@ -114,8 +115,12 @@ impl<'a> SigningMessage<'a> {
         Self(SigningMessageInner::Exempt(format, bytes))
     }
 
+    /// Signing input over `wrapper`; with `wrapper-capture`, records the
+    /// body the wrapper was built from, so only signed bodies are recorded.
     #[must_use]
     pub(crate) fn wrapper(wrapper: &'a SigningWrapper) -> Self {
+        #[cfg(feature = "wrapper-capture")]
+        capture::commit(&wrapper.0);
         Self(SigningMessageInner::Wrapper(wrapper))
     }
 

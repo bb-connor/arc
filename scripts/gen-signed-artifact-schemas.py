@@ -286,8 +286,16 @@ def covering_subset(bodies: list[tuple[str, bytes, Any]], overrides: dict[str, A
     for index, (_, _, value) in enumerate(bodies):
         absent_features(value, "", overrides, keys, features[index])
     uncovered = set().union(*features) if features else set()
+    # Bodies with equal feature sets differ only in the tie-break, so the
+    # best-ranked one of each set is the only one greedy selection can pick.
+    representative: dict[frozenset, int] = {}
+    for index, found in enumerate(features):
+        key = frozenset(found)
+        held = representative.get(key)
+        if held is None or (len(bodies[index][1]), bodies[index][0]) < (len(bodies[held][1]), bodies[held][0]):
+            representative[key] = index
     chosen = []
-    remaining = list(range(len(bodies)))
+    remaining = sorted(representative.values())
     while uncovered:
         best = max(remaining, key=lambda i: (len(features[i] & uncovered), -len(bodies[i][1]), [-ord(c) for c in bodies[i][0]]))
         chosen.append(best)
