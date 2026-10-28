@@ -781,6 +781,9 @@ impl ChioKernel {
                 crate::admission_operation::AdmissionOperationError::FindingPoolLedgerAlreadyConfigured,
             );
         }
+        self.freeze_receipt_signing_identity().map_err(|_| {
+            crate::admission_operation::AdmissionOperationError::ReceiptSigningIdentityUnavailable
+        })?;
         self.durable_admission_runtime = Some(DurableAdmissionRuntime::new(
             store,
             outcome_store,

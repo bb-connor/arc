@@ -15,6 +15,20 @@ pub use profile::{verify_operation_execution_nonce_at, OPERATION_EXECUTION_NONCE
 
 const MAX_NONCE_BYTES: usize = 16 * 1024;
 
+pub fn execution_nonce_coordinator_id(
+    issuer: &PublicKey,
+) -> Result<AdmissionIdentifier, super::AdmissionOperationError> {
+    let mut preimage = b"chio.admission-coordinator-signing-identity.v1\0".to_vec();
+    preimage.extend_from_slice(issuer.to_hex().as_bytes());
+    AdmissionIdentifier::try_new(
+        "admission_claimant_id",
+        format!("kernel:{}", chio_core::crypto::sha256_hex(&preimage)),
+    )
+}
+
+#[cfg(test)]
+mod coordinator_identity_tests;
+
 /// Signature-checked, exactly bound nonce material. The trusted store must still
 /// pin the issuer to its coordinator, verify original-request provenance, check
 /// its current fence and clock, and reserve atomically with the operation.

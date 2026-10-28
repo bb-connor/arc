@@ -11,8 +11,8 @@ fn durable_nonce_identity_unreadable_signer_refuses_attachment() {
         ));
     let result = kernel.set_durable_admission_store(store.clone(), store, fence);
     assert_eq!(
-        result.map_err(|error| error.to_string()),
-        Err("durable admission receipt signing identity is unavailable".to_owned())
+        result,
+        Err(crate::admission_operation::AdmissionOperationError::ReceiptSigningIdentityUnavailable)
     );
     assert!(!kernel.has_durable_admission_store());
 }
@@ -25,8 +25,8 @@ fn durable_nonce_identity_below_floor_refuses_attachment() {
     kernel.signing_authority.floor = KernelCryptoFloor::PqRequired;
     let result = kernel.set_durable_admission_store(store.clone(), store, fence);
     assert_eq!(
-        result.map_err(|error| error.to_string()),
-        Err("durable admission receipt signing identity is unavailable".to_owned())
+        result,
+        Err(crate::admission_operation::AdmissionOperationError::ReceiptSigningIdentityUnavailable)
     );
     assert!(!kernel.has_durable_admission_store());
 }
