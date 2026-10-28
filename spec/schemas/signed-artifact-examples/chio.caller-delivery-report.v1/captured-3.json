@@ -1,15 +1,16 @@
 {
-  "authorization_digest": "f52c0bd29c792475f728f39cb65fb5330d029b89a02172ba8057c51ed07c38ae",
-  "claim_id": "07a7afd6-6506-42b0-b3f5-85b1b7e0b04f",
+  "authorization_digest": "2b6dc277c135e7ff38d8febb50aff487c4c312fdc0f6aaf849d0f51780995031",
+  "claim_id": "b3b50703-d59c-4d4e-ab63-73d36172a630",
   "completed_at_unix_ms": 1800000000000,
   "execution_started_at_unix_ms": 1800000000000,
   "executor": {
-    "executor_id": "native-caller-executor",
-    "key_epoch": 41,
-    "public_key": "b38b633b76922936bfcf56cafc50f7597c2564d6e3f62070771ed663cfe76bfe"
+    "executor_id": "native-process-executor",
+    "key_epoch": 71,
+    "public_key": "e9ee02e12c1889487fb21c7f0401a6c04b90b9a8e0824b72668c7c996da2fbaa"
   },
   "output": {
-    "native_external_effect": true
+    "original_native_effect": true,
+    "safe": true
   },
   "realized_cost": null,
   "schema": "chio.caller-delivery-report.v1"

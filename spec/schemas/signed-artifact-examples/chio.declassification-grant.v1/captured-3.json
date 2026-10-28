@@ -1,75 +1,49 @@
 {
-  "operationId": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
-  "outcomeRecordedAtUnixMs": 1500,
-  "receiptDigest": "a151c43894ba27c083496ee5a5af8dcd152ccb433a826fdd27998312cced0fde",
-  "receiptId": "0897c913e48d1b59d9abd933041a52d2d867ca1e589eb1c9f4c6026e326134c9",
-  "reservationDigest": "adc65a22dc1ad1a82f45a9273d6b38508ed8d8f9c1e392bc103e46549888709c",
-  "reservationId": "685a2dbde5819c20b32b518de0e9e99fda9ac5f84de2ff53559c161c9661fb2f",
-  "schema": "chio.channel.terminal-outcome-commitment.v1",
-  "terminalResult": {
-    "result": {
-      "storage": "inline",
-      "value": {
-        "dispatch_commit": {
-          "committed_version": 6,
-          "coordinator_lease_epoch": 7,
-          "coordinator_lease_id": "channel-coordinator",
-          "dispatch_launch": {
-            "native_launch": null,
-            "worker_profile": null
+  "authority_id": "store-uuid-1",
+  "config_authority_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "deployment_generation": 1,
+  "resume_policy": "operator_pair",
+  "rosters": [
+    {
+      "principals": [
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
           },
-          "provider_attempt": {
-            "attempt_id": "channel-attempt-kernel-outcome-adapter",
-            "operation_id": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
-            "transport_id": "channel-transport-kernel-outcome-adapter",
-            "transport_key_epoch": 9
+          "principal": "1b21e6bb0b6181a806712191a032dc338cfc7bf285deae467333eb2a85bbafd5",
+          "subject_key": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+        },
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
           },
-          "store_fence": {
-            "lease_id": "channel-owner-3",
-            "owner_epoch": 3,
-            "store_uuid": "channel-store"
-          }
+          "principal": "89a648c33a23a1801dd56bf272942a258b554912954817ecdbea3222a6150ee5",
+          "subject_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
         },
-        "evaluation_id": "9c8fa05b4397d942222b93be84611365fec62ac073215af84b958a51af48c6fe",
-        "evaluation_lifecycle_digest": "52200e0bfb181bb774a0463153bc405b4bd348ce3509abeb064cf9f3e09993b8",
-        "operation_id": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
-        "operation_version": 7,
-        "outcome_id": "fd1899a525e08cc17b774004a47951d86f3d2ace4a0ebbfbdb92600706dbc3ef",
-        "outcome_lifecycle_digest": "a7a9ca1bc7d10fef77a714331eb67ae2bd932df257015ad913c58c2b222d59ec",
-        "outcome_recorded_at_unix_ms": 1500,
-        "outcome_recording_fence": {
-          "lease_id": "channel-owner-4",
-          "owner_epoch": 4,
-          "store_uuid": "channel-store"
-        },
-        "outcome_version": 2,
-        "post_guard_decision_digest": "62569a19ea4881580d9c8f47858967d03ec650fe05281896707fce06514c7327",
-        "pricing_verdict_digest": "154efcc0733bed5ad275bae04c362104d73ac5006e8a6118885e7b97f7d48058",
-        "projection_coordinator_lease_epoch": 7,
-        "projection_coordinator_lease_id": "channel-projection",
-        "projection_store_fence": {
-          "lease_id": "channel-owner-5",
-          "owner_epoch": 5,
-          "store_uuid": "channel-store"
-        },
-        "raw_output_digest": "26bd7a42a582c48a127f7f9481cd82c4ddf76dae1ca9ab82b0a55eb3ba0cdc5e",
-        "request_id": "channel-request-kernel-outcome-adapter",
-        "resolved_output_digest": "af0da34c17b64921ff8e70fffbc89b6fa7a9445ef03cf8407b99d913231acb00",
-        "settlement_disposition": {
-          "amount": {
-            "currency": "USD",
-            "units": 7
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
           },
-          "kind": "capture"
-        },
-        "terminal_dependency_root_digest": "0717e4a258e8da1ad57bf20a2a71c0e0752c40c9dbe2ce36e4ab7374891908d7",
-        "tool_name": "tool-outcome-test-tool",
-        "tool_server": "tool-outcome-test-server",
-        "trusted_time_unix_ms": 1600
+          "principal": "dfa643853ac77d36d5d04ac8aa4ecfa71df9ff166890d38bc79061b89a354d2e",
+          "subject_key": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+        }
+      ],
+      "quorum_k": 2,
+      "scope": {
+        "kind": "kernel"
       }
-    },
-    "resultDigest": "30348b0f66437c28efc7da07ad8fb992b74e5963a1e9dab7146f02ddc9472abc",
-    "resultId": "fd1899a525e08cc17b774004a47951d86f3d2ace4a0ebbfbdb92600706dbc3ef"
-  },
-  "terminalizedAtUnixMs": 1600
+    }
+  ],
+  "schema": "chio.stop-operator-config.v1",
+  "stop_quorum_max": 8,
+  "time_attestation_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
 }

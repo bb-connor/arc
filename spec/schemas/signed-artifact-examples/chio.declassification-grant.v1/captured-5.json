@@ -1,3 +1,17 @@
 {
-  "message": "canonical"
+  "nonce": {
+    "bound_to": {
+      "capability_id": "original-capability",
+      "parameter_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "request_id": "original-request",
+      "subject_id": "7830bb655251363480f79616553a27ead881d8932b2d78f7dfaa3633d36609d3",
+      "tool_name": "append",
+      "tool_server": "original-server"
+    },
+    "expires_at": 130,
+    "issued_at": 100,
+    "nonce_id": "original-nonce",
+    "schema": "chio.operation_execution_nonce.v1"
+  },
+  "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 }

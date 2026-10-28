@@ -1,33 +1,40 @@
 {
-  "expires_at": 18446744073709551615,
-  "id": "cap-request-matching",
-  "issued_at": 1,
-  "issuer": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39",
-  "schema": "chio.capability.v1",
-  "scope": {
-    "grants": [
-      {
-        "constraints": [
-          {
-            "type": "require_finding_recovery",
-            "value": {
-              "finding_id": "finding-a",
-              "listing_id": "listing-1",
-              "max_recoveries": 2,
-              "original_capability_id": "capability-original",
-              "original_delivery_receipt_id": "receipt-original",
-              "purchase_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-              "recovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            }
-          }
-        ],
-        "operations": [
-          "invoke"
-        ],
-        "server_id": "srv",
-        "tool_name": "tool"
-      }
-    ]
+  "aggregate_invocation_budget": {
+    "max_invocations": 4,
+    "root_binding": {
+      "body": {
+        "max_invocations": 4,
+        "root_capability_hash": "4db203e20f6b2c8157adae5d75d01d6034f2253909eed5252b4ce61319ab929c",
+        "root_capability_id": "cap-aggregate-family",
+        "root_expires_at": 200,
+        "root_issuer": "8f034784604bda6d38273104740254022f998f65766d86e0255e4faa5193a7d3",
+        "root_scope_hash": "67dd8174da205f59dcbe7c68d04c86ad30d5e8651b8bd33477492ec22322bfa0",
+        "root_subject": "d3401a67742066692b2fa0da9c5f350b5ce9bb5bc20e423193db068904e06597",
+        "schema": "chio.aggregate-budget-root.v1"
+      },
+      "signature": "67dff52bda3468e3825331f21f3b325ec87b9d73efd506661da0d7652b3dcfc8d0db76c85f393e39887deb3dcc4b19d2a41b217571a12400617030f49a46ae01"
+    },
+    "scope": "delegation_family"
   },
-  "subject": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39"
+  "delegation_chain": [
+    {
+      "aggregate_budget": {
+        "max_invocations": 4,
+        "root_binding_digest": "b79bba6f58064ebf1f067d1c47fa1578e8444ff1ddc1872024252748d86bd57c"
+      },
+      "capability_id": "cap-aggregate-family",
+      "delegatee": "10de8d438a6ddb20686e2f74bf5df5a11145c2816ced5e4737ed59be20a4f6e0",
+      "delegator": "d3401a67742066692b2fa0da9c5f350b5ce9bb5bc20e423193db068904e06597",
+      "scope_hash": "67dd8174da205f59dcbe7c68d04c86ad30d5e8651b8bd33477492ec22322bfa0",
+      "signature": "c6b5888d0ace9f61ad589e08a7f63a1d46f8f43324d4a988ccdb06e1330126d9171cb7ba7508a0ac2d926f31f59ec972b4eb3cbacfc42646a9dd6727dfa3a306",
+      "timestamp": 120
+    }
+  ],
+  "expires_at": 190,
+  "id": "cap-aggregate-child",
+  "issued_at": 120,
+  "issuer": "8f034784604bda6d38273104740254022f998f65766d86e0255e4faa5193a7d3",
+  "schema": "chio.capability.v1",
+  "scope": {},
+  "subject": "10de8d438a6ddb20686e2f74bf5df5a11145c2816ced5e4737ed59be20a4f6e0"
 }

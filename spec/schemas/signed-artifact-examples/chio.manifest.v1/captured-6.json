@@ -1,29 +1,9 @@
 {
-  "description": "OpenAPI-to-MCP bridge for Petstore (1.0.0)",
-  "name": "Petstore Bridge",
-  "public_key": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+  "name": "Provider verdict test",
+  "public_key": "927308f53d6765503d2b64c103ab5aa47206ab39502cfe8f98442fdb543100b7",
   "schema": "chio.manifest.v1",
-  "server_id": "petstore-bridge",
+  "server_id": "srv-test",
   "tools": [
-    {
-      "annotations": {
-        "destructive": false,
-        "idempotent": true,
-        "read_only": true,
-        "requires_approval": false
-      },
-      "description": "List all pets",
-      "input_schema": {
-        "properties": {
-          "limit": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "latency_hint": "fast",
-      "name": "listPets"
-    },
     {
       "annotations": {
         "destructive": false,
@@ -31,69 +11,22 @@
         "read_only": false,
         "requires_approval": false
       },
-      "description": "Create a pet",
+      "description": "Search the web",
       "input_schema": {
+        "additionalProperties": false,
         "properties": {
-          "body": {
-            "properties": {
-              "name": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "required": [
-          "body"
-        ],
-        "type": "object"
-      },
-      "latency_hint": "moderate",
-      "name": "createPet"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "idempotent": true,
-        "read_only": true,
-        "requires_approval": false
-      },
-      "description": "Get a pet by ID",
-      "input_schema": {
-        "properties": {
-          "petId": {
+          "query": {
+            "maxLength": 8,
+            "minLength": 1,
             "type": "string"
           }
         },
         "required": [
-          "petId"
+          "query"
         ],
         "type": "object"
       },
-      "latency_hint": "fast",
-      "name": "getPet"
-    },
-    {
-      "annotations": {
-        "destructive": true,
-        "idempotent": true,
-        "read_only": false,
-        "requires_approval": false
-      },
-      "description": "Delete a pet",
-      "input_schema": {
-        "properties": {
-          "petId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "petId"
-        ],
-        "type": "object"
-      },
-      "latency_hint": "moderate",
-      "name": "deletePet"
+      "name": "search_web"
     }
   ],
   "version": "1.0.0"

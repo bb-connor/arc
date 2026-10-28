@@ -1,7 +1,0 @@
-{
-  "arguments_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-  "capability_id": "cap-01a182db-e6e0-70ae-9935-42dc1a18ebe8",
-  "destination": "{\"server_id\":\"tools\",\"tool_name\":\"read\"}",
-  "expires_at": 1793200412,
-  "request_id": "process:a67a210e7fd322a514b82422a1dc303af45cc5541785d7b0d6351c784a38195c"
-}

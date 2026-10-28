@@ -1,48 +1,192 @@
 {
   "body": {
     "action": {
-      "parameter_hash": "60f59a468f7593034cb60ac0cbecf7ff2700243c57d11c8c2ffbc165da127dfa",
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
       "parameters": {
-        "capabilities": {
-          "root": {
-            "expires_at": 1793206416,
-            "id": "cap-01a18337-8400-7e54-8468-3192ec4b66e9",
-            "issued_at": 1793202816,
-            "issuer": "6caa14300bb588c08627d4b38dea7acf4ae2f0e07f7954576c4e905442977e88",
-            "schema": "chio.capability.v1",
-            "scope": {
-              "grants": [
-                {
-                  "operations": [
-                    "invoke",
-                    "delegate"
-                  ],
-                  "server_id": "chio-ipc",
-                  "tool_name": "*"
-                }
-              ]
-            },
-            "signature": "62eca6ec8b556493d8ec6c57d1fb42ddc90c0d34b14206a6830d43e52d91183e53038b4da5fb0fd2fcc846682250c228f71837888921cf22f0215ebf82bb7003",
-            "subject": "c59bcc5afddd9acbed152bf91b7270a95ed8655972af12154b004c0a9f63d3e7"
-          }
-        },
-        "record_sha256": "d353cd6edf40a9a81ffd1b179745f7941bf05168540a6c9f0fa857a44c90c23a",
-        "runtime_id": "c91ade1c-66d1-4eae-9273-4a74d03d43a4"
+        "path": "/app/src/main.rs"
       }
     },
-    "boundary_class": "detect_only",
-    "capability_id": "cap-01a18337-8400-7e54-8468-3192ec4b66e9",
-    "content_hash": "60f59a468f7593034cb60ac0cbecf7ff2700243c57d11c8c2ffbc165da127dfa",
-    "kernel_key": "6caa14300bb588c08627d4b38dea7acf4ae2f0e07f7954576c4e905442977e88",
-    "observation_outcome": "observed",
-    "policy_hash": "84355e00e7179dc2b4be2df1379ada0ebaedc65722efd6ec8e52e1c16207218d",
-    "receipt_kind": "trace_observation",
+    "boundary_class": "prevent",
+    "capability_id": "cap-001",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "ForbiddenPathGuard",
+        "verdict": true
+      },
+      {
+        "details": "no secrets detected",
+        "guard_name": "SecretLeakGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "199b85ae879fc20f4de0f498ba9a2ee30490784412b343e03936358a89e03f79",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-001",
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "pre-action-authority-digest-001",
+          "approved": true,
+          "approver_key": "approver-key",
+          "token_id": "approval-1"
+        },
+        "autonomy": {
+          "delegationBondId": "bond-1",
+          "tier": "delegated"
+        },
+        "call_chain": {
+          "chainId": "chain-1",
+          "delegatorSubject": "delegator-subject",
+          "evidenceClass": "observed",
+          "evidenceSources": [
+            "session_parent_request_lineage",
+            "local_parent_receipt_linkage",
+            "upstream_delegator_proof"
+          ],
+          "originSubject": "origin-subject",
+          "parentReceiptId": "rc-parent-1",
+          "parentRequestId": "req-parent-1",
+          "upstreamProof": {
+            "chainId": "chain-1",
+            "delegatorSubject": "delegator-subject",
+            "expiresAt": 1600,
+            "issuedAt": 1000,
+            "originSubject": "origin-subject",
+            "parentReceiptId": "rc-parent-1",
+            "parentRequestId": "req-parent-1",
+            "signature": "dc9359de087518227e2e1a646fedb702f7f21d87e1047159abf36bebbe5529ab2cf6c4ff96d9ed80dd665815388216d8d47cf9f9f96c497677a9144b6a967102",
+            "signer": "199b85ae879fc20f4de0f498ba9a2ee30490784412b343e03936358a89e03f79",
+            "subject": "511d3aa21dc50072eab82a4c5d9ce093a1b1daf5bd566d8d5cfce75a6d4cf310"
+          }
+        },
+        "commerce": {
+          "seller": "merchant.example",
+          "settlement_destination_ref": "acct:merchant-primary",
+          "shared_payment_token_id": "spt_123"
+        },
+        "economic_authorization": {
+          "amount_bounds": {
+            "approved_max": {
+              "currency": "USD",
+              "units": 500
+            },
+            "hold_amount": {
+              "currency": "USD",
+              "units": 400
+            },
+            "settlement_cap": {
+              "currency": "USD",
+              "units": 450
+            }
+          },
+          "budget": {
+            "budget_remaining": 750,
+            "budget_total": 1000,
+            "cost_charged": 250,
+            "currency": "USD",
+            "delegation_depth": 2,
+            "grant_index": 3,
+            "root_budget_holder": "agent-root-001"
+          },
+          "credit_authority_digest": "credit-authority-digest-001",
+          "economic_intent_digest": "economic-intent-digest-001",
+          "economic_mode": "metered_hold_capture",
+          "liability_refs": {
+            "bond_id": "bond-001",
+            "dispute_policy_ref": "dispute-policy-001",
+            "policy_id": "policy-001"
+          },
+          "merchant": {
+            "merchant_id": "merchant-001",
+            "merchant_of_record": "merchant-of-record-001",
+            "order_ref": "order-001"
+          },
+          "metering": {
+            "billing_unit": "1k_tokens",
+            "max_billable_units": 12,
+            "meter_profile_hash": "meter-profile-hash-001",
+            "provider": "meter.chio"
+          },
+          "payee": {
+            "beneficiary_id": "beneficiary-001",
+            "settlement_destination_ref": "acct-settle-001"
+          },
+          "payee_binding_digest": "payee-binding-digest-001",
+          "payer": {
+            "custody_provider": "custody.chio",
+            "funding_source_ref": "wallet-001",
+            "obligor_ref": "obligor-001",
+            "party_id": "payer-001"
+          },
+          "pre_action_authority_digest": "pre-action-authority-digest-001",
+          "pricing_basis": {
+            "quote_expiry": 1710000600,
+            "quote_hash": "quote-hash-001",
+            "tariff_hash": "tariff-hash-001"
+          },
+          "rail": {
+            "asset": "USD",
+            "contract_or_account_ref": "acct_1",
+            "facilitator": "stripe",
+            "kind": "card",
+            "network": "visa"
+          },
+          "settlement": {
+            "settlement_status": "pending"
+          },
+          "version": "v1"
+        },
+        "intent_hash": "intent-hash",
+        "intent_id": "intent-1",
+        "max_amount": {
+          "currency": "USD",
+          "units": 500
+        },
+        "metered_billing": {
+          "maxBilledUnits": 12,
+          "quote": {
+            "billingUnit": "1k_tokens",
+            "expiresAt": 1600,
+            "issuedAt": 1000,
+            "provider": "meter.chio",
+            "quoteId": "quote-1",
+            "quotedCost": {
+              "currency": "USD",
+              "units": 250
+            },
+            "quotedUnits": 10
+          },
+          "settlementMode": "allow_then_settle",
+          "usageEvidence": {
+            "evidenceId": "usage-1",
+            "evidenceKind": "billing_export",
+            "evidenceSha256": "usage-digest",
+            "observedUnits": 9
+          }
+        },
+        "purpose": "pay supplier",
+        "runtime_assurance": {
+          "evidenceSha256": "attestation-digest",
+          "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+          "tier": "attested",
+          "verifier": "verifier.chio",
+          "verifierFamily": "azure_maa"
+        },
+        "server_id": "payments",
+        "tool_name": "charge"
+      }
+    },
+    "policy_hash": "abc123def456",
+    "receipt_kind": "mediated_decision",
     "redaction_mode": "none",
-    "timestamp": 1793202817,
-    "tool_name": "provision_process_host",
-    "tool_origin": "chio_internal",
-    "tool_server": "chio-process-host",
-    "trust_level": "verified"
+    "timestamp": 1710000000,
+    "tool_name": "file_read",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-files",
+    "trust_level": "mediated"
   },
-  "id": "a67049cf1874c977b242d8a18536829940bedfd0b22b6e948c2d27b16ce0756c"
+  "id": "1b090908dd3f4ab681f9547d573c415f7929aaebacf58c2f02173f364d82973b"
 }

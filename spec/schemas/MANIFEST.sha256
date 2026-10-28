@@ -1,4 +1,4 @@
-f3b64002486d28637130605358d74d3395f1461d5e04d2b6cb05535a5310a1a1  spec/schemas/MANIFEST.sha256
+489c314690b262a3beda166fd88634e8d882fe522ca61ea7cc2c790ca9acc889  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -546,7 +546,7 @@ fd4686efc28b7379fdb30592fa897ced573b23b69a404e7a896f1b5e12b09593  spec/schemas/c
 a2f1233b18b4988faff0c9d31fece1a19f9a3db1a3687b8b66ca04b77b454e99  spec/schemas/chio-wire/v1/marketplace/listing-pricing-hint.schema.json
 ae804d50e7d524b044220e005d93d5b4ebf1f6ad12dc644de10701068413988b  spec/schemas/chio-wire/v1/marketplace/reservation-receipt.schema.json
 2018526a1bb7e0c6c8a51e38114272cd289582d2a39363147b97cd0f9af248b8  spec/schemas/chio-wire/v1/mcp/operator-approval.schema.json
-3bb4dd05b257bebd01e6d81116b58b3acdd6168ced05ac6049dbe9c2ea04a33e  spec/schemas/chio-wire/v1/mcp/session-credential-call.schema.json
+6999966d430ef8e422a70661cf2c3f076be1c9afe61dc01049a3dfee84978c4c  spec/schemas/chio-wire/v1/mcp/session-credential-call.schema.json
 ea05c1b6fd5e9af3a6d6b197f3cfe27d0f2554f365e4015eeb2910be038feedd  spec/schemas/chio-wire/v1/mcp/session-credential.schema.json
 dc47c229313789d8c1a8410ab7e19f4548e8a2f8f0c08a1a72fa587acecf2184  spec/schemas/chio-wire/v1/parametric/contest.schema.json
 5f3d438bc6b97f76d497c46cca78f8e23e978ab48d56466cb744f857f5fde5c3  spec/schemas/chio-wire/v1/parametric/evidence-source-checkpoint.schema.json

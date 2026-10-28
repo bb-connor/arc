@@ -243,6 +243,27 @@ if leak.returncode != 1 or "/signerSeed" not in leak.stderr:
     failures.append(f"import: accepted a key-shaped member\n{leak.stderr}")
 holder.cleanup()
 
+holder, root = generate("example cap", [entry()], {"hand.json": {"schema": "chio.work-offer.v1", "offer_id": "h"}})
+captures = root / "target/captures"
+for index in range(9):
+    capture(captures, "chio.work-offer.v1", {"schema": "chio.work-offer.v1", "offer_id": "a", f"m{index}": "v"})
+capped = run(root, "--import-captures", str(captures))
+if capped.returncode != 1 or "cannot show every recorded feature" not in capped.stderr:
+    failures.append(f"example cap: imported more distinct bodies than the cap allows\n{capped.stderr}")
+holder.cleanup()
+
+holder, root = generate(
+    "duplicate captured examples",
+    [entry()],
+    {
+        "captured-1.json": {"schema": "chio.work-offer.v1", "offer_id": "a"},
+        "captured-2.json": {"schema": "chio.work-offer.v1", "offer_id": "b"},
+    },
+    exit_code=1,
+    mentions="two examples show the same features",
+)
+holder.cleanup()
+
 holder, root = generate("allowed key-shaped member", [entry()], {"a.json": {"schema": "chio.work-offer.v1"}}, allow={"chio.work-offer.v1": ["/api_secret_ref"]})
 captures = root / "target/captures"
 capture(captures, "chio.work-offer.v1", {"schema": "chio.work-offer.v1", "api_secret_ref": "ref-1"})
@@ -394,6 +415,410 @@ PINNED_UNCAPTURED = (
 )
 
 check_uncaptured_list()
+
+
+def check_placeholder_list() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen_signed_artifact_schemas_placeholders", SCRIPT)
+    if spec is None or spec.loader is None:
+        failures.append("placeholder list: cannot load the generator")
+        return
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    listed = module.PLACEHOLDER_ARRAY_ITEMS
+    if listed != PINNED_PLACEHOLDERS:
+        failures.append(
+            "placeholder list: PLACEHOLDER_ARRAY_ITEMS differs from the pinned list; "
+            f"added {sorted(set(listed) - set(PINNED_PLACEHOLDERS))}, "
+            f"removed {sorted(set(PINNED_PLACEHOLDERS) - set(listed))}"
+        )
+    repo = SCRIPT.resolve().parents[1]
+    control = json.loads((repo / "spec/schemas/signed-artifact-schemas.json").read_text(encoding="utf-8"))
+    overrides = {entry["schema"]: entry.get("overrides", {}) for entry in control["artifacts"]}
+    for sid, pointer in listed:
+        if overrides.get(sid, {}).get(pointer) != module.PLACEHOLDER_ITEMS:
+            failures.append(f"placeholder list: {sid} {pointer} is no longer an object-item override")
+        for example in module.examples_for(repo, sid):
+            value = json.loads(example.read_text(encoding="utf-8"))
+            for step in pointer.split("/")[1:]:
+                value = value.get(step) if isinstance(value, dict) else None
+            if isinstance(value, list) and value:
+                failures.append(
+                    f"placeholder list: {example.name} of {sid} shows items at {pointer}; "
+                    "derive the item schema and drop the pair from the list"
+                )
+
+
+PINNED_PLACEHOLDERS = (
+    (
+        "chio.behavioral-feed.v1",
+        "/receipts",
+    ),
+    (
+        "chio.credit.exposure-ledger.v1",
+        "/decisions",
+    ),
+    (
+        "chio.credit.exposure-ledger.v1",
+        "/receipts",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/exposure/body/decisions",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/exposure/body/receipts",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/recentLossHistory/entries",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/scorecard/body/dimensions",
+    ),
+    (
+        "chio.credit.scorecard.v1",
+        "/dimensions",
+    ),
+    (
+        "chio.finding.worker-attested-result.v1",
+        "/result/diagnostics",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/capitalBook/body/events",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/capitalBook/body/events",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/capitalBook/body/events",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/capitalBook/body/events",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+)
+
+check_placeholder_list()
 
 if failures:
     print("\n\n".join(failures), file=sys.stderr)

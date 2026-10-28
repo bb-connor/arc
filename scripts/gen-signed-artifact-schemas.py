@@ -55,6 +55,21 @@ writes nothing and fails when any of those files differs from what
 generation would produce. Output depends only on the tree, so a second run
 is a no-op.
 
+An id keeps at most `MAX_EXAMPLES` captured examples, no two with the same
+structural features, and an example over `MAX_EXAMPLE_BYTES` only when it
+is the sole carrier of a feature. For an id this script owns, the kept
+examples must infer the same schema as the whole recording, so the import
+fails rather than drop a feature; for any other id the import keeps the
+first `MAX_EXAMPLES` bodies of the covering order. `--check` re-verifies
+the count, size and distinctness rules on the committed examples.
+
+`PLACEHOLDER_ARRAY_ITEMS` is the exact, closed list of (id, pointer)
+overrides whose array was empty in every recorded body and whose items
+are only typed as objects (backlog row M1I1-CAPTURE-COVERAGE). Generation
+fails on such an override that is not listed; the self-test pins the
+list and fails when a listed pair is no longer such an override or its
+id gains an example with a non-empty array there.
+
 `UNCAPTURED_WRAPPER_IDS` is the exact, closed list of wrapper ids that no
 capture test signs yet (backlog row M1I1-CAPTURE-COVERAGE). Generation
 refuses each of them by name: none gets an example, a schema file or a
@@ -85,6 +100,375 @@ DRAFT = "https://json-schema.org/draft/2020-12/schema"
 README_BEGIN = "<!-- BEGIN generated signed-artifact schemas -->"
 README_END = "<!-- END generated signed-artifact schemas -->"
 EXAMPLES = SCHEMAS / "signed-artifact-examples"
+MAX_EXAMPLES = 8
+MAX_EXAMPLE_BYTES = 64 * 1024
+PLACEHOLDER_ITEMS = {"type": "array", "items": {"type": "object"}}
+PLACEHOLDER_ARRAY_ITEMS: tuple[tuple[str, str], ...] = (
+    (
+        "chio.behavioral-feed.v1",
+        "/receipts",
+    ),
+    (
+        "chio.credit.exposure-ledger.v1",
+        "/decisions",
+    ),
+    (
+        "chio.credit.exposure-ledger.v1",
+        "/receipts",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/exposure/body/decisions",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/exposure/body/receipts",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/recentLossHistory/entries",
+    ),
+    (
+        "chio.credit.provider-risk-package.v1",
+        "/scorecard/body/dimensions",
+    ),
+    (
+        "chio.credit.scorecard.v1",
+        "/dimensions",
+    ),
+    (
+        "chio.finding.worker-attested-result.v1",
+        "/result/diagnostics",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/capitalBook/body/events",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/authority/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.auto-bind.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.bound-coverage.v1",
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-adjudication.v1",
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-dispute.v1",
+        "/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-package.v1",
+        "/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-instruction.v1",
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-payout-receipt.v1",
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-response.v1",
+        "/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/capitalBook/body/events",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-instruction.v1",
+        "/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/capitalBook/body/events",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.claim-settlement-receipt.v1",
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.placement.v1",
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/capitalBook/body/events",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.pricing-authority.v1",
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.quote-request.v1",
+        "/riskPackage/body/scorecard/body/dimensions",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries",
+    ),
+    (
+        "chio.market.quote-response.v1",
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
+    ),
+)
 UNCAPTURED_WRAPPER_IDS: tuple[str, ...] = (
     "chio.agent-web.external-projection-manifest.v1",
     "chio.agent-web.interop-verifier-report.v1",
@@ -348,31 +732,54 @@ def absent_features(value: Any, pointer: str, overrides: dict[str, Any], keys: d
             absent_features(item, pointer_join(pointer, key), overrides, keys, out)
 
 
-def covering_subset(bodies: list[tuple[str, bytes, Any]], overrides: dict[str, Any]) -> list[tuple[str, bytes, Any]]:
+def body_features(values: list[Any], overrides: dict[str, Any]) -> list[set]:
     keys: dict[str, set[str]] = {}
     features = []
-    for _, _, value in bodies:
+    for value in values:
         found: set = set()
         walk_features(value, "", overrides, keys, found)
         features.append(found)
-    for index, (_, _, value) in enumerate(bodies):
+    for index, value in enumerate(values):
         absent_features(value, "", overrides, keys, features[index])
-    uncovered = set().union(*features) if features else set()
+    return features
+
+
+def sole_carrier(features: list[set], index: int) -> bool:
+    others = set().union(*(found for i, found in enumerate(features) if i != index))
+    return bool(features[index] - others)
+
+
+def covering_subset(
+    bodies: list[tuple[str, bytes, Any]], overrides: dict[str, Any], owned: bool
+) -> list[tuple[str, bytes, Any]]:
+    features = body_features([value for _, _, value in bodies], overrides)
+    small = set().union(*(f for f, b in zip(features, bodies) if len(b[1]) <= MAX_EXAMPLE_BYTES))
+    candidates = [
+        i for i, b in enumerate(bodies) if len(b[1]) <= MAX_EXAMPLE_BYTES or features[i] - small
+    ]
+    everything = set().union(*features) if features else set()
+    uncovered = set().union(*(features[i] for i in candidates)) if candidates else set()
     # Bodies with equal feature sets differ only in the tie-break, so the
     # best-ranked one of each set is the only one greedy selection can pick.
     representative: dict[frozenset, int] = {}
-    for index, found in enumerate(features):
+    for index in candidates:
+        found = features[index]
         key = frozenset(found)
         held = representative.get(key)
         if held is None or (len(bodies[index][1]), bodies[index][0]) < (len(bodies[held][1]), bodies[held][0]):
             representative[key] = index
     chosen = []
     remaining = sorted(representative.values())
-    while uncovered:
+    while uncovered and len(chosen) < MAX_EXAMPLES:
         best = max(remaining, key=lambda i: (len(features[i] & uncovered), -len(bodies[i][1]), [-ord(c) for c in bodies[i][0]]))
         chosen.append(best)
         remaining.remove(best)
         uncovered -= features[best]
+    if owned and set().union(*(features[i] for i in chosen)) != everything:
+        raise GenerationError(
+            f"{MAX_EXAMPLES} examples of at most {MAX_EXAMPLE_BYTES} bytes cannot show every recorded "
+            "feature; add a map override for the free-form member"
+        )
     return [bodies[i] for i in sorted(chosen, key=lambda i: bodies[i][0])]
 
 
@@ -410,7 +817,11 @@ def import_captures(root: Path, capture_dir: Path) -> dict[str, bytes | None]:
         directory = EXAMPLES / escape_schema_id(sid)
         for old in sorted((root / directory).glob("captured-*.json")):
             changes[str(old.relative_to(root))] = None
-        for index, (_, _, value) in enumerate(covering_subset(bodies, overrides.get(sid, {})), 1):
+        try:
+            kept = covering_subset(bodies, overrides.get(sid, {}), sid in overrides)
+        except GenerationError as error:
+            raise GenerationError(f"{sid}: {error}") from error
+        for index, (_, _, value) in enumerate(kept, 1):
             changes[str(directory / f"captured-{index}.json")] = dump(value).encode("utf-8")
     return changes
 
@@ -633,6 +1044,31 @@ def plan(root: Path) -> dict[str, bytes]:
     unregistered = [sid for sid in wrapper_ids if sid not in registered]
     if unregistered:
         raise GenerationError(f"wrapper ids without a registry row: {unregistered}")
+    by_id = {entry["schema"]: entry for entry in entries}
+    placeholders = sorted(
+        (sid, pointer)
+        for sid, entry in by_id.items()
+        for pointer, fragment in entry.get("overrides", {}).items()
+        if fragment == PLACEHOLDER_ITEMS
+    )
+    unlisted = sorted(set(placeholders) - set(PLACEHOLDER_ARRAY_ITEMS))
+    if unlisted:
+        raise GenerationError(f"object-item array overrides missing from PLACEHOLDER_ARRAY_ITEMS: {unlisted}")
+    for sid in wrapper_ids:
+        paths = [path for path in examples_for(root, sid) if path.name.startswith("captured-")]
+        if not paths:
+            continue
+        if len(paths) > MAX_EXAMPLES:
+            raise GenerationError(f"{sid}: {len(paths)} examples exceed {MAX_EXAMPLES}")
+        values = [load_json(root, path.relative_to(root)) for path in paths]
+        features = body_features(values, by_id.get(sid, {}).get("overrides", {}))
+        if len({frozenset(found) for found in features}) != len(features):
+            raise GenerationError(f"{sid}: two examples show the same features")
+        for index, path in enumerate(paths):
+            if path.stat().st_size > MAX_EXAMPLE_BYTES and not sole_carrier(features, index):
+                raise GenerationError(
+                    f"{path.relative_to(root)}: over {MAX_EXAMPLE_BYTES} bytes without a feature of its own"
+                )
     uncaptured = set(UNCAPTURED_WRAPPER_IDS)
     listed = sorted(sid for sid in uncaptured if examples_for(root, sid))
     if listed:

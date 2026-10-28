@@ -1,27 +1,14 @@
 {
-  "description": "Manifest vector for bindings-core SDK fixtures",
-  "name": "Bindings Demo",
-  "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
-  "required_permissions": {
-    "environment_variables": [
-      "CHIO_ENV"
-    ],
-    "native_syscall_profile": "native_standard_v1",
-    "network_destinations": [
-      {
-        "host": "api.example.com",
-        "port": 443
-      }
-    ],
-    "read_paths": [
-      "/workspace"
-    ],
-    "write_paths": [
-      "/workspace/output"
-    ]
-  },
+  "description": "Explicit Anthropic test manifest",
+  "name": "Anthropic Messages",
+  "public_key": "e8da63a40ca687c87cfce05cb24a786c7e75cc49c70db5573f026f1c6a86ceaa",
   "schema": "chio.manifest.v1",
-  "server_id": "srv-bindings-demo",
+  "server_id": "anthropic-1",
+  "server_tools": [
+    "computer_use",
+    "bash",
+    "text_editor"
+  ],
   "tools": [
     {
       "annotations": {
@@ -30,42 +17,100 @@
         "read_only": true,
         "requires_approval": false
       },
-      "description": "Tool definition for file_read",
+      "description": "Explicit test tool get_weather",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "get_weather"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Explicit test tool search_web",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "search_web"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Explicit test tool translate_text",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "translate_text"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Explicit test tool first",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "first"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Explicit test tool second",
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "second"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Explicit test tool regular_tool",
       "flow": {
+        "declassification_purposes": [
+          "audit",
+          "support"
+        ],
         "egress": true,
         "input_clearance": {
-          "compartments": [],
+          "compartments": [
+            "customer",
+            "restricted"
+          ],
           "kind": "known",
           "owners": {}
         },
         "output_label": {
-          "compartments": [],
+          "compartments": [
+            "audit",
+            "pii"
+          ],
           "kind": "known",
           "owners": {}
         }
       },
       "input_schema": {
-        "properties": {
-          "path": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "path"
-        ],
         "type": "object"
       },
-      "latency_hint": "fast",
-      "name": "file_read",
-      "output_schema": {
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      }
+      "name": "regular_tool"
     }
   ],
-  "version": "1.0.0"
+  "version": "0.1.0"
 }

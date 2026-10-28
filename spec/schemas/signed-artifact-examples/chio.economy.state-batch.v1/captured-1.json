@@ -1,85 +1,250 @@
 {
   "anchorId": "anchor-1",
-  "batchId": "32b8c7f79c3b6a90d3ba2c0b13a9569f8d8592f0e1bbd8e057041dd76b761d12",
-  "checkpointSequence": 2,
-  "effectSlots": [],
-  "expectedHeadsRoot": "3733e0ceb2a8b7f91c815dc26abb04497f52d3782818f684bb4930871c094b88",
-  "issuedAt": 26240,
+  "batchId": "fae5a35abb9fb01784164838b99c79bc4d7f3ce73d1d44dea183e09ad68c902d",
+  "checkpointSequence": 3,
+  "effectSlots": [
+    {
+      "actionDigest": "385852988e56a6ca5f2f5c79a4815882770fad2b8677e533a8c55cf623be9936",
+      "admissionHandoff": {
+        "lifecycleFence": 9,
+        "operationVersion": 6,
+        "state": "dispatch_committed",
+        "storeFence": {
+          "lease_id": "lease-1",
+          "owner_epoch": 3,
+          "store_uuid": "store-1"
+        }
+      },
+      "anchorId": "anchor-1",
+      "effectKind": "settlement_dispatch",
+      "idempotencyKey": "3844ff528989dfc78386f4ec8853089ae31477fd00e4b3c9d9598b0219b0dd27",
+      "namespace": "economy-prod",
+      "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+      "parametersDigest": "362eda84015a38d5685d0ab7b044a3b71acb5da22a13914fb141495b57e4b56f",
+      "request": {
+        "requestBindingDigest": "fb323baa255ed7b67a448601a4156fc8cbd2b567325b48c5099e00a8bbee5548",
+        "requestId": "request-first",
+        "requestNamespaceDigest": "15cbda58bffdc194ce9011ccffa0583ffd03b586fe124fcef9d936c68c6f3845"
+      },
+      "resourceHeadDigest": "918c74adde38ee4c082aa7d5a25404917046e9fc237472f84da31525cfe6e279",
+      "resourceKey": {
+        "resourceFamily": "clearing_round",
+        "resourceId": "round-1",
+        "scopeId": "clearing-governance"
+      },
+      "schema": "chio.economy.effect-slot.v1",
+      "slotId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+      "state": "ready",
+      "target": {
+        "qualificationDigest": "ab04e03f6ec6ebc4286422612a8b857f99d4c8d90406f2ad486e36f3ae6c6872",
+        "targetId": "settlement-rail",
+        "targetKeyEpoch": 2
+      }
+    }
+  ],
+  "expectedHeadsRoot": "8877aa11922701d3da6f4e64144ff1d645cdb331d3e4f7ccc9194cc7affbc08c",
+  "issuedAt": 503,
   "namespace": "economy-prod",
-  "nextHeadsRoot": "6951280fba6bd29c1669be5728d19ca26c1239a4919a8328b2f2798a9ea90fd1",
-  "previousCheckpointDigest": "aeebad4a796fcc2e15dc4c6061b45ed9b373f26adfc798ca7d2d8cc58182718e",
-  "requestReplays": [],
+  "nextHeadsRoot": "370061334bc2f26778e8adb2ccd9e1c14ece04a782e2ec666e251bdf41543b48",
+  "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+  "previousCheckpointDigest": "df5c9192279619dd0e6eff9bab454299756bc01c0267ef14820a7c012c8d9faa",
+  "requestReplays": [
+    {
+      "effectSlotIds": [
+        "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699"
+      ],
+      "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+      "request": {
+        "requestBindingDigest": "fb323baa255ed7b67a448601a4156fc8cbd2b567325b48c5099e00a8bbee5548",
+        "requestId": "request-first",
+        "requestNamespaceDigest": "15cbda58bffdc194ce9011ccffa0583ffd03b586fe124fcef9d936c68c6f3845"
+      }
+    }
+  ],
   "schema": "chio.economy.state-batch.v1",
   "signerKeyEpoch": 1,
   "signerKeyId": "anchor-key-1",
   "transitions": [
     {
-      "expectedHeadDigest": "b3242e45c68548c4d3ba5abbf7c53d26e7cd8bc2cd0f8734a96b3fb4eb7663df",
+      "expectedHeadDigest": "918c74adde38ee4c082aa7d5a25404917046e9fc237472f84da31525cfe6e279",
       "nextHead": {
         "anchorId": "anchor-1",
-        "headVersion": 2,
-        "lifecycleFence": 2,
-        "lifecycleState": "active",
+        "effectIdempotencyKey": "3844ff528989dfc78386f4ec8853089ae31477fd00e4b3c9d9598b0219b0dd27",
+        "headVersion": 5,
+        "lifecycleFence": 5,
+        "lifecycleState": "dispatching",
         "namespace": "economy-prod",
-        "predecessorDigest": "b3242e45c68548c4d3ba5abbf7c53d26e7cd8bc2cd0f8734a96b3fb4eb7663df",
+        "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+        "predecessorDigest": "918c74adde38ee4c082aa7d5a25404917046e9fc237472f84da31525cfe6e279",
         "resourceKey": {
-          "resourceFamily": "conformance_resource",
-          "resourceId": "resource-000",
-          "scopeId": "scope-1"
+          "resourceFamily": "clearing_round",
+          "resourceId": "round-1",
+          "scopeId": "clearing-governance"
         },
-        "resourceVersion": 2,
+        "resourceVersion": 5,
         "schema": "chio.economy.resource-head.v1",
         "state": {
           "storage": "inline",
           "value": {
-            "marker": 25140,
-            "resourceId": "resource-000",
-            "version": 2
+            "fence": 5,
+            "finalizationDigest": "2147f8f749dc7df7b9264e86106f6974ddbffa26a210f48f6f6e63fdc2160a34",
+            "firstDispatchOperationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+            "governanceScopeId": "clearing-governance",
+            "inputManifestDigest": "05b3abf2579a5eb66403cd78be557fd860633a1fe2103c7642030defe32c657f",
+            "intentProgress": [
+              {
+                "activeEffectSlotId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+                "ambiguityCount": 0,
+                "attemptCount": 1,
+                "intentDigest": "362eda84015a38d5685d0ab7b044a3b71acb5da22a13914fb141495b57e4b56f",
+                "intentId": "intent-first",
+                "noEffectCount": 0,
+                "reconciliationCount": 0
+              }
+            ],
+            "lastTransitionDigest": "96dea9c85767eb30de6f57199699bde80f81427435bbc77482c5d106955a7379",
+            "outputManifestDigest": "ca6a43f375a476724d44ba170b1fb45746e92f22c18ff77399bf70ea1f833d0f",
+            "participantAcceptanceCount": 1,
+            "participantAcceptanceRoot": "036a27ced5fa099a34c38ed088a111984afdbfb741ee8bf5a8937df084ea48a8",
+            "reservationCount": 1,
+            "reservationRoot": "2ad536b66465e271958b6a9d55bb0b29ea4c8c76316016683a366cead1da2bae",
+            "roundCoreDigest": "8966afcf174acf5d5cdadb8a07fe0d2be786c5d27dde1f9c10df34b0d767f538",
+            "roundId": "round-1",
+            "rowVersion": 5,
+            "schema": "chio.clearing.round-lifecycle.v1",
+            "state": "dispatching"
           }
         },
-        "stateDigest": "e50b5ec5a25040fb12b5f87d383479a8f7a2a7d61c5155a227bdd0d41b775d59",
-        "trustedClockHighWater": 102
+        "stateDigest": "63f1e9281380ca45406a9cf12cd607e9889311105dfddd257f19e20c529695b0",
+        "trustedClockHighWater": 504
+      },
+      "preparedEffect": {
+        "actionDigest": "385852988e56a6ca5f2f5c79a4815882770fad2b8677e533a8c55cf623be9936",
+        "authorization": {
+          "mode": "direct"
+        },
+        "effectSlotDigest": "a857a8759d654910d6e721b814a4fa4034438abb32b98cf90e98863988d9ab1c",
+        "effectSlotId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+        "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42"
       },
       "resourceKey": {
-        "resourceFamily": "conformance_resource",
-        "resourceId": "resource-000",
-        "scopeId": "scope-1"
+        "resourceFamily": "clearing_round",
+        "resourceId": "round-1",
+        "scopeId": "clearing-governance"
       },
-      "transitionProofDigest": "5362daeee2088f9068e15ccbc04cc654db4c106481312d9312192126731bf8b8"
+      "transitionProofDigest": "96dea9c85767eb30de6f57199699bde80f81427435bbc77482c5d106955a7379"
     },
     {
-      "expectedHeadDigest": "69ce8c126bdcc25d2ac4dcb64c410b32fefd9068a0c80451a894a140239f89b1",
       "nextHead": {
         "anchorId": "anchor-1",
-        "headVersion": 2,
-        "lifecycleFence": 2,
-        "lifecycleState": "active",
+        "effectIdempotencyKey": "3844ff528989dfc78386f4ec8853089ae31477fd00e4b3c9d9598b0219b0dd27",
+        "headVersion": 1,
+        "lifecycleFence": 1,
+        "lifecycleState": "ready",
         "namespace": "economy-prod",
-        "predecessorDigest": "69ce8c126bdcc25d2ac4dcb64c410b32fefd9068a0c80451a894a140239f89b1",
+        "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
         "resourceKey": {
-          "resourceFamily": "conformance_resource",
-          "resourceId": "resource-001",
-          "scopeId": "scope-1"
+          "resourceFamily": "effect_slot",
+          "resourceId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+          "scopeId": "clearing-governance"
         },
-        "resourceVersion": 2,
+        "resourceVersion": 1,
         "schema": "chio.economy.resource-head.v1",
         "state": {
           "storage": "inline",
           "value": {
-            "marker": 25140,
-            "resourceId": "resource-001",
+            "actionDigest": "385852988e56a6ca5f2f5c79a4815882770fad2b8677e533a8c55cf623be9936",
+            "admissionHandoff": {
+              "lifecycleFence": 9,
+              "operationVersion": 6,
+              "state": "dispatch_committed",
+              "storeFence": {
+                "lease_id": "lease-1",
+                "owner_epoch": 3,
+                "store_uuid": "store-1"
+              }
+            },
+            "anchorId": "anchor-1",
+            "effectKind": "settlement_dispatch",
+            "idempotencyKey": "3844ff528989dfc78386f4ec8853089ae31477fd00e4b3c9d9598b0219b0dd27",
+            "namespace": "economy-prod",
+            "operationId": "034cbde8fe48069feab11cd0fe21b22e5d0bb4d6939bbb61b22a55774495dd42",
+            "parametersDigest": "362eda84015a38d5685d0ab7b044a3b71acb5da22a13914fb141495b57e4b56f",
+            "request": {
+              "requestBindingDigest": "fb323baa255ed7b67a448601a4156fc8cbd2b567325b48c5099e00a8bbee5548",
+              "requestId": "request-first",
+              "requestNamespaceDigest": "15cbda58bffdc194ce9011ccffa0583ffd03b586fe124fcef9d936c68c6f3845"
+            },
+            "resourceHeadDigest": "918c74adde38ee4c082aa7d5a25404917046e9fc237472f84da31525cfe6e279",
+            "resourceKey": {
+              "resourceFamily": "clearing_round",
+              "resourceId": "round-1",
+              "scopeId": "clearing-governance"
+            },
+            "schema": "chio.economy.effect-slot.v1",
+            "slotId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+            "state": "ready",
+            "target": {
+              "qualificationDigest": "ab04e03f6ec6ebc4286422612a8b857f99d4c8d90406f2ad486e36f3ae6c6872",
+              "targetId": "settlement-rail",
+              "targetKeyEpoch": 2
+            }
+          }
+        },
+        "stateDigest": "e0f4382365c88ba3f628a3ce3ab23171977a46a5f8c22dd49b13c8792ae8d60c",
+        "trustedClockHighWater": 504
+      },
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "05b8d4ce32a7760f251d095add2cee0da6dcdd397007b7924a1a17f9b18cd699",
+        "scopeId": "clearing-governance"
+      },
+      "transitionProofDigest": "96dea9c85767eb30de6f57199699bde80f81427435bbc77482c5d106955a7379"
+    },
+    {
+      "expectedHeadDigest": "7928c39c322391fde5caab87e9111bbb6e75f9f95388aab15d279c1a6cb14645",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "headVersion": 5,
+        "lifecycleFence": 2,
+        "lifecycleState": "clearing_reserved",
+        "namespace": "economy-prod",
+        "predecessorDigest": "7928c39c322391fde5caab87e9111bbb6e75f9f95388aab15d279c1a6cb14645",
+        "resourceKey": {
+          "resourceFamily": "obligation_disposition",
+          "resourceId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+          "scopeId": "clearing-governance"
+        },
+        "resourceVersion": 6,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "atomDigest": "f10d6066cdbbb88b91231f352de73aaf381d3a0f978c58a858b29f8ec74c6916",
+            "disposition": {
+              "kind": "clearing_reserved",
+              "round_id": "round-1"
+            },
+            "lastTransition": {
+              "authority_digest": "e33a4aca07b961a073ea5e5ad1b4651378a468d40981abd4e2abe677378c18f9",
+              "kind": "reserve_clearing",
+              "round_id": "round-1"
+            },
+            "lifecycleFence": 2,
+            "obligationId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+            "schema": "chio.obligation.disposition.v1",
             "version": 2
           }
         },
-        "stateDigest": "9fa4d15cae98ff41c2639fdb9e428cb02e9f3caeb0dcdb53908673310d92ce37",
-        "trustedClockHighWater": 102
+        "stateDigest": "44d29a724585d57d76bb004f0ab52e18cf2a1fa6a53448f72846a994976ce39f",
+        "trustedClockHighWater": 504
       },
       "resourceKey": {
-        "resourceFamily": "conformance_resource",
-        "resourceId": "resource-001",
-        "scopeId": "scope-1"
+        "resourceFamily": "obligation_disposition",
+        "resourceId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+        "scopeId": "clearing-governance"
       },
-      "transitionProofDigest": "8cee2c7bb7d36652e7e9183b62ea43bdf5bbfa59ebc3e083141b37c9e8d257f0"
+      "transitionProofDigest": "96dea9c85767eb30de6f57199699bde80f81427435bbc77482c5d106955a7379"
     }
   ]
 }

@@ -1,23 +1,9 @@
 {
-  "name": "Platform server",
-  "public_key": "9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07",
-  "required_permissions": {
-    "environment_variables": [
-      "CHIO_MODE"
-    ],
-    "native_syscall_profile": "brokered_native_v1",
-    "network_destinations": [
-      {
-        "host": "api.example.com",
-        "port": 443
-      }
-    ],
-    "read_paths": [
-      "/srv/data"
-    ]
-  },
+  "description": "OpenAPI-to-MCP bridge for Petstore (1.0.0)",
+  "name": "Petstore Bridge",
+  "public_key": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
   "schema": "chio.manifest.v1",
-  "server_id": "srv-platform",
+  "server_id": "petstore-bridge",
   "tools": [
     {
       "annotations": {
@@ -26,27 +12,89 @@
         "read_only": true,
         "requires_approval": false
       },
-      "description": "Read",
+      "description": "List all pets",
       "input_schema": {
         "properties": {
-          "large": {
-            "maximum": 18446744073709551615,
+          "limit": {
             "type": "integer"
-          },
-          "whole": {
-            "minimum": 1,
-            "type": "number"
-          },
-          "zero": {
-            "minimum": 0,
-            "type": "number"
           }
         },
         "type": "object"
       },
-      "latency_hint": "instant",
-      "name": "read"
+      "latency_hint": "fast",
+      "name": "listPets"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": false,
+        "requires_approval": false
+      },
+      "description": "Create a pet",
+      "input_schema": {
+        "properties": {
+          "body": {
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
+      "latency_hint": "moderate",
+      "name": "createPet"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": true,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Get a pet by ID",
+      "input_schema": {
+        "properties": {
+          "petId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId"
+        ],
+        "type": "object"
+      },
+      "latency_hint": "fast",
+      "name": "getPet"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "idempotent": true,
+        "read_only": false,
+        "requires_approval": false
+      },
+      "description": "Delete a pet",
+      "input_schema": {
+        "properties": {
+          "petId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "petId"
+        ],
+        "type": "object"
+      },
+      "latency_hint": "moderate",
+      "name": "deletePet"
     }
   ],
-  "version": "2.0.0"
+  "version": "1.0.0"
 }

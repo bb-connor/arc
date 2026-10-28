@@ -1,45 +1,33 @@
 {
-  "delegation_chain": [
-    {
-      "attenuations": [
-        {
-          "constraint": {
-            "type": "domain_exact",
-            "value": "a.example"
-          },
-          "server_id": "srv",
-          "tool_name": "read",
-          "type": "add_constraint"
-        }
-      ],
-      "capability_id": "snapshot-parent",
-      "delegatee": "d1f36f7711e2db889230785f9a478f9ca06463cd8f872aa6b698d1ffbad0a85f",
-      "delegator": "b2a095c86eafd130ea49646c3db51e312d8acb6daee07c4b811c8c847f782887",
-      "signature": "fb3e4c0358447473e06c2b085082c4960d4d2c6a1d11ae33240b8501f6973ec52f8e12882bb087ea68cb6292cde104d4a265c01395085bca497a0fed7062ca0d",
-      "timestamp": 100
-    }
-  ],
-  "expires_at": 200,
-  "id": "snapshot-token",
-  "issued_at": 100,
-  "issuer": "b2a095c86eafd130ea49646c3db51e312d8acb6daee07c4b811c8c847f782887",
+  "expires_at": 18446744073709551615,
+  "id": "cap-request-matching",
+  "issued_at": 1,
+  "issuer": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39",
   "schema": "chio.capability.v1",
   "scope": {
     "grants": [
       {
         "constraints": [
           {
-            "type": "path_prefix",
-            "value": "/workspace"
+            "type": "require_finding_recovery",
+            "value": {
+              "finding_id": "finding-a",
+              "listing_id": "listing-1",
+              "max_recoveries": 2,
+              "original_capability_id": "capability-original",
+              "original_delivery_receipt_id": "receipt-original",
+              "purchase_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "recovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
           }
         ],
         "operations": [
           "invoke"
         ],
         "server_id": "srv",
-        "tool_name": "read"
+        "tool_name": "tool"
       }
     ]
   },
-  "subject": "d1f36f7711e2db889230785f9a478f9ca06463cd8f872aa6b698d1ffbad0a85f"
+  "subject": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39"
 }

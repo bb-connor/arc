@@ -1422,7 +1422,13 @@
       "artifactKind": "mcp_session_credential_call",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/mcp/session-credential-call.schema.json",
-      "title": "Chio mcp session credential call signed body"
+      "title": "Chio mcp session credential call signed body",
+      "overrides": {
+        "/response/result/_meta/chio/receipt/action/parameters": {},
+        "/response/result/_meta/chioEvidence/output/structuredContent": {},
+        "/response/result/_meta/chioEvidence/receipt/action/parameters": {},
+        "/response/result/structuredContent": {}
+      }
     },
     {
       "schema": "chio.mcp.session-credential.v1",

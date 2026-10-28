@@ -50,31 +50,25 @@
         "currency": "USD",
         "units": 150
       },
-      "refunded": false,
-      "release_event": {
+      "refund_event": {
         "amount": {
           "currency": "USD",
-          "units": 30
+          "units": 149
         },
         "block": {
-          "block_hash": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "block_number": 12345682,
+          "block_hash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "block_number": 12345679,
           "transaction_hashes": [
-            "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
           ]
         },
         "escrow_id": "escrow-web3-1",
-        "partial": true,
-        "receipt_hash": "0x76f341ad5fc7373a9a9b986dedf9a4fc4ef1bb83e670380951d9e6cfcd63a7b2",
-        "release_tx_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "remaining_amount": {
-          "currency": "USD",
-          "units": 100
-        }
+        "refund_tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
+      "refunded": true,
       "released_amount": {
         "currency": "USD",
-        "units": 50
+        "units": 0
       },
       "settlement_token_address": "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8"
     },
@@ -116,17 +110,30 @@
     "salt_namespace": "chio-official-web3-stack-v1",
     "settlement_token_address": "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8"
   },
-  "dispute_posture": "undisputed",
+  "dispute_posture": "refunded",
   "dispute_snapshot": {
-    "chain_event_tx_hashes": [],
+    "chain_event_blocks": [
+      {
+        "block_hash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "block_number": 12345679,
+        "transaction_hashes": [
+          "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ]
+      }
+    ],
+    "chain_event_tx_hashes": [
+      "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    ],
     "challenge_window_secs": 600,
-    "dispute_id": "dispute-public-settlement-none",
-    "linked_receipt_ids": [],
-    "observed_at": 1743293460,
+    "dispute_id": "dispute-public-settlement-timeout-refund",
+    "linked_receipt_ids": [
+      "receipt-web3-1"
+    ],
+    "observed_at": 1743294401,
     "open_dispute_count": 0,
-    "posture": "undisputed",
+    "posture": "refunded",
     "schema": "chio.web3-settlement-dispute.v1",
-    "window_closed_at": 1743293460
+    "window_closed_at": 1743294401
   },
   "observed_confirmations": 24,
   "order_binding": {
@@ -141,7 +148,7 @@
     },
     "settlement_rail_id": "base-mainnet-usdc",
     "settlement_reference": "settlement-web3-1",
-    "settlement_tx_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "settlement_tx_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "transaction_passport_id": "passport-public-settlement-1"
   },
   "public_witness": {
@@ -307,16 +314,17 @@
       "trust_profile_id": "chio.official-web3-stack"
     },
     "execution_receipt_id": "receipt-web3-1",
-    "issued_at": 1743292860,
-    "lifecycle_state": "partially_settled",
+    "failure_reason": "escrow refunded after deadline",
+    "issued_at": 1743293801,
+    "lifecycle_state": "timed_out",
     "note": "Settled against an anchored receipt root and retained oracle provenance for the FX conversion.",
     "observed_execution": {
       "amount": {
         "currency": "USD",
-        "units": 30
+        "units": 150
       },
-      "externalReferenceId": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "observedAt": 1743292860
+      "externalReferenceId": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observedAt": 1743293801
     },
     "oracle_evidence": {
       "authority": "chio_link_runtime_v1",
@@ -455,7 +463,7 @@
     "schema": "chio.web3-settlement-execution-receipt.v1",
     "settled_amount": {
       "currency": "USD",
-      "units": 30
+      "units": 150
     },
     "settlement_reference": "settlement-web3-1"
   },

@@ -95,17 +95,15 @@
     "salt_namespace": "chio-official-web3-stack-v1",
     "settlement_token_address": "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8"
   },
-  "dispute_posture": "refunded",
+  "dispute_posture": "undisputed",
   "dispute_snapshot": {
     "chain_event_tx_hashes": [],
     "challenge_window_secs": 600,
-    "dispute_id": "dispute-public-settlement-refunded",
-    "linked_receipt_ids": [
-      "receipt-web3-1"
-    ],
+    "dispute_id": "dispute-public-settlement-none",
+    "linked_receipt_ids": [],
     "observed_at": 1743293460,
     "open_dispute_count": 0,
-    "posture": "refunded",
+    "posture": "undisputed",
     "schema": "chio.web3-settlement-dispute.v1",
     "window_closed_at": 1743293460
   },
@@ -160,6 +158,73 @@
   "settlement_receipt": {
     "dispatch": {
       "beneficiary_address": "0x2222222222222222222222222222222222222222",
+      "bond": {
+        "body": {
+          "bondId": "bond-web3-1",
+          "expiresAt": 1743294000,
+          "issuedAt": 1743292700,
+          "lifecycleState": "active",
+          "report": {
+            "disposition": "hold",
+            "exposure": {
+              "actionableReceipts": 0,
+              "activeDecisions": 0,
+              "currencies": [
+                "USD"
+              ],
+              "failedSettlementReceipts": 0,
+              "matchingDecisions": 0,
+              "matchingReceipts": 1,
+              "mixedCurrencyBook": false,
+              "pendingSettlementReceipts": 0,
+              "returnedDecisions": 0,
+              "returnedReceipts": 1,
+              "supersededDecisions": 0,
+              "truncatedDecisions": false,
+              "truncatedReceipts": false
+            },
+            "filters": {
+              "agentSubject": "subject-1",
+              "decisionLimit": 50,
+              "receiptLimit": 100
+            },
+            "generatedAt": 1743292700,
+            "latestFacilityId": "facility-web3-1",
+            "prerequisites": {
+              "activeFacilityMet": true,
+              "activeFacilityRequired": false,
+              "certificationMet": true,
+              "certificationRequired": false,
+              "currencyCoherent": true,
+              "runtimeAssuranceMet": true
+            },
+            "schema": "chio.credit.bond-report.v1",
+            "scorecard": {
+              "anomalyCount": 0,
+              "band": "prime",
+              "confidence": "high",
+              "currencies": [
+                "USD"
+              ],
+              "matchingDecisions": 0,
+              "matchingReceipts": 1,
+              "mixedCurrencyBook": false,
+              "overallScore": 0.95,
+              "probationary": false,
+              "returnedDecisions": 0,
+              "returnedReceipts": 1
+            },
+            "supportBoundary": {
+              "autonomyGatingSupported": false,
+              "externalEscrowExecutionSupported": false,
+              "reserveAccountingAuthoritative": true
+            }
+          },
+          "schema": "chio.credit.bond.v1"
+        },
+        "signature": "4858316816d986b287ab53f5fa411c6211748e07788a134592bf1550a52a9c10f040a7b7375868e58628c13081f316f1f262b173ca093aa9338a2ae339f05f04",
+        "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
+      },
       "bond_vault_contract": "0x1000000000000000000000000000000000000003",
       "capital_instruction": {
         "body": {
@@ -289,7 +354,7 @@
     },
     "execution_receipt_id": "receipt-web3-1",
     "issued_at": 1743292860,
-    "lifecycle_state": "reversed",
+    "lifecycle_state": "settled",
     "note": "Settled against an anchored receipt root and retained oracle provenance for the FX conversion.",
     "observed_execution": {
       "amount": {
@@ -433,7 +498,6 @@
       },
       "schema": "chio.anchor-inclusion-proof.v1"
     },
-    "reversal_of": "receipt-web3-original",
     "schema": "chio.web3-settlement-execution-receipt.v1",
     "settled_amount": {
       "currency": "USD",

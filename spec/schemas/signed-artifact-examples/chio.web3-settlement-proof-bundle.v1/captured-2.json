@@ -77,15 +77,35 @@
     "root_registry_runtime_codehash": "0xfc5d76d87b02096c6ae32ce644a2b98ca0bdf3c56700ad16731fad2062e6bd7f"
   },
   "commerce_order_id": "order-public-settlement-1",
-  "dispute_posture": "undisputed",
+  "deployment_provenance": {
+    "approval_hash": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "bond_vault_contract": "0x1000000000000000000000000000000000000003",
+    "bond_vault_runtime_codehash": "0x17f7936469584b38404765ac44bd7e2384337983e4bc6448a3500d0637711f09",
+    "chain_id": "eip155:8453",
+    "contract_package_id": "chio.official-web3-contracts",
+    "create2_factory": "0x1000000000000000000000000000000000000000",
+    "escrow_contract": "0x1000000000000000000000000000000000000002",
+    "escrow_runtime_codehash": "0x03d8f545c330922a33db6473430c50eafd527e04474f31abee2dc1f8c6ab2d36",
+    "identity_registry_address": "0x1000000000000000000000000000000000000004",
+    "identity_registry_runtime_codehash": "0xd4f87cc63c00d0640c8f232c8fac5e5cb99bc6cf185ef912225e07fa438614cc",
+    "provenance_id": "deployment-provenance-public-settlement-1",
+    "reviewed_manifest_hash": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "root_registry_address": "0x1000000000000000000000000000000000000001",
+    "root_registry_runtime_codehash": "0xfc5d76d87b02096c6ae32ce644a2b98ca0bdf3c56700ad16731fad2062e6bd7f",
+    "salt_namespace": "chio-official-web3-stack-v1",
+    "settlement_token_address": "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8"
+  },
+  "dispute_posture": "refunded",
   "dispute_snapshot": {
     "chain_event_tx_hashes": [],
     "challenge_window_secs": 600,
-    "dispute_id": "dispute-public-settlement-none",
-    "linked_receipt_ids": [],
+    "dispute_id": "dispute-public-settlement-refunded",
+    "linked_receipt_ids": [
+      "receipt-web3-1"
+    ],
     "observed_at": 1743293460,
     "open_dispute_count": 0,
-    "posture": "undisputed",
+    "posture": "refunded",
     "schema": "chio.web3-settlement-dispute.v1",
     "window_closed_at": 1743293460
   },
@@ -269,7 +289,7 @@
     },
     "execution_receipt_id": "receipt-web3-1",
     "issued_at": 1743292860,
-    "lifecycle_state": "settled",
+    "lifecycle_state": "reversed",
     "note": "Settled against an anchored receipt root and retained oracle provenance for the FX conversion.",
     "observed_execution": {
       "amount": {
@@ -413,6 +433,7 @@
       },
       "schema": "chio.anchor-inclusion-proof.v1"
     },
+    "reversal_of": "receipt-web3-original",
     "schema": "chio.web3-settlement-execution-receipt.v1",
     "settled_amount": {
       "currency": "USD",

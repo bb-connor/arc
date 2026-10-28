@@ -1,7 +1,25 @@
 {
-  "description": "Bindings manifest verification sample",
+  "description": "Manifest vector for bindings-core SDK fixtures",
   "name": "Bindings Demo",
   "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+  "required_permissions": {
+    "environment_variables": [
+      "CHIO_ENV"
+    ],
+    "native_syscall_profile": "native_standard_v1",
+    "network_destinations": [
+      {
+        "host": "api.example.com",
+        "port": 443
+      }
+    ],
+    "read_paths": [
+      "/workspace"
+    ],
+    "write_paths": [
+      "/workspace/output"
+    ]
+  },
   "schema": "chio.manifest.v1",
   "server_id": "srv-bindings-demo",
   "tools": [
@@ -12,7 +30,20 @@
         "read_only": true,
         "requires_approval": false
       },
-      "description": "Reads a file from the workspace",
+      "description": "Tool definition for file_read",
+      "flow": {
+        "egress": true,
+        "input_clearance": {
+          "compartments": [],
+          "kind": "known",
+          "owners": {}
+        },
+        "output_label": {
+          "compartments": [],
+          "kind": "known",
+          "owners": {}
+        }
+      },
       "input_schema": {
         "properties": {
           "path": {
@@ -28,8 +59,8 @@
       "name": "file_read",
       "output_schema": {
         "properties": {
-          "content": {
-            "type": "string"
+          "ok": {
+            "type": "boolean"
           }
         },
         "type": "object"

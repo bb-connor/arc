@@ -1,15 +1,15 @@
 {
-  "authorization_digest": "63c4a54e341e4dec5f4607e89501aac0a3535c8da02ef310439eb68ebd675577",
-  "claim_id": "runtime-custody-claim",
-  "completed_at_unix_ms": 1800000001000,
-  "execution_started_at_unix_ms": 1800000001000,
+  "authorization_digest": "e954c2175fe2237265d36d1e97946f96f60fff1dbeb5b861325c5ac3852fba74",
+  "claim_id": "claim",
+  "completed_at_unix_ms": 1200,
+  "execution_started_at_unix_ms": 1100,
   "executor": {
-    "executor_id": "runtime-custody-executor",
-    "key_epoch": 1,
-    "public_key": "269c6ecfcbaba39ad233b05ce0c862932aa752180e81b42ed45fb479cfbf88dc"
+    "executor_id": "caller-worker",
+    "key_epoch": 7,
+    "public_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
   },
   "output": {
-    "closed": true
+    "returned": true
   },
   "realized_cost": null,
   "schema": "chio.caller-delivery-report.v1"

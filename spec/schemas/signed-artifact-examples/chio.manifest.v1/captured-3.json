@@ -1,26 +1,52 @@
 {
-  "description": "Streaming test",
-  "name": "Streaming Server",
-  "public_key": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+  "name": "Platform server",
+  "public_key": "9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07",
+  "required_permissions": {
+    "environment_variables": [
+      "CHIO_MODE"
+    ],
+    "native_syscall_profile": "brokered_native_v1",
+    "network_destinations": [
+      {
+        "host": "api.example.com",
+        "port": 443
+      }
+    ],
+    "read_paths": [
+      "/srv/data"
+    ]
+  },
   "schema": "chio.manifest.v1",
-  "server_id": "streaming-srv",
+  "server_id": "srv-platform",
   "tools": [
     {
       "annotations": {
         "destructive": false,
-        "idempotent": false,
+        "idempotent": true,
         "read_only": true,
         "requires_approval": false
       },
-      "description": "Stream search results",
+      "description": "Read",
       "input_schema": {
-        "type": "object",
-        "x-chio-cancellation": true,
-        "x-chio-partial-output": true,
-        "x-chio-streaming": true
+        "properties": {
+          "large": {
+            "maximum": 18446744073709551615,
+            "type": "integer"
+          },
+          "whole": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "zero": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
-      "name": "search_stream"
+      "latency_hint": "instant",
+      "name": "read"
     }
   ],
-  "version": "1.0.0"
+  "version": "2.0.0"
 }
