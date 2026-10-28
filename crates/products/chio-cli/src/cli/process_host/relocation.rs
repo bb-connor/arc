@@ -275,6 +275,10 @@ fn relative(directory: &Path, path: &Path) -> Result<String, CliError> {
 fn digest(path: &Path) -> Result<String, CliError> {
     let file = crate::input::open_regular(path)?;
     let expected = file.metadata()?.len();
+    digest_file(file, expected)
+}
+
+fn digest_file(file: File, expected: u64) -> Result<String, CliError> {
     let limit = expected.checked_add(1).ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
