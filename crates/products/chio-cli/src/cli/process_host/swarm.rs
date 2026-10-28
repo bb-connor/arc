@@ -111,11 +111,12 @@ fn routes(record: &Record) -> Result<BTreeMap<String, Route>, CliError> {
             .iter()
             .find(|s| s.id == manifest.server_id)
         {
-            let launch = std::fs::read(
+            let launch = crate::input::read_regular(
                 server
                     .launch_policy
                     .as_ref()
                     .ok_or_else(|| error("missing launch policy"))?,
+                crate::input::MAX_DOCUMENT_BYTES,
             )?;
             (
                 "mcp",
@@ -519,3 +520,7 @@ mod plan_tests {
         .is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "swarm_reader_tests.rs"]
+mod reader_tests;

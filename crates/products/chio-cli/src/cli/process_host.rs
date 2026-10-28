@@ -6,6 +6,10 @@ use clap::Subcommand;
 
 use crate::CliError;
 
+#[cfg(all(test, unix))]
+#[path = "process_host/artifact_reader_tests.rs"]
+mod artifact_reader_tests;
+
 #[cfg(unix)]
 #[path = "process_host/call_evidence.rs"]
 mod call_evidence;

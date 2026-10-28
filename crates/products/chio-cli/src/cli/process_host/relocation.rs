@@ -273,7 +273,20 @@ fn relative(directory: &Path, path: &Path) -> Result<String, CliError> {
 }
 
 fn digest(path: &Path) -> Result<String, CliError> {
-    let mut file = File::open(path)?;
+    let file = crate::input::open_regular(path)?;
+    let expected = file.metadata()?.len();
+    digest_file(file, expected)
+}
+
+fn digest_file(file: File, expected: u64) -> Result<String, CliError> {
+    let limit = expected.checked_add(1).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "relocation file length overflow",
+        )
+    })?;
+    let mut file = file.take(limit);
+    let mut observed = 0_u64;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 65_536];
     loop {
@@ -281,7 +294,15 @@ fn digest(path: &Path) -> Result<String, CliError> {
         if count == 0 {
             break;
         }
+        observed += count as u64;
         hasher.update(&buffer[..count]);
+    }
+    if observed != expected {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "relocation file length changed while hashing",
+        )
+        .into());
     }
     Ok(hasher
         .finalize()
@@ -289,3 +310,7 @@ fn digest(path: &Path) -> Result<String, CliError> {
         .map(|byte| format!("{byte:02x}"))
         .collect())
 }
+
+#[cfg(test)]
+#[path = "relocation_reader_tests.rs"]
+mod reader_tests;
