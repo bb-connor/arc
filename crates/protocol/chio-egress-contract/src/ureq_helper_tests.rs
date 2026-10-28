@@ -192,8 +192,12 @@ fn vpc_agent(allowances: &[(&str, u16, &str)]) -> BlockingContractAgent {
             })
             .collect(),
     };
-    BlockingContractAgent::new(&contract, Duration::from_millis(300), Duration::from_secs(2))
-        .expect("agent")
+    BlockingContractAgent::new(
+        &contract,
+        Duration::from_millis(300),
+        Duration::from_secs(2),
+    )
+    .expect("agent")
 }
 
 #[test]

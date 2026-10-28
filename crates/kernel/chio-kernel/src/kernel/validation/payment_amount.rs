@@ -55,6 +55,7 @@ impl ChioKernel {
         })?;
         if adapter.rail_id() != journal.rail
             || rail_mode != journal.rail_mode
+            || adapter.egress_allowance_digest() != journal.rail_egress_allowance_digest
         {
             return Err(PaymentError::RailError(
                 "durable payment adapter does not match the persisted rail profile".to_owned(),

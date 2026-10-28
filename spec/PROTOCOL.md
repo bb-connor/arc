@@ -3230,14 +3230,33 @@ before any byte leaves the substrate. The contract carries:
 - an exact authority allow-list,
 - explicit denials for loopback, IPv4/IPv6 link-local, and IPv6 unique-local
   (`fc00::/7`),
-- a `max_redirect_chain` ceiling that bounds redirect hop count, and
-- a `max_response_bytes` ceiling that bounds the observed response body.
+- a `max_redirect_chain` ceiling that bounds redirect hop count,
+- a `max_response_bytes` ceiling that bounds the observed response body, and
+- `private_network_allowances`, empty by default: each entry pins one
+  `host:port` of the authority set to a CIDR.
+
+An allowance is the only way a contract reaches a private address. Its CIDR
+MUST lie inside 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 or
+fc00::/7, MUST be at least a /16 (IPv4) or /48 (IPv6), and MUST NOT intersect
+link-local or the metadata ranges 100.100.100.200/32 and fd00:ec2::/32. A
+contract with any allowance MUST allow only `https`. When a pinned host
+resolves, every address in the answer, public or private, MUST lie inside the
+CIDR, or the request is refused. Cloud metadata addresses (169.254.169.254,
+100.100.100.200, fd00:ec2::/32) are refused for every contract: by their
+address class when its flags deny it, and otherwise as `ReservedAddressDenied`. Each allowance set has a SHA-256 digest over its RFC 8785
+canonical form tagged `chio.egress.private-network-allowance.v1`; a payment
+journal records the digest its rail was dialed under, and recovery refuses a
+rail whose digest changed.
 
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
 
 - loopback target rejected (`LoopbackDenied`),
 - link-local / cloud metadata target rejected (`LinkLocalDenied`),
 - IPv6 ULA target rejected (`Ipv6UlaDenied`),
+- cloud metadata target that the address-class flags would admit rejected
+  (`ReservedAddressDenied`),
+- pinned host resolved outside its allowance (`PrivateNetworkAllowanceMismatch`),
+- invalid allowance at load (`InvalidAllowance`),
 - redirect chain exceeds the contract ceiling (`RedirectLimitExceeded`),
 - response body exceeds the contract ceiling (`ResponseTooLarge`),
 - scheme outside the allow-list (`SchemeDenied`),

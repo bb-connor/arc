@@ -90,11 +90,17 @@ fn unlisted_private_rail_is_refused() {
         .with_timeout(Duration::from_millis(300))
         .authorize(&authorize_request())
         .expect_err("no allowance");
-    assert!(is_rail_error(&error, "payment rail egress denied"), "{error:?}");
+    assert!(
+        is_rail_error(&error, "payment rail egress denied"),
+        "{error:?}"
+    );
 
     let other_host = BTreeSet::from([allowance("10.255.255.253", 9, "10.255.255.253/32")]);
     let error = x402_at(BLACKHOLE_RAIL, &other_host).expect_err("allowance for another host");
-    assert!(is_rail_error(&error, "payment rail egress denied"), "{error:?}");
+    assert!(
+        is_rail_error(&error, "payment rail egress denied"),
+        "{error:?}"
+    );
 }
 
 #[test]

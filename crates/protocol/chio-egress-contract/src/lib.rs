@@ -195,6 +195,11 @@ impl HttpEgressContract {
         for authority in &self.allowed_authority_set {
             validate_authority_token(authority)?;
         }
+        allowance::validate_allowances(
+            &self.private_network_allowances,
+            &self.allowed_schemes,
+            &self.allowed_authority_set,
+        )?;
         Ok(())
     }
 
@@ -223,7 +228,11 @@ impl HttpEgressContract {
         Ok(())
     }
 
-    fn enforce_host_class(&self, host: &Host<&str>, port: Option<u16>) -> Result<(), HttpEgressError> {
+    fn enforce_host_class(
+        &self,
+        host: &Host<&str>,
+        port: Option<u16>,
+    ) -> Result<(), HttpEgressError> {
         match host {
             Host::Domain(domain) => {
                 let normalized = normalize_domain_name(domain);
@@ -259,7 +268,12 @@ impl HttpEgressContract {
         address: SocketAddr,
     ) -> Result<(), HttpEgressError> {
         let ip = allowance::canonical_ip(address.ip());
-        self.enforce_address(host, Some(address.port()), ip, format!("{host} resolved to {ip}"))
+        self.enforce_address(
+            host,
+            Some(address.port()),
+            ip,
+            format!("{host} resolved to {ip}"),
+        )
     }
 
     /// Enforce the contract on a resolved address when the resolver cannot
@@ -274,9 +288,10 @@ impl HttpEgressContract {
         self.enforce_address(host, None, ip, format!("{host} resolved to {ip}"))
     }
 
-    /// Metadata endpoints are refused first. A host pinned by an allowance
-    /// for this port must resolve inside the allowance CIDR, public answers
-    /// included. Any other host falls to the address-class policy.
+    /// A host pinned by an allowance for this port must resolve inside the
+    /// allowance CIDR, public answers included. Any other host falls to the
+    /// address-class policy, and a cloud metadata address that policy would
+    /// admit is still refused.
     fn enforce_address(
         &self,
         host: &str,
@@ -285,9 +300,6 @@ impl HttpEgressContract {
         label: String,
     ) -> Result<(), HttpEgressError> {
         let address = allowance::canonical_ip(address);
-        if host.is_empty() && allowance::is_metadata_address(address) {
-            return Err(HttpEgressError::ReservedAddressDenied { host: label });
-        }
         let host = allowance::allowance_host(host);
         match port {
             Some(port) => {
@@ -296,7 +308,14 @@ impl HttpEgressContract {
                     .iter()
                     .find(|entry| entry.host == host && entry.port == port)
                 {
-                    let _ = (pin, port);
+                    if pin.cidr.contains(address) && allowance::is_unlockable_address(address) {
+                        return Ok(());
+                    }
+                    return Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+                        host,
+                        port,
+                        address,
+                    });
                 }
             }
             None => {
@@ -313,7 +332,11 @@ impl HttpEgressContract {
             IpAddr::V4(address) => classify_ipv4_address(&address),
             IpAddr::V6(address) => classify_ipv6_address(&address),
         };
-        self.enforce_ip_address_class(label, class)
+        self.enforce_ip_address_class(label.clone(), class)?;
+        if allowance::is_metadata_address(address) {
+            return Err(HttpEgressError::ReservedAddressDenied { host: label });
+        }
+        Ok(())
     }
 
     fn enforce_ip_address_class(

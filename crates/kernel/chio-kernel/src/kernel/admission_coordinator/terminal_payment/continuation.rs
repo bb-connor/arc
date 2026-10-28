@@ -49,6 +49,7 @@ impl ChioKernel {
         })?;
         if adapter.rail_id() != journal.rail
             || adapter.rail_mode() != Some(journal.rail_mode)
+            || adapter.egress_allowance_digest() != journal.rail_egress_allowance_digest
         {
             return Err(item_failure(
                 FailureKind::ContractChanged,
