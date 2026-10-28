@@ -130,6 +130,10 @@ impl PaymentAdapter for MutatingPaymentAdapter {
             metadata: serde_json::json!({"adapter": "mutating-test"}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct PostPaymentMutationGuard {
@@ -140,6 +144,10 @@ struct PostPaymentMutationGuard {
 impl Guard for PostPaymentMutationGuard {
     fn name(&self) -> &str {
         "post-payment-mutation-guard"
+    }
+
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

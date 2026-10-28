@@ -9,6 +9,10 @@ impl Guard for ApprovalAttemptObserver {
         "approval-attempt-observer"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         let identity = context.invocation_attempt_id().ok_or_else(|| {
             KernelError::GuardDenied("approval retry lacks a kernel attempt".to_owned())

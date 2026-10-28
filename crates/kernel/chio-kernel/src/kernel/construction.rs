@@ -1152,6 +1152,29 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Install the kernel settlement ledger as the settlement hook.
+    ///
+    /// A host that configures a payment adapter calls this at startup and
+    /// refuses to start when it fails. The ledger needs the configured receipt
+    /// store to record settlement reconciliations and to pass the same
+    /// validation as [`Self::set_settlement_observer_runtime`].
+    pub fn install_settlement_ledger(
+        &mut self,
+        outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
+        retry_policy: chio_settle::RetryPolicy,
+    ) -> Result<(), KernelError> {
+        let Some(receipt_store) = self.receipt_store.clone() else {
+            return Err(crate::SettlementRuntimeConfigError::MissingReceiptStore.into());
+        };
+        if !receipt_store.supports_settlement_reconciliation() {
+            return Err(crate::SettlementRuntimeConfigError::UnsupportedSettlementLedger.into());
+        }
+        let hook = Arc::new(crate::settlement_ledger::KernelSettlementLedgerHook::new(
+            receipt_store,
+        ));
+        self.set_settlement_observer_runtime(hook, outcome_store, retry_policy)
+    }
+
     fn validate_settlement_receipt_store(
         receipt_store: &dyn ReceiptStore,
         runtime: &crate::settlement_routing::SettlementObserverRuntime,

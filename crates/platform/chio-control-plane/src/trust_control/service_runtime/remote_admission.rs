@@ -1,4 +1,8 @@
 #[cfg(test)]
+#[path = "remote_admission/withholding_tests.rs"]
+mod withholding_tests;
+
+#[cfg(test)]
 #[path = "remote_admission/compacted_metadata_tests.rs"]
 mod compacted_metadata_tests;
 
@@ -1096,6 +1100,9 @@ fn operation_error(error: RemoteAdmissionError) -> AdmissionOperationStoreError 
             AdmissionAuthorityErrorCode::OutcomeUnknown => {
                 AdmissionOperationStoreError::OutcomeUnknown(error.message)
             }
+            AdmissionAuthorityErrorCode::OutputWithheld => {
+                AdmissionOperationStoreError::KernelStopped
+            }
             AdmissionAuthorityErrorCode::Unavailable
             | AdmissionAuthorityErrorCode::Timeout
             | AdmissionAuthorityErrorCode::Stopped => {
@@ -1207,6 +1214,7 @@ fn outcome_error(error: RemoteAdmissionError) -> ToolOutcomeStoreError {
 fn receipt_error(error: RemoteAdmissionError) -> ReceiptStoreError {
     match error {
         RemoteAdmissionError::Authority(error) => match error.code {
+            AdmissionAuthorityErrorCode::OutputWithheld => ReceiptStoreError::OutputWithheld,
             AdmissionAuthorityErrorCode::Fenced => ReceiptStoreError::Fenced,
             AdmissionAuthorityErrorCode::NotFound => ReceiptStoreError::NotFound(error.message),
             AdmissionAuthorityErrorCode::Conflict => ReceiptStoreError::Conflict(error.message),
@@ -1230,6 +1238,7 @@ fn receipt_error(error: RemoteAdmissionError) -> ReceiptStoreError {
 
 fn operation_as_receipt_error(error: AdmissionOperationStoreError) -> ReceiptStoreError {
     match error {
+        AdmissionOperationStoreError::KernelStopped => ReceiptStoreError::OutputWithheld,
         AdmissionOperationStoreError::Fenced => ReceiptStoreError::Fenced,
         AdmissionOperationStoreError::NotFound => {
             ReceiptStoreError::NotFound("admission operation".to_owned())

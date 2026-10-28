@@ -44,7 +44,7 @@
   <text x="104" y="538" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#c8a86f">$0.03 metered &#183; ed25519 signed</text>
   <text x="104" y="590" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" letter-spacing="2" fill="#b08d5b">08</text>
   <text x="130" y="594" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#d3cabb">Commit</text>
-  <text x="104" y="612" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#9a8f7e">sha256:9c1e&#8230; &#183; Merkle checkpoint</text>
+  <text x="104" y="612" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#9a8f7e">sha256:9c1e&#8230; &#183; batched checkpoint</text>
   <path d="M90.0 686 H390.0" stroke="#b08d5b" stroke-opacity="0.3" stroke-width="1"/>
   <rect x="234.0" y="680" width="12" height="12" transform="rotate(45 240.0 686)" fill="#1b140d" stroke="#b08d5b" stroke-opacity="0.7"/>
   <text x="240.0" y="716" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-style="italic" fill="#d8cfc0" fill-opacity="0.75">Every outcome becomes a signed receipt.</text>

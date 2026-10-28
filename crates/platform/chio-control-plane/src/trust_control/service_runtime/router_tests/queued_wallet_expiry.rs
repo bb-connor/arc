@@ -432,68 +432,23 @@ fn final_wallet_queued_expiry_healthy_token_and_signed_credential_progress() -> 
 }
 
 #[cfg(unix)]
-struct PausedOffers {
-    path: PathBuf,
-    release: Option<std::sync::mpsc::Sender<()>>,
-    writer: Option<std::thread::JoinHandle<std::io::Result<()>>>,
-}
+struct PausedOffers(Option<crate::signed_input::read_pause::ReadPause>);
 
 #[cfg(unix)]
 impl PausedOffers {
     fn new(
         path: PathBuf,
         bytes: Vec<u8>,
-    ) -> TestResult<(Self, tokio::sync::oneshot::Receiver<()>)> {
-        use std::io::Write;
-        let created = std::process::Command::new("mkfifo")
-            .args(["-m", "600"])
-            .arg(&path)
-            .status()?;
-        assert!(created.success(), "could not create paused offers fixture");
-        let (entered, observed) = tokio::sync::oneshot::channel();
-        let (release, wait) = std::sync::mpsc::channel();
-        let read_path = path.clone();
-        let writer = std::thread::spawn(move || {
-            let mut file = std::fs::OpenOptions::new().write(true).open(read_path)?;
-            let _ = entered.send(());
-            let _ = wait.recv_timeout(HANG_GUARD);
-            file.write_all(&bytes)
-        });
-        Ok((
-            Self {
-                path,
-                release: Some(release),
-                writer: Some(writer),
-            },
-            observed,
-        ))
+    ) -> TestResult<(Self, tokio::sync::mpsc::UnboundedReceiver<()>)> {
+        std::fs::write(&path, bytes)?;
+        let (pause, entered) =
+            crate::signed_input::read_pause::ReadPause::install(&path, HANG_GUARD)?;
+        Ok((Self(Some(pause)), entered))
     }
 
-    fn finish(&mut self) -> TestResult {
-        if let Some(release) = self.release.take() {
-            release.send(())?;
-        }
-        if let Some(writer) = self.writer.take() {
-            writer.join().map_err(|_| "offers writer panicked")??;
-        }
-        Ok(())
-    }
-}
-
-#[cfg(unix)]
-impl Drop for PausedOffers {
-    fn drop(&mut self) {
-        use std::os::unix::fs::OpenOptionsExt;
-        if let Some(release) = self.release.take() {
-            let _ = release.send(());
-        }
-        if let Some(writer) = self.writer.take() {
-            let reader = std::fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NONBLOCK)
-                .open(&self.path);
-            let _ = writer.join();
-            drop(reader);
+    fn finish(&mut self) {
+        if let Some(pause) = self.0.take() {
+            pause.release();
         }
     }
 }
@@ -506,7 +461,7 @@ fn final_wallet_queued_expiry_middleware_rechecks_after_registry_read() -> TestR
         let mut wallet = Wallet::new(3)?;
         let before = std::fs::read(&wallet.path)?;
         let paused_path = wallet.path.with_file_name("paused-offers.json");
-        let (mut paused, entered) = PausedOffers::new(paused_path.clone(), before.clone())?;
+        let (mut paused, mut entered) = PausedOffers::new(paused_path.clone(), before.clone())?;
         wallet.state.config.passport_issuance_offers_file = Some(paused_path);
         let polls = Arc::new(AtomicUsize::new(0));
         let counter = Arc::clone(&polls);
@@ -519,9 +474,9 @@ fn final_wallet_queued_expiry_middleware_rechecks_after_registry_read() -> TestR
             .body(Body::from_stream(stream))?;
         let router = super::super::build_router(wallet.state.clone());
         let response = tokio::spawn(async move { router.oneshot(request).await });
-        tokio::time::timeout(HANG_GUARD, entered).await??;
+        tokio::time::timeout(HANG_GUARD, entered.recv()).await?.ok_or("offers read did not enter pause")?;
         wallet.expired().await?;
-        paused.finish()?;
+        paused.finish();
         let response = tokio::time::timeout(HANG_GUARD, response).await???;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         let body = axum::body::to_bytes(response.into_body(), 4096).await?;

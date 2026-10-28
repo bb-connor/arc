@@ -142,6 +142,9 @@ fn sample_config() -> SettlementChainConfig {
         oracle: SettlementOracleConfig::default(),
         evidence_substrate: SettlementEvidenceConfig::default(),
         policy,
+        kernel_authority: crate::SettlementKernelAuthority {
+            trusted_keys: vec![Keypair::from_seed(&[7u8; 32]).public_key()],
+        },
     }
 }
 

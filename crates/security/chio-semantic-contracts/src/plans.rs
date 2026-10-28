@@ -1,9 +1,9 @@
 //! Semantic plan structure, independent of execution.
 use crate::work::units;
-use crate::VerificationBudget;
 use alloc::vec::Vec;
 use chio_security_types::recovery::{ContractError, StepId};
 use chio_security_types::semantic::{SemanticPlanInputV1, SemanticPlanV1};
+use chio_security_types::work::VerificationBudget;
 
 /// Stable bounded order: each round appends every ready step in identifier
 /// order. The order is an explanation, never an execution permit.

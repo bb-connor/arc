@@ -210,7 +210,13 @@ fn evaluate_response_serializes_execution_nonce_field() {
         parameter_hash: chio_receipt.action.parameter_hash.clone(),
     };
     let cfg = ExecutionNonceConfig::default();
-    let signed = mint_execution_nonce(&kp, binding, &cfg, 1_000_000).unwrap();
+    let signed = mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding,
+        &cfg,
+        1_000_000,
+    )
+    .unwrap();
 
     let response = EvaluateResponse {
         verdict: Verdict::Allow,
@@ -303,7 +309,13 @@ fn stale_nonce_is_rejected_against_local_clock() {
         parameter_hash: "h".into(),
     };
     let now = 1_000_000;
-    let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+    let signed = mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    )
+    .unwrap();
     let err = verify_execution_nonce(
         &signed,
         &kp.public_key(),

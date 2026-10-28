@@ -91,7 +91,7 @@ pub(super) struct TestAdmissionState {
     recovery_status: Option<crate::admission_operation::AdmissionRecoveryStatusV1>,
 }
 
-pub(super) struct TestAdmissionOperationStore {
+pub(in crate::kernel) struct TestAdmissionOperationStore {
     caller_share_times: std::sync::Mutex<Vec<u64>>,
     recovery_pages: operation_store::TestRecoveryPages,
     recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
@@ -194,7 +194,7 @@ impl TestAdmissionOperationStore {
         *self.fence.lock().expect("test admission fence lock") = fence;
     }
 
-    pub(super) fn operation(&self) -> AdmissionOperationV1 {
+    pub(in crate::kernel) fn operation(&self) -> AdmissionOperationV1 {
         self.state
             .lock()
             .expect("test admission state lock")
@@ -239,7 +239,9 @@ impl TestAdmissionOperationStore {
             .store(true, Ordering::SeqCst);
     }
 
-    pub(super) fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
+    pub(in crate::kernel) fn budget_store(
+        &self,
+    ) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
         self.budget.clone()
     }
 
@@ -448,6 +450,10 @@ impl PaymentAdapter for QualifiedDurablePaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({}),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 
@@ -1227,7 +1233,7 @@ impl ToolServerConnection for DurableIncompleteStreamServer {
     }
 }
 
-pub(super) fn durable_admission_fixture(
+pub(in crate::kernel) fn durable_admission_fixture(
     request_id: &str,
 ) -> (
     ChioKernel,

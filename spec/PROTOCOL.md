@@ -1,8 +1,10 @@
 # Chio Protocol
 
-**Version:** 1.0
-**Date:** 2026-04-14
-**Status:** Current bounded Chio release profile
+**Version:** 1.0 preview, not stable
+**Date:** 2026-10-27
+**Status:** Pre-release preview profile. The wire contract may change until the
+preview contract is frozen with its schemas and test vectors.
+`spec/schemas/VERSION` stays at 1.0.0 and carries this preview label.
 
 Chio is pre-release. This document describes the current v1 protocol profile.
 Earlier internal draft versions have been folded into this v1 contract rather
@@ -157,15 +159,19 @@ documented below. The HTTP substrate's `HttpReceipt` maps
 deterministically to `ChioReceipt` so all existing receipt verification,
 checkpoint, and evidence-export workflows continue to apply.
 
-Compatibility rule:
+Wire-format rules:
 
 - signed capability-tree bodies and signed manifests are closed: `CapabilityToken`,
   `CapabilityTokenBody`, `ChioScope`, every grant and attenuation record, `DelegationLink`
   and `ToolManifest` reject an unknown member at decode time
-- additive members are tolerated only where the type is not closed: unsigned JSON
-  responses, and `ChioReceipt`, `ChioReceiptBody`, `ChildRequestReceipt` and
-  `ChildRequestReceiptBody`, whose decoders drop members outside the body and sign
-  only the body fields
+- `ChioReceipt`, `ChioReceiptBody`, `ChildRequestReceipt` and
+  `ChildRequestReceiptBody` also reject unknown members at decode time
+- `ChioReceipt` signs canonical JSON of
+  `ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }`,
+  including `bbs_signature` when present; see the [receipt contract](#6-receipt-contract)
+- `ChildRequestReceipt` signs canonical JSON of `ChildRequestReceiptBody`
+- additive members are tolerated only where the type is not closed, such as
+  unsigned JSON responses
 - unknown schema identifiers for schema-tagged artifacts must be rejected
 - fail-closed behavior is part of the protocol contract, not an implementation
   detail
@@ -1683,6 +1689,11 @@ it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
   decodes, so a rolling upgrade does not fail at parse time, but it is denied at
   verification. That prevents a nonce from being presented for a different
   request that shares the other five fields.
+- The kernel signs execution nonces with its classical Ed25519 capability key.
+  Under the `AllowClassical` floor that key also signs receipts. Under
+  `AllowHybrid` and `PqRequired` the receipt key is the hybrid composite, the
+  Ed25519 nonce signature does not verify under it, and the receipt is not
+  authoritative (ADR-0016).
 
 Advisory (`advisory_evaluation`) records and label-only receipts are never
 authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,
@@ -1770,27 +1781,104 @@ Nested flows such as sampling, elicitation, and resource reads use
 
 ### 6.4 Receipt Metadata
 
-The shipped metadata surface is extensible JSON. The top-level keys below are
-reserved: the kernel writes its typed blocks under them, merges them last, and
-rejects a pre-existing collision from caller or hook metadata, so a verifier can
-treat a block found under a reserved key as kernel-authored and covered by the
-receipt signature. Unknown fields and unsupported schema versions fail closed.
+The shipped metadata surface is extensible JSON. Every top-level key Chio
+writes or admits is registered once in the receipt-metadata key registry,
+`chio_core_types::receipt::metadata::RECEIPT_METADATA_KEYS`, and the table
+below renders that registry row for row.
 
-| Key | Written by | Contents |
-|-----|------------|----------|
-| `chio_receipt_signing_nonce` | signing path | The pre-binding receipt id, folded into the signed body of every receipt (see "Receipt Identity And DAG"). |
-| `original_metadata` | signing path | A non-object caller metadata value displaced when the signing nonce is bound. |
-| `financial` | kernel | Financial attribution and settlement metadata. |
-| `budget_authority` | kernel | Budget-authority lineage for monetary receipts. |
-| `channel` | kernel | Streamed-output channel accounting metadata. |
-| `governed_transaction` | kernel | Governed-transaction intent and approval metadata. |
-| `admission_operation` | kernel | Durable admission projection, schema `chio.admission-receipt.v1` (see below). |
-| `delivery_contract` | kernel | Output-digest delivery evidence, schema `chio.delivery-contract.v1` (see below). |
-| `caller_delivery` | kernel | Authenticated historical caller observation digests, executor/claim identity and times, schema `chio.authenticated-caller-observation.v1`. No raw output. |
-| `finding_delivery` | kernel | Purchased-finding delivery overlay, schema `chio.finding.delivery.v1` (see below). |
+A key whose origin is a Chio signer is written by the kernel, the receipt
+signing path, the HTTP receipt projection or another Chio signer while it
+builds the receipt it signs, and never by a caller. Every such key is
+reserved: caller metadata that names one is refused before any effect, so a
+verifier can treat a block found under a reserved key as signer-authored and
+covered by the receipt signature. A runtime-admission hook writes only
+`chio_runtime`; a hook decision whose metadata names any other top-level key,
+or is not a JSON object, becomes a runtime-admission denial. A caller-or-hook
+key reaches the receipt through caller metadata, including blocks a Chio host
+component presents as the caller.
 
-Subject and issuer attribution, streamed-output chunk metadata, and
-portable-trust and federation provenance are additive extensions layered over
+A committed-safe key carries no argument or result value and no identifier or
+unsalted digest that confirms one, and a named reader needs it in plaintext.
+An unsafe key carries such a value or has no reader, and must not appear in the
+signed metadata of a committed receipt. Every caller-or-hook key is unsafe, and
+a key that is not registered is held to the same rule. Unknown fields and
+unsupported schema versions fail closed.
+
+| Key | Origin | Disclosure | Schema | Contents and audit |
+|-----|--------|------------|--------|--------------------|
+| `admission_operation` | Chio signer | unsafe | `chio.admission-receipt.v1` | Durable admission projection: kernel-minted operation id, state and fences. request_binding_hash is an unsalted digest over the immutable request hash, which covers the tool-call arguments, and the unsalted parameter hash. |
+| `attribution` | Chio signer | unsafe |  | Capability subject and issuer keys, delegation depth and grant index. Under enterprise attribution subject_key is an unsalted SHA-256 over the provider scope and the canonical principal, which confirms a guessed principal. |
+| `chio_manifest_security_v1` | Chio signer | unsafe |  | Registry-validated entrypoint evidence naming the server and tool. No production reader. |
+| `protocol_admission` | Chio signer | unsafe |  | Security admission operation id and state. last_error is free text that can quote request values. No production reader. |
+| `budget_authority` | Chio signer | committed-safe |  | Budget-authority lineage: kernel-minted hold, event, nonce and capability ids, grant index and authorized and terminal amounts. Read by the settlement observer and the authoritative-spend projection. |
+| `budget_denial_authority` | Chio signer | unsafe |  | Budget-authority lineage for a budget denial. No production writer. |
+| `financial` | Chio signer | unsafe |  | Financial attribution and settlement. cost_breakdown copies the tool server's reported cost breakdown verbatim, a tool result value. |
+| `governed_transaction` | Chio signer | unsafe |  | Governed-transaction intent and approval. Carries caller-authored purpose text, the shared payment token id, the unsalted intent hash and caller-asserted call-chain context. |
+| `caller_delivery` | Chio signer | committed-safe | `chio.authenticated-caller-observation.v1` | Authenticated caller observation report and authorization digests, executor and claim identity and times; no raw output. Read by the kernel's return-context, terminal and replay paths. |
+| `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
+| `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
+| `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
+| `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
+| `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |
+| `channel` | Chio signer | unsafe |  | Streamed-output channel accounting. No production writer. |
+| `delivery_contract` | Chio signer | unsafe | `chio.delivery-contract.v1` | Output-digest delivery evidence. observed_digest is the unsalted SHA-256 of the delivered output. |
+| `finding_delivery` | Chio signer | committed-safe | `chio.finding.delivery.v1` | Purchased-finding delivery overlay: public finding and listing ids, kernel comparison results and Chio-minted reservation and payment operation ids. Read by open-market recovery and the remote admission projection. |
+| `finding_recovery` | Chio signer | committed-safe | `chio.finding.recovery.v1` | Finding-recovery binding: recovery and finding ids, the original capability and delivery receipt ids and the purchase key. Read by the kernel's terminal and recovery-gate paths. |
+| `finding_purchase_replay_snapshot` | Chio signer | committed-safe |  | Admission-verified purchase binding and status proof frozen for terminal replay. Read by the kernel's purchase gate and replay paths. |
+| `finding_recovery_replay_snapshot` | Chio signer | committed-safe |  | Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths. |
+| `findingDenial` | Chio signer | unsafe |  | Finding-market denial family code. No production reader. |
+| `stream` | Chio signer | unsafe |  | Streamed-output chunk counts and byte totals. chunk_hashes are unsalted SHA-256 digests of each output chunk. |
+| `threshold_approval` | Chio signer | committed-safe |  | Threshold approval proposal id and hash, deadline and state for a pending call. The CLI response verifier reads the state. |
+| `memory_provenance` | Chio signer | unsafe |  | Memory write provenance. store and key are taken from the tool-call arguments. |
+| `post_invocation` | Chio signer | unsafe |  | Post-invocation guard results. escalations carry hook text that can describe the output. |
+| `execution_nonce` | Chio signer | committed-safe |  | Execution-nonce stage and cleanup flags on a preflight denial: closed codes read by the CLI response verifier. |
+| `chio_kernel` | Chio signer | unsafe |  | Kernel rejection code on a refusal receipt. No production reader. |
+| `runtime_admission` | Chio signer | unsafe |  | The kernel's runtime-admission refusal record: hook name, acceptance flag and failure code. Never accepted from a hook. No production reader. |
+| `active_response_terminal_evidence` | Chio signer | committed-safe |  | Executor receipt id, hash and key behind an active-response terminal receipt, read back by the kernel's admission terminal receipt check. |
+| `chio_http_receipt_v1` | Chio signer | unsafe |  | Embedded HTTP receipt written by the HTTP receipt projection, with raw request and session ids and nested metadata. |
+| `chio_receipt_signing_nonce` | Chio signer | unsafe |  | The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP producer embeds an unsalted content hash in it. |
+| `original_metadata` | Chio signer | unsafe |  | Written by the signing path to wrap a non-object metadata value verbatim. |
+| `finding_pool_mutation` | Chio signer | unsafe |  | Finding-pool ledger mutation evidence. Duplicates the action parameters. |
+| `session_report` | Chio signer | unsafe |  | Session report event. operation_sha256 is an unsalted digest of the whole operation, arguments included. |
+| `prior_metadata` | Chio signer | unsafe |  | Written by a kernel rejection record to wrap a non-object metadata value verbatim. |
+| `lineageReferences` | Chio signer | unsafe |  | No production writer at top level; the kernel's lineage references are nested in governed_transaction_diagnostics. Reserved so that no caller value under this key stands in for kernel lineage. |
+| `chio_http_status_scope` | Chio signer | committed-safe |  | HTTP receipt status scope, decision or final: a closed code read by the HTTP receipt projection. |
+| `chio_decision_receipt_id` | Chio signer | committed-safe |  | Receipt id of the linked HTTP decision receipt, read by the API protection proxy. |
+| `chio_kernel_receipt_id` | Chio signer | committed-safe |  | Receipt id of the linked kernel receipt, read by the HTTP authority. |
+| `otel` | Chio signer | unsafe |  | Span name, ids and attributes copied from an exported span, which can carry tool arguments and results. |
+| `correlation` | Chio signer | unsafe |  | Source Chio receipt id of an exported span. No production reader. |
+| `keyEnterpriseReceipt` | Chio signer | unsafe |  | Key-transition event, transaction and operator key ids. No production reader. |
+| `active_defense_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant id and plan identifiers. |
+| `occurred_at_unix_ms` | Chio signer | committed-safe |  | Active-defense event time, bound by the lineage ingest and the native evidence reader. |
+| `response_simulation_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant and action ids. |
+| `active_defense_backfill_v1` | Chio signer | unsafe |  | Active-defense migration marker with unaudited contents. |
+| `scimLifecycle` | Chio signer | unsafe |  | SCIM provider, user ids, user names, principal, subject key and entitlements. |
+| `mercury` | Chio signer | unsafe |  | Raw business identifiers such as account and desk. |
+| `authorizationContext` | Chio signer | unsafe |  | Wall request actor and requested domains. |
+| `guardOutcome` | Chio signer | unsafe |  | Wall guard outcome text. |
+| `deniedAccessRecord` | Chio signer | unsafe |  | Wall record of the denied request. |
+| `policySnapshot` | Chio signer | unsafe |  | Wall policy identity snapshot. No production reader. |
+| `acp` | Chio signer | unsafe |  | ACP session and tool-call ids. authorizationResource is taken from the tool call. |
+| `agent_web_receipt_ref` | Chio signer | unsafe |  | Agent Web receipt reference read only by the proof fixture. No production writer. |
+| `parent_receipt_ids` | Chio signer | unsafe |  | Parent receipt ids. No production writer; only the CLI explain display reads it. |
+| `batch_witness` | Chio signer | unsafe |  | Batch witness reference with unaudited contents. No production writer; only the CLI explain display reads it. |
+| `native_launch` | caller or hook | unsafe |  | Cage launch receipt id and SHA-256 presented by host attribution. The kernel checks its shape and, when it holds the launch, binds it and denies a different value. |
+| `provenance` | caller or hook | unsafe |  | Caller OTel trace and span ids with an optional supply_chain object of any shape, validated by the kernel. |
+| `chio_process` | caller or hook | unsafe |  | Process supervisor ids and request_sha256, an unsalted digest of the request. The kernel validates worker_profile. |
+| `route` | caller or hook | unsafe |  | Bridge, protocol target and selected route names presented by the host, checked against the route plan by the swarm admission hook. |
+| `route_selection` | caller or hook | unsafe |  | A client-supplied route selection the MCP edge copies verbatim. |
+| `source_receipt_context` | caller or hook | unsafe |  | Copied verbatim from a source envelope. |
+| `workflow_id` | caller or hook | unsafe |  | Harness and loopback workflow id, read by the runtime admission hook. |
+| `vendor_id` | caller or hook | unsafe |  | Loopback vendor id. |
+
+`active_defense_body`, `response_simulation_report`,
+`security_event_projection`, `cage_receipt` and the cage and wall `schema` key
+are not registered. Each carries raw tenant, plan, subject or process
+identifiers, or an unsalted digest over a launched process's arguments,
+environment and descriptor paths, and must not appear in a committed receipt
+until a committed-safe projection replaces it.
+
+Portable-trust and federation provenance are additive extensions layered over
 the same object.
 
 A tool call dispatched to a tool server launched under the Linux cage carries
@@ -3215,10 +3303,14 @@ A success returns the status: `scope`, `stopped`, `readiness` (`ready`,
 `process_local`, `process_only` or `unverified`), the optional `head`,
 `host_latch`, and, while a stop holds over a durable admission store,
 `withheld_operations`: the number of returned operations whose output stays in
-durable custody until resume. A refusal returns `{"error", "message"}` with
+durable custody until resume. A refusal returns `{"error", "message", "urn"}` with
 `error` one of `bad_request` (400), `stop_head_moved` (409, with the current
 `head`), `stop_not_durable` (503, with the `status` of the stop this process
-still holds), `stop_not_ready` (503) or `resume_refused` (503). A tool call
+still holds), `stop_not_ready` (503) or `resume_refused` (503). The `message`
+is fixed for each refusal kind and excludes store diagnostics. The registered
+kernel-domain `urn` identifies the refusal: `stop-bad-request`,
+`stop-head-moved`, `stop-not-durable`, `stop-not-ready` or `resume-refused`,
+respectively. Store failure details remain in operator diagnostic logs. A tool call
 denied by a stop carries `chio_runtime.identity_disposition = "reusable"` and
 `chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
 

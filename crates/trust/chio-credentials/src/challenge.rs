@@ -278,6 +278,22 @@ pub fn passport_artifact_id(passport: &AgentPassport) -> Result<String, Credenti
     Ok(sha256_hex(&canonical_json_bytes(passport)?))
 }
 
+/// The SHA-256 digest, as lowercase hex, of the canonical JSON of the
+/// credential body the issuer signature covers. Proof fields are outside the
+/// signed body, so they never change the digest a revocation binds to.
+pub fn credential_digest(credential: &ReputationCredential) -> Result<String, CredentialError> {
+    Ok(sha256_hex(&canonical_json_bytes(&credential.unsigned)?))
+}
+
+/// The distinct credential digests of `passport`, in ascending order.
+pub fn passport_credential_digests(passport: &AgentPassport) -> Result<Vec<String>, CredentialError> {
+    let mut digests = BTreeSet::new();
+    for credential in &passport.credentials {
+        digests.insert(credential_digest(credential)?);
+    }
+    Ok(digests.into_iter().collect())
+}
+
 pub fn verify_agent_passport(
     passport: &AgentPassport,
     now: u64,

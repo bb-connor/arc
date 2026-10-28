@@ -245,6 +245,8 @@ chio-bedrock-converse-adapter = { version = "=0.1.0", path = "crates/protocol/ch
 chio-binding-helpers = { version = "=0.1.0", path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { version = "=0.1.0", path = "crates/core/chio-bounded" }
 chio-file-custody = { version = "=0.1.0", path = "crates/core/chio-file-custody" }
+chio-fixed = { version = "=0.1.0", path = "crates/core/chio-fixed" }
+chio-decision-model = { version = "=0.1.0", path = "crates/core/chio-decision-model" }
 chio-cage = { version = "=0.1.0", path = "crates/security/chio-cage" }
 chio-cage-plan = { version = "=0.1.0", path = "crates/security/chio-cage-plan" }
 chio-cage-init = { version = "=0.1.0", path = "crates/security/chio-cage-init" }

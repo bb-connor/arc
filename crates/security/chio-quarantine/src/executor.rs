@@ -4,6 +4,7 @@ use crate::executor_proof::{
     validate_dispatch_authorization as validate_dispatch_authorization_proof,
 };
 mod error;
+mod lease;
 
 pub use error::ExecutorError;
 
@@ -719,9 +720,7 @@ impl<
                                         journal.clone(),
                                         work,
                                     )?;
-                                    self.store
-                                        .validate_lease(work)
-                                        .map_err(ExecutorError::Store)?;
+                                    self.require_live_lease(work)?;
                                     let request = EffectRequest {
                                         tenant_id: snapshot.plan.tenant_id.clone(),
                                         action_id: snapshot.plan.action_id.clone(),
@@ -1182,9 +1181,7 @@ impl<
                                         journal.clone(),
                                         work,
                                     )?;
-                                    self.store
-                                        .validate_lease(work)
-                                        .map_err(ExecutorError::Store)?;
+                                    self.require_live_lease(work)?;
                                     let request = EffectRequest {
                                         tenant_id: snapshot.plan.tenant_id.clone(),
                                         action_id: snapshot.plan.action_id.clone(),

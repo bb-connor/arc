@@ -76,6 +76,10 @@ impl Guard for CountingGuard {
         "counting-allow"
     }
 
+    fn evidence_declaration(&self) -> chio_kernel_core::GuardEvidenceDeclaration {
+        chio_kernel_core::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _: &GuardContext<'_>) -> std::result::Result<Verdict, KernelCoreError> {
         self.0.fetch_add(1, Ordering::SeqCst);
         Ok(Verdict::Allow)

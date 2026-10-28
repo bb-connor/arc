@@ -17,7 +17,7 @@ use std::sync::Arc;
 use chio_core::receipt::metadata::GuardEvidence;
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -237,6 +237,10 @@ impl AdvisoryPipeline {
 impl Guard for AdvisoryPipeline {
     fn name(&self) -> &str {
         "advisory-pipeline"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

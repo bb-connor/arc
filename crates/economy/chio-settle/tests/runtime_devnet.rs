@@ -431,7 +431,9 @@ async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_repl
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config()?;
+    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
+        trusted_keys: vec![operator_keypair.public_key()],
+    })?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,
@@ -567,7 +569,9 @@ async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config()?;
+    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
+        trusted_keys: vec![operator_keypair.public_key()],
+    })?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,

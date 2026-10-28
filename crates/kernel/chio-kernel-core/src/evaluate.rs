@@ -641,6 +641,10 @@ mod tests {
             self.name
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<Verdict, KernelCoreError> {
             self.result.clone()
         }

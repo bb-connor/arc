@@ -14,8 +14,9 @@
 //!   request_id, parameter_hash)` tuple. Substituting a nonce between unrelated tool
 //!   calls therefore fails the binding check.
 //! * The kernel signs the full body (nonce id + binding + expires_at)
-//!   with its receipt-signing key, so downstream tool servers can
-//!   cryptographically verify authenticity without a round trip.
+//!   with its boot-selected receipt signing backend, so a nonce meets the
+//!   same classical, hybrid or post-quantum floor as the receipts it links
+//!   and downstream tool servers can verify it without a round trip.
 //! * Replay is prevented by an `ExecutionNonceStore`: the first
 //!   `reserve_until(nonce_id, signed_expiry)` returns true and consumes the nonce; any
 //!   subsequent reservation returns false and the verify path rejects.
@@ -27,7 +28,7 @@
 //! Every installed replay store enforces signed expiry and owned rollback.
 
 use chio_core::canonical::CanonicalBytes;
-use chio_core::crypto::{verify_wrapped_bytes, Keypair, PublicKey};
+use chio_core::crypto::{verify_wrapped_bytes, PublicKey, SigningBackend};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -110,19 +111,19 @@ pub use store::InMemoryExecutionNonceStore;
 ///
 /// The kernel calls this on every `Verdict::Allow` so tool servers can
 /// verify that a call was authorized by the kernel at a known, recent
-/// time. The returned nonce is signed by `kernel_keypair`; downstream
-/// verifiers check the signature with the kernel's public key.
+/// time. The returned nonce is signed by `backend`; downstream verifiers
+/// check the signature with that backend's public key.
 pub fn mint_execution_nonce(
-    kernel_keypair: &Keypair,
+    backend: &dyn SigningBackend,
     binding: NonceBinding,
     config: &ExecutionNonceConfig,
     now: i64,
 ) -> Result<SignedExecutionNonce, KernelError> {
-    mint_execution_nonce_with_reservation(kernel_keypair, binding, None, None, config, now)
+    mint_execution_nonce_with_reservation(backend, binding, None, None, config, now)
 }
 
 pub fn mint_execution_nonce_with_reservation(
-    kernel_keypair: &Keypair,
+    backend: &dyn SigningBackend,
     binding: NonceBinding,
     reserved_hold_id: Option<String>,
     reserving_request_id: Option<String>,
@@ -150,10 +151,11 @@ pub fn mint_execution_nonce_with_reservation(
         reserving_request_id,
     };
     let signature = CanonicalBytes::from_serializable(&nonce)
-        .and_then(|canonical| kernel_keypair.sign_wrapped(EXECUTION_NONCE_SCHEMA, &canonical))
+        .and_then(|canonical| backend.sign_wrapped(EXECUTION_NONCE_SCHEMA, &canonical))
         .map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
-        })?;
+        })?
+        .signature;
     Ok(SignedExecutionNonce { nonce, signature })
 }
 
@@ -180,7 +182,7 @@ pub enum ExecutionNonceError {
     Expired { now: i64, expires_at: i64 },
     /// Binding fields did not match the presented invocation.
     BindingMismatch { field: &'static str },
-    /// Ed25519 signature did not verify under the kernel's public key.
+    /// Signature did not verify under the kernel's receipt signing key.
     InvalidSignature,
     /// Nonce was already consumed (single-use).
     Replayed,
@@ -269,7 +271,7 @@ impl From<ExecutionNonceError> for KernelError {
 /// 1. Schema check.
 /// 2. Expiry check -- `now < nonce.expires_at`.
 /// 3. Binding check -- subject, capability, server, tool, parameter_hash.
-/// 4. Signature check -- canonical JSON under the kernel's pubkey.
+/// 4. Signature check -- canonical JSON under the kernel's receipt signing key.
 /// 5. Replay check -- `nonce_store.reserve_until(nonce_id, signed_expiry)` must return `true`.
 pub fn verify_execution_nonce(
     presented: &SignedExecutionNonce,
@@ -472,6 +474,7 @@ pub(crate) fn reserve_execution_nonce(
 )]
 mod tests {
     use super::*;
+    use chio_core::crypto::{Ed25519Backend, Keypair};
 
     fn sample_binding() -> NonceBinding {
         NonceBinding {
@@ -490,9 +493,13 @@ mod tests {
         use chio_security_types::clock::{ClockError, FixedClock};
         let kp = Keypair::from_seed(&[34; 32]);
         let binding = sample_binding();
-        let mut signed =
-            mint_execution_nonce(&kp, binding.clone(), &ExecutionNonceConfig::default(), 100)
-                .unwrap();
+        let mut signed = mint_execution_nonce(
+            &Ed25519Backend::new(kp.clone()),
+            binding.clone(),
+            &ExecutionNonceConfig::default(),
+            100,
+        )
+        .unwrap();
         let store =
             InMemoryExecutionNonceStore::with_clock(4, std::sync::Arc::new(FixedClock::new(100)));
         assert!(matches!(
@@ -583,7 +590,9 @@ mod tests {
         let binding = sample_binding();
         let now = 1_000_000;
 
-        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         assert_eq!(signed.nonce.schema, EXECUTION_NONCE_SCHEMA);
         assert_eq!(signed.nonce.expires_at, now + cfg.nonce_ttl_secs as i64);
 
@@ -599,7 +608,7 @@ mod tests {
                 ..ExecutionNonceConfig::default()
             };
             assert!(
-                matches!(mint_execution_nonce(&key, sample_binding(), &config, now),
+                matches!(mint_execution_nonce(&Ed25519Backend::new(key.clone()), sample_binding(), &config, now),
                 Err(KernelError::InvalidConstraint(reason)) if reason.starts_with("execution nonce"))
             );
         }
@@ -607,8 +616,13 @@ mod tests {
             nonce_ttl_secs: 1,
             ..ExecutionNonceConfig::default()
         };
-        let signed = mint_execution_nonce(&key, sample_binding(), &config, i64::MAX - 1)
-            .expect("exact endpoint");
+        let signed = mint_execution_nonce(
+            &Ed25519Backend::new(key.clone()),
+            sample_binding(),
+            &config,
+            i64::MAX - 1,
+        )
+        .expect("exact endpoint");
         assert_eq!(signed.nonce.expires_at, i64::MAX);
     }
 
@@ -623,7 +637,9 @@ mod tests {
         let binding = sample_binding();
 
         let now = 1_000_000;
-        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         let err = verify_execution_nonce(
             &signed,
             &kp.public_key(),
@@ -645,7 +661,9 @@ mod tests {
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
-        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         let validated =
             validate_execution_nonce(&signed, &kp.public_key(), &binding, now + 1).unwrap();
 
@@ -667,7 +685,9 @@ mod tests {
         let binding = sample_binding();
         let now = 1_000_000;
 
-        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store).unwrap();
         let err = verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 2, &store)
             .unwrap_err();
@@ -680,7 +700,9 @@ mod tests {
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
-        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         let mut encoded = serde_json::to_value(signed).unwrap();
         encoded["nonce"]["bound_to"]
             .as_object_mut()
@@ -711,7 +733,13 @@ mod tests {
         let minted_binding = sample_binding();
         let now = 1_000_000;
 
-        let signed = mint_execution_nonce(&kp, minted_binding.clone(), &cfg, now).unwrap();
+        let signed = mint_execution_nonce(
+            &Ed25519Backend::new(kp.clone()),
+            minted_binding.clone(),
+            &cfg,
+            now,
+        )
+        .unwrap();
         let mut wrong = minted_binding;
         wrong.tool_name = "write_file".to_string();
 
@@ -734,7 +762,9 @@ mod tests {
         let binding = sample_binding();
         let now = 1_000_000;
 
-        let mut signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let mut signed =
+            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &cfg, now)
+                .unwrap();
         // Mutate a signed field without re-signing: signature must no longer verify.
         signed.nonce.bound_to.tool_name = "write_file".to_string();
         // Revert the binding mismatch check by also mutating the presented binding.

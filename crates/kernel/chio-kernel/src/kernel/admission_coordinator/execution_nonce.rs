@@ -106,7 +106,7 @@ impl ChioKernel {
             issued.canonical_bytes(),
             operation,
             original,
-            &self.config.keypair.public_key(),
+            &self.receipt_signing_public_key()?,
             bound_at_unix_ms,
         )
         .map_err(durable_store_error)?;
@@ -423,7 +423,7 @@ impl ChioKernel {
         let reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
             &expected,
             admission.retained_request()?,
-            &self.config.keypair,
+            self.receipt_signing_backend()?,
             config,
             trusted_now_unix_ms,
         )

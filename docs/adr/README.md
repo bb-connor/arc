@@ -27,12 +27,13 @@ Current ADR set:
 13. [ADR-0013 Async Receipt Durability](ADR-0013-async-receipt-durability.md)
 14. [ADR-0014 Iroh As Federation Transport (Deferred To Year-2)](ADR-0014-iroh-federation-transport.md)
 15. [ADR-0015 Predeclared Non-Discretionary Escrow Circuit Breakers](ADR-0015-predeclared-escrow-circuit-breakers.md)
-16. [ADR-0016 Authoritative Spend Contract](ADR-0016-authoritative-spend-contract.md)
+16. [ADR-0016 Authoritative Spend Contract](ADR-0016-authoritative-spend-contract.md) - accepted; the binding spend contract for execution nonces, budget holds and the `chio.mediated_spend.v1` predicate.
 17. [ADR-0017 Cognition-Market Finding Artifacts And Reveal-As-Governed-Call](ADR-0017-cognition-market-finding-artifacts.md)
 18. [ADR-0018 Radicle Is A Carrier, Never An Authority (Adoption Deferred)](ADR-0018-radicle-carrier-not-authority.md)
 19. [ADR-0019 Kernel Delivery Contract](ADR-0019-kernel-delivery-contract.md)
 20. [ADR-0020 Finding Status Feed Governance](ADR-0020-finding-status-feed-governance.md)
 21. [ADR-0021 Hosted Market Storage Authority And Transition-Rule Ownership](ADR-0021-hosted-market-storage-authority.md)
 22. [ADR-0039 Customer-Hosted Root Exchange](ADR-0039-customer-hosted-root-exchange.md) - proposed; every `serve-http` root is exchange-issued and anchored, with the exchange run by the provider.
+23. [ADR-0035 Web3-Free Distribution](ADR-0035-web3-free-distribution.md) - accepted (D11 option A); default kernel, core, control-plane and CLI builds reach no web3 or finding-market crate.
 
 - [ADR-0038 Native Host Program](ADR-0038-native-host-program.md) - accepted for planning; north star, three flows and native host services.

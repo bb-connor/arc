@@ -619,3 +619,63 @@ default_unwind = 4
 timeout_secs = 60
 unwinding_checks = true
 primary_rust_symbol = "chio_security_types::response_state::is_legal_response_transition"
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_q16_checked_mul_matches_i128_reference"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range i32 operands against an i128 floor reference."
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_q16_checked_add_never_wraps"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range i32 operands against exact i64 addition."
+
+[[harness]]
+crate = "chio-fixed"
+features = ["kani"]
+harness = "verify_ratio_cmp_total_order"
+lane = "pr"
+default_unwind = 1
+timeout_secs = 600
+unwinding_checks = true
+notes = "Full-range u32 ratios against exact u128 cross products, reversal and reflexivity."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_projection_total_and_admitted"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Symbolic four-element u8 feasible set and every proposal shape."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_projection_idempotent_on_admitted"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Re-projecting a projected action is the identity."
+
+[[harness]]
+crate = "chio-decision-model"
+features = ["kani"]
+harness = "verify_select_in_envelope"
+lane = "pr"
+default_unwind = 6
+timeout_secs = 600
+unwinding_checks = true
+notes = "Symbolic Q16.16 scores over a four-element feasible set; first maximum wins."

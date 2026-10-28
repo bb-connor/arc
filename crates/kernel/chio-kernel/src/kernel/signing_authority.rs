@@ -90,7 +90,8 @@ impl ChioKernel {
     /// same backend and content-preimage verification. Reconfiguration preserves
     /// queue limits and shutdown state.
     ///
-    /// This configures proposal and ordinary receipt signing, not the separate
+    /// This configures proposal, ordinary receipt and execution nonce signing,
+    /// not the separate
     /// capability, child-receipt, session-anchor or checkpoint authorities. It
     /// does not establish witnessed key rotation or qualify an all-artifact PQ
     /// runtime.
@@ -134,6 +135,24 @@ impl ChioKernel {
     /// capability authority returned by [`Self::public_key`].
     pub fn receipt_signing_public_key(&self) -> Result<chio_core::PublicKey, KernelError> {
         signing_identity(self.signing_authority.backend.as_ref())
+    }
+
+    /// The receipt signing backend, refused when its current identity falls
+    /// outside the boot signing floor.
+    pub(super) fn receipt_signing_backend(&self) -> Result<&dyn SigningBackend, KernelError> {
+        let backend = self.signing_authority.backend.as_ref();
+        let key = signing_identity(backend)?;
+        if !self
+            .signing_authority
+            .floor
+            .allowed_signing_algorithms()
+            .contains(&key.algorithm())
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "receipt authority does not satisfy the boot signing floor".into(),
+            ));
+        }
+        Ok(backend)
     }
 
     pub(super) fn receipt_signing_crypto_floor(

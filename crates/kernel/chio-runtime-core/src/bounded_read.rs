@@ -54,13 +54,35 @@ fn open_unfollowed(path: &Path) -> Result<File, ChioRuntimeError> {
         })
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn open_unfollowed(path: &Path) -> Result<File, ChioRuntimeError> {
-    let unfollowed = std::fs::symlink_metadata(path).map_err(ChioRuntimeError::Io)?;
-    if !unfollowed.file_type().is_file() {
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
+        .security_qos_flags(0)
+        .open(path)
+        .map_err(ChioRuntimeError::Io)?;
+    let metadata = file.metadata().map_err(ChioRuntimeError::Io)?;
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || !metadata.file_type().is_file()
+    {
         return Err(not_regular(path));
     }
-    File::open(path).map_err(ChioRuntimeError::Io)
+    Ok(file)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn open_unfollowed(_path: &Path) -> Result<File, ChioRuntimeError> {
+    Err(ChioRuntimeError::Io(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "atomic no-follow file opening is unavailable on this platform",
+    )))
 }
 
 fn not_regular(path: &Path) -> ChioRuntimeError {
@@ -79,6 +101,33 @@ mod tests {
     use super::*;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_open_refuses_reparse_points_and_accepts_regular_files() -> TestResult {
+        let directory = tempfile::tempdir()?;
+        let regular = directory.path().join("regular.json");
+        let link = directory.path().join("link.json");
+        std::fs::write(&regular, b"{}")?;
+        std::os::windows::fs::symlink_file(&regular, &link)?;
+        assert_eq!(read_bounded_file(&regular, 2)?, b"{}");
+        match open_unfollowed(&link) {
+            Err(ChioRuntimeError::Rejected { code, detail }) => {
+                assert_eq!(code, "runtime_untrusted_file_not_regular");
+                assert_eq!(detail, format!("{} is not a regular file", link.display()));
+            }
+            other => panic!("expected reparse-point refusal, got {other:?}"),
+        }
+        std::fs::remove_file(&regular)?;
+        match read_bounded_file(&link, 2) {
+            Err(ChioRuntimeError::Rejected { code, detail }) => {
+                assert_eq!(code, "runtime_untrusted_file_not_regular");
+                assert_eq!(detail, format!("{} is not a regular file", link.display()));
+            }
+            other => panic!("expected dangling reparse-point refusal, got {other:?}"),
+        }
+        Ok(())
+    }
 
     #[test]
     fn reads_a_file_at_the_limit() -> TestResult {

@@ -288,6 +288,14 @@ pub fn prepare_merkle_release(
     validate_web3_settlement_dispatch(dispatch)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     validate_merkle_dispatch_config(config, dispatch)?;
+    if !config
+        .kernel_authority
+        .trusts(&anchor_proof.receipt.kernel_key)
+    {
+        return Err(SettlementError::Verification(
+            "receipt kernel_key is not a trusted settlement kernel key".to_string(),
+        ));
+    }
     verify_anchor_inclusion_proof(anchor_proof)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     ensure_escrow_anchor_matches_config(config, dispatch, anchor_proof, anchor_content)?;
@@ -1137,6 +1145,11 @@ pub async fn prepare_dual_sign_release(
     if dispatch.settlement_path != Web3SettlementPath::DualSignature {
         return Err(SettlementError::Unsupported(
             "dispatch is not configured for the dual-signature path".to_string(),
+        ));
+    }
+    if !config.kernel_authority.trusts(&receipt.kernel_key) {
+        return Err(SettlementError::Verification(
+            "receipt kernel_key is not a trusted settlement kernel key".to_string(),
         ));
     }
     let verified = receipt

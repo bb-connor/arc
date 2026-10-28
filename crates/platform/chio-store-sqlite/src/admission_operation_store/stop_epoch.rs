@@ -161,6 +161,18 @@ fn verified_head(
     Ok(head)
 }
 
+pub(crate) fn require_output_release(
+    connection: &Connection,
+    authority_id: &str,
+) -> Result<(), AdmissionOperationStoreError> {
+    let head = verified_head(connection, authority_id, StopScope::Kernel)
+        .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
+    if head.is_some_and(|head| head.state == StopState::Stopped) {
+        return Err(AdmissionOperationStoreError::KernelStopped);
+    }
+    Ok(())
+}
+
 /// The digest the global commit chain references for one stop record.
 pub(crate) fn projection_reference(
     connection: &Connection,

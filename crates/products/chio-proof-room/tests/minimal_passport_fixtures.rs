@@ -12,10 +12,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_core_types::crypto::Keypair;
+use chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA;
 use chio_core_types::CanonicalBytes;
-use chio_transaction_passport::{
-    sign_transaction_passport, TransactionPassport, EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
-};
+use chio_transaction_passport::{sign_transaction_passport, TransactionPassport};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -105,7 +104,7 @@ const GRAPH_NODES: [(&str, &str, &str); 9] = [
     (
         "kernel-receipt.json",
         "receipt",
-        EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
+        CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
     ),
     ("policy.json", "policy", "chio.policy.bundle.v1"),
     ("request-digest.json", "request", "chio.request.digest.v1"),
@@ -211,7 +210,7 @@ fn kernel_receipt(policy_sha256: &str) -> TestResult<Vec<u8>> {
     let kernel = keypair(RECEIPT_SEED);
     signed(
         json!({
-            "schema": EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
+            "schema": CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
             "receipt_id": "receipt-minimal-allow",
             "capability_id": "cap-tool-read-demo",
             "guard_decision_id": "guard-decision-minimal-valid",

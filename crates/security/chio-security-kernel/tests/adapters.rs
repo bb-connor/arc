@@ -19,12 +19,12 @@ use chio_flow::{
 };
 use chio_kernel::{
     CapabilityAuthority, CapabilityAuthorityWorkloadBinding, ChioKernel, Guard, GuardContext,
-    KernelConfig, MemoryBudgetConfig, NestedFlowBridge, PostInvocationContext, PostInvocationHook,
-    PostInvocationPipeline, PostInvocationVerdict, SecurityInvocationContext,
-    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
-    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ToolCallRequest,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    GuardEvidenceDeclaration, KernelConfig, MemoryBudgetConfig, NestedFlowBridge,
+    PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+    SecurityInvocationContext, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit,
+    ToolCallRequest, ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_kernel::{
     ContainmentGuard, EngineFlowPostInvocationPort, EngineFlowPreInvocationPort,
@@ -726,6 +726,10 @@ struct ContextProbeGuard;
 impl Guard for ContextProbeGuard {
     fn name(&self) -> &str {
         "context-probe-pre"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(

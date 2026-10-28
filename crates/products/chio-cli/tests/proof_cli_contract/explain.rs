@@ -430,7 +430,7 @@ fn proof_explain_reports_receipt_coverage_exclusions_for_matrix_claim() {
         .test_expect("graph nodes array")
         .push(serde_json::json!({
             "id": denial_receipt_sha256,
-            "schema": chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
+            "schema": "chio.proof-room.receipt-evidence.v1",
             "path": "denial-receipt.json",
             "sha256": denial_receipt_sha256,
             "role": "receipt"

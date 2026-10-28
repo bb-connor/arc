@@ -224,3 +224,59 @@ fn a_tampered_stop_record_fails_closed() {
         "a tampered stop record must not load as a verified head"
     );
 }
+
+#[test]
+fn stopped_terminal_transaction_retains_finalizing_until_resume() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let operation = finalizing_tool_operation(
+        &fixture,
+        "stopped-terminal",
+        "stopped-terminal-capability",
+        begun_at,
+    );
+    let projection = unknown_projection(
+        &fixture,
+        &operation,
+        "stopped-terminal-incident",
+        'c',
+        begun_at + 20,
+    );
+    fixture
+        .store
+        .append_stop_transition(&request(StopTransition::Stop, None), &fixture.fence)
+        .unwrap();
+    assert_eq!(
+        fixture.store.commit_terminal_projection(&projection),
+        Err(AdmissionOperationStoreError::KernelStopped)
+    );
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(operation.binding().operation_id())
+            .unwrap(),
+        Some(operation.clone())
+    );
+    assert_eq!(
+        fixture
+            .store
+            .load_terminal_replay(&operation.replay_key())
+            .unwrap(),
+        None
+    );
+    fixture
+        .store
+        .append_stop_transition(
+            &request(StopTransition::Resume, Some(EPOCH_ONE)),
+            &fixture.fence,
+        )
+        .unwrap();
+    let terminal = fixture
+        .store
+        .commit_terminal_projection(&projection)
+        .unwrap();
+    assert_eq!(
+        terminal.state,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+}

@@ -64,4 +64,12 @@ impl PaymentAdapter for LostPaymentAcknowledgement {
         self.adapter
             .refund(transaction_id, amount_units, currency, reference)
     }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        self.adapter
+            .replayed_authorization_metadata(authorization_id)
+    }
 }

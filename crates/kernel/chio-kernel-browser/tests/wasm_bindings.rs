@@ -194,10 +194,10 @@ fn evaluate_rejects_malformed_json() {
 
 #[wasm_bindgen_test]
 fn web_crypto_rng_fills_buffers_larger_than_one_quota() {
-    use chio_kernel_core::Rng as _;
+    use chio_core_types::rng::Rng as _;
     let rng = chio_kernel_browser::WebCryptoRng::try_new().expect("web crypto");
     let mut buffer = vec![0u8; 200_000];
-    rng.fill_bytes(&mut buffer);
+    rng.fill_bytes(&mut buffer).expect("web crypto fill");
     for tail in [&buffer[65_536..131_072], &buffer[131_072..]] {
         assert!(tail.iter().any(|byte| *byte != 0), "chunk left zero-filled");
     }

@@ -127,7 +127,11 @@ impl SqliteAdmissionOperationStore {
         let stored =
             load_by_operation_id_tx_with_history(transaction, &context.operation_id, &history)?
                 .ok_or(AdmissionOperationStoreError::NotFound)?;
-        crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
+        crate::tool_outcome_store::require_terminal_release(
+            transaction,
+            &stored.operation,
+            &self.serving_owner.fence.store_uuid,
+        )?;
         verify_payment_terminal_source(
             transaction,
             &stored.operation,
@@ -311,7 +315,11 @@ fn verify_anchored_terminal_authority(
     let stored =
         load_by_operation_id_tx_with_history(transaction, &context.operation_id, &history)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
-    crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
+    crate::tool_outcome_store::require_terminal_release(
+        transaction,
+        &stored.operation,
+        &serving_owner.fence.store_uuid,
+    )?;
     verify_payment_terminal_source(
         transaction,
         &stored.operation,

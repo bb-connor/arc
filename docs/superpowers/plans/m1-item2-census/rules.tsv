@@ -140,3 +140,8 @@ chio-settle/src/finding_enforcement/test_anchor_proof\.rs		T	test support
 chio-economy|chio-open-market		F	
 ^sdks/jvm/chio-streaming-flink/src/integrationTest/		T	integration test fixtures rebuilt
 ^sdks/		S	SDK verifier, middleware or adapter reads commitments and openings (Tasks 12, 17); unsalted parameter and content fields deleted
+^bench/chio-chaos/src/lib\.rs		R	chaos bench producer: ReceiptDraft plus preimages, signed with FixtureRng (Task 14)
+^scripts/smoke/chio-cli-smoke\.sh		R	smoke-embedded Rust producer: ReceiptDraft plus preimages, signed with OsEntropyRng (Task 14)
+^scripts/formal/durable_lifecycle\.py		F	durable lifecycle validator checks the signed active_defense projection and opens the content commitment with the trace disclosure (Task 10)
+^scripts/gen-signing-wrapper-vectors\.py	FORBIDDEN_(RECEIPT|ACTION)_MEMBERS	D	reference verifier list of members a committed receipt must not carry; unchanged
+^scripts/acceptance/session-credentials\.py	parameter_hash	V	acceptance check keeps the receipt id, signature and binding checks; the unsalted parameter and content rechecks are deleted (no caller copy of openings in M1), and delivery resultHash becomes the resultCommitment equality (Task 14)

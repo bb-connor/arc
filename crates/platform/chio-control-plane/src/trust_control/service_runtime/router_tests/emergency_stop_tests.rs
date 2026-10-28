@@ -163,3 +163,48 @@ async fn a_trust_control_stop_survives_restart_and_refuses_new_admissions(
     assert_ne!(begin_error_code(&state).await?, "stopped");
     Ok(())
 }
+
+#[tokio::test]
+async fn stop_routes_redact_failed_store_appends() -> Result<(), Box<dyn std::error::Error>> {
+    let authority = Authority::provision()?;
+    let state = authority.state()?;
+    let connection = rusqlite::Connection::open(&authority.database)?;
+    let (status, stopped) = call(
+        &state,
+        "POST",
+        EMERGENCY_STOP_PATH,
+        Some(TOKEN),
+        serde_json::json!({"reason": "incident"}),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    connection.execute_batch("CREATE TABLE stop_test_external_write (value INTEGER);")?;
+    let (status, body) = call(&state, "POST", EMERGENCY_RESUME_PATH, Some(TOKEN),
+        serde_json::json!({"expected_epoch": {"chain_generation": stopped["head"]["chain_generation"], "epoch": stopped["head"]["epoch"]}})).await?;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        body,
+        serde_json::json!({"error": "resume_refused", "message": "Resume was refused.", "urn": "urn:chio:error:kernel:resume-refused"})
+    );
+    assert!(state.stop.control().heads().is_stopped());
+    let (status, body) = call(
+        &state,
+        "POST",
+        EMERGENCY_STOP_PATH,
+        Some(TOKEN),
+        serde_json::json!({"reason": "incident"}),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"], "stop_not_durable");
+    assert_eq!(
+        body["message"],
+        "Stop holds in this process but could not be made durable."
+    );
+    assert_eq!(body["urn"], "urn:chio:error:kernel:stop-not-durable");
+    assert_eq!(body["status"]["stopped"], true);
+    assert_eq!(body["status"]["durability"], "process_only");
+    assert!(!body.to_string().contains("authority database changed"));
+    assert!(!body.to_string().contains("serving-owner"));
+    Ok(())
+}

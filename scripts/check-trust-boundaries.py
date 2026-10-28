@@ -48,7 +48,40 @@ RETIRED_DIRECT_HELPERS = {
         "read_json_file", "read_json_file_bounded", "from_wire"),
     "crates/sdk/chio-binding-helpers/src/receipt.rs": (
         "parse_receipt_json", "parse_receipt_json", "new"),
+    "crates/observability/chio-siem/src/manager.rs": (
+        "decode_receipt_row", "decode_receipt_row", "new"),
+    "crates/tooling/chio-trace-validate/src/decode.rs": (
+        "decode_observations", "decode_observations", "from_wire"),
 }
+
+
+RETIRED_DIRECT_BOUNDS = {
+    "crates/products/chio-mercury/src/commands/shared/utils.rs": "MAX_JSON_INPUT_BYTES",
+}
+
+
+def constant_hash(text, name):
+    code = _lexer.blank_rust_noise(text)
+    matches = list(re.finditer(rf"\bconst\s+{re.escape(name)}\s*:\s*usize\s*=\s*[^;]+;", code))
+    if len(matches) != 1:
+        return None
+    match = matches[0]
+    return hashlib.sha256(text[match.start():match.end()].encode()).hexdigest()
+
+
+def local_helper_references(files, path, helper):
+    prefix = path.split("/src/", 1)[0] + "/src/"
+    found = set()
+    for source_path, text in files.items():
+        if not source_path.startswith(prefix) or not source_path.endswith(".rs"):
+            continue
+        code = _lexer.blank_test_scoped_items(_lexer.blank_rust_noise(text))
+        for match in re.finditer(rf"\b{re.escape(helper)}\b", code):
+            owner = _contracts.function_at(code, match.start())
+            key = (source_path, owner[0] if owner else "<module>")
+            if key != (path, helper):
+                found.add(key)
+    return found
 
 
 def function_body(text, owner):
@@ -106,6 +139,12 @@ def retired_direct_contracts(catalog, found, files):
         if path in found["decoder_census"]:
             errors.append(f"retired direct reader gained direct decoder: {path}")
         source = files.get(path)
+        bound = RETIRED_DIRECT_BOUNDS.get(path)
+        if bound is not None:
+            bound_hash = constant_hash(source or "", bound)
+            if (review.get("bound_constant") != bound or bound_hash is None
+                    or review.get("bound_source_sha256") != bound_hash):
+                errors.append(f"retired direct-reader bound constant changed: {path}")
         signature = f"{path}::{reader}::{constructor}#1::decode_signed"
         actual = [site for site in found["decoding_contracts"]
                   if site.startswith((f"{path}::{helper}::", f"{path}::{reader}::"))]
@@ -115,7 +154,7 @@ def retired_direct_contracts(catalog, found, files):
             review.get("reader") == reader
             and reader_hash is not None and review.get("reader_source_sha256") == reader_hash
             and _contracts.calls(helper_body or "", reader)
-            and local_helper_consumers(files, path, reader) == {(path, helper)})
+            and local_helper_references(files, path, reader) == {(path, helper)})
         if (review.get("helper") != helper or not reader_pinned or actual != [signature]
                 or review.get("constructor_contract") != signature
                 or source_hash is None or review.get("helper_source_sha256") != source_hash

@@ -224,7 +224,7 @@ impl ChioKernel {
         let now = i64::try_from(now_unix).unwrap_or(i64::MAX);
         verify_execution_nonce_without_consume(
             presented_nonce,
-            &self.config.keypair.public_key(),
+            &self.receipt_signing_public_key()?,
             &presented_nonce.nonce.bound_to,
             now,
             store,

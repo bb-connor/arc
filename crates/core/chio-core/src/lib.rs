@@ -36,6 +36,7 @@ pub use chio_core_types::receipt;
 pub use chio_core_types::security_event;
 pub use chio_core_types::session;
 pub use chio_core_types::signed_artifact;
+pub use chio_core_types::tenant_index;
 pub use chio_listing as listing;
 pub use chio_market as market;
 pub use chio_open_market as open_market;

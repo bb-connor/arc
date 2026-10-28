@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, SecurityInvocationContextV1};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError,
+    SecurityInvocationContextV1,
+};
 pub use chio_security_types::ports::ContainmentTargetKind;
 use chio_security_types::ports::{
     containment_target as derive_containment_target, ContainmentOverlayStore, PortError,
@@ -72,6 +75,23 @@ impl ContainmentGuard {
 impl Guard for ContainmentGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
+    }
+
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
+    }
+
+    fn revalidate_before_dispatch(&self, context: &GuardContext<'_>) -> Result<(), KernelError> {
+        match self.evaluate(context)?.verdict {
+            chio_kernel::Verdict::Allow => Ok(()),
+            chio_kernel::Verdict::Deny | chio_kernel::Verdict::PendingApproval => Err(
+                KernelError::GuardDenied(format!("{GUARD_NAME} dispatch revalidation denied")),
+            ),
+        }
     }
 
     fn evaluate(&self, guard_context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

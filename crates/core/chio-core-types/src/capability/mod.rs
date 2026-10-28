@@ -4,6 +4,7 @@
 //! no flat re-export layer so callers import the domain they depend on.
 
 pub mod aggregate_invocation;
+pub mod anchor;
 pub mod attenuation;
 pub mod caveat;
 pub mod crypto_floor;

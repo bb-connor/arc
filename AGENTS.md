@@ -18,7 +18,7 @@ The workspace ships 108 crates, organized into 11 functional subfolders under `c
 
 | Folder (`crates/<group>`) | Representative crates | Purpose |
 |---------------------------|-----------------------|---------|
-| `core` | `chio-core`, `chio-core-types`, `chio-errors`, `chio-arena`, `chio-adversarial-suite` | Shared types (capabilities, scopes, grants, receipts, canonical JSON, signing), error vocabulary, and the adversarial test arena. |
+| `core` | `chio-core`, `chio-core-types`, `chio-errors`, `chio-fixed`, `chio-decision-model`, `chio-arena`, `chio-adversarial-suite` | Shared types (capabilities, scopes, grants, receipts, canonical JSON, signing), error vocabulary, Q16.16 checked fixed-point arithmetic, sealed decision-model projection, and the adversarial test arena. |
 | `kernel` | `chio-kernel`, `chio-kernel-core`, `chio-kernel-browser`, `chio-kernel-mobile`, `chio-runtime`, `chio-runtime-core`, `chio-runtime-harness` | Capability validation, guard pipeline, receipt signing, platform variants, and runtime wiring/harness. |
 | `guards` | `chio-guards`, `chio-data-guards`, `chio-external-guards`, `chio-wasm-guards`, `chio-policy`, `chio-guard-registry` | Native guard implementations, policy evaluation, and the guard registry. |
 | `protocol` | `chio-mcp-adapter`, `chio-mcp-edge`, `chio-a2a-adapter`, `chio-acp-edge`, `chio-openai-adapter`, `chio-openapi-mcp-bridge`, `chio-cross-protocol`, `chio-tower` | Wrap external protocols (MCP, A2A, ACP, OpenAPI, AG-UI) and provider tool-call dialects as Chio tool servers (27 crates). |

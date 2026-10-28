@@ -28,7 +28,7 @@ crate-type = ["cdylib", "rlib"]
 # Platform adapters live here:
 #
 # - `BrowserClock` implements `chio_kernel_core::Clock` via `js_sys::Date::now()`.
-# - `WebCryptoRng` implements `chio_kernel_core::Rng` via
+# - `WebCryptoRng` implements `chio_core_types::rng::Rng` via
 #   `web_sys::Crypto::get_random_values_with_u8_array` for CSPRNG-quality
 #   entropy (receipt signing seeds, DPoP nonces, etc.).
 #

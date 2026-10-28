@@ -135,6 +135,10 @@ impl PaymentAdapter for OutcomePaymentAdapter {
     fn refund(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
         unreachable!("post-execution capture failure has no refund authority")
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[derive(Clone, Default)]

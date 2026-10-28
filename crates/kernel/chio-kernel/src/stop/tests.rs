@@ -59,7 +59,10 @@ impl DurableStopStore for MemoryStopStore {
         _fence: &StoreMutationFence,
     ) -> Result<Option<StopEpochV1>, DurableStopError> {
         if self.fail_appends.load(Ordering::SeqCst) {
-            return Err(AdmissionOperationStoreError::Unavailable("disk full".to_owned()).into());
+            return Err(AdmissionOperationStoreError::Unavailable(
+                "disk full at /private/stop-store.db".to_owned(),
+            )
+            .into());
         }
         let mut records = self.records.lock().unwrap();
         let head = verify_stop_chain(AUTHORITY, request.scope, &records)?.cloned();
@@ -367,4 +370,80 @@ fn a_stopped_status_counts_withheld_operations() {
     let stopped = local.stop(stop_command("incident")).unwrap();
     assert!(stopped.stopped);
     assert_eq!(stopped.withheld_operations, None);
+}
+
+#[test]
+fn failed_stop_and_resume_keep_store_details_out_of_wire_bodies() {
+    let store = Arc::new(MemoryStopStore::default());
+    store.fail_appends.store(true, Ordering::SeqCst);
+    let control = StopControl::durable(&store, fence());
+    let stopped = control.stop(stop_command("incident")).unwrap_err();
+    assert!(
+        matches!(&stopped, StopControlError::NotDurable { detail, .. } if detail.contains("disk full"))
+    );
+    assert_eq!(stopped.http_status(), 503);
+    let body = stopped.body();
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "error": "stop_not_durable",
+            "message": "Stop holds in this process but could not be made durable.",
+            "urn": "urn:chio:error:kernel:stop-not-durable",
+            "status": {
+                "scope": {"kind": "kernel"}, "stopped": true,
+                "readiness": {"state": "ready_stopped"},
+                "durability": "process_only", "host_latch": false,
+                "withheld_operations": 0
+            }
+        })
+    );
+    assert!(!body.to_string().contains("disk full"));
+    assert!(!body.to_string().contains("/private/stop-store.db"));
+
+    let refused = control.resume(resume_command(None)).unwrap_err();
+    assert!(matches!(&refused, StopControlError::Refused(detail) if detail.contains("disk full")));
+    assert_eq!(refused.http_status(), 503);
+    assert_eq!(
+        refused.body(),
+        serde_json::json!({
+            "error": "resume_refused",
+            "message": "Resume was refused.",
+            "urn": "urn:chio:error:kernel:resume-refused"
+        })
+    );
+    assert!(control.heads().is_stopped());
+}
+
+#[test]
+fn control_refusal_bodies_preserve_codes_and_conflict_heads_without_diagnostics() {
+    for (error, status, expected) in [
+        (
+            StopControlError::BadRequest("private request diagnostic".to_owned()),
+            400,
+            serde_json::json!({"error": "bad_request", "message": "Invalid stop request.", "urn": "urn:chio:error:kernel:stop-bad-request"}),
+        ),
+        (
+            StopControlError::NotReady("private readiness diagnostic".to_owned()),
+            503,
+            serde_json::json!({"error": "stop_not_ready", "message": "Stop control is not ready.", "urn": "urn:chio:error:kernel:stop-not-ready"}),
+        ),
+        (
+            StopControlError::HeadMoved {
+                head: Some(StopEpochId {
+                    chain_generation: 1,
+                    epoch: 7,
+                }),
+            },
+            409,
+            serde_json::json!({"error": "stop_head_moved", "message": "Stop head moved.", "urn": "urn:chio:error:kernel:stop-head-moved", "head": {"chain_generation": 1, "epoch": 7}}),
+        ),
+        (
+            StopControlError::HeadMoved { head: None },
+            409,
+            serde_json::json!({"error": "stop_head_moved", "message": "Stop head moved.", "urn": "urn:chio:error:kernel:stop-head-moved", "head": null}),
+        ),
+    ] {
+        assert_eq!(error.http_status(), status);
+        assert_eq!(error.body(), expected);
+    }
 }

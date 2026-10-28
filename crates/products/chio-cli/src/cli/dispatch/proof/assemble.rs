@@ -328,8 +328,6 @@ fn evidence_role_for_schema(path: &str, schema: &str) -> String {
         "chio.proof.first-run.guard-report.v1" => "guard-decision".to_string(),
         "chio.policy.bundle.v1" => "policy".to_string(),
         "chio.receipt.v1" => "receipt".to_string(),
-        "chio.evidence-graph.minimal-receipt.v1" => "receipt".to_string(),
-        "chio.proof-room.receipt-projection.v1" => "receipt".to_string(),
         "chio.proof-room.receipt-evidence.v1" => "receipt".to_string(),
         "chio.runtime.terminal-receipt.v1" => "receipt".to_string(),
         "chio.request.digest.v1" => "request".to_string(),

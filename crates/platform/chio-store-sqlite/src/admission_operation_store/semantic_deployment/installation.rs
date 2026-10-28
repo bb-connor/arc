@@ -6,10 +6,12 @@ use chio_core::PublicKey;
 use chio_kernel::admission_operation::NativeSecurityAuthorityBindingV1;
 use chio_kernel::recovery::recovery_flow_key;
 use chio_kernel::SecurityInvocationContext;
-use chio_security_types::recovery::{AuthorityDomainId, NonEmptyBoundedList, RecoveryScopeV1};
+use chio_security_types::recovery::{
+    AuthorityDomainId, NonEmptyBoundedList, RecoveryScopeV1, MAX_RECOVERY_VERIFICATION_WORK,
+};
+use chio_security_types::work::VerificationBudget;
 use chio_semantic_contracts::{
     compile_semantic_registry, CompiledSemanticRegistryV1, ExposedSemanticToolV1,
-    VerificationBudget,
 };
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +69,7 @@ impl NativeSemanticInstallation {
         &self,
         expected_scope: &RecoveryScopeV1,
     ) -> Result<CompiledSemanticRegistryV1, AdmissionOperationStoreError> {
-        let mut budget = VerificationBudget::new(4096)
+        let mut budget = VerificationBudget::new(4096, MAX_RECOVERY_VERIFICATION_WORK)
             .map_err(|_| invariant("semantic verification budget refused"))?;
         compile_semantic_registry(
             &self.deployment,

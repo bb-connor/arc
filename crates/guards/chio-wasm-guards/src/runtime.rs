@@ -461,6 +461,19 @@ mod tests {
     }
 
     #[test]
+    fn wasm_guard_declares_unsafe() {
+        let allowing = MockWasmBackend::allowing();
+        let denying = MockWasmBackend::denying("no");
+        for backend in [allowing, denying] {
+            let guard = WasmGuard::new("g".to_string(), Box::new(backend), false, None);
+            assert_eq!(
+                guard.evidence_declaration(),
+                chio_kernel::GuardEvidenceDeclaration::UNSAFE
+            );
+        }
+    }
+
+    #[test]
     fn guard_request_serialization() {
         let req = GuardRequest {
             tool_name: "read_file".to_string(),
@@ -925,6 +938,35 @@ mod tests {
 
         let source = load_refused_before_factory(&module_config(&path, 7));
         assert_eq!(source.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(source.to_string(), "guard input exceeds byte limit");
+    }
+
+    #[test]
+    fn load_guard_accepts_module_at_configured_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("guard.wasm");
+        let module = b"\x00asm\x01\x00\x00\x00";
+        std::fs::write(&path, module).unwrap();
+
+        let mut runtime = WasmGuardRuntime::new();
+        let mut loaded = Vec::new();
+        runtime
+            .load_guard(&module_config(&path, module.len()), |bytes, _| {
+                loaded = bytes.to_vec();
+                Ok(Box::new(MockWasmBackend::allowing()))
+            })
+            .unwrap();
+        assert_eq!(loaded, module);
+        assert_eq!(runtime.guard_count(), 1);
+    }
+
+    #[test]
+    fn load_guard_refuses_directory_module() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let source = load_refused_before_factory(&module_config(dir.path(), 1024));
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidInput);
+        assert_eq!(source.to_string(), "guard input must be a regular file");
     }
 
     #[cfg(unix)]

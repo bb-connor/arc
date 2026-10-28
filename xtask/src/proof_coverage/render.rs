@@ -70,10 +70,24 @@ pub(super) fn render_qualifiers(qualifiers: &BTreeMap<String, String>) -> String
 }
 
 pub(super) fn markdown_cells(line: &str) -> Vec<String> {
-    line.trim_matches('|')
-        .split('|')
-        .map(|cell| cell.trim().to_string())
-        .collect()
+    let mut cells = Vec::new();
+    let mut start = 0;
+    let mut escaped = false;
+    for (index, ch) in line.char_indices() {
+        if ch == '|' && !escaped {
+            cells.push(line[start..index].trim().to_string());
+            start = index + 1;
+        }
+        escaped = ch == '\\' && !escaped;
+    }
+    cells.push(line[start..].trim().to_string());
+    if line.starts_with('|') {
+        cells.remove(0);
+    }
+    if start == line.len() && line.ends_with('|') {
+        cells.pop();
+    }
+    cells
 }
 
 pub(super) fn separator_cells(cells: &[String]) -> bool {

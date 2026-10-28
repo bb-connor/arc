@@ -158,12 +158,11 @@ use support_monetary::{
     make_monetary_grant, make_runtime_attestation, make_sibling_sum_invocation_fixture,
     make_sibling_sum_monetary_fixture, make_trusted_azure_runtime_attestation,
     make_trusted_google_runtime_attestation, make_trusted_nitro_runtime_attestation,
-    spawn_bound_acp_test_server, spawn_payment_test_server, with_minimum_autonomy_tier,
-    with_minimum_runtime_assurance, CountingMonetaryServer, CreditBondFixture,
-    FailingMonetaryServer, GovernedAcpIntentFixture, GovernedCallChainContinuationTokenFixture,
-    MonetaryCostServer, PendingMonetaryServer, ReverseFailingBudgetStore,
-    SiblingSumInvocationFixture, SiblingSumMonetaryFixture, StaticPriceOracle,
-    TrackingPaymentAdapter, UnmeasuredCostServer,
+    spawn_bound_acp_test_server, with_minimum_autonomy_tier, with_minimum_runtime_assurance,
+    CountingMonetaryServer, CreditBondFixture, FailingMonetaryServer, GovernedAcpIntentFixture,
+    GovernedCallChainContinuationTokenFixture, MonetaryCostServer, PendingMonetaryServer,
+    ReverseFailingBudgetStore, SiblingSumInvocationFixture, SiblingSumMonetaryFixture,
+    StaticPriceOracle, TrackingPaymentAdapter, UnmeasuredCostServer,
 };
 use support_tool_approval::bind_test_tool_approval;
 #[path = "tests/capability_liveness.rs"]
@@ -281,7 +280,8 @@ mod dpop_required_authority;
 mod durable_admission;
 #[path = "tests/revocation_durability.rs"]
 mod revocation_durability;
-use durable_admission::{durable_admission_fixture, TestAdmissionOperationStore};
+pub(super) use durable_admission::durable_admission_fixture;
+use durable_admission::TestAdmissionOperationStore;
 #[path = "tests/durable_admission_url_elicitation_support.rs"]
 mod durable_admission_url_elicitation_support;
 use durable_admission_url_elicitation_support::{

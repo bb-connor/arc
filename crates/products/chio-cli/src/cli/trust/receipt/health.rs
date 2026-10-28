@@ -262,6 +262,26 @@ mod receipt_operator_tests {
         ))
     }
 
+    /// Run `mutate` on the store at `path` with the immutability trigger
+    /// `trigger` lifted, then re-create the trigger from its exact stored SQL,
+    /// so the store's schema catalog is canonical again when it reopens.
+    fn mutate_past_trigger(
+        path: &std::path::Path,
+        trigger: &str,
+        mutate: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = rusqlite::Connection::open(path)?;
+        let sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
+            [trigger],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch(&format!("DROP TRIGGER \"{trigger}\";"))?;
+        connection.execute_batch(mutate)?;
+        connection.execute_batch(&sql)?;
+        Ok(())
+    }
+
     fn operator_sample_receipt() -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error>
     {
         let keypair = chio_core::crypto::Keypair::generate();
@@ -412,28 +432,29 @@ mod receipt_operator_tests {
             }
             store.flush_receipt_writes()?;
         }
-        {
-            let connection = rusqlite::Connection::open(&path)?;
-            connection.execute_batch(
-                "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
-                 DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
-            )?;
-        }
+        mutate_past_trigger(
+            &path,
+            "claim_receipt_log_entries_reject_delete",
+            "DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
+        )?;
 
         // Precondition: the corrupted store is genuinely not writable.
         let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
-        assert!(
-            !matches!(store.receipt_store_health(), Ok(report) if report.healthy),
-            "the corrupted store must report not-writable"
-        );
+        let refusal = match store.receipt_store_health() {
+            Ok(report) => {
+                assert!(!report.healthy, "the corrupted store must report not-writable");
+                receipt_health_report_error(&report).to_string()
+            }
+            Err(error) => CliError::from(error).to_string(),
+        };
         drop(store);
 
         // JSON mode must fail closed, matching the human path.
-        let result = cmd_receipt_retention_repair(&archive, backend(Some(&path), None));
-        assert!(
-            result.is_err(),
-            "json retention repair must fail closed on a not-writable store"
-        );
+        let error = match cmd_receipt_retention_repair(&archive, backend(Some(&path), None)) {
+            Ok(()) => panic!("json retention repair must fail closed on a not-writable store"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), refusal);
 
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&archive);
@@ -465,20 +486,21 @@ mod receipt_operator_tests {
             }
             store.flush_receipt_writes()?;
         }
-        {
-            let connection = rusqlite::Connection::open(&path)?;
-            connection.execute_batch(
-                "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
-                 DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
-            )?;
-        }
+        mutate_past_trigger(
+            &path,
+            "claim_receipt_log_entries_reject_delete",
+            "DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
+        )?;
 
         // Precondition: the corrupted store is genuinely not writable.
         let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
-        assert!(
-            !matches!(store.receipt_store_health(), Ok(report) if report.healthy),
-            "the corrupted store must report not-writable"
-        );
+        let refusal = match store.receipt_store_health() {
+            Ok(report) => {
+                assert!(!report.healthy, "the corrupted store must report not-writable");
+                receipt_health_report_error(&report).to_string()
+            }
+            Err(error) => CliError::from(error).to_string(),
+        };
         drop(store);
 
         // Human mode must fail closed, matching the JSON path.
@@ -488,11 +510,11 @@ mod receipt_operator_tests {
             control_url: None,
             control_token: None,
         };
-        let result = cmd_receipt_retention_repair(&archive, human_backend);
-        assert!(
-            result.is_err(),
-            "human retention repair must fail closed on a not-writable store"
-        );
+        let error = match cmd_receipt_retention_repair(&archive, human_backend) {
+            Ok(()) => panic!("human retention repair must fail closed on a not-writable store"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), refusal);
 
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(&archive);
@@ -808,17 +830,13 @@ mod receipt_operator_tests {
         store.create_next_receipt_checkpoint(10, &keypair)?;
         drop(store);
 
-        // Tamper the persisted checkpoint out of band, same mechanics as the
-        // store-side reseed fixtures (drop the immutability trigger, then
-        // mutate a real body field so it no longer matches the batch_end_seq
-        // column recorded alongside it).
-        let connection = rusqlite::Connection::open(&db_path)?;
-        connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
-        connection.execute(
-            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":1', '\"batch_end_seq\":0')",
-            [],
+        // Tamper the persisted checkpoint out of band: change a body field so
+        // it no longer matches the batch_end_seq column recorded alongside it.
+        mutate_past_trigger(
+            &db_path,
+            "kernel_checkpoints_reject_update",
+            "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":1', '\"batch_end_seq\":0');",
         )?;
-        drop(connection);
 
         let error = match cmd_receipt_audit(false, backend(Some(&db_path), None)) {
             Ok(()) => {

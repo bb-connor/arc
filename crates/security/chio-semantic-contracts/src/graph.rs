@@ -1,9 +1,9 @@
 //! Bounded symbolic dependency graphs of registered remedy templates.
-use crate::VerificationBudget;
 use alloc::{vec, vec::Vec};
 use chio_security_types::recovery::{
     BoundedList, ContractError, NonEmptyBoundedList, SafeInteger, StepId, TemplateId, VersionV1,
 };
+use chio_security_types::work::VerificationBudget;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_DEPENDENCY_GRAPH_NODES: usize = 16;

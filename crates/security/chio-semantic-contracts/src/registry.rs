@@ -1,7 +1,6 @@
 //! Compilation of one signed deployment and its signed packages against the
 //! host's actual tool manifest.
 use crate::work::units;
-use crate::VerificationBudget;
 use alloc::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     vec,
@@ -20,6 +19,7 @@ use chio_security_types::semantic::{
     SemanticChannelRuleV1, SemanticChannelV1, SemanticDeploymentV1, SemanticOperationContractV1,
     SemanticOperationKindV1, SemanticPackageV1, SemanticRouteV1, SemanticSelectorV1,
 };
+use chio_security_types::work::VerificationBudget;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_REGISTRY_PACKAGES: usize = 16;

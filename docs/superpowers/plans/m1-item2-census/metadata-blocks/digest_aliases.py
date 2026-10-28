@@ -12,11 +12,19 @@ Collects, at a commit, every non-test line of three kinds:
           (`shared_payment_token_id`, `purpose`, `call_chain`, `authorization_resource`,
           `escalations`, `breakdown`, `principal`, `subject_key`, `user_name`, `user_id`,
           `provider_record_id`, `entitlements`).
+A line is a test line when its path is a test path or it lies inside an item gated by a
+test-only cfg (`test`, or `all(..)` with `test` as a top-level argument); the ranges come from
+metadata_blocks.cfg_test_lines in this directory.
 Each line must match a rule (kind, path regex, line regex) that states the preimage, whether it
 holds a committed field, and the decision. It exits 2 on a git failure other than an empty grep,
 and 1 on a non-commit revision, a kind with no lines, or any unclassified line.
 """
-import csv, os, re, subprocess, sys
+import csv, importlib.util, os, re, subprocess, sys
+
+_spec = importlib.util.spec_from_file_location(
+    "metadata_blocks", os.path.join(os.path.dirname(os.path.abspath(__file__)), "metadata_blocks.py"))
+metadata_blocks = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(metadata_blocks)
 
 TEST_PATH = re.compile(r"(/tests?/|tests?\.rs$|_tests?\b|test_support|/fixtures/|/_generated/|/benches/|/examples/)")
 
@@ -47,7 +55,7 @@ def run_git(repo, args, allow_no_match=False):
     sys.exit(2)
 
 def collect(repo, rev):
-    rows = []
+    rows, gated = [], {}
     for kind, (paths, pattern) in KINDS.items():
         out = run_git(repo, ["grep", "-n", "-E", "-e", pattern, rev, "--", *paths], allow_no_match=True)
         count = 0
@@ -55,6 +63,11 @@ def collect(repo, rev):
             _, path, line_no, text = hit.split(":", 3)
             if TEST_PATH.search(path) or path.endswith((".md", ".json", ".sql")):
                 continue
+            if path.endswith((".rs", ".inc")):
+                if path not in gated:
+                    gated[path] = metadata_blocks.cfg_test_lines(run_git(repo, ["show", f"{rev}:{path}"]).splitlines())
+                if int(line_no) in gated[path]:
+                    continue
             if text.lstrip().startswith(("//", "///", "#", "*")):
                 continue
             rows.append([kind, path, line_no, re.sub(r"\s+", " ", text.strip())])

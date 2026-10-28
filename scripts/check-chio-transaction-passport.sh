@@ -181,6 +181,36 @@ import sys
 # The generic exit (1), a usage error (2), a panic (101) or a missing command
 # (126, 127) is not a typed rejection.
 REJECTION_EXITS = {10, 20, 30, 50}
+TRANSACTION_CODES_BY_EXIT = {
+    10: (
+        "required-claim-missing", "claim-rejected", "identity-not-bound",
+        "authorization-not-bound", "receipt-uncheckpointed", "runtime-proof-rejected",
+        "buyer-review-rejected", "settlement-unverified", "dispute-unbound",
+        "transparency-preview-not-allowed",
+    ),
+    20: (
+        "passport-hash-mismatch", "artifact-hash-mismatch", "graph-not-closed",
+        "graph-cycle", "signature-invalid",
+    ),
+    30: ("passport-schema-unsupported", "artifact-schema-invalid"),
+    40: ("negative-case-mismatch",),
+    50: ("verifier-feature-unsupported", "verifier-context-invalid"),
+}
+EXIT_BY_CODE = {
+    code: exit_code
+    for exit_code, names in TRANSACTION_CODES_BY_EXIT.items()
+    for name in names
+    for code in (
+        f"urn:chio:error:transaction:{name}",
+        f"CHIO-TRANSACTION-{name.upper()}",
+    )
+}
+EXIT_BY_CODE["CHIO-CLI-JSON"] = 30
+for name in (
+    "too-large", "not-utf8", "invalid-input", "invalid-shape",
+    "canonicalization", "noncanonical",
+):
+    EXIT_BY_CODE[f"urn:chio:error:attest:signed-json-{name}"] = 30
 
 # Mirrors semantic_negative_failure_code and negative_failure_code_matches in
 # crates/products/chio-cli/src/cli/dispatch/proof.rs.
@@ -299,6 +329,14 @@ except json.JSONDecodeError:
 message = report.get("message") if isinstance(report, dict) else None
 if not isinstance(message, str):
     raise SystemExit(f"negative fixture {fixture_id} did not emit a JSON error report")
+code = report.get("code")
+expected_exit = EXIT_BY_CODE.get(code) if isinstance(code, str) else None
+if expected_exit is None:
+    raise SystemExit(f"negative fixture {fixture_id} has an unknown or missing registry code")
+if status != expected_exit:
+    raise SystemExit(
+        f"negative fixture {fixture_id} code {code} requires exit {expected_exit}, got {status}"
+    )
 observed = semantic_failure_code(message)
 if not failure_code_matches(observed, expected):
     raise SystemExit(

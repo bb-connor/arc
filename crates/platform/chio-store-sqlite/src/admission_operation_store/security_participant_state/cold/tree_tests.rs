@@ -373,9 +373,15 @@ fn absence_requires_an_authenticated_nonempty_sibling_branch() -> TestResult {
     assert_eq!(lookup(&mut memory, root, [0x80; 32])?, None);
     assert_eq!(memory.reads, 2);
     memory.nodes.remove(&child);
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(
+        lookup(&mut memory, root, [0x80; 32]),
+        Err(Error::MissingNode)
+    );
     memory.nodes.insert(child, leaf([0; 32], 3)?);
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(
+        lookup(&mut memory, root, [0x80; 32]),
+        Err(Error::NodeDigest)
+    );
     Ok(())
 }
 
@@ -390,9 +396,12 @@ fn an_empty_sibling_beside_a_leaf_is_noncanonical_on_both_paths() -> TestResult 
             right: empty_digest(),
         },
     )?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
-    assert!(batch_update(&mut memory, root, &[([0; 32], pointer(2))]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Shape));
+    assert_eq!(lookup(&mut memory, root, [0x80; 32]), Err(Error::Shape));
+    assert_eq!(
+        batch_update(&mut memory, root, &[([0; 32], pointer(2))]),
+        Err(Error::Shape)
+    );
     Ok(())
 }
 
@@ -407,8 +416,9 @@ fn a_new_key_cannot_repair_a_noncanonical_predecessor_sibling() -> TestResult {
             right: child,
         },
     )?;
-    assert!(
-        batch_update(&mut memory, root, &[([0; 32], pointer(2))]).is_err(),
+    assert_eq!(
+        batch_update(&mut memory, root, &[([0; 32], pointer(2))]),
+        Err(Error::Shape),
         "an inserted left key must not hide the predecessor's invalid right leaf"
     );
     Ok(())
@@ -424,7 +434,7 @@ fn two_empty_children_never_prove_absence() -> TestResult {
             right: empty_digest(),
         },
     )?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Shape));
     Ok(())
 }
 
@@ -434,8 +444,8 @@ fn misplaced_leaf_never_proves_absence() -> TestResult {
     let left = seed(&mut memory, leaf([0x80; 32], 1)?)?;
     let right = seed(&mut memory, leaf([0; 32], 2)?)?;
     let root = seed(&mut memory, Node::Branch { left, right })?;
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0x80; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Placement));
+    assert_eq!(lookup(&mut memory, root, [0x80; 32]), Err(Error::Placement));
     Ok(())
 }
 
@@ -448,7 +458,7 @@ fn a_branch_at_depth_256_is_refused() -> TestResult {
     for _ in 0..256 {
         root = seed(&mut memory, Node::Branch { left: root, right })?;
     }
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::Depth));
     assert!(memory.reads <= 257);
     Ok(())
 }
@@ -458,12 +468,18 @@ fn missing_and_corrupt_nodes_refuse_inclusion_and_absence() -> TestResult {
     let mut memory = Memory::default();
     let root = seed(&mut memory, leaf([0; 32], 1)?)?;
     memory.nodes.remove(&root);
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::MissingNode));
+    assert_eq!(
+        lookup(&mut memory, root, [0xff; 32]),
+        Err(Error::MissingNode)
+    );
     memory.nodes.insert(root, leaf([0; 32], 2)?);
-    assert!(lookup(&mut memory, root, [0; 32]).is_err());
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
-    assert!(batch_update(&mut memory, root, &[]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0; 32]), Err(Error::NodeDigest));
+    assert_eq!(
+        lookup(&mut memory, root, [0xff; 32]),
+        Err(Error::NodeDigest)
+    );
+    assert_eq!(batch_update(&mut memory, root, &[]), Err(Error::NodeDigest));
     Ok(())
 }
 
@@ -488,18 +504,20 @@ fn authenticated_malformed_payloads_never_prove_absence() -> TestResult {
     let root: Digest = hash.finalize().into();
     let mut memory = Memory::default();
     memory.nodes.insert(root, Node::Leaf { key, payload });
-    assert!(lookup(&mut memory, root, [0xff; 32]).is_err());
+    assert_eq!(lookup(&mut memory, root, [0xff; 32]), Err(Error::Encoding));
     Ok(())
 }
 
 #[test]
 fn duplicate_batch_keys_are_refused() {
-    assert!(batch_update(
-        &mut Memory::default(),
-        empty_digest(),
-        &[([0; 32], pointer(1)), ([0; 32], pointer(2))]
-    )
-    .is_err());
+    assert_eq!(
+        batch_update(
+            &mut Memory::default(),
+            empty_digest(),
+            &[([0; 32], pointer(1)), ([0; 32], pointer(2))]
+        ),
+        Err(Error::DuplicateKey)
+    );
 }
 
 #[test]
@@ -507,51 +525,70 @@ fn keys_refuse_unknown_classes_wrong_arity_and_oversized_identifiers() -> TestRe
     for tag in 0..=255 {
         assert_eq!(Class::from_tag(tag).is_ok(), (1..=9).contains(&tag));
     }
-    assert!(key_encoding("", Class::Lineage, &["t", "l"]).is_err());
-    assert!(key_encoding("a", Class::Lineage, &["t"]).is_err());
-    assert!(key_encoding("a", Class::Lineage, &["t", ""]).is_err());
-    assert!(key_encoding(&"a".repeat(513), Class::Lineage, &["t", "l"]).is_err());
-    assert!(key_encoding("a", Class::Lineage, &["t", &"l".repeat(513)]).is_err());
+    assert_eq!(
+        key_encoding("", Class::Lineage, &["t", "l"]),
+        Err(Error::Encoding)
+    );
+    assert_eq!(
+        key_encoding("a", Class::Lineage, &["t"]),
+        Err(Error::Encoding)
+    );
+    assert_eq!(
+        key_encoding("a", Class::Lineage, &["t", ""]),
+        Err(Error::Encoding)
+    );
+    assert_eq!(
+        key_encoding(&"a".repeat(513), Class::Lineage, &["t", "l"]),
+        Err(Error::Encoding)
+    );
+    assert_eq!(
+        key_encoding("a", Class::Lineage, &["t", &"l".repeat(513)]),
+        Err(Error::Encoding)
+    );
     key_encoding(&"a".repeat(512), Class::Lineage, &["t", &"l".repeat(512)])?;
     Ok(())
 }
 
 #[test]
 fn pointers_refuse_zero_versions_unknown_tiers_and_trailing_bytes() -> TestResult {
-    assert!(pointer(0).encode().is_err());
+    assert_eq!(pointer(0).encode(), Err(Error::Encoding));
     pointer(u64::MAX).encode()?;
-    assert!(Tier::from_tag(0).is_err());
-    assert!(Tier::from_tag(3).is_err());
+    assert_eq!(Tier::from_tag(0), Err(Error::Encoding));
+    assert_eq!(Tier::from_tag(3), Err(Error::Encoding));
     let bytes = pointer(1).encode()?;
     for length in 0..bytes.len() {
-        assert!(Payload::decode(&bytes[..length]).is_err());
+        assert_eq!(Payload::decode(&bytes[..length]), Err(Error::Encoding));
     }
     let mut trailing = bytes.clone();
     trailing.push(0);
-    assert!(Payload::decode(&trailing).is_err());
+    assert_eq!(Payload::decode(&trailing), Err(Error::Encoding));
     let mut wrong_domain = bytes;
     wrong_domain[0] ^= 1;
-    assert!(Payload::decode(&wrong_domain).is_err());
+    assert_eq!(Payload::decode(&wrong_domain), Err(Error::Encoding));
     Ok(())
 }
 
 #[test]
 fn facts_refuse_versioned_classes_and_noncanonical_witness_lengths() {
     for class in [Class::Lineage, Class::Principal, Class::Epoch, Class::Grant] {
-        assert!(Payload::Fact {
-            class,
-            body: vec![0; 32]
-        }
-        .encode()
-        .is_err());
+        assert_eq!(
+            Payload::Fact {
+                class,
+                body: vec![0; 32]
+            }
+            .encode(),
+            Err(Error::Encoding)
+        );
     }
     for length in [0, 31, 33, 63, 65, 257] {
-        assert!(Payload::Fact {
-            class: Class::Membership,
-            body: vec![0; length]
-        }
-        .encode()
-        .is_err());
+        assert_eq!(
+            Payload::Fact {
+                class: Class::Membership,
+                body: vec![0; length]
+            }
+            .encode(),
+            Err(Error::Encoding)
+        );
     }
 }
 
@@ -560,22 +597,37 @@ fn values_refuse_bad_counts_truncation_trailing_bytes_and_unknown_tables() -> Te
     let vector = fixture()?.values.remove(0);
     let bytes = hex::decode(&vector.encoded_hex)?;
     for length in [0, 7, 8, 9, bytes.len() - 1] {
-        assert!(decode_value(Class::Lineage, &bytes[..length]).is_err());
+        assert_eq!(
+            decode_value(Class::Lineage, &bytes[..length]),
+            Err(Error::Encoding)
+        );
     }
     let mut trailing = bytes.clone();
     trailing.push(0);
-    assert!(decode_value(Class::Lineage, &trailing).is_err());
+    assert_eq!(
+        decode_value(Class::Lineage, &trailing),
+        Err(Error::Encoding)
+    );
     let mut huge_count = bytes.clone();
     huge_count[..8].copy_from_slice(&u64::MAX.to_be_bytes());
-    assert!(decode_value(Class::Lineage, &huge_count).is_err());
+    assert_eq!(
+        decode_value(Class::Lineage, &huge_count),
+        Err(Error::Encoding)
+    );
     let mut huge_length = bytes;
     huge_length[8..16].copy_from_slice(&u64::MAX.to_be_bytes());
-    assert!(decode_value(Class::Lineage, &huge_length).is_err());
-    assert!(encode_value(Class::Lineage, &[]).is_err());
-    assert!(encode_value(Class::Membership, &rows(&vector)?).is_err());
+    assert_eq!(
+        decode_value(Class::Lineage, &huge_length),
+        Err(Error::Encoding)
+    );
+    assert_eq!(encode_value(Class::Lineage, &[]), Err(Error::Encoding));
+    assert_eq!(
+        encode_value(Class::Membership, &rows(&vector)?),
+        Err(Error::Encoding)
+    );
     let mut unknown = rows(&vector)?;
     unknown[0].table = "untrusted_table".into();
-    assert!(encode_value(Class::Lineage, &unknown).is_err());
+    assert_eq!(encode_value(Class::Lineage, &unknown), Err(Error::Encoding));
     Ok(())
 }
 
@@ -584,11 +636,11 @@ fn values_refuse_noncanonical_or_malformed_retained_images() -> TestResult {
     let vector = fixture()?.values.remove(0);
     let mut rows = rows(&vector)?;
     rows[0].image.push(b' ');
-    assert!(encode_value(Class::Lineage, &rows).is_err());
+    assert_eq!(encode_value(Class::Lineage, &rows), Err(Error::Encoding));
     rows[0].image = b"[]".to_vec();
-    assert!(encode_value(Class::Lineage, &rows).is_err());
+    assert_eq!(encode_value(Class::Lineage, &rows), Err(Error::Encoding));
     rows[0].image = vec![b'0'; 16_777_217];
-    assert!(encode_value(Class::Lineage, &rows).is_err());
+    assert_eq!(encode_value(Class::Lineage, &rows), Err(Error::Encoding));
     Ok(())
 }
 
@@ -607,7 +659,10 @@ fn grant_values_refuse_duplicate_rows_and_noncanonical_row_order() -> TestResult
         assert_eq!(duplicate_rows[first].table, duplicate_rows[second].table);
         assert_ne!(duplicate_rows[first], duplicate_rows[second]);
         duplicate_rows[second] = duplicate_rows[first].clone();
-        assert!(encode_value(Class::Grant, &duplicate_rows).is_err());
+        assert_eq!(
+            encode_value(Class::Grant, &duplicate_rows),
+            Err(Error::Encoding)
+        );
     }
 
     let vector = fixture()?.values.remove(3);
@@ -624,7 +679,7 @@ fn grant_values_refuse_duplicate_rows_and_noncanonical_row_order() -> TestResult
         encoded.extend((row.image.len() as u64).to_be_bytes());
         encoded.extend(row.image);
     }
-    assert!(decode_value(Class::Grant, &encoded).is_err());
+    assert_eq!(decode_value(Class::Grant, &encoded), Err(Error::Encoding));
     Ok(())
 }
 
@@ -633,9 +688,13 @@ fn a_valid_value_of_another_key_or_authority_is_refused() -> TestResult {
     for vector in fixture()?.values {
         let class = Class::from_tag(vector.class_tag)?;
         let bytes = hex::decode(&vector.encoded_hex)?;
-        assert!(verify_value_key("authority", class, [0; 32], &bytes).is_err());
-        assert!(
-            verify_value_key("other-authority", class, digest(&vector.key_hex)?, &bytes).is_err()
+        assert_eq!(
+            verify_value_key("authority", class, [0; 32], &bytes),
+            Err(Error::Binding)
+        );
+        assert_eq!(
+            verify_value_key("other-authority", class, digest(&vector.key_hex)?, &bytes),
+            Err(Error::Binding)
         );
     }
     Ok(())

@@ -76,7 +76,7 @@ impl Fixture {
             require_nonce: false,
         };
         request.execution_nonce = Some(mint_execution_nonce(
-            &kernel.config.keypair,
+            kernel.signing_authority.backend.as_ref(),
             binding_for_request(&capability, &request),
             &nonce_config,
             i64::try_from(current_unix_timestamp())?,

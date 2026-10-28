@@ -401,20 +401,26 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default)]
-struct KernelTimeoutErrorLayer;
+#[derive(Clone)]
+struct KernelTimeoutErrorLayer {
+    kernel: Arc<chio_kernel::ChioKernel>,
+}
 
 impl<S> Layer<S> for KernelTimeoutErrorLayer {
     type Service = KernelTimeoutErrorService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        KernelTimeoutErrorService { inner }
+        KernelTimeoutErrorService {
+            inner,
+            kernel: Arc::clone(&self.kernel),
+        }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct KernelTimeoutErrorService<S> {
     inner: S,
+    kernel: Arc<chio_kernel::ChioKernel>,
 }
 
 impl<S, Request> Service<Request> for KernelTimeoutErrorService<S>
@@ -434,7 +440,24 @@ where
 
     fn call(&mut self, request: Request) -> Self::Future {
         let future = self.inner.call(request);
-        Box::pin(async move { future.await.map_err(normalize_tower_error) })
+        let kernel = Arc::clone(&self.kernel);
+        Box::pin(async move {
+            let error = match future.await {
+                Ok(response) => return Ok(response),
+                Err(error) => normalize_tower_error(error),
+            };
+            if matches!(error, KernelServiceError::Timeout) {
+                tokio::task::spawn_blocking(move || kernel.await_post_effect_evidence())
+                    .await
+                    .map_err(|error| {
+                        KernelServiceError::Middleware(format!(
+                            "post-effect evidence wait failed: {error}"
+                        ))
+                    })?
+                    .map_err(map_kernel_error)?;
+            }
+            Err(error)
+        })
     }
 }
 
@@ -464,10 +487,10 @@ pub fn build_layered(
     per_tenant_limit: usize,
     request_timeout: Duration,
 ) -> impl Service<KernelRequest, Response = KernelResponse, Error = KernelServiceError> + Clone {
-    let service = KernelService::new(kernel);
+    let service = KernelService::new(Arc::clone(&kernel));
     let service = TenantConcurrencyLimitLayer::new(per_tenant_limit).layer(service);
     let service = TimeoutLayer::new(request_timeout).layer(service);
-    let service = KernelTimeoutErrorLayer.layer(service);
+    let service = KernelTimeoutErrorLayer { kernel }.layer(service);
     KernelTraceLayer.layer(service)
 }
 
@@ -478,9 +501,10 @@ mod tests {
     use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
     use chio_core_types::crypto::Keypair;
     use chio_kernel::{
-        ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallOutput, ToolCallRequest,
-        ToolServerConnection, ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE,
-        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ReceiptStore, ToolCallOutput,
+        ToolCallRequest, ToolServerConnection, ToolServerStreamResult,
+        DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+        DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
     use tower::ServiceExt;
 
@@ -742,9 +766,12 @@ mod tests {
             Ok::<(), KernelServiceError>(())
         });
         let timeout = TimeoutLayer::new(Duration::from_millis(1)).layer(inner);
-        let mut service = KernelTimeoutErrorLayer.layer(timeout);
         let kernel = ChioKernel::new(make_config());
         let request = make_kernel_request(&kernel);
+        let mut service = KernelTimeoutErrorLayer {
+            kernel: Arc::new(kernel),
+        }
+        .layer(timeout);
 
         let result = service
             .ready()
@@ -828,6 +855,9 @@ mod tests {
     async fn build_layered_timeout_drop_records_cancellation_receipt() {
         let invoked = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut kernel = ChioKernel::new(make_config());
+        let kernel_key = kernel
+            .receipt_signing_public_key()
+            .unwrap_or_else(|error| panic!("receipt signing key unavailable: {error}"));
         kernel.register_tool_server(Box::new(ParkingServer {
             invoked: Arc::clone(&invoked),
         }));
@@ -860,5 +890,109 @@ mod tests {
             panic!("cancellation receipt missing from the kernel receipt log");
         };
         assert!(receipt.is_cancelled());
+        assert_eq!(receipt.kernel_key, kernel_key);
+        assert!(receipt
+            .verify_signature()
+            .unwrap_or_else(|error| panic!("cancellation signature invalid: {error}")));
+    }
+
+    struct RecoverableReceiptStore {
+        inner: chio_store_sqlite::SqliteReceiptStore,
+        available: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl ReceiptStore for RecoverableReceiptStore {
+        fn append_chio_receipt(
+            &self,
+            receipt: &chio_core_types::receipt::body::ChioReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            if !self.available.load(Ordering::SeqCst) {
+                return Err(chio_kernel::ReceiptStoreError::Timeout {
+                    operation: "controlled receipt storage failure".to_string(),
+                    timeout_ms: 1,
+                });
+            }
+            self.inner.append_chio_receipt(receipt)
+        }
+
+        fn append_child_receipt(
+            &self,
+            receipt: &chio_core_types::receipt::lineage::ChildRequestReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            self.inner.append_child_receipt(receipt)
+        }
+
+        fn flush_receipt_writes(
+            &self,
+        ) -> Result<chio_kernel::ReceiptFlushReport, chio_kernel::ReceiptStoreError> {
+            if !self.available.load(Ordering::SeqCst) {
+                return Err(chio_kernel::ReceiptStoreError::Timeout {
+                    operation: "controlled receipt storage failure".to_string(),
+                    timeout_ms: 1,
+                });
+            }
+            self.inner.flush_receipt_writes()
+        }
+
+        fn load_retained_chio_receipt(
+            &self,
+            id: &str,
+        ) -> Result<
+            Option<chio_core_types::receipt::body::ChioReceipt>,
+            chio_kernel::ReceiptStoreError,
+        > {
+            self.inner.load_retained_chio_receipt(id)
+        }
+
+        fn load_retained_chio_receipt_commitment(
+            &self,
+            id: &str,
+        ) -> Result<Option<chio_kernel::RetainedReceiptCommitment>, chio_kernel::ReceiptStoreError>
+        {
+            self.inner.load_retained_chio_receipt_commitment(id)
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn build_layered_timeout_reports_pending_receipt_until_storage_recovers(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let available = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let invoked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut kernel = ChioKernel::new(make_config());
+        kernel.set_receipt_store(Box::new(RecoverableReceiptStore {
+            inner: chio_store_sqlite::SqliteReceiptStore::open(
+                directory.path().join("receipts.sqlite"),
+            )?,
+            available: Arc::clone(&available),
+        }))?;
+        kernel.register_tool_server(Box::new(ParkingServer {
+            invoked: Arc::clone(&invoked),
+        }));
+        let request = make_kernel_request(&kernel);
+        let kernel = Arc::new(kernel);
+        let mut service = build_layered(Arc::clone(&kernel), 16, Duration::from_millis(1));
+        let result = service.ready().await?.call(request).await;
+        let receipts_before_recovery = kernel.receipt_log().len();
+
+        available.store(true, Ordering::SeqCst);
+        let recovery_kernel = Arc::clone(&kernel);
+        tokio::task::spawn_blocking(move || recovery_kernel.await_post_effect_evidence()).await??;
+
+        assert!(invoked.load(Ordering::SeqCst));
+        assert!(matches!(
+            result,
+            Err(KernelServiceError::Kernel(
+                KernelError::PostEffectEvidencePending { buffered: 1 }
+            ))
+        ));
+        assert_eq!(receipts_before_recovery, 0);
+        let log = kernel.receipt_log();
+        assert_eq!(log.len(), 1);
+        let receipt = log.get(0).ok_or("recovered cancellation receipt missing")?;
+        assert!(receipt.is_cancelled());
+        assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
+        assert!(receipt.verify_signature()?);
+        Ok(())
     }
 }

@@ -139,6 +139,15 @@ pub(crate) fn validate_json_artifact_schema(
     label: &str,
 ) -> Result<(), ProofRoomError> {
     let value: serde_json::Value = input::decode(bytes)?;
+    if expected_schema == CHIO_RECEIPT_SCHEMA {
+        return input::decode::<chio_core_types::receipt::body::ChioReceipt>(bytes)
+            .map(drop)
+            .map_err(|_| {
+                ProofRoomError::from(format!(
+                    "proof-room.schema-violation: {label} is not a chio.receipt.v1 receipt"
+                ))
+            });
+    }
     match value.get("schema").and_then(serde_json::Value::as_str) {
         Some(actual_schema) if actual_schema == expected_schema => Ok::<(), ProofRoomError>(()),
         Some(actual_schema) => Err((format!(

@@ -6,8 +6,6 @@ use super::*;
 use crate::trust_control::ingress_lanes::{IngressLane, WALLET_ENTITLEMENT_AT_CAPACITY};
 use crate::trust_control::json_ingress::authenticate_wallet_credential;
 use futures_util::FutureExt;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -16,74 +14,21 @@ use tokio::sync::mpsc::UnboundedReceiver;
 /// surfaces as a failed progress assertion, never as the guard.
 const PAUSE_BOUND: Duration = Duration::from_secs(10);
 
-/// An offers file served through a FIFO. A check opens it and then waits for
-/// the offers, which the test withholds until it releases them.
-struct PausedOffers {
-    path: PathBuf,
-    release: std::sync::mpsc::Sender<()>,
-    writer: Option<std::thread::JoinHandle<()>>,
-}
+struct PausedOffers(crate::signed_input::read_pause::ReadPause);
 
 impl PausedOffers {
-    /// Serves one read of `offers` at `path`. A delivery on the returned
-    /// receiver means a check has opened the file and waits for its bytes.
     fn serve(path: PathBuf, offers: Vec<u8>) -> TestResult<(Self, UnboundedReceiver<()>)> {
-        let created = std::process::Command::new("mkfifo")
-            .args(["-m", "600"])
-            .arg(&path)
-            .status()?;
-        if !created.success() {
-            return Err("offers FIFO creation failed".into());
-        }
-        let (opened_tx, opened) = tokio::sync::mpsc::unbounded_channel();
-        let (release, released) = std::sync::mpsc::channel::<()>();
-        let fifo = path.clone();
-        let writer = std::thread::spawn(move || {
-            // Opening a FIFO for writing returns only once a reader opened it.
-            let Ok(mut file) = std::fs::OpenOptions::new().write(true).open(&fifo) else {
-                return;
-            };
-            let _ = opened_tx.send(());
-            let _ = released.recv_timeout(PAUSE_BOUND);
-            let _ = file.write_all(&offers);
-        });
-        Ok((
-            Self {
-                path,
-                release,
-                writer: Some(writer),
-            },
-            opened,
-        ))
+        std::fs::write(&path, offers)?;
+        let (pause, opened) =
+            crate::signed_input::read_pause::ReadPause::install(&path, PAUSE_BOUND)?;
+        Ok((Self(pause), opened))
     }
 
-    fn release(mut self) -> TestResult {
-        self.release.send(())?;
-        if let Some(writer) = self.writer.take() {
-            writer.join().map_err(|_| "offers writer panicked")?;
-        }
-        Ok(())
+    fn release(self) {
+        self.0.release();
     }
 }
 
-impl Drop for PausedOffers {
-    fn drop(&mut self) {
-        let _ = self.release.send(());
-        if let Some(writer) = self.writer.take() {
-            // A writer still waiting for a reader is let through by one that
-            // does not wait for a writer.
-            let reader = std::fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NONBLOCK)
-                .open(&self.path);
-            let _ = writer.join();
-            drop(reader);
-        }
-    }
-}
-
-/// Serves the fixture's offers through a FIFO beside its offers file and
-/// returns the configuration that reads them from there.
 fn paused_offers(
     fixture: &WalletFixture,
 ) -> TestResult<(PausedOffers, UnboundedReceiver<()>, TrustServiceConfig)> {
@@ -151,7 +96,7 @@ async fn wallet_entitlement_leaves_the_async_worker_free_while_its_offers_file_i
         "a task on the authenticating worker made no progress until the wallet entitlement check ended"
     );
 
-    offers.release()?;
+    offers.release();
     let response = tokio::time::timeout(HANG_GUARD, upload).await???;
     // The entitled token passes, and the upload keeps its original-byte
     // validation.
@@ -241,7 +186,7 @@ async fn next_wallet_entitlement_check_is_refused_at_once_while_a_paused_one_hol
     )
     .await?;
 
-    offers.release()?;
+    offers.release();
     let decision = tokio::time::timeout(HANG_GUARD, held).await??;
     assert!(
         matches!(decision, Ok(())),
@@ -269,7 +214,7 @@ async fn cancelled_wallet_entitlement_check_keeps_its_permit_until_the_check_end
 
     // The dropped request's check still reads the released offers, and only
     // then returns its permit.
-    offers.release()?;
+    offers.release();
     tokio::time::timeout(HANG_GUARD, lane.blocking_lane().wait_for_free_permit()).await?;
     assert_eq!(lane.blocking_lane().available_permits(), 1);
     Ok(())
@@ -355,7 +300,7 @@ async fn wallet_clones_share_admission_and_independent_service_states_remain_rea
         )
         .await?;
     for (offers, check) in held {
-        offers.release()?;
+        offers.release();
         tokio::time::timeout(HANG_GUARD, check)
             .await??
             .map_err(|_| "entitled wallet check refused")?;

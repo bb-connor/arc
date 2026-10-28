@@ -5,7 +5,7 @@ pub use active_response_simulation::{
 use std::sync::Arc;
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
-use chio_core::receipt::metadata::GuardEvidence;
+use chio_core::receipt::metadata::{GuardEvidence, GuardEvidenceDeclaration};
 use dashmap::DashMap;
 
 use crate::budget_store::BudgetCommitMetadata;
@@ -74,8 +74,8 @@ pub use active_response_coordinator::{
 };
 pub(crate) use active_response_executor::ActiveResponseExecutionRequestParts;
 pub use active_response_executor::{
-    bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
-    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
+    derive_active_response_dispatch_id, ActiveResponseCommittedDispatch,
+    ActiveResponseDispatchIdError, ActiveResponseDispatchIdInput, ActiveResponseEffectEvidence,
     ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
     ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
     ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
@@ -158,29 +158,35 @@ const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
 const FINANCIAL_METADATA_KEY: &str = "financial";
 const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
 const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
-const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
-    crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
-    "attribution",
-    MANIFEST_SECURITY_METADATA_KEY,
-    PROTOCOL_ADMISSION_METADATA_KEY,
-    BUDGET_AUTHORITY_METADATA_KEY,
-    BUDGET_DENIAL_AUTHORITY_METADATA_KEY,
-    FINANCIAL_METADATA_KEY,
-    GOVERNED_TRANSACTION_METADATA_KEY,
-    CALLER_DELIVERY_METADATA_KEY,
-    PROTOCOL_REFUSAL_METADATA_KEY,
-    RUNTIME_ADMISSION_METADATA_KEY,
-    "receipt_context",
-];
+/// Refusal reason for runtime-admission hook metadata that is present but not
+/// a JSON object; such metadata would displace every later kernel block.
+const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
+    "runtime admission hook metadata must be a JSON object";
 
+/// Refusal reason for runtime-admission hook metadata that names any top-level
+/// key other than `chio_runtime`.
+const HOOK_METADATA_KEY_REFUSAL: &str =
+    "runtime admission hook metadata may name only chio_runtime";
+
+/// A runtime-admission hook writes only `chio_runtime`. The kernel writes
+/// `runtime_admission` itself on its own error paths, never from hook output.
+fn is_hook_metadata_key(key: &str) -> bool {
+    key == RUNTIME_ADMISSION_METADATA_KEY
+}
+
+/// True when hook metadata names a top-level key a hook may not write.
+fn hook_metadata_names_forbidden_key(metadata: Option<&serde_json::Value>) -> bool {
+    metadata
+        .and_then(serde_json::Value::as_object)
+        .is_some_and(|object| object.keys().any(|key| !is_hook_metadata_key(key)))
+}
+
+/// The first reserved key, in registry order, that caller metadata names.
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
-    RESERVED_RECEIPT_METADATA_KEYS
-        .iter()
-        .copied()
+    chio_core::receipt::metadata::reserved_receipt_metadata_keys()
         .find(|key| object.contains_key(*key))
 }
 
@@ -792,14 +798,6 @@ impl LocalReceiptArtifact {
         })?;
         Ok(sha256_hex(&canonical))
     }
-
-    fn session_anchor_reference(&self) -> Option<chio_core::session::SessionAnchorReference> {
-        let metadata = match self {
-            Self::Tool(receipt) => receipt.metadata.as_ref(),
-            Self::Child(receipt) => receipt.metadata.as_ref(),
-        };
-        extract_session_anchor_reference_from_metadata(metadata)
-    }
 }
 
 /// Bridge a sync caller to the async tool-server dispatch path.
@@ -862,41 +860,6 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
         KernelError::SyncBridgeIncompatibleWithCurrentThreadRuntime
     ) && tokio::runtime::Handle::try_current()
         .is_ok_and(|handle| handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread)
-}
-
-fn extract_session_anchor_reference_from_metadata(
-    metadata: Option<&serde_json::Value>,
-) -> Option<chio_core::session::SessionAnchorReference> {
-    let metadata = metadata?;
-    let candidates = [
-        metadata
-            .get("governed_transaction")
-            .and_then(|value| value.get("call_chain")),
-        metadata.get("lineageReferences"),
-    ];
-
-    for candidate in candidates.into_iter().flatten() {
-        let Some(session_anchor_id) = candidate
-            .get("sessionAnchorId")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        let Some(session_anchor_hash) = candidate
-            .get("sessionAnchorHash")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        return Some(chio_core::session::SessionAnchorReference::new(
-            session_anchor_id,
-            session_anchor_hash,
-        ));
-    }
-
-    None
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
@@ -967,6 +930,10 @@ impl PartialEq<GuardDecision> for Verdict {
 pub trait Guard: Send + Sync {
     /// Human-readable guard name (e.g., "forbidden-path").
     fn name(&self) -> &str;
+
+    /// Whether the `details` of this guard's evidence may appear in a
+    /// committed receipt.
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
 
     /// Evaluate the guard against a tool call request.
     ///
@@ -1669,6 +1636,10 @@ pub use session_ops::{
 // post-signing: hook failures never block the dispatch path.
 #[path = "settlement_observer.rs"]
 pub mod settlement_observer;
+// Drain of due settlement attempts through the installed settlement runtime.
+#[path = "settlement_drain.rs"]
+mod settlement_drain;
+pub use settlement_drain::SettlementDrainReport;
 // Mpsc-backed signing task. Owns a clone of the kernel signing keypair and
 // pulls signing requests from a bounded `tokio::sync::mpsc` channel so receipt
 // signing leaves the synchronous critical path.

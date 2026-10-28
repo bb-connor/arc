@@ -129,6 +129,9 @@ fn seed_reserved_operation(
                     chio_core::sha256_hex(format!("{request_id}-intent").as_bytes()),
                 "policyDecisionHash":
                     chio_core::sha256_hex(format!("{request_id}-decision").as_bytes()),
+                "admissionArtifactFingerprint": chio_security_types::ports::Digest32::new(
+                    *chio_core::sha256(format!("{request_id}-artifact").as_bytes()).as_bytes(),
+                ),
                 "approvalSetHash": approval_set.approval_set_hash(),
             },
             "approvalSet": approval_set,

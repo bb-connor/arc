@@ -28,6 +28,7 @@ mod caller_budget;
 #[path = "validation/capability_evidence.rs"]
 mod capability_evidence;
 pub(in crate::kernel) use capability_evidence::CapabilityPreAdmissionError;
+pub(in crate::kernel) use payment_outcome::ambiguous_payment_authorization_metadata;
 #[path = "validation/cumulative.rs"]
 mod cumulative;
 #[path = "validation/issuance.rs"]
@@ -55,7 +56,12 @@ pub(crate) struct ReservedPrepayment {
 }
 
 pub(crate) enum ReservedPrepaymentFailure {
-    Denied(KernelError),
+    /// `ambiguity` carries receipt metadata when the rail could not confirm
+    /// whether the prepayment moved value.
+    Denied {
+        error: KernelError,
+        ambiguity: Option<Box<serde_json::Value>>,
+    },
     CaptureOutcomeUnknown(ReservedCaptureFailure),
 }
 
@@ -74,13 +80,16 @@ impl ReservedCaptureFailure {
     }
 
     pub(crate) fn error_code(&self) -> &'static str {
-        payment_outcome::payment_error_code(&self.error)
+        self.error.code()
     }
 }
 
 impl From<KernelError> for ReservedPrepaymentFailure {
     fn from(error: KernelError) -> Self {
-        Self::Denied(error)
+        Self::Denied {
+            error,
+            ambiguity: None,
+        }
     }
 }
 
@@ -802,7 +811,7 @@ impl ChioKernel {
             )?;
         }
 
-        Ok(())
+        self.validate_delegation_issuance_freeze(cap, &last_link.capability_id, &ancestor_snapshots)
     }
 
     fn local_budget_event_authority(&self) -> BudgetEventAuthority {
@@ -1675,42 +1684,10 @@ impl ChioKernel {
                 amount_units,
                 &currency,
             )?;
-            match (journal.state, journal.rail_mode) {
-                (
-                    crate::payment::PaymentJournalState::Authorized,
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                ) => {
-                    return Ok(Some(PaymentAuthorization {
-                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
-                            PaymentError::RailError(
-                                "authorized payment journal omitted authorization_id".to_owned(),
-                            )
-                        })?,
-                        state: crate::payment::PaymentAuthorizationState::Held,
-                        metadata: serde_json::json!({ "durable_replay": true }),
-                    }));
-                }
-                (
-                    crate::payment::PaymentJournalState::Settled,
-                    crate::payment::PaymentRailMode::PrepaidFinal,
-                ) => {
-                    return Ok(Some(PaymentAuthorization {
-                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
-                            PaymentError::RailError(
-                                "settled prepayment journal omitted authorization_id".to_owned(),
-                            )
-                        })?,
-                        state: crate::payment::PaymentAuthorizationState::PrepaidFinal,
-                        metadata: serde_json::json!({ "durable_replay": true }),
-                    }));
-                }
-                (crate::payment::PaymentJournalState::HoldPlaced, _) => {}
-                _ => {
-                    return Err(PaymentError::RailError(format!(
-                        "payment journal cannot authorize from state {:?}",
-                        journal.state
-                    )));
-                }
+            if let Some(authorization) =
+                crate::payment::replayed_payment_authorization(adapter.as_ref(), journal)?
+            {
+                return Ok(Some(authorization));
             }
         }
 
@@ -1812,6 +1789,9 @@ impl ChioKernel {
             ),
             governed,
             commerce,
+            x402: None,
+            authority_expires_at: Some(Self::payment_authority_expires_at(request)),
+            reference_is_durable: durable_journal.is_some(),
         };
         if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
             durable_journal = Some(self.begin_durable_payment_authorization_attempt(
@@ -1899,10 +1879,20 @@ impl ChioKernel {
                 trusted_now_unix_ms,
                 verified_payee_binding,
             )
-            .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"
-                ))
+            .map_err(|error| ReservedPrepaymentFailure::Denied {
+                ambiguity: error.outcome_evidence().is_some().then(|| {
+                    Box::new(ambiguous_payment_authorization_metadata(
+                        &error,
+                        Self::payment_operation_reference(
+                            request,
+                            durable_admission.map(DurableToolAdmission::operation),
+                        ),
+                    ))
+                }),
+                error: KernelError::GovernedTransactionDenied(format!(
+                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {}",
+                    error.code()
+                )),
             })?
             .ok_or_else(|| {
                 KernelError::GovernedTransactionDenied(

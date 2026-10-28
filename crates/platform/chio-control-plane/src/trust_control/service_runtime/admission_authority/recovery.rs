@@ -243,6 +243,7 @@ fn original_lease(
 
 pub(super) fn wire_projection(error: RecoveryAuthorityError) -> AdmissionAuthorityWireError {
     let code = match error.kind {
+        RemoteRecoveryFailureKind::OutputWithheld => AdmissionAuthorityErrorCode::OutputWithheld,
         RemoteRecoveryFailureKind::Unavailable => AdmissionAuthorityErrorCode::Unavailable,
         RemoteRecoveryFailureKind::Fenced => AdmissionAuthorityErrorCode::Fenced,
         RemoteRecoveryFailureKind::NotFound => AdmissionAuthorityErrorCode::NotFound,

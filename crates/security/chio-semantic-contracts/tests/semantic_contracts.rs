@@ -1,5 +1,7 @@
 use chio_core_types::recovery::*;
-use chio_security_types::{flow::InformationLabel, recovery::*, semantic::*};
+use chio_security_types::{
+    flow::InformationLabel, recovery::*, semantic::*, work::VerificationBudget,
+};
 use chio_semantic_contracts::*;
 
 #[path = "semantic_contracts/fixture.rs"]

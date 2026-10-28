@@ -803,7 +803,7 @@ pub fn verify_transparency_inclusion_proof(
         ));
     }
     if hex::encode(&current) != inclusion.root_hash {
-        return Err(SelectiveDisclosureError::TransparencyInclusionInvalid(
+        return Err(SelectiveDisclosureError::TransparencyInclusionHashMismatch(
             "root mismatch".to_string(),
         ));
     }

@@ -8,18 +8,18 @@ fn build_governed_active_response_operation(
         .approval_set_hash()
         .map_err(|error| active_response_denied(error.to_string()))?;
     let request_binding_hash = derive_active_response_operation_request_binding_hash(
-        bindings.plan_body_hash(),
-        requirement.executor_authority().authority_id(),
-        requirement.executor_authority().generation(),
-        bindings.authorization_capability_hash(),
-        bindings.governed_intent_hash(),
-        &approval_set_hash,
+        ActiveResponseOperationSeed {
+            plan_hash: bindings.plan_body_hash(),
+            executor_authority_id: requirement.executor_authority().authority_id(),
+            executor_authority_generation: requirement.executor_authority().generation(),
+            authorization_capability_hash: bindings.authorization_capability_hash(),
+            governed_intent_hash: bindings.governed_intent_hash(),
+            approval_set_hash: &approval_set_hash,
+            admission_artifact_fingerprint: &admission_artifact_fingerprint,
+        },
         requirement.policy_hash(),
     )
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let request_binding_hash = super::active_response_operation_binding::bind_active_response_operation_request_hash_to_artifact(
-        &request_binding_hash, Some(admission_artifact_fingerprint),
-    )?;
     let operation = AdmissionOperation::prepared(PreparedAdmissionOperation {
         kind: AdmissionOperationKind::GovernedActiveResponse,
         coordinator_authority_id: requirement.executor_authority().authority_id().to_string(),
@@ -76,22 +76,17 @@ pub(super) fn build_active_response_execution_request(
     let admission_artifact_fingerprint =
         super::active_response_artifact::active_response_admission_artifact_fingerprint(request)?;
     let plan_body_hash = digest_hex(&response_plan.plan_hash);
-    let legacy_dispatch_id = derive_active_response_dispatch_id(
+    let dispatch_id = derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
         response_plan,
-        &executor_authority,
-        &authorization_capability_hash,
-        &governed_intent_hash,
+        executor_authority: &executor_authority,
+        authorization_capability_hash: &authorization_capability_hash,
+        governed_intent_hash: &governed_intent_hash,
         policy_decision_hash,
         authorized_at_unix_ms,
-        &approval,
-    )
+        approval: &approval,
+        admission_artifact_fingerprint: &admission_artifact_fingerprint,
+    })
     .map_err(|error| active_response_denied(error.to_string()))?;
-    let dispatch_id =
-        super::active_response_executor::bind_active_response_dispatch_id_to_artifact(
-            &legacy_dispatch_id,
-            &admission_artifact_fingerprint,
-        )
-        .map_err(|error| active_response_denied(error.to_string()))?;
     ActiveResponseExecutionRequest::from_fresh(
         request.fresh_live_admission(),
         ActiveResponseExecutionRequestParts {
@@ -103,7 +98,7 @@ pub(super) fn build_active_response_execution_request(
             authorization_capability_hash,
             governed_intent_hash,
             policy_decision_hash: policy_decision_hash.to_string(),
-            admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
+            admission_artifact_fingerprint,
             approval,
             authorized_at_unix_ms,
             expires_at_unix_ms: response_plan.expires_at_unix_ms,
@@ -626,11 +621,8 @@ pub(super) fn validate_active_response_terminal_executor_receipt(
             && *admission_operation_version == expected_dispatch_version
             && digest_hex(approval_set_hash) == persisted_approval_set_hash
     );
-    let expected_dispatch_schema = if anchor.admission_artifact_fingerprint.is_some() {
-        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-    } else {
-        1
-    };
+    let expected_dispatch_schema =
+        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
     let expected_dispatch_id =
         super::active_response_executor::derive_active_response_terminal_dispatch_id(
             execution_dispatch,

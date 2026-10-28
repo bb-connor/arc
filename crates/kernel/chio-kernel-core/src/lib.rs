@@ -42,8 +42,9 @@
 //! - [`sign_receipt_relaying_trusted_body`] -- body-only relay that trusts the
 //!   caller `content_hash`; for transport adapters that cannot hold the content
 //!   preimage (mobile/browser/cpp-ffi). Explicit, auditable trust seam.
-//! - [`Clock`] / [`Rng`] -- abstract trait boundaries for time/entropy so
-//!   adapters on wasm/mobile can inject platform clocks and CSPRNGs.
+//! - [`Clock`] -- abstract trait boundary for time so adapters on
+//!   wasm/mobile can inject platform clocks. Entropy comes through
+//!   `chio_core_types::rng::Rng`.
 //!
 //! # What stays in `chio-kernel`
 //!
@@ -95,7 +96,6 @@ pub mod passport_verify;
 pub mod receipts;
 #[cfg(feature = "revocation-view")]
 pub mod revocation_view;
-pub mod rng;
 pub mod scope;
 
 pub use budget_split::{
@@ -110,6 +110,7 @@ pub use capability_verify::{
     verify_capability_with_negotiated_floor, CapabilityError, CapabilityEvidenceContext,
     CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
 };
+pub use chio_core_types::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,
@@ -144,7 +145,6 @@ pub use revocation_view::{
     RevocationSnapshot, RevocationSnapshotFreshnessError, RevocationView, RevocationViewError,
     RevocationViewSubject,
 };
-pub use rng::{NullRng, Rng};
 pub use scope::{MatchedGrant, ScopeMatchError};
 
 #[cfg(kani)]

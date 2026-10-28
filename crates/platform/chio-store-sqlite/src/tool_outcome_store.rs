@@ -1459,6 +1459,9 @@ fn sqlite_u64(value: u64, field: &str) -> Result<i64, ToolOutcomeStoreError> {
 
 fn admission_error(error: AdmissionOperationStoreError) -> ToolOutcomeStoreError {
     match error {
+        AdmissionOperationStoreError::KernelStopped => {
+            invariant("durable output release is withheld while the kernel is stopped")
+        }
         AdmissionOperationStoreError::Fenced => ToolOutcomeStoreError::Fenced,
         AdmissionOperationStoreError::NotFound => ToolOutcomeStoreError::NotFound,
         AdmissionOperationStoreError::Unavailable(detail)

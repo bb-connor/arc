@@ -1146,18 +1146,15 @@ fn trust_root_signer_identity(
     Ok(key_id.to_string())
 }
 
-/// Signing-wrapper schema id of the minimal receipt an evidence graph's
-/// receipt role carries. Distinct from `chio.receipt.v1` so a `ChioReceipt`
-/// signature never verifies as a minimal receipt, or the reverse.
-pub const EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA: &str = "chio.evidence-graph.minimal-receipt.v1";
-
 /// Signing-wrapper schema id of the artifact a signed evidence role carries.
 fn signed_role_wrapper_schema(role: EvidenceNodeRole) -> Option<&'static str> {
     match role {
         EvidenceNodeRole::Capability => Some("chio.capability.proof.v1"),
         EvidenceNodeRole::TrustRoot => Some("chio.trust.root.v1"),
         EvidenceNodeRole::GuardDecision => Some("chio.guard.decision.v1"),
-        EvidenceNodeRole::Receipt => Some(EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA),
+        EvidenceNodeRole::Receipt => Some(
+            chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
+        ),
         _ => None,
     }
 }

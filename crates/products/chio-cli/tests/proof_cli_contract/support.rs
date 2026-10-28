@@ -23,12 +23,15 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod archive;
 #[path = "support/bundles.rs"]
 mod bundles;
+#[path = "support/receipt_evidence.rs"]
+mod receipt_evidence;
 pub(crate) use archive::{
     tgz_member_names, write_tar_zst_with_symlink_member, write_tgz_with_symlink_member,
 };
 pub(crate) use bundles::{
     build_minimal_passport_proof_room_bundle, copy_proof_room_bundle_to_temp,
 };
+pub(crate) use receipt_evidence::{sign_terminal_receipt, signed_terminal_receipt};
 
 pub(crate) const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str =
     "application/vnd.chio.proof-room.bundle.v1+json";
@@ -831,40 +834,6 @@ fn write_collect_signed_transaction_passport(path: &Path, value: serde_json::Val
     let value = sign_transaction_passport_with_seed(value, &COLLECT_SIGNATURE_SEED);
     let bytes = serde_json::to_vec_pretty(&value).test_expect("serialize transaction passport");
     std::fs::write(path, [&bytes[..], b"\n"].concat()).test_expect("write transaction passport");
-}
-
-pub(crate) fn signed_terminal_receipt(
-    receipt_id: &str,
-    terminal_status: &str,
-    policy_digest: &str,
-) -> serde_json::Value {
-    sign_terminal_receipt(serde_json::json!({
-        "schema": chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
-        "receipt_id": receipt_id,
-        "terminal_status": terminal_status,
-        "policy_digest": policy_digest
-    }))
-}
-
-pub(crate) fn sign_terminal_receipt(mut receipt: serde_json::Value) -> serde_json::Value {
-    let keypair = Keypair::from_seed(&[23; 32]);
-    let receipt_object = receipt
-        .as_object_mut()
-        .test_expect("terminal receipt is object");
-    receipt_object.remove("signature");
-    receipt_object.insert(
-        "kernel_key".to_string(),
-        serde_json::Value::String(keypair.public_key().to_hex()),
-    );
-    let signature = keypair
-        .sign_wrapped(
-            chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&receipt)
-                .test_expect("canonical signing body"),
-        )
-        .test_expect("terminal receipt signs");
-    receipt["signature"] = serde_json::Value::String(signature.to_hex());
-    receipt
 }
 
 fn sign_runtime_lease_with_fixture_authority(value: &mut serde_json::Value) {

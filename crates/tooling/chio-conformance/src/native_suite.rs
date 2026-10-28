@@ -220,6 +220,13 @@ pub enum NativeSuiteError {
         source: serde_json::Error,
     },
 
+    #[error("json input error in {path}: {source}")]
+    Input {
+        path: String,
+        #[source]
+        source: chio_core::canonical::UntrustedJsonError,
+    },
+
     #[error("http driver error: {0}")]
     Http(String),
 
@@ -1032,16 +1039,23 @@ impl ToolServerConnection for NativeTraceEchoServer {
     }
 }
 
+/// The kernel transport frame limit.
+const MAX_KERNEL_FRAME_BYTES: usize = 16 * 1024 * 1024;
+
 fn read_kernel_messages(reader: &mut impl Read) -> Result<Vec<KernelMessage>, NativeSuiteError> {
     let mut messages = Vec::new();
     loop {
         match read_frame(reader) {
             Ok(frame) => {
-                let message: KernelMessage =
-                    serde_json::from_slice(&frame).map_err(|source| NativeSuiteError::Json {
-                        path: "<stdio>".to_string(),
-                        source,
-                    })?;
+                let message: KernelMessage = chio_core::canonical::UntrustedJsonText::from_wire(
+                    &frame,
+                    MAX_KERNEL_FRAME_BYTES,
+                )
+                .and_then(|input| input.decode_signed())
+                .map_err(|source| NativeSuiteError::Input {
+                    path: "<stdio>".to_string(),
+                    source,
+                })?;
                 let terminal = matches!(message, KernelMessage::ToolCallResponse { .. });
                 messages.push(message);
                 if terminal {

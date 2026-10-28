@@ -16,6 +16,7 @@ use crate::proof_coverage;
 use crate::qualify;
 use crate::recovery_authority_vectors;
 use crate::signed_fixtures;
+use crate::web3_free_closure;
 use crate::XtaskError;
 use crate::{crate_paths, eval_receipt_regen};
 use crate::{errors_regen, freeze_vectors, run_codegen, run_snippets, validate_scenarios};
@@ -56,6 +57,9 @@ pub(crate) fn dispatch(command: cli::Command) -> Result<(), XtaskError> {
                 &facet,
                 fixtures::Mode::from_flags(schema_only, negative_only)?,
             ),
+            CheckCommand::Web3FreeClosure { modes, roots } => {
+                web3_free_closure::run(&modes, &roots)
+            }
         },
         // -- qualify group --
         cli::Command::Qualify { command } => match command {

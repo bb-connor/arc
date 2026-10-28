@@ -39,7 +39,8 @@ pub use ccip::{
 pub use config::{
     settlement_devnet_rpc_egress_contract, DevnetContracts, DevnetMocks, EvidenceSubstrateMode,
     LocalDevnetDeployment, SettlementAmountTier, SettlementChainConfig, SettlementEvidenceConfig,
-    SettlementOracleAuthority, SettlementOracleConfig, SettlementPolicyConfig,
+    SettlementKernelAuthority, SettlementOracleAuthority, SettlementOracleConfig,
+    SettlementPolicyConfig,
 };
 pub use evm::{
     build_failure_receipt, build_reversal_receipt, confirm_transaction, estimate_call_gas,
@@ -89,10 +90,10 @@ pub use finding_enforcement::{
     FINDING_IMPAIRMENT_PUBLISHER_REQUEST_SCHEMA, FINDING_IMPAIRMENT_PUBLISHER_RESPONSE_SCHEMA,
 };
 pub use hook::{
-    SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
-    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementIdempotencyKey,
-    SettlementObservation, SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
-    SETTLEMENT_OUTCOME_SCHEMA,
+    ObservedSettlement, SettlementFailureClass, SettlementFailureCode,
+    SettlementFailureCodeParseError, SettlementFailureReason, SettlementHook, SettlementHookError,
+    SettlementIdempotencyKey, SettlementObservation, SettlementOutcome, SettlementSkipReason,
+    SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,

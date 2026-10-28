@@ -448,6 +448,9 @@ mod tests {
         fn name(&self) -> &str {
             &self.guard_name
         }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow())
         }

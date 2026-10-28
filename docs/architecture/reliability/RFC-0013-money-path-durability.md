@@ -32,7 +32,7 @@ or claim that the budget database commits atomically with the receipt database.
 | F70 | Implemented | Journal store `chio-store-sqlite/src/budget_store/payment_journal.rs` and composite schema `budget_store/composite_schema/payment/schema.sql`; kernel types `chio-kernel/src/payment/journal.rs`; `QualifiedAdmissionProjectionStore::load_payment_journal` and `advance_payment_journal`; idempotency contract and `settlement_state` on `PaymentAdapter` (`chio-kernel/src/payment.rs`). |
 | F71 | Partially implemented: recovery and the reserved-hold reaper run periodically only in `chio api protect` (see F71 below) | `reconcile_durable_admission_startup` (`kernel/admission_coordinator/recovery.rs`), `reconcile_recoverable_admissions_batch` (`recovery/batch.rs`), `reap_expired_reserved_budget_holds` (`kernel/reconciliation.rs`); periodic tick in `chio-api-protect/src/proxy/state/admission_maintenance.rs`. |
 | F68 | Implemented; active only while a settlement observer runtime is installed | Attempt-zero row seeded in the receipt append (`kernel/responses/receipt_persistence.rs`), inline claim and CAS completion (`settlement_routing.rs`), `settle_attempts` and `settle_dead_letters` in `chio-store-sqlite`, `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. |
-| F69 | Open | No production `SettlementHook` exists and no production binary installs the settlement observer runtime. Nothing calls `SettlementOutcomeStore::claim_due`, so a `Retryable` row is never re-run after the inline attempt. |
+| F69 | Partially implemented: a historical settlement-observation ledger in `chio api protect`; other hosts and retained-payment closures open | `KernelSettlementLedgerHook` (`chio-kernel/src/settlement_ledger.rs`), `ChioKernel::install_settlement_ledger`, `ChioKernel::drain_settlement_attempts` (`kernel/settlement_drain.rs`); installed by `chio api protect` whenever a payment adapter is configured and drained on its maintenance tick. A retained payment stays `Retryable` and dead-letters at the configured retry bound until the `chio.settlement-closure.v1` emission lands. |
 | F72 | Implemented | `BudgetDenyReason::CurrencyMismatch` (`chio-metering/src/budget_hierarchy.rs`), tests in `chio-metering/tests/budget_hierarchy.rs`. |
 | F73 | Closed by deletion | The off-chain EIP-3009 lane (`prepare_transfer_with_authorization`, `Eip3009NonceStore`, `InMemoryEip3009NonceStore`) had no production consumer and no longer exists in `chio-settle`. |
 | F74 | Closed by deletion | `BudgetEnforcer` no longer exists in `chio-metering`. |
@@ -73,9 +73,8 @@ accounting is silently broken in five distinct places.
 - F72 (medium): `BudgetTree` skips the spend cap on currency mismatch, contradicting
   the module's own fail-closed claim. A EUR-denominated draft walks through USD caps
   with no deny and no warning.
-- F73 (low): the durable EIP-3009 nonce store the docs reference does not exist; the
-  in-memory store loses replay state on crash and wedges at capacity with no
-  scheduled GC.
+- F73 (closed by deletion, #1769): the unused off-chain EIP-3009 lane and its
+  in-memory nonce store were removed from `chio-settle`.
 - F74 (low): `chio-metering::BudgetEnforcer` counters are process-local and reset to
   zero on restart, silently re-opening every tenant's full budget after each restart.
 
@@ -667,8 +666,10 @@ the evidence for them:
   journal is resolved only by the no-authorization path in
   `admission_coordinator/payment_compensation.rs`, so evidence insert, journal
   closure and exposure release cannot be split across APIs or crashes.
-- A reserved hold that never reached dispatch is reaped by
-  `reap_expired_reserved_budget_holds`.
+- An expired reserved hold the caller never reconciled is settled at its reserved
+  worst case by `reap_expired_reserved_budget_holds`. The reaper cannot prove the
+  call never ran, so the reserved amount is forfeited to realized spend, never
+  released.
 - `chio api protect` runs the recovery batch and the reserved-hold reaper on its
   admission maintenance tick. `serve-http` and the control plane reconcile at
   startup only; their periodic tick lands with their payment adapter wiring.
@@ -741,17 +742,20 @@ classification rather than a post-commit crash gap.
 The production driver is `KernelSettlementLedgerHook` in `chio-kernel`. It is a
 local projection and never calls a rail. Rail truth is queried only by RFC-0003
 admission recovery, which owns the payment journal, the recovery lease and the
-`settlement_state` call. The hook reads the journal through
-`QualifiedAdmissionProjectionStore::load_payment_journal`, read-only, and acts only
-on the monotonic terminal states `Settled` and `Closed`; it never writes the
-journal. Because both terminal states are monotonic, a read outside the recovery
-lease cannot observe a state that later reverses.
+`settlement_state` call. For a charge, the hook records the settlement status the
+signed receipt carries. That is a historical observation of the receipt, not a
+claim of rail finality. The closure branch may read the journal through
+`QualifiedAdmissionProjectionStore::load_payment_journal`, read-only, and never
+writes it. A journal state of `Settled` or `Closed` alone is not finality, because
+prepaid refund, normal close and cancel transitions remain. A closure binds the
+operation, hold, rail, action, amount, release evidence and journal version, and
+is tested against concurrent refund and close and against mismatches.
 
 | Terminal receipt | Hook action | Outcome |
 | --- | --- | --- |
 | Allow with `settlement_status = settled` | Upsert one `settled` `settlement_reconciliations` row carrying the rail and payment reference | `Accepted` |
 | Allow with `settlement_status = pending` or `failed` | None. Durable admission withholds pending terminal receipts, so this shape is a contract breach | `Permanent(UnsupportedEconomicForm)` |
-| Deny with a retained payment | None until the journal is terminal and a `chio.settlement-closure.v1` can be signed | `Retryable` |
+| Deny with a retained payment | None until a bound `chio.settlement-closure.v1` can be signed | `Retryable`, dead-lettered at the configured retry bound |
 | Deny without a retained payment, zero charge, or no economics | None | `Skipped` |
 
 The hook contract is that a hook never mutates receipt rows or receipt bytes.
@@ -759,11 +763,14 @@ The hook contract is that a hook never mutates receipt rows or receipt bytes.
 database written through the serving writer.
 
 `ChioKernel::install_settlement_ledger(outcome_store, retry_policy)` builds the
-hook and installs it through `set_settlement_observer_runtime`. A host that
-configures a payment adapter installs the ledger, and startup refuses when the
-install fails (no atomic projection support, store binding mismatch). A host with
-no payment adapter installs nothing. There is no driver flag: an opt-in setting
-that defaults to off recreates the silent unpaid path that F68 and F69 close.
+hook and installs it through `set_settlement_observer_runtime`. `chio api protect`
+installs the ledger whenever it configures a payment adapter, and its startup
+refuses when the install fails (no atomic projection support, store binding
+mismatch). `chio mcp wrap`, the governed sim lane and the control-plane finding
+purchase configure a payment adapter without installing the ledger; F69 stays
+partially implemented until they do. A host with no payment adapter installs
+nothing. There is no driver flag: an opt-in setting that defaults to off recreates
+the silent unpaid path that F68 and F69 close.
 
 `ChioKernel::drain_settlement_attempts(limit)` claims due rows through
 `SettlementOutcomeStore::claim_due`, rebuilds each observation from the stored
@@ -917,8 +924,8 @@ has been removed, so no process-local budget counter remains.
 - Staged rollout. The payment participant is the money-path specialization of RFC-0003's
   `DurableAdmissionMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled
-  (it only adds logging, metrics, and dead-letter rows). The F69 ledger installs
-  whenever a payment adapter is configured.
+  (it only adds logging, metrics, and dead-letter rows). `chio api protect` installs
+  the F69 ledger whenever it configures a payment adapter.
 - Operator-visible behavior changes to document in release notes: newly surfaced
   dead-letter rows and `ReconcileFailed` incidents are "recovery working", not
   "new fault"; an old hold without terminal recovery remains frozen and visible
@@ -991,9 +998,9 @@ has been removed, so no process-local budget counter remains.
 - After a clean run's reconcile, `list_incomplete_payment_journal` returns empty
   and every remaining open hold has a named, nonterminal incident.
 - An open hold is released only by recovery after a matching terminal no-movement
-  resolution, or by the reserved-hold reaper for a hold that never reached
-  dispatch. Age alone, `ReconcileFailed`, or unknown rail state never releases
-  capacity.
+  resolution. The reserved-hold reaper forfeits an expired unreconciled reserved
+  hold to realized spend at its reserved worst case. Age alone, `ReconcileFailed`,
+  or unknown rail state never releases capacity.
 - A settlement hook returning `Retryable`/`Permanent`/error for a money-bearing receipt
   produces a `settle_attempts` or `settle_dead_letters` row plus a warn and a metric;
   `chio settle status` reports it. Nothing is dropped at `receipt_persistence.rs:185`.
@@ -1043,6 +1050,6 @@ has been removed, so no process-local budget counter remains.
    `DurableAdmissionMode::Monetary`. RFC-0003 later releases with cumulative
    `SideEffecting` as the compiled production default after the kill-injection
    soak is green; RFC-0013 does not define a competing default.
-4. The F69 ledger hook installs whenever a payment adapter is configured, turning
-   eligible F68 work into reconciliation rows and draining retryable attempts on
-   the host maintenance tick.
+4. The F69 ledger hook installs in every host that configures a payment adapter,
+   turning eligible F68 work into reconciliation rows and draining retryable
+   attempts on the host maintenance tick. `chio api protect` does this today.

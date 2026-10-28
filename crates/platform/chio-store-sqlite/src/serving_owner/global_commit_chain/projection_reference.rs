@@ -79,6 +79,7 @@ pub(super) fn projection_reference_digest(
         "budget" => budget_event_reference_digest(connection, key, sequence),
         "payment" => payment_journal_reference_digest(connection, key, sequence),
         "revocation" => revocation_reference_digest(connection, key, sequence),
+        "revocation_entry" => super::revocation_entry::reference_digest(connection, key, sequence),
         "frost" => connection
             .query_row(
                 r#"

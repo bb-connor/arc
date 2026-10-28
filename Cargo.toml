@@ -10,6 +10,8 @@ members = [
     "crates/core/chio-arena",
     "crates/core/chio-bounded",
     "crates/core/chio-file-custody",
+    "crates/core/chio-fixed",
+    "crates/core/chio-decision-model",
     "crates/core/chio-supervisor",
     # Enterprise security
     "crates/security/chio-cage",
@@ -203,6 +205,7 @@ members = [
     "examples/otel-genai",
     #
     # Tests
+    "crates/tooling/chio-fixture-rng",
     "crates/tooling/chio-test-support",
     "formal/diff-tests",
     "tests/e2e",
@@ -496,6 +499,8 @@ chio-bedrock-converse-adapter = { version = "=0.1.0", path = "crates/protocol/ch
 chio-binding-helpers = { version = "=0.1.0", path = "crates/sdk/chio-binding-helpers" }
 chio-bounded = { version = "=0.1.0", path = "crates/core/chio-bounded" }
 chio-file-custody = { version = "=0.1.0", path = "crates/core/chio-file-custody" }
+chio-fixed = { version = "=0.1.0", path = "crates/core/chio-fixed" }
+chio-decision-model = { version = "=0.1.0", path = "crates/core/chio-decision-model" }
 chio-cage = { version = "=0.1.0", path = "crates/security/chio-cage" }
 chio-cage-plan = { version = "=0.1.0", path = "crates/security/chio-cage-plan" }
 chio-cage-init = { version = "=0.1.0", path = "crates/security/chio-cage-init" }

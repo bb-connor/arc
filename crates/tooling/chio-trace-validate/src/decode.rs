@@ -1,4 +1,4 @@
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, UntrustedJsonText};
 use chio_core_types::crypto::PublicKey;
 
 use crate::{SignedObservation, TraceError};
@@ -61,11 +61,13 @@ pub fn decode_observations(
                 "observation line {line_number} is empty"
             )));
         }
-        let observation: SignedObservation = serde_json::from_slice(line).map_err(|error| {
-            TraceError::InvalidInput(format!(
-                "observation line {line_number} is not valid JSON: {error}"
-            ))
-        })?;
+        let observation: SignedObservation = UntrustedJsonText::from_wire(line, MAX_TRACE_BYTES)
+            .and_then(|input| input.decode_signed())
+            .map_err(|error| {
+                TraceError::InvalidInput(format!(
+                    "observation line {line_number} is not valid JSON: {error}"
+                ))
+            })?;
         let canonical = canonical_json_bytes(&observation)?;
         if canonical != line {
             return Err(TraceError::InvalidInput(format!(

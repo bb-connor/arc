@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -20,6 +22,8 @@ class RegistryStatusGateTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         (self.root / "scripts").mkdir()
+        (self.root / "spec/registries").mkdir(parents=True)
+        (self.root / "formal").mkdir()
         shutil.copyfile(SCRIPT, self.root / "scripts" / SCRIPT.name)
 
     def write(self, rel: str, text: str) -> None:
@@ -27,10 +31,11 @@ class RegistryStatusGateTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
-    def run_check(self) -> subprocess.CompletedProcess[str]:
+    def run_check(self, env=None) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", "--noprofile", "--norc", "scripts/check-trj4-no-implementation-backed.sh"],
             cwd=self.root,
+            env=env,
             capture_output=True,
             text=True,
             check=False,
@@ -46,8 +51,38 @@ class RegistryStatusGateTests(unittest.TestCase):
             f"registry status gate: no '{NEEDLE}' occurrences under spec/registries formal",
         )
 
-    def test_green_missing_roots(self) -> None:
-        self.assertEqual(self.run_check().returncode, 0)
+    def test_red_missing_roots(self) -> None:
+        (self.root / "spec/registries").rmdir()
+        (self.root / "formal").rmdir()
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: required scan root missing: spec/registries\n")
+
+    def test_red_missing_one_root(self) -> None:
+        (self.root / "formal").rmdir()
+        result = self.run_check()
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: required scan root missing: formal\n")
+
+    def test_red_scan_error(self) -> None:
+        tools = self.root / "tools"
+        tools.mkdir()
+        grep = tools / "grep"
+        actual_grep = shutil.which("grep")
+        self.assertIsNotNone(actual_grep)
+        grep.write_text(
+            '#!/bin/sh\ncase "$*" in *formal*) exit 2;; esac\n'
+            + f'exec {shlex.quote(actual_grep)} "$@"\n',
+            encoding="utf-8",
+        )
+        grep.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"])
+        result = self.run_check(env)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(result.stderr, "::error::registry status gate: cannot scan formal\n")
 
     def test_green_other_directories_are_not_scanned(self) -> None:
         self.write("docs/notes.md", f"status: {NEEDLE}\n")

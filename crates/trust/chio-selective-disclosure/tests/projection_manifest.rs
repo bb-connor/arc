@@ -132,6 +132,57 @@ fn generated_projection_manifest_hides_exact_duration_by_default() {
 }
 
 #[test]
+fn transparency_inclusion_rejects_root_mismatch_as_hash_mismatch() {
+    let proof = sample_proof(Vec::new());
+    let mut inclusion = sample_inclusion(&proof);
+    inclusion.root_hash = sha256_hex(b"different root");
+
+    assert_eq!(
+        verify_transparency_inclusion_proof(&proof, &inclusion),
+        Err(SelectiveDisclosureError::TransparencyInclusionHashMismatch(
+            "root mismatch".to_string()
+        ))
+    );
+}
+
+#[test]
+fn transparency_inclusion_rejects_path_mismatch_as_hash_mismatch() {
+    let proof = sample_proof(Vec::new());
+    let mut inclusion = sample_inclusion(&proof);
+    inclusion.inclusion_path[0] = sha256_hex(b"different sibling");
+
+    assert_eq!(
+        verify_transparency_inclusion_proof(&proof, &inclusion),
+        Err(SelectiveDisclosureError::TransparencyInclusionHashMismatch(
+            "root mismatch".to_string()
+        ))
+    );
+}
+
+#[test]
+fn transparency_inclusion_keeps_leaf_mismatch_in_hash_class() {
+    let proof = sample_proof(Vec::new());
+    let mut inclusion = sample_inclusion(&proof);
+    inclusion.leaf_hash = sha256_hex(b"different leaf");
+
+    assert_eq!(
+        verify_transparency_inclusion_proof(&proof, &inclusion),
+        Err(SelectiveDisclosureError::TransparencyInclusionHashMismatch(
+            "leaf hash mismatch".to_string()
+        ))
+    );
+}
+
+#[test]
+fn transparency_inclusion_accepts_valid_two_leaf_path() {
+    let proof = sample_proof(Vec::new());
+    assert_eq!(
+        verify_transparency_inclusion_proof(&proof, &sample_inclusion(&proof)),
+        Ok(())
+    );
+}
+
+#[test]
 fn transparency_inclusion_rejects_truncated_path_before_root_width() {
     let proof = sample_proof(Vec::new());
     let leaf_hash = sha256_hex(proof.subject_sha256_hex.as_bytes());
@@ -153,11 +204,33 @@ fn transparency_inclusion_rejects_truncated_path_before_root_width() {
         .err()
         .unwrap_or_else(|| panic!("truncated inclusion path verified"));
 
-    assert!(matches!(
+    assert_eq!(
         error,
-        SelectiveDisclosureError::TransparencyInclusionInvalid(message)
-            if message.contains("inclusion path did not reach the root")
-    ));
+        SelectiveDisclosureError::TransparencyInclusionInvalid(
+            "inclusion path did not reach the root".to_string()
+        )
+    );
+}
+
+fn sample_inclusion(proof: &SelectiveDisclosureProof) -> TransparencyInclusionProof {
+    let leaf = Sha256::digest(proof.subject_sha256_hex.as_bytes());
+    let sibling = Sha256::digest(b"sibling");
+    let mut root = Sha256::new();
+    root.update(leaf);
+    root.update(sibling);
+    TransparencyInclusionProof {
+        schema: TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1.to_string(),
+        proof_id: "transparency-proof-1".to_string(),
+        log_id: "log-1".to_string(),
+        checkpoint: "checkpoint-1".to_string(),
+        artifact_ref: proof.subject_sha256_hex.clone(),
+        root_hash: hex::encode(root.finalize()),
+        leaf_hash: hex::encode(leaf),
+        tree_size: 2,
+        leaf_index: 0,
+        inclusion_path: vec![hex::encode(sibling)],
+        verified_at: 1,
+    }
 }
 
 fn sample_proof(disclosed: Vec<DisclosedMessage>) -> SelectiveDisclosureProof {

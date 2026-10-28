@@ -2164,14 +2164,6 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("pheromone_query_report", "signing-wrapper-v1")),
     ),
     (
-        "chio.evidence-graph.minimal-receipt.v1",
-        Some(("evidence_graph_minimal_receipt", "signing-wrapper-v1")),
-    ),
-    (
-        "chio.proof-room.receipt-projection.v1",
-        Some(("proof_room_receipt_projection", "signing-wrapper-v1")),
-    ),
-    (
         "chio.behavioral-feed.v1",
         Some(("behavioral_feed", "signing-wrapper-v1")),
     ),

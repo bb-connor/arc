@@ -902,15 +902,21 @@ fn executable_on_path(name: &str) -> Option<PathBuf> {
     find_executable(name, std::env::var_os("PATH")?.as_os_str())
 }
 
+#[cfg(unix)]
 fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
-    use std::os::unix::fs::PermissionsExt as _;
+    use rustix::fs::{accessat, Access, AtFlags, CWD};
 
     std::env::split_paths(search_path)
         .map(|directory| directory.join(name))
         .find(|candidate| {
-            fs::metadata(candidate)
-                .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+            fs::metadata(candidate).is_ok_and(|metadata| metadata.is_file())
+                && accessat(CWD, candidate, Access::EXEC_OK, AtFlags::EACCESS).is_ok()
         })
+}
+
+#[cfg(not(unix))]
+fn find_executable(_name: &str, _search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+    None
 }
 
 fn bounded_runtime_path(executable: &Path, args: &[&str], label: &str) -> Result<PathBuf, String> {
@@ -1007,6 +1013,15 @@ fn sandbox_path() -> String {
     "/usr/bin:/runtime/bin".to_owned()
 }
 
+#[cfg(not(unix))]
+pub(super) fn require_sandbox() -> Result<(), CliError> {
+    Err(CliError::cli_other_error(
+        "verified-fix packaging requires a Unix host with bubblewrap and cgroup isolation"
+            .to_owned(),
+    ))
+}
+
+#[cfg(unix)]
 pub(super) fn require_sandbox() -> Result<(), CliError> {
     for (command, message) in [
         (
@@ -1106,7 +1121,7 @@ fn command_version(command: &str, args: &[&str]) -> Result<String, CliError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
@@ -1155,5 +1170,36 @@ mod tests {
         let search_path = std::env::join_paths([sourceable.path()]).unwrap();
 
         assert_eq!(find_executable("env", &search_path), None);
+    }
+
+    #[test]
+    fn find_executable_respects_owner_permissions_before_later_candidates() {
+        for mode in [0o641, 0o654] {
+            let inaccessible = private_dir();
+            let runnable = private_dir();
+            let first = write_with_mode(inaccessible.path(), "env", mode);
+            let later = write_with_mode(runnable.path(), "env", 0o700);
+            let search_path =
+                std::env::join_paths([inaccessible.path(), runnable.path()]).unwrap();
+            let expected = if rustix::process::geteuid().is_root() {
+                first
+            } else {
+                later
+            };
+
+            assert_eq!(find_executable("env", &search_path), Some(expected));
+        }
+    }
+
+    #[test]
+    fn find_executable_respects_owner_permissions_without_a_later_candidate() {
+        for mode in [0o641, 0o654] {
+            let inaccessible = private_dir();
+            let first = write_with_mode(inaccessible.path(), "env", mode);
+            let search_path = std::env::join_paths([inaccessible.path()]).unwrap();
+            let expected = rustix::process::geteuid().is_root().then_some(first);
+
+            assert_eq!(find_executable("env", &search_path), expected);
+        }
     }
 }

@@ -1,7 +1,7 @@
 //! Payment and budget outcomes retained while preparing terminal tool output.
 
 use super::payment_outcome::{
-    payment_error_code, release_unsettled_payment_metadata, retained_payment_capture_metadata,
+    release_unsettled_payment_metadata, retained_payment_capture_metadata,
 };
 use super::*;
 use crate::kernel::responses::AllowResponseNonce;
@@ -187,7 +187,7 @@ impl ChioKernel {
                                 request,
                                 &format!(
                                     "MustPrepay authorization could not be settled after execution: {}",
-                                    payment_error_code(&error)
+                                    error.code()
                                 ),
                                 timestamp,
                                 Some(matched_grant_index),
@@ -431,7 +431,7 @@ impl ChioKernel {
                             "payment_reference": authorization.authorization_id,
                             "settlement_status": SettlementStatus::Failed,
                             "release_outcome": "outcome_unknown",
-                            "payment_release_error_code": payment_error_code(error),
+                            "payment_release_error_code": error.code(),
                             "payment_authorization_retained": true,
                             "payment_release_confirmed": false
                         }})));
@@ -562,9 +562,10 @@ impl ChioKernel {
                     tool_name: request.tool_name.clone(),
                     parameter_hash: action.parameter_hash,
                 };
-                Some(Box::new(crate::execution_nonce::mint_execution_nonce(
-                    &self.config.keypair,
+                Some(Box::new(self.sign_execution_nonce(
                     binding,
+                    None,
+                    None,
                     nonce_config,
                     now,
                 )?))

@@ -9,23 +9,20 @@ fn committed_live_admission_prepares_and_recovers_its_dispatch() {
     let harness = Harness::new();
     let mut request = harness.governed_request();
     request.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
-    request.dispatch_id = super::derive_active_response_dispatch_id(
-        &request.response_plan,
-        &request.executor_authority,
-        &request.authorization_capability_hash,
-        &request.governed_intent_hash,
-        &request.policy_decision_hash,
-        request.authorized_at_unix_ms,
-        &request.approval,
-    )
-    .unwrap_or_else(|error| panic!("live dispatch identity: {error}"));
-    request.dispatch_id = super::bind_active_response_dispatch_id_to_artifact(
-        &request.dispatch_id,
-        &request
-            .admission_artifact_fingerprint
-            .unwrap_or_else(|| panic!("bound fixture artifact")),
-    )
-    .unwrap_or_else(|error| panic!("live bound dispatch identity: {error}"));
+    request.dispatch_id =
+        super::derive_active_response_dispatch_id(chio_kernel::ActiveResponseDispatchIdInput {
+            response_plan: &request.response_plan,
+            executor_authority: &request.executor_authority,
+            authorization_capability_hash: &request.authorization_capability_hash,
+            governed_intent_hash: &request.governed_intent_hash,
+            policy_decision_hash: &request.policy_decision_hash,
+            authorized_at_unix_ms: request.authorized_at_unix_ms,
+            approval: &request.approval,
+            admission_artifact_fingerprint: &request
+                .admission_artifact_fingerprint
+                .unwrap_or_else(|| panic!("bound fixture artifact")),
+        })
+        .unwrap_or_else(|error| panic!("live dispatch identity: {error}"));
 
     let first = require_success(
         harness.executor.execute_source(&request),

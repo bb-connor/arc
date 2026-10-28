@@ -276,6 +276,10 @@ impl PaymentAdapter for FailingAuthorizationPaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("unexpected refund".to_string()))
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct BlockingAuthorizationState {
@@ -380,6 +384,10 @@ impl PaymentAdapter for BlockingAuthorizationPaymentAdapter {
             metadata: serde_json::json!({ "adapter": "blocking" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -441,6 +449,10 @@ impl PaymentAdapter for NonceCleanupPaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError("unexpected refund".to_string()))
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 fn signed_nonce_for_request(
@@ -465,7 +477,7 @@ fn signed_nonce_for_request(
             .as_secs(),
     )?;
     Ok(crate::execution_nonce::mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding,
         config,
         now,

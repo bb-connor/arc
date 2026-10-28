@@ -155,7 +155,10 @@ fn installation(
         &value.operator_root,
         value.publisher_roots.as_slice(),
         value.exposed.as_slice(),
-        &mut chio_semantic_contracts::VerificationBudget::new(4096)?,
+        &mut chio_security_types::work::VerificationBudget::new(
+            4096,
+            chio_security_types::recovery::MAX_RECOVERY_VERIFICATION_WORK,
+        )?,
     )?;
     Ok(value)
 }

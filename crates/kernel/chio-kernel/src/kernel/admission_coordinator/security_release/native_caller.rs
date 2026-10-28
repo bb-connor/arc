@@ -129,10 +129,7 @@ impl ChioKernel {
             &ledger,
             custody.security_context(),
         )
-        .map_err(recovery_required)?
-        .ok_or_else(|| {
-            recovery_required("legacy native caller custody has no original dispatch commitment")
-        })?;
+        .map_err(recovery_required)?;
         if context.original_security_dispatch_binding.as_deref() != Some(&original_binding)
             || raw.original_security_dispatch_binding() != Some(&original_binding)
         {

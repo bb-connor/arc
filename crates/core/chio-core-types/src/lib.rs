@@ -60,6 +60,8 @@ pub mod pq;
 pub mod provider_attempt;
 pub mod receipt;
 pub mod recovery;
+pub mod rng;
+pub mod root_authority;
 pub mod runtime_attestation;
 pub mod runtime_replay;
 pub mod runtime_schema;
@@ -69,6 +71,7 @@ pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
+pub mod tenant_index;
 mod wire_text;
 
 #[cfg(test)]

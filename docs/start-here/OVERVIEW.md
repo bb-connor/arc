@@ -411,7 +411,7 @@ any registry or artifact mismatch fails closed.
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="../assets/lifecycle-mobile.svg" />
-    <img src="../assets/lifecycle.svg" alt="Life of a tool call: present the token, verify it, hold the budget, guard the input, dispatch, guard the output, meter and sign, then commit the receipt to the Merkle log. A deny at verify, budget, or either guard stops the call and still produces a signed receipt." width="900" />
+    <img src="../assets/lifecycle.svg" alt="Life of a tool call: present the token, verify it, hold the budget, guard the input, dispatch, guard the output, meter and sign, then append the receipt to the content-addressed log. Receipt batches can be committed to Merkle checkpoints. A deny at verify, budget, or either guard stops the call and still produces a signed receipt." width="900" />
   </picture>
 </p>
 

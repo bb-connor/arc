@@ -980,7 +980,7 @@ fn validate_agent_web_receipt(
     if receipt.receipt_kind != ReceiptKind::MediatedDecision
         || receipt.trust_level != TrustLevel::Mediated
     {
-        return Err(signature_invalid("Agent Web receipt signature invalid"));
+        return Err(claim_failed("Agent Web receipt is not a mediated decision"));
     }
     if !trust.trusts_receipt_kernel_key(&receipt.kernel_key) {
         return Err(claim_failed("Agent Web receipt kernel key untrusted"));
@@ -1102,7 +1102,7 @@ fn expected_external_subject_schema(
     source_protocol: &str,
 ) -> Result<&'static str, TransactionPassportError> {
     protocols::external_subject_schema(source_protocol).ok_or_else(|| {
-        claim_failed(format!(
+        TransactionPassportError::AgentWebUnsupported(format!(
             "unsupported Agent Web source protocol: {source_protocol}"
         ))
     })

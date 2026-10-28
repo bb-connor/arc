@@ -74,3 +74,34 @@ fn retained_event_schema_preserves_old_notifications_and_standalone_request_shap
         );
     }
 }
+
+#[test]
+fn worker_output_line_with_a_duplicate_key_is_refused_before_an_event() {
+    let (sender, mut events) = broadcast::channel(8);
+    let (inbox, _receiver) = mcp_inbox();
+    let mut writer = BroadcastJsonRpcWriter::new(
+        sender,
+        Arc::new(StdMutex::new(VecDeque::new())),
+        Arc::new(AtomicU64::new(0)),
+        "duplicate-session".into(),
+        inbox.response_context(),
+    );
+    let line = concat!(
+        r#"{"jsonrpc":"2.0","id":7,"result":{"_meta":{"chioEvidence":"#,
+        r#"{"receipt":{"metadata":{"lane":"a","lane":"b"}}}}}}"#,
+        "\n"
+    );
+    let error = std::io::Write::write(&mut writer, line.as_bytes()).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    let source = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<chio_core::canonical::UntrustedJsonError>());
+    assert!(
+        matches!(
+            source,
+            Some(chio_core::canonical::UntrustedJsonError::SignedInput(_))
+        ),
+        "{error:?}"
+    );
+    assert!(events.try_recv().is_err());
+}

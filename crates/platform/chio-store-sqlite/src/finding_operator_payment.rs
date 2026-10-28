@@ -502,6 +502,13 @@ impl PaymentAdapter for SqliteFindingOperatorPaymentAdapter {
         )
         .map_err(PaymentError::RailError)
     }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        Ok(held_authorization(authorization_id.to_owned(), true).metadata)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -731,6 +738,9 @@ mod tests {
             reference: reference.to_owned(),
             governed: None,
             commerce: None,
+            x402: None,
+            authority_expires_at: None,
+            reference_is_durable: false,
         }
     }
 
@@ -783,6 +793,20 @@ mod tests {
                 .unwrap();
             assert!(busy_timeout >= 5_000);
         }
+    }
+
+    #[test]
+    fn durable_replay_metadata_matches_an_authorization_replay() {
+        let adapter = SqliteFindingOperatorPaymentAdapter::open_in_memory().unwrap();
+        let first = adapter.authorize(&request("purchase-replay")).unwrap();
+        let replay = adapter.authorize(&request("purchase-replay")).unwrap();
+        assert_eq!(replay.metadata["replay"], true);
+        assert_eq!(
+            adapter
+                .replayed_authorization_metadata(&first.authorization_id)
+                .unwrap(),
+            replay.metadata
+        );
     }
 
     #[test]

@@ -270,7 +270,10 @@ pub(super) fn run(state: &Path, action: Action) -> Result<(), CliError> {
         Some(response) => ("control_socket", response),
         None => ("offline", offline(state, op)?),
     };
-    println!("{}", serde_json::json!({ "via": via, "response": &response }));
+    println!(
+        "{}",
+        serde_json::json!({ "via": via, "response": &response })
+    );
     if response.get("ok") == Some(&serde_json::Value::Bool(true)) {
         Ok(())
     } else {
@@ -283,3 +286,7 @@ pub(super) fn run(state: &Path, action: Action) -> Result<(), CliError> {
         )))
     }
 }
+
+#[cfg(test)]
+#[path = "stop_control_tests.rs"]
+mod tests;

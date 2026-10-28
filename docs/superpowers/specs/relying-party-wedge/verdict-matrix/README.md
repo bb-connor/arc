@@ -12,7 +12,7 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 
 - `id` equals the file name without `.json`.
 - `category` equals the directory name: `anchored_root`, `receipt_disclosure` or `revocation_local`.
-- `requires` names the existing required driver `rust-kernel` and the new `rust-mcp-serve-http` driver (spec 11.3), which runs a real `serve-http` process against the local IdP stub.
+- `requires` names the existing required driver `rust-kernel` and the new `rust-mcp-serve-http` driver (spec 11.3), which runs a real `serve-http` process against the local IdP stub. `receipt-disclosure-008` names `rust-kernel` only, because its fault injection runs in process.
 - `expected.scope_set` is `["tool:read"]` for `tool.call` scenarios and `[]` for `exchange`, `export` and `policy.load` scenarios, which admit no tool call.
 - All fixture timestamps are fixed: `issued_at = 1792234800`. Assertion fixtures use `iat = 1792234790` and `exp = 1792235090`, and the root policy window is `valid_from = 1792000000`, `valid_until = 1799999999` (spec 7.3 and 7.4 examples).
 
@@ -36,7 +36,7 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 | `root_policy_padded_rule` | `root_policy` with one extra member (`"pad": 0`) in one rule's `match` object, signed by the configured policy key. |
 | `root_policy_inline_tools` | `root_policy` plus `disclosure.tools` naming `files/read` with empty `inline_fields` lists. |
 | `root_policy_inline_pointer` | `root_policy` plus `disclosure.tools.files/read.parameters.inline_fields = ["/path"]`. |
-| `tenant_index_key` | A 32-byte tenant index key file (`0x14 * 32`), fixture material only. |
+| `tenant_index_key` | A tenant index key set directory with one 32-byte active key (`0x14 * 32`), fixture material only. |
 | `kernel_seed` | A kernel signing seed file with mode 0600, distinct from the exchange, policy and local AS keys. |
 | `exchange_key` | The exchange signing key listed in the root policy's `exchange_keys`, available to the mutation that mints a forged root. |
 | `idp_stub_jwks` | Local IdP stub serving a JWKS over `https` with one RS256 key, `kid = "k-stub-1"`, `use = "sig"`, 2048-bit modulus. It also mints Entra-shaped tokens with a tenant-specific issuer. |
@@ -83,8 +83,8 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 | `request_scope_outside_root` | Calls a tool needing `tool:write` under a root that grants only `tool:read`. |
 | `body_tenant_id_with_authority` | Test hook that sets `tenant_id` on a receipt body that also carries `authority`, before signing. |
 | `export_auditor_hash_only` | Runs an `auditor_hash_only` export. |
-| `export_auditor_with_salt_only_opening` | Runs an auditor-profile export with a salt-only opening (`payload: null`) supplied for inclusion. |
-| `export_caller_without_tenant_tag` | Runs a `caller` export with no `tenant_tag`. |
+| `export_auditor_with_salt_only_opening` | In-process fault injection that adds a salt-only opening (`payload: null`) to an auditor-profile export assembly; the export request has no member that asks for an opening. |
+| `export_caller_without_tenant_tags` | Runs a `caller` export with no `tenant_tags`. |
 | `export_caller_tenant_a` | Runs a `caller` export with tenant A's tag. |
 | `revoke_capability_id` | Revokes the live root by `capability_id` through `/admin/revocations`, then calls. |
 | `revoke_parent_capability` | Revokes the root by `capability_id`, then calls under `delegated_child`. |

@@ -12,12 +12,12 @@ impl ChioKernel {
         now_unix_ms: u64,
     ) -> Result<u64, KernelError> {
         validate_executable_response_plan(request)?;
-        let expected_fingerprint =
-            binding
-                .admission_artifact_fingerprint
-                .ok_or(KernelError::ResponseDispatchRejected(
-                    chio_security_types::DispatchRejection::UnboundArtifactPreparation,
-                ))?;
+        let expected_fingerprint = binding.admission_artifact_fingerprint;
+        if expected_fingerprint.is_zero() {
+            return Err(KernelError::ResponseDispatchRejected(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ));
+        }
         if super::active_response_artifact::active_response_admission_artifact_fingerprint(request)?
             != expected_fingerprint
         {

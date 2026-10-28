@@ -12,7 +12,7 @@ pub struct ExecutionRequestFixture {
     pub authorization_capability_hash: String,
     pub governed_intent_hash: String,
     pub policy_decision_hash: String,
-    pub admission_artifact_fingerprint: Option<Digest32>,
+    pub admission_artifact_fingerprint: Digest32,
     pub approval: ActiveResponseExecutionApproval,
     pub authorized_at_unix_ms: u64,
     pub expires_at_unix_ms: u64,
@@ -44,12 +44,10 @@ pub struct CommittedAdmissionFixture {
     pub executor_authority: ActiveResponseExecutorAuthorityIdentity,
     pub governed_intent_hash: String,
     pub policy_decision_hash: String,
+    pub admission_artifact_fingerprint: Digest32,
     pub authorized_at_unix_ms: u64,
 }
 
-/// Seed the durable boundary left by an older binary, without constructing a
-/// fresh admission or an execution permit. Recovery must still verify the real
-/// operation, approval reservation and anchor before it can prepare a dispatch.
 pub fn seed_committed_admission(
     kernel: &super::super::ChioKernel,
     fixture: CommittedAdmissionFixture,
@@ -80,12 +78,15 @@ pub fn seed_committed_admission(
         capability_id: plan.operator_capability.capability_id.as_str().to_owned(),
         authorization_capability_hash: authorization_capability_hash.clone(),
         request_binding_hash: derive_active_response_operation_request_binding_hash(
-            &plan_body_hash,
-            fixture.executor_authority.authority_id(),
-            fixture.executor_authority.generation(),
-            &authorization_capability_hash,
-            &fixture.governed_intent_hash,
-            approval_set.approval_set_hash(),
+            crate::kernel::active_response_operation_binding::ActiveResponseOperationSeed {
+                plan_hash: &plan_body_hash,
+                executor_authority_id: fixture.executor_authority.authority_id(),
+                executor_authority_generation: fixture.executor_authority.generation(),
+                authorization_capability_hash: &authorization_capability_hash,
+                governed_intent_hash: &fixture.governed_intent_hash,
+                approval_set_hash: approval_set.approval_set_hash(),
+                admission_artifact_fingerprint: &fixture.admission_artifact_fingerprint,
+            },
             &policy_hash,
         )?,
         policy_hash,
@@ -101,13 +102,16 @@ pub fn seed_committed_admission(
         .ok_or("operation store")?;
     operations.create_prepared(operation.clone())?;
     let anchor = build_active_response_operation_anchor(
-        plan,
-        &fixture.executor_authority,
-        fixture.authorized_at_unix_ms,
-        &authorization_capability_hash,
-        &fixture.governed_intent_hash,
-        &fixture.policy_decision_hash,
-        approval_set.approval_set_hash(),
+        crate::kernel::active_response_operation_binding::ActiveResponseOperationAnchorInput {
+            response_plan: plan,
+            executor_authority: &fixture.executor_authority,
+            authorized_at_unix_ms: fixture.authorized_at_unix_ms,
+            authorization_capability_hash: &authorization_capability_hash,
+            governed_intent_hash: &fixture.governed_intent_hash,
+            policy_decision_hash: &fixture.policy_decision_hash,
+            approval_set_hash: approval_set.approval_set_hash(),
+            admission_artifact_fingerprint: fixture.admission_artifact_fingerprint,
+        },
     )?;
     kernel.journal_active_response_operation_anchor(&operation, anchor, approval_set)
         .map_err(|error| match error {
@@ -145,21 +149,22 @@ pub fn seed_committed_admission(
         admission_operation_version: active_response_dispatch_operation_version(&committed)?,
         approval_set_hash: approval_set.approval_set_hash().to_owned(),
     };
-    let dispatch_id = derive_active_response_dispatch_id(
-        plan,
-        &fixture.executor_authority,
-        &authorization_capability_hash,
-        &fixture.governed_intent_hash,
-        &fixture.policy_decision_hash,
-        fixture.authorized_at_unix_ms,
-        &approval,
-    )?;
+    let dispatch_id = derive_active_response_dispatch_id(crate::ActiveResponseDispatchIdInput {
+        response_plan: plan,
+        executor_authority: &fixture.executor_authority,
+        authorization_capability_hash: &authorization_capability_hash,
+        governed_intent_hash: &fixture.governed_intent_hash,
+        policy_decision_hash: &fixture.policy_decision_hash,
+        authorized_at_unix_ms: fixture.authorized_at_unix_ms,
+        approval: &approval,
+        admission_artifact_fingerprint: &fixture.admission_artifact_fingerprint,
+    })?;
     super::super::PreparedActiveResponseAdmission::Governed(
         super::super::GovernedActiveResponseReservation {
             operation: Box::new(committed),
             approval_set: Box::new(approval_set.clone()),
             policy_decision_hash: fixture.policy_decision_hash,
-            admission_artifact_fingerprint: None,
+            admission_artifact_fingerprint: fixture.admission_artifact_fingerprint,
             authorization_capability_hash,
             governed_intent_hash: fixture.governed_intent_hash,
             executor_authority_id: fixture.executor_authority.authority_id().to_owned(),

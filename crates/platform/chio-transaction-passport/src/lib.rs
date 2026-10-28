@@ -17,9 +17,7 @@ pub use cognition_market::{
     CognitionMarketVerifierAuthorityStatusTrust, COGNITION_MARKET_CLAIMS,
 };
 pub use error::TransactionPassportError;
-pub use evidence_graph::{
-    validate_transaction_evidence_graph, EVIDENCE_GRAPH_MINIMAL_RECEIPT_SCHEMA,
-};
+pub use evidence_graph::validate_transaction_evidence_graph;
 pub use ids::{
     RUNTIME_EXECUTION_LEASE_SCHEMA_ID, RUNTIME_REVOCATION_FRESHNESS_PROOF_SCHEMA_ID,
     RUNTIME_SANDBOX_ATTESTATION_SCHEMA_ID, RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID,

@@ -641,6 +641,9 @@ async fn full_flow_guard_error_fails_closed() {
         fn name(&self) -> &str {
             "broken-guard"
         }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Err(KernelError::Internal("simulated guard failure".to_string()))
         }

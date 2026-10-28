@@ -111,8 +111,11 @@ observation unless the signed Chio verifier report also accepts the bound claim.
 
 The shipped settlement lanes are:
 
-- EVM Merkle-proof release with anchored Chio receipt inclusion evidence
-- EVM dual-signature release using the operator's registered settlement key
+- EVM Merkle-proof release with anchored Chio receipt inclusion evidence,
+  for receipts signed by a kernel key in `kernel_authority.trusted_keys`
+- EVM dual-signature release using the operator's registered settlement key,
+  for receipts signed by a kernel key in the configured
+  `kernel_authority.trusted_keys` set
 - EVM timeout refund after the configured deadline elapses
 - EVM bond lifecycle observation for active, released, impaired, and expired
   vault state

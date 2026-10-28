@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use chio_security_types::ports::{
     validate_capability_suspension_decision, CapabilitySetSuspensionStore,
     CapabilitySuspensionQuery, RecordId,
@@ -41,6 +41,23 @@ impl CapabilitySetSuspensionGuard {
 impl Guard for CapabilitySetSuspensionGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
+    }
+
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
+    }
+
+    fn revalidate_before_dispatch(&self, context: &GuardContext<'_>) -> Result<(), KernelError> {
+        match self.evaluate(context)?.verdict {
+            chio_kernel::Verdict::Allow => Ok(()),
+            chio_kernel::Verdict::Deny | chio_kernel::Verdict::PendingApproval => Err(
+                KernelError::GuardDenied(format!("{GUARD_NAME} dispatch revalidation denied")),
+            ),
+        }
     }
 
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

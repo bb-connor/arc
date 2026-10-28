@@ -871,7 +871,6 @@ include!(concat!(env!("OUT_DIR"), "/proof_fixture_files.rs"));
 
 mod error;
 pub use error::ProofRoomError;
-pub use receipt_coverage::RECEIPT_PROJECTION_SIGNATURE_SCHEMA;
 mod verified;
 pub use verified::VerifiedProofRoomBundle;
 

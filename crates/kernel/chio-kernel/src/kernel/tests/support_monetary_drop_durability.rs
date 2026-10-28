@@ -21,6 +21,10 @@ async fn dropping_async_evaluate_after_monetary_dispatch_retains_budget_and_paym
             "abort-evidence"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow_with_evidence(vec![GuardEvidence {
                 guard_name: "abort-evidence".to_string(),

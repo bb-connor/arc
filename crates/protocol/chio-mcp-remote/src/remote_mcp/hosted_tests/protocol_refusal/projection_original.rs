@@ -409,7 +409,7 @@ async fn mcp_projection_control_valid_v2_nonce_is_preserved_through_delivery_and
     let issuance = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,
-        &keypair,
+        &chio_core::crypto::Ed25519Backend::new(keypair.clone()),
         &chio_kernel::ExecutionNonceConfig::default(),
         now,
     )?;

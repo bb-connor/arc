@@ -45,6 +45,10 @@ impl Guard for StalledGuard {
         "session-cancellation-gate"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _: &GuardContext) -> Result<GuardDecision, KernelError> {
         self.entered.notify_one();
         let deadline = std::time::Instant::now() + Duration::from_secs(5);

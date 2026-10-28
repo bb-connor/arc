@@ -553,8 +553,9 @@ pub fn sign_receipt(
     canonical_content_hex: String,
     signing_seed_hex: String,
 ) -> Result<String, ChioMobileError> {
-    let body: ChioReceiptBody =
-        serde_json::from_str(&body_json).map_err(|error| ChioMobileError::InvalidJson {
+    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(&body_json)
+        .decode_signed()
+        .map_err(|error| ChioMobileError::InvalidJson {
             message: format!("receipt body: {error}"),
         })?;
 
@@ -586,8 +587,9 @@ pub fn sign_receipt_relaying_trusted_body(
     body_json: String,
     signing_seed_hex: String,
 ) -> Result<String, ChioMobileError> {
-    let body: ChioReceiptBody =
-        serde_json::from_str(&body_json).map_err(|error| ChioMobileError::InvalidJson {
+    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(&body_json)
+        .decode_signed()
+        .map_err(|error| ChioMobileError::InvalidJson {
             message: format!("receipt body: {error}"),
         })?;
 

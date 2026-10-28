@@ -34,6 +34,14 @@ impl ErrorKind {
     }
 }
 
+fn prepayment_evidence() -> serde_json::Value {
+    serde_json::json!({
+        "adapter": "test-prepayment-custody",
+        "settlement": "pending",
+        "transaction": "prepay-custody-broadcast",
+    })
+}
+
 #[derive(Clone, Copy)]
 enum Mode {
     CaptureError(ErrorKind),
@@ -41,6 +49,7 @@ enum Mode {
     CapturedThenPanicked,
     Settled,
     AuthorizeDeclined,
+    AuthorizeOutcomeUnknown,
 }
 
 #[derive(Clone, Default)]
@@ -77,6 +86,12 @@ impl PaymentAdapter for PrepaymentAdapter {
         assert_eq!(request.currency, "USD");
         if matches!(self.mode, Mode::AuthorizeDeclined) {
             return Err(PaymentError::Declined("authorization declined".to_string()));
+        }
+        if matches!(self.mode, Mode::AuthorizeOutcomeUnknown) {
+            return Err(PaymentError::OutcomeUnknown {
+                detail: SENSITIVE_ERROR.to_string(),
+                evidence: prepayment_evidence(),
+            });
         }
         self.counters
             .authorization_retained
@@ -128,7 +143,9 @@ impl PaymentAdapter for PrepaymentAdapter {
                     metadata: serde_json::Value::Null,
                 })
             }
-            Mode::AuthorizeDeclined => unreachable!("declined authorization cannot be captured"),
+            Mode::AuthorizeDeclined | Mode::AuthorizeOutcomeUnknown => {
+                unreachable!("an unconfirmed authorization cannot be captured")
+            }
         }
     }
 
@@ -155,6 +172,10 @@ impl PaymentAdapter for PrepaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::Value::Null,
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 
@@ -446,5 +467,65 @@ fn definite_authorization_decline_keeps_clean_pre_dispatch_denial() -> TestResul
         .and_then(|financial| financial.get("authorization_id"))
         .is_none());
     assert!(response.receipt.verify_integrity_embedded_key()?);
+    Ok(())
+}
+
+#[test]
+fn outcome_unknown_prepayment_signs_its_rail_evidence() -> TestResult {
+    let fixture = Fixture::new(Mode::AuthorizeOutcomeUnknown)?;
+    let response = fixture.reserve()?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.execution_nonce.is_none());
+    assert_eq!(fixture.counters.invocations.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 0);
+    assert!(response.receipt.verify_signature()?);
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("prepayment ambiguity metadata missing")?;
+    let financial = &metadata["financial"];
+    assert_eq!(financial["payment_authorization_ambiguous"], true);
+    assert_eq!(
+        financial["payment_authorization_error_code"],
+        "outcome_unknown"
+    );
+    assert_eq!(
+        financial["payment_authorization_evidence"],
+        prepayment_evidence()
+    );
+    assert!(!metadata.to_string().contains(SENSITIVE_ERROR));
+    Ok(())
+}
+
+#[test]
+fn outcome_unknown_prepayment_denial_keeps_the_fixed_reason() -> TestResult {
+    let fixture = Fixture::new(Mode::AuthorizeOutcomeUnknown)?;
+    let response = fixture.reserve()?;
+    let expected = KernelError::GovernedTransactionDenied(
+        "MustPrepay prepayment authorization failed before reserving an execution nonce: outcome_unknown"
+            .to_string(),
+    )
+    .to_string();
+    assert_eq!(response.reason.as_deref(), Some(expected.as_str()));
+    match response.receipt.decision.clone() {
+        Some(Decision::Deny { reason, guard }) => {
+            assert_eq!(reason, expected);
+            assert_eq!(guard, "kernel");
+        }
+        other => panic!("expected a kernel deny decision, got {other:?}"),
+    }
+    assert!(response.receipt.verify_signature()?);
+    assert!(!serde_json::to_string(&response.receipt)?.contains(SENSITIVE_ERROR));
+    let financial = &response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("prepayment ambiguity metadata missing")?["financial"];
+    assert_eq!(
+        financial["payment_authorization_evidence"],
+        prepayment_evidence()
+    );
     Ok(())
 }

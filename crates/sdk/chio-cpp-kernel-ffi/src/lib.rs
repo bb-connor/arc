@@ -506,7 +506,8 @@ fn sign_receipt_json_str(
     canonical_content_hex: &str,
     signing_seed_hex: &str,
 ) -> Result<String, KernelFfiError> {
-    let body: ChioReceiptBody = serde_json::from_str(body_json)
+    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(body_json)
+        .decode_signed()
         .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
 
     let canonical_content = hex::decode(canonical_content_hex.trim_start_matches("0x"))
@@ -535,7 +536,8 @@ fn sign_receipt_relaying_trusted_body_json_str(
     body_json: &str,
     signing_seed_hex: &str,
 ) -> Result<String, KernelFfiError> {
-    let body: ChioReceiptBody = serde_json::from_str(body_json)
+    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(body_json)
+        .decode_signed()
         .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
 
     let keypair = Keypair::from_seed_hex(signing_seed_hex)

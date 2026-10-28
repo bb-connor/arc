@@ -1,0 +1,187 @@
+{
+  "generations": [
+    {
+      "key_id_hex": "2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8",
+      "set_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "subkeys_hex": {
+        "active_defense_digest": "c9acf3005b46cd8cf9cad84ea25320bcbaed42260f67fd9d0b089d91bebc3a47",
+        "enterprise_subject": "9bed66229608ad58b9c03a01681773ca8d9ac863a1e9f4db8f9d64abadc9e6fd",
+        "subject_tag": "6b0a476f3089a87a34d891e9cd25f27476dd2eafedfa2e5cd45536d5be8f3728",
+        "tenant_binding": "e650a27e5bc488e284a4d910b07e5af8548097fb342d6408e864dc25e03d502e",
+        "tenant_tag": "00960e5109e01ad4edec3049a0c838f4ac8a1be6cfe4e748f9e342749947c96d"
+      }
+    },
+    {
+      "key_id_hex": "ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3",
+      "set_key_hex": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+      "subkeys_hex": {
+        "active_defense_digest": "fe196647f0612a05e405a698ae52bfe07ba2e569d8c8b6a009f5f2a7e5cd23ba",
+        "enterprise_subject": "b6b6a1a10380cd9caa5c7e6f1e358a9ffb03601ffc1f58ca271e3a49916a9487",
+        "subject_tag": "91c6a5ec3d6725b13b4c6e41ae911099ca5eacaad52603fab599513deadb7299",
+        "tenant_binding": "d234a0b6d3b6ac276f93be45810e8fed2f669db910771de9969c4947249d5765",
+        "tenant_tag": "6ee4eb8e01395b77f24fd06648782195b75569db626d0ff24fa97678fd245b9a"
+      }
+    },
+    {
+      "key_id_hex": "7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593",
+      "set_key_hex": "927d26850d96b3a6a867fdae738cfe95131ae59fe19295e13a0a5743981d486c",
+      "subkeys_hex": {
+        "active_defense_digest": "c89d15b97e5d9b611568904270af133dbbc42bce89324461f57175ff9e3b98e1",
+        "enterprise_subject": "7103f55d55be19e83672bbbb3ea2d171d2b009736c095464e1b8d1bbec86c9a3",
+        "subject_tag": "b44307ae153f5563a8a17f3be306c28304610fdf74fc27ee8c560b59d806372a",
+        "tenant_binding": "a582f41ea499a1a0d5b9b50ed90b9a0cb56cfe5c37c5bcc15f6ab87f8f61098a",
+        "tenant_tag": "a23f38eda465d383ce4485c42309094089717fa04d9ac3c52b18d404ffda632c"
+      }
+    }
+  ],
+  "generator": "python3 -I scripts/gen-tenant-index-kat.py write",
+  "hkdf_salt_hex": "6368696f2e74656e616e742d696e6465782e7631",
+  "key_id_domain_hex": "6368696f2e74656e616e742d696e6465782d6b65792d69642e763100",
+  "schema": "chio.tenant-index-kat.v1",
+  "values": [
+    {
+      "domain_hex": "6368696f2e726563656970742e74656e616e742d62696e64696e672e763100",
+      "generation": 0,
+      "preimage_hex": "74656e616e742d61636d65",
+      "purpose": "tenant_binding",
+      "string_form": "tb1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.0f247760b8857a1be45d1c7368e92c09c4b314e87b640536941cc8e4a18d696c",
+      "value_hex": "0f247760b8857a1be45d1c7368e92c09c4b314e87b640536941cc8e4a18d696c"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 0,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c650061636d65",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.f64dceb614ce6fb90b159269f08482dac2275a0609842acd5225be3c9fe044f7",
+      "value_hex": "f64dceb614ce6fb90b159269f08482dac2275a0609842acd5225be3c9fe044f7"
+    },
+    {
+      "domain_hex": "6368696f2e7375626a6563742d7461672e763100",
+      "generation": 0,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c6500757365722d31",
+      "purpose": "subject_tag",
+      "string_form": "st1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.25a8eb91fc9837ade15f7def64d6f232e7d9c0b56b73bb999f8bdc3faf650e14",
+      "value_hex": "25a8eb91fc9837ade15f7def64d6f232e7d9c0b56b73bb999f8bdc3faf650e14"
+    },
+    {
+      "domain_hex": "6368696f2e656e74657270726973652d7375626a6563742e763100",
+      "generation": 0,
+      "preimage_hex": "0000000773636f70652d6100000005616c696365",
+      "purpose": "enterprise_subject",
+      "string_form": "esk1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.64720d7f5546f0ec33dfb9d660a2e510689095b23cdb6c6b854ddbb470944319",
+      "value_hex": "64720d7f5546f0ec33dfb9d660a2e510689095b23cdb6c6b854ddbb470944319"
+    },
+    {
+      "domain_hex": "6368696f2e6163746976652d646566656e73652e6b657965642d6469676573742e763100",
+      "generation": 0,
+      "preimage_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "purpose": "active_defense_digest",
+      "string_form": "ad1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.ab008ec109c17322375e698c582f1618922b082cb3602804c05c91e07d509316",
+      "value_hex": "ab008ec109c17322375e698c582f1618922b082cb3602804c05c91e07d509316"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 0,
+      "preimage_hex": "",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.2a1699f9a4669e5e0aa41b77acfaacb8ea9b69e1140c6cc69840561ed96d1ed8.aae60cbf7ee4d118f2d0d64456a47ce5900dcce10eb4530fe4ee48c01d8db31c",
+      "value_hex": "aae60cbf7ee4d118f2d0d64456a47ce5900dcce10eb4530fe4ee48c01d8db31c"
+    },
+    {
+      "domain_hex": "6368696f2e726563656970742e74656e616e742d62696e64696e672e763100",
+      "generation": 1,
+      "preimage_hex": "74656e616e742d61636d65",
+      "purpose": "tenant_binding",
+      "string_form": "tb1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.8c41ecb47e07403bc0ccc4a809333acb3f7601290cc66dd83da38d4114873932",
+      "value_hex": "8c41ecb47e07403bc0ccc4a809333acb3f7601290cc66dd83da38d4114873932"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 1,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c650061636d65",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.95f38a4ecc207eeaf31f2540017c19b0ee467b271fbf44c454d0e9213c24b934",
+      "value_hex": "95f38a4ecc207eeaf31f2540017c19b0ee467b271fbf44c454d0e9213c24b934"
+    },
+    {
+      "domain_hex": "6368696f2e7375626a6563742d7461672e763100",
+      "generation": 1,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c6500757365722d31",
+      "purpose": "subject_tag",
+      "string_form": "st1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.0ed89125aec2d083e93649dad6a6bb681328bfab1fec7175b38f5646435a9ea2",
+      "value_hex": "0ed89125aec2d083e93649dad6a6bb681328bfab1fec7175b38f5646435a9ea2"
+    },
+    {
+      "domain_hex": "6368696f2e656e74657270726973652d7375626a6563742e763100",
+      "generation": 1,
+      "preimage_hex": "0000000773636f70652d6100000005616c696365",
+      "purpose": "enterprise_subject",
+      "string_form": "esk1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.812dd431b285665b7c87490677a6bb25cb3ac23644c3434dc3ebc1219250076d",
+      "value_hex": "812dd431b285665b7c87490677a6bb25cb3ac23644c3434dc3ebc1219250076d"
+    },
+    {
+      "domain_hex": "6368696f2e6163746976652d646566656e73652e6b657965642d6469676573742e763100",
+      "generation": 1,
+      "preimage_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "purpose": "active_defense_digest",
+      "string_form": "ad1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.3c09b27c3fcaf093053a714c271cbbb9e59823ce88685a0dfb619d21381bbc24",
+      "value_hex": "3c09b27c3fcaf093053a714c271cbbb9e59823ce88685a0dfb619d21381bbc24"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 1,
+      "preimage_hex": "",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.ec318a0bcf3038ca811e85955f0ed3b9fdc73c299ca90906badda7387b8f63a3.d68541de10771a3861965a837faf6356f34e9126d26d18acdf2b731126364410",
+      "value_hex": "d68541de10771a3861965a837faf6356f34e9126d26d18acdf2b731126364410"
+    },
+    {
+      "domain_hex": "6368696f2e726563656970742e74656e616e742d62696e64696e672e763100",
+      "generation": 2,
+      "preimage_hex": "74656e616e742d61636d65",
+      "purpose": "tenant_binding",
+      "string_form": "tb1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.2d147e80310bfce42c6bb3d1984b271855bc413e2f4a9b6b5088b855c2b60635",
+      "value_hex": "2d147e80310bfce42c6bb3d1984b271855bc413e2f4a9b6b5088b855c2b60635"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 2,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c650061636d65",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.cdaaa383f48e10b50c4fc3b103c5c5fcb01b1fbf0240649662ce0265eb44912b",
+      "value_hex": "cdaaa383f48e10b50c4fc3b103c5c5fcb01b1fbf0240649662ce0265eb44912b"
+    },
+    {
+      "domain_hex": "6368696f2e7375626a6563742d7461672e763100",
+      "generation": 2,
+      "preimage_hex": "68747470733a2f2f6964702e6578616d706c6500757365722d31",
+      "purpose": "subject_tag",
+      "string_form": "st1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.0b01e154d3a23c215200a79764c31419a6de3a92697ac71d53fe29a618c47488",
+      "value_hex": "0b01e154d3a23c215200a79764c31419a6de3a92697ac71d53fe29a618c47488"
+    },
+    {
+      "domain_hex": "6368696f2e656e74657270726973652d7375626a6563742e763100",
+      "generation": 2,
+      "preimage_hex": "0000000773636f70652d6100000005616c696365",
+      "purpose": "enterprise_subject",
+      "string_form": "esk1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.f3743359fb05073fca5dd871cfe87678b9fd096936a9aaf2b4e695ed2035a305",
+      "value_hex": "f3743359fb05073fca5dd871cfe87678b9fd096936a9aaf2b4e695ed2035a305"
+    },
+    {
+      "domain_hex": "6368696f2e6163746976652d646566656e73652e6b657965642d6469676573742e763100",
+      "generation": 2,
+      "preimage_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "purpose": "active_defense_digest",
+      "string_form": "ad1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.e84639bb55faa821868264cbf0cb82cd3376ee3e69dc3545b565c87c990aa1cd",
+      "value_hex": "e84639bb55faa821868264cbf0cb82cd3376ee3e69dc3545b565c87c990aa1cd"
+    },
+    {
+      "domain_hex": "6368696f2e74656e616e742d7461672e763100",
+      "generation": 2,
+      "preimage_hex": "",
+      "purpose": "tenant_tag",
+      "string_form": "tt1.7bffe5a30ca9198a2040a895e72db5015f82c3974e4e7c4db09aa44893414593.b153d506345ca74f75decc806030d4cc2c3bc5778604a54761fc902aa100f67a",
+      "value_hex": "b153d506345ca74f75decc806030d4cc2c3bc5778604a54761fc902aa100f67a"
+    }
+  ]
+}

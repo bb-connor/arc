@@ -25,7 +25,6 @@ exclude_globs = [
     # Adapters, formal harnesses, fuzz targets, tests, and benches are covered
     # by their dedicated lanes rather than kernel mutation scoring.
     "crates/kernel/chio-kernel-core/src/clock.rs", # rationale: deterministic clock shim, no logic to mutation-score
-    "crates/kernel/chio-kernel-core/src/rng.rs", # rationale: RNG shim, no decision logic to mutation-score
     "crates/kernel/chio-kernel-core/src/formal_aeneas.rs", # rationale: scored by the retained Kani proof-mutation full cycle
     "crates/kernel/chio-kernel-core/src/formal_core.rs", # rationale: scored by the retained Kani proof-mutation full cycle
     "crates/kernel/chio-kernel-core/src/kani_harnesses.rs", # rationale: Kani oracle control, excluded from the mutated system

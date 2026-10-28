@@ -1,8 +1,11 @@
 #![cfg(feature = "sqlite")]
 
 use chio_revocation_oracle::{
-    EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle, RevocationOracleError,
-    SqliteRevocationOracle, SqliteRevocationOracleError, SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
+    credential_revocation_key, passport_revocation_key, EpochNonce, EpochRoot,
+    InMemoryRevocationOracle, PassportRevocationLeaf, PassportRevocationLeafError,
+    PassportRevocationLeafKind, RevocationKey, RevocationLeaf, RevocationOracle,
+    RevocationOracleError, SignedEpochRoot, SqliteRevocationOracle, SqliteRevocationOracleError,
+    SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -218,5 +221,324 @@ fn malformed_utf8_subjects_are_refused_at_the_storage_layer() -> TestResult {
         SqliteRevocationOracle::open(&path).err(),
         Some(SqliteRevocationOracleError::Storage(_))
     ));
+    Ok(())
+}
+
+fn leaf(seq: u64, subject: &str, nonce: u64, inserted_at_unix_ms: u64) -> RevocationLeaf {
+    RevocationLeaf {
+        seq,
+        key: key(subject, nonce),
+        inserted_at_unix_ms,
+    }
+}
+
+#[test]
+fn leaves_after_pages_in_sequence_order_within_the_limit() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 1), 10)?;
+    oracle.revoke(key("passport-b", 2), 20)?;
+    oracle.revoke(key("passport-c", 3), 30)?;
+
+    assert_eq!(
+        oracle.leaves_after(0, 2)?,
+        vec![leaf(1, "passport-a", 1, 10), leaf(2, "passport-b", 2, 20)]
+    );
+    assert_eq!(
+        oracle.leaves_after(2, 2)?,
+        vec![leaf(3, "passport-c", 3, 30)]
+    );
+    assert!(oracle.leaves_after(3, 2)?.is_empty());
+    assert!(oracle.leaves_after(0, 0)?.is_empty());
+    assert!(matches!(
+        oracle.leaves_after(u64::MAX, 1),
+        Err(SqliteRevocationOracleError::CursorOutOfRange(u64::MAX))
+    ));
+    Ok(())
+}
+
+#[test]
+fn leaves_are_numbered_densely_from_one_across_transactions() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    let first = SqliteRevocationOracle::open(&path)?;
+    let second = SqliteRevocationOracle::open(&path)?;
+    first.transact(10, |txn| {
+        txn.revoke(&key("passport-a", 1))?;
+        txn.revoke(&key("passport-b", 1))?;
+        Ok(())
+    })?;
+    second.revoke(key("passport-c", 1), 20)?;
+    first.revoke(key("passport-d", 1), 30)?;
+
+    let seqs = SqliteRevocationOracle::open(&path)?
+        .leaves_after(0, 16)?
+        .into_iter()
+        .map(|leaf| leaf.seq)
+        .collect::<Vec<_>>();
+    assert_eq!(seqs, vec![1, 2, 3, 4]);
+    assert_eq!(second.current_epoch_root()?.leaf_count, 4);
+    Ok(())
+}
+
+#[test]
+fn a_rolled_back_transaction_leaves_no_gap_in_seq() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 1), 10)?;
+    let refused = oracle.transact(20, |txn| {
+        txn.revoke(&key("passport-b", 1))?;
+        txn.revoke(&key("passport-c", 1))?;
+        Err::<(), _>(SqliteRevocationOracleError::Storage("refused".to_string()))
+    });
+    assert!(refused.is_err());
+    oracle.revoke(key("passport-d", 1), 30)?;
+
+    assert_eq!(
+        oracle.leaves_after(0, 16)?,
+        vec![leaf(1, "passport-a", 1, 10), leaf(2, "passport-d", 1, 30)]
+    );
+    assert!(!oracle.is_revoked(&key("passport-b", 1))?);
+    Ok(())
+}
+
+#[test]
+fn a_gap_in_the_stored_sequence_is_refused_as_corrupt() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    SqliteRevocationOracle::open(&path)?.revoke(key("passport-a", 1), 10)?;
+    rusqlite::Connection::open(&path)?.execute(
+        "UPDATE chio_revocation_oracle_leaves SET seq = 2 WHERE seq = 1",
+        [],
+    )?;
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CorruptRecord(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn the_staged_root_includes_keys_revoked_in_the_open_transaction() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 1), 10)?;
+    let ((before, staged), committed) = oracle.transact(20, |txn| {
+        let before = txn.epoch_root();
+        txn.revoke(&key("passport-b", 1))?;
+        Ok((before, txn.epoch_root()))
+    })?;
+    assert_eq!(before.leaf_count, 1);
+    assert_eq!(staged, committed);
+    assert_eq!(committed.leaf_count, 2);
+    assert_eq!(oracle.current_epoch_root()?, committed);
+    Ok(())
+}
+
+#[test]
+fn an_epoch_root_with_an_unknown_field_is_refused() -> TestResult {
+    let root = SqliteRevocationOracle::open_in_memory()?.revoke(key("passport-a", 1), 10)?;
+    let mut value = serde_json::to_value(&root)?;
+    assert_eq!(serde_json::from_value::<EpochRoot>(value.clone())?, root);
+    value
+        .as_object_mut()
+        .ok_or("an epoch root encodes as an object")?
+        .insert("extra".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<EpochRoot>(value).is_err());
+    Ok(())
+}
+
+#[test]
+fn a_signed_root_with_an_unknown_nested_field_is_refused() -> TestResult {
+    let root = SqliteRevocationOracle::open_in_memory()?.revoke(key("passport-a", 1), 10)?;
+    let signed = serde_json::json!({
+        "root": serde_json::to_value(&root)?,
+        "signature": {
+            "signer_id": "operator",
+            "algorithm": "ed25519",
+            "signature_bytes": [1, 2, 3],
+        },
+    });
+    serde_json::from_value::<SignedEpochRoot>(signed.clone())?;
+    for (path, field) in [("", "extra"), ("root", "extra"), ("signature", "extra")] {
+        let mut value = signed.clone();
+        let target = if path.is_empty() {
+            &mut value
+        } else {
+            value.get_mut(path).ok_or("nested member")?
+        };
+        target
+            .as_object_mut()
+            .ok_or("nested object")?
+            .insert(field.to_string(), serde_json::json!(0));
+        assert!(
+            serde_json::from_value::<SignedEpochRoot>(value).is_err(),
+            "an unknown field under `{path}` must be refused"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_leaf_projects_to_seq_kind_and_subject_with_the_nonce_from_the_kind() -> TestResult {
+    let digest = "ab".repeat(32);
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.transact(10, |txn| {
+        txn.revoke(&passport_revocation_key("passport-a"))?;
+        txn.revoke(&credential_revocation_key(&digest))?;
+        Ok(())
+    })?;
+    let leaves = oracle
+        .leaves_after(0, 16)?
+        .iter()
+        .map(PassportRevocationLeaf::from_oracle_leaf)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        leaves,
+        vec![
+            PassportRevocationLeaf {
+                seq: 1,
+                kind: PassportRevocationLeafKind::Passport,
+                subject: "passport-a".to_string(),
+            },
+            PassportRevocationLeaf {
+                seq: 2,
+                kind: PassportRevocationLeafKind::Credential,
+                subject: digest.clone(),
+            },
+        ]
+    );
+    assert_eq!(
+        serde_json::to_value(&leaves)?,
+        serde_json::json!([
+            {"seq": 1, "kind": "passport", "subject": "passport-a"},
+            {"seq": 2, "kind": "credential", "subject": digest},
+        ])
+    );
+    assert_eq!(
+        leaves[1].to_revocation_key(),
+        credential_revocation_key(&digest)
+    );
+    Ok(())
+}
+
+#[test]
+fn a_leaf_with_a_nonce_outside_the_kind_table_is_unpublishable() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 7), 10)?;
+    let leaves = oracle.leaves_after(0, 1)?;
+    let stored = leaves.first().ok_or("one leaf")?;
+    assert_eq!(
+        PassportRevocationLeaf::from_oracle_leaf(stored),
+        Err(PassportRevocationLeafError::UnpublishableLeaf { seq: 1 })
+    );
+    Ok(())
+}
+
+#[test]
+fn a_leaf_document_with_an_unknown_field_or_kind_is_refused() -> TestResult {
+    let valid = serde_json::json!({"seq": 1, "kind": "passport", "subject": "passport-a"});
+    serde_json::from_value::<PassportRevocationLeaf>(valid)?;
+    for refused in [
+        serde_json::json!({"seq": 1, "kind": "passport", "subject": "passport-a", "epochNonce": 1}),
+        serde_json::json!({"seq": 1, "kind": "capability", "subject": "passport-a"}),
+        serde_json::json!({"seq": 1, "subject": "passport-a"}),
+    ] {
+        assert!(serde_json::from_value::<PassportRevocationLeaf>(refused).is_err());
+    }
+    Ok(())
+}
+
+const PRIOR_SCHEMA: &str = "
+CREATE TABLE chio_revocation_oracle_meta (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1)
+) STRICT;
+CREATE TABLE chio_revocation_oracle_leaves (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL CHECK (
+        typeof(subject) = 'text'
+        AND length(subject) BETWEEN 1 AND 4096
+        AND octet_length(subject) <= 16384
+        AND instr(subject, char(0)) = 0
+    ),
+    epoch_nonce BLOB NOT NULL
+        CHECK (typeof(epoch_nonce) = 'blob' AND length(epoch_nonce) = 8),
+    inserted_at_unix_ms BLOB NOT NULL
+        CHECK (typeof(inserted_at_unix_ms) = 'blob' AND length(inserted_at_unix_ms) = 8),
+    UNIQUE (subject, epoch_nonce)
+) STRICT;
+INSERT INTO chio_revocation_oracle_meta (singleton, schema_version) VALUES (1, 1);
+";
+
+type CatalogSnapshot = (Vec<(String, String, Option<String>)>, Vec<(i64, String)>);
+
+fn catalog_and_leaves(
+    path: &std::path::Path,
+) -> Result<CatalogSnapshot, Box<dyn std::error::Error>> {
+    let raw = rusqlite::Connection::open(path)?;
+    let catalog = raw
+        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    let leaves = raw
+        .prepare("SELECT seq, subject FROM chio_revocation_oracle_leaves ORDER BY seq")?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok((catalog, leaves))
+}
+
+#[test]
+fn a_reopen_of_the_current_catalog_succeeds() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    SqliteRevocationOracle::open(&path)?.revoke(key("passport-a", 1), 10)?;
+    let before = catalog_and_leaves(&path)?;
+    let reopened = SqliteRevocationOracle::open(&path)?;
+    assert_eq!(reopened.current_epoch_root()?.leaf_count, 1);
+    assert_eq!(catalog_and_leaves(&path)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_reopen_of_the_prior_catalog_shape_is_refused_and_leaves_it_unchanged() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    let raw = rusqlite::Connection::open(&path)?;
+    raw.execute_batch(PRIOR_SCHEMA)?;
+    raw.execute(
+        "INSERT INTO chio_revocation_oracle_leaves (subject, epoch_nonce, inserted_at_unix_ms)
+         VALUES ('passport-a', ?1, ?2)",
+        rusqlite::params![
+            1_u64.to_be_bytes().as_slice(),
+            10_u64.to_be_bytes().as_slice()
+        ],
+    )?;
+    drop(raw);
+    let before = catalog_and_leaves(&path)?;
+
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    assert_eq!(catalog_and_leaves(&path)?, before);
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_stamped_catalog_with_an_extra_oracle_index_is_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    SqliteRevocationOracle::open(&path)?.revoke(key("passport-a", 1), 10)?;
+    rusqlite::Connection::open(&path)?.execute_batch(
+        "CREATE INDEX chio_revocation_oracle_leaves_extra ON chio_revocation_oracle_leaves (subject);",
+    )?;
+    let before = catalog_and_leaves(&path)?;
+    assert!(matches!(
+        SqliteRevocationOracle::open(&path),
+        Err(SqliteRevocationOracleError::CatalogMismatch)
+    ));
+    assert_eq!(catalog_and_leaves(&path)?, before);
     Ok(())
 }

@@ -1,5 +1,6 @@
 //! Bounded original-byte readers for operator files carrying authenticated data.
 
+#[cfg(unix)]
 use std::io::Read;
 use std::path::Path;
 
@@ -12,12 +13,41 @@ use crate::CliError;
 
 pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 
+#[cfg(all(test, unix))]
+#[path = "signed_input/read_pause.rs"]
+pub(crate) mod read_pause;
+
+#[cfg(unix)]
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
+    let flags = i32::try_from(flags.bits()).map_err(std::io::Error::other)?;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(flags)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "signed input must be a regular file",
+        ));
+    }
+    #[cfg(test)]
+    read_pause::wait(&metadata);
     let mut bytes = Vec::new();
-    std::fs::File::open(path)?
-        .take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
+    file.take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
         .read_to_end(&mut bytes)?;
     Ok(bytes)
+}
+
+#[cfg(not(unix))]
+pub(crate) fn read_bounded(_path: &Path) -> Result<Vec<u8>, std::io::Error> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "signed input requires nonblocking no-follow file reads",
+    ))
 }
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
@@ -454,6 +484,10 @@ fn sync_directory(_directory: &Path) -> std::io::Result<()> {
 pub(crate) fn read<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     decode(&read_bounded(path)?)
 }
+
+#[cfg(test)]
+#[path = "signed_input/file_tests.rs"]
+mod file_tests;
 
 #[cfg(test)]
 mod tests {

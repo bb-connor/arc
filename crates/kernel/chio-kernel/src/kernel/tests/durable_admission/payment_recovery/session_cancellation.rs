@@ -47,6 +47,10 @@ impl Guard for AfterPaymentGuard {
         "after-payment-host-boundary"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
     }

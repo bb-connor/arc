@@ -138,7 +138,7 @@ case "${3:-}" in
       printf '{"message":"proof verify: unexpected verifier context"}\n' >&2
       exit 1
     fi
-    printf '{"message":"proof verify: invalid settlement: public settlement independent head block hash mismatch"}\n' >&2
+    printf '{"code":"urn:chio:error:transaction:artifact-hash-mismatch","message":"proof verify: invalid settlement: public settlement independent head block hash mismatch"}\n' >&2
     exit 20
     ;;
   */family/digest-mismatch/*)
@@ -150,18 +150,35 @@ exit 2
 STUB
 chmod +x "$stub_chio"
 
-run_stub_gate() {
+run_stub_report() {
   local exit_code="$1"
-  local message="$2"
+  local report="$2"
   printf '%s\n' "$exit_code" >"$fixture_tree/stub/exit"
-  printf '{"code":"urn:chio:error:transaction:passport-hash-mismatch","message":"%s"}\n' "$message" >"$fixture_tree/stub/message"
+  printf '%s\n' "$report" >"$fixture_tree/stub/message"
   CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL=http://127.0.0.1:9 \
     PATH="$fixture_tree/bin:$PATH" CHIO_BIN="$stub_chio" \
     bash "$fixture_tree/scripts/check-chio-transaction-passport.sh" >"$fixture_tree/gate.log" 2>&1
 }
 
+run_stub_gate() {
+  local exit_code="$1"
+  local message="$2"
+  local code="${3-urn:chio:error:transaction:passport-hash-mismatch}"
+  local report
+  report="$(python3 - "$code" "$message" <<'PY'
+import json
+import sys
+print(json.dumps({"code": sys.argv[1], "message": sys.argv[2]}))
+PY
+)"
+  run_stub_report "$exit_code" "$report"
+}
+
 right_message="proof verify: evidence graph digest mismatch: expected 01, got 02"
 for rejected in \
+  "10|$right_message|requires exit 20" \
+  "30|$right_message|requires exit 20" \
+  "50|$right_message|requires exit 20" \
   "1|$right_message|exited 1" \
   "2|$right_message|exited 2" \
   "101|$right_message|exited 101" \
@@ -181,8 +198,16 @@ for rejected in \
   fi
 done
 
-for accepted in 10 20 30 50; do
-  if ! run_stub_gate "$accepted" "$right_message"; then
+for valid in \
+  "10|urn:chio:error:transaction:required-claim-missing" \
+  "20|urn:chio:error:transaction:passport-hash-mismatch" \
+  "20|CHIO-TRANSACTION-PASSPORT-HASH-MISMATCH" \
+  "30|urn:chio:error:transaction:artifact-schema-invalid" \
+  "30|urn:chio:error:attest:signed-json-invalid-input" \
+  "30|CHIO-CLI-JSON" \
+  "50|urn:chio:error:transaction:verifier-context-invalid"; do
+  IFS='|' read -r accepted code <<<"$valid"
+  if ! run_stub_gate "$accepted" "$right_message" "$code"; then
     echo "check-chio-transaction-passport.test.sh: gate refused a negative rejected with exit $accepted and the expected code" >&2
     cat "$fixture_tree/gate.log" >&2
     exit 1
@@ -192,6 +217,42 @@ for accepted in 10 20 30 50; do
     cat "$fixture_tree/gate.log" >&2
     exit 1
   fi
+done
+
+for invalid_code in \
+  "urn:chio:error:transaction:unknown" \
+  "urn:chio:error:attest:signed-json-unknown" \
+  ""; do
+  if run_stub_gate 30 "$right_message" "$invalid_code"; then
+    echo "check-chio-transaction-passport.test.sh: gate accepted unknown registry code: $invalid_code" >&2
+    exit 1
+  fi
+  grep -Fq "unknown or missing registry code" "$fixture_tree/gate.log"
+done
+
+for invalid_report in \
+  '{"message":"proof verify: evidence graph digest mismatch"}' \
+  '{"code":null,"message":"proof verify: evidence graph digest mismatch"}' \
+  '{"code":20,"message":"proof verify: evidence graph digest mismatch"}' \
+  '{"code":{},"message":"proof verify: evidence graph digest mismatch"}'; do
+  if run_stub_report 20 "$invalid_report"; then
+    echo "check-chio-transaction-passport.test.sh: gate accepted a report without a string registry code" >&2
+    exit 1
+  fi
+  grep -Fq "unknown or missing registry code" "$fixture_tree/gate.log"
+done
+
+for mismatch in \
+  "20|urn:chio:error:transaction:required-claim-missing|10" \
+  "20|urn:chio:error:transaction:artifact-schema-invalid|30" \
+  "20|urn:chio:error:transaction:verifier-context-invalid|50" \
+  "10|urn:chio:error:transaction:negative-case-mismatch|40"; do
+  IFS='|' read -r actual code expected <<<"$mismatch"
+  if run_stub_gate "$actual" "$right_message" "$code"; then
+    echo "check-chio-transaction-passport.test.sh: gate accepted exit $actual for $code" >&2
+    exit 1
+  fi
+  grep -Fq "requires exit $expected" "$fixture_tree/gate.log"
 done
 
 echo "check-chio-transaction-passport.test.sh: transaction passport gate contract passed"

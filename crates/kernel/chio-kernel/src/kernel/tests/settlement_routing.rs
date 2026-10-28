@@ -402,6 +402,7 @@ mod settlement_routing_tests {
             Some(serde_json::json!({
                 "cost_charged": 100,
                 "currency": "USD",
+                "settlement_status": "settled",
             })),
         )
     }
@@ -693,6 +694,7 @@ mod settlement_routing_tests {
         let positive = Some(serde_json::json!({
             "cost_charged": 100,
             "currency": "USD",
+            "settlement_status": "settled",
         }));
         let (accepted, accepted_calls) =
             recorded_input(HookBehavior::Accepted, positive.clone(), 10);

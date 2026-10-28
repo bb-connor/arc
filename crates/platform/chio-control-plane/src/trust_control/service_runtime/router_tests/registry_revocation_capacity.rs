@@ -14,6 +14,11 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const TOKEN: &str = "service-secret";
 
+/// The passport route refuses a revocation dated after its clock, so the
+/// passport cases run on the latest clock reading and revoke at it.
+const LATEST_CLOCK_MILLIS: u64 = u64::MAX;
+const LATEST_PASSPORT_REVOCATION: u64 = LATEST_CLOCK_MILLIS / 1_000;
+
 async fn call(
     state: &TrustServiceState,
     method: &str,
@@ -40,6 +45,9 @@ async fn call(
 fn passport_state(path: &Path) -> TrustServiceState {
     let mut state = metrics_state(TOKEN);
     state.config.passport_statuses_file = Some(path.to_path_buf());
+    state.finding_challenge_clock = Arc::new(chio_security_types::clock::FixedClock::from_millis(
+        LATEST_CLOCK_MILLIS,
+    ));
     state
 }
 
@@ -70,7 +78,7 @@ async fn passport_status_revocations_persist_at_a_full_registry() -> TestResult 
             &state,
             "POST",
             &format!("/v1/passport/statuses/{passport_id}/revoke"),
-            Some(json!({ "reason": reason, "revokedAt": u64::MAX })),
+            Some(json!({ "reason": reason, "revokedAt": LATEST_PASSPORT_REVOCATION })),
         )
         .await?;
         let stored = stored_status(&state, &format!("/v1/passport/statuses/{passport_id}")).await?;
@@ -95,7 +103,10 @@ async fn passport_status_revocation_reason_past_the_bound_is_a_client_error() ->
         &state,
         "POST",
         &format!("/v1/passport/statuses/{passport_id}/revoke"),
-        Some(json!({ "reason": "r".repeat(REASON_LIMIT + 1), "revokedAt": u64::MAX })),
+        Some(json!({
+            "reason": "r".repeat(REASON_LIMIT + 1),
+            "revokedAt": LATEST_PASSPORT_REVOCATION,
+        })),
     )
     .await?;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
@@ -198,16 +209,18 @@ async fn a_revocation_while_another_writer_holds_the_registry_is_busy_and_change
             passport_state(&passports),
             passports.clone(),
             format!("/v1/passport/statuses/{}", record.passport_id),
+            LATEST_PASSPORT_REVOCATION,
         ),
         (
             certification_state(&certifications),
             certifications.clone(),
             format!("/v1/certifications/{artifact_id}"),
+            u64::MAX,
         ),
     ];
-    for (state, path, resource) in cases {
+    for (state, path, resource, revoked_at) in cases {
         let revoke = format!("{resource}/revoke");
-        let request = json!({ "reason": "compromised", "revokedAt": u64::MAX });
+        let request = json!({ "reason": "compromised", "revokedAt": revoked_at });
         let held = crate::signed_input::lock_registry(&path).map_err(CliError::from)?;
         let before = std::fs::read(&path)?;
         let (status, body) = call(&state, "POST", &revoke, Some(request.clone())).await?;

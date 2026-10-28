@@ -1,11 +1,11 @@
 use super::*;
 
-static AGENT_WEB_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(super) static AGENT_WEB_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-struct TestEnvGuard(Vec<(&'static str, Option<std::ffi::OsString>)>);
+pub(super) struct TestEnvGuard(Vec<(&'static str, Option<std::ffi::OsString>)>);
 
 impl TestEnvGuard {
-    fn set(values: &[(&'static str, &std::ffi::OsStr)]) -> Self {
+    pub(super) fn set(values: &[(&'static str, &std::ffi::OsStr)]) -> Self {
         let mut previous = Vec::with_capacity(values.len());
         for (name, value) in values {
             previous.push((*name, std::env::var_os(name)));

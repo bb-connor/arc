@@ -1,7 +1,28 @@
-//! Durable rails retain the exact debit independently of budget exposure.
+//! Payment authorization bounds: the authority horizon and the exact durable debit.
 use super::*;
 
 impl ChioKernel {
+    pub(crate) fn payment_authority_expires_at(request: &ToolCallRequest) -> u64 {
+        request
+            .approval_token
+            .iter()
+            .chain(&request.approval_tokens)
+            .map(|token| token.expires_at)
+            .chain(
+                request
+                    .threshold_approval_proposal
+                    .iter()
+                    .map(|proposal| proposal.body.proposal_deadline),
+            )
+            .chain(request.governed_intent.iter().filter_map(|intent| {
+                intent
+                    .metered_billing
+                    .as_ref()
+                    .and_then(|metered| metered.quote.expires_at)
+            }))
+            .fold(request.capability.expires_at, u64::min)
+    }
+
     pub(super) fn durable_payment_authorized_amount(
         request: &ToolCallRequest,
         exposure_units: u64,

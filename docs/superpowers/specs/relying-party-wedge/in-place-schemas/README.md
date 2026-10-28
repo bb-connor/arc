@@ -22,6 +22,14 @@ bytes. Nothing keeps the old shape: the live file is replaced, not versioned.
 Before moving a file, re-diff it against the live file on `main`; a live change
 made after staging is carried into the staged file first.
 
+`capability/examples/` holds pinned instances for `revocation.schema.json`:
+one valid `anchor_subject` (`st1`) and one valid `tenant_tag` (`tt1`) entry,
+and the two crossed-prefix entries, which fail at `/target` on `pattern`
+(`invalid-expectations.json`). They move to
+`spec/schemas/chio-wire/v1/capability/examples/` with the schema, and the
+implementing PR runs them through the schema example check and pins the same
+four cases against the revocation decoder.
+
 | Staged file | Live path | Moved by | Changes |
 |---|---|---|---|
 | `capability/token.schema.json` | same | the anchored-root change (M1 exchange and admission) | optional signed `root_anchor` (`$ref` to `root_authority/root-anchor.schema.json`); `monetaryAmount.currency` becomes `asset` (moves with the settlement change if that lands first, see below) |
@@ -29,7 +37,7 @@ made after staging is carried into the staged file first.
 | `receipt/record.schema.json` (continued) | same | the `pdp_decision` change (M2) and the settlement change (M3) | `pdp_decision`, `prevent_external`, `delegated` enum values with their coherence rule and the required `enforcement` block; optional `settlement` block |
 | `capability/revocation.schema.json` | same | the provider revocation change (M1 item 5) | `entry_id`, closed `target_kind` (`capability_id`, `root_policy_rule`, `anchor_subject`, `tenant_tag`, `replay_key`) and `target` replace `capability_id`; reconcile with the parallel revocation-root store shape first (spec D17) |
 | `capability/grant.schema.json` | same | the settlement change (M3) | `monetaryAmount.currency` becomes `asset` with the closed `iso4217:` / `caip19:` grammar |
-| `export/evidence-export-manifest.schema.json` | `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (new live file) | the export-profile change (M1 committed receipts, caller profile M2) | full `chio.evidence_export_manifest.v1` shape from `EvidenceExportManifest`, plus `disclosureProfile`, `tenantTag` (required for `caller`) and `artifacts[]` with the closed role set |
+| `export/evidence-export-manifest.schema.json` | `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (new live file) | the export-profile change (M1 committed receipts, caller profile M2) | full `chio.evidence_export_manifest.v1` shape from `EvidenceExportManifest`, plus `disclosureProfile`, `tenantTags` (required for `caller`) and `artifacts[]` with the closed role set |
 
 `record.schema.json` collects changes from three milestones. A PR that moves
 it before the later changes land removes the members it does not implement
@@ -46,10 +54,17 @@ in the same PR.
 
 ## Choices made here that the spec leaves open
 
-- Manifest members are camelCase (`disclosureProfile`, `tenantTag`), because
+- Manifest members are camelCase (`disclosureProfile`, `tenantTags`), because
   `EvidenceExportManifest` is `#[serde(rename_all = "camelCase")]`.
-- Tags (`tenantTag`, revocation `anchor_subject` and `tenant_tag` targets) are
-  the HMAC-SHA256 output as 64 lowercase hex characters.
+- Tags are keyed index values (PROTOCOL 5.6.8). The manifest's `tenantTags`
+  holds typed values `{key_id, value}`, one per loaded generation; a revocation
+  `anchor_subject` target uses the string form `st1.<hex key_id>.<hex value>`
+  and a `tenant_tag` target uses `tt1.<hex key_id>.<hex value>`. Each target
+  kind accepts only its own prefix. The generated bindings do not enforce the
+  `if`/`then` branches that bind the prefix to the kind, so the revocation
+  decoder parses the target with `KeyedIndexValue::parse_string_form` under the
+  purpose of its `target_kind` (`SubjectTag` or `TenantTag`) and refuses the
+  other prefix.
 - A `replay_key` revocation target is the `replay_key_digest` recorded in the
   delegation context.
 - New artifact roles are listed in a separate `artifacts` array; each entry's

@@ -150,7 +150,7 @@ pub fn sign_receipt_pure(
     if signing_seed.iter().all(|byte| *byte == 0) {
         return Err(BindingError::new(
             "weak_entropy",
-            "refusing to sign: Web Crypto returned a zero-filled seed (entropy source failed)",
+            "refusing to sign: the signing seed is all zero bytes",
         ));
     }
 
@@ -193,7 +193,7 @@ pub fn sign_receipt_relaying_trusted_body_pure(
     if signing_seed.iter().all(|byte| *byte == 0) {
         return Err(BindingError::new(
             "weak_entropy",
-            "refusing to sign: Web Crypto returned a zero-filled seed (entropy source failed)",
+            "refusing to sign: the signing seed is all zero bytes",
         ));
     }
 

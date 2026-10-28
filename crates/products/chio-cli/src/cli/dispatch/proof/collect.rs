@@ -1,6 +1,10 @@
 use super::*;
 use std::{collections::BTreeSet, fs, io::Write, path::Path};
 
+#[cfg(test)]
+#[path = "collect/receipt_schema_tests.rs"]
+mod receipt_schema_tests;
+
 const PROOF_ROOM_BUNDLE_SCHEMA: &str = "chio.proof-room.bundle.v1";
 const PROOF_ROOM_VERIFIER_REPORT_SCHEMA: &str = "chio.proof-room.verifier-report.v1";
 const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str = "application/vnd.chio.proof-room.bundle.v1+json";
@@ -10,6 +14,8 @@ const PROOF_ROOM_TRUST_ROOTS_PATH: &str = "artifacts/authority/trust-roots.json"
 const PROOF_ROOM_TRUST_ROOTS_SCHEMA: &str = "chio.proof.first-run.trust-roots.v1";
 pub(super) const PROOF_COLLECT_BUNDLE_SIGNER_SEED_HEX_ENV: &str =
     "CHIO_PROOF_COLLECT_BUNDLE_SIGNER_SEED_HEX";
+const CHIO_RECEIPT_SCHEMA: &str = "chio.receipt.v1";
+const RECEIPT_EVIDENCE_SCHEMA: &str = "chio.proof-room.receipt-evidence.v1";
 const RUNTIME_TERMINAL_RECEIPT_SCHEMA: &str = "chio.runtime.terminal-receipt.v1";
 const REPORT_HASH_MISMATCH_NEGATIVE_ID: &str = "report-hash-mismatch";
 const REPORT_HASH_MISMATCH_NEGATIVE_PATH: &str = "negatives/report-hash-mismatch.json";
@@ -1029,11 +1035,19 @@ fn artifact_declares_schema(path: &Path, expected_schema: &str) -> Result<bool, 
 fn artifact_schema_from_file(path: &Path) -> Result<String, CliError> {
     let bytes = crate::input::read(path)?;
     let value: serde_json::Value = crate::input::json(&bytes)?;
-    Ok(value
+    if let Some(schema) = value
         .get("schema")
         .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_string())
+        .filter(|schema| *schema != CHIO_RECEIPT_SCHEMA)
+    {
+        return Ok(schema.to_string());
+    }
+    let is_receipt = crate::input::json::<chio_core::receipt::body::ChioReceipt>(&bytes).is_ok();
+    Ok(if is_receipt {
+        CHIO_RECEIPT_SCHEMA.to_string()
+    } else {
+        String::new()
+    })
 }
 
 fn artifact(
@@ -1177,7 +1191,7 @@ fn missing_receipt_coverage_fields(receipt: &serde_json::Value) -> Vec<&'static 
 }
 
 fn is_terminal_receipt_schema(schema: &str) -> bool {
-    schema == chio_proof_room::RECEIPT_PROJECTION_SIGNATURE_SCHEMA || schema == RUNTIME_TERMINAL_RECEIPT_SCHEMA
+    schema == RECEIPT_EVIDENCE_SCHEMA || schema == RUNTIME_TERMINAL_RECEIPT_SCHEMA
 }
 
 fn receipt_category(status: &str) -> Option<&'static str> {
@@ -1211,7 +1225,7 @@ fn receipt_category_rank(category: &str) -> usize {
 }
 
 fn artifact_class_for_node(node: &CollectedEvidenceNode) -> &'static str {
-    if is_terminal_receipt_schema(&node.schema) {
+    if node.schema == CHIO_RECEIPT_SCHEMA || is_terminal_receipt_schema(&node.schema) {
         "receipt"
     } else if node.role == "verifier-policy" || node.role == "policy" {
         "transaction-policy"

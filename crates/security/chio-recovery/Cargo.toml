@@ -1,6 +1,6 @@
 [package]
 name = "chio-recovery"
-description = "Pure bounded recovery explanations for Chio, without execution authority"
+description = "Pure bounded recovery explanations and graph planning without execution authority"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,11 +11,12 @@ publish = false
 [dependencies]
 chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false }
 chio-security-types = { workspace = true }
+chio-semantic-contracts = { version = "=0.1.0", path = "../chio-semantic-contracts", default-features = false }
 serde = { version = "1", default-features = false }
 
 [features]
 default = []
-std = ["chio-core-types/std", "chio-security-types/std", "serde/std"]
+std = ["chio-core-types/std", "chio-security-types/std", "chio-semantic-contracts/std", "serde/std"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

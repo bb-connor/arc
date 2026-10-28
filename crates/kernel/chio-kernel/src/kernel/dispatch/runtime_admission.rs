@@ -112,6 +112,40 @@ impl ChioKernel {
         };
         match evaluated {
             Ok(mut decision) => {
+                if decision
+                    .metadata
+                    .as_ref()
+                    .is_some_and(|metadata| !metadata.is_object())
+                {
+                    let mut refusal = RuntimeAdmissionDecision::deny(
+                        crate::kernel::NON_OBJECT_HOOK_METADATA_REFUSAL,
+                        Some(serde_json::json!({
+                            "runtime_admission": {
+                                "hook": hook.name(),
+                                "accepted": false,
+                                "failure_code": "runtime_admission_hook_metadata_not_object"
+                            }
+                        })),
+                    );
+                    refusal.hook_release_metadata = decision.metadata;
+                    return refusal;
+                }
+                if crate::kernel::hook_metadata_names_forbidden_key(decision.metadata.as_ref()) {
+                    let hook_release_metadata = decision.metadata.clone();
+                    if let Some(metadata) = decision
+                        .metadata
+                        .as_mut()
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        metadata.retain(|name, _| crate::kernel::is_hook_metadata_key(name));
+                    }
+                    let mut refusal = RuntimeAdmissionDecision::deny(
+                        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
+                        decision.metadata,
+                    );
+                    refusal.hook_release_metadata = hook_release_metadata;
+                    return refusal;
+                }
                 if decision.allowed {
                     match decision.verified_treaty_material.take() {
                         Some(material) => {

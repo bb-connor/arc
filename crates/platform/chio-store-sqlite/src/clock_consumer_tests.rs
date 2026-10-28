@@ -133,6 +133,9 @@ fn sqlite_injected_payment_clock_denies_replay_and_capture_without_writes() -> T
             reference: "purchase-clock".to_owned(),
             governed: None,
             commerce: None,
+            x402: None,
+            authority_expires_at: None,
+            reference_is_durable: false,
         };
         let held = store.authorize(&request)?;
         let connection = rusqlite::Connection::open(&path)?;

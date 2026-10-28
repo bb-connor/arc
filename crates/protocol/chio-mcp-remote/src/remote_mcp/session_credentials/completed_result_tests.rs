@@ -32,7 +32,7 @@ fn nonce(
     receipt: &ChioReceipt,
 ) -> Result<SignedExecutionNonce, Box<dyn std::error::Error>> {
     Ok(chio_kernel::mint_execution_nonce(
-        keypair,
+        &chio_core::crypto::Ed25519Backend::new(keypair.clone()),
         NonceBinding {
             subject_id: call.subject_key.clone(),
             request_id: call.request_id.clone(),

@@ -68,10 +68,10 @@ class AnchorBatchAsyncWitnessTests(unittest.TestCase):
         self.assertIn("--advisory caller acknowledged the load-bearing runtime gate", result.stdout)
 
     def test_green_policy_outside_the_window(self) -> None:
-        self.write(LIB, source(TRUE, gap=51))
-        self.assertEqual(self.run_check().returncode, 0)
-        self.write(LIB, source(TRUE, gap=52, call_first=True))
-        self.assertEqual(self.run_check().returncode, 0)
+        for call_first in (False, True):
+            with self.subTest(call_first=call_first):
+                self.write(LIB, source(TRUE, gap=50, call_first=call_first))
+                self.assertEqual(self.run_check().returncode, 0)
 
     def test_green_async_variant_definition_and_doc_lines(self) -> None:
         self.write(
@@ -117,8 +117,10 @@ class AnchorBatchAsyncWitnessTests(unittest.TestCase):
         self.assert_flagged(self.run_check(), f"{LIB}:3")
 
     def test_red_window_boundary_is_fifty_lines(self) -> None:
-        self.write(LIB, source(TRUE, gap=48))
-        self.assert_flagged(self.run_check(), f"{LIB}:51")
+        for call_first, call_line in ((False, 52), (True, 2)):
+            with self.subTest(call_first=call_first):
+                self.write(LIB, source(TRUE, gap=49, call_first=call_first))
+                self.assert_flagged(self.run_check(), f"{LIB}:{call_line}")
 
     def test_red_reports_every_site_and_prints_hint(self) -> None:
         self.write(LIB, source(TRUE))

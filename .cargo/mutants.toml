@@ -176,7 +176,6 @@ exclude_globs = [
     # rationale: platform clocks, RNG adapters, and formal harnesses are covered
     # by dedicated deterministic and verification lanes, not mutation scoring.
     "crates/kernel/chio-kernel-core/src/clock.rs", # rationale: excluded helper or verification surface.
-    "crates/kernel/chio-kernel-core/src/rng.rs", # rationale: excluded helper or verification surface.
     "crates/kernel/chio-kernel-core/src/formal_aeneas.rs", # rationale: excluded helper or verification surface.
     "crates/kernel/chio-kernel-core/src/formal_core.rs", # rationale: excluded helper or verification surface.
     "crates/kernel/chio-kernel-core/src/kani_harnesses.rs", # rationale: excluded helper or verification surface.

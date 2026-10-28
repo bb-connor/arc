@@ -10,7 +10,7 @@
 use std::future::Future;
 use std::thread;
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 pub mod external;
 
@@ -139,6 +139,10 @@ impl<E: ExternalGuard> Guard for ScopedAsyncGuard<E> {
         self.adapter.name()
     }
 
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        self.adapter.evidence_declaration()
+    }
+
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         // By design: a tool-scoped guard returns Allow for traffic outside
         // its scope. The deny-by-default contract is enforced by the
@@ -224,6 +228,10 @@ mod tests {
             "allow-external"
         }
 
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
+
         fn cache_key(&self, _ctx: &GuardCallContext) -> Option<String> {
             None
         }
@@ -239,6 +247,10 @@ mod tests {
     impl ExternalGuard for DenyExternalGuard {
         fn name(&self) -> &str {
             "deny-external"
+        }
+
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
         }
 
         fn cache_key(&self, _ctx: &GuardCallContext) -> Option<String> {
@@ -258,6 +270,10 @@ mod tests {
     impl ExternalGuard for CountingExternalGuard {
         fn name(&self) -> &str {
             "counting-external"
+        }
+
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
         }
 
         fn cache_key(&self, _ctx: &GuardCallContext) -> Option<String> {

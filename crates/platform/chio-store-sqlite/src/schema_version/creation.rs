@@ -37,11 +37,12 @@ fn inspect_declared(
     connection: &Connection,
     namespaces: &BTreeSet<String>,
 ) -> Result<SchemaState, SchemaVersionError> {
-    let app_id: i32 = connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-    let empty: bool = connection.query_row(
-        "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema)",
+    // One statement reads both values from one snapshot, so a concurrent
+    // creator's commit is seen whole or not at all.
+    let (app_id, empty): (i32, bool) = connection.query_row(
+        "SELECT application_id, NOT EXISTS(SELECT 1 FROM sqlite_schema) FROM pragma_application_id()",
         [],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
     if app_id == 0 && empty {
         return Ok(SchemaState::Empty);
@@ -202,6 +203,65 @@ fn validate_namespaces(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_application_id_shadow_refused_without_mutation(
+        shadow_sql: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(METADATA_SCHEMA)?;
+        connection.execute(
+            "INSERT INTO chio_store_schema_versions VALUES ('receipt', 1)",
+            [],
+        )?;
+        connection.execute_batch(shadow_sql)?;
+        connection.pragma_update(None, "query_only", true)?;
+        let catalog_sql = "SELECT group_concat(sql, char(10)) FROM (SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name)";
+        let before_catalog: String = connection.query_row(catalog_sql, [], |row| row.get(0))?;
+        let before_changes = connection.total_changes();
+        let actual_id: i32 =
+            connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
+        assert_eq!(actual_id, 0);
+        match inspect_schema(&connection, &["receipt"]) {
+            Err(SchemaVersionError::Sqlite(rusqlite::Error::SqliteFailure(
+                code,
+                Some(message),
+            ))) => {
+                assert_eq!(code.code, rusqlite::ErrorCode::Unknown);
+                assert_eq!(code.extended_code, 1);
+                assert_eq!(message, "'pragma_application_id' is not a function");
+            }
+            result => panic!("shadowed application_id must refuse: {result:?}"),
+        }
+        assert_eq!(connection.total_changes(), before_changes);
+        let after_catalog: String = connection.query_row(catalog_sql, [], |row| row.get(0))?;
+        assert_eq!(after_catalog, before_catalog);
+        let actual_id: i32 =
+            connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
+        assert_eq!(actual_id, 0);
+        let shadow_id: i32 = connection.query_row(
+            "SELECT application_id FROM pragma_application_id",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(shadow_id, CHIO_SQLITE_APPLICATION_ID);
+        Ok(())
+    }
+
+    #[test]
+    fn inspection_refuses_application_id_shadow_table_without_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        assert_application_id_shadow_refused_without_mutation(&format!(
+            "CREATE TABLE pragma_application_id(application_id INTEGER); INSERT INTO pragma_application_id VALUES ({CHIO_SQLITE_APPLICATION_ID});"
+        ))
+    }
+
+    #[test]
+    fn inspection_refuses_application_id_shadow_view_without_mutation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        assert_application_id_shadow_refused_without_mutation(&format!(
+            "CREATE VIEW pragma_application_id AS SELECT {CHIO_SQLITE_APPLICATION_ID} AS application_id;"
+        ))
+    }
 
     #[test]
     fn inspection_works_on_query_only_connections() -> Result<(), Box<dyn std::error::Error>> {

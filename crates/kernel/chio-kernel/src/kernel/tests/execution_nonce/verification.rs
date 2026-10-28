@@ -36,7 +36,13 @@ fn stale_nonce_is_rejected_after_ttl() {
         parameter_hash: "h".into(),
     };
     let now = 1_000_000;
-    let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+    let signed = mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    )
+    .unwrap();
 
     let err = verify_execution_nonce(
         &signed,
@@ -118,7 +124,13 @@ fn tampered_signature_is_rejected() {
         parameter_hash: "h".into(),
     };
     let now = 1_000_000;
-    let mut signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+    let mut signed = mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    )
+    .unwrap();
     // Mutate a signed field after signing. Caller also mutates the
     // expected binding so the code path reaches signature verify.
     signed.nonce.bound_to.tool_name = "write_file".to_string();
@@ -543,7 +555,7 @@ fn strict_nonce_mode_denies_dispatch_with_stale_nonce() {
         i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX) - cfg.nonce_ttl_secs as i64 - 1;
     request.execution_nonce = Some(
         mint_execution_nonce(
-            &kernel.config.keypair,
+            kernel.signing_authority.backend.as_ref(),
             binding_for_request(&cap, &request),
             &cfg,
             stale_issued_at,
@@ -573,8 +585,15 @@ fn strict_nonce_mode_denies_dispatch_with_mismatched_binding() {
     let mut wrong_binding = binding_for_request(&cap, &request);
     wrong_binding.tool_name = "write_file".to_string();
     let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-    request.execution_nonce =
-        Some(mint_execution_nonce(&kernel.config.keypair, wrong_binding, &cfg, now).unwrap());
+    request.execution_nonce = Some(
+        mint_execution_nonce(
+            kernel.signing_authority.backend.as_ref(),
+            wrong_binding,
+            &cfg,
+            now,
+        )
+        .unwrap(),
+    );
 
     let err = block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false))
         .unwrap_err();
@@ -658,7 +677,13 @@ fn kernel_ttl_enforces_30s_default() {
         parameter_hash: "h".into(),
     };
     let now = 1_000_000;
-    let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+    let signed = mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    )
+    .unwrap();
     // exactly on the boundary -> rejected (strict < check).
     let err =
         verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 30, &store).unwrap_err();

@@ -316,13 +316,12 @@ fn validate_event_authority_receipt(
             event.authority_receipt_ref
         )));
     }
-    if !receipt.action.verify_hash().map_err(|error| {
-        CommerceOrderError::ReplayFailed(format!(
-            "authority receipt action hash invalid: {}: {error}",
-            event.authority_receipt_ref
-        ))
-    })? {
-        return Err(CommerceOrderError::ReplayFailed(format!(
+    if !receipt
+        .action
+        .verify_hash()
+        .map_err(|error| action_hash_encoding_error(&event.authority_receipt_ref, error))?
+    {
+        return Err(CommerceOrderError::ReplayDigestMismatch(format!(
             "authority receipt action hash invalid: {}",
             event.authority_receipt_ref
         )));
@@ -594,4 +593,13 @@ fn is_allowed_transition(prior_state: &str, next_state: &str, transition: &str) 
             | ("settlement_reconciled", "failed_closed", "fail_closed")
             | ("disputed", "failed_closed", "fail_closed")
     )
+}
+
+pub(super) fn action_hash_encoding_error(
+    receipt_ref: &str,
+    error: chio_core_types::error::Error,
+) -> CommerceOrderError {
+    CommerceOrderError::ReplayFailed(format!(
+        "authority receipt action hash invalid: {receipt_ref}: {error}"
+    ))
 }

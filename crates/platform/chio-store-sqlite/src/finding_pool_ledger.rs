@@ -45,74 +45,7 @@ use qualification::{
     prepare_database_identity, refuse_unauthored_receipt_outbox, verify_rollback_anchor,
     AnchoredLedgerTransaction, FindingPoolDomainLease, QualifiedDatabaseIdentity,
 };
-use schema::{
-    ensure_column, ensure_lifecycle_columns, ensure_outbox_delivery_claim_columns,
-    ensure_query_indexes,
-};
-
-const SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS finding_pool_ledger_metadata (
-    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    ledger_domain TEXT NOT NULL,
-    receipt_sink_id TEXT,
-    receipt_authority_json TEXT,
-    ledger_store_binding_sha256 TEXT,
-    store_generation TEXT NOT NULL DEFAULT '0',
-    outbox_lease_epoch INTEGER NOT NULL DEFAULT 0,
-    trusted_time_high_water_unix_ms TEXT NOT NULL DEFAULT '0'
-) STRICT;
-
-CREATE TABLE IF NOT EXISTS finding_pool_allocations (
-    allocation_envelope_sha256 TEXT PRIMARY KEY,
-    allocation_id TEXT NOT NULL UNIQUE,
-    pool_id TEXT NOT NULL UNIQUE,
-    pool_sha256 TEXT NOT NULL,
-    purchaser_id TEXT NOT NULL,
-    purchaser_key_json TEXT NOT NULL,
-    currency TEXT NOT NULL,
-    signed_amount_units TEXT NOT NULL,
-    reserved_units TEXT NOT NULL,
-    spent_units TEXT NOT NULL,
-    expires_at_unix_ms TEXT NOT NULL
-) STRICT;
-
-CREATE TABLE IF NOT EXISTS finding_pool_debits (
-    purchase_id TEXT PRIMARY KEY,
-    tenant_id TEXT,
-    allocation_envelope_sha256 TEXT NOT NULL,
-    debit_request_binding_sha256 TEXT,
-    finding_id TEXT NOT NULL,
-    listing_id TEXT NOT NULL,
-    reservation_id TEXT NOT NULL,
-    authoritative_payment_operation_id TEXT NOT NULL,
-    accepted_bid_envelope_sha256 TEXT NOT NULL,
-    venue_admission_envelope_sha256 TEXT NOT NULL,
-    amount_units TEXT NOT NULL,
-    currency TEXT NOT NULL,
-    state TEXT NOT NULL CHECK (state IN ('reserved', 'finalized', 'released')),
-    claim_deadline_unix_ms TEXT NOT NULL,
-    claimed_at_unix_ms TEXT,
-    durable_admission_operation_id TEXT,
-    reserved_after_units TEXT NOT NULL,
-    spent_after_units TEXT NOT NULL,
-    FOREIGN KEY (allocation_envelope_sha256)
-        REFERENCES finding_pool_allocations(allocation_envelope_sha256)
-) STRICT;
-
-CREATE TABLE IF NOT EXISTS finding_pool_receipt_outbox (
-    receipt_id TEXT PRIMARY KEY,
-    purchase_id TEXT NOT NULL,
-    allocation_envelope_sha256 TEXT NOT NULL,
-    mutation_kind TEXT NOT NULL,
-    signed_receipt_json TEXT NOT NULL,
-    occurred_at_unix_ms TEXT NOT NULL,
-    acknowledged_at_unix_ms TEXT,
-    delivery_claim_owner TEXT,
-    delivery_claim_expires_at_unix_ms INTEGER,
-    delivery_claim_epoch INTEGER,
-    delivery_sequence INTEGER
-) STRICT;
-"#;
+use schema::initialize_schema;
 
 const MAX_EXPIRED_RECLAMATIONS_PER_DEBIT: usize = 64;
 
@@ -207,49 +140,7 @@ impl SqliteFindingPoolLedger {
             let mut connection = pool
                 .get()
                 .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-            connection
-                .execute_batch(SCHEMA)
-                .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "receipt_sink_id",
-                "ALTER TABLE finding_pool_ledger_metadata ADD COLUMN receipt_sink_id TEXT",
-            )?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "receipt_authority_json",
-                "ALTER TABLE finding_pool_ledger_metadata ADD COLUMN receipt_authority_json TEXT",
-            )?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "ledger_store_binding_sha256",
-                "ALTER TABLE finding_pool_ledger_metadata \
-                 ADD COLUMN ledger_store_binding_sha256 TEXT",
-            )?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "store_generation",
-                "ALTER TABLE finding_pool_ledger_metadata \
-                 ADD COLUMN store_generation TEXT NOT NULL DEFAULT '0'",
-            )?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "outbox_lease_epoch",
-                "ALTER TABLE finding_pool_ledger_metadata \
-                 ADD COLUMN outbox_lease_epoch INTEGER NOT NULL DEFAULT 0",
-            )?;
-            ensure_column(
-                &connection,
-                "finding_pool_ledger_metadata",
-                "trusted_time_high_water_unix_ms",
-                "ALTER TABLE finding_pool_ledger_metadata \
-                 ADD COLUMN trusted_time_high_water_unix_ms TEXT NOT NULL DEFAULT '0'",
-            )?;
+            initialize_schema(&mut connection)?;
             bind_ledger_domain(&connection, &ledger_domain)?;
             bind_rollback_anchor(&connection, &rollback_anchor)?;
             ledger_store_binding_sha256 = bind_ledger_store(
@@ -260,11 +151,8 @@ impl SqliteFindingPoolLedger {
                 &rollback_anchor,
             )?;
             refuse_unauthored_receipt_outbox(&connection)?;
-            ensure_lifecycle_columns(&connection)?;
-            ensure_outbox_delivery_claim_columns(&connection)?;
             outbox_lease_epoch = domain_lease
                 .initialize_outbox_lease_epoch(|| advance_outbox_lease_epoch(&connection))?;
-            ensure_query_indexes(&connection)?;
             verify_qualified_connection(&connection)?;
             connection
                 .execute_batch("BEGIN IMMEDIATE; ROLLBACK;")

@@ -16,6 +16,10 @@ pub trait Guard: Send + Sync {
     /// Human-readable guard name (e.g., "forbidden-path").
     fn name(&self) -> &str;
 
+    /// Whether the `details` of this guard's evidence may appear in a
+    /// committed receipt.
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
+
     /// Evaluate the guard against a tool call request.
     ///
     /// Returns `Ok(Verdict::Allow)` to pass, `Ok(Verdict::Deny)` to block,

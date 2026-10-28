@@ -13,6 +13,80 @@ gate = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(gate)
 
 
+class RetiredReaderPinCalibration(unittest.TestCase):
+    path = "crates/products/chio-mercury/src/commands/shared/utils.rs"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.catalog = json.loads((ROOT / gate.CATALOG).read_text())
+        cls.files = dict(gate.sources(ROOT))
+        cls.found = gate.scan(ROOT, cls.catalog)[0]
+
+    def test_bound_constant_cannot_change_without_review(self):
+        files = self.files.copy()
+        before = "const MAX_JSON_INPUT_BYTES: usize = 16 * 1024 * 1024;"
+        self.assertEqual(files[self.path].count(before), 1)
+        files[self.path] = files[self.path].replace(before, "const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024 * 1024;", 1)
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader bound constant changed: " + self.path],
+        )
+
+    def test_bound_constant_must_resolve_uniquely(self):
+        declaration = "const MAX_JSON_INPUT_BYTES: usize = 16 * 1024 * 1024;"
+        for replacement in ("", declaration + "\n" + declaration):
+            with self.subTest(replacement=replacement):
+                files = self.files.copy()
+                files[self.path] = files[self.path].replace(declaration, replacement, 1)
+                self.assertEqual(
+                    gate.retired_direct_contracts(self.catalog, self.found, files),
+                    ["retired direct-reader bound constant changed: " + self.path],
+                )
+
+    def test_bounded_reader_reference_noise_is_ignored(self):
+        files = self.files.copy()
+        files[self.path] += (
+            '\n// read_json_file_bounded\n'
+            'const READER_NOTE: &str = "read_json_file_bounded";\n'
+            '#[cfg(test)] mod reference_test {\n'
+            '    use super::read_json_file_bounded as indirect_reader;\n'
+            '}\n'
+        )
+        self.assertEqual(gate.retired_direct_contracts(self.catalog, self.found, files), [])
+
+    def test_bounded_reader_function_item_reference_requires_review(self):
+        files = self.files.copy()
+        files[self.path] += ("\nfn indirect_reader(path: &Path) { "
+                           "let reader = read_json_file_bounded::<serde_json::Value>; "
+                           "reader(path, usize::MAX); }\n")
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader signed helper changed: " + self.path],
+        )
+
+    def test_bounded_reader_module_alias_requires_review(self):
+        files = self.files.copy()
+        files[self.path] += "\nuse self::read_json_file_bounded as indirect_reader;\n"
+        self.assertEqual(
+            gate.retired_direct_contracts(self.catalog, self.found, files),
+            ["retired direct-reader signed helper changed: " + self.path],
+        )
+
+    def test_bound_catalog_pin_cannot_be_removed_or_renamed(self):
+        for field, value in (("bound_source_sha256", None), ("bound_constant", "OTHER_BOUND")):
+            with self.subTest(field=field):
+                catalog = json.loads(json.dumps(self.catalog))
+                row = catalog["retired_direct_readers"][self.path]
+                if value is None:
+                    row.pop(field)
+                else:
+                    row[field] = value
+                self.assertEqual(
+                    gate.retired_direct_contracts(catalog, self.found, self.files),
+                    ["retired direct-reader bound constant changed: " + self.path],
+                )
+
+
 class BoundaryGateCalibration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

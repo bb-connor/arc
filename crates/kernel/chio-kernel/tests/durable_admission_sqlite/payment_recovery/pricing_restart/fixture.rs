@@ -88,6 +88,10 @@ impl PaymentAdapter for TracedCapture {
             "returned capture fixture has no refund authority".into(),
         ))
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 pub(super) struct CostServer {

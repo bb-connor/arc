@@ -280,11 +280,16 @@ fn fault_case(fault: Fault) -> TestResult {
     }
     if after_effect {
         assert!(
-            matches!(
-                result,
-                Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
-            ),
-            "{result:?}"
+            match fault {
+                Fault::StopAfterOutputJoin => {
+                    matches!(result, Err(KernelError::OutputWithheld))
+                }
+                _ => matches!(
+                    result,
+                    Err(KernelError::SecurityDispatchOutcomeRecoveryRequired(_))
+                ),
+            },
+            "{fault:?}: {result:?}"
         );
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     } else {

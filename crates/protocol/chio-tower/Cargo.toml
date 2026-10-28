@@ -29,6 +29,7 @@ url = { workspace = true }
 tower = { version = "0.5", features = ["util", "timeout", "limit", "load-shed"] }
 tower-layer = "0.3"
 tower-service = "0.3"
+tokio = { workspace = true }
 http = "1"
 http-body = "1"
 http-body-util = "0.1"

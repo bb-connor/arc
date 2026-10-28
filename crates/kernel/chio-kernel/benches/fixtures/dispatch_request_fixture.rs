@@ -15,9 +15,9 @@ use chio_core::receipt::{
 use chio_core::session::{OperationContext, RequestId, SessionId};
 use chio_kernel::{
     capability_matches_request, BudgetStore, ChioKernel, Guard, GuardContext, GuardDecision,
-    InMemoryBudgetStore, InMemoryRevocationStore, KernelConfig, KernelError, NestedFlowBridge,
-    ReceiptLog, RevocationStore, Session, ToolCallRequest, ToolServerConnection, Verdict,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    GuardEvidenceDeclaration, InMemoryBudgetStore, InMemoryRevocationStore, KernelConfig,
+    KernelError, NestedFlowBridge, ReceiptLog, RevocationStore, Session, ToolCallRequest,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_test_support::prelude::*;
@@ -518,6 +518,10 @@ impl BenchGuard {
 impl Guard for BenchGuard {
     fn name(&self) -> &str {
         self.name
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

@@ -46,6 +46,10 @@ impl Guard for ParkingGuard {
         "cleanup-fault-ownership-gate"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         self.entered.notify_one();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);

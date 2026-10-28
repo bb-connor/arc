@@ -4,6 +4,7 @@ use std::io::Read;
 use std::net::{IpAddr, Ipv6Addr};
 use std::path::Path;
 
+use chio_core::crypto::PublicKey;
 use chio_core::web3::trust_profile::Web3FinalityMode;
 use chio_egress_contract::HttpEgressContract;
 use reqwest::Url;
@@ -228,6 +229,55 @@ pub struct SettlementChainConfig {
     #[serde(default)]
     pub evidence_substrate: SettlementEvidenceConfig,
     pub policy: SettlementPolicyConfig,
+    pub kernel_authority: SettlementKernelAuthority,
+}
+
+/// Kernel keys whose signed receipts may authorize an escrow release.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "SettlementKernelAuthorityFields")]
+pub struct SettlementKernelAuthority {
+    pub trusted_keys: Vec<PublicKey>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettlementKernelAuthorityFields {
+    trusted_keys: Vec<PublicKey>,
+}
+
+impl TryFrom<SettlementKernelAuthorityFields> for SettlementKernelAuthority {
+    type Error = SettlementError;
+
+    fn try_from(fields: SettlementKernelAuthorityFields) -> Result<Self, Self::Error> {
+        let authority = Self {
+            trusted_keys: fields.trusted_keys,
+        };
+        authority.validate()?;
+        Ok(authority)
+    }
+}
+
+impl SettlementKernelAuthority {
+    pub fn validate(&self) -> Result<(), SettlementError> {
+        if self.trusted_keys.is_empty() {
+            return Err(SettlementError::invalid_input(
+                "settlement config kernel_authority.trusted_keys must name at least one kernel key",
+            ));
+        }
+        for (index, key) in self.trusted_keys.iter().enumerate() {
+            if self.trusted_keys[..index].contains(key) {
+                return Err(SettlementError::invalid_input(
+                    "settlement config kernel_authority.trusted_keys must not repeat a kernel key",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn trusts(&self, key: &PublicKey) -> bool {
+        self.trusted_keys.contains(key)
+    }
 }
 
 impl SettlementChainConfig {
@@ -265,6 +315,7 @@ impl SettlementChainConfig {
         self.oracle.validate()?;
         self.evidence_substrate.validate()?;
         self.policy.validate()?;
+        self.kernel_authority.validate()?;
         self.validate_rpc_egress_contract()?;
         Ok(())
     }
@@ -431,7 +482,11 @@ impl LocalDevnetDeployment {
             .map_err(Into::into)
     }
 
-    pub fn into_chain_config(self) -> Result<SettlementChainConfig, SettlementError> {
+    pub fn into_chain_config(
+        self,
+        kernel_authority: SettlementKernelAuthority,
+    ) -> Result<SettlementChainConfig, SettlementError> {
+        kernel_authority.validate()?;
         let egress_contract = settlement_devnet_rpc_egress_contract(&self.rpc_url)?;
         Ok(SettlementChainConfig {
             chain_id: self.chain_id,
@@ -451,6 +506,7 @@ impl LocalDevnetDeployment {
             },
             evidence_substrate: SettlementEvidenceConfig::default(),
             policy: SettlementPolicyConfig::default(),
+            kernel_authority,
         })
     }
 }
@@ -459,7 +515,38 @@ impl LocalDevnetDeployment {
 mod tests {
     use super::*;
 
+    use chio_core::crypto::Keypair;
     use chio_test_support::prelude::*;
+
+    fn sample_kernel_authority() -> SettlementKernelAuthority {
+        SettlementKernelAuthority {
+            trusted_keys: vec![Keypair::from_seed(&[7u8; 32]).public_key()],
+        }
+    }
+
+    fn sample_deployment() -> LocalDevnetDeployment {
+        LocalDevnetDeployment {
+            manifest_id: "chio.web3-deployment.local-devnet.v1".to_string(),
+            network_name: "ganache-devnet".to_string(),
+            chain_id: "eip155:31337".to_string(),
+            rpc_url: "http://127.0.0.1:8545".to_string(),
+            deployed_at: "2026-04-02T00:00:00Z".to_string(),
+            operator_address: "0x5000000000000000000000000000000000000001".to_string(),
+            operator_epoch: 1,
+            delegate_address: "0x5000000000000000000000000000000000000002".to_string(),
+            settlement_token_symbol: "USDC".to_string(),
+            settlement_token_address: "0x6000000000000000000000000000000000000001".to_string(),
+            contracts: DevnetContracts {
+                identity_registry: "0x1000000000000000000000000000000000000001".to_string(),
+                root_registry: "0x1000000000000000000000000000000000000002".to_string(),
+                escrow: "0x1000000000000000000000000000000000000003".to_string(),
+                bond_vault: "0x1000000000000000000000000000000000000004".to_string(),
+                price_resolver: "0x1000000000000000000000000000000000000005".to_string(),
+            },
+            mocks: None,
+            accounts: None,
+        }
+    }
 
     fn sample_chain_config() -> SettlementChainConfig {
         SettlementChainConfig {
@@ -478,7 +565,86 @@ mod tests {
             oracle: SettlementOracleConfig::default(),
             evidence_substrate: SettlementEvidenceConfig::default(),
             policy: SettlementPolicyConfig::default(),
+            kernel_authority: sample_kernel_authority(),
         }
+    }
+
+    const EMPTY_KERNEL_AUTHORITY: &str =
+        "invalid input: settlement config kernel_authority.trusted_keys must name at least one kernel key";
+
+    #[test]
+    fn chain_config_refuses_empty_kernel_authority() {
+        let mut config = sample_chain_config();
+        config.kernel_authority.trusted_keys.clear();
+
+        let error = config.validate().test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_duplicate_kernel_keys() {
+        let mut config = sample_chain_config();
+        let key = config.kernel_authority.trusted_keys[0].clone();
+        config.kernel_authority.trusted_keys.push(key);
+
+        let error = config.validate().test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid input: settlement config kernel_authority.trusted_keys must not repeat a kernel key"
+        );
+    }
+
+    #[test]
+    fn chain_config_refuses_empty_kernel_authority_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        value["kernel_authority"]["trusted_keys"] = serde_json::json!([]);
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_unknown_kernel_authority_field_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        value["kernel_authority"]["fallback"] = serde_json::json!(true);
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "unknown field `fallback`, expected `trusted_keys`"
+        );
+    }
+
+    #[test]
+    fn chain_config_round_trips_kernel_authority() {
+        let config = sample_chain_config();
+        let value = serde_json::to_value(&config).test_unwrap();
+
+        let parsed = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap();
+        assert_eq!(parsed, config);
+    }
+
+    #[test]
+    fn local_devnet_refuses_empty_kernel_authority_at_load() {
+        let error = sample_deployment()
+            .into_chain_config(SettlementKernelAuthority {
+                trusted_keys: Vec::new(),
+            })
+            .test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_absent_kernel_authority_at_load() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        let removed = value
+            .as_object_mut()
+            .test_expect("chain config serializes as an object")
+            .remove("kernel_authority");
+        assert!(removed.is_some());
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(error.to_string(), "missing field `kernel_authority`");
     }
 
     #[test]
@@ -513,29 +679,10 @@ mod tests {
 
     #[test]
     fn local_devnet_maps_price_resolver_as_reference_contract() {
-        let deployment = LocalDevnetDeployment {
-            manifest_id: "chio.web3-deployment.local-devnet.v1".to_string(),
-            network_name: "ganache-devnet".to_string(),
-            chain_id: "eip155:31337".to_string(),
-            rpc_url: "http://127.0.0.1:8545".to_string(),
-            deployed_at: "2026-04-02T00:00:00Z".to_string(),
-            operator_address: "0x5000000000000000000000000000000000000001".to_string(),
-            operator_epoch: 1,
-            delegate_address: "0x5000000000000000000000000000000000000002".to_string(),
-            settlement_token_symbol: "USDC".to_string(),
-            settlement_token_address: "0x6000000000000000000000000000000000000001".to_string(),
-            contracts: DevnetContracts {
-                identity_registry: "0x1000000000000000000000000000000000000001".to_string(),
-                root_registry: "0x1000000000000000000000000000000000000002".to_string(),
-                escrow: "0x1000000000000000000000000000000000000003".to_string(),
-                bond_vault: "0x1000000000000000000000000000000000000004".to_string(),
-                price_resolver: "0x1000000000000000000000000000000000000005".to_string(),
-            },
-            mocks: None,
-            accounts: None,
-        };
-
-        let config = deployment.into_chain_config().test_unwrap();
+        let config = sample_deployment()
+            .into_chain_config(sample_kernel_authority())
+            .test_unwrap();
+        assert_eq!(config.kernel_authority, sample_kernel_authority());
         assert_eq!(
             config.oracle.authority,
             SettlementOracleAuthority::ChioLinkReceiptEvidence

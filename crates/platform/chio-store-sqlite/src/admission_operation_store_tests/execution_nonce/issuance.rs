@@ -231,7 +231,7 @@ fn durable_nonce_issuance_cannot_be_replaced_even_after_expiry() -> TestResult {
     fixture.reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &fixture.operation,
         &fixture.original,
-        &fixture.key,
+        &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
         &ExecutionNonceConfig::default(),
         now_ms(),
     )?;
@@ -331,7 +331,7 @@ fn durable_nonce_issuance_generic_cas_cannot_forge_evidence() -> TestResult {
 fn durable_nonce_issuance_rejects_legacy_profiles_and_wrong_issuers() -> TestResult {
     let mut fixture = prepared_nonce_fixture(None)?;
     let signed = mint_execution_nonce(
-        &fixture.key,
+        &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
         fixture.reservation.signed_nonce().nonce.bound_to.clone(),
         &ExecutionNonceConfig::default(),
         i64::try_from(now_ms() / 1_000)?,
@@ -359,7 +359,7 @@ fn durable_nonce_issuance_rejects_legacy_profiles_and_wrong_issuers() -> TestRes
     fixture.reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &fixture.operation,
         &fixture.original,
-        &Keypair::generate(),
+        &chio_core::crypto::Ed25519Backend::generate(),
         &ExecutionNonceConfig::default(),
         now_ms(),
     )?;
@@ -438,7 +438,7 @@ fn durable_nonce_issuance_reservation_requires_the_exact_retained_artifact() -> 
     fixture.reservation = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &fixture.operation,
         &fixture.original,
-        &fixture.key,
+        &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
         &ExecutionNonceConfig::default(),
         now_ms(),
     )?;

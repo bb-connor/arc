@@ -12,10 +12,10 @@ use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
 use chio_cross_protocol::routing::{plan_authoritative_route, route_selection_metadata};
 use chio_kernel::{
     ApprovalStore, ChioKernel, ExecutionNonceConfig, ExecutionNonceStore, Guard, GuardContext,
-    GuardDecision, InMemoryApprovalStore, KernelConfig, KernelError, ReceiptStore, RevocationStore,
-    SignedExecutionNonce, ToolCallRequest, ToolCallResponse, ToolServerConnection,
-    Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    GuardDecision, GuardEvidenceDeclaration, InMemoryApprovalStore, KernelConfig, KernelError,
+    ReceiptStore, RevocationStore, SignedExecutionNonce, ToolCallRequest, ToolCallResponse,
+    ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -236,6 +236,10 @@ struct HttpProjectionGuard;
 impl Guard for HttpProjectionGuard {
     fn name(&self) -> &str {
         "http_projection_policy"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

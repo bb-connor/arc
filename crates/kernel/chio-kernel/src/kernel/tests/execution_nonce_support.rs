@@ -41,7 +41,7 @@ pub(super) fn mint_nonce_for_request(
 ) -> crate::execution_nonce::SignedExecutionNonce {
     let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
     mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding_for_request(cap, request),
         cfg,
         now,

@@ -682,6 +682,108 @@ pub const MANIFEST_RESOURCE_ROOT_DENIED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-manifest", "chio-kernel"],
 };
 
+pub const KERNEL_STOP_BAD_REQUEST: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:stop-bad-request",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Invalid stop request.",
+    help: "Provide a nonempty stop reason of at most 1024 bytes without control characters.",
+    string_code: "CHIO-KERNEL-STOP-BAD-REQUEST",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-kernel",
+        "chio-cli",
+        "chio-control-plane",
+        "chio-mcp-remote",
+        "chio-api-protect",
+    ],
+};
+
+pub const KERNEL_STOP_NOT_DURABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:stop-not-durable",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Stop holds in this process but could not be made durable.",
+    help: "Keep the process stopped and inspect operator diagnostics before retrying the durable stop.",
+    string_code: "CHIO-KERNEL-STOP-NOT-DURABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-cli", "chio-control-plane", "chio-mcp-remote", "chio-api-protect"],
+};
+
+pub const KERNEL_STOP_HEAD_MOVED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:stop-head-moved",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Stop head moved.",
+    help: "Read the current stop status and confirm its epoch before attempting resume.",
+    string_code: "CHIO-KERNEL-STOP-HEAD-MOVED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-kernel",
+        "chio-cli",
+        "chio-control-plane",
+        "chio-mcp-remote",
+        "chio-api-protect",
+    ],
+};
+
+pub const KERNEL_STOP_NOT_READY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:stop-not-ready",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Stop control is not ready.",
+    help: "Keep access denied and restore verified stop authority before retrying.",
+    string_code: "CHIO-KERNEL-STOP-NOT-READY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-kernel",
+        "chio-cli",
+        "chio-control-plane",
+        "chio-mcp-remote",
+        "chio-api-protect",
+    ],
+};
+
+pub const KERNEL_RESUME_REFUSED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:resume-refused",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Resume was refused.",
+    help: "Inspect operator diagnostics and verified stop status before retrying resume.",
+    string_code: "CHIO-KERNEL-RESUME-REFUSED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &[
+        "chio-kernel",
+        "chio-cli",
+        "chio-control-plane",
+        "chio-mcp-remote",
+        "chio-api-protect",
+    ],
+};
+
+pub const KERNEL_OUTPUT_WITHHELD: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:output-withheld",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Durable output is retained while the kernel is stopped.",
+    help: "After resume, retry the retained request with the same identity.",
+    string_code: "CHIO-KERNEL-OUTPUT-WITHHELD",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-process", "chio-control-plane"],
+};
+
 pub const KERNEL_INTERNAL_ERROR: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:internal-error",
     domain: Domain::Kernel,
@@ -3938,6 +4040,12 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     MANIFEST_SIGNATURE_INVALID,
     MANIFEST_TOOL_NOT_REGISTERED,
     MANIFEST_RESOURCE_ROOT_DENIED,
+    KERNEL_STOP_BAD_REQUEST,
+    KERNEL_STOP_NOT_DURABLE,
+    KERNEL_STOP_HEAD_MOVED,
+    KERNEL_STOP_NOT_READY,
+    KERNEL_RESUME_REFUSED,
+    KERNEL_OUTPUT_WITHHELD,
     KERNEL_INTERNAL_ERROR,
     KERNEL_RUNTIME_ADMISSION_READINESS_TIMEOUT,
     KERNEL_SESSION_NOT_INITIALIZED,

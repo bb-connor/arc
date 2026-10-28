@@ -10,6 +10,10 @@ impl Guard for AttemptRecordingGuard {
         self.name
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         let identity = context.invocation_attempt_id().ok_or_else(|| {
             KernelError::GuardDenied("kernel guard attempt is missing".to_owned())

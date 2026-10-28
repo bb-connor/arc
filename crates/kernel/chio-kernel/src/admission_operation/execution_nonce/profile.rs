@@ -6,7 +6,7 @@ use crate::execution_nonce::{
     validate_execution_nonce_binding_and_expiry, ExecutionNonce, ExecutionNonceConfig,
 };
 use chio_core::canonical::CanonicalBytes;
-use chio_core::crypto::{verify_wrapped_bytes, Keypair};
+use chio_core::crypto::{verify_wrapped_bytes, SigningBackend};
 
 /// Nonce profile reserved for the operation-owned admission authority.
 pub const OPERATION_EXECUTION_NONCE_SCHEMA: &str = "chio.operation_execution_nonce.v1";
@@ -41,7 +41,7 @@ impl AdmissionExecutionNonceReservationV1 {
     pub fn mint_for_operation(
         operation: &AdmissionOperationV1,
         original: &RetainedToolAdmissionRequestV1,
-        issuer: &Keypair,
+        issuer: &dyn SigningBackend,
         config: &ExecutionNonceConfig,
         now_unix_ms: u64,
     ) -> Result<Self, AdmissionOperationStoreError> {
@@ -75,17 +75,18 @@ impl AdmissionExecutionNonceReservationV1 {
             reserving_request_id: None,
         };
         let body = signing_body(operation.binding().operation_id(), &nonce)?;
+        let outcome = issuer
+            .sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)
+            .map_err(invalid)?;
         let signed = SignedExecutionNonce {
             nonce,
-            signature: issuer
-                .sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)
-                .map_err(invalid)?,
+            signature: outcome.signature,
         };
         Self::verify(
             operation,
             original,
             &signed,
-            &issuer.public_key(),
+            &outcome.public_key,
             now_unix_ms,
         )
     }
@@ -149,6 +150,7 @@ pub fn verify_operation_execution_nonce_at(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_core::crypto::Keypair;
 
     #[test]
     fn historical_nonce_requires_original_operation_request_key_and_time(

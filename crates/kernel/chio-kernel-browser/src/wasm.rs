@@ -8,7 +8,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use chio_core_types::capability::{features::CapabilityNegotiation, token::CapabilityToken};
-use chio_kernel_core::Rng as _;
+use chio_core_types::rng::Rng as _;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -40,6 +40,16 @@ fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T,
         let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
         to_js_error(&err)
     })
+}
+
+/// Signed receipt input: repeated keys refuse and integers keep their signed domain.
+fn parse_signed_json<T: serde::de::DeserializeOwned>(label: &str, raw: &str) -> Result<T, JsValue> {
+    chio_core_types::canonical::UntrustedJsonText::new(raw)
+        .decode_signed()
+        .map_err(|error| {
+            let err = BindingError::new("invalid_json_input", format!("{label}: {error}"));
+            to_js_error(&err)
+        })
 }
 
 fn encode_result<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
@@ -110,7 +120,7 @@ pub fn evaluate(request_json: &str) -> Result<JsValue, JsValue> {
 /// [`sign_receipt_relaying_trusted_body`].
 #[wasm_bindgen]
 pub fn sign_receipt(body_json: &str, signing_seed_hex: &str) -> Result<JsValue, JsValue> {
-    let input: SignReceiptRequestJson = parse_json("sign_receipt body", body_json)?;
+    let input: SignReceiptRequestJson = parse_signed_json("sign_receipt body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt = sign_receipt_pure(input, &seed).map_err(|err| to_js_error(&err))?;
     encode_signed_receipt(&receipt)
@@ -129,7 +139,7 @@ pub fn sign_receipt_relaying_trusted_body(
     signing_seed_hex: &str,
 ) -> Result<JsValue, JsValue> {
     let input: SignReceiptRequestJson =
-        parse_json("sign_receipt_relaying_trusted_body body", body_json)?;
+        parse_signed_json("sign_receipt_relaying_trusted_body body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt =
         sign_receipt_relaying_trusted_body_pure(input, &seed).map_err(|err| to_js_error(&err))?;
@@ -219,8 +229,8 @@ fn parse_trusted_issuers_jsvalue(value: &JsValue) -> Result<Vec<String>, JsValue
 }
 
 /// Mint a fresh 32-byte signing seed using the browser's Web Crypto RNG
-/// and return it as lowercase hex. Surfaces entropy-source failures as
-/// structured errors instead of silently returning a zero-filled seed.
+/// and return it as lowercase hex. An entropy-source failure is a
+/// structured error and no seed is returned.
 #[wasm_bindgen]
 pub fn mint_signing_seed_hex() -> Result<String, JsValue> {
     let rng = WebCryptoRng::try_new().map_err(|error| {
@@ -230,12 +240,11 @@ pub fn mint_signing_seed_hex() -> Result<String, JsValue> {
         ))
     })?;
     let mut seed = [0u8; 32];
-    rng.fill_bytes(&mut seed);
-    if seed.iter().all(|b| *b == 0) {
-        return Err(to_js_error(&BindingError::new(
-            "weak_entropy",
-            "Web Crypto returned a zero-filled seed; refusing to use it",
-        )));
-    }
+    rng.fill_bytes(&mut seed).map_err(|error| {
+        to_js_error(&BindingError::new(
+            "entropy_unavailable",
+            format!("{error}"),
+        ))
+    })?;
     Ok(hex_encode_lower(&seed))
 }

@@ -139,10 +139,16 @@ pub mod revocation_runtime;
 #[cfg(not(loom))]
 pub mod revocation_store;
 #[cfg(not(loom))]
+pub mod rng;
+#[cfg(not(loom))]
 pub mod runtime;
 #[cfg(not(loom))]
 mod runtime_trace;
 pub mod session;
+#[cfg(not(loom))]
+mod settlement_ledger;
+#[cfg(not(loom))]
+pub use settlement_ledger::KernelSettlementLedgerHook;
 #[cfg(not(loom))]
 mod settlement_routing;
 #[cfg(not(loom))]
@@ -564,7 +570,9 @@ pub use payment::{
     PaymentJournalState, PaymentJournalTransition, PaymentRailMode, PaymentReleaseAuthorityBinding,
     PaymentReleaseAuthorityKind, PaymentResult, PaymentSettleAction,
     PreDispatchPaymentUnwindEvidence, PreDispatchPaymentUnwindStatus, RailSettlementState,
-    RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
+    RailSettlementStatus, ReceiptSettlement, X402Eip3009Authorization, X402ExactEvmPayload,
+    X402Network, X402PaymentAdapter, X402PaymentContext, X402PaymentPayload,
+    X402PaymentRequirements, X402RailConfig, X402Refusal, X402SettlementRef,
 };
 #[cfg(not(loom))]
 pub use post_invocation::{
@@ -654,17 +662,19 @@ mod kernel;
 #[cfg(not(loom))]
 pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 
+pub use chio_core::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+
 #[cfg(not(loom))]
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
     active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
-    bind_active_response_dispatch_id_to_artifact, derive_active_response_dispatch_id,
-    prepare_response_dispatch, AcquiredNativeSecurityEgress, ActiveResponseAdmissionRequest,
-    ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
+    derive_active_response_dispatch_id, prepare_response_dispatch, AcquiredNativeSecurityEgress,
+    ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
+    ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
     ActiveResponseArtifactAuthorityAttestationInput, ActiveResponseAuthorizationRequest,
-    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseEffectEvidence,
-    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
+    ActiveResponseCommittedDispatch, ActiveResponseDispatchIdError, ActiveResponseDispatchIdInput,
+    ActiveResponseEffectEvidence, ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
     ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
     ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
@@ -716,6 +726,8 @@ pub use kernel::NativeSecurityDispatchCaptureAuthority;
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
+#[cfg(not(loom))]
+pub use kernel::SettlementDrainReport;
 #[cfg(not(loom))]
 pub use kernel::VerifiedNativeDispatchCredentials;
 #[cfg(all(not(loom), feature = "admission-test-support"))]

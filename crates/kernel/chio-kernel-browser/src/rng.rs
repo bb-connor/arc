@@ -1,20 +1,13 @@
 //! Web Crypto RNG adapter.
 //!
 //! Wraps `crypto.getRandomValues()` so the portable
-//! [`chio_kernel_core::Rng`] trait can source CSPRNG-quality entropy
-//! inside a browser. Used by the signing path to build a fresh Ed25519
-//! seed per `sign_receipt` call when the caller does not already have a
-//! long-lived kernel key, and to mint receipt identifiers.
+//! [`chio_core_types::rng::Rng`] trait can source CSPRNG-quality entropy
+//! inside a browser. Used to mint receipt signing seeds.
 //!
-//! The adapter fails closed: if the runtime has no `globalThis.crypto`
-//! global (e.g. a wasm32 host that does not provide the Web Crypto API), the
-//! [`WebCryptoRng::try_new`] constructor returns
-//! [`WebCryptoRngError::Unavailable`]. The kernel-core `Rng` trait's
-//! `fill_bytes` has no error channel, so once the adapter is constructed
-//! a later `fill_bytes` call that fails for any reason falls back to
-//! zeroing the destination buffer; callers that depend on entropy (such
-//! as the receipt-signing path in this crate) detect a zero-filled
-//! seed up-front and refuse to sign with structured error.
+//! The adapter fails closed: [`WebCryptoRng::try_new`] returns
+//! [`WebCryptoRngError::Unavailable`] when the runtime has no
+//! `globalThis.crypto.getRandomValues`, and a failed `getRandomValues` call
+//! returns [`RngError`] from `fill_bytes`.
 
 #[cfg(target_arch = "wasm32")]
 use alloc::string::{String, ToString};
@@ -22,12 +15,11 @@ use alloc::string::{String, ToString};
 #[cfg(not(target_arch = "wasm32"))]
 use std::string::{String, ToString};
 
-use chio_kernel_core::Rng;
+use chio_core_types::rng::{Rng, RngError};
 
 /// Errors that can occur while probing for the browser's Web Crypto
 /// subsystem. These are surfaced at adapter construction time so the
-/// wasm entry points can reject work early rather than signing with a
-/// silently-zeroed seed.
+/// wasm entry points can reject work early.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WebCryptoRngError {
     /// The host environment does not expose `globalThis.crypto` with a
@@ -47,8 +39,20 @@ impl core::fmt::Display for WebCryptoRngError {
 }
 
 /// Web Crypto `getRandomValues` quota per call, in bytes.
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", test))]
 const MAX_GET_RANDOM_VALUES_BYTES: usize = 65_536;
+
+/// Fills `dest` in quota-sized chunks; the first failing chunk fails the whole fill.
+#[cfg(any(target_arch = "wasm32", test))]
+fn fill_in_quota_chunks<E>(
+    dest: &mut [u8],
+    mut fill_chunk: impl FnMut(&mut [u8]) -> Result<(), E>,
+) -> Result<(), RngError> {
+    for chunk in dest.chunks_mut(MAX_GET_RANDOM_VALUES_BYTES) {
+        fill_chunk(chunk).map_err(|_| RngError("Web Crypto getRandomValues failed"))?;
+    }
+    Ok(())
+}
 
 /// CSPRNG adapter backed by `globalThis.crypto.getRandomValues(...)`.
 ///
@@ -90,26 +94,20 @@ impl WebCryptoRng {
 
 #[cfg(target_arch = "wasm32")]
 impl Rng for WebCryptoRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        // Web Crypto rejects a request larger than 65 536 bytes, so the
-        // buffer is filled in chunks of at most that size. On any failure the
-        // whole buffer is zeroed; the Rng trait has no error channel and
-        // signing-path callers refuse an all-zero seed.
-        for chunk in dest.chunks_mut(MAX_GET_RANDOM_VALUES_BYTES) {
-            if self.crypto.get_random_values_with_u8_array(chunk).is_err() {
-                dest.fill(0);
-                return;
-            }
-        }
+    fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        fill_in_quota_chunks(dest, |chunk| {
+            self.crypto
+                .get_random_values_with_u8_array(chunk)
+                .map(|_| ())
+        })
     }
 }
 
 /// Host-target stub so the crate still compiles on native targets and
 /// `cargo test -p chio-kernel-browser` can run without the wasm
-/// toolchain. Native callers should not rely on this for entropy: the
-/// adapter always errors out at construction, and the wasm bindings
-/// that reach for it are themselves gated on `cfg(target_arch =
-/// "wasm32")`.
+/// toolchain. The adapter always errors out at construction, and the
+/// wasm bindings that reach for it are themselves gated on
+/// `cfg(target_arch = "wasm32")`.
 #[cfg(not(target_arch = "wasm32"))]
 pub struct WebCryptoRng;
 
@@ -126,9 +124,56 @@ impl WebCryptoRng {
 
 #[cfg(not(target_arch = "wasm32"))]
 impl Rng for WebCryptoRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        for byte in dest.iter_mut() {
-            *byte = 0;
-        }
+    fn fill_bytes(&self, _dest: &mut [u8]) -> Result<(), RngError> {
+        Err(RngError("Web Crypto is unavailable on native targets"))
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::{fill_in_quota_chunks, MAX_GET_RANDOM_VALUES_BYTES};
+    use chio_core_types::rng::RngError;
+
+    #[test]
+    fn fill_failure_returns_error() {
+        let mut dest = std::vec![0xaa_u8; MAX_GET_RANDOM_VALUES_BYTES * 2 + 1];
+        let mut calls = 0usize;
+        let result = fill_in_quota_chunks(&mut dest, |chunk| {
+            calls += 1;
+            if calls == 2 {
+                return Err(());
+            }
+            chunk.fill(0x11);
+            Ok(())
+        });
+        assert_eq!(result, Err(RngError("Web Crypto getRandomValues failed")));
+        assert_eq!(calls, 2, "the fill stops at the first failing chunk");
+    }
+
+    #[test]
+    fn fill_splits_at_the_web_crypto_quota() {
+        let mut dest = std::vec![0u8; MAX_GET_RANDOM_VALUES_BYTES * 2 + 1];
+        let mut lengths = std::vec::Vec::new();
+        let result = fill_in_quota_chunks(&mut dest, |chunk| {
+            lengths.push(chunk.len());
+            chunk.fill(0x11);
+            Ok::<(), ()>(())
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            lengths,
+            [MAX_GET_RANDOM_VALUES_BYTES, MAX_GET_RANDOM_VALUES_BYTES, 1]
+        );
+        assert!(dest.iter().all(|byte| *byte == 0x11));
+    }
+
+    #[test]
+    fn native_stub_refuses_to_fill() {
+        use chio_core_types::rng::Rng;
+        let mut dest = [0u8; 8];
+        assert_eq!(
+            super::WebCryptoRng.fill_bytes(&mut dest),
+            Err(RngError("Web Crypto is unavailable on native targets"))
+        );
     }
 }

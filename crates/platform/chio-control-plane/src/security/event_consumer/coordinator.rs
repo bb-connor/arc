@@ -135,7 +135,7 @@ pub(super) fn synthetic_prepared_dispatch_binding(
         authorization_capability_hash: response_plan.operator_capability.capability_digest,
         governed_intent_hash: Digest32::new([94_u8; 32]),
         policy_decision_hash: Digest32::new([95_u8; 32]),
-        admission_artifact_fingerprint: Some(Digest32::new([96_u8; 32])),
+        admission_artifact_fingerprint: Digest32::new([96_u8; 32]),
         approval,
     };
     binding

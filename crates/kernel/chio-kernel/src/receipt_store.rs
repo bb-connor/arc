@@ -333,6 +333,8 @@ pub struct AuthorizationReceiptConsumption {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
+    #[error("durable output is withheld while the kernel is stopped")]
+    OutputWithheld,
     #[error(transparent)]
     Schema(#[from] chio_security_types::schema::SchemaRefusal),
     #[error(transparent)]
@@ -512,6 +514,27 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         Err(ReceiptStoreError::Unsupported(
             "atomic settlement observation projection".to_string(),
+        ))
+    }
+    /// Whether this store implements `record_settlement_reconciliation`. The
+    /// kernel settlement ledger installs only on a store that reports `true`.
+    fn supports_settlement_reconciliation(&self) -> bool {
+        false
+    }
+    /// Record the settlement reconciliation of a stored receipt through the
+    /// serving writer unless a row already exists for it. The write never
+    /// touches receipt rows or receipt bytes, and an existing row (including
+    /// one an operator set) is left unchanged. `note` carries the rail payment
+    /// reference. Returns whether this call created the row; a receipt that is
+    /// not stored is `NotFound`.
+    fn record_settlement_reconciliation(
+        &self,
+        _receipt_id: &str,
+        _state: crate::operator_report::SettlementReconciliationState,
+        _note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "settlement reconciliation".to_string(),
         ))
     }
     /// Load a chio receipt by id. The provided default returns `None`; a store
@@ -1421,6 +1444,9 @@ fn claimed_authorization_error(
     match error {
         Store::Unavailable(detail) => AdmissionBudgetAuthorizationError::Unavailable(detail),
         Store::Fenced => AdmissionBudgetAuthorizationError::Fenced,
+        Store::KernelStopped => AdmissionBudgetAuthorizationError::Invariant(
+            "stopped admission cannot acquire a budget authorization claim".into(),
+        ),
         Store::NotFound => AdmissionBudgetAuthorizationError::Invariant(
             "admission operation was not found".to_owned(),
         ),
@@ -1438,6 +1464,9 @@ fn claimed_capture_error(
     match error {
         Store::Unavailable(detail) => Capture::Unavailable(detail),
         Store::Fenced => Capture::Fenced,
+        Store::KernelStopped => {
+            Capture::Invariant("stopped admission cannot acquire a capture claim".into())
+        }
         Store::NotFound => Capture::Invariant("admission operation was not found".to_owned()),
         Store::Invariant(detail) => Capture::Invariant(detail),
         Store::OutcomeUnknown(detail) => Capture::OutcomeUnknown(detail),

@@ -344,19 +344,27 @@ impl PheromoneRelayService {
                 Some(code.to_string())
             },
         };
-        self.store.record_event_report(&report)?;
+        let store_result = self.store.record_event_report(&report);
+        let file_result = self.write_event_report_file(&report);
+        store_result.and(file_result)
+    }
+
+    fn write_event_report_file(
+        &self,
+        report: &RelayEventReport,
+    ) -> Result<(), PheromoneRelayError> {
         if let Some(report_dir) = &self.config.report_dir {
             std::fs::create_dir_all(report_dir)?;
-            let report_hash = canonical_sha256(&report)?;
+            let report_hash = canonical_sha256(report)?;
             let suffix = report_hash.chars().take(12).collect::<String>();
             let filename = format!(
                 "{}-{}-{}.json",
-                generated_at_unix_ms,
-                sanitize_event_part(event_kind),
+                report.generated_at_unix_ms,
+                sanitize_event_part(&report.event_kind),
                 suffix
             );
             let path = report_dir.join(filename);
-            let json = serde_json::to_string_pretty(&report)?;
+            let json = serde_json::to_string_pretty(report)?;
             std::fs::write(path, format!("{json}\n"))?;
         }
         Ok(())
@@ -695,13 +703,19 @@ pub(crate) fn relay_http_error(
 ) -> (StatusCode, Json<RelayOperatorReport>) {
     let now = service.request_now_unix_ms();
     let response = relay_error_response(&error);
-    let _ = service.emit_event_report(
+    if let Err(report_error) = service.emit_event_report(
         "request_rejected",
         false,
         error.code(),
         &error.to_string(),
         now,
-    );
+    ) {
+        tracing::error!(
+            error = %error,
+            report_error = %report_error,
+            "failed to persist pheromone relay event report"
+        );
+    }
     (
         response.status,
         Json(RelayOperatorReport {
@@ -760,6 +774,7 @@ fn relay_error_response(error: &PheromoneRelayError) -> RelayErrorResponse {
         | E::AlertDeliveryInvalid(_)
         | E::AlertAssuranceInvalid(_)
         | E::ArchivePackageInvalid(_)
+        | E::StoredInput(_)
         | E::CanonicalJson(_)
         | E::Sqlite(_)
         | E::Http(_)
@@ -794,9 +809,8 @@ fn runtime_error_response(error: &PheromoneRuntimeError) -> RelayErrorResponse {
         | E::WorkflowContextMismatch(_)
         | E::WorkflowVerification(_)
         | E::Json(_)
-        | E::SchemaInvalid(_)
         | E::InvalidField(_) => refused,
-        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) => RELAY_INTERNAL_ERROR,
+        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) | E::SchemaInvalid(_) => RELAY_INTERNAL_ERROR,
         E::StorePoisoned => RELAY_STORE_UNAVAILABLE,
     }
 }
@@ -998,6 +1012,9 @@ pub(crate) fn sanitize_event_part(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    mod event_reports;
+    mod local_failures;
 
     use super::{
         relay_error_response, PheromoneReceiveReport, PheromoneRuntimeError, RelayBatchReceiver,

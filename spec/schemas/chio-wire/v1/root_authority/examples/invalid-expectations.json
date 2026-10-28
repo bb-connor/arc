@@ -307,6 +307,14 @@
     "keyword": "not",
     "path": "/rules/1"
   },
+  "root-policy.projection-second-slash.json": {
+    "keyword": "pattern",
+    "path": "/rules/0/idp_scope_projection/crm.read/1"
+  },
+  "root-policy.projection-without-slash.json": {
+    "keyword": "pattern",
+    "path": "/rules/0/idp_scope_projection/crm.read/1"
+  },
   "root-policy.retain-artifact-on-entra.json": {
     "keyword": "not",
     "path": "/rules/1"

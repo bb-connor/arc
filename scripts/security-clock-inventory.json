@@ -45,7 +45,6 @@
     "crates/platform/chio-control-plane/src/issuance/tests.rs::unique_path": 1,
     "crates/platform/chio-control-plane/src/lib.rs::unique_receipt_db_path": 1,
     "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_materializes_threshold_approval_against_runtime_policy_hash": 1,
-    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": 1,
     "crates/platform/chio-control-plane/src/security/active_response/tests.rs::system_now_unix_ms": 1,
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/tests.rs::now_unix_ms": 1,
     "crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::real_adapter_now_unix_seconds": 1,
@@ -752,11 +751,6 @@
       "contract": "Shared fallible clock sampled before authority/mutation, with explicit seconds/range conversion and caller refusal on error. Budget event identities use UUID; optional lag metrics skip unavailable samples."
     },
     "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_materializes_threshold_approval_against_runtime_policy_hash": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."
-    },
-    "crates/platform/chio-control-plane/src/policy/tests.rs::load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes": {
       "occurrences": 1,
       "disposition": "fixture",
       "contract": "Test/benchmark helper for fixture freshness or path uniqueness. No production wall-clock bypass."

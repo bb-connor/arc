@@ -340,8 +340,12 @@ impl ChioKernel {
                     },
                 );
             }
-            Err(ReservedPrepaymentFailure::Denied(error)) => {
+            Err(ReservedPrepaymentFailure::Denied { error, ambiguity }) => {
                 let mut reason = error.to_string();
+                let denial_metadata = merge_metadata_objects(
+                    extra_metadata.clone(),
+                    ambiguity.map(|metadata| *metadata),
+                );
                 let credential_disposition = if governed_mustprepay {
                     match credential_reservation.commit() {
                         Ok(disposition) => disposition,
@@ -379,7 +383,7 @@ impl ChioKernel {
                                 durable_operation: durable_admission
                                     .as_ref()
                                     .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: extra_metadata.clone(),
+                                runtime_admission_metadata: denial_metadata.clone(),
                                 verified_payee_binding: verified_governed_payee_binding.as_ref(),
                                 budget_lease_acquired,
                             },

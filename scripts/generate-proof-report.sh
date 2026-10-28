@@ -734,6 +734,7 @@ tracked_paths = [
     repo / ADAPTER_SOURCE_INVENTORY,
     repo / "xtask/src/adapter_no_bypass.rs",
     repo / "xtask/src/adapter_no_bypass/constructors.rs",
+    repo / "xtask/src/adapter_no_bypass/nonce_signing.rs",
     repo / "xtask/src/adapter_no_bypass/source.rs",
     repo / "xtask/src/cli.rs",
     repo / "xtask/src/dispatch.rs",
