@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 6f62e76221fe6c3e788ec0c562d0d3e11618715ea2056f65e554ac73a6c9428e
+// Schema content SHA-256: 59ffbc7d0101f6d1ea79690009d155f09b8b472206aecdcb96f71f9fd9fa652c
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -595,6 +595,33 @@ const (
 // Defines values for ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind.
 const (
 	ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKindContainer ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind = "container"
+)
+
+// Defines values for ReceiptDecisionModelWitnessEvaluation.
+const (
+	ReceiptDecisionModelWitnessEvaluationEvaluated ReceiptDecisionModelWitnessEvaluation = "evaluated"
+	ReceiptDecisionModelWitnessEvaluationFallback  ReceiptDecisionModelWitnessEvaluation = "fallback"
+)
+
+// Defines values for ReceiptDecisionModelWitnessFallbackReason.
+const (
+	ReceiptDecisionModelWitnessFallbackReasonEmptyProposal      ReceiptDecisionModelWitnessFallbackReason = "empty_proposal"
+	ReceiptDecisionModelWitnessFallbackReasonPolicyUnavailable  ReceiptDecisionModelWitnessFallbackReason = "policy_unavailable"
+	ReceiptDecisionModelWitnessFallbackReasonProposalInfeasible ReceiptDecisionModelWitnessFallbackReason = "proposal_infeasible"
+	ReceiptDecisionModelWitnessFallbackReasonScorerError        ReceiptDecisionModelWitnessFallbackReason = "scorer_error"
+	ReceiptDecisionModelWitnessFallbackReasonWorkExhausted      ReceiptDecisionModelWitnessFallbackReason = "work_exhausted"
+)
+
+// Defines values for ReceiptDecisionModelWitnessOutcome.
+const (
+	ReceiptDecisionModelWitnessOutcomeAllow ReceiptDecisionModelWitnessOutcome = "allow"
+	ReceiptDecisionModelWitnessOutcomeDeny  ReceiptDecisionModelWitnessOutcome = "deny"
+	ReceiptDecisionModelWitnessOutcomeHold  ReceiptDecisionModelWitnessOutcome = "hold"
+)
+
+// Defines values for ReceiptDecisionModelWitnessSchema.
+const (
+	ReceiptDecisionModelWitnessSchemaChioDecisionModelWitnessV1 ReceiptDecisionModelWitnessSchema = "chio.decision-model-witness.v1"
 )
 
 // Defines values for ReceiptDeliveryContractResult.
@@ -7052,6 +7079,32 @@ type ReceiptAdmissionMetadataStoreFence struct {
 	OwnerEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"owner_epoch"`
 	StoreUuid  ReceiptAdmissionMetadataIdentifier           `json:"store_uuid"`
 }
+
+// ReceiptDecisionModelWitness defines model for ReceiptDecisionModelWitness.
+type ReceiptDecisionModelWitness struct {
+	ArtifactDigest  ReceiptDecisionModelWitnessDigest          `json:"artifact_digest"`
+	Evaluation      ReceiptDecisionModelWitnessEvaluation      `json:"evaluation"`
+	FallbackReason  *ReceiptDecisionModelWitnessFallbackReason `json:"fallback_reason,omitempty"`
+	ModelCardDigest ReceiptDecisionModelWitnessDigest          `json:"model_card_digest"`
+	Outcome         ReceiptDecisionModelWitnessOutcome         `json:"outcome"`
+	Schema          ReceiptDecisionModelWitnessSchema          `json:"schema"`
+	WorkOps         int64                                      `json:"work_ops"`
+}
+
+// ReceiptDecisionModelWitnessEvaluation defines model for ReceiptDecisionModelWitness.Evaluation.
+type ReceiptDecisionModelWitnessEvaluation string
+
+// ReceiptDecisionModelWitnessFallbackReason defines model for ReceiptDecisionModelWitness.FallbackReason.
+type ReceiptDecisionModelWitnessFallbackReason string
+
+// ReceiptDecisionModelWitnessOutcome defines model for ReceiptDecisionModelWitness.Outcome.
+type ReceiptDecisionModelWitnessOutcome string
+
+// ReceiptDecisionModelWitnessSchema defines model for ReceiptDecisionModelWitness.Schema.
+type ReceiptDecisionModelWitnessSchema string
+
+// ReceiptDecisionModelWitnessDigest defines model for ReceiptDecisionModelWitnessDigest.
+type ReceiptDecisionModelWitnessDigest = string
 
 // ReceiptDeliveryContract defines model for ReceiptDeliveryContract.
 type ReceiptDeliveryContract struct {

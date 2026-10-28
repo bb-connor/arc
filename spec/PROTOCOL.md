@@ -1576,6 +1576,7 @@ unsupported schema versions fail closed.
 | `finding_recovery` | Chio signer | committed-safe | `chio.finding.recovery.v1` | Finding-recovery binding: recovery and finding ids, the original capability and delivery receipt ids and the purchase key. Read by the kernel's terminal and recovery-gate paths. |
 | `finding_purchase_replay_snapshot` | Chio signer | committed-safe |  | Admission-verified purchase binding and status proof frozen for terminal replay. Read by the kernel's purchase gate and replay paths. |
 | `finding_recovery_replay_snapshot` | Chio signer | committed-safe |  | Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths. |
+| `decision_model_witness` | Chio signer | committed-safe | `chio.decision-model-witness.v1` | Decision-model witness: model card and artifact digests, outcome (the verdict class), evaluated-or-fallback tag, closed fallback reason and the model-constant work count. No argument, result, atom or rule selection, or margin. Read by the kernel's replay path and the offline verifier. |
 | `findingDenial` | Chio signer | unsafe |  | Finding-market denial family code. No production reader. |
 | `stream` | Chio signer | unsafe |  | Streamed-output chunk counts and byte totals. chunk_hashes are unsalted SHA-256 digests of each output chunk. |
 | `threshold_approval` | Chio signer | committed-safe |  | Threshold approval proposal id and hash, deadline and state for a pending call. The CLI response verifier reads the state. |
@@ -2722,6 +2723,51 @@ non-revocation claim.
 The finding family registers `chio.finding.v1`, the eighteen signed
 artifacts above, the five unsigned carriers, and the open-market penalty
 envelope at this stage.
+
+### 6.4.8 Decision Model Witness
+
+A tool call judged by a pinned decision model carries a
+`decision_model_witness` block whose schema is
+`chio.decision-model-witness.v1`. Like the delivery block it carries no
+signature of its own and is authenticated by the enclosing receipt.
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `schema` | `chio.decision-model-witness.v1` | Pinned schema identifier. |
+| `model_card_digest` | 64 lowercase hex | Digest of the pinned model card. |
+| `artifact_digest` | 64 lowercase hex | Digest of the pinned model artifact. |
+| `outcome` | `allow`, `hold`, `deny` | The decision-model guard's own outcome. A later guard can deny a call this guard allowed, so `outcome` need not equal the receipt verdict. |
+| `evaluation` | `evaluated`, `fallback` | Whether the model evaluated the call or the guard fell back to deny. |
+| `fallback_reason` | `empty_proposal`, `proposal_infeasible`, `scorer_error`, `work_exhausted`, `policy_unavailable` | Present exactly when `evaluation` is `fallback`. |
+| `work_ops` | integer, 0 to 4294967295 | Work charged: the pinned artifact's op count when evaluated, 0 on fallback. |
+
+The evaluation contract is closed. With `evaluation = evaluated`,
+`fallback_reason` is absent, `work_ops` equals the op count of the pinned
+artifact, and `outcome` is any of `allow`, `hold` or `deny`. With
+`evaluation = fallback`, `fallback_reason` is present, `outcome` is `deny`,
+`work_ops` is 0, and no selection commitment is written. Every other
+combination is malformed and fails closed.
+
+The block is a function of the tuple (`model_card_digest`, `artifact_digest`,
+`outcome`, `evaluation`, `fallback_reason`) and the artifact's fixed op count.
+It carries no argument, result, atom bitmap, per-atom margin, or fired or
+unknown rule set. Those argument-derived selections are reserved for one
+metadata commitment under `salt_ref = "metadata.decision_model.selection"`,
+whose opening carries `atoms_pos_hex`, `atoms_neg_hex`, `rules_fired_hex`,
+`rules_unknown_hex` and `min_margin_q16`; no selection data is written until
+that commitment is defined. A decision-model deny carries the fixed evidence
+text `action=deny; reason=decision-model` and no rule id.
+
+A verifier holding the artifact and the opened selection commitment recomputes
+the fired and unknown rule sets and `outcome`, and checks that an evaluated
+`deny` has a fired deny rule, an evaluated `hold` has a fired hold rule or an
+unknown deny or hold rule, and an evaluated `allow` has neither. A verifier
+without the opening checks the digests, the shape, `work_ops` against the
+artifact and the committed-field half of the contract only. The
+machine-readable contract is registered at
+`spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json`;
+unknown fields, a non-pinned schema, non-hex digests and malformed evaluation
+combinations fail closed.
 
 ### 6.5 Checkpoints
 

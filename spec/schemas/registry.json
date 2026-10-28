@@ -144,6 +144,12 @@
       "schemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json"
     },
     {
+      "schema": "chio.decision-model-witness.v1",
+      "artifactKind": "decision_model_witness",
+      "introducedBy": "decision-model-witness-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
+    },
+    {
       "schema": "chio.delivery-contract.v1",
       "artifactKind": "delivery_contract",
       "introducedBy": "delivery-contract-v1",

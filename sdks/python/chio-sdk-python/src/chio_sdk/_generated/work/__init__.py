@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
+# Schema sha256: 06789f7cc8fb9ed55f9aba55aadcbf4ec7c60d519627433209cdf916fda34f0d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from .join_inputs_schema import ArtifactVersionRef, OpaqueId, Parent, RecoveryDigest32, RecoveryDigest32Item, Scope, WorkDigest, WorkId, WorkJoinInputsV1
 from .request_schema import Action, Action2, Action3, Action4, Action5, Action6, Action7, Body, Body7, Body8, CatalogCursor, CatalogRef, Command, CommandRef, Commitment, DelegationRecord, DraftRef, FundingRef, GraphRecord, Handle, NewWorkItem, OpaqueId, PolicyGeneration, Preparation, PreparationRef, ProfileRef, Proposal, Proposal1, Proposal2, Proposal3, Proposal4, Proposal5, Query, Query1, Query2, Query3, Query4, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Terms, Terms1, WorkDigest, WorkId, WorkRequestV1, WorkSlotId
-from .response_schema import Acceptance, Acceptance1, Acceptance2, Acceptance3, Acceptance4, Artifact, Artifact1, Artifact2, Artifact3, Artifact4, Artifact5, ArtifactVersionRef, BilateralDelivery, BilateralDelivery1, BilateralDelivery2, BilateralDelivery3, BindingField, Body, Body11, Body12, CatalogCursor, CatalogPage, CatalogRef, CommandRef, CommandResult, Condition, Control, Decision, DelegationRecord, DraftRef, Effect, Enforcement, Execution, Execution1, Execution2, Execution3, Handle, OpaqueId, Operation, Outcome, Outcome11, Outcome9, OwnerOperationRef, PolicyGeneration, PreparationRef, Prepared, Prepared1, Prepared2, Prepared3, Profile, ProfileRef, Recovery, Recovery1, Recovery2, Recovery3, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryLink, RecoveryOperation, RefusalCode, Rejection, RejectionCode, Release, Release10, Release12, Release13, Release14, Release15, Result, Result10, Result11, Result12, Result13, Result14, Result2, Result3, Result4, Result5, Result6, Result8, Result9, ResultReference, ResultReference1, ResultReference2, ResultReference3, SafeInteger, Scope, Settlement, Settlement1, Settlement2, Settlement3, State, Value, Value1, Value2, View, WorkDigest, WorkId, WorkResponseV1, WorkSlotId
+from .response_schema import Acceptance, Acceptance1, Acceptance2, Acceptance3, Acceptance4, Artifact, Artifact1, Artifact2, Artifact3, Artifact4, Artifact5, ArtifactVersionRef, BilateralDelivery, BilateralDelivery1, BilateralDelivery2, BilateralDelivery3, BindingField, Body, Body11, Body12, CatalogCursor, CatalogPage, CatalogRef, CommandRef, CommandResult, Condition, Control, Decision, DelegationRecord, DraftRef, Effect, Enforcement, Execution, Execution1, Execution2, Execution3, Handle, OpaqueId, Operation, Outcome, Outcome10, Outcome12, OwnerOperationRef, PolicyGeneration, PreparationRef, Prepared, Prepared1, Prepared2, Prepared3, Profile, ProfileRef, Recovery, Recovery1, Recovery2, Recovery3, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryLink, RecoveryOperation, RefusalCode, Rejection, RejectionCode, Release, Release10, Release12, Release13, Release14, Release15, Result, Result10, Result11, Result12, Result13, Result14, Result2, Result3, Result4, Result5, Result6, Result8, Result9, ResultReference, ResultReference1, ResultReference2, ResultReference3, SafeInteger, Scope, Settlement, Settlement1, Settlement2, Settlement3, State, Value, Value1, Value2, View, WorkDigest, WorkId, WorkResponseV1, WorkSlotId
 
 __all__ = [
     "Acceptance",
@@ -69,8 +69,8 @@ __all__ = [
     "OpaqueId",
     "Operation",
     "Outcome",
-    "Outcome11",
-    "Outcome9",
+    "Outcome10",
+    "Outcome12",
     "OwnerOperationRef",
     "Parent",
     "PolicyGeneration",

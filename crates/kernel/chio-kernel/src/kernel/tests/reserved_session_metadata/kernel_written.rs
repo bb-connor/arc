@@ -163,6 +163,14 @@ fn caller_cannot_set_finding_recovery_replay_snapshot() {
 }
 
 #[test]
+fn caller_cannot_set_decision_model_witness() {
+    assert_refused_on_every_caller_path(
+        "decision_model_witness",
+        "decision_model_witness is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
 fn caller_cannot_set_finding_denial() {
     assert_refused_on_every_caller_path(
         "findingDenial",
@@ -383,6 +391,7 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "finding_recovery",
             "finding_purchase_replay_snapshot",
             "finding_recovery_replay_snapshot",
+            "decision_model_witness",
             "findingDenial",
             "stream",
             "threshold_approval",

@@ -95,7 +95,7 @@ projection. See `capability/README.md`.
 | `capability/token.schema.json`                         |   627 |
 | `capability/verified-approval-set.schema.json`         |    44 |
 
-### receipt (6)
+### receipt (7)
 
 Signed receipts produced after tool calls complete, plus lineage and
 inclusion-proof shapes. See `receipt/README.md`.
@@ -103,6 +103,7 @@ inclusion-proof shapes. See `receipt/README.md`.
 | File                                           | Lines |
 |------------------------------------------------|-------|
 | `receipt/admission-metadata.schema.json`       |   153 |
+| `receipt/decision-model-witness.schema.json`   |    77 |
 | `receipt/delivery-contract.schema.json`        |    30 |
 | `receipt/finding-delivery.schema.json`         |    64 |
 | `receipt/inclusion-proof.schema.json`          |    30 |

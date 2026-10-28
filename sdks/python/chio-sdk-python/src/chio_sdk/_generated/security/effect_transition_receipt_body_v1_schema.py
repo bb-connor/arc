@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
+# Schema sha256: 06789f7cc8fb9ed55f9aba55aadcbf4ec7c60d519627433209cdf916fda34f0d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -33,14 +33,14 @@ class Kind(Enum):
     freeze_issuance = "freeze_issuance"
 
 
-class Outcome1(BaseModel):
+class Outcome2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     state: Literal["requested"]
 
 
-class Outcome4(BaseModel):
+class Outcome5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -99,7 +99,7 @@ class Effect(BaseModel):
     observed_base_version_hash: response_state_transition_receipt_body_v1_schema.Digest
 
 
-class Outcome2(BaseModel):
+class Outcome3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -107,7 +107,7 @@ class Outcome2(BaseModel):
     resulting_version_hash: response_state_transition_receipt_body_v1_schema.Digest
 
 
-class Outcome3(BaseModel):
+class Outcome4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -115,7 +115,7 @@ class Outcome3(BaseModel):
     error_code: response_state_transition_receipt_body_v1_schema.Identifier
 
 
-class Outcome5(BaseModel):
+class Outcome6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -123,7 +123,7 @@ class Outcome5(BaseModel):
     resulting_version_hash: response_state_transition_receipt_body_v1_schema.Digest
 
 
-class Outcome6(BaseModel):
+class Outcome7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -132,9 +132,9 @@ class Outcome6(BaseModel):
 
 
 class Outcome(
-    RootModel[Outcome1 | Outcome2 | Outcome3 | Outcome4 | Outcome5 | Outcome6]
+    RootModel[Outcome2 | Outcome3 | Outcome4 | Outcome5 | Outcome6 | Outcome7]
 ):
-    root: Outcome1 | Outcome2 | Outcome3 | Outcome4 | Outcome5 | Outcome6
+    root: Outcome2 | Outcome3 | Outcome4 | Outcome5 | Outcome6 | Outcome7
 
 
 class ChioEffectTransitionReceiptBodyV1(BaseModel):

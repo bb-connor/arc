@@ -2793,6 +2793,7 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -6661,6 +6662,7 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -6714,6 +6716,10 @@
       "from::custom_deserialize",
       "validate::custom_deserialize",
       "validate::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": [
+      "deserialize::from_value",
+      "from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/wire_text.rs": [
       "schema::custom_deserialize"
@@ -7799,7 +7805,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 1111
+          "instances": 1112
         }
       ]
     },
@@ -8101,6 +8107,24 @@
           ],
           "checked": true,
           "instances": 3
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The decision-model witness Deserialize reads through strict_serde::lossless: repeated keys are refused and the decoded value must reserialize to the exact input, so a null fallback_reason or an unknown member is refused. validate() then enforces the pinned schema, the digest shape and the evaluation contract. Decoding grants no authority; the block is authenticated by the enclosing receipt.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value",
+            "serde::Deserializer"
+          ],
+          "checked": true
         }
       ]
     },

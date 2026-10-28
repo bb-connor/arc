@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
+# Schema sha256: 06789f7cc8fb9ed55f9aba55aadcbf4ec7c60d519627433209cdf916fda34f0d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -59,7 +59,7 @@ from .declassification_consumption_receipt_body_v1_schema import ChioDeclassific
 from .declassification_grant_schema import Algorithm, Body, Body2, Digest32, Digest32Item, FlowIdentifier, SignedDeclassificationGrant, TargetLabel
 from .declassification_outcome_receipt_body_v1_schema import ChioDeclassificationOutcomeReceiptBodyV1, ToState
 from .detector_health_receipt_body_v1_schema import ChioDetectorHealthReceiptBodyV1, Digest, DigestItem, GroupBinding, GroupBinding1, GroupBinding2, Header, HealthKind, Identifier, Policy, Time, Watermark, Watermark1, Watermark2, Watermark3
-from .effect_transition_receipt_body_v1_schema import ChioEffectTransitionReceiptBodyV1, Effect, Header, JsonSafePositiveInteger, Kind, Outcome, Outcome1, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, Target, Target1, Target2, Target3, Target4
+from .effect_transition_receipt_body_v1_schema import ChioEffectTransitionReceiptBodyV1, Effect, Header, JsonSafePositiveInteger, Kind, Outcome, Outcome2, Outcome3, Outcome4, Outcome5, Outcome6, Outcome7, Target, Target1, Target2, Target3, Target4
 from .flow_denial_receipt_body_v1_schema import ChioFlowDenialReceiptBodyV1, Digest, DigestItem, Header, Identifier, Policy, Time
 from .information_label_schema import FlowIdentifier, InformationLabel, InformationLabel1, InformationLabel2
 from .key_log_activation_commit_body_v1_schema import ChioKeyLogActivationCommitBodyV1, Hash, KeyLogIdentifier
@@ -356,12 +356,12 @@ __all__ = [
     "OperatorCeilings",
     "Options",
     "Outcome",
-    "Outcome1",
     "Outcome2",
     "Outcome3",
     "Outcome4",
     "Outcome5",
     "Outcome6",
+    "Outcome7",
     "PathIdentity",
     "PayloadItem",
     "Policy",

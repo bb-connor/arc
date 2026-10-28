@@ -1355,6 +1355,11 @@ files = ["crates/core/chio-core-types/src/capability/cumulative_approval.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.decision-model-witness.v1"
+files = ["crates/core/chio-core-types/src/receipt/metadata/decision_model.rs"]
+first_seen = "5deaa69e24"
+
+[[schema]]
 value = "chio.decoy-private-envelope.v1"
 files = ["crates/security/chio-decoy/src/registry.rs"]
 first_seen = "6ea79bb5da"

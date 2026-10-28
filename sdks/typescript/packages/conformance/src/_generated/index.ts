@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 329d18f55294f487a412967e8a87723e0138b8d7a362ea7f38c29b545dcd07e1
+// Schema SHA: 7d0932abf0341c1df9fef32e6cae6a9749b509f783e23a15ab10501b0e3a5457
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -3343,6 +3343,23 @@ export namespace Receipt_AdmissionMetadata {
       };
     };
   }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json
+export namespace Receipt_DecisionModelWitness {
+  export type ChioDecisionModelWitnessReceiptMetadata = {
+    [k: string]: unknown;
+  } & {
+    schema: "chio.decision-model-witness.v1";
+    model_card_digest: Digest;
+    artifact_digest: Digest;
+    outcome: "allow" | "hold" | "deny";
+    evaluation: "evaluated" | "fallback";
+    fallback_reason?: "empty_proposal" | "proposal_infeasible" | "scorer_error" | "work_exhausted" | "policy_unavailable";
+    work_ops: number;
+  };
+  export type Digest = string;
 }
 
 // -----------------------------------------------------------------------------

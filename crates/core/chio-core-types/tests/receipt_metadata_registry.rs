@@ -59,6 +59,10 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
         Registered(ChioInternal, CommittedSafe),
     ),
     (
+        "decision_model_witness",
+        Registered(ChioInternal, CommittedSafe),
+    ),
+    (
         "finding_recovery_replay_snapshot",
         Registered(ChioInternal, CommittedSafe),
     ),
