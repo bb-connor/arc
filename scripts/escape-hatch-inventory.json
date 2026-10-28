@@ -103,6 +103,7 @@
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::start_observed_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_entry_after_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_lineage_through_for_test": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_paused_extension_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs::await_waits_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs::retry_requested_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::reader_connection_for_test": 1,
