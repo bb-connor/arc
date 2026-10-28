@@ -717,7 +717,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 
 | # | Owner | Question | Default in this plan |
 |---|---|---|---|
-| O1 | owner (Connor) | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | PR D2 implements whichever is chosen; it does not open until the decision is recorded. Nothing else waits on O1 |
+| O1 | owner (Connor) | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | Decided by director ruling 2026-10-28 under delegated owner authority: option 2, fail-closed. A trust service without lifecycle state (keyring-backed or seed-file-backed) is refused as a remote exchange signer at config load with the typed refusal `trust-control exchange signer requires lifecycle state`. The option 1 work is not done. The edge's local `seed-file:` exchange signer (D1) is unaffected |
 | O2 | owner (Connor) | Decision 1: `serve-http` has no remote store and refuses `--control-url` | proposed (Root-2 endorses it technically); item 5's Q4 refusal stays until PR E lands the rule and both amendments atomically |
 | O6 | owner (Connor) | Sign off the spec amendment (2.4 trust-control row, the last 8.3 refusal, 10.5 `factory.rs`, 10.8 signer flags) | separate docs PR; gates PR D2 and PR E |
 
