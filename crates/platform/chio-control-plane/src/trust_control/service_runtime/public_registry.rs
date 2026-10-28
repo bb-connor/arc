@@ -206,3 +206,7 @@ fn public_certification_get_json_with_query<Q: Serialize, T: for<'de> Deserializ
         ))
     })
 }
+
+#[cfg(test)]
+#[path = "public_registry_tests.rs"]
+mod tests;

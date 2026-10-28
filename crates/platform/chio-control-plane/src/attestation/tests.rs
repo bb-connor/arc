@@ -1630,3 +1630,75 @@ fn jwt_original_tokens_are_bounded_unambiguous_and_keep_signed_preimage(
     assert_eq!(cause.code(), "urn:chio:error:attest:signed-json-too-large");
     Ok(())
 }
+
+fn watch_for_dials() -> (u16, thread::JoinHandle<bool>) {
+    let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+    listener.set_nonblocking(true).test_unwrap();
+    let port = listener.local_addr().test_unwrap().port();
+    let dials = thread::spawn(move || {
+        for _ in 0..200 {
+            if listener.accept().is_ok() {
+                return true;
+            }
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        false
+    });
+    (port, dials)
+}
+
+fn issuer_fetch_failure(fetcher: usize, url: &str) -> (String, String) {
+    match fetcher {
+        0 => match fetch_azure_maa_openid_metadata(url) {
+            Err(AzureMaaVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Azure metadata outcome: {:?}", other.err()),
+        },
+        1 => match fetch_azure_maa_jwks(url) {
+            Err(AzureMaaVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Azure JWKS outcome: {:?}", other.err()),
+        },
+        2 => match fetch_google_confidential_vm_openid_metadata(url) {
+            Err(GoogleConfidentialVmVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Google metadata outcome: {:?}", other.err()),
+        },
+        _ => match fetch_google_confidential_vm_jwks(url) {
+            Err(GoogleConfidentialVmVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Google JWKS outcome: {:?}", other.err()),
+        },
+    }
+}
+
+#[test]
+fn attestation_issuer_fetchers_refuse_private_and_plaintext_targets_before_dialing() {
+    for fetcher in 0..4 {
+        let (port, dials) = watch_for_dials();
+        let private = format!("https://0.0.0.0:{port}/issuer");
+        let plaintext = format!("http://127.0.0.1:{port}/issuer");
+        let private_failure = issuer_fetch_failure(fetcher, &private);
+        let plaintext_failure = issuer_fetch_failure(fetcher, &plaintext);
+        assert!(
+            !dials.join().test_unwrap(),
+            "fetcher {fetcher} dialed a refused issuer target"
+        );
+        assert_eq!(
+            private_failure,
+            (
+                private.clone(),
+                chio_egress_contract::HttpEgressError::PrivateNetworkDenied {
+                    host: "0.0.0.0".to_owned()
+                }
+                .to_string()
+            )
+        );
+        assert_eq!(
+            plaintext_failure,
+            (
+                plaintext.clone(),
+                chio_egress_contract::HttpEgressError::SchemeDenied {
+                    scheme: "http".to_owned()
+                }
+                .to_string()
+            )
+        );
+    }
+}
