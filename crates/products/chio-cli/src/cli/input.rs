@@ -86,6 +86,21 @@ pub(crate) fn read_regular(path: &Path, bound: usize) -> Result<Vec<u8>, std::io
 pub(crate) fn open_regular(path: &Path) -> Result<std::fs::File, std::io::Error> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
+    open_regular_options(path, options)
+}
+
+#[cfg(unix)]
+pub(crate) fn create_new_regular(path: &Path) -> Result<std::fs::File, std::io::Error> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true).mode(0o600);
+    open_regular_options(path, options)
+}
+
+fn open_regular_options(
+    path: &Path,
+    mut options: std::fs::OpenOptions,
+) -> Result<std::fs::File, std::io::Error> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
