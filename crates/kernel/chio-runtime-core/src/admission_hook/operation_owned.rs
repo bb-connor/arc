@@ -32,7 +32,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         let bundle_digest = self.core.bundle_digest.clone();
         self.hook
             .store
-            .verify_operation_owned_replay_source(authority.source_snapshot())
+            .verify_operation_owned_runtime_source(authority.source_qualification())
             .map_err(runtime_error)?;
         let report = self
             .core
@@ -88,7 +88,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             KernelError::DurableAdmission("native runtime source is not configured".into())
         })?;
         if intent.runtime_authority_id() != binding.runtime_authority_id()
-            || intent.expectation_id() != binding.expectation_id()
+            || intent.qualification_id() != binding.qualification_id()
             || intent.phase() != RuntimeParticipantPhase::Dispatch
             || intent.plan_digest().as_str()
                 != self.operation_owned_plan_digest(
@@ -202,7 +202,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             &self.verified_swarm_request_binding,
             &self.hook.swarm_witness_keys,
             binding.runtime_authority_id(),
-            binding.expectation_id(),
+            binding.qualification_id(),
             request_binding_hash,
             grant_index,
             phase,

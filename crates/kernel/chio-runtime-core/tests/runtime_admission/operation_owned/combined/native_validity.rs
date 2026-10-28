@@ -6,7 +6,7 @@ use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeDispatchValidity, RuntimeParticipantClaimIntentV1,
 };
-use chio_kernel::admission_operation::{AdmissionOperationStore, RuntimeReplaySourceSnapshotV1};
+use chio_kernel::admission_operation::{AdmissionOperationStore, RuntimeSourceQualificationV1};
 use chio_kernel::{KernelError, RuntimeAdmissionDecision, RuntimeParticipantClaimAuthority};
 
 type Hook = ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>;
@@ -124,7 +124,7 @@ impl RuntimeAdmissionHook for SharedHook {
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &RuntimeAdmissionRevalidationContext<'_>,
-        source: &RuntimeReplaySourceSnapshotV1,
+        source: &RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         self.0
             .revalidate_operation_owned_before_dispatch(context, source)
@@ -148,7 +148,7 @@ fn revalidation_input<'a>(
 fn physical_input(
     fixture: &Fixture,
 ) -> TestResult<(
-    RuntimeReplaySourceSnapshotV1,
+    RuntimeSourceQualificationV1,
     RuntimeParticipantClaimIntentV1,
 )> {
     let history = super::super::faults::history(fixture)?;
@@ -157,7 +157,7 @@ fn physical_input(
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,

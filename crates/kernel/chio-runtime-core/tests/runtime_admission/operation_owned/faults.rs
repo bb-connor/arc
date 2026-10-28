@@ -110,7 +110,7 @@ impl RuntimeAdmissionHook for FaultHook {
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         self.inner
             .revalidate_operation_owned_before_dispatch(context, source)

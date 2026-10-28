@@ -43,11 +43,11 @@ impl SqliteRuntimeOrchestrationStore {
 }
 
 impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
-    fn verify_operation_owned_replay_source(
+    fn verify_operation_owned_runtime_source(
         &self,
-        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), ChioRuntimeError> {
-        self.verify_expected_replay_source(expected)
+        self.verify_runtime_source(expected)
     }
 
     fn bundle(
@@ -89,120 +89,6 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         evidence_id: &str,
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
         SqliteRuntimeOrchestrationStore::treaty_runtime_artifact(self, evidence_kind, evidence_id)
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        let inserted = connection
-            .execute(
-                "INSERT OR IGNORE INTO runtime_consumed_leases (lease_id, admission_id) VALUES (?1, ?2)",
-                params![lease_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        if inserted == 0 {
-            return Err(ChioRuntimeError::Rejected {
-                code: "destructive_lease_replay",
-                detail: format!("destructive lease {lease_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        connection
-            .execute(
-                "DELETE FROM runtime_consumed_leases WHERE lease_id = ?1 AND admission_id = ?2",
-                params![lease_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        Ok(())
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        let inserted = connection
-            .execute(
-                "INSERT OR IGNORE INTO runtime_consumed_treaty_continuations (continuation_id, admission_id) VALUES (?1, ?2)",
-                params![continuation_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        if inserted == 0 {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_treaty_continuation_replay",
-                detail: format!("treaty continuation {continuation_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        connection
-            .execute(
-                "DELETE FROM runtime_consumed_treaty_continuations WHERE continuation_id = ?1 AND admission_id = ?2",
-                params![continuation_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        Ok(())
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        let inserted = connection
-            .execute(
-                "INSERT OR IGNORE INTO runtime_consumed_swarm_continuations (continuation_id, admission_id) VALUES (?1, ?2)",
-                params![continuation_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        if inserted == 0 {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_swarm_continuation_replay",
-                detail: format!("swarm continuation {continuation_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let connection = self.lock_connection()?;
-        super::replay_source::ensure_legacy_replay_writable(&connection)?;
-        connection
-            .execute(
-                "DELETE FROM runtime_consumed_swarm_continuations WHERE continuation_id = ?1 AND admission_id = ?2",
-                params![continuation_id, admission_id],
-            )
-            .map_err(sqlite_error)?;
-        Ok(())
     }
 
     fn runtime_trust_floor(

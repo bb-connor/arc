@@ -46,7 +46,7 @@ impl ChioKernel {
             let source = store_call("activation", || {
                 runtime
                     .store
-                    .load_runtime_participant_activation(binding, &runtime.fence, now)
+                    .load_runtime_source_qualification(binding, &runtime.fence, now)
             })?;
             (source, history)
         };

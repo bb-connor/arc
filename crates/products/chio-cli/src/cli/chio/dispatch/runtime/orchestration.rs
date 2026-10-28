@@ -26,7 +26,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_lint(
         store_backend: "profile_lint".to_string(),
         store_path_sha256: profile_sha256,
         run_counts: std::collections::BTreeMap::new(),
-        consumed_lease_count: 0,
         trust_floor_count: 0,
         latest_failure_code: None,
         evidence_sink_healthy: true,

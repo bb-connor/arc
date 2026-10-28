@@ -183,7 +183,7 @@ fn runtime_claim_cannot_upgrade_original_absent_runtime_selection() -> TestResul
 
 fn intent(
     operation: &AdmissionOperationV1,
-    source: &RuntimeReplayMigrationRecordV1,
+    source: &RuntimeSourceRecordV1,
     episode: &str,
     resources: &[(Kind, &str)],
 ) -> TestResult<RuntimeParticipantClaimIntentV1> {
@@ -210,7 +210,7 @@ fn intent(
     )?)
 }
 
-fn imported(fixture: &Fixture, empty: bool) -> TestResult<RuntimeReplayMigrationRecordV1> {
+fn imported(fixture: &Fixture, empty: bool) -> TestResult<RuntimeSourceRecordV1> {
     let source = Source::new(fixture, empty);
     let pinned = pin(fixture, &source)?;
     Ok(import(fixture, &source, &pinned)?)
