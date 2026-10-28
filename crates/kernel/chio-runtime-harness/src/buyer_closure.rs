@@ -434,7 +434,10 @@ mod tests {
     #[test]
     fn buyer_closure_emits_chio_federation_schemas() -> Result<(), crate::RuntimeLoopbackError> {
         let step = destructive_runtime_loopback_step();
-        let store = chio_runtime_core::InMemoryRuntimeAdmissionStore::new();
+        let root = crate::tests::temp_root("buyer-treaty-source")?;
+        let store =
+            chio_runtime_core::SqliteRuntimeOrchestrationStore::open(root.join("source.sqlite"))
+                .map_err(|error| crate::RuntimeLoopbackError::message(error.to_string()))?;
         let vendor_key = chio_attest_loopback::runtime_vendor_keypair(2).map_err(|error| {
             crate::RuntimeLoopbackError::message(format!(
                 "runtime loopback vendor key failed: {error}"

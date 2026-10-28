@@ -68,7 +68,7 @@ pub fn validate_runtime_workflow_run_report(
             ),
         });
     }
-    if !is_sha256_hex(&report.admission_report_sha256) {
+    if !is_sha256_hex(&report.admission_receipt_sha256) {
         return Err(ChioRuntimeError::Rejected {
             code: "runtime_workflow_invalid_admission_report_hash",
             detail: "runtime workflow report admission report hash is not sha256 hex".to_string(),
@@ -208,7 +208,7 @@ pub(super) fn validate_runtime_step_evidence(
         });
     }
     ensure_sha256_hash(
-        &step.admission_report_sha256,
+        &step.admission_receipt_sha256,
         "runtime_step_evidence_invalid_admission_hash",
     )?;
     ensure_sha256_hash(

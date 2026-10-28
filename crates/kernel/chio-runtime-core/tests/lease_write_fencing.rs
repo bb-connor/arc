@@ -64,7 +64,7 @@ fn write_step(
             admission_id: "admission-a".into(),
             state: status.into(),
             destructive: true,
-            admission_report_sha256: Some("1".repeat(64)),
+            admission_receipt_sha256: Some("1".repeat(64)),
             tool_receipt_sha256: Some("2".repeat(64)),
             lease_id: Some("distinct-destructive-operation-lease".into()),
         },
