@@ -256,9 +256,8 @@ fn nonce_command(
         operation.version(),
         &identifier(
             "claimant",
-            &chio_kernel::admission_operation::execution_nonce_coordinator_id(&key.public_key())?
-                .as_str()
-                .to_owned(),
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(&key.public_key())?
+                .as_str(),
         ),
         now,
         now + 60_000,

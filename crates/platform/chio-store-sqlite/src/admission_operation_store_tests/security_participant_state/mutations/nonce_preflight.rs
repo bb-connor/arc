@@ -14,9 +14,8 @@ pub(in crate::admission_operation_store::tests) fn prepare_issuance_fixture(
     let binding = initialized.admission_binding()?;
     let (operation, lease, _) = setup_selected_phase(
         fixture,
-        &chio_kernel::admission_operation::execution_nonce_coordinator_id(&issuer.public_key())?
-            .as_str()
-            .to_owned(),
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(&issuer.public_key())?
+            .as_str(),
         &context,
         now_ms(),
         Some(binding.clone()),
