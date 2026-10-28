@@ -88,6 +88,7 @@ generator change that starts enforcing one of these removes it from both.
 | `delegation-context.id-jag-without-provider-record`, `delegation-context.id-jag-without-identity-digest` | provider-backed kinds carry `provider_record_id` and `provider_identity_digest` |
 | `delegation-context.static-bearer-with-provider-record` | non-provider kinds carry neither provider member |
 | `delegation-context.id-jag-without-kid`, `delegation-context.oidc-jwt-without-kid` | `oauth_id_jag`, `entra_jwt`, `entra_agent_id` and `oidc_jwt` carry `key_snapshot_digest`, `kid`, `alg` and `artifact_digest` |
+| `delegation-context.introspection-with-artifact-digest`, `delegation-context.local-as-with-artifact-digest`, `delegation-context.operator-key-with-artifact-digest` | `artifact_digest` only on `oauth_id_jag`, `entra_jwt`, `entra_agent_id` and `oidc_jwt` |
 | `delegation-context.static-bearer-with-kid`, `delegation-context.static-bearer-issuer`, `delegation-context.static-bearer-claims` | `operator_static_bearer`: issuer `urn:chio:operator`, no key or artifact members, no claims |
 | `delegation-context.retained-on-static-bearer` | `artifact_retained` is `false` except for `oauth_id_jag` |
 | `delegation-context.entra-claim-on-id-jag` | `azp`, `appid`, `oid`, `tid` only for the Entra kinds |

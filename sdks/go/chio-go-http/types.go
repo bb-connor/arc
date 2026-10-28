@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: c42cfe16c80f83df69e29ede423104fbf3b2d26df7a6f033c5dafbf5f2dbba73
+// Schema content SHA-256: f2fb1301ee791bb51418e8542138d8bf4235638636189b4b010c6f8ae936f110
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes

@@ -503,7 +503,7 @@ Bearer intake (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `ent
 
 Rules:
 
-- `artifact_digest` is SHA-256 of the exact compact JWS bytes received.
+- `artifact_digest` is SHA-256 of the exact compact JWS bytes received. It is present for `oauth_id_jag`, `entra_jwt`, `entra_agent_id` and `oidc_jwt` and absent for every other kind.
 - `provider_record_id` and `provider_identity_digest` name the provider record the exchange verified against and the digest of its identity projection (section 7.4), which equals the matched rule's. `issuer` equals the record's issuer. Both members are present for provider-backed kinds and absent for `chio_local_as`, `chio_operator_key` and `operator_static_bearer`.
 - Decoding is strict (G18): an unknown member in the context, `anchor`, `exchange`, a commitment object or `claims` rejects. `claims` keys are exactly the rule's `recorded_claims` names.
 - `artifact_retained` (D7, M2) is `true` only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`. The retained token is stored in the evidence store keyed by `artifact_digest` and never in the context, receipts or logs. Every other kind is always `false`.

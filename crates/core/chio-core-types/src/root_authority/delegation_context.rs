@@ -109,6 +109,8 @@ impl DelegationAnchorFields {
             for (field, present) in jws {
                 presence(field, present, true)?;
             }
+        } else {
+            presence("artifact_digest", self.artifact_digest.is_some(), false)?;
         }
         if self.kind == AnchorKind::OperatorStaticBearer {
             if self.issuer.as_str() != OPERATOR_ISSUER {
