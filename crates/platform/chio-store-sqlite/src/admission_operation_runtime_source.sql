@@ -59,7 +59,6 @@ CREATE TABLE IF NOT EXISTS runtime_source_supersessions (
         typeof(replacement_runtime_authority_id) = 'text'
         AND octet_length(replacement_runtime_authority_id) BETWEEN 1 AND 2048
         AND instr(replacement_runtime_authority_id, char(0)) = 0
-        AND replacement_runtime_authority_id <> prior_runtime_authority_id
     ),
     canonical_supersession BLOB NOT NULL CHECK (
         typeof(canonical_supersession) = 'blob'
@@ -70,6 +69,7 @@ CREATE TABLE IF NOT EXISTS runtime_source_supersessions (
         AND octet_length(record_digest) <= 128 AND instr(record_digest, char(0)) = 0
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
+    CHECK (replacement_runtime_authority_id <> prior_runtime_authority_id),
     FOREIGN KEY (prior_runtime_authority_id) REFERENCES runtime_source_qualifications(runtime_authority_id),
     FOREIGN KEY (replacement_runtime_authority_id) REFERENCES runtime_source_qualifications(runtime_authority_id)
 );
