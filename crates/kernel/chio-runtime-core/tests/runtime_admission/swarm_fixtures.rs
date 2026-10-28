@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn runtime_swarm_continuation(
+pub(crate) fn runtime_swarm_continuation(
     token_id: &str,
     child_task_id: &str,
     route_plan_receipt_id: &str,
@@ -40,7 +40,7 @@ pub(super) fn runtime_swarm_continuation(
     Ok(token)
 }
 
-pub(super) fn runtime_swarm_witness_chain(
+pub(crate) fn runtime_swarm_witness_chain(
     chain_id: &str,
     child_task_id: &str,
     parent_scope_hash: &str,
@@ -73,7 +73,7 @@ pub(super) fn runtime_swarm_witness_chain(
     Ok(chain)
 }
 
-pub(super) fn runtime_swarm_scope(max_invocations: u32) -> ChioScope {
+pub(crate) fn runtime_swarm_scope(max_invocations: u32) -> ChioScope {
     ChioScope {
         grants: vec![ToolGrant {
             server_id: "vendor-ledger".to_string(),
@@ -91,7 +91,7 @@ pub(super) fn runtime_swarm_scope(max_invocations: u32) -> ChioScope {
 
 // Stable, signed capabilities let the independently built request and witness
 // bind the complete token, not merely a shared label or scope.
-pub(super) fn runtime_swarm_capability(
+pub(crate) fn runtime_swarm_capability(
     task_id: &str,
 ) -> Result<CapabilityToken, Box<dyn std::error::Error>> {
     let (id, seed, limit) = match task_id {
@@ -116,19 +116,19 @@ pub(super) fn runtime_swarm_capability(
     )?)
 }
 
-pub(super) fn swarm_witness_keypair() -> Keypair {
+pub(crate) fn swarm_witness_keypair() -> Keypair {
     Keypair::from_seed(&[31u8; 32])
 }
 
-pub(super) fn trusted_swarm_witness_keys() -> Vec<PublicKey> {
+pub(crate) fn trusted_swarm_witness_keys() -> Vec<PublicKey> {
     vec![swarm_witness_keypair().public_key()]
 }
 
-pub(super) fn swarm_witness_issuer() -> String {
+pub(crate) fn swarm_witness_issuer() -> String {
     format!("did:chio:{}", swarm_witness_keypair().public_key().to_hex())
 }
 
-pub(super) fn runtime_swarm_join_parent_set_hash(
+pub(crate) fn runtime_swarm_join_parent_set_hash(
     chain_id: &str,
     receipt_ids: &[&str],
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -141,7 +141,7 @@ pub(super) fn runtime_swarm_join_parent_set_hash(
     Ok(sha256_hex(&canonical_json_bytes(&body)?))
 }
 
-pub(super) fn runtime_swarm_route_plan_receipt(
+pub(crate) fn runtime_swarm_route_plan_receipt(
     route_plan_id: &str,
     task_id: &str,
     bridge_id: &str,
@@ -170,7 +170,7 @@ pub(super) fn runtime_swarm_route_plan_receipt(
     Ok(receipt)
 }
 
-pub(super) fn runtime_swarm_terminal_graph_receipt(
+pub(crate) fn runtime_swarm_terminal_graph_receipt(
 ) -> Result<SwarmTerminalGraphReceipt, Box<dyn std::error::Error>> {
     let mut receipt = SwarmTerminalGraphReceipt {
         schema: CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA.to_string(),
@@ -205,13 +205,13 @@ pub(super) fn runtime_swarm_terminal_graph_receipt(
     Ok(receipt)
 }
 
-pub(super) fn canonical_test_hash<T: serde::Serialize>(
+pub(crate) fn canonical_test_hash<T: serde::Serialize>(
     value: &T,
 ) -> Result<String, Box<dyn std::error::Error>> {
     Ok(sha256_hex(&canonical_json_bytes(value)?))
 }
 
-pub(super) fn runtime_swarm_revocation_root(
+pub(crate) fn runtime_swarm_revocation_root(
     revoked_subjects: &[&str],
     revoked_task_ids: &[&str],
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -228,7 +228,7 @@ pub(super) fn runtime_swarm_revocation_root(
 /// Retained signed graphs served to the hook in place of the S1 issuer. Hook
 /// tests use it to present malformed or stale evidence the issuer refuses.
 #[derive(Debug)]
-pub(super) struct RetainedSwarmGraphs(Vec<SwarmAuthorityBundle>);
+pub(crate) struct RetainedSwarmGraphs(Vec<SwarmAuthorityBundle>);
 
 impl runtime_api::SwarmGraphSource for RetainedSwarmGraphs {
     fn swarm_graph(
@@ -249,15 +249,15 @@ impl runtime_api::SwarmGraphSource for RetainedSwarmGraphs {
     }
 }
 
-pub(super) fn retained_swarm_graphs(
+pub(crate) fn retained_swarm_graphs(
     bundle: &SwarmAuthorityBundle,
 ) -> std::sync::Arc<RetainedSwarmGraphs> {
     std::sync::Arc::new(RetainedSwarmGraphs(vec![bundle.clone()]))
 }
 
 /// Test view of the qualified S1 issuer owned by the fixture authority.
-pub(super) struct IssuedGraphs(
-    pub(super) chio_store_sqlite::work_graph_store::SqliteWorkGraphStore,
+pub(crate) struct IssuedGraphs(
+    pub(crate) chio_store_sqlite::work_graph_store::SqliteWorkGraphStore,
 );
 
 impl std::fmt::Debug for IssuedGraphs {
@@ -280,7 +280,7 @@ impl runtime_api::SwarmGraphSource for IssuedGraphs {
     }
 }
 
-pub(super) fn issue_root(
+pub(crate) fn issue_root(
     authority: &chio_store_sqlite::SqliteAuthorityStore,
     swarm: &SwarmAuthorityBundle,
 ) -> Result<(), Box<dyn std::error::Error>> {
