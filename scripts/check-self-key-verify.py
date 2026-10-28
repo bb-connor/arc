@@ -244,6 +244,7 @@ EMBEDDED_KEY_CALLERS: dict[tuple[str, str], tuple[str, int]] = {
     ("crates/kernel/chio-kernel/src/approval/collector.rs", "validate_new"): ("GUARDED", 1),
     ("crates/kernel/chio-kernel/src/authority.rs", "validate_issued_response_at"): ("GUARDED", 1),
     ("crates/kernel/chio-kernel/src/capability_lineage.rs", "validate_signed_token"): ("GUARDED", 1),
+    ("crates/kernel/chio-kernel/src/checkpoint/builders.rs", "build_checkpoint_with_chain_frontier_at"): ("GUARDED", 1),
     ("crates/kernel/chio-kernel/src/kernel/active_response_admission.rs", "new"): ("GUARDED", 1),
     ("crates/kernel/chio-kernel/src/kernel/active_response_admission.rs", "validate_active_response_submission"): ("GUARDED", 1),
     ("crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs", "verify_active_response_artifact_authority_attestation"): ("PINNED", 1),

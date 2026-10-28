@@ -164,7 +164,9 @@ pub fn build_checkpoint_with_chain_frontier_at(
                 .transpose()?
         }
         Some(previous) => {
-            validate_checkpoint(previous, std::slice::from_ref(&keypair.public_key()))?;
+            // The previous head may carry a rotated-out kernel key; callers
+            // authenticate the persisted head before building on it.
+            previous.verify_integrity_embedded_key()?;
             validate_checkpoint_successor_position(previous, checkpoint_seq, batch_start_seq)?;
             if prior_chain.leaf_count() != previous.body.checkpoint_seq {
                 return Err(CheckpointError::Continuity(format!(
