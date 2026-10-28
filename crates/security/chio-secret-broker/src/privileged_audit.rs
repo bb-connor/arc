@@ -47,11 +47,11 @@ use crate::authority_ipc::{
     verify_authority_exchange, SignedAuthorityRequest, SignedAuthorityResponse,
     VerifiedAuthorityExchange,
 };
-#[cfg(unix)]
-use crate::lifecycle_lock::LifecycleLock;
 use crate::protocol::{BrokerExecuteRequest, MAX_BODY_BYTES, MAX_WIRE_BYTES};
 use crate::provision::AdminAuthorization;
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
+#[cfg(unix)]
+use chio_secure_ipc::LifecycleLock;
 
 #[path = "privileged_audit/audit_input_error.rs"]
 mod audit_input_error;

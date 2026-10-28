@@ -304,7 +304,7 @@ use response::write_broker_ipc_response;
 mod lifecycle;
 
 #[cfg(unix)]
-use crate::lifecycle_lock::LifecycleLock;
+use chio_secure_ipc::LifecycleLock;
 #[cfg(unix)]
 use lifecycle::acquire_broker_socket_lifecycle_lock;
 
