@@ -1,5 +1,3 @@
-//! Finalize already claimed preparation without touching legacy replay state.
-
 use super::*;
 
 impl PreparedRuntimeAdmission {
