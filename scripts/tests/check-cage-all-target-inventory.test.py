@@ -27,6 +27,9 @@ HEADERS = {
     "bin_chio_cage_init": (
         "Running unittests src/main.rs (/tmp/chio_cage_init-bin)"
     ),
+    "cage_receipt_disclosure_audit": (
+        "Running tests/cage_receipt_disclosure_audit.rs (/tmp/cage_receipt_disclosure_audit)"
+    ),
     "enforcement_evidence": (
         "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)"
     ),

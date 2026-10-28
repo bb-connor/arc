@@ -17,13 +17,15 @@ EXPECTED_COUNTS = {
     "lib_chio_cage_plan": 7,
     "lib_chio_cage_init": 1,
     "entrypoint": 1,
-    "enforcement_evidence": 8,
+    "cage_receipt_disclosure_audit": 2,
+    "enforcement_evidence": 12,
     "linux_compile": 27,
     "linux_enforcement": 40,
 }
-EXPECTED_TOTAL = 114
-EXPECTED_SHA256 = "3bbbf825d4039f51d3b368ef675c8e98fe625f513c2f01c10812a38e4323e252"
+EXPECTED_TOTAL = 120
+EXPECTED_SHA256 = "c68e1ed6e8e73a5010eac67c902f559b1ad72d70d6ef110cfe66ca907e470c1b"
 EXPECTED_INTEGRATION_TARGETS = {
+    "cage_receipt_disclosure_audit.rs",
     "enforcement_evidence.rs",
     "linux_compile.rs",
     "linux_enforcement.rs",
