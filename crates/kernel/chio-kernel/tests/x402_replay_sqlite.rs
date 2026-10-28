@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
@@ -12,7 +12,9 @@ use chio_kernel::{
     X402PaymentContext, X402PaymentPayload, X402PaymentRequirements, X402RailConfig, X402Refusal,
     DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
 };
-use chio_security_types::clock::{Clock, FixedClock};
+use chio_security_types::clock::{
+    Clock, ClockError, ClockReading, FixedClock, MonotonicInstant, UnixMillis,
+};
 use chio_store_sqlite::SqliteExecutionNonceStore;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -37,20 +39,39 @@ fn adapter(
     facilitator: &str,
     replay: Arc<dyn ExecutionNonceStore>,
 ) -> Result<X402PaymentAdapter, Box<dyn Error>> {
+    adapter_at(facilitator, replay, clock())
+}
+
+fn adapter_at(
+    facilitator: &str,
+    replay: Arc<dyn ExecutionNonceStore>,
+    clock: Arc<dyn Clock>,
+) -> Result<X402PaymentAdapter, Box<dyn Error>> {
     let rail = X402RailConfig::new(X402Network::allowlisted(NETWORK)?, ASSET, "USDC", 6, PAY_TO)?;
-    Ok(X402PaymentAdapter::new(facilitator, rail, clock(), replay)?
+    Ok(X402PaymentAdapter::new(facilitator, rail, clock, replay)?
         .with_timeout(Duration::from_secs(2)))
 }
 
 fn open_store(path: &std::path::Path) -> Result<Arc<dyn ExecutionNonceStore>, Box<dyn Error>> {
+    open_store_at(path, clock())
+}
+
+fn open_store_at(
+    path: &std::path::Path,
+    clock: Arc<dyn Clock>,
+) -> Result<Arc<dyn ExecutionNonceStore>, Box<dyn Error>> {
     Ok(Arc::new(SqliteExecutionNonceStore::open_with_clock(
         path,
         DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
-        clock(),
+        clock,
     )?))
 }
 
 fn request(nonce: &str) -> PaymentAuthorizeRequest {
+    expiring_request(nonce, VALID_BEFORE)
+}
+
+fn expiring_request(nonce: &str, valid_before: u64) -> PaymentAuthorizeRequest {
     let requirements = X402PaymentRequirements {
         scheme: "exact".to_owned(),
         network: NETWORK.to_owned(),
@@ -80,7 +101,7 @@ fn request(nonce: &str) -> PaymentAuthorizeRequest {
                         to: PAY_TO.to_owned(),
                         value: "125".to_owned(),
                         valid_after: VALID_AFTER.to_string(),
-                        valid_before: VALID_BEFORE.to_string(),
+                        valid_before: valid_before.to_string(),
                         nonce: nonce.to_owned(),
                     },
                 },
@@ -250,6 +271,54 @@ fn x402_concurrent_duplicates_on_one_store_settle_once() -> TestResult {
         }
     }
     assert_eq!((settled, reused), (1, 1));
+    assert_eq!(facilitator.finish()?, 1);
+    Ok(())
+}
+
+/// Trusted clock whose wall and monotonic time advance together on demand.
+struct AdvancingClock(AtomicU64);
+
+impl Clock for AdvancingClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let unix_secs = self.0.load(Ordering::SeqCst);
+        let nanos = unix_secs
+            .checked_mul(1_000_000_000)
+            .ok_or(ClockError::Overflow)?;
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(unix_secs)?,
+            MonotonicInstant::from_nanos(nanos),
+        ))
+    }
+}
+
+#[test]
+fn x402_nonce_outlives_its_first_expiry_across_a_reopen() -> TestResult {
+    let short_valid_before = NOW + 100;
+    let after_short_retention = short_valid_before + 61;
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("x402-replay.sqlite3");
+    let clock = Arc::new(AdvancingClock(AtomicU64::new(NOW)));
+
+    let facilitator = Facilitator::spawn()?;
+    adapter_at(
+        &facilitator.url,
+        open_store_at(&path, clock.clone())?,
+        clock.clone(),
+    )?
+    .authorize(&expiring_request(NONCE, short_valid_before))?;
+    assert_eq!(facilitator.finish()?, 1);
+
+    clock.0.store(after_short_retention, Ordering::SeqCst);
+    let reopened = open_store_at(&path, clock.clone())?;
+    let error = adapter_at(UNREACHABLE, reopened.clone(), clock.clone())?
+        .authorize(&expiring_request(NONCE, VALID_BEFORE))
+        .err()
+        .ok_or("the nonce must stay spent under a later expiry")?;
+    assert!(is_nonce_reused(&error), "unexpected refusal: {error:?}");
+
+    let facilitator = Facilitator::spawn()?;
+    adapter_at(&facilitator.url, reopened, clock)?
+        .authorize(&expiring_request(OTHER_NONCE, VALID_BEFORE))?;
     assert_eq!(facilitator.finish()?, 1);
     Ok(())
 }

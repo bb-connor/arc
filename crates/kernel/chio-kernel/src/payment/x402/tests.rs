@@ -1010,3 +1010,127 @@ fn an_unavailable_clock_refuses_before_the_facilitator() {
         matches!(error, PaymentError::Unavailable(message) if message == "x402 trusted clock is unavailable")
     );
 }
+
+/// Trusted clock whose wall and monotonic time advance together on demand.
+struct AdvancingClock(AtomicU64);
+
+impl AdvancingClock {
+    fn starting_at(unix_secs: u64) -> Arc<Self> {
+        Arc::new(Self(AtomicU64::new(unix_secs)))
+    }
+
+    fn advance_to(&self, unix_secs: u64) {
+        self.0.store(unix_secs, Ordering::SeqCst);
+    }
+}
+
+impl Clock for AdvancingClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let unix_secs = self.0.load(Ordering::SeqCst);
+        Ok(ClockReading::new(
+            UnixMillis::from_secs(unix_secs)?,
+            MonotonicInstant::from_nanos(unix_secs * 1_000_000_000),
+        ))
+    }
+}
+
+const SHORT_VALID_BEFORE: u64 = NOW + 100;
+/// Past the short authorization's expiry plus the replay store's grace, and
+/// still inside the long authorization's window.
+const AFTER_SHORT_RETENTION: u64 = SHORT_VALID_BEFORE + 61;
+
+fn expiring_at(valid_before: u64) -> PaymentAuthorizeRequest {
+    let mut request = request(Some(context()));
+    x402_mut(&mut request)
+        .payment_payload
+        .payload
+        .authorization
+        .valid_before = valid_before.to_string();
+    request
+}
+
+#[test]
+fn a_spent_nonce_outlives_the_expiry_it_was_signed_with() {
+    let clock = AdvancingClock::starting_at(NOW);
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock.clone()));
+    let (url, _requests, handle) = settling_facilitator(1);
+    adapter_with(&url, clock.clone(), replay.clone())
+        .authorize(&expiring_at(SHORT_VALID_BEFORE))
+        .expect("the short authorization settles");
+    handle.join().expect("facilitator stub exits");
+
+    clock.advance_to(AFTER_SHORT_RETENTION);
+    let error = adapter_with(UNREACHABLE, clock.clone(), replay.clone())
+        .authorize(&expiring_at(VALID_BEFORE))
+        .expect_err("the nonce stays spent under a later expiry");
+    assert!(refused(error, X402Refusal::NonceReused));
+
+    let (url, _requests, handle) = settling_facilitator(1);
+    let mut other = expiring_at(VALID_BEFORE);
+    x402_mut(&mut other)
+        .payment_payload
+        .payload
+        .authorization
+        .nonce = OTHER_NONCE.to_owned();
+    adapter_with(&url, clock, replay)
+        .authorize(&other)
+        .expect("a distinct nonce still settles");
+    handle.join().expect("facilitator stub exits");
+}
+
+#[test]
+fn an_uncertain_settlement_keeps_the_nonce_past_its_expiry() {
+    let clock = AdvancingClock::starting_at(NOW);
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(16, clock.clone()));
+    let (url, _requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (503, serde_json::json!({})),
+    ]);
+    let error = adapter_with(&url, clock.clone(), replay.clone())
+        .authorize(&expiring_at(SHORT_VALID_BEFORE))
+        .expect_err("settlement unavailable");
+    handle.join().expect("facilitator stub exits");
+    assert!(
+        matches!(error, PaymentError::Unavailable(message) if message == "x402 facilitator settlement is unavailable")
+    );
+
+    clock.advance_to(AFTER_SHORT_RETENTION);
+    let error = adapter_with(UNREACHABLE, clock, replay)
+        .authorize(&expiring_at(VALID_BEFORE))
+        .expect_err("a possibly broadcast nonce stays spent");
+    assert!(refused(error, X402Refusal::NonceReused));
+}
+
+#[test]
+fn a_full_replay_store_refuses_before_settlement() {
+    let replay: Arc<dyn ExecutionNonceStore> =
+        Arc::new(InMemoryExecutionNonceStore::with_clock(1, clock_at(NOW)));
+    let (url, requests, handle) = spawn_json_server(vec![
+        (200, serde_json::json!({ "isValid": true })),
+        (200, settle_success()),
+        (200, serde_json::json!({ "isValid": true })),
+    ]);
+    let adapter = adapter_with(&url, clock_at(NOW), replay);
+    adapter
+        .authorize(&request(Some(with_nonce(NONCE))))
+        .expect("the first nonce settles");
+    let error = adapter
+        .authorize(&request(Some(with_nonce(OTHER_NONCE))))
+        .expect_err("no capacity for a second nonce");
+    handle.join().expect("facilitator stub exits");
+    assert!(refused(error, X402Refusal::ReplayCapacityExhausted));
+    let paths: Vec<String> = requests
+        .iter()
+        .map(|request| request.lines().next().unwrap_or_default().to_owned())
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "POST /verify HTTP/1.1",
+            "POST /settle HTTP/1.1",
+            "POST /verify HTTP/1.1"
+        ]
+    );
+}

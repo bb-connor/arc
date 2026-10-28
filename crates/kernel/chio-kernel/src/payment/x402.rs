@@ -89,6 +89,8 @@ pub enum X402Refusal {
     Expired { now: u64, valid_before: u64 },
     #[error("x402 authorization nonce was already used")]
     NonceReused,
+    #[error("x402 replay store has no capacity for another nonce")]
+    ReplayCapacityExhausted,
     #[error("x402 facilitator rejected the payment")]
     VerifyRejected,
     #[error("x402 facilitator verification failed")]
