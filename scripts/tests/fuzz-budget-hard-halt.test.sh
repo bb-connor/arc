@@ -52,7 +52,51 @@ for name, expected in expected_steps.items():
     if observed != expected:
         raise SystemExit(f"{name} budget steps {observed} != {expected}")
 
+repo = workflows.parent.parent
+removed_names = (
+    "GH_FUZZ_BUDGET_WORKFLOWS",
+    "GH_FUZZ_BUDGET_MINUTES",
+    "GH_FUZZ_BUDGET_CAP_MODE",
+    "GH_FUZZ_BUDGET_RATE_LIMIT_MODE",
+)
+callers = sorted(workflows.glob("*.yml")) + sorted((repo / "scripts").glob("*")) + sorted(
+    (repo / "docs/fuzzing").glob("*.md")
+)
+for caller in callers:
+    if not caller.is_file():
+        continue
+    text = caller.read_text(encoding="utf-8", errors="replace")
+    for removed in removed_names:
+        if removed in text:
+            raise SystemExit(f"{caller.relative_to(repo)} still uses removed {removed}")
+
 pr_text = Path(sys.argv[1]).read_text(encoding="utf-8")
+on_block = pr_text[pr_text.index("    paths:\n"):pr_text.index("\npermissions:")]
+pr_paths = re.findall(r'^      - "([^"]+)"$', on_block, re.M)
+def path_covered(path: str) -> bool:
+    for pattern in pr_paths:
+        regex = re.escape(pattern).replace(r"\*\*", ".*").replace(r"\*", "[^/]*")
+        if re.fullmatch(regex, path):
+            return True
+    return False
+for path in [
+    "scripts/select-fuzz-targets.py",
+    "scripts/tests/check-fuzz-manifest-selection.test.py",
+    "scripts/check-fuzz-budget.sh",
+    ".clusterfuzzlite/build.sh",
+    ".cargo/config.toml",
+    "fuzz/target-map.toml",
+    "fuzz/Cargo.lock",
+    "Cargo.toml",
+    "Makefile",
+    "scripts/ci-pr-tier.sh",
+    "scripts/spec-drift-check.sh",
+    "scripts/check-review-slices.py",
+    ".github/workflows/cflite_pr.yml",
+]:
+    if not path_covered(path):
+        raise SystemExit(f"cflite_pr pull_request paths do not trigger on selector input {path}")
+
 fail_start = pr_text.index("name: Fail if no targets fired (changed-target mode)")
 fail_block = pr_text[fail_start:pr_text.index("\n      - name:", fail_start)]
 if '"${CLASSIFICATION}" == "no-fuzz-relevant-change"' not in fail_block:

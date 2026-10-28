@@ -366,12 +366,19 @@ measure_workflows() {
                     err "fuzz-budget: jobs listing for ${wf} run ${run_id} returned ${returned} of ${declared} jobs"
                     exit 2
                 fi
-                # A run cancelled before its jobs were created, or one whose
-                # workflow file failed to start, has no jobs and no runner time.
-                if [[ "${declared}" == "0" && "${conclusion}" != "cancelled" \
-                    && "${conclusion}" != "startup_failure" ]]; then
-                    err "fuzz-budget: ${wf} run ${run_id} lists no jobs (conclusion: ${conclusion:-none})"
-                    exit 2
+                # A run with no jobs has used no runner time when it is still
+                # queued, waiting, pending or starting (it is not cached, so a
+                # later check measures it), or when it completed after being
+                # cancelled before its jobs were created or failing to start.
+                if [[ "${declared}" == "0" ]]; then
+                    case "${run_status}:${conclusion}" in
+                        queued:* | waiting:* | pending:* | in_progress:* \
+                            | completed:cancelled | completed:startup_failure) ;;
+                        *)
+                            err "fuzz-budget: ${wf} run ${run_id} lists no jobs (status: ${run_status}, conclusion: ${conclusion:-none})"
+                            exit 2
+                            ;;
+                    esac
                 fi
                 # Runner time needs the accounting fields of every job. A job
                 # assigned to a runner must carry its start (and, once

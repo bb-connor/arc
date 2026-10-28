@@ -622,7 +622,34 @@ def cancelled_run_without_jobs_counts_zero() -> None:
     case.raw_jobs(42, {"total_count": 0, "jobs": []})
     expect(case.check(), 0, "runs=1 queried=1 executed=0 min")
     case.listing([run(42, start, start + 5, conclusion="success")])
-    expect(case.check(), 2, "fuzz.yml run 42 lists no jobs")
+    expect(case.check(), 2, "fuzz.yml run 42 lists no jobs (status: completed, conclusion: success)")
+
+
+def unfinished_run_without_jobs_counts_zero_uncached() -> None:
+    start = NOW - 600
+    for status in ["queued", "waiting", "pending", "in_progress"]:
+        case = Case()
+        case.listing([run(45, start, start + 5, status=status)])
+        case.raw_jobs(45, {"total_count": 0, "jobs": []})
+        ledger = case.dir / "ledger.json"
+        expect(case.check(GH_FUZZ_BUDGET_LEDGER=str(ledger)), 0, "runs=1 queried=1 executed=0 min")
+        assert json.loads(ledger.read_text())["runs"] == {}, ledger.read_text()
+        case.raw_jobs(45, {"total_count": 1, "jobs": [dict(job(start, start + 600, "runner"), id=1)]})
+        case.listing([run(45, start, start + 700)])
+        expect(case.check(GH_FUZZ_BUDGET_LEDGER=str(ledger)), 0, "runs=1 queried=1 executed=10 min")
+    unknown = Case()
+    unknown.listing([run(46, start, start + 5, status="requested")])
+    unknown.raw_jobs(46, {"total_count": 0, "jobs": []})
+    expect(unknown.check(), 2, "fuzz.yml run 46 lists no jobs (status: requested")
+
+
+def completed_run_without_jobs_is_refused() -> None:
+    start = NOW - 600
+    for conclusion in ["success", "failure", "skipped", "timed_out"]:
+        case = Case()
+        case.listing([run(47, start, start + 5, conclusion=conclusion)])
+        case.raw_jobs(47, {"total_count": 0, "jobs": []})
+        expect(case.check(), 2, f"fuzz.yml run 47 lists no jobs (status: completed, conclusion: {conclusion})")
 
 
 def invalid_mutation_listing_is_not_cached() -> None:
@@ -750,6 +777,8 @@ CASES = [
     unassigned_job_timestamps_must_show_it_never_ran,
     cancelled_run_without_jobs_counts_zero,
     invalid_mutation_listing_is_not_cached,
+    unfinished_run_without_jobs_counts_zero_uncached,
+    completed_run_without_jobs_is_refused,
     ledger_skips_completed_runs,
     foreign_ledger_is_ignored,
     malformed_ledger_is_ignored,
