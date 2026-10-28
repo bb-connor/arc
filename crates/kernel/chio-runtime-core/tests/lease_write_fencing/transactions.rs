@@ -8,7 +8,7 @@ fn step() -> RuntimeOrchestrationStepState {
         admission_id: "admission-a".into(),
         state: "completed".into(),
         destructive: true,
-        admission_report_sha256: Some("1".repeat(64)),
+        admission_receipt_sha256: Some("1".repeat(64)),
         tool_receipt_sha256: Some("2".repeat(64)),
         lease_id: Some("destructive-lease-not-the-run-lease".into()),
     }

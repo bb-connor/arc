@@ -11,3 +11,8 @@ Device or inode changes refuse, including copied databases, restored backups, re
 Operator requalification is tracked as RUNTIME-SOURCE-REQUALIFY. Its required design appends a fenced superseded record and creates a new source record without deleting history; only non-superseded records will count toward the active-source limit. That interface is not implemented by this contract.
 
 The installation exclusion guard is shared with other authority-source families. Its migration-era method name is tracked by SOURCE-INSTALLATION-GUARD-NAME; the exclusion remains required during source callbacks.
+
+The runtime harness installs a qualified SQLite source before invoking the kernel.
+Its admission artifact is the signed kernel receipt, including a denial receipt.
+Workflow, step and proof-source records bind `admissionReceiptSha256`; the
+separate cross-boundary treaty admission report retains its own report digest.
