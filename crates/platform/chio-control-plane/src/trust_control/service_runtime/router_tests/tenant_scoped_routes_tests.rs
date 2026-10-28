@@ -200,7 +200,7 @@ async fn tenant_credential_cannot_export_another_tenants_evidence() -> TestResul
         EVIDENCE_EXPORT_PATH,
         TENANT_A,
         Some(json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-b"),
             "requireProofs": false,
         })),
     )
