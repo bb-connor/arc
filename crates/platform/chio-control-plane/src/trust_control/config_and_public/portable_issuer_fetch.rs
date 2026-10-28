@@ -365,7 +365,27 @@ pub(crate) fn recheck_oid4vp_passport_lifecycle(
     requested_at: u64,
     accept_now: u64,
 ) -> Result<Option<PassportLifecycleResolution>, CliError> {
-    let _ = (config, passport_id, status_ref, requested_at, accept_now);
+    if let Some(path) = config.passport_statuses_file.as_deref() {
+        return resolve_registered_lifecycle(path, passport_id, accept_now).map(Some);
+    }
+    let Some(status_ref) = status_ref else {
+        return Ok(lifecycle);
+    };
+    let held_until = status_ref
+        .distribution
+        .cache_ttl_secs
+        .and_then(|ttl| requested_at.checked_add(ttl))
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "OID4VP passport status reference grants no cache TTL for its remote lifecycle"
+                    .to_string(),
+            )
+        })?;
+    if accept_now > held_until {
+        return Err(CliError::cli_other_error(
+            "remote passport lifecycle is older than its cache TTL at acceptance".to_string(),
+        ));
+    }
     Ok(lifecycle)
 }
 

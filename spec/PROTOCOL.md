@@ -4867,6 +4867,10 @@ the operator configures a partner registry:
   parent capability bounds, then requires every matched mirror to be fresh
   and to hold none of the passport keys before it consumes the challenge or
   request
+- the OID4VP door resolves a local lifecycle registry again at that instant;
+  a remote lifecycle answer holds only until the time sampled before the
+  partner sync plus the `cache_ttl_secs` of the credential's signed status
+  reference, and a reference without a TTL is refused
 
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
