@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::mpsc;
@@ -30,7 +30,9 @@ impl Reader {
     }
 }
 
-fn fifo_refusal(reader: Reader) -> TestResult {
+pub(super) fn fifo_refusal(
+    reader: impl FnOnce(&Path, &Path) -> Result<(), CliError> + Send + 'static,
+) -> TestResult {
     let directory = tempfile::tempdir()?;
     let artifact = directory.path().join("artifact.fifo");
     let key_path = directory.path().join("trusted.pub");
@@ -47,7 +49,7 @@ fn fifo_refusal(reader: Reader) -> TestResult {
     let (send, receive) = mpsc::channel();
     let input = artifact.clone();
     let worker = std::thread::spawn(move || {
-        let outcome = match reader.verify(&input, &key_path) {
+        let outcome = match reader(&input, &key_path) {
             Err(CliError::Io(error)) => Err((error.kind(), error.to_string())),
             Err(other) => Err((ErrorKind::InvalidData, other.to_string())),
             Ok(()) => Ok(()),
@@ -55,7 +57,7 @@ fn fifo_refusal(reader: Reader) -> TestResult {
         let _ = send.send(outcome);
     });
     let first = receive.recv_timeout(Duration::from_secs(5));
-    let unblock = if first.is_err() {
+    let mut unblock = if first.is_err() {
         Some(
             OpenOptions::new()
                 .read(true)
@@ -66,13 +68,16 @@ fn fifo_refusal(reader: Reader) -> TestResult {
     } else {
         None
     };
+    if let Some(writer) = unblock.as_mut() {
+        writer.write_all(b"{}")?;
+    }
+    drop(unblock);
     let timely = first.is_ok();
     let outcome = match first {
         Ok(outcome) => outcome,
         Err(_) => receive.recv_timeout(Duration::from_secs(5))?,
     };
     worker.join().map_err(|_| "artifact reader panicked")?;
-    drop(unblock);
     assert!(timely, "artifact reader blocked opening a FIFO");
     assert_eq!(
         outcome,
@@ -83,15 +88,42 @@ fn fifo_refusal(reader: Reader) -> TestResult {
 
 #[test]
 fn call_artifact_fifo_is_refused_without_blocking() -> TestResult {
-    fifo_refusal(Reader::Call)
+    fifo_refusal(|artifact, key| Reader::Call.verify(artifact, key))
 }
 
 #[test]
 fn outcomes_artifact_fifo_is_refused_without_blocking() -> TestResult {
-    fifo_refusal(Reader::Outcomes)
+    fifo_refusal(|artifact, key| Reader::Outcomes.verify(artifact, key))
 }
 
 #[test]
 fn run_artifact_fifo_is_refused_without_blocking() -> TestResult {
-    fifo_refusal(Reader::Run)
+    fifo_refusal(|artifact, key| Reader::Run.verify(artifact, key))
+}
+
+#[test]
+fn state_artifact_fifo_is_refused_without_blocking() -> TestResult {
+    fifo_refusal(|artifact, _| super::state::read_json::<serde_json::Value>(artifact).map(|_| ()))
+}
+
+#[test]
+fn state_artifact_regular_control_and_bound() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let artifact = directory.path().join("state.json");
+    std::fs::write(&artifact, b"{\"value\":42}")?;
+    let value: serde_json::Value = super::state::read_json(&artifact)?;
+    assert_eq!(value, serde_json::json!({"value": 42}));
+    let bound = super::state::MAX_CONFIG_BYTES as usize;
+    std::fs::File::create(&artifact)?.set_len(bound as u64 + 1)?;
+    let result = super::state::read_json::<serde_json::Value>(&artifact);
+    let Err(CliError::Io(failure)) = result else {
+        return Err("expected bounded input I/O refusal".into());
+    };
+    assert_eq!(failure.kind(), ErrorKind::Other);
+    assert!(matches!(
+        failure.get_ref().and_then(|source| source.downcast_ref::<chio_core::canonical::UntrustedJsonError>()),
+        Some(chio_core::canonical::UntrustedJsonError::TooLarge { bytes, bound: actual })
+            if *bytes == bound + 1 && *actual == bound
+    ));
+    Ok(())
 }

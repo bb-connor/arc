@@ -519,3 +519,7 @@ mod plan_tests {
         .is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "swarm_reader_tests.rs"]
+mod reader_tests;

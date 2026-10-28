@@ -289,3 +289,7 @@ fn digest(path: &Path) -> Result<String, CliError> {
         .map(|byte| format!("{byte:02x}"))
         .collect())
 }
+
+#[cfg(test)]
+#[path = "relocation_reader_tests.rs"]
+mod reader_tests;
