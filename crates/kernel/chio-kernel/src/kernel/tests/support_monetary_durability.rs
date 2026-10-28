@@ -685,9 +685,9 @@ enum MonetaryFailureCase {
     ToolNotRegistered,
 }
 
-const MONETARY_FAILURE_CASES: [MonetaryFailureCase; 5] = [
+/// The dispatch-deadline case runs separately on a paused clock.
+const MONETARY_FAILURE_CASES: [MonetaryFailureCase; 4] = [
     MonetaryFailureCase::Cancellation,
-    MonetaryFailureCase::Deadline,
     MonetaryFailureCase::Incomplete,
     MonetaryFailureCase::Generic,
     MonetaryFailureCase::ToolNotRegistered,
@@ -811,26 +811,102 @@ impl MonetaryFailureFixture {
     }
 }
 
+async fn assert_top_level_failure_retains_funds(
+    case: MonetaryFailureCase,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = MonetaryFailureFixture::new(case, "top-level")?;
+    let first = fixture.kernel.evaluate_tool_call(&fixture.request).await?;
+    assert_eq!(first.verdict, Verdict::Deny);
+    assert_monetary_capture_receipt_metadata(
+        &first.receipt,
+        &fixture.capability.id,
+        &fixture.request.request_id,
+    )?;
+    fixture.assert_retained()?;
+
+    let mut fresh = fixture.request.clone();
+    fresh.request_id = format!("{}-fresh", fresh.request_id);
+    let retry = fixture.kernel.evaluate_tool_call(&fresh).await?;
+    assert_eq!(retry.verdict, Verdict::Deny);
+    fixture.assert_retained()?;
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn non_durable_monetary_terminal_failures_retain_top_level_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
-        let fixture = MonetaryFailureFixture::new(case, "top-level")?;
-        let first = fixture.kernel.evaluate_tool_call(&fixture.request).await?;
-        assert_eq!(first.verdict, Verdict::Deny);
-        assert_monetary_capture_receipt_metadata(
-            &first.receipt,
-            &fixture.capability.id,
-            &fixture.request.request_id,
-        )?;
-        fixture.assert_retained()?;
-
-        let mut fresh = fixture.request.clone();
-        fresh.request_id = format!("{}-fresh", fresh.request_id);
-        let retry = fixture.kernel.evaluate_tool_call(&fresh).await?;
-        assert_eq!(retry.verdict, Verdict::Deny);
-        fixture.assert_retained()?;
+        assert_top_level_failure_retains_funds(case).await?;
     }
+    Ok(())
+}
+
+/// The hanging server is always invoked before its budget is measured: the
+/// paused clock only advances to the deadline once the runtime is idle.
+#[tokio::test(flavor = "current_thread", start_paused = true)]
+async fn non_durable_monetary_dispatch_deadline_retains_top_level_funds(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_top_level_failure_retains_funds(MonetaryFailureCase::Deadline).await
+}
+
+async fn assert_nested_failure_retains_funds(
+    case: MonetaryFailureCase,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = MonetaryFailureFixture::new(case, "nested")?;
+    let session_id = fixture.kernel.open_session(
+        fixture.request.agent_id.clone(),
+        vec![fixture.capability.clone()],
+    )?;
+    fixture.kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        &fixture.request.request_id,
+        &fixture.request.agent_id,
+    );
+    fixture
+        .kernel
+        .begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let mut client = NoopNestedFlowClient;
+
+    let first = fixture
+        .kernel
+        .evaluate_tool_call_with_nested_flow_client_async(
+            &context,
+            &fixture.request,
+            &mut client,
+            None,
+        )
+        .await?;
+    assert_eq!(first.verdict, Verdict::Deny);
+    assert_monetary_capture_receipt_metadata(
+        &first.receipt,
+        &fixture.capability.id,
+        &fixture.request.request_id,
+    )?;
+    fixture.assert_retained()?;
+
+    let mut fresh = fixture.request.clone();
+    fresh.request_id = format!("{}-fresh", fresh.request_id);
+    let replay_session_id = fixture
+        .kernel
+        .open_session(fresh.agent_id.clone(), vec![fixture.capability.clone()])?;
+    fixture.kernel.activate_session(&replay_session_id)?;
+    let replay_context =
+        make_operation_context(&replay_session_id, &fresh.request_id, &fresh.agent_id);
+    fixture
+        .kernel
+        .begin_session_request(&replay_context, OperationKind::ToolCall, true)?;
+    let retry = fixture
+        .kernel
+        .evaluate_tool_call_with_nested_flow_client_async(
+            &replay_context,
+            &fresh,
+            &mut client,
+            None,
+        )
+        .await?;
+    assert_eq!(retry.verdict, Verdict::Deny);
+    fixture.assert_retained()?;
     Ok(())
 }
 
@@ -838,63 +914,15 @@ async fn non_durable_monetary_terminal_failures_retain_top_level_funds(
 async fn non_durable_monetary_terminal_failures_retain_nested_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
-        let fixture = MonetaryFailureFixture::new(case, "nested")?;
-        let session_id = fixture.kernel.open_session(
-            fixture.request.agent_id.clone(),
-            vec![fixture.capability.clone()],
-        )?;
-        fixture.kernel.activate_session(&session_id)?;
-        let context = make_operation_context(
-            &session_id,
-            &fixture.request.request_id,
-            &fixture.request.agent_id,
-        );
-        fixture
-            .kernel
-            .begin_session_request(&context, OperationKind::ToolCall, true)?;
-        let mut client = NoopNestedFlowClient;
-
-        let first = fixture
-            .kernel
-            .evaluate_tool_call_with_nested_flow_client_async(
-                &context,
-                &fixture.request,
-                &mut client,
-                None,
-            )
-            .await?;
-        assert_eq!(first.verdict, Verdict::Deny);
-        assert_monetary_capture_receipt_metadata(
-            &first.receipt,
-            &fixture.capability.id,
-            &fixture.request.request_id,
-        )?;
-        fixture.assert_retained()?;
-
-        let mut fresh = fixture.request.clone();
-        fresh.request_id = format!("{}-fresh", fresh.request_id);
-        let replay_session_id = fixture
-            .kernel
-            .open_session(fresh.agent_id.clone(), vec![fixture.capability.clone()])?;
-        fixture.kernel.activate_session(&replay_session_id)?;
-        let replay_context =
-            make_operation_context(&replay_session_id, &fresh.request_id, &fresh.agent_id);
-        fixture
-            .kernel
-            .begin_session_request(&replay_context, OperationKind::ToolCall, true)?;
-        let retry = fixture
-            .kernel
-            .evaluate_tool_call_with_nested_flow_client_async(
-                &replay_context,
-                &fresh,
-                &mut client,
-                None,
-            )
-            .await?;
-        assert_eq!(retry.verdict, Verdict::Deny);
-        fixture.assert_retained()?;
+        assert_nested_failure_retains_funds(case).await?;
     }
     Ok(())
+}
+
+#[tokio::test(flavor = "current_thread", start_paused = true)]
+async fn non_durable_monetary_dispatch_deadline_retains_nested_funds(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_nested_failure_retains_funds(MonetaryFailureCase::Deadline).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
