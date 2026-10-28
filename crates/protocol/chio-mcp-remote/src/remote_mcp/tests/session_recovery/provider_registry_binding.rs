@@ -12,7 +12,7 @@ async fn static_bearer_resume_ignores_provider_record_changes(
 }
 
 #[tokio::test]
-async fn enterprise_resume_binds_only_its_provider_record() -> Result<(), Box<dyn std::error::Error>>
+async fn enterprise_resume_binds_its_provider_selection() -> Result<(), Box<dyn std::error::Error>>
 {
     registry_scope_case(true).await
 }
@@ -66,6 +66,9 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
     let mut unrelated = registry["providers"]["enterprise-login"].clone();
     unrelated["provider_id"] = json!("unrelated-login");
     unrelated["enabled"] = json!(false);
+    unrelated["issuer"] = json!("https://unrelated.enterprise.example");
+    unrelated["trust_boundary"]["allowed_issuers"] =
+        json!(["https://unrelated.enterprise.example"]);
     registry["providers"]["unrelated-login"] = unrelated;
     std::fs::write(&registry_path, serde_json::to_vec(&registry)?)?;
     let Some(RestoredSession::Serve(unrelated_change)) = factory.restore_session(&record)? else {
@@ -145,5 +148,112 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
     assert_eq!(cause.to_string(), expected.to_string());
 
     drop((fresh, unchanged, restored, factory));
+    Ok(())
+}
+
+#[tokio::test]
+async fn provider_registry_unmatched_resume_refuses_new_matching_provider(
+) -> Result<(), Box<dyn std::error::Error>> {
+    provider_selection_change(None, false).await
+}
+
+#[tokio::test]
+async fn provider_registry_unmatched_resume_refuses_enabled_matching_provider(
+) -> Result<(), Box<dyn std::error::Error>> {
+    provider_selection_change(Some(false), false).await
+}
+
+#[tokio::test]
+async fn provider_registry_matched_resume_refuses_lower_id_competitor(
+) -> Result<(), Box<dyn std::error::Error>> {
+    provider_selection_change(Some(true), true).await
+}
+
+async fn provider_selection_change(
+    initial_enabled: Option<bool>,
+    competing: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let temp = chio_test_support::private_tempdir()?;
+    let directory = temp.path();
+    let registry_path = directory.join("enterprise-providers.json");
+    write_registry(&registry_path, initial_enabled.unwrap_or(false));
+    if initial_enabled.is_none() {
+        std::fs::write(
+            &registry_path,
+            br#"{"version":"chio.enterprise-providers.v1","providers":{}}"#,
+        )?;
+    }
+    let keypair = Keypair::generate();
+    let mut config = test_remote_config();
+    config.policy_path = directory.join("policy.yaml");
+    std::fs::write(
+        &config.policy_path,
+        "capabilities:\n  default:\n    tools: []\n",
+    )?;
+    config.test_transport = Some(Arc::new(ReadOnlyTransport));
+    config.session_db_path = Some(directory.join("sessions.sqlite3"));
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(directory));
+    config.enterprise_providers_file = Some(registry_path.clone());
+    config.auth_token = None;
+    config.auth_jwt_public_key = Some(keypair.public_key().to_hex());
+    config.auth_jwt_issuer = Some(ISSUER.to_string());
+    config.auth_jwt_audience = Some("chio-mcp".to_string());
+    configure_signed_manifest(&mut config, directory);
+    let verifier = jwt_verifier(&config);
+    let token = signed_token(&keypair);
+    let auth = authenticate(&verifier, &token)
+        .map_err(|response| format!("initial bearer admission failed: {}", response.status()))?;
+    let selected = |auth: &SessionAuthContext| match &auth.method {
+        SessionAuthMethod::OAuthBearer {
+            enterprise_identity: Some(identity),
+            ..
+        } => identity.provider_record_id.clone(),
+        other => panic!("expected enterprise identity, got {other:?}"),
+    };
+    assert_eq!(
+        selected(&auth).as_deref(),
+        initial_enabled
+            .filter(|enabled| *enabled)
+            .map(|_| "enterprise-login")
+    );
+    let factory = RemoteSessionFactory::new(config)?;
+    let keyring = factory
+        .resume_hmac_keyring
+        .clone()
+        .ok_or("resume keyring")?;
+    let fresh = factory.spawn_session(auth.clone())?;
+    ready_factory_session(&fresh).await?;
+    let record = sign_test_resume_record(fresh.resume_record()?.ok_or("fresh record")?, &keyring);
+    let Some(RestoredSession::Serve(unchanged)) = factory.restore_session(&record)? else {
+        return Err("unchanged provider selection did not resume".into());
+    };
+    unchanged.shutdown_upstream_transport()?;
+    write_registry(&registry_path, true);
+    if competing {
+        let mut registry: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&registry_path)?)?;
+        let mut competitor = registry["providers"]["enterprise-login"].clone();
+        competitor["provider_id"] = json!("a-competing-login");
+        registry["providers"]["a-competing-login"] = competitor;
+        std::fs::write(&registry_path, serde_json::to_vec(&registry)?)?;
+    }
+    let current = authenticate(&verifier, &token)
+        .map_err(|response| format!("updated bearer admission failed: {}", response.status()))?;
+    assert_eq!(
+        selected(&current).as_deref(),
+        Some(if competing {
+            "a-competing-login"
+        } else {
+            "enterprise-login"
+        })
+    );
+    let refusal = validate_session_auth_context(&current, &auth)
+        .expect_err("fresh bearer admission retained the former identity");
+    assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+    assert!(
+        factory.restore_session(&record)?.is_none(),
+        "changed provider selection resumed an old identity"
+    );
+    fresh.shutdown_upstream_transport()?;
     Ok(())
 }
