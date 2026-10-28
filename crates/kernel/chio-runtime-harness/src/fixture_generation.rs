@@ -71,21 +71,21 @@ pub(crate) fn assemble_qualified_fixture(
             return Err(error);
         }
     }
-    let first = out_dir.join("same-source-first");
-    fs::create_dir(&first).map_err(io_error)?;
+    let first_dir = tempfile::tempdir().map_err(io_error)?;
+    let first = first_dir.path();
     for name in &admission.evidence_paths {
         fs::copy(out_dir.join(name), first.join(name)).map_err(io_error)?;
     }
     assemble_runtime_loopback_outputs(
         run_id,
         steps,
-        &first,
+        first,
         now_unix_ms,
         admission.clone(),
         baseline.clone(),
     )?;
     assemble_runtime_loopback_outputs(run_id, steps, out_dir, now_unix_ms, admission, baseline)?;
-    compare_generated_files(&first, out_dir)
+    compare_generated_files(first, out_dir)
 }
 
 fn read_parity_report(

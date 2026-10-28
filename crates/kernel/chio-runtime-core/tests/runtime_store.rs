@@ -114,7 +114,6 @@ fn sqlite_runtime_orchestration_store_persists_run_and_step_status(
                 admission_id: "adm-live-1".to_string(),
                 state: "proof_accepted".to_string(),
                 destructive: true,
-                admission_receipt_sha256: Some("1".repeat(64)),
                 tool_receipt_sha256: Some("2".repeat(64)),
                 lease_id: Some("lease-live-1".to_string()),
             },

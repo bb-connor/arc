@@ -14,5 +14,5 @@ The installation exclusion guard is shared with other authority-source families.
 
 The runtime harness installs a qualified SQLite source before invoking the kernel.
 Its admission artifact is the signed kernel receipt, including a denial receipt.
-Workflow, step and proof-source records bind `admissionReceiptSha256`; the
+Step and proof-source records bind `toolReceiptSha256`; the
 separate cross-boundary treaty admission report retains its own report digest.

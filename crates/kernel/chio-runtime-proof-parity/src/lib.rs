@@ -456,7 +456,6 @@ fn ensure_source_records_bind_workflow_step_evidence(
             );
         };
         for field in [
-            "admissionReceiptSha256",
             "toolReceiptSha256",
             "bilateralDsseSha256",
             "workflowStepSha256",

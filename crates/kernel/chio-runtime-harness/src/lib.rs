@@ -35,10 +35,7 @@ use admission_loop::execute_runtime_admission_loop;
 use evidence_io::read_utf8_json_file;
 use proof_assembly::{assemble_runtime_loopback_outputs, StaticProofBaseline};
 #[cfg(test)]
-use proof_assembly::{
-    runtime_admission_receipt_sha256_for_workflow, step_admission_binding,
-    validate_step_admission_binding_counts,
-};
+use proof_assembly::{step_admission_binding, validate_step_admission_binding_counts};
 use scenario::{normalize_runtime_loopback_steps, RuntimeLoopbackScenario};
 
 const RUNTIME_LOOPBACK_AUTHORITY_STORE_UUID: &str = "018bcfe5-6800-7000-8000-000000000001";
@@ -315,8 +312,8 @@ mod windows_authority_tests {
 #[cfg(test)]
 mod tests {
     use super::{
-        run_runtime_loopback_scenario, runtime_admission_receipt_sha256_for_workflow,
-        step_admission_binding, validate_step_admission_binding_counts,
+        run_runtime_loopback_scenario, step_admission_binding,
+        validate_step_admission_binding_counts,
     };
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -487,20 +484,8 @@ mod tests {
     }
 
     #[test]
-    fn step_admission_binding_rejects_more_workflow_steps_than_admission_hashes() {
-        let error = match validate_step_admission_binding_counts(2, 1, 2) {
-            Ok(()) => panic!("accepted mismatched workflow/admission hash counts"),
-            Err(error) => error,
-        };
-
-        assert!(error
-            .to_string()
-            .contains("workflow step count 2 did not match admission report hash count 1"));
-    }
-
-    #[test]
     fn step_admission_binding_rejects_more_workflow_steps_than_admission_ids() {
-        let error = match validate_step_admission_binding_counts(2, 2, 1) {
+        let error = match validate_step_admission_binding_counts(2, 1) {
             Ok(()) => panic!("accepted mismatched workflow/admission id counts"),
             Err(error) => error,
         };
@@ -513,39 +498,11 @@ mod tests {
     #[test]
     fn step_admission_binding_uses_exact_index_without_fallback(
     ) -> Result<(), crate::RuntimeLoopbackError> {
-        let hashes = ["hash-a".to_string(), "hash-b".to_string()];
         let ids = ["admission-a".to_string(), "admission-b".to_string()];
 
-        let binding = step_admission_binding(1, &hashes, &ids)?;
+        let binding = step_admission_binding(1, &ids)?;
 
-        assert_eq!(binding.admission_receipt_sha256, "hash-b");
-        assert_eq!(binding.admission_id, "admission-b");
-        Ok(())
-    }
-
-    #[test]
-    fn runtime_workflow_admission_hash_uses_report_hash_without_rehashing(
-    ) -> Result<(), crate::RuntimeLoopbackError> {
-        let admission_hash = "a".repeat(64);
-        let selected = runtime_admission_receipt_sha256_for_workflow(
-            None,
-            std::slice::from_ref(&admission_hash),
-            None,
-        )?;
-
-        assert_eq!(selected, admission_hash);
-        assert_ne!(selected, chio_core::sha256_hex(admission_hash.as_bytes()));
-        Ok(())
-    }
-
-    #[test]
-    fn runtime_workflow_admission_hash_uses_terminal_denial_hash(
-    ) -> Result<(), crate::RuntimeLoopbackError> {
-        let denied_hash = "b".repeat(64);
-        let selected =
-            runtime_admission_receipt_sha256_for_workflow(None, &[], Some(&denied_hash))?;
-
-        assert_eq!(selected, denied_hash);
+        assert_eq!(binding, "admission-b");
         Ok(())
     }
 

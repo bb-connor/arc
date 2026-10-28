@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::evidence_io::{canonical_sha256_json, write_runtime_json_artifact};
+use crate::evidence_io::write_runtime_json_artifact;
 use crate::kernel::execute_runtime_loopback_step;
 use crate::scenario::RuntimeLoopbackStep;
 use crate::treaty::RuntimeLoopbackTreatyContext;
@@ -11,8 +11,6 @@ pub(crate) struct RuntimeLoopbackAdmissionOutput {
     pub(crate) accepted: bool,
     pub(crate) failure_code: Option<String>,
     pub(crate) evidence_paths: Vec<String>,
-    pub(crate) admission_hashes: Vec<String>,
-    pub(crate) terminal_admission_receipt_sha256: Option<String>,
     pub(crate) evidence_manifest_entries: Vec<chio_runtime_core::RuntimeEvidenceManifestEntry>,
     pub(crate) live_tool_receipts: Vec<chio_core::receipt::body::ChioReceipt>,
     pub(crate) live_treaty_contexts: Vec<Option<RuntimeLoopbackTreatyContext>>,
@@ -28,8 +26,6 @@ pub(crate) fn execute_runtime_admission_loop(
     let mut accepted = true;
     let mut failure_code = None;
     let mut evidence_paths = Vec::new();
-    let mut admission_hashes = Vec::new();
-    let mut terminal_admission_receipt_sha256 = None;
     let mut evidence_manifest_entries = Vec::new();
     let mut live_tool_receipts = Vec::new();
     let mut live_treaty_contexts = Vec::new();
@@ -65,17 +61,11 @@ pub(crate) fn execute_runtime_admission_loop(
             &mut evidence_manifest_entries,
             &mut evidence_paths,
         )?;
-        let admission_hash = canonical_sha256_json(
-            &execution.receipt,
-            "Chio runtime admission receipt canonical hash",
-        )?;
-        terminal_admission_receipt_sha256 = Some(admission_hash.clone());
         if !execution.accepted {
             accepted = false;
             failure_code = execution.failure_code;
             break;
         }
-        admission_hashes.push(admission_hash);
         live_tool_receipts.push(execution.receipt);
         live_treaty_contexts.push(execution.treaty);
     }
@@ -84,8 +74,6 @@ pub(crate) fn execute_runtime_admission_loop(
         accepted,
         failure_code,
         evidence_paths,
-        admission_hashes,
-        terminal_admission_receipt_sha256,
         evidence_manifest_entries,
         live_tool_receipts,
         live_treaty_contexts,

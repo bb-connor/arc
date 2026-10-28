@@ -79,8 +79,6 @@ pub(super) fn verify_buyer_review_runtime_reports(
         || proof_regeneration_input.evidence_manifest_sha256 != manifest_sha256
         || proof_regeneration_input.workflow_run_report_sha256 != runtime_run_sha256
         || proof_regeneration_input.source_records != proof_regeneration_report.source_records
-        || runtime_run_report.admission_receipt_sha256 != bilateral.remote_receipt_sha256
-        || proof_regeneration_input.admission_receipt_sha256 != bilateral.remote_receipt_sha256
         || proof_regeneration_input.trust_bundle_sha256 != trust_bundle_sha256
         || proof_regeneration_input.verification_context_sha256 != verification_context_sha256
         || proof_regeneration_report.proof_package_sha256.as_deref() != Some(proof_sha256)
@@ -100,8 +98,7 @@ pub(super) fn verify_buyer_review_runtime_reports(
     if step.lease_id.is_none() || step.governance_receipt_id.is_none() {
         return Err("chio_buyer_review_runtime_report_mismatch");
     }
-    if step.admission_receipt_sha256 != bilateral.remote_receipt_sha256
-        || step.tool_receipt_sha256 != bilateral.remote_receipt_sha256
+    if step.tool_receipt_sha256 != bilateral.remote_receipt_sha256
         || step.parent_receipt_sha256.as_deref() != Some(bilateral.local_receipt_sha256.as_str())
         || step.output_sha256 != bilateral.outcome_sha256
     {
@@ -145,7 +142,6 @@ pub(super) fn verify_buyer_review_runtime_reports(
         .iter()
         .any(|record| {
             record.step_index == step.step_index
-                && record.admission_receipt_sha256 == step.admission_receipt_sha256
                 && record.tool_receipt_sha256 == step.tool_receipt_sha256
                 && record.bilateral_dsse_sha256 == step.bilateral_dsse_sha256
                 && record.workflow_step_sha256 == step.workflow_step_sha256

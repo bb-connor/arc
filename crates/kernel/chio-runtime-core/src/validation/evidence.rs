@@ -68,12 +68,6 @@ pub fn validate_runtime_workflow_run_report(
             ),
         });
     }
-    if !is_sha256_hex(&report.admission_receipt_sha256) {
-        return Err(ChioRuntimeError::Rejected {
-            code: "runtime_workflow_invalid_admission_report_hash",
-            detail: "runtime workflow report admission report hash is not sha256 hex".to_string(),
-        });
-    }
     validate_acceptance_failure_code(
         report.accepted,
         report.failure_code.as_deref(),
@@ -207,10 +201,6 @@ pub(super) fn validate_runtime_step_evidence(
             detail: "runtime step evidence must bind admission id".to_string(),
         });
     }
-    ensure_sha256_hash(
-        &step.admission_receipt_sha256,
-        "runtime_step_evidence_invalid_admission_hash",
-    )?;
     ensure_sha256_hash(
         &step.tool_receipt_sha256,
         "runtime_step_evidence_invalid_tool_receipt_hash",
