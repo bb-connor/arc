@@ -78,12 +78,11 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/recovery/semantic.rs:18` `SEMANTIC_TRANSFORMATION_SIGNATURE_DOMAIN` = `chio:semantic-transformation:v1`
 - `crates/core/chio-core-types/src/recovery/semantic.rs:19` `SEMANTIC_PREREQUISITE_SIGNATURE_DOMAIN` = `chio:semantic-prerequisite:v1`
 
-## crates/kernel/chio-kernel (33)
+## crates/kernel/chio-kernel (32)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
 - `crates/kernel/chio-kernel/src/admission_operation.rs:94` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9` `SCHEMA` = `chio.admission-caller-dispatch-context.v1`
-- `crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:12` `SCHEMA` = `chio.governed-approval-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs:6` `SCHEMA` = `chio.native-security-authority-binding.v1`
 - `crates/kernel/chio-kernel/src/checkpoint.rs:39` `CHECKPOINT_PUBLICATION_SCHEMA` = `chio.checkpoint_publication.v1`
 - `crates/kernel/chio-kernel/src/checkpoint.rs:40` `CHECKPOINT_WITNESS_SCHEMA` = `chio.checkpoint_witness.v1`
