@@ -52,6 +52,7 @@ pub mod economic_effect_coordinator;
 pub mod economic_state_anchor;
 pub mod economic_state_recovery;
 pub mod enterprise_federation;
+pub mod enterprise_identity_index;
 pub mod evidence_export;
 pub mod federation_policy;
 pub mod fiscal_runtime_readiness;
