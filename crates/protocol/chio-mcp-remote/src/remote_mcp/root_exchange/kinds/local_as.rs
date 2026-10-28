@@ -176,6 +176,7 @@ pub fn verify(
     now: u64,
 ) -> Result<AnchorEvidence, RootExchangeError> {
     let local = verify_token(server, token, sender, now)?;
+    let scope_values = scope_values(&local.claims)?;
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
@@ -192,7 +193,7 @@ pub fn verify(
         artifact_digest: Some(local.token_digest),
         request_digest: local.token_digest,
         claims: local.claims,
-        scope_values: Vec::new(),
+        scope_values,
         provider_id: None,
         scope_bound: None,
         holder: None,
@@ -240,6 +241,7 @@ pub fn verify_reexchange(
     if let Some(requested) = request.scope {
         claims.insert("scope".to_owned(), Value::String(requested.join(" ")));
     }
+    let scope_values = scope_values(&claims)?;
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
@@ -256,7 +258,7 @@ pub fn verify_reexchange(
         artifact_digest: Some(local.token_digest),
         request_digest: request.request_digest,
         claims,
-        scope_values: Vec::new(),
+        scope_values,
         provider_id: None,
         scope_bound: Some(root_scope),
         holder: None,

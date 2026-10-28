@@ -700,6 +700,20 @@ async fn introspection_without_exp_refuses() {
 }
 
 #[tokio::test]
+async fn introspection_without_iat_refuses() {
+    let introspector = StubIntrospector::answering(edit(introspection_response(), |response| {
+        response.remove("iat");
+    }));
+    let error = introspection_refusal(&introspector).await;
+    assert_eq!(error, RootExchangeError::ClaimMissing("iat"));
+    refusal_code(&error, OAuthErrorCode::InvalidGrant);
+    let valid = StubIntrospector::answering(introspection_response());
+    oauth_introspection::verify(&every_kind(), "opaque-token", NOW, &valid)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn introspection_response_refusals() {
     let cases = [
         (
@@ -1291,4 +1305,89 @@ async fn introspection_issued_after_expiry_refuses() {
     let error = introspection_refusal(&introspector).await;
     assert_eq!(error, RootExchangeError::ClaimInvalid("exp"));
     refusal_code(&error, OAuthErrorCode::InvalidGrant);
+}
+
+fn local_rule(edit_rule: impl FnOnce(&mut Value)) -> RootExchange {
+    let mut rule = base_rule("local-users", "chio_local_as");
+    edit_rule(&mut rule);
+    build(vec![rule], &[]).unwrap()
+}
+
+fn local_evidence() -> AnchorEvidence {
+    let key = local_keypair().public_key();
+    let headers = no_headers();
+    local_as::verify(
+        &local_server(&key),
+        &local_token(&local_claims()),
+        PresentedSender::from(crate::SenderRequest::from(&headers)),
+        NOW,
+    )
+    .unwrap()
+}
+
+fn recorded_scope(prepared: &PreparedAnchoredRoot) -> Vec<&str> {
+    match &prepared.context().anchor.claims.scope {
+        Some(ClaimValue::List(values)) => values.iter().map(|value| value.as_str()).collect(),
+        other => panic!("scope recorded as {other:?}"),
+    }
+}
+
+#[test]
+fn local_token_scope_is_recorded_and_matched() {
+    let plain = local_rule(|rule| rule["recorded_claims"] = json!({ "scope": "plain" }));
+    let prepared = plain
+        .prepare(local_evidence(), None, None, NOW, &entropy())
+        .unwrap();
+    assert_eq!(recorded_scope(&prepared), ["mcp:invoke", "mcp:read"]);
+    consistent(&plain, &prepared);
+
+    let committed = local_rule(|rule| rule["recorded_claims"] = json!({ "scope": "committed" }));
+    let prepared = committed
+        .prepare(local_evidence(), None, None, NOW, &entropy())
+        .unwrap();
+    assert!(matches!(
+        prepared.context().anchor.claims.scope,
+        Some(ClaimValue::Committed(_))
+    ));
+    consistent(&committed, &prepared);
+
+    let listed = local_rule(|rule| {
+        rule["match"]["claims"] = json!({ "scope": ["mcp:invoke", "mcp:read"] });
+    });
+    listed
+        .prepare(local_evidence(), None, None, NOW, &entropy())
+        .unwrap();
+    let narrower = local_rule(|rule| rule["match"]["claims"] = json!({ "scope": ["mcp:read"] }));
+    assert_eq!(
+        narrower
+            .prepare(local_evidence(), None, None, NOW, &entropy())
+            .unwrap_err(),
+        RootExchangeError::RuleMatchCount { matched: 0 }
+    );
+}
+
+#[test]
+fn local_reexchange_scope_is_the_narrowed_request() {
+    let token = local_token(&local_claims());
+    let narrowed = ["mcp:read".to_owned()];
+    let evidence = || reexchange(&token, Some(&narrowed), Some(RESOURCE), Some(CLIENT_ID)).unwrap();
+    assert_eq!(evidence().scope_values, ["mcp:read"]);
+
+    let exchange = local_rule(|rule| {
+        rule["recorded_claims"] = json!({ "scope": "plain" });
+        rule["match"]["claims"] = json!({ "scope": ["mcp:read"] });
+    });
+    let prepared = exchange
+        .prepare(evidence(), None, None, NOW, &entropy())
+        .unwrap();
+    assert_eq!(recorded_scope(&prepared), ["mcp:read"]);
+
+    let invoke_only =
+        local_rule(|rule| rule["match"]["claims"] = json!({ "scope": ["mcp:invoke"] }));
+    assert_eq!(
+        invoke_only
+            .prepare(evidence(), None, None, NOW, &entropy())
+            .unwrap_err(),
+        RootExchangeError::RuleMatchCount { matched: 0 }
+    );
 }

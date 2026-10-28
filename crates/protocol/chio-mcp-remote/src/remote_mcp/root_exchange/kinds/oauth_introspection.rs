@@ -193,7 +193,7 @@ pub async fn verify(
     if seconds(&response, "nbf")?.is_some_and(|nbf| nbf > now.saturating_add(skew)) {
         return Err(RootExchangeError::AssertionNotYetValid);
     }
-    let iat = seconds(&response, "iat")?.unwrap_or(now);
+    let iat = required_seconds(&response, "iat")?;
     if iat > now.saturating_add(skew) {
         return Err(RootExchangeError::AssertionIssuedInFuture);
     }
