@@ -613,6 +613,7 @@ pub(crate) fn decode_remote_import_request(
         .map_err(|error| BundleVerifyError::trust_invalid(error.to_string()))?;
     let request = chio_security_types::strict_serde::lossless(
         value,
+        "RemoteEvidenceImportRequest",
         serde_json::from_value::<RemoteEvidenceImportRequest>,
         |typed: &RemoteEvidenceImportRequest| serde_json::to_value(typed),
     )

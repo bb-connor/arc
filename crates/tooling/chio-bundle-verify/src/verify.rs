@@ -130,38 +130,47 @@ pub fn read_package(dir: &Path) -> Result<EvidenceImportPackage, BundleVerifyErr
         }
     }
     let envelope: EvidencePackageEnvelope = match read_bytes(dir, ENVELOPE_FILE) {
-        Ok(bytes) => crate::read::decode_strict(ENVELOPE_FILE, &bytes)?,
+        Ok(bytes) => crate::read::decode_strict(ENVELOPE_FILE, "EvidencePackageEnvelope", &bytes)?,
         Err(error) => {
             return Err(BundleVerifyError::envelope(format!(
                 "invalid or missing evidence export envelope: {error}"
             )))
         }
     };
-    let manifest: EvidenceExportManifest = read_json(dir, MANIFEST_FILE)?;
+    let manifest: EvidenceExportManifest = read_json(dir, MANIFEST_FILE, "EvidenceExportManifest")?;
     verify_inventory(&manifest)?;
     verify_manifest_file_hashes(dir, &manifest)?;
     verify_policy_attachment(dir, &manifest)?;
     let bundle = EvidenceExportBundle {
-        query: read_json(dir, QUERY_FILE)?,
-        tool_receipts: read_ndjson(dir, RECEIPTS_FILE)?,
-        child_receipts: read_ndjson(dir, CHILD_RECEIPTS_FILE)?,
+        query: read_json(dir, QUERY_FILE, "EvidenceExportQuery")?,
+        tool_receipts: read_ndjson(dir, RECEIPTS_FILE, "EvidenceToolReceiptRecord")?,
+        child_receipts: read_ndjson(dir, CHILD_RECEIPTS_FILE, "EvidenceChildReceiptRecord")?,
         child_receipt_scope: manifest.child_receipt_scope,
-        checkpoints: read_ndjson(dir, CHECKPOINTS_FILE)?,
-        capability_lineage: read_ndjson(dir, CAPABILITY_LINEAGE_FILE)?,
-        inclusion_proofs: read_ndjson(dir, INCLUSION_PROOFS_FILE)?,
-        uncheckpointed_receipts: read_ndjson(dir, UNCHECKPOINTED_FILE)?,
-        retention: read_json(dir, RETENTION_FILE)?,
+        checkpoints: read_ndjson(dir, CHECKPOINTS_FILE, "KernelCheckpoint")?,
+        capability_lineage: read_ndjson(dir, CAPABILITY_LINEAGE_FILE, "CapabilitySnapshot")?,
+        inclusion_proofs: read_ndjson(dir, INCLUSION_PROOFS_FILE, "ReceiptInclusionProof")?,
+        uncheckpointed_receipts: read_ndjson(
+            dir,
+            UNCHECKPOINTED_FILE,
+            "EvidenceUncheckpointedReceipt",
+        )?,
+        retention: read_json(dir, RETENTION_FILE, "EvidenceRetentionMetadata")?,
     };
     let transparency = Some(CheckpointTransparencySummary {
-        publications: read_ndjson(dir, PUBLICATIONS_FILE)?,
-        witnesses: read_ndjson(dir, WITNESSES_FILE)?,
-        consistency_proofs: read_ndjson(dir, CONSISTENCY_PROOFS_FILE)?,
-        equivocations: read_ndjson(dir, EQUIVOCATIONS_FILE)?,
+        publications: read_ndjson(dir, PUBLICATIONS_FILE, "CheckpointPublication")?,
+        witnesses: read_ndjson(dir, WITNESSES_FILE, "CheckpointWitness")?,
+        consistency_proofs: read_ndjson(
+            dir,
+            CONSISTENCY_PROOFS_FILE,
+            "CheckpointConsistencyProof",
+        )?,
+        equivocations: read_ndjson(dir, EQUIVOCATIONS_FILE, "CheckpointEquivocation")?,
     });
     let federation_policy = if manifest.federation_policy.is_some() {
         Some(read_json::<FederationPolicyDocument>(
             dir,
             FEDERATION_POLICY_FILE,
+            "FederationPolicyDocument",
         )?)
     } else {
         None
@@ -211,7 +220,8 @@ fn verify_policy_attachment(
     let Some(expected_policy) = &manifest.policy else {
         return Ok(());
     };
-    let metadata: PolicyAttachmentMetadata = read_json(dir, POLICY_METADATA_FILE)?;
+    let metadata: PolicyAttachmentMetadata =
+        read_json(dir, POLICY_METADATA_FILE, "PolicyAttachmentMetadata")?;
     if &metadata != expected_policy {
         return Err(BundleVerifyError::inconsistent(
             "policy metadata file does not match evidence manifest",
