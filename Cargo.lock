@@ -3532,6 +3532,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-decision-model"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+ "proptest",
+]
+
+[[package]]
 name = "chio-decoy"
 version = "0.1.0"
 dependencies = [
