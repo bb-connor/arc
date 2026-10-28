@@ -1008,6 +1008,46 @@ fn release_denies_settlement_packet_for_other_economics() {
 }
 
 #[test]
+fn release_denies_contexts_that_move_the_signed_packet_references() {
+    let mutations: [Mutation<CommerceOrderContext>; 2] = [
+        ("settlement_packet_ref", |context| {
+            context.settlement_packet_ref = "settlement-packet-other".to_string()
+        }),
+        ("reconciliation_ref", |context| {
+            context.reconciliation_ref = "reconciliation-other".to_string()
+        }),
+    ];
+    for (field, mutate) in mutations {
+        let mut fixture = ReleaseFixture::new();
+        mutate(&mut fixture.acceptance.updated_context);
+        mutate(&mut fixture.advanced);
+        assert_eq!(
+            fixture.denial(),
+            escrow(CommerceEscrowError::SettlementPacketUnbound(field)),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn release_denies_contexts_whose_quote_digest_does_not_recompute() {
+    let mut fixture = ReleaseFixture::new();
+    fixture.acceptance.updated_context.quote_id = "quote-other".to_string();
+    fixture.advanced.quote_id = "quote-other".to_string();
+    let expected = fixture.acceptance.updated_context.quote_sha256.clone();
+    let actual = crate::canonical_quote_sha256(&fixture.acceptance.updated_context)
+        .test_expect("quote digest");
+    assert_eq!(
+        fixture.denial(),
+        CommerceOrderError::DigestMismatch {
+            field: "order context quote".to_string(),
+            expected,
+            actual,
+        }
+    );
+}
+
+#[test]
 fn release_denies_advanced_context_that_rewrites_immutable_fields() {
     let mutations: [Mutation<CommerceOrderContext>; 12] = [
         ("order_id", |context| {
