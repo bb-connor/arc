@@ -592,6 +592,13 @@ class TypeResolutionTests(unittest.TestCase):
         source = "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) } struct Record { n: u32 } fn good(t: &str) { let r = Record::decode(t); consume(r); }"
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), [])
 
+    def test_local_generic_extractor_over_a_raw_decode_is_an_extractor(self):
+        extractor = "pub struct Bounded<T>(pub T); impl<S, T> FromRequest<S> for Bounded<T> where T: DeserializeOwned { type Rejection = E; async fn from_request(request: Request, _state: &S) -> Result<Self, E> { let bytes = read(request); serde_json::from_slice(&bytes).map(Self).map_err(wrap) } } "
+        findings = self.findings({"crates/demo/src/lib.rs": extractor + "async fn bad(Bounded(r): Bounded<ChioReceipt>) {}"})
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad: raw extractor Bounded<ChioReceipt>", findings[0])
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": extractor + "async fn good(Bounded(r): Bounded<u32>) {}"}), [])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
