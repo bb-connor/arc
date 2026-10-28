@@ -27,6 +27,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "acp_envelope_decode",
     "anchor_bundle_verify",
     "chio_yaml_parse",
+    "commerce_receipt_verify",
     "did_resolve",
     "eval_receipt_bundle",
     "federation_trust_establishment",
@@ -313,6 +314,12 @@ fn receipt_log_replay_smoke() {
 fn rollback_anchor_slots_smoke() {
     use chio_store_sqlite::fuzz::rollback_anchor_slots;
     assert_seed_floor("rollback_anchor_slots", rollback_anchor_slots);
+}
+
+#[test]
+fn commerce_receipt_verify_smoke() {
+    use chio_commerce_order::fuzz::commerce_receipt_verify;
+    assert_seed_floor("commerce_receipt_verify", commerce_receipt_verify);
 }
 
 #[test]

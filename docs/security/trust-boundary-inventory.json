@@ -19435,6 +19435,21 @@
     "crates/platform/chio-agent-web-interop/src/policy.rs": [
       "parse_policy::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json"
     ],
+    "crates/platform/chio-commerce-order/src/fuzz.rs": [
+      "commerce_receipt_verify::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::verify_commerce_receipt",
+      "decode_fixture::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "load_fixture::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::decode_fixture",
+      "replay::shared-reader::crates/platform/chio-commerce-order/src/replay.rs::replay_event_log",
+      "resign::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
+      "settle::shared-reader::crates/platform/chio-commerce-order/src/settlement.rs::validate_settlement_packet",
+      "verify_commerce_receipt::shared-reader::crates/platform/chio-commerce-order/src/types.rs::decode_authority_receipt",
+      "verify_commerce_receipt::shared-reader::crates/platform/chio-commerce-order/src/types.rs::decode_authority_receipt"
+    ],
     "crates/platform/chio-commerce-order/src/input.rs": [
       "decode::original-json-reader::UntrustedJsonText"
     ],

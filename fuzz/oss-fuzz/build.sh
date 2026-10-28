@@ -47,6 +47,7 @@ TARGETS=(
     fuzz_merkle_checkpoint
     revocation_oracle_merkle
     rollback_anchor_slots
+    commerce_receipt_verify
     peers_lock_decode
     fuzz_tool_action
 )

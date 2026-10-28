@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod error;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod ids;
 mod input;
 mod mandate;

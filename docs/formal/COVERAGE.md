@@ -14,6 +14,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-acp-edge::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-anchor::*` | - | - | - | 5 | - | - | 1 | 2 | - | - |
 | `chio-attest-verify::*` | - | - | - | 4 | - | - | 1 | 2 | - | - |
+| `chio-commerce-order::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-config::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-conformance::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-control-plane::*` | - | - | - | - | - | - | 1 | - | - | - |
@@ -128,6 +129,12 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 
 - `.cargo/mutants.toml::chio-attest-verify` (scope=workspace-active)
 - `audits/mutation/per-crate-configs/chio-attest-verify.toml` (scope=workspace-exact)
+
+### `chio-commerce-order::*`
+
+**fuzz**
+
+- `fuzz/target-map.toml::commerce_receipt_verify`
 
 ### `chio-config::*`
 
@@ -1316,7 +1323,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `5c42b7b51594f629903d8f8b97833fb41225b527bc8bd441bfce54055ab4182d`
+- Input digest: `f3f5a6681b90ad00f7c26e5df6936ebff8bbf8ff65b3964ec99fcd96fad2e727`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1627,9 +1634,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/RevocationPropagationUnfairWitness.tla`: `303c81c61d89013ce2798ebf53441f9a6855de6dbcad5ea1da611daf023adbed`
 - `formal/tla/trace/TraceCheckRevocationPropagation.tla`: `60b0a3b0a287605cbd9735c755a5af94a94f84398800d8767400967bf05a1749`
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
-- `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
-- `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `2c6545211222e52b0efbef6d8742401b3c7202329cebe848b724629457aad60b`
+- `fuzz/owners.toml`: `9ecb4d90e46cd353e720d06d9843e19934764cb228aac16d97dc11115cfa2f2a`
+- `fuzz/target-map.toml`: `1860ffa1034ead48c8d4684326977e14942c92193ea834618350bc8def25f72b`
+- `git-worktree://rust-files`: `d68fbb33a1f665261bf0014f86f1c4be15b9a03b4923652bd64536db7eed51f9`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
