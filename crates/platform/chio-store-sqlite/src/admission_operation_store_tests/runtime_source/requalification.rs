@@ -108,3 +108,66 @@ fn requalification_stale_fence_refuses_before_source_callback() -> Result<(), Bo
     assert_eq!(global_count(&fixture.store), before);
     Ok(())
 }
+
+#[test]
+fn requalification_reclaims_active_capacity_without_deleting_history() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture();
+    let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+    for index in 1..128 {
+        fixture.store.install_runtime_source(
+            &identifier("source", &format!("capacity-source-{index}")),
+            &identifier("runtime", &format!("capacity-runtime-{index}")),
+            &Source::new(&fixture, Behavior::Normal),
+            &fixture.fence,
+            now_ms(),
+        )?;
+    }
+    let replacement = Source::new(&fixture, Behavior::Normal);
+    replace(&fixture, &prior, &replacement, &fixture.fence)?;
+    assert_eq!(source_count(&fixture.store), 129);
+    let before = global_count(&fixture.store);
+    assert_eq!(
+        fixture.store.install_runtime_source(
+            &identifier("source", "over-capacity-source"),
+            &identifier("runtime", "over-capacity-runtime"),
+            &Source::new(&fixture, Behavior::Normal),
+            &fixture.fence,
+            now_ms(),
+        ),
+        Err(AdmissionOperationStoreError::Invariant(
+            "runtime source capacity or source identity conflict".into(),
+        )),
+    );
+    assert_eq!(source_count(&fixture.store), 129);
+    assert_eq!(global_count(&fixture.store), before);
+    let connection = fixture.store.connection()?;
+    crate::admission_operation_store::verify_runtime_source_projection_coverage(&connection)?;
+    verify_admission_operation_invariants(&connection)?;
+    Ok(())
+}
+
+#[test]
+fn missing_supersession_refuses_global_projection_coverage() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+    replace(
+        &fixture,
+        &prior,
+        &Source::new(&fixture, Behavior::Normal),
+        &fixture.fence,
+    )?;
+    let connection = fixture.store.connection()?;
+    crate::admission_operation_store::verify_runtime_source_projection_coverage(&connection)?;
+    connection.execute_batch(
+        "DROP TRIGGER runtime_source_supersessions_no_delete;
+         DELETE FROM runtime_source_supersessions;",
+    )?;
+    let result =
+        crate::admission_operation_store::verify_runtime_source_projection_coverage(&connection);
+    assert!(matches!(result,
+        Err(crate::serving_owner::SqliteServingOwnerError::Invalid(detail))
+        if detail == "runtime source qualification integrity: runtime sources and global references have different counts"
+    ));
+    Ok(())
+}
