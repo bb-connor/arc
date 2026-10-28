@@ -1,11 +1,10 @@
-//! Live kernel admission against a physically sealed runtime source and a
-//! separately qualified SQLite authority. No legacy replay adapter is used.
+//! Kernel admission with a physically qualified SQLite runtime source.
 
 use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantAuthorityBindingV1, RuntimeParticipantDisposition,
 };
-use chio_kernel::admission_operation::AdmissionIdentifier;
+use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeSourcePort};
 use chio_kernel::{ChioKernel, KernelConfig, Verdict};
 use chio_store_sqlite::SqliteAuthorityStore;
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -161,24 +160,23 @@ impl Fixture {
         let fence = authority.mutation_fence();
         let source_id = AdmissionIdentifier::try_new("source_id", "live-runtime-source")?;
         let runtime_id = AdmissionIdentifier::try_new("runtime_id", "live-runtime-authority")?;
-        let expected =
-            store.expect_runtime_replay_source(&source_id, &runtime_id, &source, &fence, NOW)?;
-        store.import_runtime_replay_source(
+        let qualification = source.qualify(
+            &source_id,
             &runtime_id,
-            expected.expectation_id(),
-            &source,
-            &fence,
-            NOW,
+            &AdmissionIdentifier::try_new("destination_authority_id", fence.store_uuid.clone())?,
         )?;
+        if activate {
+            let installed =
+                store.install_runtime_source(&source_id, &runtime_id, &source, &fence, NOW)?;
+            assert_eq!(
+                installed.qualification_id().as_str(),
+                qualification.qualification_sha256()
+            );
+        }
         let binding = RuntimeParticipantAuthorityBindingV1::new(
             runtime_id,
-            expected.expectation_id().clone(),
+            AdmissionIdentifier::try_new("qualification_id", qualification.qualification_sha256())?,
         );
-        if activate {
-            let active = store.activate_runtime_replay_source(&binding, &source, &fence, NOW)?;
-            assert!(active.is_active());
-            assert_eq!(active.event_sequence(), 3);
-        }
         Ok(Self {
             _directory: FixtureDirectory::Owned(directory),
             authority,
@@ -201,11 +199,11 @@ impl Fixture {
         Ok(ChioRuntimeAdmissionHook::new(
             profile(),
             SqliteRuntimeOrchestrationStore::open(self._directory.path().join("runtime.sqlite3"))?,
+            self.binding.clone(),
         )
         .with_runtime_trust_input(trust, keys)
         .with_pheromone_query_report(report)
         .with_runtime_pheromone_policy(policy, weights)
-        .with_operation_owned_runtime_replay(self.binding.clone())
         .with_swarm_graph_source(Arc::new(IssuedGraphs(self.authority.work_graph_store()))))
     }
 
@@ -304,19 +302,11 @@ fn live_owned_runtime_dispatch_retains_claim_and_real_trust_floor() -> TestResul
     assert!(metadata["chio_runtime"]
         .get("reserved_destructive_lease_id")
         .is_none());
-    assert!(fixture
-        .source
-        .consume_destructive_lease("lease-live-1", "adm-live-1")
-        .is_err());
-    assert!(fixture
-        .source
-        .release_destructive_lease("lease-live-1", "adm-live-1")
-        .is_err());
     Ok(())
 }
 
 #[test]
-fn owned_runtime_denies_inactive_source_and_ephemeral_read_only_fallback() -> TestResult {
+fn owned_runtime_denies_uninstalled_source_and_ephemeral_read_only_fallback() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for (activate, durable, read_only) in [(false, true, false), (true, false, true)] {
         let fixture = Fixture::new(activate)?;
@@ -333,23 +323,16 @@ fn owned_runtime_denies_inactive_source_and_ephemeral_read_only_fallback() -> Te
 }
 
 #[test]
-fn owned_runtime_denies_fixed_clock_override_and_wrong_physical_source() -> TestResult {
+fn owned_runtime_denies_wrong_physical_source() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
-    for wrong_source in [false, true] {
-        let fixture = Fixture::new(true)?;
-        let hook = if wrong_source {
-            let other = SqliteRuntimeOrchestrationStore::open(
-                fixture._directory.path().join("other-runtime.sqlite3"),
-            )?;
-            ChioRuntimeAdmissionHook::new(profile(), other)
-                .with_operation_owned_runtime_replay(fixture.binding.clone())
-        } else {
-            fixture.hook()?.with_fixed_now_unix_ms(NOW)
-        };
-        let kernel = fixture.kernel(hook, true, false)?;
-        let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
-        assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
-        assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
-    }
+    let fixture = Fixture::new(true)?;
+    let other = SqliteRuntimeOrchestrationStore::open(
+        fixture._directory.path().join("other-runtime.sqlite3"),
+    )?;
+    let hook = ChioRuntimeAdmissionHook::new(profile(), other, fixture.binding.clone());
+    let kernel = fixture.kernel(hook, true, false)?;
+    let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
+    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }

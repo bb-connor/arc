@@ -366,9 +366,8 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
     for code in [
         "admission_bundle_id_mismatch",
         "runtime_trust_floor_store_unsupported",
-        "runtime_replay_source_invalid",
-        "runtime_replay_source_inventory_limit",
-        "runtime_replay_source_sealed",
+        "runtime_source_qualification_invalid",
+        "runtime_store_schema_mismatch",
         "missing_governed_intent",
         "missing_chio_admission_context",
         "invalid_chio_admission_context",
