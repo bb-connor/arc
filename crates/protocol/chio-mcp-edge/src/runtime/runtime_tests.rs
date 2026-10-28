@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 
 #[path = "runtime_tests/channel_roots.rs"]
 mod channel_roots;
+#[path = "runtime_tests/deny_code.rs"]
+mod deny_code;
 #[path = "runtime_tests/initialized_handshake.rs"]
 mod initialized_handshake;
 #[path = "runtime_tests/request_identity.rs"]
