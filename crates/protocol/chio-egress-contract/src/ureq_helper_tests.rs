@@ -2,6 +2,7 @@ use super::*;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Condvar;
 use std::thread;
 use std::time::Instant;
 
@@ -176,24 +177,73 @@ fn deadline_bounds_a_response_that_drips_inside_the_phase_timeout() {
     handle.join().expect("server");
 }
 
+fn lookup_fn(
+    resolve: impl Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync + 'static,
+) -> ContractLookup {
+    Arc::new(resolve)
+}
+
 fn lookup_after(delay: Duration, answer: SocketAddr) -> ContractLookup {
-    Arc::new(move |_host: &str, _port: u16| {
+    lookup_fn(move |_host: &str, _port: u16| {
         thread::sleep(delay);
         Ok(vec![answer])
     })
 }
 
+#[derive(Default)]
+struct Hold {
+    released: Mutex<bool>,
+    release: Condvar,
+    started: AtomicUsize,
+    finished: AtomicUsize,
+}
+
+impl Hold {
+    fn open(&self) {
+        *self.released.lock().expect("hold") = true;
+        self.release.notify_all();
+    }
+
+    fn wait_finished(&self, count: usize) {
+        for _ in 0..500 {
+            if self.finished.load(Ordering::SeqCst) == count {
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        panic!("held lookups did not return");
+    }
+}
+
+/// Every lookup blocks until the hold opens, then answers `answer`.
+fn held_lookup(answer: SocketAddr) -> (ContractLookup, Arc<Hold>) {
+    let hold = Arc::new(Hold::default());
+    let gate = Arc::clone(&hold);
+    let lookup = lookup_fn(move |_host: &str, _port: u16| {
+        gate.started.fetch_add(1, Ordering::SeqCst);
+        let mut released = gate.released.lock().expect("hold");
+        while !*released {
+            released = gate.release.wait(released).expect("hold");
+        }
+        drop(released);
+        gate.finished.fetch_add(1, Ordering::SeqCst);
+        Ok(vec![answer])
+    });
+    (lookup, hold)
+}
+
 #[test]
 fn slow_resolution_spends_the_request_deadline() {
-    let (authority, handle) =
-        serve_once("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-    let server: SocketAddr = authority.parse().expect("server");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    listener.set_nonblocking(true).expect("nonblocking");
+    let server = listener.local_addr().expect("address");
+    let (lookup, hold) = held_lookup(server);
     let target = format!("slow.example:{}", server.port());
     let agent = BlockingContractAgent::with_lookup(
         &HttpEgressContract::permissive_for_tests(&target),
         Duration::from_secs(5),
         Duration::from_secs(1),
-        lookup_after(Duration::from_secs(3), server),
+        lookup,
     )
     .expect("agent");
     let started = Instant::now();
@@ -211,9 +261,79 @@ fn slow_resolution_spends_the_request_deadline() {
     );
     assert!(
         elapsed < Duration::from_secs(2),
-        "a 3 second lookup must end at the 1 second deadline, took {elapsed:?}"
+        "a held lookup must end at the 1 second deadline, took {elapsed:?}"
     );
-    drop(handle);
+    assert_eq!(
+        listener.accept().map(drop).map_err(|error| error.kind()),
+        Err(io::ErrorKind::WouldBlock),
+        "a lookup past the deadline must not dial"
+    );
+    hold.open();
+    hold.wait_finished(1);
+}
+
+const HELD_LOOKUPS: usize = 16;
+
+#[test]
+fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
+    let (authority, handle) =
+        serve_once("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    let server: SocketAddr = authority.parse().expect("server");
+    let (lookup, hold) = held_lookup(server);
+    let call = |name: &str, deadline: Duration| {
+        let target = format!("{name}:{}", server.port());
+        BlockingContractAgent::with_lookup(
+            &HttpEgressContract::permissive_for_tests(&target),
+            Duration::from_secs(2),
+            deadline,
+            lookup.clone(),
+        )
+        .expect("agent")
+        .get(&format!("http://{target}/"))
+        .expect("allowed")
+        .call()
+    };
+    for index in 0..HELD_LOOKUPS {
+        let host = format!("held{index}.example");
+        assert_eq!(
+            call(&host, Duration::from_millis(50)),
+            Err(deadline_refusal(&host))
+        );
+    }
+    for _ in 0..3 {
+        assert_eq!(
+            call("held0.example", Duration::from_millis(50)),
+            Err(deadline_refusal("held0.example"))
+        );
+    }
+    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS);
+    let full = HttpEgressError::DnsResolutionFailed {
+        host: "spare.example".to_string(),
+        details: "too many name lookups are in flight".to_string(),
+    };
+    let started = Instant::now();
+    assert_eq!(
+        call("spare.example", Duration::from_secs(5)),
+        Err(full.clone())
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS);
+
+    hold.open();
+    hold.wait_finished(HELD_LOOKUPS);
+    let response = (0..100)
+        .find_map(|_| match call("spare.example", Duration::from_secs(5)) {
+            Err(refusal) if refusal == full => {
+                thread::sleep(Duration::from_millis(10));
+                None
+            }
+            outcome => Some(outcome),
+        })
+        .expect("a returned lookup frees its slot")
+        .expect("response");
+    assert_eq!(response.status(), 204);
+    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS + 1);
+    handle.join().expect("server");
 }
 
 #[test]
@@ -275,7 +395,7 @@ fn the_first_checked_answer_is_the_only_address_dialed() {
     let target = format!("rebind.example:{}", server.port());
     let lookups = Arc::new(AtomicUsize::new(0));
     let observed = Arc::clone(&lookups);
-    let rebinding: ContractLookup = Arc::new(move |_host: &str, port: u16| {
+    let rebinding = lookup_fn(move |_host: &str, port: u16| {
         if observed.fetch_add(1, Ordering::SeqCst) == 0 {
             Ok(vec![server])
         } else {
