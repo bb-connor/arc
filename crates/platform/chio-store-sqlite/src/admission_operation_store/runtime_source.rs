@@ -153,6 +153,13 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
+pub(super) fn require_active_source(
+    connection: &Connection,
+    runtime: &AdmissionIdentifier,
+) -> Result<(), AdmissionOperationStoreError> {
+    supersession::require_active(connection, runtime.as_str())
+}
+
 pub(super) fn require_qualified_source(
     connection: &Connection,
     authority: &AdmissionIdentifier,
