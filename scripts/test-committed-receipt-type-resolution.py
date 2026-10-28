@@ -564,6 +564,34 @@ class TypeResolutionTests(unittest.TestCase):
     def test_macro_expanded_decode_of_a_plain_type_is_allowed(self):
         self.assertEqual(self.raw_decodes("macro_rules! decoder { ($name:ident, $ty:ty) => { fn $name(s: &str) { serde_json::from_str::<$ty>(s); } }; } decoder!(good, u32);"), [])
 
+    def test_helper_calls_resolve_to_the_generic_helper(self):
+        helper = "mod input { pub fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) } pub fn read(p: &str) -> Vec<u8> { Vec::new() } } mod other { pub fn decode(p: &str) -> u32 { 0 } } "
+        cases = [
+            ("fn bad(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 1),
+            ("use crate::input::decode as parse; fn bad(t: &str) -> Result<ChioReceipt, E> { parse(t) }", 1),
+            ("fn good(t: &str) -> u32 { let n = crate::other::decode(t); n }", 0),
+            ("fn good(p: &str) { let bytes = std::fs::read(p); consume(bytes); }", 0),
+        ]
+        for source, expected in cases:
+            with self.subTest(source=source):
+                findings = self.findings({"crates/demo/src/lib.rs": helper + source})
+                self.assertEqual(len(findings), expected, findings)
+
+    def test_generic_helper_with_an_inferred_decode_checks_its_callers(self):
+        helper = "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { let v = serde_json::from_str(t)?; post(v) } "
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn good(t: &str) -> Result<u32, E> { decode(t) }"}), [])
+        findings = self.findings({"crates/demo/src/lib.rs": helper + "fn bad(t: &str) -> Result<ChioReceipt, E> { decode(t) }"})
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad: raw decode decode(t)", findings[0])
+
+    def test_tail_decode_through_a_closure_argument(self):
+        findings = self.raw_decodes("fn bad(v: &str) -> Result<ChioReceipt, E> { serde_json::from_str(v).map_err(|_| { wrap() }) }")
+        self.assertEqual(len(findings), 1, findings)
+
+    def test_associated_call_does_not_name_a_free_helper(self):
+        source = "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) } struct Record { n: u32 } fn good(t: &str) { let r = Record::decode(t); consume(r); }"
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), [])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
