@@ -87,7 +87,8 @@ the Entra rules.
 
 Entra roots: one root per token, keyed by `(issuer, uti)`. A different token
 presenting an already-bound `uti` denies, and a second explicit exchange of
-the same token denies. Root lifetime is `min(capability_ttl_secs, token exp - now)`.
+the same token denies. Root lifetime is
+`min(now + capability_ttl_secs, token exp, policy.valid_until) - now`.
 After the root expires, requests carrying the same token get HTTP 401 with RFC
 6750 `error="invalid_token"`. Identity-provider revocation of an Entra
 principal takes effect at the expiry of tokens issued before it.
@@ -469,8 +470,11 @@ Caller revocation request, signed by `revoker_key`:
   claim named by the record's `subject_mapping.tenant_id_field`, and
   `subject_tag = HMAC-SHA256(K[subject-tag], "chio.subject-tag.v1" || 0x00 || issuer || 0x00 || subject)`.
 - Every tag carries the `key_id` of the generation it was derived under. A
-  tag carried as a string uses `tt1.<hex key_id>.<hex value>` or
-  `st1.<hex key_id>.<hex value>` and is parsed exactly.
+  tenant tag carried as a string uses `tt1.<hex key_id>.<hex value>` and a
+  subject tag uses `st1.<hex key_id>.<hex value>`. Each is parsed exactly under
+  its own purpose: a revocation entry whose `target_kind` is `tenant_tag`
+  refuses an `st1` target, and one whose `target_kind` is `anchor_subject`
+  refuses a `tt1` target.
 - New tags use the active generation. A lookup or revocation match computes
   the candidate from plaintext it holds under every loaded generation and
   matches on `(key_id, value)`. A retired generation stays loaded while any

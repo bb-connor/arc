@@ -22,6 +22,14 @@ bytes. Nothing keeps the old shape: the live file is replaced, not versioned.
 Before moving a file, re-diff it against the live file on `main`; a live change
 made after staging is carried into the staged file first.
 
+`capability/examples/` holds pinned instances for `revocation.schema.json`:
+one valid `anchor_subject` (`st1`) and one valid `tenant_tag` (`tt1`) entry,
+and the two crossed-prefix entries, which fail at `/target` on `pattern`
+(`invalid-expectations.json`). They move to
+`spec/schemas/chio-wire/v1/capability/examples/` with the schema, and the
+implementing PR runs them through the schema example check and pins the same
+four cases against the revocation decoder.
+
 | Staged file | Live path | Moved by | Changes |
 |---|---|---|---|
 | `capability/token.schema.json` | same | the anchored-root change (M1 exchange and admission) | optional signed `root_anchor` (`$ref` to `root_authority/root-anchor.schema.json`); `monetaryAmount.currency` becomes `asset` (moves with the settlement change if that lands first, see below) |
@@ -49,9 +57,14 @@ in the same PR.
 - Manifest members are camelCase (`disclosureProfile`, `tenantTags`), because
   `EvidenceExportManifest` is `#[serde(rename_all = "camelCase")]`.
 - Tags are keyed index values (PROTOCOL 5.6.8). The manifest's `tenantTags`
-  holds typed values `{key_id, value}`, one per loaded generation; revocation
-  `anchor_subject` and `tenant_tag` targets use the string form
-  `st1.<hex key_id>.<hex value>` and `tt1.<hex key_id>.<hex value>`.
+  holds typed values `{key_id, value}`, one per loaded generation; a revocation
+  `anchor_subject` target uses the string form `st1.<hex key_id>.<hex value>`
+  and a `tenant_tag` target uses `tt1.<hex key_id>.<hex value>`. Each target
+  kind accepts only its own prefix. The generated bindings do not enforce the
+  `if`/`then` branches that bind the prefix to the kind, so the revocation
+  decoder parses the target with `KeyedIndexValue::parse_string_form` under the
+  purpose of its `target_kind` (`SubjectTag` or `TenantTag`) and refuses the
+  other prefix.
 - A `replay_key` revocation target is the `replay_key_digest` recorded in the
   delegation context.
 - New artifact roles are listed in a separate `artifacts` array; each entry's
