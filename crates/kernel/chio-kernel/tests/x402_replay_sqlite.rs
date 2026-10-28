@@ -51,7 +51,7 @@ fn adapter_at(
     Ok(X402PaymentAdapter::new(
         facilitator,
         rail,
-        &std::collections::BTreeSet::new(),
+        &chio_kernel::payment::EgressAllowanceSet::default(),
         clock,
         replay,
     )?

@@ -1,6 +1,7 @@
 use super::{
-    private_network_allowance_digest, HttpEgressContract, HttpEgressError, IpCidr,
-    PrivateNetworkAllowance, PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
+    private_network_allowance_digest, EgressAllowanceSet, HttpEgressContract, HttpEgressError,
+    IpCidr, PrivateNetworkAllowance, PrivateNetworkAllowanceError,
+    EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
 };
 use std::collections::BTreeSet;
 use std::net::{IpAddr, SocketAddr};
@@ -523,4 +524,80 @@ fn portless_resolver_refuses_a_pinned_host() {
             host: FACILITATOR.to_string()
         })
     );
+}
+
+#[test]
+fn contract_takes_only_the_set_entries_for_its_authorities() {
+    let set = EgressAllowanceSet::new([
+        allowance(FACILITATOR, 8443, "10.20.0.0/24"),
+        allowance(FACILITATOR, 9443, "10.21.0.0/24"),
+        allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+        allowance("public.example", 443, "10.30.0.0/24"),
+        allowance("unrelated.vpc.internal", 8443, "10.40.0.0/24"),
+    ])
+    .expect("valid set");
+    let contract = vpc_contract(&[]).with_private_network_allowances(&set);
+    assert_eq!(
+        contract.private_network_allowances,
+        BTreeSet::from([
+            allowance(FACILITATOR, 8443, "10.20.0.0/24"),
+            allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+            allowance("public.example", 443, "10.30.0.0/24"),
+        ])
+    );
+    contract
+        .validate()
+        .expect("filtered allowances fit the contract");
+    assert_eq!(resolved(&contract, FACILITATOR, "10.20.0.5", 8443), Ok(()));
+
+    let empty = vpc_contract(&[allowance(FACILITATOR, 8443, "10.20.0.0/24")])
+        .with_private_network_allowances(&EgressAllowanceSet::default());
+    assert!(empty.private_network_allowances.is_empty());
+}
+
+#[test]
+fn allowance_set_validates_each_entry_and_refuses_duplicates() {
+    assert_eq!(
+        EgressAllowanceSet::new([allowance(FACILITATOR, 8443, "100.100.0.0/16")]),
+        Err(PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
+            cidr: "100.100.0.0/16".to_string(),
+            reserved: "100.100.100.200/32".to_string(),
+        })
+    );
+    assert_eq!(
+        EgressAllowanceSet::new([
+            allowance(FACILITATOR, 8443, "10.20.0.0/24"),
+            allowance(FACILITATOR, 8443, "10.21.0.0/24"),
+        ]),
+        Err(PrivateNetworkAllowanceError::DuplicateAllowance {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+        })
+    );
+}
+
+#[test]
+fn allowance_set_document_is_strict() {
+    let parsed: EgressAllowanceSet = serde_json::from_value(serde_json::json!({
+        "allow": [{"host": FACILITATOR, "port": 8443, "cidr": "10.20.0.0/24"}]
+    }))
+    .expect("set document");
+    assert_eq!(
+        parsed.entries(),
+        &BTreeSet::from([allowance(FACILITATOR, 8443, "10.20.0.0/24")])
+    );
+    let error = serde_json::from_value::<EgressAllowanceSet>(serde_json::json!({
+        "allow": [],
+        "allowPrivate": true
+    }))
+    .expect_err("unknown document field");
+    assert!(
+        error.to_string().contains("unknown field `allowPrivate`"),
+        "{error}"
+    );
+    let error = serde_json::from_value::<EgressAllowanceSet>(serde_json::json!({
+        "allow": [{"host": FACILITATOR, "port": 8443, "cidr": "10.0.0.0/8"}]
+    }))
+    .expect_err("broad CIDR in the document");
+    assert!(error.to_string().contains("broader than /16"), "{error}");
 }

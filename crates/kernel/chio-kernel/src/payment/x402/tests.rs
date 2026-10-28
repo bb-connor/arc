@@ -62,7 +62,7 @@ fn adapter_with(
     X402PaymentAdapter::new(
         facilitator,
         test_rail(),
-        &std::collections::BTreeSet::new(),
+        &crate::payment::EgressAllowanceSet::default(),
         clock,
         replay,
     )
@@ -469,7 +469,7 @@ fn facilitator_url_is_validated_at_construction() {
         let error = X402PaymentAdapter::new(
             url,
             test_rail(),
-            &std::collections::BTreeSet::new(),
+            &crate::payment::EgressAllowanceSet::default(),
             clock_at(NOW),
             replay_store(),
         )
@@ -482,7 +482,7 @@ fn facilitator_url_is_validated_at_construction() {
     X402PaymentAdapter::new(
         "https://facilitator.example/x402",
         test_rail(),
-        &std::collections::BTreeSet::new(),
+        &crate::payment::EgressAllowanceSet::default(),
         clock_at(NOW),
         replay_store(),
     )
@@ -500,7 +500,7 @@ fn facilitator_outside_the_public_network_is_refused_at_construction() {
         let error = X402PaymentAdapter::new(
             url,
             test_rail(),
-            &std::collections::BTreeSet::new(),
+            &crate::payment::EgressAllowanceSet::default(),
             clock_at(NOW),
             replay_store(),
         )

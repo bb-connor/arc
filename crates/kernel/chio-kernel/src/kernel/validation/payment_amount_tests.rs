@@ -1,6 +1,4 @@
-use std::collections::BTreeSet;
-
-use chio_egress_contract::PrivateNetworkAllowance;
+use chio_egress_contract::{EgressAllowanceSet, PrivateNetworkAllowance};
 
 use crate::payment::{
     AcpPaymentAdapter, PaymentAdapter, PaymentError, PaymentJournalRecord, PaymentJournalState,
@@ -36,11 +34,14 @@ fn journal_under(digest: &str) -> PaymentJournalRecord {
 
 fn vpc_rail() -> AcpPaymentAdapter {
     AcpPaymentAdapter::new("https://facilitator.vpc.internal:8443")
-        .with_private_network_allowances(&BTreeSet::from([PrivateNetworkAllowance {
-            host: "facilitator.vpc.internal".to_owned(),
-            port: 8443,
-            cidr: "10.20.0.0/24".parse().expect("cidr"),
-        }]))
+        .with_private_network_allowances(
+            &EgressAllowanceSet::new([PrivateNetworkAllowance {
+                host: "facilitator.vpc.internal".to_owned(),
+                port: 8443,
+                cidr: "10.20.0.0/24".parse().expect("cidr"),
+            }])
+            .expect("valid allowance set"),
+        )
         .expect("allowance for the rail's own authority")
 }
 
