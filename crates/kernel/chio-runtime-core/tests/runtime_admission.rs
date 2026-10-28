@@ -20,6 +20,7 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
     for code in [
         "admission_bundle_id_mismatch",
         "runtime_trust_floor_store_unsupported",
+        "operation_owned_runtime_source_unsupported",
         "runtime_source_qualification_invalid",
         "runtime_store_schema_mismatch",
         "missing_governed_intent",
@@ -34,8 +35,6 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
         "missing_chio_swarm_authority_bundle",
         "chio_swarm_authority_ref_mismatch",
         "chio_swarm_authority_rejected",
-        "chio_swarm_continuation_replay",
-        "chio_swarm_continuation_store_unsupported",
         "missing_chio_treaty_context",
         "invalid_chio_treaty_context",
         "request_smuggled_trust_root",
@@ -61,7 +60,6 @@ fn runtime_failure_code_registry_covers_hook_surface_codes() {
         "runtime_step_evidence_missing_admission_id",
         "runtime_step_evidence_missing_consistency_anchor",
         "runtime_step_evidence_missing_governance",
-        "duplicate_consumed_swarm_continuation",
     ] {
         assert!(
             registry.contains(code),
