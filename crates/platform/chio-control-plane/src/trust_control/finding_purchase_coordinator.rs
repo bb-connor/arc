@@ -44,7 +44,7 @@ use chio_kernel::admission_operation::{
 };
 use chio_kernel::tool_outcome::{ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeStore};
 use chio_kernel_core::evidence_verify::{
-    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint, verify_checkpoint_signature,
+    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint,
 };
 use chio_open_market::bidding::{
     ReservationReceipt, SignedAskResponse, SignedBidRequest, SignedReservationReceipt,
@@ -1653,15 +1653,15 @@ impl FindingPurchaseCoordinator {
                 "zero-charge currency conflicts with the reservation".to_owned(),
             ));
         }
-        validate_checkpoint(checkpoint)
-            .map_err(|error| PurchaseCoordinatorError::CheckpointEvidence(error.to_string()))?;
+        let checkpoint = validate_checkpoint(checkpoint)
+            .map_err(|error| PurchaseCoordinatorError::CheckpointEvidence(error.to_string()))?
+            .checkpoint();
         if checkpoint.body.issued_at > now {
             return Err(PurchaseCoordinatorError::CheckpointEvidence(
                 "denial checkpoint is ahead of the finalization clock".to_owned(),
             ));
         }
-        if !matches!(verify_checkpoint_signature(checkpoint), Ok(true))
-            || checkpoint.body.kernel_key != receipt.kernel_key
+        if checkpoint.body.kernel_key != receipt.kernel_key
             || checkpoint.body.issued_at < receipt.timestamp
             || inclusion_proof.checkpoint_seq != checkpoint.body.checkpoint_seq
             || inclusion_proof.merkle_root != checkpoint.body.merkle_root

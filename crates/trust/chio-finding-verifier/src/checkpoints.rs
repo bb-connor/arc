@@ -397,12 +397,15 @@ mod tests {
         )?;
         let signer = Keypair::from_seed(&[7; 32]);
         let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
-        assert!(verify_checkpoint_signature(&checkpoint)?);
+        verify_checkpoint_signature(&checkpoint)?;
         assert!(has_strict_checkpoint_signature(&checkpoint));
         checkpoint.body.kernel_key = weak_key;
         checkpoint.signature = forged_signature;
 
-        assert!(!verify_checkpoint_signature(&checkpoint)?);
+        assert!(matches!(
+            verify_checkpoint_signature(&checkpoint),
+            Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
+        ));
         assert!(!has_strict_checkpoint_signature(&checkpoint));
         Ok(())
     }

@@ -2241,6 +2241,12 @@ fn maybe_build_checkpoint(
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
         // O(b) Merkle build over the batch, plus O(log n) over the chain
         // frontier; the predecessor digest comes from the cached head.
+        let predecessor = head
+            .latest_checkpoint
+            .as_ref()
+            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .transpose()
+            .map_err(checkpoint_error_to_receipt_store)?;
         let checkpoint =
             chio_kernel_core::evidence_verify::build_checkpoint_with_chain_frontier_at(
                 checkpoint_seq,
@@ -2251,7 +2257,7 @@ fn maybe_build_checkpoint(
                     keypair: &signer.keypair,
                     issued_at: clock.unix_millis()?,
                 },
-                head.latest_checkpoint.as_ref(),
+                predecessor.as_ref(),
                 &chain_frontier,
             )
             .map_err(checkpoint_error_to_receipt_store)?;

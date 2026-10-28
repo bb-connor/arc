@@ -29,7 +29,8 @@ use chio_core_types::receipt::kinds::{BoundaryClass, ReceiptKind};
 use chio_core_types::root_authority::VerifierTrust;
 use chio_kernel_core::evidence_verify::{
     build_evidence_transparency_claims, checkpoint_body_sha256, validate_checkpoint_transparency,
-    verify_checkpoint_signature, verify_checkpoint_transparency_records,
+    verify_checkpoint_signature, verify_checkpoint_transparency_records, CheckpointError,
+    VerifiedCheckpoint,
 };
 
 use crate::error::BundleVerifyError;
@@ -602,8 +603,8 @@ pub fn verify_child_receipts(
 pub fn verify_checkpoints<'a>(
     checkpoints: &'a [KernelCheckpoint],
     trust: &VerifierTrust,
-) -> Result<BTreeMap<u64, &'a KernelCheckpoint>, BundleVerifyError> {
-    let mut by_seq = BTreeMap::<u64, &KernelCheckpoint>::new();
+) -> Result<BTreeMap<u64, VerifiedCheckpoint<'a>>, BundleVerifyError> {
+    let mut by_seq = BTreeMap::<u64, VerifiedCheckpoint<'a>>::new();
     for checkpoint in checkpoints {
         if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
             return Err(BundleVerifyError::schema(format!(
@@ -616,18 +617,16 @@ pub fn verify_checkpoints<'a>(
                 "evidence signer is outside the trusted kernel key set",
             ));
         }
-        let signed = verify_checkpoint_signature(checkpoint).map_err(|error| {
-            BundleVerifyError::signature(format!(
-                "checkpoint signature verification failed: {}: {error}",
-                checkpoint.body.checkpoint_seq
-            ))
-        })?;
-        if !signed {
-            return Err(BundleVerifyError::signature(format!(
+        let checkpoint = verify_checkpoint_signature(checkpoint).map_err(|error| match error {
+            CheckpointError::InvalidSignature => BundleVerifyError::signature(format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
-            )));
-        }
+            )),
+            error => BundleVerifyError::signature(format!(
+                "checkpoint signature verification failed: {}: {error}",
+                checkpoint.body.checkpoint_seq
+            )),
+        })?;
         if let Some(existing) = by_seq.get(&checkpoint.body.checkpoint_seq) {
             let digest = |checkpoint: &KernelCheckpoint| {
                 checkpoint_body_sha256(&checkpoint.body).map_err(|error| {
@@ -636,8 +635,8 @@ pub fn verify_checkpoints<'a>(
                     ))
                 })
             };
-            let existing_sha256 = digest(existing)?;
-            let checkpoint_sha256 = digest(checkpoint)?;
+            let existing_sha256 = digest(existing.checkpoint())?;
+            let checkpoint_sha256 = digest(checkpoint.checkpoint())?;
             if existing_sha256 != checkpoint_sha256 {
                 return Err(BundleVerifyError::inconsistent(format!(
                     "checkpoint transparency equivocation detected: checkpoint_seq {} has conflicting digests {} and {}",
@@ -682,7 +681,7 @@ pub fn verify_lineage(
 /// by the same key, and the unproved receipts match the manifest count.
 pub fn verify_inclusion_proofs(
     tool_receipts_by_seq: &BTreeMap<u64, &ChioReceipt>,
-    checkpoints_by_seq: &BTreeMap<u64, &KernelCheckpoint>,
+    checkpoints_by_seq: &BTreeMap<u64, VerifiedCheckpoint<'_>>,
     inclusion_proofs: &[ReceiptInclusionProof],
     expected_uncheckpointed_receipts: u64,
 ) -> Result<(), BundleVerifyError> {

@@ -800,7 +800,10 @@ pub(crate) mod tests {
                 .map(|(_, bytes)| bytes)
                 .collect::<Vec<_>>(),
             &checkpoint_key,
-            Some(&first),
+            Some(
+                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                    .expect("verified predecessor"),
+            ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],
         )
         .unwrap();
@@ -873,7 +876,10 @@ pub(crate) mod tests {
                 .map(|(_, bytes)| bytes)
                 .collect::<Vec<_>>(),
             &checkpoint_key,
-            Some(&first),
+            Some(
+                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                    .expect("verified predecessor"),
+            ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],
         )
         .unwrap();

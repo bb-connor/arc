@@ -17,7 +17,7 @@ pub fn build_checkpoint_with_previous_at(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     signing: CheckpointSigningContext<'_>,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain_leaf_hashes: &[Hash],
 ) -> Result<KernelCheckpoint, CheckpointError> {
     build_checkpoint_with_chain_frontier_at(
@@ -38,7 +38,7 @@ pub fn build_checkpoint_with_chain_frontier_at(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     signing: CheckpointSigningContext<'_>,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain: &CheckpointChainFrontier,
 ) -> Result<KernelCheckpoint, CheckpointError> {
     let CheckpointSigningContext { keypair, issued_at } = signing;
@@ -80,7 +80,7 @@ pub fn build_checkpoint_with_chain_frontier_at(
                 .transpose()?
         }
         Some(previous) => {
-            validate_checkpoint(previous)?;
+            validate_checkpoint_statement(previous)?;
             validate_checkpoint_successor_position(previous, checkpoint_seq, batch_start_seq)?;
             if prior_chain.leaf_count() != previous.body.checkpoint_seq {
                 return Err(CheckpointError::Continuity(format!(

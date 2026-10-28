@@ -99,7 +99,7 @@ fn exercise_merkle(
     assert_eq!(checkpoint.body.merkle_root, tree.root());
     assert!(matches!(
         chio_kernel_core::evidence_verify::verify_checkpoint_signature(&checkpoint),
-        Ok(true)
+        Ok(_)
     ));
     if let Err(error) = chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint) {
         panic!("built checkpoint should validate: {error}");
@@ -109,7 +109,7 @@ fn exercise_merkle(
     body_tampered.body.tree_size = body_tampered.body.tree_size.saturating_add(1);
     assert!(matches!(
         chio_kernel_core::evidence_verify::verify_checkpoint_signature(&body_tampered),
-        Ok(false)
+        Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
     ));
     assert!(chio_kernel_core::evidence_verify::validate_checkpoint(&body_tampered).is_err());
 
@@ -117,7 +117,7 @@ fn exercise_merkle(
     range_tampered.body.batch_end_seq = range_tampered.body.batch_end_seq.saturating_add(1);
     assert!(matches!(
         chio_kernel_core::evidence_verify::verify_checkpoint_signature(&range_tampered),
-        Ok(false)
+        Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
     ));
     assert!(chio_kernel_core::evidence_verify::validate_checkpoint(&range_tampered).is_err());
 

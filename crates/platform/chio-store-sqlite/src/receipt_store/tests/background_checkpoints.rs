@@ -602,7 +602,9 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
         6,
         &range_bytes,
         &keypair,
-        Some(&checkpoint_one),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+        ),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     // Break the predecessor linkage while keeping the row individually valid:
@@ -794,7 +796,9 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
         6,
         &range_bytes,
         &keypair,
-        Some(&checkpoint_two),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_two).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?,
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_two.body)?,
@@ -1067,7 +1071,9 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         max_batch * 2,
         &canonical_receipt_bytes(&store, max_batch + 1, max_batch * 2),
         &keypair,
-        Some(&checkpoint_one),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+        ),
         &[checkpoint_one_leaf],
     )?;
     insert_checkpoint_row(&store, &checkpoint_two, checkpoint_two.body.batch_end_seq);
@@ -1346,7 +1352,9 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
         max_batch * 2,
         &canonical_receipt_bytes(&store, max_batch + 1, max_batch * 2),
         &keypair,
-        Some(&checkpoint_one),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+        ),
         &old_frontier,
     )?;
 

@@ -269,7 +269,7 @@ pub fn checkpoint_chain_root(chain_leaf_hashes: &[Hash]) -> Result<Hash, Checkpo
 pub fn build_checkpoint_publication(
     checkpoint: &KernelCheckpoint,
 ) -> Result<CheckpointPublication, CheckpointError> {
-    validate_checkpoint(checkpoint)?;
+    let checkpoint = validate_checkpoint(checkpoint)?.checkpoint();
     Ok(CheckpointPublication {
         log_id: checkpoint_log_id(checkpoint),
         schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
@@ -331,8 +331,8 @@ pub fn build_checkpoint_witness(
     checkpoint: &KernelCheckpoint,
     witness_checkpoint: &KernelCheckpoint,
 ) -> Result<CheckpointWitness, CheckpointError> {
-    validate_checkpoint(checkpoint)?;
-    validate_checkpoint(witness_checkpoint)?;
+    let checkpoint = validate_checkpoint(checkpoint)?.checkpoint();
+    let witness_checkpoint = validate_checkpoint(witness_checkpoint)?.checkpoint();
 
     let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body)?;
     let witness_checkpoint_sha256 = checkpoint_body_sha256(&witness_checkpoint.body)?;
@@ -456,7 +456,7 @@ fn build_checkpoint_consistency_proof_from_tree(
     chain_leaf_hashes: &[Hash],
     chain_tree: &MerkleTree,
 ) -> Result<CheckpointConsistencyProof, CheckpointError> {
-    validate_checkpoint_predecessor(previous, current)?;
+    let (previous, current) = validate_checkpoint_pair(previous, current)?;
     let previous = ValidatedCheckpoint::after_validation(previous)?;
     let current = ValidatedCheckpoint::after_validation(current)?;
     build_checkpoint_consistency_proof_from_validated(
@@ -700,11 +700,11 @@ struct ValidatedCheckpoint<'a> {
 
 impl<'a> ValidatedCheckpoint<'a> {
     fn validate(checkpoint: &'a KernelCheckpoint) -> Result<Self, CheckpointError> {
-        validate_checkpoint(checkpoint)?;
-        Self::after_validation(checkpoint)
+        Self::after_validation(validate_checkpoint(checkpoint)?)
     }
 
-    fn after_validation(checkpoint: &'a KernelCheckpoint) -> Result<Self, CheckpointError> {
+    fn after_validation(checkpoint: VerifiedCheckpoint<'a>) -> Result<Self, CheckpointError> {
+        let checkpoint = checkpoint.checkpoint();
         Ok(Self {
             checkpoint,
             checkpoint_sha256: checkpoint_body_sha256(&checkpoint.body)?,
@@ -786,10 +786,8 @@ pub fn detect_checkpoint_equivocation(
     first: &KernelCheckpoint,
     second: &KernelCheckpoint,
 ) -> Result<Option<CheckpointEquivocation>, CheckpointError> {
-    validate_checkpoint(first)?;
-    validate_checkpoint(second)?;
-    let first = ValidatedCheckpoint::after_validation(first)?;
-    let second = ValidatedCheckpoint::after_validation(second)?;
+    let first = ValidatedCheckpoint::validate(first)?;
+    let second = ValidatedCheckpoint::validate(second)?;
     Ok(detect_checkpoint_equivocation_from_validated(
         &first, &second,
     ))
@@ -1299,24 +1297,64 @@ pub fn build_inclusion_proof(
     })
 }
 
+/// A checkpoint whose body carries a valid signature by its `kernel_key`.
+///
+/// Only [`verify_checkpoint_signature`] and [`validate_checkpoint`] construct
+/// one, so a consumer that takes a `VerifiedCheckpoint` never sees an
+/// unverified statement.
+#[derive(Debug, Clone, Copy)]
+pub struct VerifiedCheckpoint<'a> {
+    checkpoint: &'a KernelCheckpoint,
+}
+
+impl<'a> VerifiedCheckpoint<'a> {
+    /// The verified checkpoint statement.
+    #[must_use]
+    pub fn checkpoint(&self) -> &'a KernelCheckpoint {
+        self.checkpoint
+    }
+}
+
+impl core::ops::Deref for VerifiedCheckpoint<'_> {
+    type Target = KernelCheckpoint;
+
+    fn deref(&self) -> &KernelCheckpoint {
+        self.checkpoint
+    }
+}
+
 /// Verify the signature on a KernelCheckpoint.
 ///
-/// Returns `Ok(true)` if the signature is valid.
-pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool, CheckpointError> {
+/// Fails with [`CheckpointError::InvalidSignature`] when `kernel_key` did not
+/// sign the canonical body.
+pub fn verify_checkpoint_signature(
+    checkpoint: &KernelCheckpoint,
+) -> Result<VerifiedCheckpoint<'_>, CheckpointError> {
     #[cfg(test)]
     test_counters::CHECKPOINT_SIGNATURE_VERIFICATION_COUNT.with(|count| {
         count.set(count.get().saturating_add(1));
     });
     let body_bytes = canonical_json_bytes(&checkpoint.body)
         .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
-    Ok(checkpoint
+    if !checkpoint
         .body
         .kernel_key
-        .verify_strict(&body_bytes, &checkpoint.signature))
+        .verify_strict(&body_bytes, &checkpoint.signature)
+    {
+        return Err(CheckpointError::InvalidSignature);
+    }
+    Ok(VerifiedCheckpoint { checkpoint })
 }
 
 /// Validate the integrity of a single checkpoint statement.
-pub fn validate_checkpoint(checkpoint: &KernelCheckpoint) -> Result<(), CheckpointError> {
+pub fn validate_checkpoint(
+    checkpoint: &KernelCheckpoint,
+) -> Result<VerifiedCheckpoint<'_>, CheckpointError> {
+    validate_checkpoint_statement(checkpoint)?;
+    verify_checkpoint_signature(checkpoint)
+}
+
+fn validate_checkpoint_statement(checkpoint: &KernelCheckpoint) -> Result<(), CheckpointError> {
     if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
         return Err(CheckpointError::Invalid(format!(
             "unsupported checkpoint schema {}",
@@ -1381,9 +1419,6 @@ pub fn validate_checkpoint(checkpoint: &KernelCheckpoint) -> Result<(), Checkpoi
             ));
         }
     }
-    if !verify_checkpoint_signature(checkpoint)? {
-        return Err(CheckpointError::InvalidSignature);
-    }
     Ok(())
 }
 
@@ -1436,10 +1471,18 @@ pub fn validate_checkpoint_predecessor(
     predecessor: &KernelCheckpoint,
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), CheckpointError> {
-    validate_checkpoint(predecessor)?;
-    validate_checkpoint(checkpoint)?;
+    validate_checkpoint_pair(predecessor, checkpoint).map(|_| ())
+}
+
+fn validate_checkpoint_pair<'a>(
+    predecessor: &'a KernelCheckpoint,
+    checkpoint: &'a KernelCheckpoint,
+) -> Result<(VerifiedCheckpoint<'a>, VerifiedCheckpoint<'a>), CheckpointError> {
+    let predecessor = validate_checkpoint(predecessor)?;
+    let checkpoint = validate_checkpoint(checkpoint)?;
     let predecessor_sha256 = checkpoint_body_sha256(&predecessor.body)?;
-    validate_checkpoint_predecessor_link(predecessor, &predecessor_sha256, checkpoint)
+    validate_checkpoint_predecessor_link(&predecessor, &predecessor_sha256, &checkpoint)?;
+    Ok((predecessor, checkpoint))
 }
 
 fn validate_checkpoint_predecessor_link(

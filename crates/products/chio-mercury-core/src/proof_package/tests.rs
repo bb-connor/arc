@@ -436,7 +436,10 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         2,
         std::slice::from_ref(&second_canonical),
         &checkpoint_keypair,
-        Some(&first_checkpoint),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&first_checkpoint)
+                .expect("verified predecessor"),
+        ),
         &[first_chain_leaf],
     )
     .expect("second checkpoint");

@@ -44,7 +44,6 @@ impl ComplianceCoverage {
             || checkpoint.body.kernel_key != *kernel_key
             || checkpoint.body.issued_at > issued_at
             || chio_kernel_core::evidence_verify::validate_checkpoint(checkpoint).is_err()
-            || !chio_kernel_core::evidence_verify::verify_checkpoint_signature(checkpoint).unwrap_or(false)
             || entries.iter().any(|entry| {
                 entry
                     .entry_seq

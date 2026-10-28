@@ -832,7 +832,10 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
         6,
         &range_bytes,
         &keypair,
-        Some(&checkpoint_one),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one)
+                .expect("verified predecessor"),
+        ),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     insert_checkpoint_row(&store, &checkpoint_two, checkpoint_two.body.batch_end_seq);
@@ -919,7 +922,10 @@ fn catch_up_rejects_divergent_chain_root_before_advancing_head(
         6,
         &range_bytes,
         &keypair,
-        Some(&checkpoint_one),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one)
+                .expect("verified predecessor"),
+        ),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     assert_ne!(

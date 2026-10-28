@@ -34,7 +34,7 @@ use chio_core::hashing::Hash;
 use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_kernel_core::evidence_verify::{
     build_checkpoint_with_chain_frontier_at, build_checkpoint_with_previous_at,
-    CheckpointChainFrontier, CheckpointError, CheckpointSigningContext,
+    CheckpointChainFrontier, CheckpointError, CheckpointSigningContext, VerifiedCheckpoint,
 };
 
 /// Build a signed kernel checkpoint from a batch of canonical receipt bytes.
@@ -74,7 +74,7 @@ pub fn build_checkpoint_with_previous(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain_leaf_hashes: &[Hash],
 ) -> Result<KernelCheckpoint, CheckpointError> {
     use chio_security_types::clock::{Clock, SystemClock};
@@ -100,7 +100,7 @@ pub fn build_checkpoint_with_chain_frontier(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain: &CheckpointChainFrontier,
 ) -> Result<KernelCheckpoint, CheckpointError> {
     use chio_security_types::clock::{Clock, SystemClock};

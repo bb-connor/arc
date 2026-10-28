@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::receipt::checkpoint::is_supported_checkpoint_schema;
-use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_core::receipt::evidence::ReceiptReadBoundary;
 use chio_core::receipt::evidence::{
     EvidenceExportBundle, EvidenceExportQuery, EvidenceTransparencyClaims,
@@ -13,9 +13,11 @@ use chio_core::receipt::{
 };
 use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
-use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
 use chio_kernel_core::evidence_verify::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
+};
+use chio_kernel_core::evidence_verify::{
+    verify_checkpoint_signature, CheckpointError, VerifiedCheckpoint,
 };
 use serde::{Deserialize, Serialize};
 
@@ -870,15 +872,16 @@ fn authenticate_authoritative_receipt_order(
             record.seq, proof.checkpoint_seq
         )));
     }
-    if !is_supported_checkpoint_schema(&checkpoint.body.schema)
-        || !verify_checkpoint_signature(checkpoint)
-            .map_err(|error| MercuryContractError::Validation(error.to_string()))?
-    {
-        return Err(MercuryContractError::Validation(format!(
+    let unbound = || {
+        format!(
             "authoritative receipt sequence {} is not bound to a valid signed checkpoint",
             record.seq
-        )));
+        )
+    };
+    if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
+        return Err(MercuryContractError::Validation(unbound()));
     }
+    let checkpoint = verified_checkpoint(checkpoint, unbound)?;
     if proof.merkle_root != checkpoint.body.merkle_root
         || proof.leaf_index != proof.proof.leaf_index
     {
@@ -1296,16 +1299,24 @@ fn verify_trusted_checkpoint_requirements(
         ));
     }
     for checkpoint in &bundle.checkpoints {
-        if !verify_checkpoint_signature(checkpoint)
-            .map_err(|error| MercuryContractError::Validation(error.to_string()))?
-        {
-            return Err(MercuryContractError::Validation(format!(
+        verified_checkpoint(checkpoint, || {
+            format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
-            )));
-        }
+            )
+        })?;
     }
     Ok(bundled_checkpoint_prefix_covered)
+}
+
+fn verified_checkpoint(
+    checkpoint: &KernelCheckpoint,
+    refusal: impl FnOnce() -> String,
+) -> Result<VerifiedCheckpoint<'_>, MercuryContractError> {
+    verify_checkpoint_signature(checkpoint).map_err(|error| match error {
+        CheckpointError::InvalidSignature => MercuryContractError::Validation(refusal()),
+        error => MercuryContractError::Validation(error.to_string()),
+    })
 }
 
 fn verify_signed_bundle_manifest_coverage(
@@ -1485,15 +1496,12 @@ fn verify_chio_bundle(
                 checkpoint.body.schema
             )));
         }
-        if publication_profile.checkpoint_signatures_required
-            && !verify_checkpoint_signature(checkpoint)
-                .map_err(|error| MercuryContractError::Validation(error.to_string()))?
-        {
-            return Err(MercuryContractError::Validation(format!(
+        let checkpoint = verified_checkpoint(checkpoint, || {
+            format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
-            )));
-        }
+            )
+        })?;
         if checkpoints_by_seq
             .insert(checkpoint.body.checkpoint_seq, checkpoint)
             .is_some()

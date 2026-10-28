@@ -1056,7 +1056,10 @@ fn resolved_delivery_with_times(
             3,
             std::slice::from_ref(&receipt_bytes),
             &checkpoint_signer,
-            Some(&fx.checkpoint),
+            Some(
+                &chio_kernel_core::evidence_verify::validate_checkpoint(&fx.checkpoint)
+                    .expect("verified predecessor"),
+            ),
             &[prior_chain_leaf],
         )?,
         checkpoint_time,
