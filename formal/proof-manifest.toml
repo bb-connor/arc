@@ -646,23 +646,34 @@ symbol_sha256 = [
 model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
 model_kind = "lean"
 relationship = "transliteration"
-rust_source = "crates/kernel/chio-kernel/src/checkpoint.rs"
+rust_source = "crates/core/chio-core-types/src/receipt/checkpoint.rs"
 rust_symbols = [
   "KernelCheckpointBody",
   "KernelCheckpoint",
   "ReceiptInclusionProof",
   "ReceiptInclusionProof::verify",
-  "build_inclusion_proof",
-  "verify_checkpoint_signature",
 ]
-normalized_sha256 = "92e0f820f439c56b668fa6a693948ae10452f4018fb432947c95a0f6176e15d8"
+normalized_sha256 = "0c2a7baf20e933b03f68d2d9ca58fc924082140cd7ccc38c71becfe02ec16991"
 symbol_sha256 = [
   { symbol = "KernelCheckpointBody", sha256 = "cd1d6b91e592859a881b7f07fd18a5f07814dd7536a2d8702b534f19596f147c" },
   { symbol = "KernelCheckpoint", sha256 = "6199079e137de72df31dc0edc14bb54337e2cda2177d2dc78eee38d6c33d07b4" },
   { symbol = "ReceiptInclusionProof", sha256 = "6fb42fed267ef9b1f4b27c67ca0ce9b5436b22bd78c4eb525f154996e2c617b4" },
   { symbol = "ReceiptInclusionProof::verify", sha256 = "e2d3affb6bf892f08beac5d9056ce8807e1c43101a7f62808b4e0eab517b3fbc" },
+]
+
+[[mirror]]
+model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
+model_kind = "lean"
+relationship = "transliteration"
+rust_source = "crates/kernel/chio-kernel-core/src/evidence_verify.rs"
+rust_symbols = [
+  "build_inclusion_proof",
+  "verify_checkpoint_signature",
+]
+normalized_sha256 = "15d09dfdf6b957066b500fda0e8559371173bcde429b5a4e055a8229063a88a6"
+symbol_sha256 = [
   { symbol = "build_inclusion_proof", sha256 = "39fb10be9c0cf8f290ac73e3fd18cf4cc4952c96a20aeb761ce6a34a622ca194" },
-  { symbol = "verify_checkpoint_signature", sha256 = "20046e6c7da11c2699aba49dddaf69ac1f33309166ecdd55c52f1f20701f15b8" },
+  { symbol = "verify_checkpoint_signature", sha256 = "0e334fe65f747698ba9302ba2f23a49cb5280bc86c0c30bc7c9ce09081027241" },
 ]
 
 # The bounded model projects only checkpoint sequence and Merkle root.
@@ -671,23 +682,34 @@ symbol_sha256 = [
 model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
 model_kind = "lean"
 relationship = "abstraction_anchor"
-rust_source = "crates/kernel/chio-kernel/src/checkpoint/builders.rs"
+rust_source = "crates/kernel/chio-kernel-core/src/evidence_verify/builders.rs"
 rust_symbols = [
   "CheckpointSigningContext",
-  "build_checkpoint",
-  "build_checkpoint_with_previous",
   "build_checkpoint_with_previous_at",
-  "build_checkpoint_with_chain_frontier",
   "build_checkpoint_with_chain_frontier_at",
 ]
-normalized_sha256 = "df1c41993dde322592c497bba39aa0616dd5e582a86d591248b1a01863d06f71"
+normalized_sha256 = "b62a6e71f294d28aa573f3c81955dda9c4e093f6a3b197d03973c94ad46a4c13"
 symbol_sha256 = [
   { symbol = "CheckpointSigningContext", sha256 = "470cd3aec02d4f9589c096df83d8678e824104840d05ea3c3e7cd7612b07a197" },
+  { symbol = "build_checkpoint_with_previous_at", sha256 = "d5c9e15d7bad17f335e225fd207691be8a60f4b673fee3aff023c73c12214936" },
+  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "142018cec6b882a4193d304437790e421fc755845905ee05d0b2f12d94460edd" },
+]
+
+[[mirror]]
+model_file = "formal/lean4/Chio/Chio/Core/Receipt.lean"
+model_kind = "lean"
+relationship = "abstraction_anchor"
+rust_source = "crates/kernel/chio-kernel/src/checkpoint.rs"
+rust_symbols = [
+  "build_checkpoint",
+  "build_checkpoint_with_previous",
+  "build_checkpoint_with_chain_frontier",
+]
+normalized_sha256 = "a38ed82a6a721339887c7e3edc9bc466eea8cbc0a31bab235fa650590bc09064"
+symbol_sha256 = [
   { symbol = "build_checkpoint", sha256 = "43f68cff56db2effbf22622b756c4c14160b55a7f9a5229b914feb28c2c66e3e" },
   { symbol = "build_checkpoint_with_previous", sha256 = "e853f8494246e1b2d30f9bf74d84bc89786b6737bc387ee72ff9f57e79075ae1" },
-  { symbol = "build_checkpoint_with_previous_at", sha256 = "d5c9e15d7bad17f335e225fd207691be8a60f4b673fee3aff023c73c12214936" },
   { symbol = "build_checkpoint_with_chain_frontier", sha256 = "645d086c4522657c579d18574ba6930fcd6f2719869ea8d4a694d32f1692e468" },
-  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "142018cec6b882a4193d304437790e421fc755845905ee05d0b2f12d94460edd" },
 ]
 
 # TLA records are abstraction anchors. Their hashes force model review when the
