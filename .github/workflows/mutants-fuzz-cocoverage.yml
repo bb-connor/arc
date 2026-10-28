@@ -102,24 +102,37 @@ jobs:
           set -euo pipefail
           cargo install cargo-fuzz --locked --version 0.13.1
 
+      - name: Restore fuzz budget ledger
+        if: steps.forced.outputs.skip == 'false'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
+
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
           set -euo pipefail
-          # Cocoverage runs share the 1,800 min/30d envelope with
-          # cflite_*.yml and fuzz.yml. Cap is advisory (CAP_MODE=warn):
-          # these runs count toward the window they gate, so a hard halt
-          # would not clear on its own. The script emits used/cap/remaining.
+          # Mutation lanes are reported, not capped: the gate prints the
+          # mutation envelope's runner minutes and cannot fail this job.
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
             scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
             echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
             exit 2
           fi
+
+      - name: Save fuzz budget ledger
+        if: always() && steps.forced.outputs.skip == 'false'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
       - name: Run cargo-mutants to enumerate surviving mutants
         id: mutate

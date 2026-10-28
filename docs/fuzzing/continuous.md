@@ -15,9 +15,9 @@ Locked decision (`id=continuous-fuzzing-path`):
 - ClusterFuzzLite on GitHub Actions hosted runners is the bridge that carries
   coverage through the OSS-Fuzz acceptance window (typically 2-6 weeks) and
   remains the documented permanent fallback.
-- Budget cap: 2,000 GHA runner-minutes per month for ClusterFuzzLite, with a
-  hard halt at 1,800 min/30d to leave 200 min/month headroom inside the
-  public-repo free tier. Enforced by `scripts/check-fuzz-budget.sh`.
+- Budget cap: a hard halt at 1,800 runner-min/30d for ClusterFuzzLite
+  (`cflite_pr.yml` plus `cflite_batch.yml`). Enforced by
+  `scripts/check-fuzz-budget.sh`.
 
 OSS-Fuzz post-acceptance is free CPU on Google's hosts and the route to
 sustained continuous fuzzing without burning the GHA cap. The bridge keeps
@@ -27,43 +27,62 @@ verdict before it reaches the long-running OSS-Fuzz soak.
 
 ## GHA budget
 
-The public-repo GitHub Actions free tier is 2,000 runner-minutes per month.
-The continuous-fuzzing program self-caps at 1,800 min/30d for fuzz-related
-runs (200 min/month headroom for everything else). Enforcement:
+`scripts/check-fuzz-budget.sh` measures trailing-30d runner-executed job time
+per budget envelope:
 
-- `scripts/check-fuzz-budget.sh` queries the trailing-30d billed-second
-  total for `cflite_pr.yml`, `cflite_batch.yml`, `fuzz.yml`,
-  `mutants.yml`, `mutants-fuzz-cocoverage.yml`, and `proof-mutants.yml`, sums
-  them, and exits non-zero when the sum crosses the cap unless a lane
-  explicitly opts into `GH_FUZZ_BUDGET_CAP_MODE=warn`.
-- PR-time CFLite budget checks are advisory when the shared trailing window is
-  already over cap. The PR still runs changed-target sampling, but shared
-  budget exhaustion does not block unrelated merge readiness.
-- PR-time mutation gates hard halt when the cap is crossed. These gates are
-  release qualification signals and must not run warn-only.
-- Scheduled measurement lanes may use `GH_FUZZ_BUDGET_CAP_MODE=warn` to keep
-  producing dashboard evidence after the trailing window is already over cap;
-  those workflows must document the advisory posture in the step comment.
-- Override during incident triage: `GH_FUZZ_BUDGET_MINUTES=900` (or any
-  lower value) in the workflow env. Do not raise the cap above 1,800
-  without re-opening the locked decision.
+| Envelope   | Workflows                                                         | Cap (runner-min/30d) |
+|------------|-------------------------------------------------------------------|----------------------|
+| `cflite`   | `cflite_pr.yml`, `cflite_batch.yml`                               | 1,800                |
+| `native`   | `fuzz.yml`                                                        | 26,000               |
+| `mutation` | `mutants.yml`, `mutants-fuzz-cocoverage.yml`, `proof-mutants.yml` | reported, not capped |
 
-Sizing intent (steady state, 27-target inventory):
+- A job counts from runner pickup to completion: queue time and jobs that
+  never received a runner (GitHub cancels those after 24 hours) are not runner
+  minutes, and parallel matrix jobs each count in full. Run listings beyond
+  GitHub's 1,000-result search limit are split by day, and a day that still
+  exceeds it fails closed.
+- The `cflite` window starts at the later of 30 days ago and the UTC
+  timestamp in `fuzz/cflite-budget-epoch` (2026-10-28T00:00:00Z). Runs before
+  it are excluded: until then every ClusterFuzzLite run built all targets
+  because the selection never reached the builder, so that usage does not
+  describe the current workflows. Once the epoch is older than 30 days it has
+  no effect and the file is removed. A missing, malformed or future epoch
+  fails the `cflite` envelope closed. `native` and `mutation` always use the
+  30-day window.
+- A capped envelope at or over its cap exits 1. An API error, truncated
+  listing or unregistered workflow in a capped envelope exits 2.
+- Mutation and proof-mutation lanes are reported, not capped. The gate prints
+  their usage (or why it is unverified) and never fails on them.
+- `GH_FUZZ_BUDGET_SCOPE` selects `cflite`, `native`, `mutation` or `all` (the
+  default). Each workflow checks its own envelope.
+- Job timing costs one API call per run, so workflows restore and save a
+  shared ledger (`GH_FUZZ_BUDGET_LEDGER`, kept in the Actions cache) that
+  holds the executed seconds of completed runs; each check queries only runs
+  the ledger has not seen.
+- Named exception `cflite-pr-evidence`: the `cflite_pr.yml` budget step sets
+  `GH_FUZZ_BUDGET_CAP_EXCEPTION=cflite-pr-evidence`, so a `cflite` overrun is
+  reported (the gate prints an `EXCEPTION cflite-pr-evidence` line) and the
+  PR still runs changed-target sampling. PR fuzzing is per-PR evidence, its
+  minutes still count toward the window, and `cflite_batch.yml` enforces the
+  cap. The exception is valid only with `GH_FUZZ_BUDGET_SCOPE=cflite`; no other
+  lane has one.
+- GitHub rate limits (HTTP 403, 429) and server errors (HTTP 5xx) are retried
+  for three attempts, honouring `Retry-After` and `X-RateLimit-Reset`
+  (otherwise 1s then 2s). A required wait over 600s or a third failure leaves
+  the usage unverified, which fails a capped envelope (exit 2); the mutation
+  envelope reports it as unverified.
+- Each budget step restores the ledger before the check and saves it with
+  `if: always()`, and the gate writes the runs it validated even when it
+  fails, so a failed or rate-limited check does not lose its progress.
+- The nightly `cflite_batch.yml` rotation and the `fuzz.yml` matrix hard halt
+  at their caps. The trailing window drops runs older than 30 days, so a halted
+  lane resumes once its usage is back under the cap.
+- Changing an envelope or cap means editing the script constants and
+  reopening the locked decision above.
 
-| Lane              | Cadence             | Per-run cost         | 30-day cost (est.) |
-|-------------------|---------------------|----------------------|--------------------|
-| `cflite_pr`       | per PR (sampled)    | ~3 targets x 60-120s | ~300 min/month     |
-| `cflite_batch`    | nightly rotation    | 1 target x 30 min    | ~900 min/month     |
-| `fuzz` (in-tree)  | nightly matrix      | parallel, 30 min/job | runner-time only   |
-| OSS-Fuzz          | continuous, free    | n/a (Google CPU)     | 0 GHA min          |
-
-The in-tree `fuzz.yml` matrix runs on the GitHub-hosted pool but bills
-against the same free tier; nightly wall-clock is bounded by the longest
-single target rather than the sum because the matrix runs jobs in parallel.
-The cap-check script includes the two ClusterFuzzLite workflows, the in-tree
-fuzz matrix, mutation testing, mutants-fuzz co-coverage, and formal proof
-mutation testing. Keep that six-workflow filter aligned with the workflow
-inventory rather than raising the cap when a lane consumes more than expected.
+The `native` cap sizes the nightly matrix as observed (33 targets at about
+45 runner-minutes each, about 24,400 runner-min over 30 days) with about 7%
+headroom. Adding matrix targets needs a matching cap change.
 
 ## Workflow inventory
 
@@ -116,22 +135,35 @@ for them.
 
 ## ClusterFuzzLite bridge
 
-### Observed selector limitation (October 11, 2026)
+### Selector transport
 
-`FUZZ-SELECTOR-TRANSPORT` is an open P3 efficiency follow-up in the
-[landing ledger](../security/landing-ledger.md). On PR #1160 head `36d77fe276`,
-job `114428079323` supplies `CHIO_CFLITE_TARGETS` to the outer action, but the
-nested builder container receives neither selector variable. It builds the full
-33-target inventory. This PR requests all 33, so the transport defect does not
-omit coverage or explain a difference between its requested and actual workload.
-Other subset requests can unnecessarily build the full inventory.
+The ClusterFuzzLite actions do not forward workflow environment into the
+nested builder container (observed on PR #1160 job `114428079323`, which
+built the full inventory for a subset request and was cancelled at 75
+minutes). Workflows therefore write the selected target names to
+`.clusterfuzzlite/selected-targets` in the checkout before `build_fuzzers`;
+the checkout is the container's `$SRC/chio`, and `.clusterfuzzlite/build.sh`
+builds exactly the listed targets, rejecting an empty list, a non-file path or
+an unknown name. Without the file it builds every target (`fuzz: full`).
+`cflite_pr.yml` writes the changed-target selection and `cflite_batch.yml`
+writes the night's rotation target.
 
-Repair acceptance is an actual container-boundary control for a subset, full
-selection, unknown names and conflicting selectors, preserving each target's
-features, sanitizer, seed handling and sampling budget. No repair or new fuzz
-campaign is claimed here. The current job's 75-minute cancellation still leaves
-sampling incomplete after its 70-minute-20-second build. Complete earlier runs
-are source-specific evidence, not qualification of the cancelled job.
+`scripts/select-fuzz-targets.py` computes the PR selection. Trigger globs in
+`fuzz/target-map.toml` select their targets. Fuzz build inputs select the
+whole inventory: `.cargo/`, `.clusterfuzzlite/`, the root `Cargo.toml`
+(members inherit workspace dependencies from it), `fuzz/Cargo.toml`,
+`fuzz/Cargo.lock`, the target map and the selector. A member crate manifest
+selects the whole inventory only when its package (at the head or the merge
+base) is a path package in `fuzz/Cargo.lock`; the root `Cargo.lock` and
+manifests of crates outside the fuzz dependency graph cannot change the fuzz
+build, which resolves against its own lock.
+
+When no target fires, the selector also classifies the diff. The PR passes
+only on `no-fuzz-relevant-change`: every changed path is test, bench or
+example code, belongs to a crate outside the fuzz dependency graph, or is a
+non-Rust file owned by no crate outside `spec/schemas/`. Any other empty
+selection is `unclassified`, names the fuzz-relevant paths without a mapped
+target, and fails until `fuzz/target-map.toml` covers them.
 
 The descriptions below state the intended selection behavior.
 
@@ -140,7 +172,7 @@ coverage into the bridge that carries Chio through the OSS-Fuzz acceptance
 window and remains the documented permanent fallback after acceptance lands:
 
 - `.github/workflows/cflite_pr.yml` -- changed-target sampling per
-  `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
+  `scripts/select-fuzz-targets.py` and `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
   per PR after the glob match). Opt-in `fuzz: full` PR label promotes the
   run to a full-corpus sweep across all 27 targets at 120s each
   (release-cut PRs and trust-boundary edits).
@@ -151,13 +183,9 @@ window and remains the documented permanent fallback after acceptance lands:
   the weekly-soak Tier-A plan was dropped along with Tier A, and OSS-Fuzz
   is the post-acceptance soak path.
 
-PR-time fuzz and mutation workflows invoke `scripts/check-fuzz-budget.sh`
-before any fuzz or mutation step so the 1,800 GHA min/30d cap is visible in
-the run logs. PR-time CFLite budget checks are advisory because the trailing
-window is shared across unrelated PRs, while PR-time mutation remains a hard
-halt. Scheduled fuzz, CFLite rotation, mutants nightly, and mutants
-fuzz-cocoverage lanes may stay warning-only when their purpose is measurement
-continuity rather than PR or release qualification.
+Fuzz and mutation workflows invoke `scripts/check-fuzz-budget.sh` for their
+envelope before any fuzz or mutation step so usage is visible in the run
+logs (see GHA budget above).
 
 The CFLite builder image lives under `.clusterfuzzlite/`:
 

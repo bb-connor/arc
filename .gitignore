@@ -148,3 +148,6 @@ audits/evidence/**/mutants.out/*.txt
 
 # Intermediate vocabulary conversion for the IETF draft.
 spec/ietf/*.v3.xml
+
+# Per-run ClusterFuzzLite target selection written by cflite workflows.
+/.clusterfuzzlite/selected-targets

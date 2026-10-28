@@ -4,9 +4,8 @@
 #
 # Builds the chio-fuzz targets listed below and copies each resulting
 # binary into $OUT/<target>, plus a per-target seed corpus zip when one
-# exists under fuzz/corpus/<target>/. Set CHIO_CFLITE_TARGET to build a
-# single target or CHIO_CFLITE_TARGETS to build a newline/comma-separated
-# subset selected by the PR changed-target workflow.
+# exists under fuzz/corpus/<target>/. A workflow restricts the build to a
+# subset through .clusterfuzzlite/selected-targets (see below).
 #
 # Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
 #
@@ -59,16 +58,21 @@ TARGETS=(
     fuzz_tool_action
 )
 
+# The ClusterFuzzLite actions do not forward workflow environment into the
+# builder container, so workflows select a subset by writing target names, one
+# per line, to .clusterfuzzlite/selected-targets in the checkout before
+# build_fuzzers runs. The checkout is the container's $SRC/chio. Without that
+# file every target is built.
+selection_file="$SRC/chio/.clusterfuzzlite/selected-targets"
 selected_targets=("${TARGETS[@]}")
-if [ -n "${CHIO_CFLITE_TARGETS:-}" ] && [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
-    echo "set only one of CHIO_CFLITE_TARGETS or CHIO_CFLITE_TARGET" >&2
-    exit 1
-fi
-
-if [ -n "${CHIO_CFLITE_TARGETS:-}" ]; then
-    mapfile -t requested_targets < <(printf '%s\n' "${CHIO_CFLITE_TARGETS}" | tr ',' '\n' | sed '/^[[:space:]]*$/d' | sort -u)
+if [ -e "$selection_file" ]; then
+    if [ ! -f "$selection_file" ]; then
+        echo "$selection_file is not a regular file" >&2
+        exit 1
+    fi
+    mapfile -t requested_targets < <(sed -e 's/[[:space:]]//g' -e '/^$/d' "$selection_file" | sort -u)
     if [ "${#requested_targets[@]}" -eq 0 ]; then
-        echo "CHIO_CFLITE_TARGETS was set but no target names were provided" >&2
+        echo "$selection_file names no targets" >&2
         exit 1
     fi
     selected_targets=()
@@ -82,24 +86,12 @@ if [ -n "${CHIO_CFLITE_TARGETS:-}" ]; then
             fi
         done
         if [ "$found" != "true" ]; then
-            echo "unknown CHIO_CFLITE_TARGETS entry: $requested" >&2
+            echo "unknown target in $selection_file: $requested" >&2
             exit 1
         fi
     done
-elif [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
-    found=false
-    for target in "${TARGETS[@]}"; do
-        if [ "$target" = "$CHIO_CFLITE_TARGET" ]; then
-            found=true
-            selected_targets=("$target")
-            break
-        fi
-    done
-    if [ "$found" != "true" ]; then
-        echo "unknown CHIO_CFLITE_TARGET: $CHIO_CFLITE_TARGET" >&2
-        exit 1
-    fi
 fi
+echo "building ${#selected_targets[@]} of ${#TARGETS[@]} fuzz targets: ${selected_targets[*]}"
 
 for target in "${selected_targets[@]}"; do
     features=""

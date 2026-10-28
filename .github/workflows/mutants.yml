@@ -13,9 +13,8 @@
 #                     no --in-diff scope. Wall budget: <= 4 h per crate.
 #                     Uploads mutants.out/ as a workflow artifact.
 #
-# Both jobs share the 1,800 GHA runner-min/30d cap with the fuzz lanes.
-# The PR job treats the cap as a hard halt; the nightly lane keeps an
-# advisory posture so dashboard evidence continues flowing.
+# Both jobs report their runner minutes through the fuzz budget gate.
+# Mutation lanes are reported, not capped.
 #
 # Cutover rule:
 #   The lane flips after two consecutive nightly runs report >= 80 caught
@@ -172,26 +171,37 @@ jobs:
           set -euo pipefail
           bash scripts/check-mutants-rationale.sh
 
+      - name: Restore fuzz budget ledger
+        if: steps.select.outputs.selected == 'true'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
+
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.select.outputs.selected == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: fail
-          GH_FUZZ_BUDGET_WORKFLOWS: mutants.yml,mutants-fuzz-cocoverage.yml,proof-mutants.yml
-          GH_FUZZ_BUDGET_MINUTES: 48000
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
           set -euo pipefail
-          # Mutation runs share the 1,800 min/30d envelope with fuzz.
-          # PR runs use --in-diff scoping but are release qualification
-          # gates when triggered, so over-cap usage is a hard halt.
-          # Full nightly sweeps keep their advisory measurement posture.
+          # Mutation lanes are reported, not capped: the gate prints the
+          # mutation envelope's runner minutes and cannot fail this job.
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
             scripts/check-fuzz-budget.sh "${{ github.repository }}"
           else
             echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
             exit 2
           fi
+
+      - name: Save fuzz budget ledger
+        if: always() && steps.select.outputs.selected == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
       - name: Capture PR diff for --in-diff scoping
         id: diff
@@ -383,16 +393,21 @@ jobs:
           set -euo pipefail
           bash scripts/check-mutants-rationale.sh
 
+      - name: Restore fuzz budget ledger
+        if: steps.forced.outputs.skip == 'false'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
+
       - name: Verify shared 30-day fuzz/mutants budget
         if: steps.forced.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          # Hosted nightly sweeps share the 1,800 min/30d envelope with the
-          # fuzz lanes. When the cap is hit the sweep must still run so that
-          # measurement keeps flowing into the dashboard (continue-on-error
-          # is already true at job level). Treat the cap as advisory here.
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          # Mutation lanes are reported, not capped.
+          GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
           set -euo pipefail
           if [[ -x scripts/check-fuzz-budget.sh ]]; then
@@ -401,6 +416,13 @@ jobs:
             echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
             exit 2
           fi
+
+      - name: Save fuzz budget ledger
+        if: always() && steps.forced.outputs.skip == 'false'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
       - name: Run cargo-mutants full-workspace sweep
         id: mutate
