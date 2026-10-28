@@ -628,7 +628,7 @@ impl RawInvocationOutcomeV1 {
         if let Some(security_context) = self.security_invocation_context.as_ref() {
             validate_security_context_request_binding(&request, security_context)?;
         }
-        if self.federation_context_json.is_some() && request.federated_origin_kernel_id.is_none() {
+        if self.federation_context_json.is_some() != request.federated_origin_kernel_id.is_some() {
             return Err(ToolOutcomeError::Binding("raw.federation_context"));
         }
         if let Some(context) = &self.federation_context_json {

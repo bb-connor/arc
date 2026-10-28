@@ -1860,9 +1860,9 @@ rust_symbols = [
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "f5273b36caf04d6228fbee847cbb2d59c8b4210ea88a4dd1f084dcdabd2cb443"
+normalized_sha256 = "78fea74f48ce830411631e17984552f6bdf0719166393bb025e6d94a2937d10d"
 symbol_sha256 = [
-  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "8b6f23c4fea00f83642372cc0e99072a1d8b4d685247c931929e91411548f089" },
+  { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "9ec149a0cb443e25da83afa5366012f02a30c02ee77a42f298f9276d775c7497" },
   { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "712dd4a7ac03a49172a3c6f1d634845b5a2b427e8ccd444ccfe2c0ddf9d535af" },
   { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "ddc774c8fd7ec9931ba72f34fcf5f5f6a40951c2a6121728abf23950f90330a1" },
 ]
@@ -1999,13 +1999,13 @@ rust_symbols = [
   "RawInvocationOutcomeV1::from_committed_dispatch",
   "required_option",
 ]
-normalized_sha256 = "67561fd2fb1102a51a4b287008559071dfca4125f112db642c69b192d4240bb4"
+normalized_sha256 = "43efc9d66baf01fbfae28db736da00ee73b8452640cc4381cbc382f959574a45"
 symbol_sha256 = [
   { symbol = "RawInvocationOutcomeV1", sha256 = "ae5bf489e53c417a5a57ffec4b0b9ef2f8baeb289af30a9efc1aba806fca0b13" },
   { symbol = "PersistedRawInvocationOutcomeV1", sha256 = "2cf23291cad34c153d0f7fada07ce11c2aa12c95ab3221b40a1bf0a5f3a07751" },
   { symbol = "RawInvocationOutcomeV1::from_persisted", sha256 = "b104ffeefe31e12ab30672b3d32cd35287130c479ec57fe43ed4b7712fdc11a8" },
   { symbol = "RawInvocationOutcomeV1::to_persisted", sha256 = "181c498e0eea9b7712e7892ccce3608ca8f8ed7f3fc3cb97e404395fed298732" },
-  { symbol = "RawInvocationOutcomeV1::canonical_blob_bounded", sha256 = "5b028168da8763d9c8336c72d27de8436f853b9586b0f20e58b7423ea9045e13" },
+  { symbol = "RawInvocationOutcomeV1::canonical_blob_bounded", sha256 = "3b37fcb3059c4fcc4a6780cca41cc470ee3c698b72aa7782e4f8557ec1090e51" },
   { symbol = "RawInvocationOutcomeV1::requires_security_release", sha256 = "6512ab1bcf2bbc3e4bcff6458704b23b863e291a1a66d569336a551a827c4bfd" },
   { symbol = "ToolOutcomeStore", sha256 = "9bd4195732fc89e845185b7aafbe5cafb040ee683c4f8d72508d52c57b5d085f" },
   { symbol = "RawInvocationOutcomeV1::from_canonical_bytes", sha256 = "15db4b9efd11cb2aacaf2a6942d4dcd1613c3f00686de90ddbf3b401ddec6fc2" },
