@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "runtime_source/encoding.rs"]
+mod encoding;
 use chio_kernel::admission_operation::{RuntimeSourcePort, RuntimeSourceQualificationV1};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
