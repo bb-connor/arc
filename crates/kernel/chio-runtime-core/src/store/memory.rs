@@ -7,9 +7,6 @@ use crate::*;
 pub struct InMemoryRuntimeAdmissionStore {
     bundles: Arc<Mutex<BTreeMap<String, RuntimeAdmissionBundle>>>,
     treaty_artifacts: Arc<Mutex<BTreeMap<(String, String), TreatyRuntimeArtifactRecord>>>,
-    consumed_leases: Arc<Mutex<BTreeSet<String>>>,
-    consumed_treaty_continuations: Arc<Mutex<BTreeSet<String>>>,
-    consumed_swarm_continuations: Arc<Mutex<BTreeSet<String>>>,
     trust_floors: Arc<Mutex<BTreeMap<String, RuntimeTrustFloorEntry>>>,
 }
 
@@ -92,93 +89,6 @@ impl RuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
         Ok(treaty_artifacts
             .get(&(evidence_kind.to_string(), evidence_id.to_string()))
             .cloned())
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_leases.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime admission consumption store is poisoned".to_string())
-        })?;
-        if !consumed.insert(lease_id.to_string()) {
-            return Err(ChioRuntimeError::Rejected {
-                code: "destructive_lease_replay",
-                detail: format!("destructive lease {lease_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_leases.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime admission consumption store is poisoned".to_string())
-        })?;
-        consumed.remove(lease_id);
-        Ok(())
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_treaty_continuations.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime treaty continuation store is poisoned".to_string())
-        })?;
-        if !consumed.insert(continuation_id.to_string()) {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_treaty_continuation_replay",
-                detail: format!("treaty continuation {continuation_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_treaty_continuations.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime treaty continuation store is poisoned".to_string())
-        })?;
-        consumed.remove(continuation_id);
-        Ok(())
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_swarm_continuations.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime swarm continuation store is poisoned".to_string())
-        })?;
-        if !consumed.insert(continuation_id.to_string()) {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_swarm_continuation_replay",
-                detail: format!("swarm continuation {continuation_id} was already consumed"),
-            });
-        }
-        Ok(())
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut consumed = self.consumed_swarm_continuations.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime swarm continuation store is poisoned".to_string())
-        })?;
-        consumed.remove(continuation_id);
-        Ok(())
     }
 
     fn runtime_trust_floor(

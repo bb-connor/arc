@@ -96,7 +96,7 @@ fn prepared_nonce(fixture: &Fixture) -> TestResult<(AdmissionOperationV1, Admiss
 
 fn reserve(
     fixture: &Fixture,
-    source: &RuntimeReplayMigrationRecordV1,
+    source: &RuntimeSourceRecordV1,
     operation: &AdmissionOperationV1,
     lease: &AdmissionRecoveryLease,
     episode: &str,

@@ -160,7 +160,6 @@ fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
     let profile_sha256 = chio_runtime_core::runtime_orchestration_profile_sha256(&profile)?;
     let status = reopened.status_report(&profile, profile_sha256, 1_800_000_002_000, true)?;
     assert_eq!(status.store_backend, "sqlite");
-    assert_eq!(status.consumed_lease_count, 1);
     assert_eq!(status.run_counts.get("proof_accepted"), Some(&1));
     Ok(())
 }

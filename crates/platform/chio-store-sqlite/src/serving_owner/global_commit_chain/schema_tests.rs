@@ -95,7 +95,7 @@ fn missing_projection_kinds_refuse_without_rewriting_catalog_or_history() -> Tes
         "security_participant_migration",
         "dpop_replay_migration",
         "governed_approval_authority",
-        "runtime_replay_migration",
+        "runtime_source_qualification",
         "finding_status",
         "finding_challenge",
     ] {

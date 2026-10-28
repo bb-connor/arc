@@ -10,10 +10,10 @@ mod admission_replay;
 mod evidence_artifacts;
 mod health_summaries;
 mod leases_scheduler;
-mod replay_source;
 mod run_write_fence;
 mod runs_steps;
-mod schema_migrations;
+mod schema;
+mod source_qualification;
 mod treaty_artifacts;
 mod trust_floors;
 
@@ -42,24 +42,25 @@ impl SqliteRuntimeOrchestrationStore {
             }
         }
         let connection = Connection::open(&path).map_err(sqlite_error)?;
-        connection
-            .pragma_update(None, "journal_mode", "WAL")
-            .map_err(sqlite_error)?;
-        connection
-            .pragma_update(None, "synchronous", "FULL")
-            .map_err(sqlite_error)?;
-        connection
-            .busy_timeout(std::time::Duration::from_millis(5_000))
-            .map_err(sqlite_error)?;
         let store = Self {
             path,
             clock,
             connection: Mutex::new(connection),
         };
-        // A sealed source must be verified before legacy schema initialization
-        // can recreate a missing replay table and erase evidence of corruption.
-        store.verify_replay_source_before_init()?;
         store.init_schema()?;
+        store.verify_source_qualification_on_open()?;
+        {
+            let connection = store.lock_connection()?;
+            connection
+                .pragma_update(None, "journal_mode", "WAL")
+                .map_err(sqlite_error)?;
+            connection
+                .pragma_update(None, "synchronous", "FULL")
+                .map_err(sqlite_error)?;
+            connection
+                .busy_timeout(std::time::Duration::from_millis(5_000))
+                .map_err(sqlite_error)?;
+        }
         Ok(store)
     }
 

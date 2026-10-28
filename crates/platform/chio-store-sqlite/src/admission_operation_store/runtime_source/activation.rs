@@ -12,10 +12,10 @@ impl SqliteAdmissionOperationStore {
     pub fn activate_runtime_replay_source(
         &self,
         binding: &RuntimeParticipantAuthorityBindingV1,
-        source: &dyn RuntimeReplaySourcePort,
+        source: &dyn RuntimeSourcePort,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<RuntimeReplayMigrationRecordV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceRecordV1, AdmissionOperationStoreError> {
         let _migration = self
             .serving_owner
             .begin_replay_source_migration()
@@ -77,12 +77,12 @@ impl SqliteAdmissionOperationStore {
         Ok(active)
     }
 
-    pub(in crate::admission_operation_store) fn load_activated_runtime_source(
+    pub(in crate::admission_operation_store) fn load_qualified_runtime_source(
         &self,
         binding: &RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         let record = self
             .load_runtime_replay_migration(
                 binding.runtime_authority_id(),

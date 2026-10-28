@@ -712,7 +712,6 @@ pub struct RuntimeOrchestrationStatusReport {
     pub store_backend: String,
     pub store_path_sha256: String,
     pub run_counts: BTreeMap<String, u64>,
-    pub consumed_lease_count: u64,
     pub trust_floor_count: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_failure_code: Option<String>,
@@ -987,7 +986,6 @@ pub struct RuntimeOpsStatusReport {
     pub run_counts: BTreeMap<String, u64>,
     pub active_lease_count: u64,
     pub stale_lease_count: u64,
-    pub consumed_lease_count: u64,
     pub evidence_sink_healthy: bool,
     pub provider_healthy: bool,
     pub ready: bool,

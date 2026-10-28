@@ -135,7 +135,7 @@ pub trait RuntimeAdmissionHook: Send + Sync {
     fn revalidate_reserved_operation(
         &self,
         _context: &RuntimeAdmissionContext<'_>,
-        _source: &crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        _source: &crate::admission_operation::RuntimeSourceQualificationV1,
         _claim: &crate::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
         Err(KernelError::DurableAdmission(
@@ -201,7 +201,7 @@ pub trait RuntimeAdmissionHook: Send + Sync {
     fn revalidate_operation_owned_before_dispatch(
         &self,
         _context: &RuntimeAdmissionRevalidationContext<'_>,
-        _source: &crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        _source: &crate::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         Err(KernelError::DurableAdmission(
             "operation-owned runtime revalidation is unsupported".to_owned(),
@@ -215,7 +215,7 @@ pub trait RuntimeAdmissionHook: Send + Sync {
     fn revalidate_operation_owned_for_native_capture(
         &self,
         _context: &RuntimeAdmissionRevalidationContext<'_>,
-        _source: &crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        _source: &crate::admission_operation::RuntimeSourceQualificationV1,
         _intent: &crate::admission_operation::runtime_participant::RuntimeParticipantClaimIntentV1,
     ) -> Result<crate::admission_operation::runtime_participant::RuntimeDispatchValidity, KernelError>
     {
