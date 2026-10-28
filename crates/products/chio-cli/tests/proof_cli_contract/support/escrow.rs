@@ -24,8 +24,8 @@ pub(crate) fn pinned_escrow_ledger_bytes(
 
 /// The offline PSP commerce bundle with its completed order backed by a
 /// released escrow ledger pinned in the order context. Without
-/// `keep_ledger_node` the ledger node is dropped from the evidence graph after
-/// the order passport is bound, so the pin has no ledger to prove it.
+/// `keep_ledger_node` the ledger node is dropped from the transaction evidence
+/// graph after the bundle is sealed, so the pin has no ledger to prove it.
 pub(crate) fn build_commerce_escrow_bundle(keep_ledger_node: bool) -> (tempfile::TempDir, PathBuf) {
     let tempdir = tempfile::tempdir().test_expect("tempdir");
     let source = workspace_root().join("fixtures/proof-room/commerce-payments/offline-psp-valid");
@@ -66,15 +66,32 @@ pub(crate) fn build_commerce_escrow_bundle(keep_ledger_node: bool) -> (tempfile:
             "role": COMMERCE_ESCROW_LEDGER_ROLE,
         }));
     refresh_commerce_order_passport(&bundle, &mut evidence_graph);
+    write_transaction_graph(&bundle, &mut evidence_graph);
+    sync_proof_room_transaction_roots(&bundle);
+
     if !keep_ledger_node {
         evidence_graph["nodes"]
             .as_array_mut()
             .test_expect("graph nodes array")
             .retain(|node| node["role"].as_str() != Some(COMMERCE_ESCROW_LEDGER_ROLE));
+        write_transaction_graph(&bundle, &mut evidence_graph);
+        for artifact_path in ["transaction-passport.json", "evidence-graph.json"] {
+            std::fs::copy(
+                bundle.join(artifact_path),
+                bundle.join("roots").join(artifact_path),
+            )
+            .test_expect("sync proof-room root artifact");
+        }
+        refresh_existing_manifest_artifacts(&bundle);
     }
-    refresh_evidence_graph_content_ids(&bundle, &mut evidence_graph);
-    write_json(&evidence_graph_path, &evidence_graph);
 
+    (tempdir, bundle)
+}
+
+fn write_transaction_graph(bundle: &Path, evidence_graph: &mut serde_json::Value) {
+    let evidence_graph_path = bundle.join("evidence-graph.json");
+    refresh_evidence_graph_content_ids(bundle, evidence_graph);
+    write_json(&evidence_graph_path, evidence_graph);
     let passport_path = bundle.join("transaction-passport.json");
     let mut passport: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&passport_path).test_expect("read passport"))
@@ -82,9 +99,6 @@ pub(crate) fn build_commerce_escrow_bundle(keep_ledger_node: bool) -> (tempfile:
     passport["evidence_graph_sha256"] =
         serde_json::Value::String(sha256_file(&evidence_graph_path));
     write_json(&passport_path, &passport);
-    sync_proof_room_transaction_roots(&bundle);
-
-    (tempdir, bundle)
 }
 
 fn released_escrow_ledger(
