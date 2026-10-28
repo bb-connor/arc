@@ -366,4 +366,116 @@ if [[ $positive_classified_status -ne 0 ]]; then
     exit 1
 fi
 
-echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms)."
+
+# Non-reqwest HTTP clients. Each case is a tiny crate tree; the expected
+# outcome is "reject" or "accept".
+http_client_case() {
+    local name="$1" path="$2"
+    mkdir -p "$work/$name/$(dirname "$path")"
+    cat > "$work/$name/$path"
+}
+
+http_client_case ureq_builder crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::AgentBuilder::new().redirects(0).build()
+}
+EOF
+http_client_case ureq_top_level crates/chio-fake/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    let _ = ureq::get(url).call();
+}
+EOF
+http_client_case ureq_imported_builder crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{Agent, AgentBuilder};
+
+pub fn agent() -> Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_imported_fn crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::post;
+
+pub fn publish(url: &str) {
+    let _ = post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_aliased crates/chio-fake/src/lib.rs <<'EOF'
+use ureq as http;
+
+pub fn publish(url: &str) {
+    let _ = http::post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_v3_agent crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::Agent::new_with_defaults()
+}
+EOF
+http_client_case ureq_kernel_classified crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: kernel crates take no classification.
+    ureq::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_kernel_type_only crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+pub struct Rail {
+    pub http: ureq::Agent,
+}
+EOF
+http_client_case hyper_client crates/chio-fake/src/lib.rs <<'EOF'
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
+
+pub fn client() {
+    let _ = Client::builder(TokioExecutor::new());
+}
+EOF
+http_client_case unscanned_client_crate crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+attohttpc = "0.28"
+EOF
+http_client_case ureq_classified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the
+    // endpoint the operator named.
+    ureq::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_contract_owner crates/protocol/chio-egress-contract/src/ureq_helper.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::AgentBuilder::new().redirects(0).build()
+}
+EOF
+http_client_case ureq_test_source crates/chio-fake/tests/http.rs <<'EOF'
+#[test]
+fn fetch() {
+    let _ = ureq::get("http://127.0.0.1:1").call();
+}
+EOF
+http_client_case ureq_mention crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+//! The price oracle once used a `ureq` client.
+pub fn noop() {}
+EOF
+
+for expectation in \
+    reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
+    reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
+    reject:ureq_kernel_classified reject:ureq_kernel_type_only reject:hyper_client \
+    reject:unscanned_client_crate accept:ureq_classified accept:ureq_contract_owner \
+    accept:ureq_test_source accept:ureq_mention; do
+    expected="${expectation%%:*}"
+    name="${expectation#*:}"
+    case_status=0
+    CHIO_EGRESS_LINT_ROOT="$work/$name" bash "$LINT" > "$work/$name.log" 2>&1 || case_status=$?
+    if [[ "$expected" == reject && $case_status -eq 0 ]] || \
+       [[ "$expected" == accept && $case_status -ne 0 ]]; then
+        cat "$work/$name.log" >&2
+        echo "FAIL: lint should $expected the $name case" >&2
+        exit 1
+    fi
+done
+
+echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients, any ureq in kernel crates, and unscanned HTTP client crates."

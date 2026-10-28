@@ -1605,6 +1605,25 @@ mod tests {
     }
 
     #[test]
+    fn payment_adapters_refuse_non_public_rails_before_dispatch() {
+        for url in [
+            "https://10.0.0.1",
+            "https://localhost",
+            "https://[fd00::1]",
+            "https://169.254.169.254",
+        ] {
+            let error = AcpPaymentAdapter::new(url)
+                .with_timeout(Duration::from_millis(200))
+                .authorize(&test_payment_authorize_request())
+                .expect_err(url);
+            assert!(
+                matches!(&error, PaymentError::RailError(message) if message == "payment rail egress denied"),
+                "{url}: {error:?}"
+            );
+        }
+    }
+
+    #[test]
     fn payment_error_bodies_are_not_reflected() {
         let (url, _request_rx, handle) = spawn_once_json_server(
             400,
