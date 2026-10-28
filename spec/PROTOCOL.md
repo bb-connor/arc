@@ -3091,9 +3091,14 @@ tool, server and argument hash, and the request ID it supplied. It MUST bind
 `receipt.decision.verdict` is `"allow"` and `receipt.content_hash` equals the
 SHA-256 of the canonical `output`. A receipt whose decision is not `"allow"`
 never yields tool output, whatever `outputKind` and `output` claim; a
-relabeled signed denial MUST be rejected or treated as that denial. A verifier
-MUST fail closed when the evidence is absent or the receipt does not verify,
-and MUST NOT retry an uncertain external effect on that basis alone.
+relabeled signed denial MUST be rejected or treated as that denial. When the
+receipt carries a signed `metadata.admission_operation` block (section 6.4), a
+verifier that accepts `"value"` MUST also require the block's `request_id` to
+equal the supplied request ID, `projected_state` to be `"completed"`,
+`projected_dispatch_state` to be `"terminal"` and `tool_outcome_id` to be
+present. A verifier MUST fail closed when the evidence is absent or the receipt
+does not verify, and MUST NOT retry an uncertain external effect on that basis
+alone.
 
 The edge overwrites any upstream `_meta.chio` or `_meta.chioEvidence`, and
 replaces a non-object upstream `_meta` with an object, before it installs the
