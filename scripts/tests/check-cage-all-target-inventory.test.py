@@ -154,6 +154,30 @@ def main() -> int:
             raise SystemExit("cage inventory checker accepted an extra source target")
         extra_target.unlink()
 
+        enforcement = crate / "tests/linux_enforcement.rs"
+        enforcement_source = enforcement.read_text(encoding="utf-8")
+        enforcement.write_text(
+            enforcement_source
+            + '\n#[cfg(feature = "enforcement-mutants")]\n#[test]\n'
+            + "fn enforcement_mutation_unratcheted() {}\n",
+            encoding="utf-8",
+        )
+        if invoke(root, None) == 0:
+            raise SystemExit("cage inventory checker accepted an extra mutation test")
+        enforcement.write_text(
+            enforcement_source.replace(
+                "fn enforcement_mutation_partial_landlock_denies_launch()",
+                "fn renamed_mutation_case()",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        if invoke(root, None) == 0:
+            raise SystemExit("cage inventory checker accepted a renamed mutation test")
+        enforcement.write_text(enforcement_source, encoding="utf-8")
+        if invoke(root, None) != 0:
+            raise SystemExit("cage inventory checker rejected the restored mutation inventory")
+
         for path in crate.rglob("*.rs"):
             path.write_text("", encoding="utf-8")
         if invoke(root, None) == 0:

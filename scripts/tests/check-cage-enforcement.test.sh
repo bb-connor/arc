@@ -91,12 +91,88 @@ EOF
 
 cat >"$fake_bin/python3" <<'EOF'
 #!/usr/bin/env bash
-if [[ "${1:-}" == *"/check-cage-all-target-inventory.py" ]] ||
-  [[ "${1:-}" == "scripts/check-cage-all-target-inventory.py" ]]; then
+checker="${1:-}"
+if [[ "$checker" == "-I" ]]; then
+  checker="${2:-}"
+fi
+if [[ "$checker" == *"/check-cage-all-target-inventory.py" ]] ||
+  [[ "$checker" == "scripts/check-cage-all-target-inventory.py" ]]; then
   exec "${CHIO_REAL_PYTHON3:?}" "$@"
 fi
 exit 0
 EOF
+
+export FAKE_CAGE_RENDERER="$work/render-cage-run.py"
+cat >"$FAKE_CAGE_RENDERER" <<'EOF'
+import importlib.util
+import os
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("cage_inventory", os.environ["FAKE_CAGE_CHECKER"])
+checker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(checker)
+root = Path(os.environ["FAKE_CAGE_ROOT"])
+kind, mode = sys.argv[1], sys.argv[2]
+inventory = checker.source_inventory(root)
+mutations = checker.mutation_inventory(root)
+UNIT_HEADERS = {
+    "lib": "Running unittests src/lib.rs (/tmp/chio_cage-lib)",
+    "lib_chio_cage_plan": "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)",
+    "lib_chio_cage_init": "Running unittests src/lib.rs (/tmp/chio_cage_init-lib)",
+    "bin_chio_cage_init": "Running unittests src/main.rs (/tmp/chio_cage_init-bin)",
+}
+
+
+def block(results, filtered=0, header=None):
+    passed = sum(status == "ok" for _, status in results)
+    ignored = len(results) - passed
+    lines = [f"     {header}"] if header else []
+    lines.append(f"running {len(results)} tests")
+    lines.extend(f"test {name} ... {status}" for name, status in results)
+    lines.append(
+        f"test result: ok. {passed} passed; 0 failed; {ignored} ignored; "
+        f"0 measured; {filtered} filtered out; finished in 0.01s"
+    )
+    return lines
+
+
+def adjust(names, prefix, extra):
+    results = [(name, "ok") for name in names]
+    if mode == f"zero_{prefix}s":
+        return []
+    if mode == f"removed_{prefix}":
+        return results[:-1]
+    if mode == f"skipped_{prefix}":
+        return results[:-1] + [(results[-1][0], "ignored")]
+    if mode == f"extra_{prefix}":
+        return results + [(extra, "ok")]
+    return results
+
+
+output = []
+if kind == "all-targets":
+    for target in checker.EXPECTED_COUNTS:
+        header = UNIT_HEADERS.get(target, f"Running tests/{target}.rs (/tmp/{target})")
+        names = inventory[target]
+        if target == "linux_enforcement":
+            results = adjust(names, "probe", "unratcheted_real_linux_probe")
+        else:
+            results = [(name, "ok") for name in names]
+        output.extend(block(results, header=header))
+elif kind == "mutations":
+    results = adjust(mutations, "mutation", "enforcement_mutation_unratcheted")
+    output.extend(block(results, filtered=len(inventory["linux_enforcement"])))
+else:
+    raise SystemExit(f"unknown fake cargo lane {kind}")
+print("\n".join(output))
+EOF
+export FAKE_CAGE_CHECKER="$trusted_root/check-cage-all-target-inventory.py"
+export FAKE_CAGE_ROOT="$repo_root"
+expected_all_targets="$("$real_python3" -I "$FAKE_CAGE_CHECKER" --root "$repo_root" --expected all-targets)"
+expected_probes="$("$real_python3" -I "$FAKE_CAGE_CHECKER" --root "$repo_root" --expected probes | grep -c .)"
+expected_mutations="$("$real_python3" -I "$FAKE_CAGE_CHECKER" --root "$repo_root" --expected mutations | grep -c .)"
+evidence_marker="all_targets=${expected_all_targets} probes=${expected_probes} mutations=${expected_mutations}"
 
 cat >"$fake_bin/cc" <<'EOF'
 #!/usr/bin/env bash
@@ -183,208 +259,15 @@ if [[ "$args" == *" --test enforcement_evidence "* ]] ||
   printf 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n'
   exit 0
 fi
-if [[ "$args" == *" --all-targets "* ]] ||
-   [[ "$args" == *" --test linux_enforcement "* ]]; then
-  mode="${FAKE_CARGO_MODE:-success}"
-  if [[ "$mode" == "unavailable" ]]; then
-    exit 127
-  fi
-  if [[ "$args" == *"enforcement-mutants"* ]]; then
-    tests=(
-      enforcement_mutation_disabling_landlock_denies_launch
-      enforcement_mutation_partial_landlock_denies_launch
-      enforcement_mutation_disabling_seccomp_denies_launch
-      bootstrap_mutation_unsealed_plan_denies_launch
-      bootstrap_mutation_corrupt_plan_digest_denies_launch
-      bootstrap_mutation_missing_descriptor_denies_launch
-      bootstrap_mutation_malformed_status_denies_launch
-      bootstrap_mutation_trace_binding_mismatch_denies_launch
-      bootstrap_mutation_exit_before_exec_denies_launch
-      bootstrap_mutation_skipped_execution_identity_denies_launch
-    )
-    case "$mode" in
-      zero_mutations)
-        printf 'test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out\n'
-        exit 0
-        ;;
-      removed_mutation) tests=("${tests[@]:0:9}") ;;
-      extra_mutation) tests+=(enforcement_mutation_unratcheted) ;;
-    esac
-    if [[ "$mode" == "skipped_mutation" ]]; then
-      for ((index = 0; index < 9; index++)); do
-        printf 'test %s ... ok\n' "${tests[$index]}"
-      done
-      printf 'test %s ... ignored\n' "${tests[9]}"
-      printf 'test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 27 filtered out\n'
-      exit 0
-    fi
-    for test_name in "${tests[@]}"; do
-      printf 'test %s ... ok\n' "$test_name"
-    done
-    printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 27 filtered out\n' "${#tests[@]}"
-    exit 0
-  fi
-
-  probes=(
-    real_kernel_reports_fully_enforced_then_clean_exit
-    execution_identity_is_exact_after_root_drop_or_unprivileged_launch
-    sealed_launch_preparation_is_secret_free_and_owns_descriptors_without_launching
-    launch_prepared_revalidates_mutated_retained_target_before_spawn
-    real_launch_consumes_the_observed_sealed_preparation_contract
-    dynamically_linked_target_uses_only_retained_runtime_artifacts
-    fully_enforced_child_exposes_authenticated_stdio_and_exact_argv
-    target_exec_has_no_leaked_control_or_resource_descriptors
-    independent_seccomp_filter_kills_forbidden_socket
-    landlock_denies_ungranted_path_after_fd_based_target_exec
-    seccomp_kills_forbidden_process_creation
-    seccomp_confines_resource_limits_and_signals_to_the_cage
-    landlock_denies_file_creation_without_a_grant
-    retained_target_survives_path_replacement
-    retained_helper_survives_path_replacement_without_reopening
-    pidfd_forwards_an_allowed_termination_signal
-    exact_write_and_read_grants_are_enforced_from_retained_descriptors
-    directory_read_grant_denies_a_forbidden_hard_link_created_after_compilation
-    landlock_grant_does_not_follow_a_replaced_path
-    target_exec_exception_cannot_be_recreated_after_exec
-    landlock_denies_write_to_existing_ungranted_file
-    default_deny_blocks_remove_rename_and_hard_link
-    landlock_denies_symlink_traversal_escape
-    default_deny_blocks_ipv4_and_ipv6_connect_and_bind
-    default_deny_blocks_unreviewed_syscall
-    seccomp_kills_x32_syscall_alias
-    seccomp_kills_foreign_architecture_syscall
-    target_receives_no_parent_secret_or_loader_injection_environment
-    default_deny_blocks_undeclared_executable_path
-    a_second_exec_by_absolute_path_is_killed
-    a_second_exec_through_proc_self_fd_is_killed
-    a_second_exec_through_the_interpreter_is_killed
-    a_fault_in_the_target_reaches_its_default_action
-    a_timer_signal_reaches_the_target
-    a_stopped_target_stays_stopped_until_it_is_continued
-    racing_stops_continues_and_a_kill_end_with_an_observed_exit
-    dropping_a_stopped_target_reaps_it
-    rapid_stop_continue_then_drop_reaps_the_target
-  )
-  case "$mode" in
-    zero_probes) probes=() ;;
-    removed_probe) probes=("${probes[@]:0:35}") ;;
-    extra_probe) probes+=(unratcheted_real_linux_probe) ;;
-  esac
-
-  print_target() {
-    local header="$1"
-    shift
-    printf '     %s\n' "$header"
-    printf 'running %d tests\n' "$#"
-    for test_name in "$@"; do
-      printf 'test %s ... ok\n' "$test_name"
-    done
-    printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n' "$#"
-  }
-
-  if [[ "$args" == *" --all-targets "* ]]; then
-    lib_tests=(
-      acknowledged_child_reaper_handoff_reaps
-      admission_consumes_nonforgeable_registry_authorization
-      admission_fails_closed_on_unqualified_linux_architecture
-      architecture_syscall_tables_cover_reviewed_profiles
-      child_reaper_send_failure_reaps_synchronously
-      child_reaper_start_failure_reaps_synchronously
-      child_supervisor_retries_sigkill_until_reaped
-      constrained_exec_filter_fails_closed
-      launch_revalidates_unlisted_constraint_keys
-      descriptor_purpose_rejects_unknown_nested_fields
-      environment_is_minimal_and_credentials_fail_closed
-      every_syscall_profile_is_default_deny_and_has_no_network_creation
-      helper_identity_control_rejects_same_bytes_different_identity
-      path_identity_control_rejects_changed_retained_resource_identity
-      required_enforcement_comparison_is_exact
-      seccomp_control_rejects_forbidden_socket_before_default_deny
-      seccomp_rejects_peer_process_authority_in_every_profile
-      signature_is_verified_before_permissions_are_read
-      swapped_extra_and_missing_stdio_roles_fail_plan_validation
-      swapped_live_stdio_descriptors_fail_identity_verification
-    )
-    plan_tests=(
-      accepts_bounded_canonical_non_root_identity
-      rejects_root_zero_unsorted_duplicate_and_primary_groups
-      construction_rejects_constraints_for_unlisted_syscalls
-      construction_rejects_unconfined_limits_and_invalid_arguments
-      empty_alternatives_cannot_introduce_unconditional_syscall_authority
-      wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
-      the_syscall_vocabulary_cannot_name_process_creation
-    )
-    init_tests=(
-      exact_target_argv_is_used_and_mutation_is_rejected
-    )
-    evidence_tests=(
-      bootstrap_failure_cannot_claim_enforcement_or_exit
-      cage_receipt_rejects_missing_or_forged_enforcement_bindings
-      cage_receipt_tampering_and_sink_failure_fail_closed
-      evidence_shapes_reject_unknown_fields_and_noncanonical_digests
-      exit_is_bound_to_a_previously_fully_enforced_process
-      fully_enforced_release_receipt_is_signed_verified_and_persistable
-      fully_enforced_requires_prepared_exec_identity_and_status_eof
-      rejection_bootstrap_and_exit_have_distinct_truthful_signed_receipts
-    )
-    compile_tests=(
-      arbitrary_secret_runtime_file_requires_exact_signed_read_authority
-      broker_profile_requires_a_connected_authenticated_unix_descriptor
-      compile_is_deterministic_and_starts_from_deny_all
-      compiled_profile_binds_the_exact_registry_snapshot
-      directory_read_grant_is_bounded_to_its_admitted_descendant_inode_closure
-      dynamically_linked_cage_init_is_rejected_before_descriptor_transfer
-      executable_runtime_file_gets_exact_execute_read_grant
-      forbidden_hard_link_alias_is_rejected_before_compilation
-      overlapping_read_grants_retain_each_path_once_and_reject_hardlink_aliases
-      header_only_cage_init_is_rejected_before_descriptor_transfer
-      missing_write_parent_and_runtime_aliases_fail_closed
-      explicit_read_write_file_shares_one_retained_descriptor_and_requires_both_ceilings
-      retained_grant_survives_path_replacement_without_reopening
-      runtime_file_rebound_to_forbidden_descriptor_fails_closed
-      script_target_is_rejected_before_launch
-      target_argv_is_bounded_and_bound_into_the_plan_digest
-      zero_initialized_tls_does_not_bind_an_unused_file_offset
-      hard_link_into_a_forbidden_directory_is_rejected
-      forbidden_directory_scan_admits_an_unrelated_hard_link_beside_a_socket
-      only_connection_oriented_unix_sockets_can_carry_broker_ipc
-      group_writable_runtime_file_without_an_execute_bit_is_rejected
-      admission_with_a_missing_write_grant_creates_nothing
-      a_denied_admission_leaves_no_write_grant_behind
-      compile_creates_a_pending_write_grant_owned_by_the_execution_identity
-      a_failed_compile_keeps_its_created_grant_and_the_other_creators_file
-      the_next_compile_retains_a_grant_left_by_a_failed_compile
-      an_unprivileged_compile_refuses_a_pending_grant_for_another_identity
-    )
-    print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
-    print_target "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)" "${plan_tests[@]}"
-    print_target "Running unittests src/lib.rs (/tmp/chio_cage_init-lib)" "${init_tests[@]}"
-    print_target "Running unittests src/main.rs (/tmp/chio_cage_init-bin)"
-    print_target "Running tests/entrypoint.rs (/tmp/entrypoint)" standalone_helper_rejects_missing_control_descriptor
-    print_target "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)" "${evidence_tests[@]}"
-    print_target "Running tests/linux_compile.rs (/tmp/linux_compile)" "${compile_tests[@]}"
-    printf '     Running tests/linux_enforcement.rs (/tmp/linux_enforcement)\n'
-    printf 'running %d tests\n' "${#probes[@]}"
-    if [[ "$mode" == "skipped_probe" ]]; then
-      for ((index = 0; index < 25; index++)); do
-        printf 'test %s ... ok\n' "${probes[$index]}"
-      done
-      printf 'test %s ... ignored\n' "${probes[25]}"
-      printf 'test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s\n'
-      exit 0
-    fi
-    for test_name in "${probes[@]}"; do
-      printf 'test %s ... ok\n' "$test_name"
-    done
-    printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n' "${#probes[@]}"
-    exit 0
-  fi
-
-  for test_name in "${probes[@]}"; do
-    printf 'test %s ... ok\n' "$test_name"
-  done
-  printf 'test result: ok. %d passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n' "${#probes[@]}"
-  exit 0
+if [[ "${FAKE_CARGO_MODE:-success}" == "unavailable" ]] &&
+  { [[ "$args" == *" --all-targets "* ]] || [[ "$args" == *" --test linux_enforcement "* ]]; }; then
+  exit 127
+fi
+if [[ "$args" == *" --all-targets "* ]]; then
+  exec "${CHIO_REAL_PYTHON3:?}" -I "${FAKE_CAGE_RENDERER:?}" all-targets "${FAKE_CARGO_MODE:-success}"
+fi
+if [[ "$args" == *" --test linux_enforcement "* ]] && [[ "$args" == *"enforcement-mutants"* ]]; then
+  exec "${CHIO_REAL_PYTHON3:?}" -I "${FAKE_CAGE_RENDERER:?}" mutations "${FAKE_CARGO_MODE:-success}"
 fi
 printf 'unexpected fake cargo invocation: %s\n' "$*" >&2
 exit 65
@@ -456,7 +339,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=102 probes=38 mutations=10$' \
+grep -Eq "^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} ${evidence_marker}$" \
   "$work/1-success.out"
 
 status="$(run_gate 1 success musl)"
@@ -464,7 +347,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success-musl.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=102 probes=38 mutations=10$' \
+grep -Eq "^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} ${evidence_marker}$" \
   "$work/1-success-musl.out"
 
 for ldd_mode in musl_without_libc musl_without_interpreter; do

@@ -30,6 +30,19 @@ EXPECTED_INTEGRATION_TARGETS = {
     "linux_compile.rs",
     "linux_enforcement.rs",
 }
+MUTANT_FEATURE = 'feature = "enforcement-mutants"'
+EXPECTED_MUTATIONS = (
+    "bootstrap_mutation_corrupt_plan_digest_denies_launch",
+    "bootstrap_mutation_exit_before_exec_denies_launch",
+    "bootstrap_mutation_malformed_status_denies_launch",
+    "bootstrap_mutation_missing_descriptor_denies_launch",
+    "bootstrap_mutation_skipped_execution_identity_denies_launch",
+    "bootstrap_mutation_trace_binding_mismatch_denies_launch",
+    "bootstrap_mutation_unsealed_plan_denies_launch",
+    "enforcement_mutation_disabling_landlock_denies_launch",
+    "enforcement_mutation_disabling_seccomp_denies_launch",
+    "enforcement_mutation_partial_landlock_denies_launch",
+)
 TEST_DECLARATION = re.compile(
     r"(?P<attrs>(?:\s*#\[[^\]]+\]\s*)+)" r"(?:async\s+)?fn\s+(?P<name>[A-Za-z0-9_]+)"
 )
@@ -111,7 +124,7 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
             for name, attributes in test_declarations(path):
                 if relative == "src/launch.rs" and name == "unsupported_platform_keeps_a_fail_closed_signal_surface":
                     continue
-                if 'not(target_os = "linux")' in attributes or 'feature = "enforcement-mutants"' in attributes:
+                if 'not(target_os = "linux")' in attributes or MUTANT_FEATURE in attributes:
                     continue
                 inventory[target].append(name)
     inventory["entrypoint"] = [name for name, _ in test_declarations(helper / "tests/entrypoint.rs")]
@@ -119,7 +132,7 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
     for file_name in sorted(EXPECTED_INTEGRATION_TARGETS):
         target = Path(file_name).stem
         for name, attributes in test_declarations(tests / file_name):
-            if 'feature = "enforcement-mutants"' in attributes:
+            if MUTANT_FEATURE in attributes:
                 continue
             inventory[target].append(name)
 
@@ -152,6 +165,17 @@ def source_inventory(root: Path) -> dict[str, list[str]]:
             f"expected_sha256={EXPECTED_SHA256} observed_sha256={digest}"
         )
     return dict(inventory)
+
+
+def mutation_inventory(root: Path) -> list[str]:
+    path = root / "crates/security/chio-cage/tests/linux_enforcement.rs"
+    names = sorted(name for name, attributes in test_declarations(path) if MUTANT_FEATURE in attributes)
+    if names != sorted(EXPECTED_MUTATIONS):
+        raise InventoryError(
+            "chio-cage mutation inventory changed: "
+            f"expected={sorted(EXPECTED_MUTATIONS)!r} observed={names!r}"
+        )
+    return names
 
 
 def header_target(kind: str, path: str, executable: str) -> str:
@@ -251,17 +275,30 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--run-output", type=Path)
     parser.add_argument("--source-only", action="store_true")
+    parser.add_argument("--expected", choices=("all-targets", "probes", "mutations"))
     args = parser.parse_args()
-    if args.source_only == (args.run_output is not None):
-        parser.error("choose exactly one of --source-only or --run-output")
+    modes = [args.source_only, args.run_output is not None, args.expected is not None]
+    if modes.count(True) != 1:
+        parser.error("choose exactly one of --source-only, --run-output or --expected")
 
     try:
-        expected = source_inventory(args.root.resolve())
+        root = args.root.resolve()
+        expected = source_inventory(root)
+        mutations = mutation_inventory(root)
         if args.run_output is not None:
             verify_execution(args.run_output, expected)
     except (InventoryError, OSError, UnicodeError) as error:
         raise SystemExit(str(error)) from error
 
+    if args.expected == "all-targets":
+        print(EXPECTED_TOTAL)
+        return 0
+    if args.expected == "probes":
+        print("\n".join(expected["linux_enforcement"]))
+        return 0
+    if args.expected == "mutations":
+        print("\n".join(mutations))
+        return 0
     print(
         "chio-cage Linux all-target inventory passed "
         f"({EXPECTED_TOTAL} tests; {EXPECTED_SHA256})"

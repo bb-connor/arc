@@ -261,6 +261,32 @@ passed_total() {
   ' "$1"
 }
 
+inventory_names() {
+  local names
+  names="$(python3 -I "$inventory_checker" --root "$root" --expected "$1")" || return 1
+  if [[ -z "$names" ]] || grep -Evq '^[a-z0-9_]+$' <<<"$names"; then
+    echo "chio-cage $1 inventory is empty or malformed" >&2
+    return 1
+  fi
+  printf '%s\n' "$names"
+}
+
+expected_all_targets="$(python3 -I "$inventory_checker" --root "$root" --expected all-targets)"
+if [[ ! "$expected_all_targets" =~ ^[1-9][0-9]*$ ]]; then
+  echo "chio-cage all-target inventory total is malformed" >&2
+  exit 1
+fi
+probe_names="$(inventory_names probes)"
+mutation_names="$(inventory_names mutations)"
+expected_probes=()
+while IFS= read -r test_name; do
+  expected_probes+=("$test_name")
+done <<<"$probe_names"
+expected_mutations=()
+while IFS= read -r test_name; do
+  expected_mutations+=("$test_name")
+done <<<"$mutation_names"
+
 all_targets_output="$log_dir/all-targets.out"
 run_cargo_lane \
   "real-Linux all-target cage lane" \
@@ -271,8 +297,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 104 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 104 tests" >&2
+if [[ "$all_targets_passed" -ne "$expected_all_targets" ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly $expected_all_targets tests" >&2
   exit 1
 fi
 
@@ -290,48 +316,6 @@ awk '
   }
 ' "$all_targets_output" >"$probe_output"
 
-expected_probes=(
-  real_kernel_reports_fully_enforced_then_clean_exit
-  execution_identity_is_exact_after_root_drop_or_unprivileged_launch
-  sealed_launch_preparation_is_secret_free_and_owns_descriptors_without_launching
-  launch_prepared_revalidates_mutated_retained_target_before_spawn
-  real_launch_consumes_the_observed_sealed_preparation_contract
-  dynamically_linked_target_uses_only_retained_runtime_artifacts
-  fully_enforced_child_exposes_authenticated_stdio_and_exact_argv
-  target_exec_has_no_leaked_control_or_resource_descriptors
-  independent_seccomp_filter_kills_forbidden_socket
-  landlock_denies_ungranted_path_after_fd_based_target_exec
-  seccomp_kills_forbidden_process_creation
-  seccomp_confines_resource_limits_and_signals_to_the_cage
-  landlock_denies_file_creation_without_a_grant
-  retained_target_survives_path_replacement
-  retained_helper_survives_path_replacement_without_reopening
-  pidfd_forwards_an_allowed_termination_signal
-  exact_write_and_read_grants_are_enforced_from_retained_descriptors
-  directory_read_grant_denies_a_forbidden_hard_link_created_after_compilation
-  landlock_grant_does_not_follow_a_replaced_path
-  target_exec_exception_cannot_be_recreated_after_exec
-  landlock_denies_write_to_existing_ungranted_file
-  default_deny_blocks_remove_rename_and_hard_link
-  landlock_denies_symlink_traversal_escape
-  default_deny_blocks_ipv4_and_ipv6_connect_and_bind
-  default_deny_blocks_unreviewed_syscall
-  seccomp_kills_x32_syscall_alias
-  seccomp_kills_foreign_architecture_syscall
-  target_receives_no_parent_secret_or_loader_injection_environment
-  default_deny_blocks_undeclared_executable_path
-  a_second_exec_by_absolute_path_is_killed
-  a_second_exec_through_proc_self_fd_is_killed
-  a_second_exec_through_the_interpreter_is_killed
-  a_fault_in_the_target_reaches_its_default_action
-  a_timer_signal_reaches_the_target
-  a_stopped_target_stays_stopped_until_it_is_continued
-  racing_stops_continues_and_a_kill_end_with_an_observed_exit
-  dropping_a_stopped_target_reaps_it
-  rapid_stop_continue_then_drop_reaps_the_target
-  seccomp_kills_unreviewed_ioctl_requests
-  the_target_starts_with_every_signal_at_its_default_disposition
-)
 for test_name in "${expected_probes[@]}"; do
   if [[ "$(grep -Fxc "test $test_name ... ok" "$probe_output")" -ne 1 ]]; then
     echo "real-Linux cage probe lane omitted, skipped, or duplicated $test_name" >&2
@@ -364,18 +348,6 @@ run_cargo_lane \
     --features real-linux-enforcement,enforcement-mutants \
     mutation_ -- --test-threads=1
 
-expected_mutations=(
-  enforcement_mutation_disabling_landlock_denies_launch
-  enforcement_mutation_partial_landlock_denies_launch
-  enforcement_mutation_disabling_seccomp_denies_launch
-  bootstrap_mutation_unsealed_plan_denies_launch
-  bootstrap_mutation_corrupt_plan_digest_denies_launch
-  bootstrap_mutation_missing_descriptor_denies_launch
-  bootstrap_mutation_malformed_status_denies_launch
-  bootstrap_mutation_trace_binding_mismatch_denies_launch
-  bootstrap_mutation_exit_before_exec_denies_launch
-  bootstrap_mutation_skipped_execution_identity_denies_launch
-)
 for test_name in "${expected_mutations[@]}"; do
   if [[ "$(grep -Fxc "test $test_name ... ok" "$mutation_output")" -ne 1 ]]; then
     echo "real-Linux cage mutation lane omitted, skipped, or duplicated $test_name" >&2
