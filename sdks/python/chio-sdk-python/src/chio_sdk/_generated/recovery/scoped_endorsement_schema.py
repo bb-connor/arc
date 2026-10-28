@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -59,7 +59,7 @@ class Target(BaseModel):
     action: RecoveryDigest32
 
 
-class Target14(BaseModel):
+class Target20(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -74,7 +74,7 @@ class ScopedEndorsementV1(BaseModel):
     domain_version: Literal[1]
     evidence: OpaqueId
     scope: Scope
-    target: Target | Target14
+    target: Target | Target20
     influence: RecoveryDigest32
     assertions: list[OpaqueId] = Field(..., max_length=8, min_length=1)
     destination: OpaqueId

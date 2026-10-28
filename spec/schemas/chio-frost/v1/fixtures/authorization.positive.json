@@ -18,7 +18,7 @@
     "schema": "chio.frost.authorization-body.v1",
     "scopeId": "treaty.atlantic.v1"
   },
-  "groupSignature": "b5bb90cbbb5b6a54bae24dfc8afc4745a9270535ee33a9054057d3ac152f4e9d71c1c870c89b217ccd159fedd67e8e92d2c7ae11bd3974447b3e5c115624fb03",
+  "groupSignature": "b5bb90cbbb5b6a54bae24dfc8afc4745a9270535ee33a9054057d3ac152f4e9d09119deec2b6e531799be8692faf0ab4606b8fd289174fe7c79ced41052b0703",
   "schema": "chio.frost.authorization.v1",
   "suiteId": "FROST-ED25519-SHA512-v1"
 }

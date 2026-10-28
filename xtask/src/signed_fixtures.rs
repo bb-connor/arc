@@ -400,17 +400,23 @@ pub(crate) const STEPS: &[Step] = &[
     },
     Step {
         name: "recovery knowledge contract vectors",
-        regenerate: cargo(&[
-            "test",
-            "-p",
-            "chio-core-types",
-            "--test",
-            "recovery_knowledge_contracts",
-            "--",
-            "--ignored",
-            "--exact",
-            "write_shared_vectors",
-        ]),
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-core-types",
+                "--test",
+                "recovery_knowledge_contracts",
+                "--",
+                "--ignored",
+                "--exact",
+                "write_shared_vectors",
+            ],
+            &[(
+                "CHIO_KNOWLEDGE_VECTOR_OUT",
+                "../../../spec/vectors/recovery/v1/knowledge-contracts.json",
+            )],
+        ),
         check: cargo(&[
             "test",
             "-p",
@@ -546,7 +552,15 @@ pub(crate) const STEPS: &[Step] = &[
     Step {
         name: "stop operator config fixtures",
         regenerate: cargo_env(
-            &["test", "-p", "chio-kernel", "--lib", "stop::config::tests"],
+            &[
+                "test",
+                "-p",
+                "chio-kernel",
+                "--lib",
+                "stop::config::tests::committed_fixtures_are_the_generator_output",
+                "--",
+                "--exact",
+            ],
             &[("CHIO_WRITE_STOP_CONFIG_FIXTURES", "1")],
         ),
         check: cargo(&["test", "-p", "chio-kernel", "--lib", "stop::config::tests"]),

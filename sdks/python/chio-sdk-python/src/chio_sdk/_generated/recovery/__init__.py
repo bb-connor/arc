@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -38,7 +38,7 @@ from .effect_contract_schema import LookupFinality, SemanticEffectContractV1
 from .explanation_evaluation_schema import Assessment, Candidate, DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationEvaluationV1, RefusalCode, SafeInteger, Scope
 from .explanation_report_schema import DestinationId, Limits, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationReportV1, RefusalCode, SafeInteger, Scope
 from .explanation_request_schema import DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationRequestV1, RefusalCode, SafeInteger, Scope
-from .explanation_snapshot_schema import DestinationId, Fact, Influence, Influence1, Integrity, Observation, OpaqueId, Operation, Reason, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationSnapshotV1, RefusalCode, SafeInteger, Scope, Source, State, State4, State6, Target, Target6, Target7, Target8
+from .explanation_snapshot_schema import DestinationId, Fact, Influence, Influence1, Integrity, Observation, OpaqueId, Operation, Reason, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationSnapshotV1, RefusalCode, SafeInteger, Scope, Source, State, State4, State6, Target, Target10, Target8, Target9
 from .explanation_view_schema import Assessment, Candidate, DestinationId, OpaqueId, Operation, Projection, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationViewV1, RefusalCode, SafeInteger, Scope, Summary
 from .grant_binding_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, RecoveryMandatoryGrantBindingV1, SafeInteger, Scope
 from .isolation_boundary_schema import ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink16, ArtifactSink17, ArtifactSink18, IsolationBoundaryV1, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope
@@ -58,7 +58,7 @@ from .return_admission_schema import ArtifactInfluence, ArtifactRecipient, Artif
 from .return_contract_schema import ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink22, ArtifactSink23, ArtifactSink24, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, ReturnContractV1, SafeInteger, Scope
 from .review_document_schema import OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryReviewDocumentV1, RefusalCode, SafeInteger, Scope
 from .review_request_schema import OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryReviewRequestV1, RefusalCode, SafeInteger, Scope
-from .scoped_endorsement_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, ScopedEndorsementV1, Target, Target14
+from .scoped_endorsement_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, ScopedEndorsementV1, Target, Target20
 from .semantic_action_schema import OpaqueId, Output, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticActionV1, SemanticInputVersion, SemanticNativeSource
 from .semantic_annotation_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticAnnotationV1, SemanticInputVersion
 from .semantic_audience_schema import Completeness, Cursor, OpaqueId, Pagination, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticAudienceV1
@@ -71,32 +71,31 @@ from .semantic_prerequisite_schema import Kind, OpaqueId, RecoveryDigest32, Reco
 from .semantic_provider_request_schema import Kind, OpaqueId, SemanticProviderRequestV1
 from .semantic_provider_response_schema import OpaqueId, SemanticProviderResponseV1
 from .semantic_transformation_schema import Disposition, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticInputVersion, SemanticTransformationV1
-from .signed_artifact_archive_manifest_schema import Algorithm, SignedArtifactArchiveManifestV1
-from .signed_artifact_certificate_schema import Algorithm, SignedArtifactCertificateV1
-from .signed_authority_coverage_schema import Algorithm, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryAuthorityCoverageV1
-from .signed_confined_disclosure_schema import Algorithm, ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink25, ArtifactSink26, ArtifactSink27, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedConfinedDisclosureV1
-from .signed_confined_endorsement_schema import Algorithm, ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink28, ArtifactSink29, ArtifactSink30, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedConfinedEndorsementV1
-from .signed_explanation_report_schema import Algorithm, DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySignedExplanationReportV1, RefusalCode, SafeInteger, Scope
-from .signed_explanation_view_schema import Algorithm, DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySignedExplanationViewV1, RefusalCode, SafeInteger, Scope
-from .signed_policy_deployment_change_schema import Algorithm, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedPolicyDeploymentChangeV1
-from .signed_provider_finality_schema import Algorithm, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryProviderFinalityV1
-from .signed_recovery_grant_schema import Algorithm, Body, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryGrant
-from .signed_recovery_setup_probe_schema import Algorithm, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoverySetupProbeV1
-from .signed_recovery_setup_report_schema import Algorithm, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoverySetupReportV1
-from .signed_scoped_endorsement_schema import Algorithm, SignedScopedEndorsementV1
-from .signed_semantic_annotation_schema import Algorithm, SignedSemanticAnnotationV1
-from .signed_semantic_audience_schema import Algorithm, SignedSemanticAudienceV1
-from .signed_semantic_deployment_schema import Algorithm, SignedSemanticDeploymentV1
-from .signed_semantic_package_schema import Algorithm, SignedSemanticPackageV1
-from .signed_semantic_prerequisite_schema import Algorithm, SignedSemanticPrerequisiteV1
-from .signed_semantic_transformation_schema import Algorithm, SignedSemanticTransformationV1
+from .signed_artifact_archive_manifest_schema import SignedArtifactArchiveManifestV1
+from .signed_artifact_certificate_schema import SignedArtifactCertificateV1
+from .signed_authority_coverage_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryAuthorityCoverageV1
+from .signed_confined_disclosure_schema import ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink25, ArtifactSink26, ArtifactSink27, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedConfinedDisclosureV1
+from .signed_confined_endorsement_schema import ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink28, ArtifactSink29, ArtifactSink30, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedConfinedEndorsementV1
+from .signed_explanation_report_schema import DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySignedExplanationReportV1, RefusalCode, SafeInteger, Scope
+from .signed_explanation_view_schema import DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySignedExplanationViewV1, RefusalCode, SafeInteger, Scope
+from .signed_policy_deployment_change_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedPolicyDeploymentChangeV1
+from .signed_provider_finality_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryProviderFinalityV1
+from .signed_recovery_grant_schema import Body, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoveryGrant
+from .signed_recovery_setup_probe_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoverySetupProbeV1
+from .signed_recovery_setup_report_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SignedRecoverySetupReportV1
+from .signed_scoped_endorsement_schema import SignedScopedEndorsementV1
+from .signed_semantic_annotation_schema import SignedSemanticAnnotationV1
+from .signed_semantic_audience_schema import SignedSemanticAudienceV1
+from .signed_semantic_deployment_schema import SignedSemanticDeploymentV1
+from .signed_semantic_package_schema import SignedSemanticPackageV1
+from .signed_semantic_prerequisite_schema import SignedSemanticPrerequisiteV1
+from .signed_semantic_transformation_schema import SignedSemanticTransformationV1
 from .support_issue_effect_schema import OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySupportIssueEffectContractV1, RefusalCode, SafeInteger, Scope
 from .support_issue_input_schema import OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoverySupportIssueInputV1, RefusalCode, SafeInteger, Scope
 from .trajectory_schema import Expected, Frame, RecoveryTrajectoryV1
 from .transport_request_schema import OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryTransportRequestV1, RefusalCode, SafeInteger, Scope
 
 __all__ = [
-    "Algorithm",
     "ArtifactArchiveManifestV1",
     "ArtifactCertificateV1",
     "ArtifactHandleV1",
@@ -348,9 +347,9 @@ __all__ = [
     "State6",
     "Summary",
     "Target",
-    "Target14",
-    "Target6",
-    "Target7",
+    "Target10",
+    "Target20",
     "Target8",
+    "Target9",
     "Template",
 ]

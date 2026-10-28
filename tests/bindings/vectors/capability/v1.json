@@ -39,7 +39,7 @@
             }
           ]
         },
-        "signature": "a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85f197b18e8ad05607745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64fb5c27d81ed505",
+        "signature": "9236a6b5bfbd89678f28d666dfa3568810de2ebe0c62a5395c1ae2ffd68b7f453a5fafe58fcd379b58f5ac631d22adbbcac2f0230137a468d09e33a8a4fbd00d",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-valid\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc6202459c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b865be00\",\"timestamp\":1710000250}],\"expires_at\":1710000800,\"id\":\"cap-bindings-valid\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -80,7 +80,7 @@
             }
           ]
         },
-        "signature": "d4f16e2dc56f829a047cf339e7139c0ceb859045f4854b746bdecf6901fb493a1088bab6456d2c39b38cc955f84041ebd22d8636bf4cfc45e838423b868de509",
+        "signature": "972dd504920dbd8bacdc75a48c1e49f882b9fa154b2683674ddf791f7fba34e54e66bebbadb9affdf58f6127c9374be379d770123d2b6a93671ec86c16ea330f",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000100,\"id\":\"cap-bindings-expired\",\"issued_at\":1710000000,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -121,7 +121,7 @@
             }
           ]
         },
-        "signature": "2f479e50d9f15956dc5eabe69259a67ef93d4fd24fd97972d2aa500edac315eff3fe01c1170b3a412df73ea1d94e0b4704419fb356538d6843766bdac40e570b",
+        "signature": "04e59bba410e16d53bfdc03d5c222712565eb47c098ed788e237273fdeb7a633634bf18abedfa949cf19669826410c5305e16fdbab87902f530cbf6ac6d39101",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710001200,\"id\":\"cap-bindings-not-yet-valid\",\"issued_at\":1710000600,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -211,7 +211,7 @@
             }
           ]
         },
-        "signature": "76466629cbe01ac3915bb67af0ff4fa591aec42d8a8f72e7c36731b7b1596cfb39e3a82dfc467dd2ed61c7ba7a5e728016d82b1702cbac5b8cc94719b99d0c08",
+        "signature": "c9f6927713d2f2289cfbf5507b008e7b17b88ad74b4ce9f8b5e71da2419fc2afc9639a233a046e8b908e997b7f94f3e8c55cc77b12a9410d525ea43a600b530a",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-broken-chain\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"e5031fd5c95e1cb79201c9750831e6604ee65fa451202f0ef540e9e30f7bc8e73ca877424e7ca3121db39cbb57e97827878a8656b077a7c084f9bfeeb8466f0e\",\"timestamp\":1710000301}],\"expires_at\":1710000800,\"id\":\"cap-bindings-broken-chain\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -251,7 +251,7 @@
             }
           ]
         },
-        "signature": "bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9aa59fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7decd6a477db920c",
+        "signature": "423e1a5ce4c07d2ef4aa8c11c065b1d778dba80d4e91242ca59c0a431529965bc6a332f9e431d4fd11c68b0431fde84b48991476dd5bea9137d8c8c8471c6804",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-direct\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -325,7 +325,7 @@
             }
           ]
         },
-        "signature": "afc3e02a2af7cb0ca18518690284b05cc9e655ad924d071af1d6e4f85c0c454b12fc584a49c61fc44f2ee9545005ce08e296a0349fe170e586f81a4882557f05",
+        "signature": "60655101e9e4e8a7a8a5b393b1772922f3bff3698104b8be170002c8cabe152b98fe72a9dc72ad45836f3512eae6b23c34784540af6a98f672e2ea2dd7ce5a04",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-multi-tool\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":5,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"},{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":20,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_stat\"},{\"constraints\":[{\"type\":\"max_args_size\",\"value\":8192},{\"type\":\"max_length\",\"value\":2048}],\"dpop_required\":true,\"max_invocations\":2,\"operations\":[\"invoke\"],\"server_id\":\"srv-shell\",\"tool_name\":\"exec\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -364,7 +364,7 @@
             }
           ]
         },
-        "signature": "fc83211b94899262b9e8e9fadf62cfe01732ee22e7313a4d337555ae5860be05103369f01d33b90a69cf9d4f352922caa51c6a9e353ccb01f03927e12e234405",
+        "signature": "311d6f3b37da677228953094ef24d7fa74d5a42953b2a54b91576bddd562fbacac28b0385344683e8b409987b90dbd968aef75cdc2771c089d17b28e82e6e90e",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-resources\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"resource_grants\":[{\"operations\":[\"read\",\"subscribe\"],\"uri_pattern\":\"file:///workspace/*\"},{\"operations\":[\"read\"],\"uri_pattern\":\"https://docs.chio-protocol.dev/*\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -402,7 +402,7 @@
             }
           ]
         },
-        "signature": "3dad45d697631aa48dfff0bd4d2463552b5fadd51831d3add795854e14bbab9601ba325c7be4744e60318cb86e34532d344c6081106ac7173a3f90ca83fa1d0c",
+        "signature": "10290705927c577307d9a08427ef89ff5ec862a15f809f9eb9b64988623d260b53a3444166ce07d3f20ffc8ccea8929eb06e64908690325e87baedeab94b1602",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-prompts\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"prompt_grants\":[{\"operations\":[\"get\"],\"prompt_name\":\"summarize\"},{\"operations\":[\"get\"],\"prompt_name\":\"review-*\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -459,7 +459,7 @@
             }
           ]
         },
-        "signature": "9c03d2ddb61bdc8a73a7d8786fa059c588f5059069a3f8cc076f7552f68468137f5993083958ae31cc812a61216af79b129cbee43fdbfc5faa77e07504201e02",
+        "signature": "1ddbd940d3bd74eb4455558933f470761d909908c0953aa297f154acef5cc7454009ba8b9de395037b9a2b9391eb87785c108d678a0052b1573e61f510184704",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-mixed\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":10,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}],\"prompt_grants\":[{\"operations\":[\"get\"],\"prompt_name\":\"summarize\"}],\"resource_grants\":[{\"operations\":[\"read\"],\"uri_pattern\":\"file:///workspace/*\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -493,7 +493,7 @@
             }
           ]
         },
-        "signature": "fd9243a19d632b7dc8a99a593b51746a950e4c003263a828c13b63db946bc4f1584525ea7a74a1963ef9ebaba24c4ccfa49a7f4b9f79f309da37f104d7dd3400",
+        "signature": "b133aa6e086f458975c7cc037b62fd7922fc6cc5eb9c1d5bdba50967fede1ef0f1fe55161f6898cf7795cc877cbb5fa3869fa120c558d482f15f267977352e0e",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-empty-constraints\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -544,7 +544,7 @@
             }
           ]
         },
-        "signature": "36bca5568f8a611cf915746f9f3030f0553a2a604f39fb089cec33cc050d9b03972d5f5171a67be59269696c5b1ea374f01925faf30f06d2a5d9976d9b216b06",
+        "signature": "99ca052ad0203c3b83f9b54362ee7e5ec0c5acb201579e8c3a81aeb18124f912292161703206cfe363602969195153ec643fb89014a3b3619cedf7ea8a383a0f",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-cost-caps\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/payments/\"},{\"type\":\"governed_intent_required\"}],\"dpop_required\":true,\"max_cost_per_invocation\":{\"currency\":\"USD\",\"units\":5000},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"USD\",\"units\":5000},\"operations\":[\"invoke\"],\"server_id\":\"srv-payments\",\"tool_name\":\"transfer\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -614,7 +614,7 @@
             }
           ]
         },
-        "signature": "7933227beb96d24b2c8a688d1d2983b5c9de0be97ed24b3232367f6e8e2538e2f83094544d7f6ebb36174badf9c096fa7cb12bdd1dd15d2f1c2b00997d10650a",
+        "signature": "b29a1e6e0d28f5fb1fd59207cf19e752b690e832af9b557afb76bb10fb43d1257c5c73ee4456c0f3c5a1b6de297a4319bbe0d36ac78ce31e0865a5641a157d07",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-depth4\",\"delegatee\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"41c64f6376703a7fc09d51d0a115fa5f399ab5c6b3117809351c805469454b42f6ca35fc5bd60de07ad1f3be1decdfcb760c955f319e6960557a28f2494fbf04\",\"timestamp\":1710000210},{\"capability_id\":\"cap-bindings-depth4\",\"delegatee\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"delegator\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"signature\":\"664f6e658c3f5b2df495c9986cdc200da41d494783eb13ddfd376fa740120e5beb61d839104fcf511424d148a028f6ff5ca1db5a41cb33394125798ff5c40906\",\"timestamp\":1710000220},{\"capability_id\":\"cap-bindings-depth4\",\"delegatee\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"delegator\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"signature\":\"4fcb28eec68b0e39fc8c65eee003eda6b3cb20ea03630cf99494a3a89d45060e9a52c499c8a471acbec71ed3a8b2439e30aa50843d6e2cf850cef484eb76bd0c\",\"timestamp\":1710000230},{\"capability_id\":\"cap-bindings-depth4\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"signature\":\"0082423786e0aaae5a27b40783040b233f0bdc9853ebdd80b6b9ad806183d9d4e21c2b140099189e83504b59958b948078b89baf0d4d32bfbe24c3baa267400d\",\"timestamp\":1710000240}],\"expires_at\":1710000800,\"id\":\"cap-bindings-depth4\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -691,7 +691,7 @@
             }
           ]
         },
-        "signature": "2ac46701d62eaf42d369082581835822ffae5da19623e591ccaa48d0ba202da50204bfead28cb75e2b0f905c4c5358e509cb744fd43e11518b4d88bb00a2f002",
+        "signature": "ed7dc93628352fd93836456a913d8065dfba3a0afe2f14f6a3dca301973d93c3c94ecfb600befb37bfb50586f174ab25b9e4a2185db83a9823af1d9c3322ba0b",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"e62d65c68b60518d6f7fc7cbd37a2b9e7fe2b65582ddec9ba2e0666e4f0cf0a25ae7b14866384a66bc0da779ce8f8d826c283e0fd2c974e7c2e5ba27d5c0eb0f\",\"timestamp\":1710000210},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"delegator\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"signature\":\"f56da5e0938b3de0222c131462ed9e31ed63424f2301ebdb79f42cfe8ea03873afa85b8ed45a0abb5f81ca3a886e968f57d24af55e8106cbf771b902ee134002\",\"timestamp\":1710000220},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"delegator\":\"d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c\",\"signature\":\"ecb23499591122d3f068a132cd6ff4e117078560e7b77319166a3941523ce1a558396f702bc93732252ef0641c022dfe568c390433ef79726104095cd8777a06\",\"timestamp\":1710000230},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737\",\"delegator\":\"5c9c6df261c9cb840475776aaefcd944b405328fab28f9b3a95ef40490d3de84\",\"signature\":\"bbb83fa5b2f1e030c0f3931c64333381f0dd00acbf01c0f90b879dc7ab756d2c004fbbd4326a21798d01917eb3069155af8ac57aa1519970b0ea25c721009706\",\"timestamp\":1710000240},{\"capability_id\":\"cap-bindings-depth5\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737\",\"signature\":\"1042727c4eb4255f955164d941b758eb63551641c27c708bececd9da4d5d48db0cfe3bd0ecec75d2471cecc5a57e0a02a8c25fe568ff6f2e062ed29bbe36780b\",\"timestamp\":1710000250}],\"expires_at\":1710000800,\"id\":\"cap-bindings-depth5\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -739,7 +739,7 @@
             }
           ]
         },
-        "signature": "c41bd16e240c7add13d89e89b3dfb72611cc7e9cc8532a29cb81e9479fdf1e4ae3ffb29f0feb587c1cc1e7817fc3ed54fff51a3304dd97feb4ef1e7f9c3e090d",
+        "signature": "2cf7ae0ce45288a1b21f6f27c5f5bfb726b71a5404e4791fac48eaf8a3b112fb212903614eacee4356599f710afd88ae9de205aae766d81adaee8115ffe2e207",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-edge-issued\",\"issued_at\":1710000400,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -779,7 +779,7 @@
             }
           ]
         },
-        "signature": "3f82877920f3174dbbff88a28faf11384feddf89733ae9eca8db26ba93aec246a031c62392adcc0ea67f4dcc52dd249e52ecee07b99fbe3da98f12820ab83d03",
+        "signature": "9ca3820e91f134cb39e7b6451335a5cf05851c1f65cba6fd1c2b74c8d737c6a5820299e2db99aad32e781353d2b32952609c729d17ce6254826167c81708a902",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000400,\"id\":\"cap-bindings-edge-expires\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -835,7 +835,7 @@
             }
           ]
         },
-        "signature": "f07e2f37668b446180eefaf981bbc06ac380d9f716ff25a9e4236ee30a5b4f3b395dcf2fd2ee9fe31ea36aa612dea37b8a2e29789b6162ab713ae19b489d7901",
+        "signature": "0498fcac7f94544e4beee071ea88cef6c476f7e239f6dfb92c4affca00d8e903da820cee2d6782007e4372f63a9cdd8e28cf64c876bc6881daef794a8d252706",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-complex-constraints\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"domain_glob\",\"value\":\"*.chio-protocol.dev\"},{\"type\":\"max_length\",\"value\":1024},{\"type\":\"max_args_size\",\"value\":4096},{\"type\":\"custom\",\"value\":[\"rate_limit\",\"10/min\"]}],\"max_invocations\":50,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-net\",\"tool_name\":\"http_get\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -891,7 +891,7 @@
             }
           ]
         },
-        "signature": "e5ad6d4c9418791b13e4e0430d0ce002ec86e6f98c7b2536fe3fccb4e78175e81d2004be8dee99ec2c3bb24755b20e341a83ba7131ff37e8934986bff9ae1c09",
+        "signature": "573ef02830dc4c423275c17ba649364165c4bf9a258b38d8ecac2c1c894618d410f2578e76c4c24d0950564f78ea7d54c3a8c40d1a27c1aa7d9fa7d6b9f01601",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-dual\",\"delegatee\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"5d18c8a790e448882a822361f3f3d68a2d699acfab42fc8568ff00e90149bebd16a3fd61670a7f0344dd0424f4633c9ca8d53e9c086669e6c70264f2e7705804\",\"timestamp\":1710000220},{\"capability_id\":\"cap-bindings-dual\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc\",\"signature\":\"16c627c76531b8e6ae181d00bb5bef3fd1c452ff436a6ffdcd5d5ee83a2f0ff68d2c2f6e811e6ddc66e63459ccf33fba1144c400841f63d5ae6a265812d1f108\",\"timestamp\":1710000240}],\"expires_at\":1710000800,\"id\":\"cap-bindings-dual\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
@@ -971,7 +971,7 @@
             }
           ]
         },
-        "signature": "93e03a173656419bdfccf65804b255c3f75f32a2ad595d263d1cd9a4fb07e1565092e17cfdeab713bd76e2ee3ba5423cc0d3f1a467cc38575217043d0597e802",
+        "signature": "2586fd78f265ac499aa878f2445feb41c93fa8c0d63b7fdfeec887712ef2a815897e4f621d6ba66b5354f33692b955ed6cd428407bc40cde78c8efa3cd19fa09",
         "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
       },
       "capability_signing_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-edge-not-yet\",\"issued_at\":1710000401,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"schema\":\"chio.capability.v1\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",

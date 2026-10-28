@@ -3,7 +3,7 @@
   "expected": {
     "decision": "allow",
     "parameter_hash_valid": true,
-    "signature_valid": true
+    "signature_valid": false
   },
   "receipt": {
     "action": {

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,22 +12,67 @@ from __future__ import annotations
 
 from .bilateral_signature_slice_envelope_schema import ChioBilateralDsseSignatureSliceEnvelope, Signature
 from .bilateral_signature_slice_schema import CapabilityLeaseRef, ChioBilateralDsseSignatureSliceStatement, CoSign, CrossOrgVisibility, Digest, GovernanceReceiptRef, HashRecord, JointDisposition, KernelIdentity, PolicyEvaluationSummary, PolicyVerdict, Predicate, SubjectItem, Verdict
+from .cross_issuer_migration_schema import ChioCrossIssuerMigrationSignedBody
+from .enterprise_migration_transition_schema import ChioEnterpriseMigrationTransitionSignedBody, Key
+from .federated_delegation_policy_schema import ChioFederatedDelegationPolicySignedBody
+from .federation_activation_exchange_schema import ActivationRef, ChioFederationActivationExchangeSignedBody, DelegationControl, GoverningCharterRef, ImportControl, ListingRef, Scope
+from .federation_kernel_handshake_schema import Capabilities, ChioFederationKernelHandshakeSignedBody, Features, LadderManifestRef
+from .federation_open_admission_policy_schema import ChioFederationOpenAdmissionPolicySignedBody, FeeScheduleRef, GoverningCharterRef, MinimumBondAmount, StakeRequirement
+from .federation_policy_schema import ChioFederationPolicySignedBody
+from .federation_qualification_matrix_schema import Case, ChioFederationQualificationMatrixSignedBody
+from .federation_quorum_report_schema import AntiEclipsePolicy, ChioFederationQuorumReportSignedBody, Freshness, Publisher, Publisher1, ReportRef
+from .federation_reputation_clearing_schema import ArtifactRef, ChioFederationReputationClearingSignedBody, Continuity, Input, SybilControl
+from .transport_iroh_peer_directory_bundle_schema import ChioFederationTransportIrohPeerDirectoryBundleSignedBody
 
 __all__ = [
+    "ActivationRef",
+    "AntiEclipsePolicy",
+    "ArtifactRef",
+    "Capabilities",
     "CapabilityLeaseRef",
+    "Case",
     "ChioBilateralDsseSignatureSliceEnvelope",
     "ChioBilateralDsseSignatureSliceStatement",
+    "ChioCrossIssuerMigrationSignedBody",
+    "ChioEnterpriseMigrationTransitionSignedBody",
+    "ChioFederatedDelegationPolicySignedBody",
+    "ChioFederationActivationExchangeSignedBody",
+    "ChioFederationKernelHandshakeSignedBody",
+    "ChioFederationOpenAdmissionPolicySignedBody",
+    "ChioFederationPolicySignedBody",
+    "ChioFederationQualificationMatrixSignedBody",
+    "ChioFederationQuorumReportSignedBody",
+    "ChioFederationReputationClearingSignedBody",
+    "ChioFederationTransportIrohPeerDirectoryBundleSignedBody",
     "CoSign",
+    "Continuity",
     "CrossOrgVisibility",
+    "DelegationControl",
     "Digest",
+    "Features",
+    "FeeScheduleRef",
+    "Freshness",
     "GovernanceReceiptRef",
+    "GoverningCharterRef",
     "HashRecord",
+    "ImportControl",
+    "Input",
     "JointDisposition",
     "KernelIdentity",
+    "Key",
+    "LadderManifestRef",
+    "ListingRef",
+    "MinimumBondAmount",
     "PolicyEvaluationSummary",
     "PolicyVerdict",
     "Predicate",
+    "Publisher",
+    "Publisher1",
+    "ReportRef",
+    "Scope",
     "Signature",
+    "StakeRequirement",
     "SubjectItem",
+    "SybilControl",
     "Verdict",
 ]

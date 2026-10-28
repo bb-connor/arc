@@ -1,0 +1,55 @@
+# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.
+#
+# Source: spec/schemas/chio-wire/v1/**/*.schema.json
+# Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+#
+# Manual edits will be overwritten by the next regeneration; the
+# spec-drift CI lane enforces this header on every file
+# under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
+
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Body(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    capabilityPublicKeyHex: str
+    createdAt: int
+    operation: str
+    overlapExpiresAt: int | None = None
+    previousEventSha256: str | None = None
+    principalId: str
+    role: str
+    schema_: str = Field(..., alias="schema")
+    tenantId: str
+
+
+class LifecycleEvent(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    body: Body
+    signature: str
+    signerKey: str
+
+
+class ChioFindingHostedPrincipalReplicationEventSignedBody(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    authorityEpoch: int
+    committedAt: int
+    lifecycleEvent: LifecycleEvent
+    schema_: Literal["chio.finding.hosted-principal-replication-event.v1"] = Field(
+        ..., alias="schema"
+    )
+    sequence: int
+    sourceAuthority: str
+    tenantId: str

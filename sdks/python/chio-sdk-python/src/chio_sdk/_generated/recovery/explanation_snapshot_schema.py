@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -177,7 +177,7 @@ class Target(BaseModel):
     kind: Literal["intent"]
 
 
-class Target6(BaseModel):
+class Target8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -185,7 +185,7 @@ class Target6(BaseModel):
     kind: Literal["destination"]
 
 
-class Target7(BaseModel):
+class Target9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -193,7 +193,7 @@ class Target7(BaseModel):
     scope: RecoveryDigest32
 
 
-class Target8(BaseModel):
+class Target10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -292,7 +292,7 @@ class Observation(BaseModel):
     scope: Scope
     source: Source
     state: State4 | State | State6
-    target: Target | Target6 | Target7 | Target8
+    target: Target | Target8 | Target9 | Target10
 
 
 class RecoveryExplanationSnapshotV1(BaseModel):

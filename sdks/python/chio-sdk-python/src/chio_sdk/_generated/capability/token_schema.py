@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -17,13 +17,6 @@ from typing import Any, Literal
 from pydantic import StrictBool, BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 from . import aggregate_invocation_budget_schema, cumulative_approval_root_schema
-
-
-class Algorithm(Enum):
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
 
 
 class ScopeAttenuation(BaseModel):
@@ -81,7 +74,7 @@ class RequireApprovalAboveConstraint(BaseModel):
     value: Value
 
 
-class Value4(BaseModel):
+class Value7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -96,7 +89,7 @@ class CumulativeApprovalDirectConstraint(BaseModel):
         extra="forbid",
     )
     type: Literal["require_cumulative_approval_above"]
-    value: Value4
+    value: Value7
 
 
 class Kind(Enum):
@@ -202,7 +195,7 @@ class PromptGrant(BaseModel):
     operations: list[Operation] = Field(..., min_length=1)
 
 
-class Value5(BaseModel):
+class Value8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -219,7 +212,7 @@ class CumulativeApprovalDelegableConstraint(BaseModel):
         extra="forbid",
     )
     type: Literal["require_cumulative_approval_above"]
-    value: Value5
+    value: Value8
 
 
 class AttenuationWitness(BaseModel):
@@ -319,7 +312,6 @@ class ChioCapabilitytoken(BaseModel):
     aggregate_invocation_budget: (
         aggregate_invocation_budget_schema.ChioAggregateInvocationBudget | None
     ) = None
-    algorithm: Algorithm | None = None
     caveats: list[Caveat] | None = Field(
         None,
         description="At most one caveat, which must be bind_security_context.",

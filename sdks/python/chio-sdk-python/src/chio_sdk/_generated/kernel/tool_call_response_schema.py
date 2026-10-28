@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -28,7 +28,7 @@ class Result(BaseModel):
     value: Any
 
 
-class Result16(BaseModel):
+class Result17(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -36,7 +36,7 @@ class Result16(BaseModel):
     total_chunks: conint(ge=0)
 
 
-class Result17(BaseModel):
+class Result18(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -45,7 +45,7 @@ class Result17(BaseModel):
     chunks_received: conint(ge=0)
 
 
-class Result18(BaseModel):
+class Result19(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -62,14 +62,14 @@ class Error(BaseModel):
     detail: constr(min_length=1)
 
 
-class Error9(BaseModel):
+class Error10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     code: Literal["capability_expired"]
 
 
-class Error10(BaseModel):
+class Error11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -84,7 +84,7 @@ class Detail(BaseModel):
     reason: constr(min_length=1)
 
 
-class Error11(BaseModel):
+class Error12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -92,7 +92,7 @@ class Error11(BaseModel):
     detail: Detail
 
 
-class Error12(BaseModel):
+class Error13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -100,7 +100,7 @@ class Error12(BaseModel):
     detail: constr(min_length=1)
 
 
-class Error13(BaseModel):
+class Error14(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -108,12 +108,12 @@ class Error13(BaseModel):
     detail: constr(min_length=1)
 
 
-class Result19(BaseModel):
+class Result20(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     status: Literal["err"]
-    error: Error | Error9 | Error10 | Error11 | Error12 | Error13
+    error: Error | Error10 | Error11 | Error12 | Error13 | Error14
 
 
 class ChioKernelmessageToolCallResponse(BaseModel):
@@ -124,10 +124,10 @@ class ChioKernelmessageToolCallResponse(BaseModel):
     id: constr(min_length=1)
     result: (
         Result
-        | Result16
         | Result17
         | Result18
         | Result19
+        | Result20
         | pending_approval_schema.ChioToolcallresultPendingApproval
     )
     receipt: record_schema.ChioReceiptRecord

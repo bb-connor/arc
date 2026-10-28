@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -33,7 +33,7 @@ class Body(BaseModel):
     kind: Literal["tool_invocation"]
 
 
-class Body5(BaseModel):
+class Body148(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -52,7 +52,7 @@ class BoundToolInvocationBinding(BaseModel):
     )
 
 
-class Body6(BaseModel):
+class Body149(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -75,4 +75,4 @@ class ChioGovernedTransactionIntent(BaseModel):
     call_chain: dict[str, Any] | None = None
     autonomy: dict[str, Any] | None = None
     context: Any | None = None
-    body: Body | Body5 | Body6 | None = None
+    body: Body | Body148 | Body149 | None = None

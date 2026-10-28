@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -46,14 +46,14 @@ class PublicKey(
     )
 
 
-class Operation11(BaseModel):
+class Operation13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["genesis"]
 
 
-class Operation12(BaseModel):
+class Operation14(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -63,7 +63,7 @@ class Operation12(BaseModel):
     witness_roster_binding: Hash
 
 
-class Operation13(BaseModel):
+class Operation15(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -73,21 +73,21 @@ class Operation13(BaseModel):
     recovery_policy_binding: Hash | None = None
 
 
-class Operation14(BaseModel):
+class Operation16(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["retire"]
 
 
-class Operation15(BaseModel):
+class Operation17(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     type: Literal["revoke"]
 
 
-class Operation16(BaseModel):
+class Operation18(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -101,21 +101,21 @@ class Operation16(BaseModel):
 
 class Operation(
     RootModel[
-        Operation11
-        | Operation12
-        | Operation13
+        Operation13
         | Operation14
         | Operation15
         | Operation16
+        | Operation17
+        | Operation18
     ]
 ):
     root: (
-        Operation11
-        | Operation12
-        | Operation13
+        Operation13
         | Operation14
         | Operation15
         | Operation16
+        | Operation17
+        | Operation18
     )
 
 

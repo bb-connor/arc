@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 31d6c58928f59b213048f56bd61de1f7c959dead0e1721466dfb4f053e01ce6a
+# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -235,7 +235,7 @@ class ChioBrokerAuthorityRpcResponseBodyV1(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.broker-authority-rpc.v1"] = Field(..., alias="schema")
+    schema_: Literal["chio.broker-authority-response.v1"] = Field(..., alias="schema")
     requestId: AuthorityRpcResponseIdentifier
     requestDigest: Digest
     issuedAtUnixSeconds: PositiveU64

@@ -1597,7 +1597,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff",
         "body": {
           "artifact": "fixture-artifact",
@@ -1798,7 +1797,7 @@
           "valid_until_unix_ms": 20000,
           "version": "fixture-version"
         },
-        "signature": "004c939ff1b28d958aed8d7b2782856b3340ca5b1e7db8a8fcf948fd069e8fc4170e7950edb8a1f37ef102177f0622c111abe40262acf42a01a0bba7c52ac30c"
+        "signature": "f7f4beca2b19b749fac9e114c6b1012fbf4106d9a99fdbc47f503960090af44774aa0e33f905abb6446dd772717c386284fd07f45f166c1e0135fbd57f74c70c"
       },
       "name": "signed-artifact-certificate.schema.json",
       "schema": "signed-artifact-certificate.schema.json",
@@ -1807,7 +1806,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff",
         "body": {
           "artifact": "fixture-artifact",
@@ -2008,7 +2006,7 @@
           "valid_until_unix_ms": 20000,
           "version": "fixture-version"
         },
-        "signature": "004c939ff1b28d958aed8d7b2782856b3340ca5b1e7db8a8fcf948fd069e8fc4170e7950edb8a1f37ef102177f0622c111abe40262acf42a01a0bba7c52ac30c",
+        "signature": "f7f4beca2b19b749fac9e114c6b1012fbf4106d9a99fdbc47f503960090af44774aa0e33f905abb6446dd772717c386284fd07f45f166c1e0135fbd57f74c70c",
         "unexpected": true
       },
       "name": "signed-artifact-certificate.schema.json:unknown-field",
@@ -2018,7 +2016,6 @@
     },
     {
       "body": {
-        "authority_key": "9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff",
         "body": {
           "artifact": "fixture-artifact",
           "configuration": [
@@ -2218,7 +2215,7 @@
           "valid_until_unix_ms": 20000,
           "version": "fixture-version"
         },
-        "signature": "004c939ff1b28d958aed8d7b2782856b3340ca5b1e7db8a8fcf948fd069e8fc4170e7950edb8a1f37ef102177f0622c111abe40262acf42a01a0bba7c52ac30c"
+        "signature": "f7f4beca2b19b749fac9e114c6b1012fbf4106d9a99fdbc47f503960090af44774aa0e33f905abb6446dd772717c386284fd07f45f166c1e0135fbd57f74c70c"
       },
       "name": "signed-artifact-certificate.schema.json:missing-field",
       "schema": "signed-artifact-certificate.schema.json",
@@ -3016,7 +3013,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78",
         "body": {
           "domain_version": 1,
@@ -3275,7 +3271,7 @@
             }
           ]
         },
-        "signature": "2157122c96027fc5f8abad8e5f30b36b1572bb310deb35046937bb55422c29e851819a9761113da98e26b90e1a2bee922681d4e1a4fd42a9f016b95183833109"
+        "signature": "c6124b079a4fb71384ea116aca424ee31db145ff319a13ace612586e272a3f15597e46e190f21f246f78b4b10193441ba5140c94192e244859f9db219ab15705"
       },
       "name": "signed-artifact-archive-manifest.schema.json",
       "schema": "signed-artifact-archive-manifest.schema.json",
@@ -3284,7 +3280,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78",
         "body": {
           "domain_version": 1,
@@ -3543,7 +3538,7 @@
             }
           ]
         },
-        "signature": "2157122c96027fc5f8abad8e5f30b36b1572bb310deb35046937bb55422c29e851819a9761113da98e26b90e1a2bee922681d4e1a4fd42a9f016b95183833109",
+        "signature": "c6124b079a4fb71384ea116aca424ee31db145ff319a13ace612586e272a3f15597e46e190f21f246f78b4b10193441ba5140c94192e244859f9db219ab15705",
         "unexpected": true
       },
       "name": "signed-artifact-archive-manifest.schema.json:unknown-field",
@@ -3553,7 +3548,6 @@
     },
     {
       "body": {
-        "authority_key": "25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78",
         "body": {
           "domain_version": 1,
           "root": {
@@ -3811,7 +3805,7 @@
             }
           ]
         },
-        "signature": "2157122c96027fc5f8abad8e5f30b36b1572bb310deb35046937bb55422c29e851819a9761113da98e26b90e1a2bee922681d4e1a4fd42a9f016b95183833109"
+        "signature": "c6124b079a4fb71384ea116aca424ee31db145ff319a13ace612586e272a3f15597e46e190f21f246f78b4b10193441ba5140c94192e244859f9db219ab15705"
       },
       "name": "signed-artifact-archive-manifest.schema.json:missing-field",
       "schema": "signed-artifact-archive-manifest.schema.json",
@@ -5359,7 +5353,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "9ff6204d61b59a9e61afdd64fdf294bfe8a16687ba0538823ba59db6cb7b21ff",
         "body": {
           "artifact": "fixture-artifact",
@@ -5569,7 +5562,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "25fc32c478a5a4f84e4557a0342e08278c883641b6149bdb0b4a986ab6c2cb78",
         "body": {
           "domain_version": 1,
