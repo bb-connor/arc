@@ -108,41 +108,6 @@ impl SqliteBudgetStore {
         Ok(seq)
     }
 
-    /// The exact event_seq of the mutation event written under `event_id`, or
-    /// None if no such event exists (or it predates seq assignment). The
-    /// cluster budget-write handler waits on THIS write's own event_seq, looked
-    /// up by the write's event_id, instead of MAX(event_seq) for the authority:
-    /// a concurrent same-authority commit (or an idempotent retry while later
-    /// same-origin events already exist) can raise that MAX above this write's
-    /// seq, making the quorum wait target the wrong (higher) seq and roll back a
-    /// write that itself reached quorum. Looked up by the unique event_id, this
-    /// is race-free and, for an idempotent retry, returns the ORIGINAL event's
-    /// seq.
-    pub fn mutation_event_seq_for_event_id(
-        &self,
-        event_id: &str,
-    ) -> Result<Option<u64>, BudgetStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let seq: Option<Option<i64>> = transaction
-            .query_row(
-                "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",
-                rusqlite::params![event_id],
-                |row| row.get::<_, Option<i64>>(0),
-            )
-            .optional()?;
-        transaction.rollback()?;
-        seq.flatten()
-            .map(|value| {
-                u64::try_from(value).map_err(|_| {
-                    BudgetStoreError::Invariant(
-                        "budget mutation event has a negative event sequence".to_string(),
-                    )
-                })
-            })
-            .transpose()
-    }
-
     pub fn mutation_event_for_event_id(
         &self,
         event_id: &str,
@@ -226,15 +191,7 @@ impl SqliteBudgetStore {
         Ok(Some(usage))
     }
 
-    /// The quorum-witness identity of the mutation event stored under `event_id`:
-    /// `(event_seq, authority_id, lease_epoch)`, or None when no such event exists
-    /// or it predates seq assignment. The witness must target the event's STORED
-    /// origin authority, not the current lease: an idempotent retry after
-    /// leadership moved re-reads the already-written event, and peers advertise it
-    /// under its ORIGINAL authority, so keying the wait on the current leader would
-    /// look under the wrong origin and time out a write that already committed.
-    /// A null-seq (legacy) row returns None so the caller
-    /// falls back to the authority MAX rather than witnessing on seq 0.
+    /// Return the stored mutation's sequence and origin, or `None` if absent.
     pub fn mutation_event_witness_for_event_id(
         &self,
         event_id: &str,
@@ -256,14 +213,15 @@ impl SqliteBudgetStore {
         let witness = row
             .map(
                 |(seq, authority_id, lease_epoch)| -> Result<_, BudgetStoreError> {
-                    let Some(seq) = seq else {
-                        return Ok(None);
-                    };
-                    let seq = u64::try_from(seq).map_err(|_| {
-                        BudgetStoreError::Invariant(
-                            "budget mutation witness has a negative event sequence".to_string(),
-                        )
-                    })?;
+                    let seq = seq
+                        .filter(|seq| *seq > 0)
+                        .and_then(|seq| u64::try_from(seq).ok())
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "budget mutation witness has no positive event sequence"
+                                    .to_string(),
+                            )
+                        })?;
                     let lease_epoch = lease_epoch
                         .map(|epoch| {
                             u64::try_from(epoch).map_err(|_| {
@@ -274,11 +232,10 @@ impl SqliteBudgetStore {
                             })
                         })
                         .transpose()?;
-                    Ok(Some((seq, authority_id, lease_epoch)))
+                    Ok((seq, authority_id, lease_epoch))
                 },
             )
-            .transpose()?
-            .flatten();
+            .transpose()?;
         transaction.rollback()?;
         Ok(witness)
     }

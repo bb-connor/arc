@@ -1,4 +1,4 @@
-//! Decode retained debit and authorization custody without guessing legacy facts.
+//! Decode retained debit and authorization custody.
 use super::*;
 
 pub(super) fn payment_journal_from_row(

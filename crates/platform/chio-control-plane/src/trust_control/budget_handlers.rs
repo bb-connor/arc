@@ -162,12 +162,6 @@ fn generated_budget_event_id() -> String {
 /// commit (or a retry while later same-origin events exist) raises that MAX
 /// above this write's seq, so the quorum wait would target a later event and
 /// `handle_try_charge_cost` would roll back a write that itself reached quorum.
-/// The handlers now always mint an event_id when the
-/// caller omitted one (`generated_budget_event_id`), so the by-id lookup is
-/// precise; the authority-MAX fallback remains only as a defensive path (row not
-/// found) and can only OVER-target the seq (wait longer), never under-target it,
-/// so the witness still never over-counts (fail-closed). A single-node write (no
-/// authority) carries an unclustered token, and the quorum wait short-circuits.
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,
@@ -193,7 +187,6 @@ fn budget_write_token(
                     authority_id,
                     lease_epoch.unwrap_or(current.lease_epoch),
                 ),
-                // Existing event with a legacy null authority: use the current lease.
                 Some((seq, None, _)) => (seq, current.authority_id.clone(), current.lease_epoch),
                 // No stored event (or no event_id): fall back to the authority MAX
                 // under the current lease. Over-targets (waits longer), never

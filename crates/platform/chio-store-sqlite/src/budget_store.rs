@@ -88,6 +88,10 @@ mod connection_recovery;
 mod tests;
 
 #[cfg(test)]
+#[path = "budget_store/witness_sequence_tests.rs"]
+mod witness_sequence_tests;
+
+#[cfg(test)]
 #[path = "budget_store/tests/import_boundaries.rs"]
 mod import_boundaries;
 
