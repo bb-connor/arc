@@ -333,15 +333,10 @@ fn fingerprint_remote_auth_contract(
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let provider_id = match &auth_context.method {
-        SessionAuthMethod::OAuthBearer {
-            enterprise_identity: Some(identity),
-            ..
-        } => identity.provider_record_id.as_deref(),
-        _ => None,
-    };
+    let registry_scope =
+        enterprise_provider_registry::RegistryDigestScope::for_auth(&auth_context.method);
     let enterprise_provider_registry_hash = registry
-        .map(|registry| registry.digest(provider_id, &config.clock))
+        .map(|registry| registry.digest(&registry_scope, &config.clock))
         .transpose()?;
     let fingerprint = if let Some(token) = config.auth_token.as_deref() {
         RemoteAuthContractFingerprint {
@@ -546,14 +541,14 @@ fn read_resume_hmac_keyring_file(path: &FsPath) -> Result<Zeroizing<Vec<u8>>, Cl
         )));
     }
     #[cfg(target_vendor = "apple")]
-    if chio_file_custody::darwin_descriptor_grants_extended_acl_authority(&file)
-        .map_err(|error| {
+    if chio_file_custody::darwin_descriptor_grants_extended_acl_authority(&file).map_err(
+        |error| {
             CliError::cli_other_error(format!(
                 "inspect remote MCP resume HMAC keyring ACL {}: {error}",
                 path.display()
             ))
-        })?
-    {
+        },
+    )? {
         return Err(CliError::cli_other_error(format!(
             "remote MCP resume HMAC keyring {} grants extended ACL authority",
             path.display()
