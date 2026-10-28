@@ -224,6 +224,8 @@ pub enum TrustAccessError {
     PeerNonClusterScope { node_id: String, scope: String },
     #[error("cluster peer \"{node_id}\" names scope \"{scope}\" more than once")]
     DuplicatePeerScope { node_id: String, scope: Scope },
+    #[error("cluster peer \"{0}\" holds cluster:replicate without cluster-openings:replicate, so it cannot take the initial cluster snapshot")]
+    PeerSnapshotScopeMissing(String),
     #[error("[cluster] node_id {0:?} is invalid")]
     InvalidClusterNodeId(String),
     #[error("[cluster] declares peers but no node_id and node_key_file for this node")]
@@ -929,6 +931,11 @@ impl ClusterPeerPins {
                 if !scopes.insert(scope) {
                     return Err(TrustAccessError::DuplicatePeerScope { node_id, scope });
                 }
+            }
+            if scopes.contains(&Scope::ClusterReplicate)
+                && !scopes.contains(&Scope::ClusterOpeningsReplicate)
+            {
+                return Err(TrustAccessError::PeerSnapshotScopeMissing(node_id));
             }
             peers.insert(
                 node_id.clone(),

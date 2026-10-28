@@ -490,7 +490,7 @@ fn authority_replication_peer_client_rejects_plaintext_and_redirects() {
         crate::trust_control::caller_credentials::tests::peer(
             "http://192.0.2.1:4000",
             &Keypair::generate(),
-            &["cluster:replicate"],
+            crate::trust_control::caller_credentials::tests::REPLICA_SCOPES,
         )
     ));
     assert!(matches!(

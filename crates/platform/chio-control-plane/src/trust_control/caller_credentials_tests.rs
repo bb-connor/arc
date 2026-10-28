@@ -43,6 +43,20 @@ pub(crate) fn peer(node_id: &str, keypair: &Keypair, scopes: &[&str]) -> String 
 
 pub(crate) const SELF_NODE: &str = "https://node-a.example:9101";
 
+/// The scopes every pinned replica needs: the delta lanes and the initial
+/// cluster snapshot.
+pub(crate) const REPLICA_SCOPES: &[&str] = &["cluster:replicate", "cluster-openings:replicate"];
+
+/// Remove `scope` from a loaded peer pin. Load refuses such a peer set, so this
+/// is how route and handler tests reach their per-route scope refusals.
+pub(crate) fn withhold_peer_scope(pins: &mut ClusterPeerPins, node_id: &str, scope: Scope) {
+    let removed = pins
+        .peers
+        .get_mut(node_id)
+        .is_some_and(|peer| peer.scopes.remove(&scope));
+    assert!(removed, "peer {node_id} holds no {scope} to withhold");
+}
+
 pub(crate) fn config(body: &str) -> String {
     let cluster = if body.contains("[[cluster.peers]]") {
         format!(
@@ -248,6 +262,24 @@ fn peer_shape_refusals_name_their_rule() {
         TrustAccessError::PeerNoScopes(node.to_string())
     );
     assert_eq!(
+        refusal(&with_peer(peer(node, &keypair, &["cluster:replicate"]))),
+        TrustAccessError::PeerSnapshotScopeMissing(node.to_string())
+    );
+    let replica =
+        TrustAccessConfig::from_toml_str(&with_peer(peer(node, &keypair, REPLICA_SCOPES)))
+            .test_unwrap();
+    assert_eq!(
+        replica
+            .peers
+            .iter()
+            .map(|pin| pin.scopes.iter().copied().collect::<Vec<_>>())
+            .collect::<Vec<_>>(),
+        vec![vec![
+            Scope::ClusterReplicate,
+            Scope::ClusterOpeningsReplicate
+        ]]
+    );
+    assert_eq!(
         refusal(&with_peer(peer(
             node,
             &keypair,
@@ -260,8 +292,8 @@ fn peer_shape_refusals_name_their_rule() {
     );
     let twice = format!(
         "{}{}",
-        peer(node, &keypair, &["cluster:replicate"]),
-        peer(node, &Keypair::generate(), &["cluster:replicate"])
+        peer(node, &keypair, REPLICA_SCOPES),
+        peer(node, &Keypair::generate(), REPLICA_SCOPES)
     );
     assert_eq!(
         refusal(&with_peer(twice)),
@@ -269,12 +301,8 @@ fn peer_shape_refusals_name_their_rule() {
     );
     let shared_key = format!(
         "{}{}",
-        peer(node, &keypair, &["cluster:replicate"]),
-        peer(
-            "https://node-c.example:9101",
-            &keypair,
-            &["cluster:replicate"]
-        )
+        peer(node, &keypair, REPLICA_SCOPES),
+        peer("https://node-c.example:9101", &keypair, REPLICA_SCOPES)
     );
     assert_eq!(
         refusal(&with_peer(shared_key)),
@@ -284,7 +312,7 @@ fn peer_shape_refusals_name_their_rule() {
         )
     );
     let bad_key =
-        peer(node, &keypair, &["cluster:replicate"]).replace(&keypair.public_key().to_hex(), "zz");
+        peer(node, &keypair, REPLICA_SCOPES).replace(&keypair.public_key().to_hex(), "zz");
     assert_eq!(
         refusal(&with_peer(bad_key)),
         TrustAccessError::InvalidPeerKey(node.to_string())
@@ -416,7 +444,8 @@ fn status_target() -> PeerRequestTarget<'static> {
 #[test]
 fn peer_signature_binds_node_path_query_body_and_time() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let mut access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    withhold_peer_scope(&mut access.peers, NODE_B, Scope::ClusterOpeningsReplicate);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/revocations/delta",
@@ -511,7 +540,7 @@ fn peer_signature_binds_node_path_query_body_and_time() {
 #[test]
 fn peer_body_digest_mismatch_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let signed = PeerRequestTarget {
         method: "POST",
         path: "/v1/internal/cluster/partition",
@@ -553,7 +582,7 @@ fn peer_body_digest_mismatch_refuses() {
 #[test]
 fn peer_nonce_replay_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/cluster/status",
@@ -601,7 +630,7 @@ fn peer_nonce_replay_refuses() {
 #[test]
 fn peer_nonce_cache_refuses_when_full() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/cluster/status",
@@ -648,7 +677,7 @@ fn peer_nonce_cache_refuses_when_full() {
 #[test]
 fn peer_headers_must_carry_nonce_and_body_digest() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/cluster/status",
@@ -688,7 +717,7 @@ fn peer_headers_must_carry_nonce_and_body_digest() {
 fn peer_signature_from_unpinned_key_refused() {
     let pinned = Keypair::generate();
     let impostor = Keypair::generate();
-    let access = peer_access(NODE_B, &pinned, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &pinned, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/cluster/status",
@@ -801,7 +830,7 @@ pub(crate) fn signed_peer_headers_for(
 #[test]
 fn peer_request_for_another_receiver_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "POST",
         path: "/v1/internal/cluster/partition",
@@ -849,7 +878,7 @@ fn peer_request_for_another_receiver_refuses() {
 #[test]
 fn peer_request_for_another_deployment_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "POST",
         path: "/v1/internal/cluster/partition",
@@ -907,7 +936,7 @@ fn peer_request_for_another_deployment_refuses() {
 #[test]
 fn peer_retry_with_new_nonce_accepted() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = PeerRequestTarget {
         method: "POST",
         path: "/v1/internal/cluster/partition",
@@ -952,7 +981,7 @@ fn cluster_identity_rules_refuse_at_startup() {
     let peers_without_identity = format!(
         "deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:9101\"\n{}{}",
         reader(),
-        peer(NODE_B, &keypair, &["cluster:replicate"])
+        peer(NODE_B, &keypair, REPLICA_SCOPES)
     );
     assert_eq!(
         refusal(&peers_without_identity),
@@ -970,7 +999,7 @@ fn cluster_identity_rules_refuse_at_startup() {
         refusal(&config(&format!(
             "{}{}",
             reader(),
-            peer(SELF_NODE, &keypair, &["cluster:replicate"])
+            peer(SELF_NODE, &keypair, REPLICA_SCOPES)
         ))),
         TrustAccessError::SelfPinned(SELF_NODE.to_string())
     );
@@ -978,7 +1007,7 @@ fn cluster_identity_rules_refuse_at_startup() {
         &config(&format!(
             "{}{}",
             reader(),
-            peer(NODE_B, &keypair, &["cluster:replicate"])
+            peer(NODE_B, &keypair, REPLICA_SCOPES)
         ))
         .replace(&format!("node_id = \"{SELF_NODE}\""), "node_id = \"  /\""),
     );
@@ -1151,7 +1180,7 @@ pub(crate) fn test_access_with_roles(
 #[test]
 fn peer_replay_after_restart_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
     access
@@ -1226,7 +1255,7 @@ fn peer_replay_after_restart_refuses() {
 #[test]
 fn peer_replay_in_the_restart_second_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
     let before_restart = nonce_cache();
@@ -1259,7 +1288,7 @@ fn peer_replay_in_the_restart_second_refuses() {
 #[test]
 fn peer_future_dated_replay_after_restart_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let before_restart = nonce_cache();
     let led = signed_peer_headers(
@@ -1318,7 +1347,7 @@ fn peer_future_dated_replay_after_restart_refuses() {
 #[test]
 fn peer_replay_after_clock_step_back_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let nonces = nonce_cache();
     let first = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
@@ -1379,7 +1408,7 @@ fn peer_replay_after_clock_step_back_refuses() {
 #[test]
 fn peer_replay_at_the_window_boundary_refuses() {
     let keypair = Keypair::generate();
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let nonces = nonce_cache();
     let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
@@ -1429,8 +1458,8 @@ fn peer_nonce_quota_keeps_other_peers_admitted() {
     let access = TrustAccessConfig::from_toml_str(&config(&format!(
         "{}{}{}",
         reader(),
-        peer(NODE_B, &node_b, &["cluster:replicate"]),
-        peer(NODE_C, &node_c, &["cluster:replicate"])
+        peer(NODE_B, &node_b, REPLICA_SCOPES),
+        peer(NODE_C, &node_c, REPLICA_SCOPES)
     )))
     .test_unwrap();
     let target = status_target();
@@ -1525,7 +1554,7 @@ fn peer_signature_golden_vector() {
         GOLDEN_PEER_PAYLOAD
     );
     assert_eq!(signed.signature, GOLDEN_PEER_SIGNATURE);
-    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let mut headers = HeaderMap::new();
     for (name, value) in [
         (CLUSTER_NODE_ID_HEADER, NODE_B.to_string()),
@@ -1591,7 +1620,7 @@ fn invalid_deployment_tenant_and_peer_node_id_refuse_at_startup() {
     let error = refusal(&config(&format!(
         "{}{}",
         reader(),
-        peer("  /", &keypair, &["cluster:replicate"])
+        peer("  /", &keypair, REPLICA_SCOPES)
     )));
     assert_eq!(
         error,
@@ -1607,7 +1636,7 @@ fn peer_pinning_this_nodes_key_refuses() {
     let config = TrustAccessConfig::from_toml_str(&config(&format!(
         "{}{}",
         reader(),
-        peer(NODE_B, &shared, &["cluster:replicate"])
+        peer(NODE_B, &shared, REPLICA_SCOPES)
     )))
     .test_unwrap();
     let error = TrustAccess::from_parts(config, Some(Keypair::from_seed(&seed))).test_unwrap_err();

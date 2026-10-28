@@ -74,7 +74,11 @@ A credential naming `root-exchange:sign` loads, but no route accepts it until
 the root-exchange signing route exists.
 
 Peer scopes, valid only on `[[cluster.peers]]`: `cluster:replicate` and
-`cluster-openings:replicate`.
+`cluster-openings:replicate`. A peer that holds `cluster:replicate` must also
+hold `cluster-openings:replicate`: replication starts from the full cluster
+snapshot, which carries receipt openings, so a peer without that scope could
+never finish its first sync. Loading refuses such a peer with
+`PeerSnapshotScopeMissing`.
 
 ## Role presets
 

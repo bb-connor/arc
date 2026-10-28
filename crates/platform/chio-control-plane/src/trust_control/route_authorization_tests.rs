@@ -12,7 +12,7 @@ use tower::ServiceExt;
 
 use super::super::caller_credentials::tests::{
     config, credential, fresh_nonce, peer, signed_peer_headers, signed_peer_headers_for,
-    DEPLOYMENT, SELF_NODE,
+    withhold_peer_scope, DEPLOYMENT, REPLICA_SCOPES, SELF_NODE,
 };
 use super::super::caller_credentials::{
     sign_cluster_peer_request, AuthenticatedPeer, PeerAddressing, TrustAccess, TrustAccessConfig,
@@ -245,12 +245,8 @@ fn fixture_config(node_b: &Keypair, node_c: &Keypair) -> String {
             None,
         ));
     }
-    body.push_str(&peer(
-        NODE_B,
-        node_b,
-        &["cluster:replicate", "cluster-openings:replicate"],
-    ));
-    body.push_str(&peer(NODE_C, node_c, &["cluster:replicate"]));
+    body.push_str(&peer(NODE_B, node_b, REPLICA_SCOPES));
+    body.push_str(&peer(NODE_C, node_c, REPLICA_SCOPES));
     config(&body)
 }
 
@@ -301,7 +297,13 @@ fn mounted_router(authorizer: RouteAuthorizer) -> Router {
 
 /// A receiver whose nonce cache started a full freshness window before `NOW`.
 fn authorizer_for(listener: Listener, text: &str) -> RouteAuthorizer {
-    let config = TrustAccessConfig::from_toml_str(text).test_unwrap();
+    authorizer_from(
+        listener,
+        TrustAccessConfig::from_toml_str(text).test_unwrap(),
+    )
+}
+
+fn authorizer_from(listener: Listener, config: TrustAccessConfig) -> RouteAuthorizer {
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = PeerNonceCache::new(Some(started_before_now()), access.peers().iter().count());
@@ -317,13 +319,27 @@ fn started_before_now() -> i64 {
     i64::try_from(NOW).test_unwrap() - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS
 }
 
+/// The fixture peer set with `cluster-openings:replicate` withheld from
+/// node C, so the openings rows keep a route-level refusal to exercise.
+fn fixture_access(node_b: &Keypair, node_c: &Keypair) -> TrustAccessConfig {
+    let mut config =
+        TrustAccessConfig::from_toml_str(&fixture_config(node_b, node_c)).test_unwrap();
+    withhold_peer_scope(&mut config.peers, NODE_C, Scope::ClusterOpeningsReplicate);
+    config
+}
+
 fn fixture() -> Fixture {
     let node_b = Keypair::generate();
     let node_c = Keypair::generate();
-    let text = fixture_config(&node_b, &node_c);
     Fixture {
-        public: mounted_router(authorizer_for(Listener::Public, &text)),
-        internal: mounted_router(authorizer_for(Listener::Internal, &text)),
+        public: mounted_router(authorizer_from(
+            Listener::Public,
+            fixture_access(&node_b, &node_c),
+        )),
+        internal: mounted_router(authorizer_from(
+            Listener::Internal,
+            fixture_access(&node_b, &node_c),
+        )),
         node_b,
         node_c,
     }
