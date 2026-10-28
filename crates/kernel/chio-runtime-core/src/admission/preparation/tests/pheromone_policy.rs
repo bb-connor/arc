@@ -1,15 +1,15 @@
+use super::super::{prepare_runtime_admission, RuntimeAdmissionPreparation};
+use crate::{
+    runtime_peer_weights_sha256, InMemoryRuntimeAdmissionStore, RuntimeAdmissionBundle,
+    RuntimeAdmissionInput, RuntimeAdmissionProfile, RuntimePeerWeight, RuntimePeerWeights,
+    RuntimePheromoneAdvisory, RuntimePheromonePolicy, RuntimePheromonePolicyRule,
+    RuntimeRequestBinding, RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundle,
+    SignedRuntimePheromoneQueryReport, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
+    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+};
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_runtime_core::{
-    evaluate_runtime_admission, runtime_peer_weights_sha256, InMemoryRuntimeAdmissionStore,
-    RuntimeAdmissionBundle, RuntimeAdmissionInput, RuntimeAdmissionProfile, RuntimePeerWeight,
-    RuntimePeerWeights, RuntimePheromoneAdvisory, RuntimePheromonePolicy,
-    RuntimePheromonePolicyRule, RuntimeRequestBinding, RuntimeTrustedVerifierKey,
-    RuntimeVerifierTrustBundle, SignedRuntimePheromoneQueryReport,
-    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
-    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
-    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
-};
 use std::io;
 
 fn profile() -> RuntimeAdmissionProfile {
@@ -159,19 +159,23 @@ fn chio_native_runtime_policy_material_emits_chio_decision(
     let signed_weights = SignedExportEnvelope::sign(weights, &verifier)?;
     let high_risk_query_report = signed_query_report(advisory(0.91), &verifier)?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile,
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&high_risk_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile,
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&high_risk_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(rejected.schema, "chio.runtime.admission-report.v1");
@@ -224,19 +228,23 @@ fn destructive_admission_requires_signed_pheromone_policy() -> Result<(), Box<dy
     let store = InMemoryRuntimeAdmissionStore::new();
     store.insert_bundle(bundle())?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: None,
-        trusted_verifier_keys: &[],
-        pheromone_query_report: None,
-        runtime_pheromone_policy: None,
-        runtime_peer_weights: None,
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: None,
+            trusted_verifier_keys: &[],
+            pheromone_query_report: None,
+            runtime_pheromone_policy: None,
+            runtime_peer_weights: None,
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -263,19 +271,23 @@ fn signed_runtime_pheromone_policy_can_deny_before_dispatch(
     let signed_weights = SignedExportEnvelope::sign(weights, &verifier)?;
 
     let high_risk_query_report = signed_query_report(advisory(0.91), &verifier)?;
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&high_risk_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&high_risk_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -311,19 +323,23 @@ fn runtime_pheromone_policy_requires_action_class_for_governance_scoped_rule(
     let signed_weights = SignedExportEnvelope::sign(weights, &verifier)?;
     let high_risk_query_report = signed_query_report(advisory(0.91), &verifier)?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&high_risk_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&high_risk_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -351,19 +367,23 @@ fn runtime_pheromone_policy_rejects_query_report_signed_by_other_key(
     let signed_weights = SignedExportEnvelope::sign(weights, &verifier)?;
     let attacker_query_report = signed_query_report(advisory(0.10), &attacker)?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&attacker_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&attacker_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -392,19 +412,23 @@ fn runtime_pheromone_policy_enforces_distinct_origin_floor(
     low_origin_advisory.distinct_origin_pairs = 0;
     let low_origin_query_report = signed_query_report(low_origin_advisory, &verifier)?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&low_origin_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&low_origin_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -433,19 +457,23 @@ fn runtime_pheromone_policy_rejects_future_dated_advisory() -> Result<(), Box<dy
     future_advisory.evaluated_at_unix_ms = 1_800_000_002_000;
     let future_query_report = signed_query_report(future_advisory, &verifier)?;
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
-        profile: &profile(),
-        store: &store,
-        admission_id: "adm-live-1",
-        request: &binding(),
-        action_class_id: None,
-        runtime_trust_input: Some(&signed_trust),
-        trusted_verifier_keys: &trusted_keys(&verifier),
-        pheromone_query_report: Some(&future_query_report),
-        runtime_pheromone_policy: Some(&signed_policy),
-        runtime_peer_weights: Some(&signed_weights),
-        now_unix_ms: 1_800_000_001_000,
-    })?;
+    let RuntimeAdmissionPreparation::Rejected(rejected) =
+        prepare_runtime_admission(RuntimeAdmissionInput {
+            profile: &profile(),
+            store: &store,
+            admission_id: "adm-live-1",
+            request: &binding(),
+            action_class_id: None,
+            runtime_trust_input: Some(&signed_trust),
+            trusted_verifier_keys: &trusted_keys(&verifier),
+            pheromone_query_report: Some(&future_query_report),
+            runtime_pheromone_policy: Some(&signed_policy),
+            runtime_peer_weights: Some(&signed_weights),
+            now_unix_ms: 1_800_000_001_000,
+        })?
+    else {
+        return Err("policy input unexpectedly prepared".into());
+    };
 
     assert!(!rejected.accepted);
     assert_eq!(
@@ -458,7 +486,7 @@ fn runtime_pheromone_policy_rejects_future_dated_advisory() -> Result<(), Box<dy
 #[test]
 fn runtime_pheromone_query_report_parser_reads_snake_case_fields(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let advisory = chio_runtime_core::runtime_pheromone_advisory_from_query_report_json(
+    let advisory = crate::runtime_pheromone_advisory_from_query_report_json(
         &serde_json::json!({
             "schema": "chio.pheromone.query-report.v1",
             "accepted": true,
