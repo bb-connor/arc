@@ -1633,6 +1633,19 @@ fn local_token_scope_is_recorded_and_matched() {
 }
 
 #[test]
+fn local_issue_records_the_token_audience() {
+    let exchange = local_rule(|rule| rule["recorded_claims"] = json!({ "aud": "plain" }));
+    let prepared = exchange
+        .prepare(issue(|_| {}).unwrap(), None, None, NOW, &entropy())
+        .unwrap();
+    match &prepared.context().anchor.claims.aud {
+        Some(ClaimValue::Plain(aud)) => assert_eq!(aud.as_str(), RESOURCE),
+        other => panic!("aud recorded as {other:?}"),
+    }
+    consistent(&exchange, &prepared);
+}
+
+#[test]
 fn local_reexchange_scope_is_the_narrowed_request() {
     let token = local_token(&local_claims());
     let narrowed = ["mcp:read".to_owned()];

@@ -76,6 +76,11 @@ impl AnchorEvidence {
         self.artifact_digest.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn claim(&self, name: &str) -> Option<&Value> {
+        self.claims.get(name)
+    }
+
     #[must_use]
     pub fn sender_constraint(&self) -> Option<&ChioSenderConstraintClaims> {
         self.sender_constraint.as_ref()

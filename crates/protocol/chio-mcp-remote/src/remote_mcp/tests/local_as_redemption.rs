@@ -69,6 +69,18 @@ fn redeemed_code_verifies_into_issue_evidence() {
     assert_eq!(evidence.artifact_digest(), Some(&code_digest));
     assert_eq!(Some(evidence.token_exp()), claims["exp"].as_u64());
     assert_eq!(evidence.sender_constraint(), None);
+    for name in [
+        "iss",
+        "sub",
+        "aud",
+        "scope",
+        "client_id",
+        "resource",
+        "iat",
+        "exp",
+    ] {
+        assert_eq!(evidence.claim(name), claims.get(name), "{name}");
+    }
     assert_eq!(redeemed.subject(), "operator");
     assert_eq!(redeemed.client_id(), "client-abc");
     assert_eq!(redeemed.resource(), "https://edge.example/mcp");
