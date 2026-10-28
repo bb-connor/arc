@@ -74,8 +74,9 @@ pub(super) fn load_all(
     let mut result = Vec::new();
     for row in rows {
         let (prior_id, replacement_id, bytes, digest) = row.map_err(|error| error.to_string())?;
-        let record: Supersession =
-            serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+        let record: Supersession = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 8192)
+            .and_then(|input| input.decode_canonical())
+            .map_err(|error| error.to_string())?;
         let prior = records
             .iter()
             .find(|r| r.qualification.runtime_authority_id() == prior_id)
