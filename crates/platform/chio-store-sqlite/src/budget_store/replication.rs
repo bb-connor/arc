@@ -253,7 +253,8 @@ impl SqliteBudgetStore {
                         .and_then(|seq| u64::try_from(seq).ok())
                         .ok_or_else(|| {
                             BudgetStoreError::Invariant(
-                                "budget mutation witness has no positive event sequence".to_string(),
+                                "budget mutation witness has no positive event sequence"
+                                    .to_string(),
                             )
                         })?;
                     let lease_epoch = lease_epoch
