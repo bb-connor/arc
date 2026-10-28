@@ -280,6 +280,7 @@ jobs:
           run_gate bash ./scripts/tests/check-chio-proof-room-release-truth.test.sh
           run_gate bash ./scripts/check-chio-schema-registry.sh
           run_gate bash ./scripts/tests/check-chio-schema-registry.test.sh
+          run_gate python3 ./scripts/tests/gen-signed-artifact-schemas.test.py
           run_gate bash ./scripts/tests/check-chio-transaction-passport.test.sh
           run_gate python3 ./scripts/check-root-authority-schema-examples.py
           run_gate python3 ./scripts/tests/check-root-authority-schema-examples.test.py
