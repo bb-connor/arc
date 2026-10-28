@@ -196,11 +196,13 @@ fn publish_verified(
 /// capability carries a signed subject, the row is export metadata only and
 /// each export that selects it refuses the row. A row for a capability the
 /// snapshot does not hold is validated again when a receipt first needs it.
-fn refuse_lineage(published: &Published, capability: &str, reason: &str) -> Result<(), WalkError> {
+fn refuse_lineage(
+    published: &Published,
+    capability: &str,
+    reason: &crate::capability_lineage::LineageReaderRefusal,
+) -> Result<(), WalkError> {
     if published.with_db(|db| db.holds_unsigned_subject(capability))? {
-        return Err(WalkError::Integrity(format!(
-            "capability lineage of {capability} is refused by the local reader: {reason}"
-        )));
+        return Err(WalkError::Integrity(reason.message(capability)));
     }
     Ok(())
 }

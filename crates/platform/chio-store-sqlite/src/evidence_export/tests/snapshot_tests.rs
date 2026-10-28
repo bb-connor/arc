@@ -702,7 +702,7 @@ fn earlier_lineage_refusal_with_honest_later_attribution_fails_the_snapshot() {
     );
     assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage of cap-1 is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-1 claims signed-token provenance without a signed token",
+        "capability lineage of cap-1 is refused by the local reader: conflict: capability lineage cap-1 claims signed-token provenance without a signed token",
     );
     snapshots.shutdown();
 }
@@ -729,7 +729,7 @@ fn non_utf8_lineage_issuer_of_unsigned_receipts_fails_the_snapshot() {
     edit_lineage(&path, "UPDATE capability_lineage SET issuer_key = CAST(x'ff' AS TEXT) WHERE capability_id = 'cap'");
     assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage of cap is refused by the local reader: invalid utf-8 sequence of 1 bytes from index 0 at index 2",
+        "capability lineage of cap is refused by the local reader: capability lineage contains invalid UTF-8 at column 2",
     );
     snapshots.shutdown();
 }
@@ -744,7 +744,7 @@ fn undecodable_lineage_grants_of_unsigned_receipts_fail_the_snapshot() {
     );
     assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, urn:chio:error:attest:signed-json-invalid-input",
+        "capability lineage of cap is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input",
     );
     snapshots.shutdown();
 }
@@ -762,7 +762,7 @@ fn signed_lineage_issuer_change_of_unsigned_receipts_fails_the_snapshot() {
     );
     assert_reader_refusal_fails_the_snapshot(
         &snapshots,
-        "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap does not match its signed token projection",
+        "capability lineage of cap is refused by the local reader: conflict: capability lineage cap does not match its signed token projection",
     );
     snapshots.shutdown();
 }

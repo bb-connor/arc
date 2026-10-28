@@ -22,7 +22,7 @@ use super::project::{
     child_source_matches, SignedToolProjection, CHILD_SOURCE_PROJECTION_SQL,
     TOOL_SOURCE_PROJECTION_SQL,
 };
-use crate::capability_lineage::snapshot_from_row;
+use crate::capability_lineage::{snapshot_from_row, LineageReaderRefusal};
 use crate::receipt_store::support::{
     checkpoint_error_to_receipt_store, latest_watermark_archive_path,
     parse_persisted_checkpoint_row, retention_watermark, validate_checkpoint_base,
@@ -1277,7 +1277,7 @@ pub(super) struct LineageRow {
     pub(super) capability_id: String,
     /// The subject the canonical local reader accepts from this row, or why
     /// it refuses the row.
-    pub(super) subject: Result<String, String>,
+    pub(super) subject: Result<String, LineageReaderRefusal>,
 }
 
 /// Read capability lineage rows above `after` for subject refresh through
@@ -1344,9 +1344,10 @@ pub(super) fn copy_lineage(
             Ok(LineageRow {
                 rowid: row.get(11)?,
                 capability_id: row.get(0)?,
-                subject: snapshot_from_row(row)
-                    .map(|snapshot| snapshot.subject_key)
-                    .map_err(|error| error.to_string()),
+                subject: match snapshot_from_row(row) {
+                    Ok(snapshot) => Ok(snapshot.subject_key),
+                    Err(error) => Err(LineageReaderRefusal::from_sql(error)?),
+                },
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
