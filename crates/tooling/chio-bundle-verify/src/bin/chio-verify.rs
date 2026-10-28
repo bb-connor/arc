@@ -70,7 +70,7 @@ fn main() -> ExitCode {
         Err(error) => return reject(&error, args.json),
     };
     let report = match verify_bundle(&args.bundle_dir, &trust, None) {
-        Ok(report) => report,
+        Ok(verified) => verified.report,
         Err(error) => return reject(&error, args.json),
     };
     let class = report.exit_class(&trust);

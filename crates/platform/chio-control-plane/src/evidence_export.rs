@@ -624,13 +624,29 @@ pub(crate) fn decode_remote_import_request(
     Ok(request)
 }
 
-/// Verify a decoded package with the verifier-owned `trust`.
+/// Verify a decoded package with the verifier-owned `trust` and refuse it
+/// unless every column the trust file requires is verified.
 pub(crate) fn verify_import_package(
     package: &EvidenceImportPackage,
     trust: &VerifierTrust,
 ) -> Result<(), CliError> {
-    chio_bundle_verify::verify_decoded_package(package, trust, Some(&HttpReceiptProjection))?;
+    chio_bundle_verify::verify_decoded_bundle(package, trust, Some(&HttpReceiptProjection))?
+        .require_columns(trust)?;
     Ok(())
+}
+
+/// Verify an exported package directory with the verifier-owned `trust` and
+/// report its columns, refusing a required column this verifier cannot
+/// verify.
+fn verify_evidence_bundle(
+    input: &Path,
+    trust: &VerifierTrust,
+) -> Result<chio_bundle_verify::VerifiedBundle, CliError> {
+    Ok(chio_bundle_verify::verify_bundle(
+        input,
+        trust,
+        Some(&HttpReceiptProjection),
+    )?)
 }
 
 #[allow(
@@ -645,7 +661,9 @@ pub fn cmd_evidence_import(
     json_output: bool,
     trust: &VerifierTrust,
 ) -> Result<(), CliError> {
-    let package = load_verified_evidence_package(input, trust)?.package;
+    let verified = verify_evidence_bundle(input, trust)?;
+    verified.report.require_columns(trust)?;
+    let package = verified.package.package;
     let share_import = build_federated_share_import(&package)?;
 
     let share = match (receipt_db, control_url) {
@@ -703,9 +721,11 @@ pub fn cmd_evidence_verify(
     json_output: bool,
 ) -> Result<(), CliError> {
     let clock_now = unix_now()?;
-    let verified = load_verified_evidence_package(input, trust)?;
-    let report = chio_bundle_verify::report(&verified, trust);
-    let required_columns = report.exit_class(trust);
+    let chio_bundle_verify::VerifiedBundle {
+        package: verified,
+        report,
+    } = verify_evidence_bundle(input, trust)?;
+    let required_columns = report.require_columns(trust);
     let manifest = verified.package.manifest;
     let transparency = verified.transparency;
     let claim_boundary = verified.claims;
@@ -793,13 +813,7 @@ pub fn cmd_evidence_verify(
         }
     }
 
-    if required_columns != chio_bundle_verify::ExitClass::Verified {
-        return Err(chio_bundle_verify::BundleVerifyError::required_column(
-            "a column the trust file requires is not verified for every receipt",
-        )
-        .into());
-    }
-    Ok(())
+    required_columns.map_err(CliError::from)
 }
 
 /// The federated share an import records: the verified receipts and lineage

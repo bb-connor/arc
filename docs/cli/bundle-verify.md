@@ -33,7 +33,13 @@ exactly that binding. No key may be pinned in two roles, and weak Ed25519 keys
 refuse.
 
 `required_columns` names the report columns that must be `verified` for every
-receipt.
+receipt. `chio-verify`, `chio evidence verify`, `chio evidence import` and the
+trust-control `POST /v1/evidence/import` route apply it the same way: a
+`settlement` requirement refuses with `attest:bundle-feature-unsupported`
+before any file is read, even for a bundle with no receipts, and a required
+column that is not `verified` refuses with
+`attest:bundle-required-column-unverified`. An import stores and forwards
+nothing it refuses; the route answers 400 with the registry code.
 
 ## Report
 
