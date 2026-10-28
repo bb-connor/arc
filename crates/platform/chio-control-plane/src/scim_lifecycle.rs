@@ -10,6 +10,8 @@ use sha2::{Digest, Sha256};
 use crate::enterprise_federation::{EnterpriseProviderKind, EnterpriseProviderRecord};
 use crate::CliError;
 
+const MAX_REGISTRY_BYTES: usize = 64 * 1024 * 1024;
+
 pub const SCIM_LIFECYCLE_REGISTRY_VERSION: &str = "chio.scim-lifecycle-registry.v1";
 pub const SCIM_LIFECYCLE_RECORD_SCHEMA: &str = "chio.scim-lifecycle-record.v1";
 pub const SCIM_CORE_USER_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -155,10 +157,10 @@ impl Default for ScimLifecycleRegistry {
 
 impl ScimLifecycleRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match fs::read(path) {
+        match crate::signed_input::read_bounded_with_limit(path, MAX_REGISTRY_BYTES) {
             Ok(bytes) => {
                 let mut registry: Self =
-                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
+                    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_REGISTRY_BYTES)
                         .and_then(|input| input.decode_signed())?;
                 if registry.version != SCIM_LIFECYCLE_REGISTRY_VERSION {
                     return Err(CliError::cli_other_error(format!(

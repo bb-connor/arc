@@ -17,8 +17,15 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 #[path = "signed_input/read_pause.rs"]
 pub(crate) mod read_pause;
 
-#[cfg(unix)]
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
+    read_bounded_with_limit(path, MAX_SIGNED_FILE_BYTES)
+}
+
+#[cfg(unix)]
+pub(crate) fn read_bounded_with_limit(
+    path: &Path,
+    max_bytes: usize,
+) -> Result<Vec<u8>, std::io::Error> {
     use std::os::unix::fs::OpenOptionsExt;
 
     let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
@@ -37,13 +44,16 @@ pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
     #[cfg(test)]
     read_pause::wait(&metadata);
     let mut bytes = Vec::new();
-    file.take(crate::integer::count(MAX_SIGNED_FILE_BYTES + 1))
+    file.take(crate::integer::count(max_bytes).saturating_add(1))
         .read_to_end(&mut bytes)?;
     Ok(bytes)
 }
 
 #[cfg(not(unix))]
-pub(crate) fn read_bounded(_path: &Path) -> Result<Vec<u8>, std::io::Error> {
+pub(crate) fn read_bounded_with_limit(
+    _path: &Path,
+    _max_bytes: usize,
+) -> Result<Vec<u8>, std::io::Error> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "signed input requires nonblocking no-follow file reads",

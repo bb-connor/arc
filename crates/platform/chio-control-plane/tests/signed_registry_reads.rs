@@ -59,11 +59,11 @@ macro_rules! registry_reader_tests {
                 let path = dir.path().join("registry.json");
                 std::fs::File::create(&path)?.set_len((REGISTRY_LIMIT + 4096) as u64)?;
                 let error = Registry::load(&path).err().ok_or("oversized file accepted")?;
-                assert!(matches!(
-                    error,
-                    CliError::SignedJson(UntrustedJsonError::TooLarge { bytes, bound })
-                        if bytes == REGISTRY_LIMIT + 1 && bound == REGISTRY_LIMIT
-                ), "{error:?}");
+                let CliError::SignedJson(UntrustedJsonError::TooLarge { bytes, bound }) = error else {
+                    return Err(format!("unexpected refusal: {error:?}").into());
+                };
+                assert_eq!(bytes, REGISTRY_LIMIT + 1);
+                assert_eq!(bound, REGISTRY_LIMIT);
                 Ok(())
             }
 
