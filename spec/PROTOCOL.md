@@ -1936,7 +1936,9 @@ digest-bound protocol payload evidence named by the mandate or payment
 artifact; they do not replace Chio receipts or widen payment authority.
 
 An order context MAY pin `escrow_digest`, the sha256 of the canonical JSON of a
-`chio.commerce.escrow-ledger.v1` custody ledger. The ledger's custody account
+`chio.commerce.escrow-ledger.v1` custody ledger. The field is optional only
+because an order without escrow is a valid v1 order context; an escrow-backed
+order always pins it. The ledger's custody account
 MUST be `chio:commerce:escrow:custody`, its depositor, beneficiary, and custody
 accounts MUST be pairwise distinct, and its legs MUST be exactly the lock leg
 (depositor to custody) and, once `released`, the release leg (custody to

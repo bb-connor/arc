@@ -1,4 +1,4 @@
-8d38d61e578f50e86e0e263607d8d95f9aca24dc88395cefbb01cec030aeb420  spec/schemas/MANIFEST.sha256
+932cc0064fc0d9abefb3689aee337da98af06b7a8d13f744923f47c97bcdadba  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -16,7 +16,7 @@ fddf38436c3fcc9a4eebeffa3b81a7d23fe635ef9ea34187c877f9ef1044cda3  spec/schemas/c
 c2f631fb7aafccd334198102d62fdaadbac1ec6de7d6178d677cde6ad23ae630  spec/schemas/chio-commerce/v1/event-log.schema.json
 ee4ad24ae81d0b8615982795c023bafefedb5ec02e8dc2887ddac0f281d7b3e9  spec/schemas/chio-commerce/v1/federation-trust-bundle.schema.json
 29df382375a9fa67e8bb01c4da1d5cf325d14af3f357e0a03998a3ac5044068f  spec/schemas/chio-commerce/v1/mandate-allowance-ledger.schema.json
-01604656b75fbdd7cceda2d379971e4adab92e32d1542dfc722cdd80695fd4e9  spec/schemas/chio-commerce/v1/order-context.schema.json
+055b6160662fbf29ce73db195c820892b24dfcdc1136a71ba2cc0c173de4f8dc  spec/schemas/chio-commerce/v1/order-context.schema.json
 829344f5675819dc569c740993d4bdaf76264268d12a66f9404507437799fc3c  spec/schemas/chio-commerce/v1/order-passport.schema.json
 e83a2d3978fd0fbac3becf76dd824557b102c7df587874a5837f8ceeb9e3b9f5  spec/schemas/chio-commerce/v1/payment-lifecycle.schema.json
 b508227afaa6768a162fb98dfd04efea0dfd27704759e8d43ffe9ed1817d8363  spec/schemas/chio-commerce/v1/protocol-payload.schema.json

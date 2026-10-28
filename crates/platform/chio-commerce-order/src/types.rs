@@ -86,6 +86,7 @@ pub struct CommerceOrderContext {
     pub trust_market_requirement: Option<CommerceTrustMarketRequirement>,
     pub current_state: String,
     /// sha256 hex of the canonical escrow ledger once custody is locked.
+    /// Optional only because an order without escrow is a valid v1 context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escrow_digest: Option<String>,
 }
