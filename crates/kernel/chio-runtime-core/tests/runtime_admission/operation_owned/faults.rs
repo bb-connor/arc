@@ -207,9 +207,10 @@ fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestR
 fn real_trust_floor_write_failure_denies_and_releases_the_prior_claim() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
+    let hook = fixture.hook()?;
     let raw = rusqlite::Connection::open(fixture._directory.path().join("runtime.sqlite3"))?;
     raw.execute_batch("CREATE TRIGGER injected_floor_failure BEFORE INSERT ON runtime_trust_floors BEGIN SELECT RAISE(ABORT, 'injected trust floor write failure'); END;")?;
-    let kernel = fixture.kernel(fixture.hook()?, true, false)?;
+    let kernel = fixture.kernel(hook, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
