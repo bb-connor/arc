@@ -716,11 +716,8 @@ mod tests {
     ) -> TestResult<String> {
         let claimant = id(
             "claimant_id",
-            &chio_kernel::admission_operation::execution_nonce_coordinator_id(
-                &signer.public_key(),
-            )?
-            .as_str()
-            .to_owned(),
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(&signer.public_key())?
+                .as_str(),
         );
         let lease = store.claim_recovery(
             operation.binding().operation_id(),
