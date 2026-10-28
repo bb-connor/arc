@@ -14,6 +14,9 @@ pub const DROPPED_INPUT: &str = "decoded value drops input fields";
 /// The refusal when a JSON object repeats a key.
 pub const DUPLICATE_KEY: &str = "duplicate object key";
 
+/// Serde's untagged refusal for the macro's `LosslessTarget` remote alias.
+const UNTAGGED_FALLTHROUGH: &str = "data did not match any variant of untagged enum LosslessTarget";
+
 /// A `serde_json::Value` decoded from any deserializer, refusing a repeated
 /// object key at every depth instead of keeping the last one.
 struct StrictValue(Value);
@@ -105,7 +108,7 @@ where
 {
     let StrictValue(value) = StrictValue::deserialize(deserializer)?;
     let typed = decode(value.clone()).map_err(|error| {
-        if error.to_string() == "data did not match any variant of untagged enum LosslessTarget" {
+        if error.to_string() == UNTAGGED_FALLTHROUGH {
             D::Error::custom(format!(
                 "data did not match any variant of untagged enum {type_name}"
             ))
