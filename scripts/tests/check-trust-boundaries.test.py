@@ -187,7 +187,7 @@ class BoundaryGateCalibration(unittest.TestCase):
                 self.assertTrue(any("reader evidence" in error and path in error for error in errors), errors)
 
     def test_checkpoint_typed_evidence_requires_its_closed_source_shape(self):
-        path = "crates/kernel/chio-kernel/src/checkpoint.rs"
+        path = "crates/core/chio-core-types/src/receipt/checkpoint.rs"
         errors = self.errors(path, lambda text: text.replace("pub checkpoint_seq: u64,", "pub checkpoint_seq: serde_json::Value,", 1))
         self.assertTrue(any("reader evidence" in error and "checkpoint_validate.rs" in error for error in errors), errors)
 
