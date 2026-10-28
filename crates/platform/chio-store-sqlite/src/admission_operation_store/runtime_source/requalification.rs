@@ -148,5 +148,10 @@ fn checked_replacement(
             "runtime source requalification identity already exists",
         ));
     }
+    if supersessions.len() >= MAX_SUPERSEDED {
+        return Err(invariant(
+            "runtime source supersession history capacity exhausted",
+        ));
+    }
     Ok(None)
 }

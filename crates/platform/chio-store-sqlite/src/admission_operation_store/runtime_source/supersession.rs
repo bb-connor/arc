@@ -51,10 +51,31 @@ impl Supersession {
     }
 }
 
+pub(super) fn verify_counts(
+    connection: &Connection,
+    qualification_count: usize,
+) -> Result<(), String> {
+    let count: usize = connection
+        .query_row(
+            "SELECT COUNT(*) FROM runtime_source_supersessions",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|error| error.to_string())?;
+    if count > MAX_SUPERSEDED {
+        return Err("runtime source supersession history capacity exceeded".into());
+    }
+    if count > qualification_count {
+        return Err("runtime source supersession count exceeds source count".into());
+    }
+    Ok(())
+}
+
 pub(super) fn load_all(
     connection: &Connection,
     records: &[RuntimeSourceRecordV1],
 ) -> Result<Vec<Supersession>, String> {
+    verify_counts(connection, records.len())?;
     let mut statement = connection.prepare(
         "SELECT
          CASE WHEN typeof(prior_runtime_authority_id) = 'text'
