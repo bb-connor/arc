@@ -315,7 +315,7 @@ impl SqliteRootExchangeStore {
     }
 
     /// Every tag generation a stored root references must be loaded.
-    pub fn verify_tag_generations(&self, loaded: &[Sha256Digest]) -> Result<()> {
+    pub(super) fn verify_tag_generations(&self, loaded: &[Sha256Digest]) -> Result<()> {
         self.read_only(|tx| {
             let mut statement = tx
                 .prepare("SELECT DISTINCT tag_key_id FROM root_exchange_roots ORDER BY tag_key_id")
