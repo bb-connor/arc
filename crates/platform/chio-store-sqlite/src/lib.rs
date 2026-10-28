@@ -56,6 +56,7 @@ const AUTHORIZATION_STATEMENT_CACHE_CAPACITY: usize = 64;
 
 pub mod admission_operation_store;
 mod agent_web_replay_store;
+mod approval_replay_store;
 pub mod approval_store;
 pub mod authority;
 pub mod budget_store;
@@ -406,6 +407,7 @@ pub use admission_operation_store::{
 pub use agent_web_replay_store::{
     SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,
 };
+pub use approval_replay_store::{SqliteApprovalReplayStore, SqliteApprovalReplayStoreError};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};

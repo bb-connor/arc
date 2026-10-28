@@ -10,7 +10,7 @@
 //!
 //! The harness panics if a corpus directory is missing, unreadable, or empty
 //! - a renamed directory or typo'd target name would otherwise produce a
-//! silent vacuous pass without feeding any bytes through the entry point.
+//!   silent vacuous pass without feeding any bytes through the entry point.
 //!
 //! The inventory tests below keep this honest: every cargo-fuzz binary must
 //! appear in the scheduled workflow matrix, and every scheduled target must
@@ -40,6 +40,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "peers_lock_decode",
     "receipt_log_replay",
     "rollback_anchor_slots",
+    "settlement_approval_witness",
     "underwriting_policy_input",
     "wasm_guard_escape",
     "wasm_guard_smith",
@@ -360,5 +361,13 @@ fn frost_round2_envelope_smoke() {
     assert_seed_floor(
         "frost_round2_envelope",
         chio_fuzz::entries::frost_round2_envelope,
+    );
+}
+
+#[test]
+fn settlement_approval_witness_smoke() {
+    assert_seed_floor(
+        "settlement_approval_witness",
+        chio_fuzz::entries::settlement_approval_witness,
     );
 }

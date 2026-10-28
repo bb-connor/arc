@@ -1,0 +1,1 @@
+{"amount_minor_units":150,"capability_id":"settlement-capability","chain_id":8453,"dispatch_id":"dispatch-web3-1","payee_address":"0x2222222222222222222222222222222222222222","schema":"chio.settlement-binding.v1","settlement_currency":"USD","token_contract":null,"token_symbol":"USDC"}

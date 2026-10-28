@@ -155,6 +155,7 @@ jobs:
           - response_authority_protocol
           - response_lifecycle
           - underwriting_policy_input
+          - settlement_approval_witness
           - revocation_oracle_merkle
           - rollback_anchor_slots
           - commerce_receipt_verify

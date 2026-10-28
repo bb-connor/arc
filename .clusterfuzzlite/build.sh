@@ -47,6 +47,7 @@ TARGETS=(
     response_authority_protocol
     response_lifecycle
     underwriting_policy_input
+    settlement_approval_witness
     fuzz_policy_parse_compile
     policy_analyze
     fuzz_sql_parser

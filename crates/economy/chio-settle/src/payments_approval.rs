@@ -3,12 +3,30 @@ use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use super::{ApprovalBinding, SettlementError};
 
 impl ApprovalBinding {
-    /// Assert that a settlement dispatch matches the approval-bound spend.
-    pub fn assert_dispatch(
+    pub(crate) fn assert_dispatch(
         &self,
         lane: &str,
         dispatch: &Web3SettlementDispatchArtifact,
     ) -> Result<(), SettlementError> {
+        if self.dispatch_id != dispatch.dispatch_id {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} dispatch mismatch"
+            )));
+        }
+        let capability_id = dispatch
+            .capital_instruction
+            .body
+            .query
+            .capability_id
+            .as_deref()
+            .ok_or_else(|| {
+                SettlementError::InvalidBinding(format!("{lane} capability identity is missing"))
+            })?;
+        if self.capability_id != capability_id {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} capability mismatch"
+            )));
+        }
         let expected_chain = format!("eip155:{}", self.chain_id);
         if dispatch.chain_id != expected_chain {
             return Err(SettlementError::InvalidBinding(format!(
@@ -32,11 +50,18 @@ impl ApprovalBinding {
                 dispatch.settlement_amount.units, self.amount_minor_units
             )));
         }
-        self.assert_token_symbol(lane, &dispatch.settlement_amount.currency)
+        if !self
+            .settlement_currency
+            .eq_ignore_ascii_case(&dispatch.settlement_amount.currency)
+        {
+            return Err(SettlementError::InvalidBinding(format!(
+                "{lane} settlement currency mismatch"
+            )));
+        }
+        Ok(())
     }
 
-    /// Assert that a lane's token symbol matches the approval-bound token.
-    pub fn assert_token_symbol(
+    pub(crate) fn assert_token_symbol(
         &self,
         lane: &str,
         lane_token_symbol: &str,
@@ -50,6 +75,15 @@ impl ApprovalBinding {
                  approval-bound token {:?}",
                 self.token_symbol
             )));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn require_symbol_only_lane(&self) -> Result<(), SettlementError> {
+        if self.token_contract.is_some() {
+            return Err(SettlementError::InvalidBinding(
+                "symbol-only settlement cannot enforce a token contract".to_string(),
+            ));
         }
         Ok(())
     }

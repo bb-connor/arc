@@ -445,3 +445,17 @@ path = "fuzz/fuzz_targets/frost_round2_envelope.rs"
 triggers = ["crates/trust/chio-federation-authority/src/frost_ceremony.rs", "crates/trust/chio-federation-authority/src/frost_ceremony/**", "crates/platform/chio-store-sqlite/src/frost_store/ceremony/**", "fuzz/fuzz_targets/frost_round2_envelope.rs", "fuzz/src/entries.rs", "fuzz/src/entries/frost_round2_envelope.rs", "fuzz/corpus/frost_round2_envelope/**"]
 seeds = "fuzz/corpus/frost_round2_envelope"
 notes = "Bounded signed input, context, roster, signature and recipient decryption against the three-of-five fixture."
+
+[targets.settlement_approval_witness]
+crate = "chio-settle"
+path = "fuzz/fuzz_targets/settlement_approval_witness.rs"
+triggers = [
+    "crates/economy/chio-settle/**",
+    "crates/platform/chio-store-sqlite/src/approval_replay_store*",
+    "crates/platform/chio-store-sqlite/src/approval_replay_store/**",
+    "fuzz/src/entries/settlement_approval_witness.rs",
+    "fuzz/fuzz_targets/settlement_approval_witness.rs",
+    "fuzz/corpus/settlement_approval_witness/**",
+]
+seeds = "fuzz/corpus/settlement_approval_witness"
+notes = "Signed settlement binding congruence and single-use artifact issuance."

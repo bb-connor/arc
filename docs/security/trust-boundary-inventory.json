@@ -18846,6 +18846,9 @@
       "verify_finding_recovery_context::shared-reader::crates/economy/chio-open-market/src/recovery.rs::strict_member",
       "verify_finding_recovery_context::shared-reader::crates/economy/chio-open-market/src/recovery.rs::strict_member"
     ],
+    "crates/economy/chio-settle/src/approval_witness.rs": [
+      "verify_governed_approval::shared-reader::crates/economy/chio-settle/src/input.rs::canonical"
+    ],
     "crates/economy/chio-settle/src/ccip.rs": [
       "prepares_bounded_ccip_message::shared-reader::crates/economy/chio-settle/src/ccip.rs::sample_receipt",
       "reconciles_duplicate_and_delayed_delivery::shared-reader::crates/economy/chio-settle/src/ccip.rs::sample_receipt",

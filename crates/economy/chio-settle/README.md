@@ -32,6 +32,30 @@ broadcast. `submit_call` uses `eth_sendTransaction`, which requires an RPC node
 that can send from the configured account. It rejects root publication,
 escrow release/refund, and bond-exit selectors; those require a durable publisher.
 
+## Settlement approvals
+
+`verify_governed_approval` checks a signed `GovernedApprovalToken` against a
+pinned approver, subject, request id, and intent hash. The intent must carry
+`context.chioSettlementBinding` with schema `chio.settlement-binding.v1`.
+It binds chain, payee, amount, rail token, settlement currency, dispatch id,
+and capability id. The approval lifetime is at most one hour.
+
+Both `build_x402_payment_requirements` and `evaluate_circle_nanopayment`
+consume the resulting opaque `VerifiedApproval`. They refuse contract-pinned
+bindings because these projections express token symbols only. x402 keeps
+rail tokens separate from the settlement currency; Circle requires them to
+match. Both lanes require an explicit dispatch capability id. A missing id
+is refused without consuming the approval, even when the signed capability
+id equals the dispatch id. Invalid lane inputs do not consume the approval.
+
+The integrating runtime supplies the trusted clock and one shared
+`ApprovalReplayStore` across both lanes. `InMemoryApprovalReplayStore` is
+process-local. `chio-store-sqlite::SqliteApprovalReplayStore` retains consumed
+request/intent pairs and a clock high-water mark across reopen. Artifact
+issuance consumes approval before returning; a crash after consumption can
+leave no returned artifact. This does not make external payment delivery
+transactional or prove that a payment occurred.
+
 ## Features
 
 | Feature | Default | Effect |
@@ -74,8 +98,8 @@ Ed25519 compatibility for the native lane. Preparation provides no broadcast.
 
 CCIP and watchdog helpers model preparation and reconciliation; they provide
 no scheduler or cross-chain broadcaster. Circle and paymaster helpers evaluate
-supplied policy. Persistent nonce protection and deployed rail services are
-caller work.
+supplied policy. Durable approval replay requires the shared SQLite backend;
+deployed rail services and their payment execution remain caller work.
 
 Unit and schema tests exercise these boundaries. Devnet tests require Node,
 `ethers`, and `ganache`, and return early when prerequisites are unavailable.
