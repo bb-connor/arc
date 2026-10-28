@@ -58,22 +58,13 @@ struct RegistryFixture {
 }
 
 impl RegistryFixture {
+    /// An admitted session holding a credential that works under the
+    /// registry as written at admission.
     async fn admitted() -> TestResult<Self> {
-        Self::admitted_with_auth(false).await
-    }
-
-    async fn admitted_with_auth(enterprise: bool) -> TestResult<Self> {
-        let keypair = Keypair::generate();
         let http = fixture_configured(None, |directory, config| {
             let path = directory.join("enterprise-providers.json");
             write_record(&path, enabled_record())?;
             config.enterprise_providers_file = Some(path);
-            if enterprise {
-                config.auth_token = None;
-                config.auth_jwt_public_key = Some(keypair.public_key().to_hex());
-                config.auth_jwt_issuer = Some(ISSUER.to_string());
-                config.auth_jwt_audience = Some("chio-mcp".to_string());
-            }
             Ok(())
         })?;
         let registry_path = http
@@ -83,42 +74,15 @@ impl RegistryFixture {
             .enterprise_providers_file
             .clone()
             .ok_or("registry path")?;
-        let bearer = if enterprise {
-            support::sign_jwt(
-                &keypair,
-                &json!({
-                    "iss": ISSUER, "sub": "user-123", "aud": "chio-mcp",
-                    "scope": "mcp:invoke", "tid": "tenant-123", "org_id": "org-789",
-                    "exp": support::unix_now() + 300,
-                }),
-            )
-        } else {
-            "operator-fixture".to_string()
-        };
-        let session = initialize_with_token(&http, &bearer).await?;
+        let session = initialize(&http).await?;
         let Some(RemoteSessionEntry::Active(bound)) = http.state.sessions.lookup(&session).await
         else {
             return Err("initialized session is not active".into());
         };
-        if enterprise {
-            let SessionAuthMethod::OAuthBearer {
-                enterprise_identity: Some(identity),
-                ..
-            } = &bound.auth_context.method
-            else {
-                return Err("enterprise fixture lacks an authenticated identity".into());
-            };
-            assert_eq!(
-                identity.provider_record_id.as_deref(),
-                Some("enterprise-login")
-            );
-        } else {
-            assert!(matches!(
-                bound.auth_context.method,
-                SessionAuthMethod::StaticBearer { .. }
-            ));
-        }
-
+        assert!(matches!(
+            bound.auth_context.method,
+            SessionAuthMethod::StaticBearer { .. }
+        ));
         let token = credential(&http, &session).await?;
         let fixture = Self {
             http,
@@ -277,49 +241,68 @@ async fn static_session_credential_survives_an_unrelated_provider_addition() -> 
 }
 
 #[tokio::test]
-async fn session_credential_is_refused_after_its_provider_is_disabled() -> TestResult {
-    let fixture = RegistryFixture::admitted_with_auth(true).await?;
-    write_record(
-        &fixture.registry_path,
-        provider_record(false, ISSUER, "https://issuer.enterprise.example/jwks"),
-    )?;
-    fixture
-        .assert_refused(
-            StatusCode::UNAUTHORIZED,
-            b"invalid, expired, or revoked session credential",
-        )
-        .await?;
-    fixture.shutdown().await
-}
-
-#[tokio::test]
-async fn session_credential_is_refused_after_its_provider_is_removed() -> TestResult {
-    let fixture = RegistryFixture::admitted_with_auth(true).await?;
-    write_providers(&fixture.registry_path, json!({}))?;
-    fixture
-        .assert_refused(
-            StatusCode::SERVICE_UNAVAILABLE,
-            b"urn:chio:error:transport:provider-registry-invalid",
-        )
-        .await?;
-    fixture.shutdown().await
-}
-
-#[tokio::test]
-async fn enterprise_session_credential_survives_an_unrelated_provider_change() -> TestResult {
-    let fixture = RegistryFixture::admitted_with_auth(true).await?;
-    write_record(&fixture.registry_path, enabled_record())?;
-    fixture.assert_accepted().await?;
-    let mut other = provider_record(
-        true,
-        "https://unrelated.enterprise.example",
-        "https://unrelated.enterprise.example/jwks",
+async fn enterprise_session_refuses_operator_session_credentials() -> TestResult {
+    let keypair = Keypair::generate();
+    let http = fixture_configured(None, |directory, config| {
+        let path = directory.join("enterprise-providers.json");
+        write_record(&path, enabled_record())?;
+        config.enterprise_providers_file = Some(path);
+        config.auth_token = None;
+        config.auth_jwt_public_key = Some(keypair.public_key().to_hex());
+        config.auth_jwt_issuer = Some(ISSUER.to_string());
+        config.auth_jwt_audience = Some("chio-mcp".to_string());
+        Ok(())
+    })?;
+    let bearer = support::sign_jwt(
+        &keypair,
+        &json!({
+            "iss": ISSUER, "sub": "user-123", "aud": "chio-mcp",
+            "scope": "mcp:invoke", "tid": "tenant-123", "org_id": "org-789",
+            "exp": support::unix_now() + 300,
+        }),
     );
-    other["provider_id"] = json!("unrelated-login");
-    write_providers(
-        &fixture.registry_path,
-        json!({"enterprise-login": enabled_record(), "unrelated-login": other}),
-    )?;
-    fixture.assert_accepted().await?;
-    fixture.shutdown().await
+    let session = initialize_with_token(&http, &bearer).await?;
+    let Some(RemoteSessionEntry::Active(bound)) = http.state.sessions.lookup(&session).await else {
+        return Err("initialized session is not active".into());
+    };
+    let SessionAuthMethod::OAuthBearer {
+        enterprise_identity: Some(identity),
+        ..
+    } = &bound.auth_context.method
+    else {
+        return Err("enterprise fixture lacks an authenticated identity".into());
+    };
+    assert_eq!(
+        identity.provider_record_id.as_deref(),
+        Some("enterprise-login")
+    );
+    let response = request(&http, MCP_ENDPOINT_PATH, &bearer, Some(&session), PING).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let _ = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+
+    let issuance = request(
+        &http,
+        &format!("/admin/sessions/{session}/credential"),
+        "admin-fixture",
+        None,
+        br#"{"ttlSeconds":300,"allowedTools":["echo_json"]}"#,
+    )
+    .await?;
+    let redemption = request(
+        &http,
+        MCP_ENDPOINT_PATH,
+        "chio_session_v1_unknown",
+        Some(&session),
+        PING,
+    )
+    .await?;
+    for response in [issuance, redemption] {
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(response.into_body(), 16 * 1024).await?;
+        assert_eq!(&body[..], b"session credentials require static operator auth, a distinct admin token, and a shared hosted owner");
+    }
+    assert_eq!(http.calls.load(Ordering::SeqCst), 0);
+    http.state.sessions.shutdown_all_active().await?;
+    http.state.factory.shutdown_shared_upstream_owner()?;
+    Ok(())
 }
