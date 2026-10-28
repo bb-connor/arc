@@ -315,7 +315,11 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
     if let Some(path) = config.passport_statuses_file.as_deref() {
         let registry = PassportStatusRegistry::load(path)?;
         let resolution = registry.resolve_at(passport_id, clock_now);
-        crate::passport_revocation::check_passport_revocation(path, &resolution)?;
+        crate::passport_revocation::check_registered_passport_revocation(
+            path,
+            &registry,
+            &resolution,
+        )?;
         return Ok(PassportLifecyclePlan::Resolved(Some(resolution)));
     }
     let Some(status_ref) = status_ref else {

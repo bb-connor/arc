@@ -582,7 +582,7 @@ async fn public_token_work_cannot_starve_unrelated_operator_mutation() -> TestRe
         bearer("service-secret")?,
         Json(PassportStatusRevocationRequest {
             reason: Some("compromised".to_string()),
-            revoked_at: Some(first_offers.issued_at + 1),
+            revoked_at: Some(first_offers.issued_at),
         }),
     )
     .await;

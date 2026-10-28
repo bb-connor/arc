@@ -470,6 +470,10 @@ pub(crate) async fn handle_revoke_passport_status(
         Ok(path) => path,
         Err(response) => return response,
     };
+    let now = match clock_unix_secs(state.finding_challenge_clock.as_ref()) {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
     let lane = state.operator_registry_write_lane.clone();
     run_registry_update(&lane, move || {
         crate::passport_revocation::revoke_passport_status(
@@ -477,6 +481,7 @@ pub(crate) async fn handle_revoke_passport_status(
             &passport_id,
             request.reason.as_deref(),
             request.revoked_at,
+            now,
         )
     })
     .await

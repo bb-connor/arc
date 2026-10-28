@@ -709,7 +709,7 @@ pub(crate) fn resolve_passport_lifecycle_for_service(
     let (path, registry) = load_passport_status_registry_for_admin(config)?;
     let mut lifecycle = registry.resolve_for_passport(passport, at)?;
     lifecycle.source = Some("registry:trust-control".to_string());
-    crate::passport_revocation::check_passport_revocation(&path, &lifecycle)?;
+    crate::passport_revocation::check_presented_passport_revocation(&path, &lifecycle, passport)?;
     Ok(Some(lifecycle))
 }
 
@@ -723,7 +723,11 @@ pub(crate) fn resolve_passport_status_for_service(
     let (path, registry) = load_passport_status_registry_for_admin(config)?;
     let mut resolution = registry.resolve_at(passport_id, at);
     resolution.source = Some("registry:trust-control".to_string());
-    crate::passport_revocation::check_passport_revocation(&path, &resolution)?;
+    crate::passport_revocation::check_registered_passport_revocation(
+        &path,
+        &registry,
+        &resolution,
+    )?;
     Ok(resolution)
 }
 
