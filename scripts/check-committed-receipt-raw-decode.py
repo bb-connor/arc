@@ -28,10 +28,10 @@ Every production workspace member is scanned: `crates/` and each other
 top-level member directory except `bench`, `examples` and `tests`. A renamed
 import (`use path::ChioReceipt as Receipt`) is read as an alias.
 
-The scan is lexical. It does not resolve paths, trait dispatch, or helpers in
-other crates, and a short type name defined differently in two crates is only
-strict when every definition is, so a pass is evidence for the listed forms
-only.
+The scan resolves lexical crate/module paths, type aliases and imports before
+computing the strict wrapper closure. It does not perform Rust type inference,
+trait dispatch or macro expansion, or follow generic helpers in other crates.
+A pass is evidence for the listed forms only.
 """
 
 from __future__ import annotations
@@ -39,11 +39,14 @@ from __future__ import annotations
 import argparse
 import functools
 import importlib.util
+import io
 import re
 import sys
 import tempfile
 import tomllib
+import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,6 +62,7 @@ def _load(name: str, path: Path):
 _gate = _load("trust_boundaries_gate", ROOT / "scripts/check-trust-boundaries.py")
 _lexer = _gate._lexer
 _contracts = _gate._contracts
+_resolution = _load("receipt_type_resolution", ROOT / "scripts/receipt_type_resolution.py")
 
 # The receipt types that carry a serde_json::Value member (action parameters,
 # metadata). Derived impls already refuse a duplicate field of a Chio object;
@@ -175,6 +179,37 @@ ALLOWED = (
         "owner": "verify_file",
         "call": "serde_json::from_value(signed.action.parameters.clone())",
         "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
+        "owner": "verify_file",
+        "call": "crate::input::project(signed.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/process_host/run_evidence.rs",
+        "owner": "verify_file",
+        "call": "serde_json::from_value(signed.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/run_evidence.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs",
+        "owner": "verify_outcomes",
+        "call": "serde_json::from_value(signed_call.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_outcomes("),
             ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_original_receipt("),
             ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
             ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
@@ -363,7 +398,6 @@ RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*(?:(?:de|value
 EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
-TYPE_ALIAS = re.compile(r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
 TRAIT_CALL = re.compile(
     r"(?<![\w:.])(?:::\s*)?(?:[a-z_]\w*\s*::\s*)*(?:Deserialize\b"
     r"|<\s*((?:[\w:&',\s]|<(?:[^<>]|<[^<>]*>)*>)+?)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
@@ -379,7 +413,6 @@ BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*
 IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
 BLOCK_HEADER = re.compile(r"\b(?:impl|trait)\b[^{};]*\{")
 USE_STATEMENT = re.compile(r"\buse\s[^;]*;")
-USE_RENAME = re.compile(r"\b(\w+)\s+as\s+(\w+)\b")
 VARIANT_NAME = re.compile(r"([{,]\s*(?:#\[[^\]]*\]\s*)*)[A-Z]\w*(?=\s*(?:[,{(}]|=))")
 DOCUMENT_CALL = re.compile(r"\.\s*decode_document\s*(?=::|\()")
 STATIC_ITEM = re.compile(r"\b(?:static|const)\s+(?:mut\s+)?(\w+)\s*:\s*([^=;]+?)\s*=(?![=>])")
@@ -458,45 +491,6 @@ def implementing_type(code: str, offset: int) -> str:
                 text = text[close:]
             found = re.split(r"\bfor\b", text)[-1].split("where")[0].strip()
     return found
-
-
-def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
-    """Names whose every workspace definition holds a strict type at any depth.
-
-    A name defined more than once with a non-strict body stays out, so an
-    unrelated type that shares a name with a wrapper is not swept in. Error
-    types carry receipts for reporting and are never decoded from input."""
-    definitions: dict[str, list[str]] = {}
-    for _, code in files:
-        for match in TYPE_DEFINITION.finditer(code):
-            opening = match.end(2) - 1
-            right = ")" if code[opening] == "(" else "}"
-            close = _contracts.closing(code, opening, code[opening], right)
-            body = code[opening:close]
-            if match.group(0).startswith("enum"):
-                body = VARIANT_NAME.sub(r"\1", body)
-            if not match.group(1).endswith("Error"):
-                definitions.setdefault(match.group(1), []).append(body)
-        for statement in USE_STATEMENT.finditer(code):
-            for original, alias in USE_RENAME.findall(statement.group(0)):
-                if original != alias:
-                    definitions.setdefault(alias, []).append(original)
-        for match in TYPE_ALIAS.finditer(code):
-            if not any(start < match.start() < end for start, end, _ in block_spans(code)):
-                definitions.setdefault(match.group(1), []).append(match.group(2))
-    strict = set(STRICT_TYPES)
-    changed = True
-    while changed:
-        changed = False
-        for name, bodies in definitions.items():
-            if name not in strict and all(set(IDENTIFIER.findall(body)) & strict for body in bodies):
-                strict.add(name)
-                changed = True
-    return frozenset(strict)
-
-
-def mentions_strict(text: str, strict: frozenset[str]) -> bool:
-    return bool(set(IDENTIFIER.findall(text)) & strict)
 
 
 def angle_argument(code: str, index: int) -> tuple[str, int]:
@@ -811,7 +805,7 @@ def in_deserialize_impl(code: str, offset: int) -> bool:
 
 def scan(root: Path) -> list[str]:
     files = production_files(root)
-    strict = strict_closure(files)
+    strict = _resolution.TypeResolver(root, files, SimpleNamespace(**globals()))
     helpers = generic_raw_helpers(files)
     aliases = {rel: raw_aliases(code) for rel, code in files}
     findings = []
@@ -823,7 +817,7 @@ def scan(root: Path) -> list[str]:
             arguments = fn_code[arguments_start:_contracts.closing(fn_code, arguments_start)]
             for match in EXTRACTOR.finditer(arguments):
                 target, _ = angle_argument(arguments, match.end() - 1)
-                if mentions_strict(target, strict):
+                if strict.mentions(target, rel, row[1]):
                     findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor", "text"))
             body_start = row[2] - row[1]
             for match in FROM_REQUEST.finditer(fn_code, body_start):
@@ -831,7 +825,7 @@ def scan(root: Path) -> list[str]:
                 statement = fn_code[statement_start:match.start()] + " " + let_annotation(fn_code, match.start())
                 for extractor in BODY_EXTRACTOR.finditer(statement):
                     target, _ = angle_argument(statement, extractor.end() - 1)
-                    if mentions_strict(target, strict):
+                    if strict.mentions(target, rel, row[1] + match.start()):
                         findings.append((rel, owner, call_text(fn_code, match.start()), "extractor", "text"))
                         break
             if owner.split("#")[0] == "deserialize" and in_deserialize_impl(code, row[1]):
@@ -842,7 +836,7 @@ def scan(root: Path) -> list[str]:
                 target = targets(fn_code, offset, explicit, returns)
                 if self_type:
                     target = re.sub(r"\bSelf\b", self_type, target)
-                if mentions_strict(target, strict):
+                if strict.mentions(target, rel, row[1] + offset):
                     findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
         rows = _contracts.functions(code)
         for item in STATIC_ITEM.finditer(code):
@@ -851,7 +845,7 @@ def scan(root: Path) -> list[str]:
             initializer = code[item.start():statement_end(code, item.end())]
             for offset, explicit, kind in decode_sites(initializer, item.end() - item.start(), helpers.get(crate_of(rel), {}), aliases[rel]):
                 target = explicit if explicit is not None else item.group(2)
-                if mentions_strict(target, strict):
+                if strict.mentions(target, rel, item.start() + offset):
                     findings.append((rel, f"static {item.group(1)}", call_text(initializer, offset), "decode", kind))
     errors = []
     remaining = list(findings)
@@ -1056,6 +1050,11 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args()
     self_test()
+    tests = _load("receipt_type_resolution_tests", ROOT / "scripts/test-committed-receipt-type-resolution.py")
+    output = io.StringIO()
+    result = unittest.TextTestRunner(stream=output).run(unittest.defaultTestLoader.loadTestsFromModule(tests))
+    if not result.wasSuccessful():
+        raise SystemExit(output.getvalue())
     errors = scan(args.root)
     if errors:
         print("raw JSON decode of a strict type outside decode_signed:", file=sys.stderr)
