@@ -161,9 +161,7 @@ impl SqliteAdmissionOperationStore {
         }
         for resource in intent.resources() {
             let occupied: bool = transaction.query_row(
-                "SELECT EXISTS(SELECT 1 FROM runtime_replay_legacy_tombstones
-                     WHERE runtime_authority_id = ?1 AND participant_kind = ?2 AND resource_id = ?3)
-                 OR EXISTS(SELECT 1 FROM runtime_replay_claim_resources AS resource
+                "SELECT EXISTS(SELECT 1 FROM runtime_replay_claim_resources AS resource
                      WHERE runtime_authority_id = ?1 AND participant_kind = ?2 AND resource_id = ?3
                      AND NOT EXISTS(SELECT 1 FROM runtime_replay_claim_releases AS released
                          WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id))",
@@ -172,7 +170,7 @@ impl SqliteAdmissionOperationStore {
             ).map_err(sqlite_error)?;
             if occupied {
                 return Err(invariant(
-                    "runtime participant resource is already reserved or historically spent",
+                    "runtime participant resource is already reserved",
                 ));
             }
         }
@@ -328,7 +326,7 @@ fn require_intent(
         .runtime()
         .ok_or_else(|| invariant("runtime claim lacks an original authority profile"))?;
     if selected.runtime_authority_id() != intent.runtime_authority_id()
-        || selected.expectation_id() != intent.expectation_id()
+        || selected.qualification_id() != intent.qualification_id()
     {
         return Err(invariant(
             "runtime claim changed the original authority selection",
@@ -342,10 +340,10 @@ fn require_intent(
             "runtime claim grant is absent from the original matching grants",
         ));
     }
-    runtime_replay::require_imported_source(
+    runtime_source::require_qualified_source(
         connection,
         intent.runtime_authority_id(),
-        intent.expectation_id(),
+        intent.qualification_id(),
     )?;
     Ok(())
 }
@@ -359,7 +357,7 @@ fn ledger_digest(
         &(
             operation.binding().operation_id(),
             intent.runtime_authority_id(),
-            intent.expectation_id(),
+            intent.qualification_id(),
         ),
     )
 }

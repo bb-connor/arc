@@ -16,11 +16,6 @@ pub struct JsonRuntimeAdmissionStore {
 struct JsonRuntimeAdmissionStoreState {
     schema: String,
     bundles: Vec<RuntimeAdmissionBundle>,
-    consumed_lease_ids: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    consumed_treaty_continuation_ids: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    consumed_swarm_continuation_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     trust_floors: Vec<RuntimeTrustFloorEntry>,
 }
@@ -30,9 +25,6 @@ impl Default for JsonRuntimeAdmissionStoreState {
         Self {
             schema: CHIO_RUNTIME_ADMISSION_STORE_SCHEMA.to_string(),
             bundles: Vec::new(),
-            consumed_lease_ids: Vec::new(),
-            consumed_treaty_continuation_ids: Vec::new(),
-            consumed_swarm_continuation_ids: Vec::new(),
             trust_floors: Vec::new(),
         }
     }
@@ -96,37 +88,6 @@ impl JsonRuntimeAdmissionStore {
                 return Err(ChioRuntimeError::DuplicateAdmissionBundle);
             }
         }
-        let mut lease_ids = BTreeSet::new();
-        for lease_id in &state.consumed_lease_ids {
-            if !lease_ids.insert(lease_id.as_str()) {
-                return Err(ChioRuntimeError::Rejected {
-                    code: "duplicate_consumed_lease",
-                    detail: format!("runtime admission store repeats consumed lease {lease_id}"),
-                });
-            }
-        }
-        let mut continuation_ids = BTreeSet::new();
-        for continuation_id in &state.consumed_treaty_continuation_ids {
-            if !continuation_ids.insert(continuation_id.as_str()) {
-                return Err(ChioRuntimeError::Rejected {
-                    code: "duplicate_consumed_treaty_continuation",
-                    detail: format!(
-                        "runtime admission store repeats treaty continuation {continuation_id}"
-                    ),
-                });
-            }
-        }
-        let mut swarm_continuation_ids = BTreeSet::new();
-        for continuation_id in &state.consumed_swarm_continuation_ids {
-            if !swarm_continuation_ids.insert(continuation_id.as_str()) {
-                return Err(ChioRuntimeError::Rejected {
-                    code: "duplicate_consumed_swarm_continuation",
-                    detail: format!(
-                        "runtime admission store repeats swarm continuation {continuation_id}"
-                    ),
-                });
-            }
-        }
         let mut trust_floor_ids = BTreeSet::new();
         for entry in &state.trust_floors {
             let identity = trust_floor_identity(&entry.verifier_id, &entry.key_id);
@@ -182,112 +143,6 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
             .iter()
             .find(|bundle| bundle.admission_id == admission_id)
             .cloned())
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        if state
-            .consumed_lease_ids
-            .iter()
-            .any(|consumed| consumed == lease_id)
-        {
-            return Err(ChioRuntimeError::Rejected {
-                code: "destructive_lease_replay",
-                detail: format!("destructive lease {lease_id} was already consumed"),
-            });
-        }
-        let mut candidate = state.clone();
-        candidate.consumed_lease_ids.push(lease_id.to_string());
-        self.commit(&mut state, candidate)
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        let mut candidate = state.clone();
-        candidate
-            .consumed_lease_ids
-            .retain(|consumed| consumed != lease_id);
-        self.commit(&mut state, candidate)
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        if state
-            .consumed_treaty_continuation_ids
-            .iter()
-            .any(|consumed| consumed == continuation_id)
-        {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_treaty_continuation_replay",
-                detail: format!("treaty continuation {continuation_id} was already consumed"),
-            });
-        }
-        let mut candidate = state.clone();
-        candidate
-            .consumed_treaty_continuation_ids
-            .push(continuation_id.to_string());
-        self.commit(&mut state, candidate)
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        let mut candidate = state.clone();
-        candidate
-            .consumed_treaty_continuation_ids
-            .retain(|consumed| consumed != continuation_id);
-        self.commit(&mut state, candidate)
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        if state
-            .consumed_swarm_continuation_ids
-            .iter()
-            .any(|consumed| consumed == continuation_id)
-        {
-            return Err(ChioRuntimeError::Rejected {
-                code: "chio_swarm_continuation_replay",
-                detail: format!("swarm continuation {continuation_id} was already consumed"),
-            });
-        }
-        let mut candidate = state.clone();
-        candidate
-            .consumed_swarm_continuation_ids
-            .push(continuation_id.to_string());
-        self.commit(&mut state, candidate)
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        _admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        let mut state = self.lock_state()?;
-        let mut candidate = state.clone();
-        candidate
-            .consumed_swarm_continuation_ids
-            .retain(|consumed| consumed != continuation_id);
-        self.commit(&mut state, candidate)
     }
 
     fn runtime_trust_floor(

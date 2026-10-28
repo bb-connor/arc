@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use chio_core_types::StoreMutationFence;
 use chio_kernel::admission_operation::{
-    AdmissionOperationStoreError, RuntimeReplaySourceSnapshotV1,
+    AdmissionOperationStoreError, RuntimeSourceQualificationV1,
 };
 use chio_store_sqlite::SqliteAdmissionOperationStore;
 
@@ -31,7 +31,7 @@ fn pin_real_source(
     store: &SqliteAdmissionOperationStore,
     source: &SqliteRuntimeOrchestrationStore,
     fence: &StoreMutationFence,
-) -> TestResult<(AdmissionIdentifier, RuntimeReplayMigrationRecordV1)> {
+) -> TestResult<(AdmissionIdentifier, RuntimeSourceRecordV1)> {
     seed_inventory(source)?;
     let runtime = AdmissionIdentifier::try_new("runtime_authority_id", "serialized-runtime")?;
     let source_id = AdmissionIdentifier::try_new("source_id", "serialized-source")?;
@@ -47,19 +47,19 @@ struct BlockingSource<'a> {
     seal_calls: AtomicUsize,
 }
 
-impl RuntimeReplaySourcePort for BlockingSource<'_> {
+impl RuntimeSourcePort for BlockingSource<'_> {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime: &AdmissionIdentifier,
         destination: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         self.inner.preview(source_id, runtime, destination)
     }
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         if self.seal_calls.fetch_add(1, Ordering::SeqCst) == 0 {
             self.entered.send(()).map_err(unavailable)?;
@@ -76,7 +76,7 @@ impl RuntimeReplaySourcePort for BlockingSource<'_> {
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.inner.verify_exact(expected)
     }
@@ -102,7 +102,7 @@ fn owner_shared_import_guard_rejects_concurrency_without_blocking_destination_re
         seal_calls: AtomicUsize::new(0),
     };
     let observed = now_ms()?;
-    let imported = std::thread::scope(|scope| -> TestResult<RuntimeReplayMigrationRecordV1> {
+    let imported = std::thread::scope(|scope| -> TestResult<RuntimeSourceRecordV1> {
         let worker = scope.spawn(|| {
             first.import_runtime_replay_source(
                 &runtime,
@@ -201,19 +201,19 @@ impl ReentrantSource<'_> {
     }
 }
 
-impl RuntimeReplaySourcePort for ReentrantSource<'_> {
+impl RuntimeSourcePort for ReentrantSource<'_> {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime: &AdmissionIdentifier,
         destination: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         self.inner.preview(source_id, runtime, destination)
     }
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.check_reentrancy()?;
         self.inner.seal_exact(expected)
@@ -221,7 +221,7 @@ impl RuntimeReplaySourcePort for ReentrantSource<'_> {
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.check_reentrancy()?;
         self.inner.verify_exact(expected)
@@ -282,19 +282,19 @@ struct FailAfterSeal<'a> {
     fail_once: AtomicBool,
 }
 
-impl RuntimeReplaySourcePort for FailAfterSeal<'_> {
+impl RuntimeSourcePort for FailAfterSeal<'_> {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime: &AdmissionIdentifier,
         destination: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         self.inner.preview(source_id, runtime, destination)
     }
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.inner.seal_exact(expected)?;
         if self.fail_once.swap(false, Ordering::SeqCst) {
@@ -308,7 +308,7 @@ impl RuntimeReplaySourcePort for FailAfterSeal<'_> {
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.inner.verify_exact(expected)
     }
@@ -350,7 +350,7 @@ fn assert_guard_released_after_failure(failure: Failure) -> TestResult {
         second.load_runtime_replay_migration(&runtime, &fence, now_ms()?)?,
         Some(expected.clone())
     );
-    RuntimeReplaySourcePort::verify_exact(&inner, expected.snapshot())?;
+    RuntimeSourcePort::verify_exact(&inner, expected.snapshot())?;
     assert_all_legacy_kinds_blocked(&inner);
     assert_destination_history(&Connection::open(&database)?, &expected)?;
     let imported = second.import_runtime_replay_source(
@@ -388,8 +388,8 @@ fn pending_pin_survives_owner_restart_after_real_source_seal_before_import() -> 
     // Model the interruption boundary after a committed source seal but before
     // the destination receives its acknowledgment and records event 2. This
     // test uses normal drop/reopen, not a subprocess or power-loss simulation.
-    RuntimeReplaySourcePort::seal_exact(&source, expected.snapshot())?;
-    RuntimeReplaySourcePort::verify_exact(&source, expected.snapshot())?;
+    RuntimeSourcePort::seal_exact(&source, expected.snapshot())?;
+    RuntimeSourcePort::verify_exact(&source, expected.snapshot())?;
     assert_all_legacy_kinds_blocked(&source);
     assert_eq!(
         store.load_runtime_replay_migration(&runtime, &fence, now_ms()?)?,
@@ -443,7 +443,7 @@ fn pending_pin_survives_owner_restart_after_real_source_seal_before_import() -> 
         expected.snapshot().canonical_bytes()
     );
     assert_eq!(imported.expectation_id(), expected.expectation_id());
-    RuntimeReplaySourcePort::verify_exact(&reopened_source, expected.snapshot())?;
+    RuntimeSourcePort::verify_exact(&reopened_source, expected.snapshot())?;
     assert_all_legacy_kinds_blocked(&reopened_source);
     assert_destination_history(&Connection::open(&database)?, &imported)?;
     Ok(())

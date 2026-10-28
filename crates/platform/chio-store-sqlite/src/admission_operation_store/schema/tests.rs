@@ -15,11 +15,11 @@ fn physical_rows(
 }
 
 #[test]
-fn canonical_catalog_does_not_recreate_a_missing_runtime_barrier() -> TestResult {
+fn canonical_catalog_does_not_recreate_a_missing_source_guard() -> TestResult {
     let connection = Connection::open_in_memory()?;
     connection.execute_batch(&admission_operation_schema_sql()?)?;
     verify_admission_operation_schema(&connection)?;
-    connection.execute_batch("DROP TRIGGER runtime_replay_legacy_tombstones_no_delete")?;
+    connection.execute_batch("DROP TRIGGER runtime_source_qualifications_no_delete")?;
     let before = admission_operation_schema_catalog(&connection)?;
     assert!(verify_admission_operation_schema(&connection).is_err());
     assert_eq!(admission_operation_schema_catalog(&connection)?, before);
@@ -27,52 +27,42 @@ fn canonical_catalog_does_not_recreate_a_missing_runtime_barrier() -> TestResult
 }
 
 #[test]
-fn runtime_replay_tables_reject_hidden_rowid_replacement() -> TestResult {
+fn runtime_source_rejects_hidden_rowid_replacement() -> TestResult {
     let connection = Connection::open_in_memory()?;
     connection.execute_batch("PRAGMA foreign_keys = OFF; PRAGMA recursive_triggers = OFF;")?;
-    connection.execute_batch(RUNTIME_REPLAY_MIGRATION_SCHEMA)?;
+    connection.execute_batch(RUNTIME_SOURCE_SCHEMA)?;
     let digest = "0".repeat(64);
-    for (table, columns, values) in [
-        (
-            "runtime_replay_migration_expectations",
-            "runtime_authority_id, source_id, expectation_id, destination_store_uuid, canonical_source, inventory_sha256, expectation_digest",
-            format!("'runtime', 'source', 'expectation', 'destination', X'01', '{digest}', '{digest}'"),
-        ),
-        (
-            "runtime_replay_migration_events",
-            "runtime_authority_id, sequence, mutation_kind, expectation_digest, inventory_sha256, event_digest, observed_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch",
-            format!("'runtime', 1, 'expect_runtime_replay_source', '{digest}', '{digest}', '{digest}', 1, 'destination', 'lease', 1"),
-        ),
-        (
-            "runtime_replay_legacy_tombstones",
-            "runtime_authority_id, participant_kind, resource_id, source_id, expectation_id, historical_admission_id",
-            "'runtime', 'destructive_lease', 'resource', 'source', 'expectation', 'admission'".into(),
-        ),
+    let table = "runtime_source_qualifications";
+    let columns = "runtime_authority_id, source_id, qualification_id, destination_store_uuid, canonical_source, observed_at_unix_ms, store_lease_id, store_owner_epoch, record_digest";
+    let values =
+        format!("'runtime', 'source', '{digest}', 'destination', X'01', 1, 'lease', 1, '{digest}'");
+    connection.execute(
+        &format!("INSERT INTO {table} ({columns}) VALUES ({values})"),
+        [],
+    )?;
+    let before = physical_rows(&connection, table)?;
+    let replacement = values
+        .replace("'runtime'", "'other-runtime'")
+        .replace("'source'", "'other-source'")
+        .replace(&digest, &"1".repeat(64));
+    for hidden_key in ["rowid", "_rowid_", "oid"] {
+        let error = connection.execute(
+            &format!("INSERT OR REPLACE INTO {table} ({hidden_key}, {columns}) VALUES (1, {replacement})"), [],
+        ).err().ok_or("implicit rowid replacement unexpectedly succeeded")?;
+        assert_eq!(
+            error.to_string(),
+            format!("table {table} has no column named {hidden_key}")
+        );
+        assert_eq!(physical_rows(&connection, table)?, before);
+    }
+    for sql in [
+        "UPDATE runtime_source_qualifications SET source_id = 'different'",
+        "DELETE FROM runtime_source_qualifications",
+        "INSERT OR REPLACE INTO runtime_source_qualifications SELECT * FROM runtime_source_qualifications",
     ] {
-        connection.execute(&format!("INSERT INTO {table} ({columns}) VALUES ({values})"), [])?;
-        let before = physical_rows(&connection, table)?;
-        // Every declared key differs, so the uniqueness guards alone would not
-        // stop REPLACE from deleting the old row through an implicit rowid.
-        let replacement = values
-            .replace("'runtime'", "'other-runtime'")
-            .replace("'source'", "'other-source'")
-            .replace("'expectation'", "'other-expectation'");
-        for hidden_key in ["rowid", "_rowid_", "oid"] {
-            let error = connection
-                .execute(
-                    &format!(
-                        "INSERT OR REPLACE INTO {table} ({hidden_key}, {columns}) VALUES (1, {replacement})"
-                    ),
-                    [],
-                )
-                .err()
-                .ok_or("implicit rowid replacement unexpectedly succeeded")?;
-            assert!(
-                error.to_string().contains(&format!("no column named {hidden_key}")),
-                "{table}: {error}"
-            );
-            assert_eq!(physical_rows(&connection, table)?, before);
-        }
+        let error = connection.execute(sql, []).err().ok_or("source qualification changed")?;
+        assert_eq!(error.to_string(), "runtime source qualification is immutable");
+        assert_eq!(physical_rows(&connection, table)?, before);
     }
     Ok(())
 }

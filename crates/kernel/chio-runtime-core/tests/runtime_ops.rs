@@ -528,7 +528,6 @@ fn runtime_orchestration_contracts_validate_status_and_run_report(
         store_backend: "sqlite".to_string(),
         store_path_sha256: "7".repeat(64),
         run_counts: std::collections::BTreeMap::from([("proof_accepted".to_string(), 1)]),
-        consumed_lease_count: 1,
         trust_floor_count: 1,
         latest_failure_code: None,
         evidence_sink_healthy: true,

@@ -1,13 +1,13 @@
 use super::*;
 use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationStoreError, RuntimeReplaySourcePort,
-    RuntimeReplaySourceSnapshotV1,
+    AdmissionIdentifier, AdmissionOperationStoreError, RuntimeSourcePort,
+    RuntimeSourceQualificationV1,
 };
 
 fn assert_no_seal_after_mismatch(
     store: &SqliteRuntimeOrchestrationStore,
     raw: &Connection,
-    expected: &RuntimeReplaySourceSnapshotV1,
+    expected: &RuntimeSourceQualificationV1,
 ) -> TestResult {
     let before = raw_snapshot(raw)?;
     assert_code(
@@ -56,7 +56,7 @@ fn preview_is_read_only_and_unchanged_source_seals_and_retries_exactly() -> Test
             (identity.device, identity.inode, identity.link_count)
         );
         assert!(
-            RuntimeReplaySourcePort::verify_exact(&store, &expected).is_err(),
+            RuntimeSourcePort::verify_exact(&store, &expected).is_err(),
             "a preview cannot attest installed barriers"
         );
         assert_eq!(raw_snapshot(&raw)?, before);
@@ -74,13 +74,13 @@ fn preview_is_read_only_and_unchanged_source_seals_and_retries_exactly() -> Test
         } else {
             assert!(seal.markers().is_empty());
         }
-        RuntimeReplaySourcePort::verify_exact(&store, &expected)?;
+        RuntimeSourcePort::verify_exact(&store, &expected)?;
         assert_eq!(store.seal_expected_legacy_replay_source(&expected)?, seal);
         // The original standalone API retains its exact-reseal semantics.
         assert_eq!(store.seal_legacy_replay_source(&binding)?, seal);
         drop(store);
         let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
-        RuntimeReplaySourcePort::verify_exact(&reopened, &expected)?;
+        RuntimeSourcePort::verify_exact(&reopened, &expected)?;
         assert_eq!(
             reopened.seal_expected_legacy_replay_source(&expected)?,
             seal
@@ -146,7 +146,7 @@ fn identical_inventory_in_a_different_file_cannot_satisfy_a_preview() -> TestRes
         .load_legacy_replay_source_seal(&binding()?)?
         .is_none());
     original.seal_expected_legacy_replay_source(&expected)?;
-    RuntimeReplaySourcePort::verify_exact(&original, &expected)?;
+    RuntimeSourcePort::verify_exact(&original, &expected)?;
     Ok(())
 }
 
@@ -163,7 +163,7 @@ fn hard_link_created_after_preview_rejects_without_retiring_the_source() -> Test
     assert_no_seal_after_mismatch(&store, &raw, &expected)?;
     std::fs::remove_file(&link)?;
     store.seal_expected_legacy_replay_source(&expected)?;
-    RuntimeReplaySourcePort::verify_exact(&store, &expected)?;
+    RuntimeSourcePort::verify_exact(&store, &expected)?;
     Ok(())
 }
 
@@ -205,7 +205,7 @@ fn real_sqlite_source_port_has_no_unsealed_or_mismatched_success_fallback() -> T
         "destination_authority_id",
         binding.destination_authority_id(),
     )?;
-    let port: &dyn RuntimeReplaySourcePort = &store;
+    let port: &dyn RuntimeSourcePort = &store;
     let stale = port.preview(&source, &runtime, &destination)?;
     assert!(matches!(
         port.verify_exact(&stale),
@@ -271,16 +271,16 @@ fn structurally_valid_rehashed_snapshot_data_cannot_authorize_a_different_source
         preimage.extend_from_slice(&body);
         changed["inventorySha256"] =
             serde_json::json!(chio_core_types::crypto::sha256_hex(&preimage));
-        let untrusted = RuntimeReplaySourceSnapshotV1::from_canonical_bytes(
+        let untrusted = RuntimeSourceQualificationV1::from_canonical_bytes(
             &chio_core_types::crypto::canonical_json_bytes(&changed)?,
         )?;
         assert_no_seal_after_mismatch(&store, &raw, &untrusted)?;
     }
     let mut noncanonical = expected.canonical_bytes().to_vec();
     noncanonical.push(b' ');
-    assert!(RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&noncanonical).is_err());
+    assert!(RuntimeSourceQualificationV1::from_canonical_bytes(&noncanonical).is_err());
     store.seal_expected_legacy_replay_source(&expected)?;
-    RuntimeReplaySourcePort::verify_exact(&store, &expected)?;
+    RuntimeSourcePort::verify_exact(&store, &expected)?;
     Ok(())
 }
 

@@ -17,7 +17,7 @@ use std::sync::Arc;
 use chio_control_plane::{DurableAdmissionRuntime, PreparedPrivateDirectory};
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair, Signature};
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
-use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeReplaySourcePort};
+use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeSourcePort};
 use chio_kernel::ChioKernel;
 use chio_process::{ProcessRoute, ProcessRuntime};
 use chio_runtime_core::{
@@ -237,46 +237,19 @@ pub(super) fn provision(
             .map_err(error)?;
     let runtime_id = AdmissionIdentifier::try_new("runtime_id", runtime.runtime_id().to_owned())
         .map_err(error)?;
-    let expected = store
-        .expect_runtime_replay_source(
+    let installed = store
+        .install_runtime_source(
             &source_id,
             &runtime_id,
             &source,
             &fence,
-            runtime
-                .authority_clock()
-                .unix_millis()
-                .map_err(error)?
-                .get(),
+            runtime.authority_clock().unix_millis().map_err(error)?.get(),
         )
         .map_err(error)?;
-    store
-        .import_runtime_replay_source(
-            &runtime_id,
-            expected.expectation_id(),
-            &source,
-            &fence,
-            runtime
-                .authority_clock()
-                .unix_millis()
-                .map_err(error)?
-                .get(),
-        )
-        .map_err(error)?;
-    let binding =
-        RuntimeParticipantAuthorityBindingV1::new(runtime_id, expected.expectation_id().clone());
-    store
-        .activate_runtime_replay_source(
-            &binding,
-            &source,
-            &fence,
-            runtime
-                .authority_clock()
-                .unix_millis()
-                .map_err(error)?
-                .get(),
-        )
-        .map_err(error)?;
+    let binding = RuntimeParticipantAuthorityBindingV1::new(
+        runtime_id,
+        installed.qualification_id().clone(),
+    );
     let body = ProfileBody {
         schema: SCHEMA.into(),
         runtime_id: runtime.runtime_id().into(),
@@ -351,17 +324,17 @@ pub(super) fn install(
         .local_runtime_participant()
         .ok_or_else(|| error("swarm source requires a local qualified authority"))?;
     let active = store
-        .load_runtime_replay_migration(
+        .load_runtime_source(
             signed.body.binding.runtime_authority_id(),
             &fence,
             kernel.authority_clock().unix_millis().map_err(error)?.get(),
         )
         .map_err(error)?
-        .ok_or_else(|| error("missing activated swarm source"))?;
-    if !active.is_active() || active.expectation_id() != signed.body.binding.expectation_id() {
-        return Err(error("swarm source generation is not active"));
+        .ok_or_else(|| error("missing qualified swarm source"))?;
+    if active.qualification_id() != signed.body.binding.qualification_id() {
+        return Err(error("swarm source qualification differs from the profile"));
     }
-    source.verify_exact(active.snapshot()).map_err(error)?;
+    source.verify_exact(active.qualification()).map_err(error)?;
     let authority_store = authority
         .local_authority_store()
         .ok_or_else(|| error("swarm graphs require a local qualified authority"))?;

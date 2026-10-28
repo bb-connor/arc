@@ -792,7 +792,7 @@ where
             ));
         }
         self.store
-            .verify_operation_owned_replay_source(authority.source_snapshot())
+            .verify_operation_owned_runtime_source(authority.source_qualification())
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         match self.prepare_request(context)? {
             preparation::HookAdmissionPreparation::Immediate(decision) if !decision.allowed => {
@@ -819,11 +819,11 @@ where
     fn revalidate_reserved_operation(
         &self,
         context: &KernelRuntimeAdmissionContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
     ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
         self.store
-            .verify_operation_owned_replay_source(source)
+            .verify_operation_owned_runtime_source(source)
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
         match self.prepare_request(context)? {
             preparation::HookAdmissionPreparation::Prepared(prepared) => {
@@ -855,7 +855,7 @@ where
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &KernelRuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         let binding = self.operation_owned_binding.as_ref().ok_or_else(|| {
             KernelError::DurableAdmission(
@@ -868,7 +868,7 @@ where
             ));
         }
         self.store
-            .verify_operation_owned_replay_source(source)
+            .verify_operation_owned_runtime_source(source)
             .map_err(|error| {
                 KernelError::DurableAdmission(format!(
                     "runtime revalidation source verification failed: {error}"
@@ -880,7 +880,7 @@ where
     fn revalidate_operation_owned_for_native_capture(
         &self,
         context: &KernelRuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         intent: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimIntentV1,
     ) -> Result<
         chio_kernel::admission_operation::runtime_participant::RuntimeDispatchValidity,

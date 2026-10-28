@@ -5,8 +5,8 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeReplaySourcePort};
-use chio_store_sqlite::{RuntimeReplayMigrationRecordV1, SqliteAuthorityStore};
+use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeSourcePort};
+use chio_store_sqlite::{RuntimeSourceRecordV1, SqliteAuthorityStore};
 
 use super::*;
 
@@ -58,10 +58,10 @@ fn real_activated_source_and_destination_survive_owner_restart_without_resealing
     let current = authority.mutation_fence();
     assert!(current.owner_epoch > fence.owner_epoch);
     assert!(store
-        .load_runtime_participant_activation(&binding, &fence, now_ms()?)
+        .load_runtime_source_qualification(&binding, &fence, now_ms()?)
         .is_err());
-    let snapshot = store.load_runtime_participant_activation(&binding, &current, now_ms()?)?;
-    source.verify_operation_owned_replay_source(&snapshot)?;
+    let snapshot = store.load_runtime_source_qualification(&binding, &current, now_ms()?)?;
+    source.verify_operation_owned_runtime_source(&snapshot)?;
     assert_eq!(snapshot, *expected.snapshot());
     assert_eq!(
         store.activate_runtime_replay_source(&binding, &source, &current, now_ms()?)?,
@@ -107,7 +107,7 @@ fn now_ms() -> TestResult<u64> {
 }
 
 fn source_binding(
-    record: &RuntimeReplayMigrationRecordV1,
+    record: &RuntimeSourceRecordV1,
 ) -> TestResult<RuntimeReplaySourceBinding> {
     Ok(RuntimeReplaySourceBinding::new(
         record.snapshot().source_id().to_owned(),
@@ -118,7 +118,7 @@ fn source_binding(
 
 fn assert_destination_history(
     raw: &Connection,
-    record: &RuntimeReplayMigrationRecordV1,
+    record: &RuntimeSourceRecordV1,
 ) -> TestResult {
     let runtime_authority = record.snapshot().runtime_authority_id();
     let expectations: i64 = raw.query_row(
@@ -234,7 +234,7 @@ fn import_exact_source_and_reopen(populated: bool) -> TestResult {
     );
     let binding = source_binding(&expected)?;
     assert!(source.load_legacy_replay_source_seal(&binding)?.is_none());
-    assert!(RuntimeReplaySourcePort::verify_exact(&source, expected.snapshot()).is_err());
+    assert!(RuntimeSourcePort::verify_exact(&source, expected.snapshot()).is_err());
     {
         let raw = Connection::open(&database)?;
         assert_destination_history(&raw, &expected)?;
@@ -261,7 +261,7 @@ fn import_exact_source_and_reopen(populated: bool) -> TestResult {
     if populated {
         assert_inventory(&seal);
     }
-    RuntimeReplaySourcePort::verify_exact(&source, imported.snapshot())?;
+    RuntimeSourcePort::verify_exact(&source, imported.snapshot())?;
     assert_all_legacy_kinds_blocked(&source);
     assert_eq!(
         store.expect_runtime_replay_source(
@@ -319,7 +319,7 @@ fn import_exact_source_and_reopen(populated: bool) -> TestResult {
         )?,
         imported,
     );
-    RuntimeReplaySourcePort::verify_exact(&reopened_source, expected.snapshot())?;
+    RuntimeSourcePort::verify_exact(&reopened_source, expected.snapshot())?;
     assert_all_legacy_kinds_blocked(&reopened_source);
     assert_destination_history(&Connection::open(&database)?, &imported)?;
     Ok(())
