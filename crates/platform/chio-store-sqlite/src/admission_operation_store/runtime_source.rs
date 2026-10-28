@@ -157,6 +157,7 @@ pub(super) fn require_active_source(
     connection: &Connection,
     runtime: &AdmissionIdentifier,
 ) -> Result<(), AdmissionOperationStoreError> {
+    verify_runtime_source_projection_coverage(connection).map_err(map_owner_error)?;
     supersession::require_active(connection, runtime.as_str())
 }
 
