@@ -5,6 +5,10 @@ use super::*;
 
 mod integrity;
 mod records;
+mod requalification;
+mod supersession;
+
+pub use requalification::RuntimeSourceRequalificationInput;
 
 pub(crate) use integrity::{
     runtime_source_projection_reference, verify_runtime_source_pristine,
@@ -81,7 +85,8 @@ impl SqliteAdmissionOperationStore {
                 }
                 return Ok(existing.clone());
             }
-            if current.len() >= MAX_SOURCES
+            if supersession::active_count(&transaction, &current).map_err(integrity_error)?
+                >= MAX_SOURCES
                 || current
                     .iter()
                     .any(|record| record.qualification.source_id() == source_id.as_str())
@@ -121,6 +126,7 @@ impl SqliteAdmissionOperationStore {
         verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
         source_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
         verify_runtime_source_projection_coverage(&transaction).map_err(map_owner_error)?;
+        supersession::require_active(&transaction, runtime_authority_id.as_str())?;
         let record = records::load_record(&transaction, runtime_authority_id.as_str())
             .map_err(integrity_error)?;
         if record.as_ref().is_some_and(|record| {
