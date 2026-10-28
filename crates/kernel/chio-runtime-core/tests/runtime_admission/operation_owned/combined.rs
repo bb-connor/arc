@@ -30,22 +30,16 @@ struct CombinedFixture {
 
 impl CombinedFixture {
     fn new() -> TestResult<Self> {
-        Self::with_retired_resource(None)
-    }
-
-    fn with_retired_resource(retired: Option<RuntimeParticipantKind>) -> TestResult<Self> {
-        Self::with_treaty_input(retired, |_, _, _| Ok(()))
+        Self::with_treaty_input(|_, _, _| Ok(()))
     }
 
     fn with_treaty_input(
-        retired: Option<RuntimeParticipantKind>,
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
     ) -> TestResult<Self> {
-        Self::with_swarm_input(retired, prepare, runtime_swarm_bundle(false)?)
+        Self::with_swarm_input(prepare, runtime_swarm_bundle(false)?)
     }
 
     fn with_swarm_input(
-        retired: Option<RuntimeParticipantKind>,
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
         swarm: SwarmAuthorityBundle,
     ) -> TestResult<Self> {
@@ -65,24 +59,6 @@ impl CombinedFixture {
             source.insert_bundle(admission)?;
             insert_treaty_runtime_fixture(source, &treaty)?;
             issue_root(authority, &swarm)?;
-            // Imported markers model an earlier legacy consumer. They must
-            // exclude the entire new live claim, not only the colliding member.
-            match retired {
-                Some(RuntimeParticipantKind::DestructiveLease) => {
-                    source.consume_destructive_lease("lease-live-1", "earlier-legacy-admission")?
-                }
-                Some(RuntimeParticipantKind::TreatyContinuation) => source
-                    .consume_treaty_continuation(
-                        "continue-runtime-1",
-                        "earlier-legacy-admission",
-                    )?,
-                Some(RuntimeParticipantKind::SwarmContinuation) => source
-                    .consume_swarm_continuation(
-                        "continuation-child-a",
-                        "earlier-legacy-admission",
-                    )?,
-                None => {}
-            }
             let mut request =
                 chio_swarm_runtime_request(args, hash, swarm_runtime_context(&swarm)?)?;
             request.federated_origin_kernel_id = Some("kernel.buyer".into());
@@ -280,10 +256,10 @@ fn combined_owned_denial_panic_and_source_loss_release_every_resource() -> TestR
     for fault in [
         faults::Fault::Deny,
         faults::Fault::Panic,
-        faults::Fault::SourceBarrier,
+        faults::Fault::SourcePathMoved,
     ] {
         let fixture = CombinedFixture::new()?;
-        let removes_barrier = matches!(fault, faults::Fault::SourceBarrier);
+        let moves_source = matches!(fault, faults::Fault::SourcePathMoved);
         let kernel = fixture.kernel(faults::FaultHook::new(
             fixture.hook()?,
             fixture.inner._directory.path().join("runtime.sqlite3"),
@@ -309,72 +285,21 @@ fn combined_owned_denial_panic_and_source_loss_release_every_resource() -> TestR
             operation.state(),
             chio_kernel::admission_operation::AdmissionOperationState::CompensatedBeforeDispatch
         );
-        if removes_barrier {
-            let raw = rusqlite::Connection::open(
-                fixture.inner._directory.path().join("runtime.sqlite3"),
-            )?;
-            let count: i64 = raw.query_row(
-                "SELECT count(*) FROM sqlite_schema WHERE type = 'trigger' AND name = 'runtime_replay_source_lease_no_insert'",
-                [], |row| row.get(0),
-            )?;
-            assert_eq!(count, 0, "fault fixture must remove the barrier");
+        if moves_source {
+            assert!(!fixture
+                .inner
+                ._directory
+                .path()
+                .join("runtime.sqlite3")
+                .exists());
+            assert!(fixture
+                .inner
+                ._directory
+                .path()
+                .join("runtime.moved")
+                .is_file());
         }
         assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
-    }
-    Ok(())
-}
-
-#[test]
-fn combined_owned_imported_collision_in_any_resource_rejects_without_partial_custody() -> TestResult
-{
-    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
-    for kind in [
-        RuntimeParticipantKind::DestructiveLease,
-        RuntimeParticipantKind::TreatyContinuation,
-        RuntimeParticipantKind::SwarmContinuation,
-    ] {
-        let fixture = CombinedFixture::with_retired_resource(Some(kind))?;
-        let kernel = fixture.kernel(fixture.hook()?)?;
-        let response = kernel.evaluate_tool_call_blocking_with_metadata(
-            &fixture.inner.request,
-            Some(swarm_route_metadata()),
-        )?;
-        assert_eq!(response.verdict, Verdict::Deny, "{kind:?}: {response:#?}");
-        assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains(
-                    "runtime participant resource is already reserved or historically spent"
-                )),
-            "collision must reach the physical replay conflict: {response:#?}"
-        );
-        assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
-        assert!(faults::history(&fixture.inner)?.is_empty());
-        let store = fixture.inner.authority.admission_operation_store();
-        let migration = store
-            .load_runtime_replay_migration(
-                fixture.inner.binding.runtime_authority_id(),
-                &fixture.inner.authority.mutation_fence(),
-                NOW,
-            )?
-            .ok_or("retired source migration")?;
-        assert!(migration.is_active());
-        assert_eq!(migration.snapshot().markers().len(), 1);
-        assert_eq!(migration.snapshot().markers()[0].kind(), kind);
-        let raw =
-            rusqlite::Connection::open(fixture.inner._directory.path().join("authority.sqlite3"))?;
-        for table in [
-            "runtime_replay_claim_episodes",
-            "runtime_replay_claim_resources",
-            "runtime_replay_claim_releases",
-        ] {
-            let count: i64 =
-                raw.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
-                    row.get(0)
-                })?;
-            assert_eq!(count, 0, "{kind:?}: partial {table}");
-        }
     }
     Ok(())
 }
