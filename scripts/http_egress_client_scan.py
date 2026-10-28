@@ -9,7 +9,10 @@ and every `use` tree form, including multi-line groups, nested groups, `self`
 renames and renames of the items themselves. A glob import from a client crate
 is refused because it hides what it binds. Paths are matched over the whole
 source, so a path split across lines or written from the crate root (`::ureq`)
-still matches, and a client function named without a call still counts.
+still matches, and a client function named without a call still counts. A
+constructor alias matches under any path prefix (`crate::`, `self::`,
+`super::`, `::`), and a qualified type path `<T>::` or `<T as Trait>::` counts
+when `T` names an agent type or an alias of one.
 
 A finding outside the kernel is accepted when one of the four lines above it
 carries the classification marker for its crate. Kernel crates take no
@@ -47,6 +50,7 @@ UNSCANNED_PACKAGES = frozenset(
 DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 USE_STATEMENT = re.compile(r"\b(pub(?:\([^)]*\))?\s+)?use\s+([^;]*);", re.S)
 EXTERN_CRATE = re.compile(r"\bextern\s+crate\s+([A-Za-z_]\w*)\s+as\s+([A-Za-z_]\w*)\s*;")
+QUALIFIED_TYPE_PATH = re.compile(r"<([^<>]*)>\s*::\s*\w+")
 TYPE_ALIAS = re.compile(r"\btype\s+([A-Za-z_]\w*)\s*(?:<[^=;]*>)?\s*=\s*([^;]+);")
 
 
@@ -200,6 +204,17 @@ def bind_names(text: str, ureq_roots: set[str], hyper_roots: set[str]):
             return constructors, findings
 
 
+def names_agent_type(qualified: str, ureq_roots: set[str], constructors: set[str]) -> bool:
+    """True when `<T>` or `<T as Trait>` names a ureq agent type or an alias of one."""
+    segments = [s.strip() for s in re.split(r"\s+as\s+", qualified, maxsplit=1)[0].split("::") if s.strip()]
+    if segments and segments[-1] in constructors:
+        return True
+    return any(
+        segment in ureq_roots and any(later in UREQ_CONSTRUCTORS for later in segments[index + 1 :])
+        for index, segment in enumerate(segments)
+    )
+
+
 def scan_file(rel: str, raw: str, roots: dict[str, set[str]]) -> list[tuple[int, str]]:
     text = lexer.blank_rust_noise(raw)
     ureq_roots = set(roots["ureq"])
@@ -217,13 +232,16 @@ def scan_file(rel: str, raw: str, roots: dict[str, set[str]]) -> list[tuple[int,
         ("hyper", re.compile(r"(?<!\w)(?:" + alternation(hyper_roots) + r")\s*::\s*client\b")),
     ]
     if constructors:
-        patterns.append(("ureq", re.compile(r"(?<![\w:])(?:" + alternation(constructors) + r")\s*::\s*\w+")))
+        patterns.append(("ureq", re.compile(r"(?<!\w)(?:" + alternation(constructors) + r")\s*::\s*\w+")))
     in_kernel = rel.startswith(KERNEL_ROOT)
     if in_kernel:
         patterns.append(("kernel", re.compile(r"(?<!\w)(?:" + alternation(ureq_roots) + r")\b")))
     for family, pattern in patterns:
         for match in pattern.finditer(text):
             found.add((match.start(), family))
+    for match in QUALIFIED_TYPE_PATH.finditer(text):
+        if names_agent_type(match.group(1), ureq_roots, constructors):
+            found.add((match.start(), "ureq"))
     raw_lines = raw.split("\n")
     result = set()
     for offset, family in found:
