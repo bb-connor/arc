@@ -59,6 +59,7 @@ REAL_KEY_CRATES = (
     "crates/protocol/chio-mcp-edge/",
     "crates/protocol/chio-mcp-remote/",
     "crates/security/chio-secret-broker/",
+    "crates/tooling/chio-bundle-verify/",
     "crates/trust/chio-credentials/",
     "crates/trust/chio-federation/",
     "crates/trust/chio-reputation/",
