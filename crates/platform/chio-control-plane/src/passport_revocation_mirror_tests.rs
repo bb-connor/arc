@@ -5,6 +5,7 @@ use chio_core::Keypair;
 use chio_revocation_oracle::{
     credential_revocation_key, passport_revocation_key, EpochRoot, PassportRevocationLeaf,
     PassportRevocationLeafKind, RevocationKey, SignedEpochRoot, SqliteRevocationOracle,
+    MAX_REVOCATION_SUBJECT_BYTES,
 };
 use chio_security_types::clock::FixedClock;
 
@@ -966,5 +967,68 @@ fn a_full_page_past_the_offered_root_stages_only_the_leaves_up_to_it() -> TestRe
     );
     b.commit(&partner(), staged, &FixedClock::from_millis(10_000))?;
     assert_eq!(accepted(&b)?.root.leaf_count, 3);
+    Ok(())
+}
+
+#[test]
+fn a_page_with_an_oversized_subject_is_refused_while_staging() -> TestResult {
+    let a = Publisher::new()?;
+    a.revoke(passport_revocation_key("passport-a"), 9_000)?;
+    let dir = tempfile::tempdir()?;
+    let b = mirror(dir.path())?;
+    let mut oversized = a.source(10_000);
+    oversized.leaves_override = Some(vec![leaf(1, &"x".repeat(MAX_REVOCATION_SUBJECT_BYTES + 1))]);
+    assert_eq!(
+        b.stage(&partner(), &mut oversized)
+            .map(|staged| staged.leaves().len()),
+        Err(PartnerRevocationError::MalformedPage(
+            PARTNER.to_owned(),
+            "leaf subject exceeds the revocation subject bound".to_owned()
+        ))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_check_overlapping_syncs_reads_one_committed_state() -> TestResult {
+    const ROUNDS: u64 = 300;
+    let a = Publisher::new()?;
+    a.revoke(passport_revocation_key("passport-0"), 9_000)?;
+    let dir = tempfile::tempdir()?;
+    let syncer = mirror(dir.path())?;
+    syncer.sync(
+        &partner(),
+        &mut a.source(10_000),
+        &FixedClock::from_millis(10_000),
+    )?;
+    let checker = mirror(dir.path())?;
+    let done = std::sync::atomic::AtomicBool::new(false);
+    let checked = std::thread::scope(|scope| {
+        let writer = scope.spawn(|| {
+            let outcome = (1..=ROUNDS).try_for_each(|round| {
+                let at = 10_000 + round;
+                a.revoke(passport_revocation_key(&format!("passport-{round}")), at)
+                    .map_err(|error| error.to_string())?;
+                syncer
+                    .sync(&partner(), &mut a.source(at), &FixedClock::from_millis(at))
+                    .map(|_| ())
+                    .map_err(|error| error.to_string())
+            });
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+            outcome
+        });
+        let mut checks = Vec::new();
+        while !done.load(std::sync::atomic::Ordering::SeqCst) {
+            checks.push(checker.check_passport(
+                &partner(),
+                &passport("passport-unrelated"),
+                10_000 + ROUNDS,
+            ));
+        }
+        (writer.join(), checks)
+    });
+    let (writer, checks) = checked;
+    assert_eq!(writer.map_err(|_| "writer panicked")?, Ok(()));
+    assert_eq!(checks.iter().find(|check| check.is_err()), None);
     Ok(())
 }

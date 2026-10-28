@@ -206,6 +206,18 @@ impl SqliteRevocationOracle {
         body(&connection)
     }
 
+    /// Runs `body` against the connection and the tree inside one read
+    /// transaction, so owner state the body reads and the tree describe one
+    /// committed state.
+    pub fn read_with_tree<T>(
+        &self,
+        body: impl FnOnce(&Connection, &InMemoryRevocationOracle) -> Result<T>,
+    ) -> Result<T> {
+        let tree = self.current()?;
+        let connection = self.lock_connection()?;
+        body(&connection, &tree)
+    }
+
     /// Revokes `key`, or returns [`RevocationOracleError::AlreadyRevoked`].
     pub fn revoke(&self, key: RevocationKey, now_unix_ms: u64) -> Result<EpochRoot> {
         let (inserted, root) = self.transact(now_unix_ms, |txn| txn.revoke(&key))?;

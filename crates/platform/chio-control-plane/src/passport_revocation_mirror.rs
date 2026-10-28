@@ -19,7 +19,8 @@ use std::sync::{Arc, Mutex};
 
 use chio_revocation_oracle::{
     verify_fresh_epoch_root, EpochRoot, FreshnessConfig, PassportRevocationLeaf, RevocationKey,
-    RevocationOracleError, SignedEpochRoot, SqliteRevocationOracle, SqliteRevocationOracleError,
+    RevocationOracle, RevocationOracleError, SignedEpochRoot, SqliteRevocationOracle,
+    SqliteRevocationOracleError,
 };
 use chio_security_types::clock::Clock;
 use rusqlite::{params, OptionalExtension};
@@ -262,8 +263,34 @@ impl PartnerRevocationMirror {
         partner: &RevocationPartner,
         now_unix_ms: u64,
     ) -> Result<SignedEpochRoot, PartnerRevocationError> {
-        let accepted = self
-            .accepted()?
+        self.fresh_view(partner, &[], now_unix_ms)
+            .map(|(accepted, _)| accepted)
+    }
+
+    /// Reads the accepted root, the mirror tree's root and the first of
+    /// `subjects` the tree holds, then requires that accepted root to verify
+    /// against `partner`'s pinned key, be fresh at `now_unix_ms` and equal the
+    /// tree.
+    fn fresh_view(
+        &self,
+        partner: &RevocationPartner,
+        subjects: &[RevocationKey],
+        now_unix_ms: u64,
+    ) -> Result<(SignedEpochRoot, Option<RevocationKey>), PartnerRevocationError> {
+        let (accepted, local, revoked) = self
+            .oracle
+            .read_with_tree(|connection, tree| {
+                Ok((
+                    read_accepted(connection)?,
+                    tree.epoch_root(),
+                    subjects
+                        .iter()
+                        .find(|subject| tree.contains(subject))
+                        .cloned(),
+                ))
+            })
+            .map_err(mirror_unavailable(&self.partner_id))?;
+        let accepted = accepted
             .ok_or_else(|| PartnerRevocationError::NoVerifiedRoot(self.partner_id.clone()))?;
         verify_signature(partner, &accepted)?;
         let root = &accepted.root;
@@ -277,14 +304,10 @@ impl PartnerRevocationMirror {
                 ttl_ms: partner.revocation_freshness_ttl_ms(),
             },
         )?;
-        let local = self
-            .oracle
-            .current_epoch_root()
-            .map_err(mirror_unavailable(&self.partner_id))?;
         if !same_tree(&local, root) {
             return Err(diverged(&self.partner_id));
         }
-        Ok(accepted)
+        Ok((accepted, revoked))
     }
 
     /// Refuses unless the mirror is fresh at `now_unix_ms` and holds none of
@@ -295,18 +318,12 @@ impl PartnerRevocationMirror {
         subjects: &[RevocationKey],
         now_unix_ms: u64,
     ) -> Result<(), PartnerRevocationError> {
-        self.require_fresh(partner, now_unix_ms)?;
-        for subject in subjects {
-            let revoked = self
-                .oracle
-                .is_revoked(subject)
-                .map_err(mirror_unavailable(&self.partner_id))?;
-            if revoked {
-                return Err(PartnerRevocationError::Revoked {
-                    partner_id: self.partner_id.clone(),
-                    subject: subject.subject_id.as_str().to_owned(),
-                });
-            }
+        let (_, revoked) = self.fresh_view(partner, subjects, now_unix_ms)?;
+        if let Some(subject) = revoked {
+            return Err(PartnerRevocationError::Revoked {
+                partner_id: self.partner_id.clone(),
+                subject: subject.subject_id.as_str().to_owned(),
+            });
         }
         Ok(())
     }
