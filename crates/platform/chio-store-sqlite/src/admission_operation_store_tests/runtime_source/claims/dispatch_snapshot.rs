@@ -5,7 +5,7 @@ use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantDis
 #[test]
 fn native_runtime_ledger_snapshot_retains_exact_claim_after_release() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (initial, lease) = setup(&fixture, "runtime-ledger-snapshot")?;
     let intent = intent(&initial, &source, "claim", &[])?;
     let (operation, reference) =

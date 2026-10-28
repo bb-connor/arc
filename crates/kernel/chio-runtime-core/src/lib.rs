@@ -41,7 +41,6 @@ mod ops;
 mod orchestration;
 mod pheromone_policy;
 pub mod program;
-mod replay_source;
 mod schema;
 mod serde_io;
 mod store;
@@ -51,12 +50,11 @@ mod validation;
 #[cfg(feature = "work")]
 pub mod work;
 
+pub use admission::RuntimeAdmissionInput;
 pub(crate) use admission::{
-    commit_prepared_runtime_admission, prepare_runtime_admission_from_bundle, trust_floor_identity,
+    prepare_runtime_admission_from_bundle, trust_floor_identity,
     validate_runtime_trust_floor_transition, PreparedRuntimeAdmission, RuntimeAdmissionPreparation,
-    RuntimeAdmissionReservationTracker,
 };
-pub use admission::{evaluate_runtime_admission, RuntimeAdmissionInput};
 pub use admission_hook::ChioRuntimeAdmissionHook;
 pub use buyer::{
     verify_buyer_attestation_packet, verify_buyer_attestation_review_package,
@@ -83,10 +81,7 @@ pub use orchestration::{
     validate_runtime_orchestration_evidence_integrity, RuntimeOrchestrationEvidence,
     RuntimeOrchestrationEvidenceFailure,
 };
-pub use replay_source::{
-    RuntimeReplayMarker, RuntimeReplayMarkerKind, RuntimeReplaySourceBinding,
-    RuntimeReplaySourceSeal, MAX_RUNTIME_REPLAY_SOURCE_BYTES, MAX_RUNTIME_REPLAY_SOURCE_MARKERS,
-};
+
 pub use schema::{
     CHIO_ATTEST_BUYER_ATTESTATION_PACKET_SCHEMA,
     CHIO_ATTEST_BUYER_ATTESTATION_REVIEW_PACKAGE_SCHEMA,

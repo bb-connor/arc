@@ -1,7 +1,6 @@
 #![cfg(unix)]
 
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
 use chio_kernel::admission_operation::{
@@ -19,16 +18,14 @@ fn fresh_operation_owned_source_qualification_has_no_retired_replay_namespace(
     let locks = directory.path().join("locks");
     std::fs::DirBuilder::new().mode(0o700).create(&locks)?;
     SqliteAuthorityStore::provision(&database, &locks)?;
-    let authority = SqliteAuthorityStore::open_serving_with_clock(
-        &database,
-        &locks,
-        chio_test_support::clock::clock(),
-    )?;
+    let clock = chio_test_support::clock::clock();
+    let authority =
+        SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
     let source_path = directory.path().join("runtime.sqlite3");
     let source = SqliteRuntimeOrchestrationStore::open(&source_path)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();
-    let now = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
+    let now = clock.unix_millis()?.get();
     let runtime = AdmissionIdentifier::try_new("runtime", "fresh-runtime")?;
     let installed = store.install_runtime_source(
         &AdmissionIdentifier::try_new("source", "fresh-source")?,
