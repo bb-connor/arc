@@ -13,8 +13,8 @@ use chio_runtime::{
     CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
 };
 
-#[path = "runtime_boundary/replay_source.rs"]
-mod replay_source;
+#[path = "runtime_boundary/source_qualification.rs"]
+mod source_qualification;
 
 #[test]
 fn runtime_facade_exposes_chio_trust_floor_schema_and_runtime_types() {

@@ -3,7 +3,7 @@
 
 use super::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationId, AdmissionOperationStoreError,
-    RuntimeReplayParticipantKind,
+    RuntimeParticipantKind,
 };
 use serde::{Deserialize, Serialize};
 
@@ -156,14 +156,14 @@ impl RuntimeParticipantClaimEvidenceV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeParticipantResourceV1 {
-    kind: RuntimeReplayParticipantKind,
+    kind: RuntimeParticipantKind,
     resource_id: AdmissionIdentifier,
     artifact_digest: AdmissionDigest,
 }
 
 impl RuntimeParticipantResourceV1 {
     pub fn new(
-        kind: RuntimeReplayParticipantKind,
+        kind: RuntimeParticipantKind,
         resource_id: AdmissionIdentifier,
         artifact_digest: AdmissionDigest,
     ) -> Self {
@@ -174,7 +174,7 @@ impl RuntimeParticipantResourceV1 {
         }
     }
 
-    pub fn kind(&self) -> RuntimeReplayParticipantKind {
+    pub fn kind(&self) -> RuntimeParticipantKind {
         self.kind
     }
 
