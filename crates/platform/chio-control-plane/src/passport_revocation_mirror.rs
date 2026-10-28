@@ -131,6 +131,20 @@ pub trait PartnerRevocationSource {
     ) -> Result<PassportRevocationLeavesPage, PartnerRevocationError>;
 }
 
+/// A partner's signed root and the leaves a mirror lacks, fetched and checked
+/// page by page but not yet applied.
+#[derive(Debug)]
+pub struct StagedPartnerSync {
+    offered: SignedEpochRoot,
+    leaves: Vec<PassportRevocationLeaf>,
+}
+
+impl StagedPartnerSync {
+    pub fn leaves(&self) -> &[PassportRevocationLeaf] {
+        &self.leaves
+    }
+}
+
 /// The mirror of `partner_id` kept beside the revocation partner registry at
 /// `registry`: `<registry file name>.partner-<partner_id>.revocations.sqlite3`.
 pub fn partner_revocation_mirror_path(
@@ -295,14 +309,25 @@ impl PartnerRevocationMirror {
         Ok(())
     }
 
-    /// Fetches the partner's signed root and the leaves the mirror lacks from
-    /// `source`, then applies them at the time `clock` reads after the fetch.
+    /// Stages the partner's feed from `source`, then commits it at the time
+    /// `clock` reads after the fetch.
     pub fn sync(
         &self,
         partner: &RevocationPartner,
         source: &mut dyn PartnerRevocationSource,
         clock: &dyn Clock,
     ) -> Result<EpochRoot, PartnerRevocationError> {
+        let staged = self.stage(partner, source)?;
+        self.commit(partner, staged, clock)
+    }
+
+    /// Fetches the partner's signed root and the leaves the mirror lacks from
+    /// `source`. Nothing is written.
+    pub fn stage(
+        &self,
+        partner: &RevocationPartner,
+        source: &mut dyn PartnerRevocationSource,
+    ) -> Result<StagedPartnerSync, PartnerRevocationError> {
         let offered = source.signed_root()?;
         verify_signature(partner, &offered)?;
         let have = self
@@ -323,11 +348,21 @@ impl PartnerRevocationMirror {
             after = page.leaves.last().map_or(after, |leaf| leaf.seq);
             leaves.extend(page.leaves);
         }
+        Ok(StagedPartnerSync { offered, leaves })
+    }
+
+    /// Applies `staged` at the time `clock` reads now.
+    pub fn commit(
+        &self,
+        partner: &RevocationPartner,
+        staged: StagedPartnerSync,
+        clock: &dyn Clock,
+    ) -> Result<EpochRoot, PartnerRevocationError> {
         let now = clock
             .unix_millis()
             .map_err(|error| PartnerRevocationError::Clock(error.to_string()))?
             .get();
-        self.apply(partner, &offered, &leaves, now)
+        self.apply(partner, &staged.offered, &staged.leaves, now)
     }
 
     /// Applies `leaves`, each as the mirror's next leaf, and commits `offered`

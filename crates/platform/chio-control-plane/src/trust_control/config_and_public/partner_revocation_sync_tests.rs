@@ -14,15 +14,22 @@ use chio_security_types::clock::FixedClock;
 use super::super::portable_issuer_fetch::{
     build_portable_fetch_agent, PortableFetchDeadline, PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT,
 };
-use super::{sync_partner_revocation_mirror, PartnerRevocationFeed};
+use super::{sync_partner_revocation_mirror, sync_within, PartnerRevocationFeed};
+use crate::bounded_worker_pool::tests::{drain, single_worker_pool};
+use crate::passport_revocation::passport_revocation_oracle_path;
+use crate::passport_revocation_feed::{
+    passport_revocation_leaves_page, sign_passport_revocation_root,
+};
 use crate::passport_revocation_feed::{
     passport_revocation_root_signer_id, PassportRevocationFeedError, PassportRevocationLeavesPage,
     PassportRevocationRootDocument, PASSPORT_REVOCATION_LEAVES_SCHEMA,
 };
+use crate::passport_revocation_mirror::PartnerRevocationSource;
 use crate::passport_revocation_mirror::{
     partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
 };
 use crate::revocation_partner::RevocationPartner;
+use chio_revocation_oracle::{passport_revocation_key, SqliteRevocationOracle};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 type Fallible<T> = Result<T, Box<dyn std::error::Error>>;
@@ -279,5 +286,98 @@ fn the_strict_transport_refuses_a_loopback_partner_before_any_fetch() -> TestRes
         Err(std::io::ErrorKind::WouldBlock)
     );
     assert_eq!(mirror.mirror.accepted()?, None);
+    Ok(())
+}
+
+/// One partner feed with one revoked passport, served from memory.
+#[derive(Clone)]
+struct OnePassportFeed {
+    root: SignedEpochRoot,
+    page: PassportRevocationLeavesPage,
+}
+
+impl OnePassportFeed {
+    fn new() -> Fallible<Self> {
+        let dir = tempfile::tempdir()?;
+        let registry = dir.path().join("a-passport-statuses.json");
+        let oracle = SqliteRevocationOracle::open(&passport_revocation_oracle_path(&registry)?)?;
+        oracle.revoke(passport_revocation_key("passport-1"), NOW_MS)?;
+        Ok(Self {
+            root: sign_passport_revocation_root(&oracle, &registry, authority(), NOW_MS)?,
+            page: passport_revocation_leaves_page(&oracle, &registry, 0)?,
+        })
+    }
+}
+
+impl PartnerRevocationSource for OnePassportFeed {
+    fn signed_root(&mut self) -> Result<SignedEpochRoot, PartnerRevocationError> {
+        Ok(self.root.clone())
+    }
+
+    fn leaves_after(
+        &mut self,
+        _after: u64,
+    ) -> Result<PassportRevocationLeavesPage, PartnerRevocationError> {
+        Ok(self.page.clone())
+    }
+}
+
+fn deadline_in(left: Duration) -> Fallible<PortableFetchDeadline> {
+    Ok(PortableFetchDeadline::starting_at(
+        Instant::now()
+            .checked_sub(PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT - left)
+            .ok_or("monotonic clock too young for the deadline fixture")?,
+    )?)
+}
+
+#[test]
+fn a_sync_abandoned_at_its_deadline_never_commits() -> TestResult {
+    let feed = OnePassportFeed::new()?;
+    let mirror = mirror()?;
+    let partner = revocation_partner("https://trust.acme.example");
+    let clock: Arc<dyn chio_security_types::clock::Clock> =
+        Arc::new(FixedClock::from_millis(NOW_MS));
+    let pool = single_worker_pool();
+    let (staged_tx, staged_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let mut late = feed.clone();
+    let refused = sync_within(
+        &pool,
+        deadline_in(Duration::from_millis(200))?,
+        Arc::clone(&mirror.mirror),
+        partner.clone(),
+        Arc::clone(&clock),
+        move |mirror, partner, _deadline| {
+            let staged = mirror.stage(partner, &mut late)?;
+            let _sent = staged_tx.send(());
+            let _released = release_rx.recv();
+            Ok(staged)
+        },
+    )
+    .err()
+    .ok_or("a sync past its deadline must refuse")?;
+    assert!(
+        matches!(&refused, PartnerRevocationError::Fetch(partner_id, _) if partner_id == PARTNER),
+        "{refused}"
+    );
+    staged_rx.recv()?;
+    release_tx.send(())?;
+    drain(&pool);
+    assert_eq!(mirror.mirror.accepted()?, None);
+
+    let mut timely = feed.clone();
+    let root = sync_within(
+        &pool,
+        PortableFetchDeadline::start()?,
+        Arc::clone(&mirror.mirror),
+        partner,
+        clock,
+        move |mirror, partner, _deadline| mirror.stage(partner, &mut timely),
+    )?;
+    assert_eq!(root, feed.root.root);
+    assert_eq!(
+        mirror.mirror.accepted()?.map(|accepted| accepted.root),
+        Some(feed.root.root)
+    );
     Ok(())
 }

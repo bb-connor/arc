@@ -907,3 +907,64 @@ fn a_cached_mirror_handle_is_reused_across_syncs_and_dropped_when_the_registry_f
     assert_eq!(relocated.accepted()?, None);
     Ok(())
 }
+
+/// Serves a fixed signed root and fixed pages keyed by their cursor.
+struct FixedPages {
+    root: SignedEpochRoot,
+    pages: Vec<PassportRevocationLeavesPage>,
+}
+
+impl PartnerRevocationSource for FixedPages {
+    fn signed_root(&mut self) -> Result<SignedEpochRoot, PartnerRevocationError> {
+        Ok(self.root.clone())
+    }
+
+    fn leaves_after(
+        &mut self,
+        after: u64,
+    ) -> Result<PassportRevocationLeavesPage, PartnerRevocationError> {
+        self.pages
+            .iter()
+            .find(|page| page.after == after)
+            .cloned()
+            .ok_or_else(|| PartnerRevocationError::TruncatedLeaves(PARTNER.to_owned()))
+    }
+}
+
+#[test]
+fn a_full_page_past_the_offered_root_stages_only_the_leaves_up_to_it() -> TestResult {
+    let a = Publisher::new()?;
+    for subject in ["passport-1", "passport-2", "passport-3"] {
+        a.revoke(passport_revocation_key(subject), 9_000)?;
+    }
+    let dir = tempfile::tempdir()?;
+    let b = mirror(dir.path())?;
+    let page = |after: u64, leaves: Vec<PassportRevocationLeaf>| PassportRevocationLeavesPage {
+        schema: PASSPORT_REVOCATION_LEAVES_SCHEMA.to_owned(),
+        after,
+        leaves,
+    };
+    let full_page_after_one = (2..)
+        .take(MAX_PASSPORT_REVOCATION_PAGE_LEAVES)
+        .map(|seq| leaf(seq, &format!("passport-{seq}")))
+        .collect();
+    let mut source = FixedPages {
+        root: a.signed(10_000)?,
+        pages: vec![
+            page(0, vec![leaf(1, "passport-1")]),
+            page(1, full_page_after_one),
+        ],
+    };
+    let staged = b.stage(&partner(), &mut source)?;
+    assert_eq!(
+        staged.leaves(),
+        &[
+            leaf(1, "passport-1"),
+            leaf(2, "passport-2"),
+            leaf(3, "passport-3")
+        ][..]
+    );
+    b.commit(&partner(), staged, &FixedClock::from_millis(10_000))?;
+    assert_eq!(accepted(&b)?.root.leaf_count, 3);
+    Ok(())
+}

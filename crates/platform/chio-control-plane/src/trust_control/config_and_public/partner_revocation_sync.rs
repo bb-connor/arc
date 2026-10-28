@@ -9,12 +9,13 @@ use super::*;
 use chio_egress_contract::HttpEgressContract;
 use chio_revocation_oracle::{EpochRoot, SignedEpochRoot};
 
+use crate::bounded_worker_pool::BoundedWorkerPool;
 use crate::passport_revocation_feed::{
     PassportRevocationLeavesPage, PassportRevocationRootDocument,
     MAX_PASSPORT_REVOCATION_PAGE_BYTES,
 };
 use crate::passport_revocation_mirror::{
-    PartnerRevocationError, PartnerRevocationMirror, PartnerRevocationSource,
+    PartnerRevocationError, PartnerRevocationMirror, PartnerRevocationSource, StagedPartnerSync,
 };
 use crate::revocation_partner::RevocationPartner;
 
@@ -124,27 +125,49 @@ pub fn sync_partner_revocation_mirror(
     partner: RevocationPartner,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<EpochRoot, PartnerRevocationError> {
-    let partner_id = partner.partner_id.clone();
-    let fetch_error =
-        |error: CliError| PartnerRevocationError::Fetch(partner_id.clone(), error.to_string());
-    let deadline = PortableFetchDeadline::start().map_err(fetch_error)?;
-    let outcome = run_portable_fetch(&PORTABLE_ISSUER_FETCH_POOL, deadline, move |deadline| {
-        Ok(sync_over_strict_transport(
-            &mirror,
-            &partner,
-            clock.as_ref(),
-            deadline,
-        ))
-    });
-    outcome.map_err(fetch_error)?
+    let deadline = PortableFetchDeadline::start().map_err(|error| {
+        PartnerRevocationError::Fetch(partner.partner_id.clone(), error.to_string())
+    })?;
+    sync_within(
+        &PORTABLE_ISSUER_FETCH_POOL,
+        deadline,
+        mirror,
+        partner,
+        clock,
+        stage_over_strict_transport,
+    )
 }
 
-fn sync_over_strict_transport(
+fn sync_within<S>(
+    pool: &BoundedWorkerPool,
+    deadline: PortableFetchDeadline,
+    mirror: Arc<PartnerRevocationMirror>,
+    partner: RevocationPartner,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+    stage: S,
+) -> Result<EpochRoot, PartnerRevocationError>
+where
+    S: FnOnce(
+            &PartnerRevocationMirror,
+            &RevocationPartner,
+            PortableFetchDeadline,
+        ) -> Result<StagedPartnerSync, PartnerRevocationError>
+        + Send
+        + 'static,
+{
+    let partner_id = partner.partner_id.clone();
+    let outcome = run_portable_fetch(pool, deadline, move |deadline| {
+        Ok(stage(&mirror, &partner, deadline)
+            .and_then(|staged| mirror.commit(&partner, staged, clock.as_ref())))
+    });
+    outcome.map_err(|error| PartnerRevocationError::Fetch(partner_id, error.to_string()))?
+}
+
+fn stage_over_strict_transport(
     mirror: &PartnerRevocationMirror,
     partner: &RevocationPartner,
-    clock: &dyn chio_security_types::clock::Clock,
     deadline: PortableFetchDeadline,
-) -> Result<EpochRoot, PartnerRevocationError> {
+) -> Result<StagedPartnerSync, PartnerRevocationError> {
     let fetch_error = |error: CliError| {
         PartnerRevocationError::Fetch(partner.partner_id.clone(), error.to_string())
     };
@@ -154,7 +177,7 @@ fn sync_over_strict_transport(
     let agent = build_portable_fetch_agent(pinned, true, &deadline).map_err(fetch_error)?;
     let mut feed =
         PartnerRevocationFeed::new(&partner.partner_id, &partner.issuer, agent, deadline);
-    mirror.sync(partner, &mut feed, clock)
+    mirror.stage(partner, &mut feed)
 }
 
 #[cfg(test)]
