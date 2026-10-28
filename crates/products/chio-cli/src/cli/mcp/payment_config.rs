@@ -167,13 +167,27 @@ pub fn durable_replay_db_path(path: &str) -> Result<&str, X402ReplayStorePathErr
     Ok(path)
 }
 
-/// SQLite opens a private temporary database for an empty URI filename.
+/// SQLite opens a private temporary database for an empty URI filename,
+/// including `file://` and `file://localhost` with no path, and refuses any
+/// URI authority other than empty or `localhost`.
 fn names_a_temporary_database(path: &str) -> bool {
-    path.strip_prefix("file:").is_some_and(|uri| {
-        uri.split(['?', '#'])
-            .next()
-            .is_none_or(|name| name.is_empty())
-    })
+    let Some(uri) = path.strip_prefix("file:") else {
+        return false;
+    };
+    let uri = uri.split(['?', '#']).next().unwrap_or_default();
+    let name = match uri.strip_prefix("//") {
+        Some(authority_and_path) => {
+            let (authority, name) = authority_and_path
+                .split_once('/')
+                .unwrap_or((authority_and_path, ""));
+            if !authority.is_empty() && !authority.eq_ignore_ascii_case("localhost") {
+                return true;
+            }
+            name
+        }
+        None => uri,
+    };
+    name.is_empty()
 }
 
 #[cfg(test)]
