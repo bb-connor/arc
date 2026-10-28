@@ -348,7 +348,8 @@ pub(crate) fn parse_checkpoint_signed_columns(
         )));
     }
 
-    chio_kernel::checkpoint::validate_checkpoint(&checkpoint)
+    checkpoint
+        .verify_integrity_embedded_key()
         .map_err(checkpoint_error_to_receipt_store)?;
 
     Ok(checkpoint)
@@ -682,7 +683,7 @@ fn verify_checkpoint_chain_integrity_with_frontier_at_watermark(
         }
         expected_publication_ids.insert(row.checkpoint_seq);
         if let Some(predecessor) = latest.as_ref() {
-            chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
+            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, &checkpoint)
                 .map_err(checkpoint_error_to_receipt_store)?;
         } else {
             validate_checkpoint_base(&checkpoint)?;
@@ -1051,8 +1052,8 @@ pub(crate) fn latest_checkpoint_is_chain_connected(
         )));
     };
     let predecessor = parse_persisted_checkpoint_row(predecessor_row)?;
-    chio_kernel::checkpoint::validate_checkpoint_predecessor(&predecessor, checkpoint)
-        .map_err(checkpoint_error_to_receipt_store)
+    chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(&predecessor, checkpoint)
+    .map_err(checkpoint_error_to_receipt_store)
 }
 
 pub(crate) fn validate_checkpoint_against_claim_log(
@@ -1238,11 +1239,12 @@ pub(crate) fn insert_checkpoint_incremental_tx(
     predecessor: Option<&KernelCheckpoint>,
     checkpoint: &KernelCheckpoint,
 ) -> Result<KernelCheckpoint, ReceiptStoreError> {
-    chio_kernel::checkpoint::validate_checkpoint(checkpoint)
+    checkpoint
+        .verify_integrity_embedded_key()
         .map_err(checkpoint_error_to_receipt_store)?;
     match predecessor {
         Some(predecessor) => {
-            chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, checkpoint)
+            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, checkpoint)
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "checkpoint predecessor continuity violation: {error}"
@@ -1304,10 +1306,7 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         if existing_checkpoint != *checkpoint {
             match predecessor {
                 Some(predecessor) => {
-                    chio_kernel::checkpoint::validate_checkpoint_predecessor(
-                        predecessor,
-                        &existing_checkpoint,
-                    )
+                    chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, &existing_checkpoint)
                     .map_err(|error| {
                         ReceiptStoreError::Conflict(format!(
                             "checkpoint {} already exists with a divergent predecessor linkage: {error}",
@@ -1367,7 +1366,8 @@ fn store_kernel_checkpoint_tx(
     tx: &Connection,
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), ReceiptStoreError> {
-    chio_kernel::checkpoint::validate_checkpoint(checkpoint)
+    checkpoint
+        .verify_integrity_embedded_key()
         .map_err(checkpoint_error_to_receipt_store)?;
 
     if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {
@@ -1412,7 +1412,10 @@ fn expected_checkpoint_projection_rows(
     ),
     ReceiptStoreError,
 > {
-    let publication = chio_kernel::checkpoint::build_checkpoint_publication(checkpoint)
+    let publication = chio_kernel::checkpoint::build_checkpoint_publication(
+        checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
         .map_err(checkpoint_error_to_receipt_store)?;
     let head = CheckpointTreeHeadProjectionRow {
         checkpoint_seq: row.checkpoint_seq,

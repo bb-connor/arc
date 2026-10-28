@@ -1160,13 +1160,17 @@ pub fn cmd_evidence_verify(
         Some(summary) => chio_kernel::checkpoint::verify_checkpoint_transparency_records(
             &package.bundle.checkpoints,
             summary,
+            verification.trusted_kernel_keys(),
         )
         .map_err(|error| {
             CliError::attest_error(format!(
                 "checkpoint transparency verification failed: {error}"
             ))
         })?,
-        None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
+        None => validate_checkpoint_transparency_summary(
+            &package.bundle.checkpoints,
+            verification.trusted_kernel_keys(),
+        )?,
     };
     let claim_boundary = verification.claims(&package.bundle, &transparency)?;
 

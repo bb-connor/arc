@@ -476,9 +476,10 @@ impl FindingVerifiedFixDraft {
         chio_finding_verifier::verify_checkpoint_membership(
             &resolved,
             std::slice::from_ref(&self.evidence_checkpoint),
-            &chio_kernel::checkpoint::build_checkpoint_transparency(std::slice::from_ref(
-                &self.evidence_checkpoint,
-            ))
+            &chio_kernel::checkpoint::build_checkpoint_transparency(
+                std::slice::from_ref(&self.evidence_checkpoint),
+                &pinned_checkpoint_signers(&self.verifier_profile.body),
+            )
             .map_err(string_error)?,
             &self.verifier_profile.body,
             &self.finding.evidence_checkpoint_ref,
@@ -558,9 +559,10 @@ impl FindingVerifiedFixDraft {
         let evidence = FindingEvidenceBundle {
             receipts: resolved,
             checkpoints: vec![self.evidence_checkpoint.clone()],
-            checkpoint_transparency: build_checkpoint_transparency(std::slice::from_ref(
-                &self.evidence_checkpoint,
-            ))
+            checkpoint_transparency: build_checkpoint_transparency(
+                std::slice::from_ref(&self.evidence_checkpoint),
+                &pinned_checkpoint_signers(&self.verifier_profile.body),
+            )
             .map_err(string_error)?,
             finding_delivery: None,
             recipe_preimage: Some(&recipe),
@@ -724,9 +726,10 @@ impl FindingOperatorProofBundle {
         let evidence = FindingEvidenceBundle {
             receipts: resolved,
             checkpoints: vec![self.evidence_checkpoint.clone()],
-            checkpoint_transparency: build_checkpoint_transparency(std::slice::from_ref(
-                &self.evidence_checkpoint,
-            ))
+            checkpoint_transparency: build_checkpoint_transparency(
+                std::slice::from_ref(&self.evidence_checkpoint),
+                &pinned_checkpoint_signers(&self.bundle.verifier_profile.body),
+            )
             .map_err(string_error)?,
             finding_delivery: None,
             recipe_preimage: Some(&recipe),
@@ -1679,6 +1682,17 @@ fn decode_bounded(encoded: &str, max_bytes: usize, label: &'static str) -> Resul
         return Err(format!("{label} is not canonical bounded base64"));
     }
     Ok(bytes)
+}
+
+
+fn pinned_checkpoint_signers(
+    profile: &chio_finding::FindingChallengeVerifierProfile,
+) -> Vec<chio_core::PublicKey> {
+    profile
+        .checkpoint_logs
+        .iter()
+        .map(|log| log.signer.key.clone())
+        .collect()
 }
 
 fn string_error(error: impl std::fmt::Display) -> String {

@@ -222,9 +222,10 @@ pub(super) fn verify_child_receipts(
     Ok(())
 }
 
-pub(super) fn verify_checkpoints(
-    checkpoints: &[KernelCheckpoint],
-) -> Result<BTreeMap<u64, &KernelCheckpoint>, CliError> {
+pub(super) fn verify_checkpoints<'a>(
+    checkpoints: &'a [KernelCheckpoint],
+    trusted_kernel_keys: &[PublicKey],
+) -> Result<BTreeMap<u64, &'a KernelCheckpoint>, CliError> {
     let mut by_seq = BTreeMap::<u64, &KernelCheckpoint>::new();
     for checkpoint in checkpoints {
         if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
@@ -233,7 +234,7 @@ pub(super) fn verify_checkpoints(
                 checkpoint.body.schema
             )));
         }
-        if !verify_checkpoint_signature(checkpoint)? {
+        if !verify_checkpoint_signature(checkpoint, trusted_kernel_keys)? {
             return Err(CliError::attest_error(format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
@@ -287,8 +288,9 @@ pub(super) fn verify_lineage(
 
 pub(super) fn validate_checkpoint_transparency_summary(
     checkpoints: &[KernelCheckpoint],
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, CliError> {
-    validate_checkpoint_transparency(checkpoints).map_err(|error| {
+    validate_checkpoint_transparency(checkpoints, trusted_kernel_keys).map_err(|error| {
         CliError::attest_error(format!(
             "checkpoint transparency verification failed: {error}"
         ))
@@ -301,6 +303,7 @@ pub(super) fn verify_checkpoint_transparency_records(
     witnesses: &[CheckpointWitness],
     consistency_proofs: &[CheckpointConsistencyProof],
     equivocations: &[CheckpointEquivocation],
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, CliError> {
     chio_kernel::checkpoint::verify_checkpoint_transparency_records(
         checkpoints,
@@ -310,6 +313,7 @@ pub(super) fn verify_checkpoint_transparency_records(
             consistency_proofs: consistency_proofs.to_vec(),
             equivocations: equivocations.to_vec(),
         },
+        trusted_kernel_keys,
     )
     .map_err(|error| {
         CliError::attest_error(format!(
@@ -636,18 +640,23 @@ pub(crate) fn validate_import_package_data(
     let lineage_by_capability = verify_lineage(&package.bundle.capability_lineage)?;
     let tool_receipts_by_seq = verify_tool_receipts(&package.bundle.tool_receipts)?;
     verify_child_receipts(&package.bundle.child_receipts)?;
-    let checkpoints_by_seq = verify_checkpoints(&package.bundle.checkpoints)?;
+    let trusted_kernel_keys = verification.trusted_kernel_keys();
+    let checkpoints_by_seq = verify_checkpoints(&package.bundle.checkpoints, trusted_kernel_keys)?;
     let transparency = match package.transparency.as_ref() {
         Some(summary) => chio_kernel::checkpoint::verify_checkpoint_transparency_records(
             &package.bundle.checkpoints,
             summary,
+            trusted_kernel_keys,
         )
         .map_err(|error| {
             CliError::attest_error(format!(
                 "checkpoint transparency verification failed: {error}"
             ))
         })?,
-        None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
+        None => validate_checkpoint_transparency_summary(
+            &package.bundle.checkpoints,
+            trusted_kernel_keys,
+        )?,
     };
     verification.claims(&package.bundle, &transparency)?;
     verify_transparency_claim_boundary(

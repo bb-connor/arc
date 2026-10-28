@@ -953,7 +953,7 @@ pub(super) fn authenticate_checkpoints(
         let checkpoint = parse_persisted_checkpoint_row(row.clone()).map_err(integrity)?;
         match next_previous.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
+                chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, &checkpoint)
                     .map_err(|error| integrity(checkpoint_error_to_receipt_store(error)))?
             }
             None => validate_checkpoint_base(&checkpoint).map_err(integrity)?,

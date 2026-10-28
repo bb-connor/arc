@@ -72,6 +72,10 @@ pub(in crate::commands) fn export_trust_network(
     let mut shared_proof_package: MercuryProofPackage = read_json_file(&shared_proof_package_src)?;
     let witness_record_ref = relative_display(output, &witness_record_path)?;
     let trust_anchor_ref = relative_display(output, &trust_anchor_record_path)?;
+    let carried_kernel_keys = chio_kernel::checkpoint::verify_integrity_embedded_key_set(
+        &shared_proof_package.chio_bundle.checkpoints,
+    )
+    .map_err(|error| CliError::Other(error.to_string()))?;
     let anchored_publications = shared_proof_package
         .chio_bundle
         .checkpoints
@@ -94,6 +98,7 @@ pub(in crate::commands) fn export_trust_network(
             chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
                 checkpoint,
                 binding,
+                &carried_kernel_keys,
             )
             .map_err(|error| CliError::Other(error.to_string()))
         })
@@ -102,6 +107,7 @@ pub(in crate::commands) fn export_trust_network(
         Some(summary) => summary,
         None => chio_kernel::checkpoint::validate_checkpoint_transparency(
             &shared_proof_package.chio_bundle.checkpoints,
+            &carried_kernel_keys,
         )
         .map_err(|error| CliError::Other(error.to_string()))?,
     };

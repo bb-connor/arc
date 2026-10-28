@@ -12,6 +12,7 @@ pub(super) fn write_evidence_package(
     exported_at: u64,
 ) -> Result<(), CliError> {
     ensure_clean_output_dir(output)?;
+    let kernel_key = [signing_key.public_key()];
     let transparency = match transparency {
         Some(summary) => {
             verify_checkpoint_transparency_records(
@@ -20,10 +21,11 @@ pub(super) fn write_evidence_package(
                 &summary.witnesses,
                 &summary.consistency_proofs,
                 &summary.equivocations,
+                &kernel_key,
             )?;
             summary
         }
-        None => validate_checkpoint_transparency_summary(&bundle.checkpoints)?,
+        None => validate_checkpoint_transparency_summary(&bundle.checkpoints, &kernel_key)?,
     };
     let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
     let disclosure_notice = maybe_build_disclosure_notice(&bundle.query);

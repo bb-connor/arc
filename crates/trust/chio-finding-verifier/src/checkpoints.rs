@@ -170,7 +170,12 @@ fn verify_checkpoint_membership_inner(
     if checkpoints.is_empty() {
         return Err(CheckpointMembershipError::NoCheckpoints);
     }
-    verify_checkpoint_transparency_records(checkpoints, transparency)
+    let pinned_signer_keys = profile
+        .checkpoint_logs
+        .iter()
+        .map(|log| log.signer.key.clone())
+        .collect::<Vec<_>>();
+    verify_checkpoint_transparency_records(checkpoints, transparency, &pinned_signer_keys)
         .map_err(|_| CheckpointMembershipError::TransparencyInvalid)?;
     let pinned_logs: BTreeMap<&str, _> = profile
         .checkpoint_logs
@@ -180,7 +185,7 @@ fn verify_checkpoint_membership_inner(
     let mut by_seq = BTreeMap::new();
     for checkpoint in checkpoints {
         let seq = checkpoint.body.checkpoint_seq;
-        if validate_checkpoint(checkpoint).is_err() {
+        if validate_checkpoint(checkpoint, &pinned_signer_keys).is_err() {
             return Err(CheckpointMembershipError::CheckpointInvalid(seq));
         }
         if !has_strict_checkpoint_signature(checkpoint) {
@@ -396,12 +401,15 @@ mod tests {
         )?;
         let signer = Keypair::from_seed(&[7; 32]);
         let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
-        assert!(verify_checkpoint_signature(&checkpoint)?);
+        assert!(verify_checkpoint_signature(
+            &checkpoint,
+            &[signer.public_key()]
+        )?);
         assert!(has_strict_checkpoint_signature(&checkpoint));
-        checkpoint.body.kernel_key = weak_key;
+        checkpoint.body.kernel_key = weak_key.clone();
         checkpoint.signature = forged_signature;
 
-        assert!(!verify_checkpoint_signature(&checkpoint)?);
+        assert!(!verify_checkpoint_signature(&checkpoint, &[weak_key])?);
         assert!(!has_strict_checkpoint_signature(&checkpoint));
         Ok(())
     }

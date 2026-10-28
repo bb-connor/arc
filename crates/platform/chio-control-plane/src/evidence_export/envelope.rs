@@ -62,6 +62,10 @@ impl EvidenceVerificationPolicy {
         Ok(())
     }
 
+    pub(super) fn trusted_kernel_keys(&self) -> &[PublicKey] {
+        &self.trusted_kernel_keys
+    }
+
     fn require_signer(&self, key: &PublicKey) -> Result<(), CliError> {
         if !self.trusted_kernel_keys.contains(key) {
             return Err(CliError::attest_error(

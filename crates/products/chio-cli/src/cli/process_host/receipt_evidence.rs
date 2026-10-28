@@ -21,11 +21,10 @@ impl Evidence {
         key: &PublicKey,
         observed_at: u64,
     ) -> Result<(), CliError> {
-        validate_checkpoint(&self.checkpoint).map_err(error)?;
+        validate_checkpoint(&self.checkpoint, std::slice::from_ref(key)).map_err(error)?;
         let body = &self.checkpoint.body;
         let proof = &self.inclusion;
-        if body.kernel_key != *key
-            || body.issued_at < receipt.timestamp
+        if body.issued_at < receipt.timestamp
             || body.issued_at > observed_at / 1000
             || proof.checkpoint_seq != body.checkpoint_seq
             || proof.merkle_root != body.merkle_root

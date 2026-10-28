@@ -2105,7 +2105,7 @@ fn digest_mismatch_case(
         Filing::VenueAudit => (challenged.venue_authorization()?, Vec::new()),
     };
     let deny_checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&deny_checkpoint))?;
+        build_checkpoint_transparency(core::slice::from_ref(&deny_checkpoint), std::slice::from_ref(&deny_checkpoint.body.kernel_key))?;
     Ok(DigestMismatchCase {
         challenge: challenged.sign_challenge(authorization, evidence, affected)?,
         failed_delivery,
@@ -2245,9 +2245,9 @@ fn evidence_invalid_case(
         Filing::VenueAudit => (challenged.venue_authorization()?, Vec::new()),
     };
     let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&evidence.checkpoint))?;
+        build_checkpoint_transparency(core::slice::from_ref(&evidence.checkpoint), std::slice::from_ref(&evidence.checkpoint.body.kernel_key))?;
     let unresolved_checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&unresolved_checkpoint))?;
+        build_checkpoint_transparency(core::slice::from_ref(&unresolved_checkpoint), std::slice::from_ref(&unresolved_checkpoint.body.kernel_key))?;
     let production_log_id = log_id_for(&production_log_signer())?;
     let checkpoint_policy = challenged
         .profile
@@ -2463,7 +2463,7 @@ fn replay_case(
         &checkpoint_ref,
     )];
     let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&checkpoint))?;
+        build_checkpoint_transparency(core::slice::from_ref(&checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
     let replay_policy = challenged
         .profile
         .body

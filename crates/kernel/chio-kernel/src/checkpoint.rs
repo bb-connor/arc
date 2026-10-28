@@ -84,6 +84,8 @@ pub enum CheckpointError {
     Invalid(String),
     #[error("checkpoint signature verification failed")]
     InvalidSignature,
+    #[error("checkpoint kernel key is not a trusted kernel key")]
+    UntrustedKernelKey,
     #[error("checkpoint continuity error: {0}")]
     Continuity(String),
 }
@@ -469,8 +471,9 @@ pub fn checkpoint_chain_root(chain_leaf_hashes: &[Hash]) -> Result<Hash, Checkpo
 /// Build a deterministic publication record from a signed checkpoint.
 pub fn build_checkpoint_publication(
     checkpoint: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointPublication, CheckpointError> {
-    validate_checkpoint(checkpoint)?;
+    validate_checkpoint(checkpoint, trusted_kernel_keys)?;
     Ok(CheckpointPublication {
         log_id: checkpoint_log_id(checkpoint),
         schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
@@ -519,11 +522,12 @@ fn bind_checkpoint_publication_trust_anchor_after_validation(
 pub fn build_trust_anchored_checkpoint_publication(
     checkpoint: &KernelCheckpoint,
     trust_anchor_binding: CheckpointPublicationTrustAnchorBinding,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointPublication, CheckpointError> {
     trust_anchor_binding
         .validate()
         .map_err(|error| CheckpointError::Invalid(error.to_string()))?;
-    let publication = build_checkpoint_publication(checkpoint)?;
+    let publication = build_checkpoint_publication(checkpoint, trusted_kernel_keys)?;
     bind_checkpoint_publication_trust_anchor_after_validation(publication, trust_anchor_binding)
 }
 
@@ -531,9 +535,10 @@ pub fn build_trust_anchored_checkpoint_publication(
 pub fn build_checkpoint_witness(
     checkpoint: &KernelCheckpoint,
     witness_checkpoint: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointWitness, CheckpointError> {
-    validate_checkpoint(checkpoint)?;
-    validate_checkpoint(witness_checkpoint)?;
+    validate_checkpoint(checkpoint, trusted_kernel_keys)?;
+    validate_checkpoint(witness_checkpoint, trusted_kernel_keys)?;
 
     let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body)?;
     let witness_checkpoint_sha256 = checkpoint_body_sha256(&witness_checkpoint.body)?;
@@ -656,8 +661,9 @@ fn build_checkpoint_consistency_proof_from_tree(
     current: &KernelCheckpoint,
     chain_leaf_hashes: &[Hash],
     chain_tree: &MerkleTree,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointConsistencyProof, CheckpointError> {
-    validate_checkpoint_predecessor(previous, current)?;
+    validate_checkpoint_predecessor(previous, current, trusted_kernel_keys)?;
     let previous = ValidatedCheckpoint::after_validation(previous)?;
     let current = ValidatedCheckpoint::after_validation(current)?;
     build_checkpoint_consistency_proof_from_validated(
@@ -732,6 +738,7 @@ pub fn build_checkpoint_consistency_proof(
     previous: &KernelCheckpoint,
     current: &KernelCheckpoint,
     chain_leaf_hashes: &[Hash],
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointConsistencyProof, CheckpointError> {
     let to_size = chain_tree_size(current)?;
     if chain_leaf_hashes.len() != to_size {
@@ -743,7 +750,13 @@ pub fn build_checkpoint_consistency_proof(
         )));
     }
     let tree = MerkleTree::from_hashes(chain_leaf_hashes.to_vec())?;
-    build_checkpoint_consistency_proof_from_tree(previous, current, chain_leaf_hashes, &tree)
+    build_checkpoint_consistency_proof_from_tree(
+        previous,
+        current,
+        chain_leaf_hashes,
+        &tree,
+        trusted_kernel_keys,
+    )
 }
 
 /// Verify a genesis-anchored consistency proof against two signed checkpoints.
@@ -755,12 +768,14 @@ pub fn verify_checkpoint_consistency_proof(
     previous: &KernelCheckpoint,
     current: &KernelCheckpoint,
     proof: &CheckpointConsistencyProof,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<bool, CheckpointError> {
     verify_checkpoint_consistency_proof_with_anchor(
         previous,
         current,
         proof,
         CheckpointConsistencyAnchor::Genesis,
+        trusted_kernel_keys,
     )
 }
 
@@ -778,8 +793,9 @@ pub fn verify_checkpoint_consistency_proof_with_anchor(
     current: &KernelCheckpoint,
     proof: &CheckpointConsistencyProof,
     anchor: CheckpointConsistencyAnchor<'_>,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<bool, CheckpointError> {
-    validate_checkpoint_predecessor(previous, current)?;
+    validate_checkpoint_predecessor(previous, current, trusted_kernel_keys)?;
     let previous_log_id = checkpoint_log_id(previous);
     let current_log_id = checkpoint_log_id(current);
     if previous_log_id != current_log_id {
@@ -900,8 +916,11 @@ struct ValidatedCheckpoint<'a> {
 }
 
 impl<'a> ValidatedCheckpoint<'a> {
-    fn validate(checkpoint: &'a KernelCheckpoint) -> Result<Self, CheckpointError> {
-        validate_checkpoint(checkpoint)?;
+    fn validate(
+        checkpoint: &'a KernelCheckpoint,
+        trusted_kernel_keys: &[PublicKey],
+    ) -> Result<Self, CheckpointError> {
+        validate_checkpoint(checkpoint, trusted_kernel_keys)?;
         Self::after_validation(checkpoint)
     }
 
@@ -986,9 +1005,10 @@ fn detect_checkpoint_equivocation_from_validated(
 pub fn detect_checkpoint_equivocation(
     first: &KernelCheckpoint,
     second: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<Option<CheckpointEquivocation>, CheckpointError> {
-    validate_checkpoint(first)?;
-    validate_checkpoint(second)?;
+    validate_checkpoint(first, trusted_kernel_keys)?;
+    validate_checkpoint(second, trusted_kernel_keys)?;
     let first = ValidatedCheckpoint::after_validation(first)?;
     let second = ValidatedCheckpoint::after_validation(second)?;
     Ok(detect_checkpoint_equivocation_from_validated(
@@ -1123,12 +1143,13 @@ struct DerivedCheckpointTransparency<'a> {
     clippy::indexing_slicing,
     reason = "All positions are created by enumerating this immutable checkpoint slice in this function."
 )]
-fn derive_checkpoint_transparency(
-    checkpoints: &[KernelCheckpoint],
-) -> Result<DerivedCheckpointTransparency<'_>, CheckpointError> {
+fn derive_checkpoint_transparency<'a>(
+    checkpoints: &'a [KernelCheckpoint],
+    trusted_kernel_keys: &[PublicKey],
+) -> Result<DerivedCheckpointTransparency<'a>, CheckpointError> {
     let checkpoints = checkpoints
         .iter()
-        .map(ValidatedCheckpoint::validate)
+        .map(|checkpoint| ValidatedCheckpoint::validate(checkpoint, trusted_kernel_keys))
         .collect::<Result<Vec<_>, _>>()?;
     let mut publications = checkpoints
         .iter()
@@ -1308,8 +1329,9 @@ fn derive_checkpoint_transparency(
 /// Derive publication, witness, and equivocation records from a checkpoint set.
 pub fn build_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, CheckpointError> {
-    Ok(derive_checkpoint_transparency(checkpoints)?.summary)
+    Ok(derive_checkpoint_transparency(checkpoints, trusted_kernel_keys)?.summary)
 }
 
 /// Validate that a checkpoint set is transparency-safe, fork-free, and
@@ -1324,6 +1346,7 @@ pub fn build_checkpoint_transparency(
 )]
 pub fn validate_checkpoint_transparency(
     checkpoints: &[KernelCheckpoint],
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, CheckpointError> {
     let mut checkpoint_seqs = BTreeSet::new();
     for checkpoint in checkpoints {
@@ -1335,7 +1358,7 @@ pub fn validate_checkpoint_transparency(
         }
     }
 
-    let derived = derive_checkpoint_transparency(checkpoints)?;
+    let derived = derive_checkpoint_transparency(checkpoints, trusted_kernel_keys)?;
     let transparency = derived.summary;
     if let Some(equivocation) = transparency.equivocations.first() {
         return Err(CheckpointError::Continuity(format!(
@@ -1396,8 +1419,9 @@ pub fn validate_checkpoint_transparency(
 pub fn verify_checkpoint_transparency_records(
     checkpoints: &[KernelCheckpoint],
     supplied: &CheckpointTransparencySummary,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, CheckpointError> {
-    let derived = validate_checkpoint_transparency(checkpoints)?;
+    let derived = validate_checkpoint_transparency(checkpoints, trusted_kernel_keys)?;
     let derived_publications = derived
         .publications
         .iter()
@@ -1475,8 +1499,9 @@ pub fn verify_checkpoint_transparency_records(
 pub fn verify_checkpoint_continuity(
     previous: &KernelCheckpoint,
     current: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<bool, CheckpointError> {
-    match validate_checkpoint_predecessor(previous, current) {
+    match validate_checkpoint_predecessor(previous, current, trusted_kernel_keys) {
         Ok(()) => Ok(true),
         Err(CheckpointError::Continuity(_)) => Ok(false),
         Err(error) => Err(error),
@@ -1510,15 +1535,26 @@ pub fn build_inclusion_proof(
 /// Verify the signature on a KernelCheckpoint.
 ///
 /// Returns `Ok(true)` if the signature is valid.
-pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool, CheckpointError> {
+///
+/// The signature is checked under the member of `trusted_kernel_keys` equal to
+/// the carried `kernel_key`; a carried key outside that set is refused before
+/// any signature check.
+pub fn verify_checkpoint_signature(
+    checkpoint: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
+) -> Result<bool, CheckpointError> {
     #[cfg(test)]
     CHECKPOINT_SIGNATURE_VERIFICATION_COUNT.with(|count| {
         count.set(count.get().saturating_add(1));
     });
+    let trusted_kernel_key = trusted_kernel_keys
+        .iter()
+        .find(|key| **key == checkpoint.body.kernel_key)
+        .ok_or(CheckpointError::UntrustedKernelKey)?;
     let canonical = CanonicalBytes::from_serializable(&checkpoint.body)
         .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
     match verify_wrapped_bytes(
-        &checkpoint.body.kernel_key,
+        trusted_kernel_key,
         CHECKPOINT_SCHEMA,
         &canonical,
         &checkpoint.signature,
@@ -1539,8 +1575,11 @@ fn checkpoint_equivocation_inspection_count_for_test() -> usize {
     CHECKPOINT_EQUIVOCATION_INSPECTION_COUNT.with(std::cell::Cell::get)
 }
 
-/// Validate the integrity of a single checkpoint statement.
-pub fn validate_checkpoint(checkpoint: &KernelCheckpoint) -> Result<(), CheckpointError> {
+/// Validate a single checkpoint statement signed by a trusted kernel key.
+pub fn validate_checkpoint(
+    checkpoint: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
+) -> Result<(), CheckpointError> {
     if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
         return Err(CheckpointError::Invalid(format!(
             "unsupported checkpoint schema {}",
@@ -1605,10 +1644,50 @@ pub fn validate_checkpoint(checkpoint: &KernelCheckpoint) -> Result<(), Checkpoi
             ));
         }
     }
-    if !verify_checkpoint_signature(checkpoint)? {
+    if !verify_checkpoint_signature(checkpoint, trusted_kernel_keys)? {
         return Err(CheckpointError::InvalidSignature);
     }
     Ok(())
+}
+
+/// Validates every checkpoint under the kernel key it carries and returns the
+/// distinct carried keys. Integrity only: a caller that acts on the result
+/// binds the returned keys to trusted kernel keys first.
+pub fn verify_integrity_embedded_key_set(
+    checkpoints: &[KernelCheckpoint],
+) -> Result<Vec<PublicKey>, CheckpointError> {
+    let mut carried: Vec<PublicKey> = Vec::new();
+    for checkpoint in checkpoints {
+        checkpoint.verify_integrity_embedded_key()?;
+        if !carried.contains(&checkpoint.body.kernel_key) {
+            carried.push(checkpoint.body.kernel_key.clone());
+        }
+    }
+    Ok(carried)
+}
+
+/// Validates a predecessor link with each checkpoint verified under the kernel
+/// key it carries, so a link across a kernel key rotation is accepted.
+/// Integrity only: a caller that acts on the result binds both carried keys
+/// to trusted kernel keys first.
+pub fn verify_integrity_embedded_key_predecessor(
+    predecessor: &KernelCheckpoint,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), CheckpointError> {
+    let carried = [
+        predecessor.body.kernel_key.clone(),
+        checkpoint.body.kernel_key.clone(),
+    ];
+    validate_checkpoint_predecessor(predecessor, checkpoint, &carried)
+}
+
+impl KernelCheckpoint {
+    /// Validates the statement under the kernel key it carries. Integrity
+    /// only: the carried key is never a trust source, so a caller that acts on
+    /// the result binds `body.kernel_key` to a trusted kernel key first.
+    pub fn verify_integrity_embedded_key(&self) -> Result<(), CheckpointError> {
+        validate_checkpoint(self, std::slice::from_ref(&self.body.kernel_key))
+    }
 }
 
 fn is_lowercase_sha256(value: &str) -> bool {
@@ -1659,9 +1738,10 @@ fn validate_checkpoint_successor_position(
 pub fn validate_checkpoint_predecessor(
     predecessor: &KernelCheckpoint,
     checkpoint: &KernelCheckpoint,
+    trusted_kernel_keys: &[PublicKey],
 ) -> Result<(), CheckpointError> {
-    validate_checkpoint(predecessor)?;
-    validate_checkpoint(checkpoint)?;
+    validate_checkpoint(predecessor, trusted_kernel_keys)?;
+    validate_checkpoint(checkpoint, trusted_kernel_keys)?;
     let predecessor_sha256 = checkpoint_body_sha256(&predecessor.body)?;
     validate_checkpoint_predecessor_link(predecessor, &predecessor_sha256, checkpoint)
 }

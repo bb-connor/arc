@@ -227,7 +227,7 @@ async fn strict_nonce_subprocess() -> Result {
         .iter()
         .find(|checkpoint| checkpoint.body.checkpoint_seq == proof.checkpoint_seq)
         .ok_or("unknown refusal has no checkpoint")?;
-    chio_kernel::checkpoint::validate_checkpoint(checkpoint)?;
+    chio_kernel::checkpoint::validate_checkpoint(checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key))?;
     assert!(proof.verify(
         &chio_core_types::crypto::canonical_json_bytes(&response.receipt)?,
         &checkpoint.body.merkle_root

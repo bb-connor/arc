@@ -8,15 +8,13 @@ use chio_core::receipt::{
 use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_kernel::checkpoint::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
-    CheckpointTransparencySummary,
+    verify_integrity_embedded_key_set, CheckpointTransparencySummary,
 };
 use chio_kernel::evidence_export::{
     build_evidence_transparency_claims, EvidenceExportBundle, EvidenceExportQuery,
     EvidenceTransparencyClaims,
 };
-use chio_kernel::{
-    is_supported_checkpoint_schema, verify_checkpoint_signature, ReceiptReadBoundary,
-};
+use chio_kernel::{is_supported_checkpoint_schema, ReceiptReadBoundary};
 use serde::{Deserialize, Serialize};
 
 use crate::bundle::{MercuryBundleManifest, MercuryBundleReference};
@@ -895,8 +893,7 @@ fn authenticate_authoritative_receipt_order(
         )));
     }
     if !is_supported_checkpoint_schema(&checkpoint.body.schema)
-        || !verify_checkpoint_signature(checkpoint)
-            .map_err(|error| MercuryContractError::Validation(error.to_string()))?
+        || checkpoint.verify_integrity_embedded_key().is_err()
     {
         return Err(MercuryContractError::Validation(format!(
             "authoritative receipt sequence {} is not bound to a valid signed checkpoint",
@@ -1320,9 +1317,7 @@ fn verify_trusted_checkpoint_requirements(
         ));
     }
     for checkpoint in &bundle.checkpoints {
-        if !verify_checkpoint_signature(checkpoint)
-            .map_err(|error| MercuryContractError::Validation(error.to_string()))?
-        {
+        if checkpoint.verify_integrity_embedded_key().is_err() {
             return Err(MercuryContractError::Validation(format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
@@ -1510,8 +1505,7 @@ fn verify_chio_bundle(
             )));
         }
         if publication_profile.checkpoint_signatures_required
-            && !verify_checkpoint_signature(checkpoint)
-                .map_err(|error| MercuryContractError::Validation(error.to_string()))?
+            && checkpoint.verify_integrity_embedded_key().is_err()
         {
             return Err(MercuryContractError::Validation(format!(
                 "checkpoint signature verification failed: {}",
@@ -1698,9 +1692,16 @@ fn derive_publication_materials_with_summary(
     ),
     MercuryContractError,
 > {
+    let carried_kernel_keys = verify_integrity_embedded_key_set(&bundle.checkpoints)
+        .map_err(|error| MercuryContractError::Validation(error.to_string()))?;
     let normalized_transparency = match checkpoint_transparency {
         Some(summary) => Some(
-            verify_checkpoint_transparency_records(&bundle.checkpoints, summary).map_err(
+            verify_checkpoint_transparency_records(
+                &bundle.checkpoints,
+                summary,
+                &carried_kernel_keys,
+            )
+            .map_err(
                 |error| {
                     MercuryContractError::Validation(format!(
                         "checkpoint transparency verification failed: {error}"
@@ -1712,7 +1713,8 @@ fn derive_publication_materials_with_summary(
     };
     let transparency = match normalized_transparency.as_ref() {
         Some(summary) => summary.clone(),
-        None => validate_checkpoint_transparency(&bundle.checkpoints).map_err(|error| {
+        None => validate_checkpoint_transparency(&bundle.checkpoints, &carried_kernel_keys)
+            .map_err(|error| {
             MercuryContractError::Validation(format!(
                 "checkpoint transparency verification failed: {error}"
             ))

@@ -399,7 +399,7 @@ fn fixture_with_runtime_assurance(
         1_750_000_001,
         &checkpoint_signer,
     )?;
-    let checkpoint_transparency = build_checkpoint_transparency(std::slice::from_ref(&checkpoint))?;
+    let checkpoint_transparency = build_checkpoint_transparency(std::slice::from_ref(&checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
     let log_id = checkpoint_log_id(&checkpoint);
     let evidence_checkpoint_ref = format!("{log_id}#1");
 
@@ -1066,7 +1066,7 @@ fn resolved_delivery_with_times(
         &checkpoint_signer,
     )?;
     let checkpoints = vec![fx.checkpoint.clone(), checkpoint];
-    let checkpoint_transparency = build_checkpoint_transparency(&checkpoints)?;
+    let checkpoint_transparency = build_checkpoint_transparency(&checkpoints, &checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())?;
     Ok(ResolvedFindingDeliveryEvidence {
         receipt: ResolvedReceiptEvidence {
             receipt,
@@ -1484,7 +1484,7 @@ fn production_checkpoints_cannot_postdate_the_finding() -> TestResult {
         trust.trusted_time.saturating_add(1),
         &keypair(23),
     )?;
-    evidence.checkpoint_transparency = build_checkpoint_transparency(&evidence.checkpoints)?;
+    evidence.checkpoint_transparency = build_checkpoint_transparency(&evidence.checkpoints, &evidence.checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())?;
 
     let draft = verify_finding_evidence(&fx.raw_finding, &trust, &evidence)?;
     let membership = draft
@@ -1511,7 +1511,7 @@ fn production_receipts_cannot_postdate_their_checkpoint() -> TestResult {
         fx.receipts[0].receipt.timestamp,
         &keypair(23),
     )?;
-    evidence.checkpoint_transparency = build_checkpoint_transparency(&evidence.checkpoints)?;
+    evidence.checkpoint_transparency = build_checkpoint_transparency(&evidence.checkpoints, &evidence.checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())?;
 
     let draft = verify_finding_evidence(&fx.raw_finding, &trust, &evidence)?;
     let membership = draft

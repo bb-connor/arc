@@ -847,8 +847,8 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
         chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&forged.body)?,
     )?;
-    chio_kernel::checkpoint::validate_checkpoint(&forged)?;
-    chio_kernel::checkpoint::validate_checkpoint_predecessor(&checkpoint_one, &forged)?;
+    chio_kernel::checkpoint::validate_checkpoint(&forged, std::slice::from_ref(&forged.body.kernel_key))?;
+    chio_kernel::checkpoint::validate_checkpoint_predecessor(&checkpoint_one, &forged, &[checkpoint_one.body.kernel_key.clone(), forged.body.kernel_key.clone()])?;
     assert_eq!(forged.body.batch_start_seq, winner.body.batch_start_seq);
     assert_eq!(forged.body.batch_end_seq, winner.body.batch_end_seq);
     assert_eq!(forged.body.merkle_root, winner.body.merkle_root);

@@ -301,7 +301,7 @@ fn checkpoint_archive_reopens_with_exact_typed_predecessors() -> TestResult {
         let checkpoint = parse_persisted_checkpoint_row(row)?;
         validate_checkpoint_against_claim_log(&archived, &checkpoint)?;
         if let Some(previous) = predecessor.as_ref() {
-            chio_kernel::checkpoint::validate_checkpoint_predecessor(previous, &checkpoint)?;
+            chio_kernel::checkpoint::validate_checkpoint_predecessor(previous, &checkpoint, std::slice::from_ref(&previous.body.kernel_key))?;
         }
         predecessor = Some(checkpoint);
     }

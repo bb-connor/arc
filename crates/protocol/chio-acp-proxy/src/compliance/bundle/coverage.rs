@@ -41,10 +41,9 @@ impl ComplianceCoverage {
             || *snapshot_end_entry_seq == 0
             || archived_through_entry_seq > snapshot_end_entry_seq
             || checkpoint.body.batch_end_seq != *snapshot_end_entry_seq
-            || checkpoint.body.kernel_key != *kernel_key
             || checkpoint.body.issued_at > issued_at
-            || chio_kernel::checkpoint::validate_checkpoint(checkpoint).is_err()
-            || !chio_kernel::checkpoint::verify_checkpoint_signature(checkpoint).unwrap_or(false)
+            || chio_kernel::checkpoint::validate_checkpoint(checkpoint, std::slice::from_ref(kernel_key))
+                .is_err()
             || entries.iter().any(|entry| {
                 entry
                     .entry_seq

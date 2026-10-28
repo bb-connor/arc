@@ -688,7 +688,7 @@ mod tests {
             },
         };
         let transparency =
-            build_checkpoint_transparency(&[first, second]).expect("transparency summary");
+            build_checkpoint_transparency(&[first.clone(), second], std::slice::from_ref(&first.body.kernel_key)).expect("transparency summary");
 
         let claims = build_evidence_transparency_claims(&bundle, &transparency, None);
         assert_eq!(
@@ -746,7 +746,7 @@ mod tests {
             },
         };
         let mut transparency =
-            build_checkpoint_transparency(&[first.clone(), second.clone()]).expect("summary");
+            build_checkpoint_transparency(&[first.clone(), second.clone()], std::slice::from_ref(&first.body.kernel_key)).expect("summary");
         let binding = chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
             publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
                 chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
@@ -761,9 +761,9 @@ mod tests {
             publication_profile_version: "phase4-pilot".to_string(),
         };
         transparency.publications = vec![
-            crate::checkpoint::build_trust_anchored_checkpoint_publication(&first, binding.clone())
+            crate::checkpoint::build_trust_anchored_checkpoint_publication(&first, binding.clone(), std::slice::from_ref(&first.body.kernel_key))
                 .expect("first anchored publication"),
-            crate::checkpoint::build_trust_anchored_checkpoint_publication(&second, binding)
+            crate::checkpoint::build_trust_anchored_checkpoint_publication(&second, binding, std::slice::from_ref(&second.body.kernel_key))
                 .expect("second anchored publication"),
         ];
 

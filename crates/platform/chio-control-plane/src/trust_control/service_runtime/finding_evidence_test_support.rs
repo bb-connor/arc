@@ -121,7 +121,7 @@ pub(super) fn make_signed_finding_report(
         checkpoints: vec![inputs.checkpoint.clone()],
         checkpoint_transparency: build_checkpoint_transparency(std::slice::from_ref(
             inputs.checkpoint,
-        ))?,
+        ), std::slice::from_ref(&inputs.checkpoint.body.kernel_key))?,
         finding_delivery: None,
         recipe_preimage: Some(inputs.recipe_bytes),
         status_proof_input: None,

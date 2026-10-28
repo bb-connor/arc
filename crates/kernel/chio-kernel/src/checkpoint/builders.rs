@@ -164,7 +164,7 @@ pub fn build_checkpoint_with_chain_frontier_at(
                 .transpose()?
         }
         Some(previous) => {
-            validate_checkpoint(previous)?;
+            validate_checkpoint(previous, std::slice::from_ref(&keypair.public_key()))?;
             validate_checkpoint_successor_position(previous, checkpoint_seq, batch_start_seq)?;
             if prior_chain.leaf_count() != previous.body.checkpoint_seq {
                 return Err(CheckpointError::Continuity(format!(

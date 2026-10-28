@@ -1140,9 +1140,9 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&replacement.body)?,
     )?;
-    chio_kernel::checkpoint::validate_checkpoint(&replacement)?;
+    chio_kernel::checkpoint::validate_checkpoint(&replacement, std::slice::from_ref(&replacement.body.kernel_key))?;
     assert!(
-        chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &checkpoint_two)
+        chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &checkpoint_two, std::slice::from_ref(&replacement.body.kernel_key))
             .is_err(),
         "the retained checkpoint 2 must be disconnected from the replacement"
     );
@@ -1226,7 +1226,7 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&replacement_two.body)?,
     )?;
-    chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &replacement_two)?;
+    chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &replacement_two, std::slice::from_ref(&replacement.body.kernel_key))?;
     let replacement_two_json = serde_json::to_string(&replacement_two.body)?;
     let replacement_two_signature = replacement_two.signature.to_hex();
     let replacement_predecessor = replacement_two
@@ -1377,7 +1377,7 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
         chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&replacement_one.body)?,
     )?;
-    chio_kernel::checkpoint::validate_checkpoint(&replacement_one)?;
+    chio_kernel::checkpoint::validate_checkpoint(&replacement_one, std::slice::from_ref(&replacement_one.body.kernel_key))?;
 
     let replacement_one_json = serde_json::to_string(&replacement_one.body)?;
     let replacement_one_signature = replacement_one.signature.to_hex();
