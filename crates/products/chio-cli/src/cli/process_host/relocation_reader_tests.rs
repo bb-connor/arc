@@ -307,3 +307,63 @@ fn relocation_walk_bounds_directory_depth() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn relocation_walk_refuses_file_replaced_by_fifo_without_blocking() -> TestResult {
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::time::Duration;
+
+    let root = canonical_tempdir()?;
+    let moved = canonical_tempdir()?;
+    let artifact = root.path().join("artifact");
+    std::fs::write(&artifact, b"inside")?;
+    let root_path = root.path().to_path_buf();
+    let moved_path = moved.path().join("original");
+    let (send, receive) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let _hook = DescendHook;
+        BEFORE_FILE_OPEN.with(|slot| {
+            *slot.borrow_mut() = Some(Box::new(move |path| {
+                std::fs::rename(path, &moved_path)?;
+                if !std::process::Command::new("mkfifo")
+                    .arg(path)
+                    .status()?
+                    .success()
+                {
+                    return Err(error("fixture FIFO creation failed"));
+                }
+                Ok(())
+            }));
+        });
+        let outcome = match digests(&root_path, SidecarPolicy::Sealed) {
+            Err(CliError::Chio(error)) => Ok(error.message().to_owned()),
+            other => Err(format!("expected typed nonregular refusal, got {other:?}")),
+        };
+        let _ = send.send(outcome);
+    });
+    let first = receive.recv_timeout(Duration::from_secs(5));
+    let timely = first.is_ok();
+    let unblock = if timely {
+        None
+    } else {
+        Some(
+            std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .custom_flags(libc::O_NONBLOCK)
+                .open(&artifact)?,
+        )
+    };
+    let outcome = match first {
+        Ok(outcome) => outcome,
+        Err(_) => receive.recv_timeout(Duration::from_secs(5))?,
+    };
+    worker.join().map_err(|_| "relocation reader panicked")?;
+    drop(unblock);
+    assert!(timely, "relocation walk blocked opening a replaced FIFO");
+    assert_eq!(
+        outcome,
+        Ok("process host: host state contains a nonregular file: artifact".to_owned())
+    );
+    Ok(())
+}
