@@ -5345,9 +5345,9 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
     Ok(())
 }
 
-/// The reservation freezes the exact buyer-signed bid envelope, not only
-/// its body digest. Re-signing the same body under another key must fail at
-/// the admission-time reservation gate before payment or dispatch.
+/// The bid envelope must be signed by the token offer subject. Re-signing
+/// the same body under another key fails the deterministic handshake
+/// binding before the reservation gate, payment, or dispatch.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
     let lane = open_lane(LaneOptions::standard()).await?;
@@ -5373,7 +5373,7 @@ async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
         nonce: "nonce-resigned-bid-1",
     })?;
     let response = lane.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_denied_with(&response, "reservation does not bind this purchase");
+    assert_denied_with(&response, "purchase context verification failed");
     assert_eq!(lane.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);
