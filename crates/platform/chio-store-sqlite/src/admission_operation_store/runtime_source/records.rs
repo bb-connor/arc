@@ -65,13 +65,14 @@ pub(in crate::admission_operation_store) fn verify_all_records(
     if !source_table_exists(connection)? {
         return Err("runtime source qualification table is absent".into());
     }
-    let count: usize = connection
+    let count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM runtime_source_qualifications",
             [],
             |row| row.get(0),
         )
         .map_err(|error| error.to_string())?;
+    let count = usize::try_from(count).map_err(|error| error.to_string())?;
     if count > MAX_QUALIFICATION_HISTORY {
         return Err("runtime source qualification history capacity exceeded".into());
     }

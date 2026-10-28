@@ -55,13 +55,14 @@ pub(super) fn verify_counts(
     connection: &Connection,
     qualification_count: usize,
 ) -> Result<(), String> {
-    let count: usize = connection
+    let count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM runtime_source_supersessions",
             [],
             |row| row.get(0),
         )
         .map_err(|error| error.to_string())?;
+    let count = usize::try_from(count).map_err(|error| error.to_string())?;
     if count > MAX_SUPERSEDED {
         return Err("runtime source supersession history capacity exceeded".into());
     }
