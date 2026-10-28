@@ -67,6 +67,7 @@ use super::finding_status_verifier::MarketFindingStatusVerifier;
 use super::{FindingMarketConfig, TrustStop};
 
 const MAX_CREDENTIAL_TEXT_BYTES: usize = 512;
+const MAX_CACHED_TERMINAL_BYTES: usize = 64 * 1024 * 1024;
 const FINDING_OPERATOR_PURCHASE_JOB_SCHEMA: &str = "chio.finding.operator-purchase-job.v1";
 const PREDISPATCH_RELEASE_REJECTION: &str =
     "purchase failed before dispatch and its reservation was released";
@@ -1722,7 +1723,9 @@ fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
 pub(crate) fn decode_cached_terminal(
     result_json: &[u8],
 ) -> Result<FindingPurchaseResult, FindingPurchaseExecutionError> {
-    serde_json::from_slice(result_json).map_err(|error| execution_internal(error.to_string()))
+    chio_core::canonical::UntrustedJsonText::from_wire(result_json, MAX_CACHED_TERMINAL_BYTES)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| execution_internal(error.code()))
 }
 
 fn execution_internal(error: impl std::fmt::Display) -> FindingPurchaseExecutionError {
