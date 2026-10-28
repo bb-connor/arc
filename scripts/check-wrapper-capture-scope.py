@@ -11,6 +11,7 @@ one test run. This gate fails when:
 - any tracked file outside the hook, the manifest, the harness and this
   gate names the feature, so no manifest, workflow, Dockerfile, build
   script or other source file can enable it or compile code under it.
+  Markdown is prose that no build reads, so it may name the feature.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ NAMING_FILES = HOOK_FILES | {
     "scripts/check-wrapper-capture-scope.py",
     "scripts/tests/check-wrapper-capture-scope.test.py",
 }
+PROSE_SUFFIXES = {".md"}
 
 
 def tracked_files(root: Path) -> list[str]:
@@ -62,7 +64,7 @@ def check(root: Path) -> list[str]:
 
     for rel in tracked_files(root):
         path = root / rel
-        if not path.is_file():
+        if not path.is_file() or path.suffix in PROSE_SUFFIXES:
             continue
         try:
             text = path.read_text(encoding="utf-8")

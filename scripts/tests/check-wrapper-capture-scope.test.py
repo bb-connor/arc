@@ -72,6 +72,11 @@ expect(
     1,
     "crates/core/chio-core-types/src/receipt.rs",
 )
+expect(
+    "named in a plan document",
+    {**BASE, "docs/plans/capture.md": "Run with `--features chio-core-types/wrapper-capture`.\n"},
+    0,
+)
 
 if failures:
     print("\n\n".join(failures), file=sys.stderr)
