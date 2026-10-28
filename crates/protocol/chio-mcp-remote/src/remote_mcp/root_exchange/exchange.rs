@@ -634,6 +634,7 @@ impl RootExchange {
             provider_id: Some(record.identity().provider_id.to_string()),
             scope_bound: None,
             holder: None,
+            sender_constraint: None,
         })
     }
 

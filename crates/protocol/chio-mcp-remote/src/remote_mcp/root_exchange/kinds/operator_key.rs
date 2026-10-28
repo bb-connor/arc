@@ -118,5 +118,6 @@ pub fn verify(
         provider_id: None,
         scope_bound: Some(request.scope.clone()),
         holder: Some(request.holder),
+        sender_constraint: None,
     })
 }

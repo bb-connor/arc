@@ -1,18 +1,23 @@
-//! `chio_local_as`: an access token of the local authorization server, and
-//! its RFC 8693 re-exchange.
+//! `chio_local_as`: an authorization code redeemed at the local
+//! authorization server, and the RFC 8693 re-exchange of the access token
+//! issued for it.
 //!
-//! A local access token verifies against the local authorization server's
-//! Ed25519 key. Its sender constraint (`cnf`) binds both paths: the request
-//! presenting it must satisfy the same mTLS and attestation bindings the
-//! token names, and a token confirmed by a Chio sender key refuses because
-//! no DPoP proof can be held here. The principal is the token `sub`, the
-//! tenant the local authorization server issuer, and the recorded issuer is
-//! `urn:chio:local-as`.
+//! Both paths check a sender constraint (`cnf`) against the request: the
+//! one the authorization request bound to the code, or the one the subject
+//! token names. The request must satisfy the mTLS and attestation bindings
+//! it names, and a Chio sender key refuses because no DPoP proof can be held
+//! here. The constraint is carried on the evidence for the access token
+//! issued with the root. The principal is the code's subject or the token
+//! `sub`, the tenant the local authorization server issuer, and the
+//! recorded issuer is `urn:chio:local-as`.
 //!
-//! Issuance spends `(chio_local_as, urn:chio:local-as, jti)` and anchors at
-//! the token's `exp`. A re-exchange spends the subject token's `jti` once in
-//! its own namespace, so a token whose root was minted at issuance can still
-//! be re-exchanged once. The requested `scope` and `resource` must be a
+//! Issuance spends `(chio_local_as_issue, urn:chio:local-as, hex
+//! SHA-256(code))` and anchors at the issued token's `exp`, so it consumes
+//! the code, never the token's `jti`. A re-exchange spends
+//! `(chio_local_as, urn:chio:local-as, jti)` of the subject token once, so a
+//! freshly issued token can be re-exchanged exactly once. A local access
+//! token verifies against the local authorization server's Ed25519 key. The
+//! requested `scope` and `resource` must be a
 //! subset of the subject token's and the requested root scope a subset of
 //! the subject root's; the root takes the requested root scope, or the
 //! subject root's, within the rule ceiling, records the requested `scope`
@@ -33,7 +38,7 @@ use super::super::error::RootExchangeError;
 use super::super::evidence::AnchorEvidence;
 use super::super::jws::{CompactJws, VerifyingKey};
 use super::super::replay::{ReplayKey, ReplayNamespace};
-use crate::SenderRequest;
+use crate::{ChioSenderConstraintClaims, SenderRequest};
 
 const KIND: AnchorKind = AnchorKind::ChioLocalAs;
 
@@ -58,6 +63,25 @@ impl<'a> From<SenderRequest<'a>> for PresentedSender<'a> {
     fn from(request: SenderRequest<'a>) -> Self {
         Self(request)
     }
+}
+
+/// An authorization code the local authorization server redeemed after
+/// checking its client, redirect URI, PKCE verifier and resource.
+#[derive(Clone, Copy)]
+pub struct RedeemedCode<'a> {
+    pub code: &'a str,
+    /// Unix seconds from which the code is no longer redeemable.
+    pub code_expires_at: u64,
+    pub subject: &'a str,
+    pub client_id: &'a str,
+    pub resource: &'a str,
+    pub scopes: &'a [String],
+    /// The sender constraint the authorization request bound to the code.
+    pub sender_constraint: Option<&'a ChioSenderConstraintClaims>,
+    /// The `exp` of the access token issued for the code.
+    pub token_exp: u64,
+    /// SHA-256 of the exact token request body.
+    pub request_digest: Sha256Digest,
 }
 
 /// The stored root a subject token resolves to.
@@ -86,9 +110,9 @@ struct LocalToken {
     claims: Map<String, Value>,
     jti: String,
     iat: u64,
-    exp: u64,
     principal: String,
     token_digest: Sha256Digest,
+    sender_constraint: Option<ChioSenderConstraintClaims>,
 }
 
 fn local_key(server: &LocalAuthorizationServer<'_>) -> Result<VerifyingKey, RootExchangeError> {
@@ -129,47 +153,77 @@ fn verify_token(
     if iat >= exp {
         return Err(RootExchangeError::ClaimInvalid("exp"));
     }
-    super::sender::check(claims, sender.0)?;
+    let sender_constraint = super::sender::check(claims, sender.0)?;
     Ok(LocalToken {
         jti: required_string(claims, "jti")?.to_owned(),
         principal: required_string(claims, "sub")?.to_owned(),
         claims: claims.clone(),
         iat,
-        exp,
         token_digest: Sha256Digest::from_hash(sha256(token.as_bytes())),
+        sender_constraint,
     })
 }
 
-/// Verify a local access token presented by `sender` at `now` (Unix
-/// seconds) for the root issued with it.
-pub fn verify(
+/// Verify the authorization `code` redeemed by `sender` at `now` (Unix
+/// seconds) for the root the access token issued for it names.
+pub fn verify_issue(
     server: &LocalAuthorizationServer<'_>,
-    token: &str,
+    code: RedeemedCode<'_>,
     sender: PresentedSender<'_>,
     now: u64,
 ) -> Result<AnchorEvidence, RootExchangeError> {
-    let local = verify_token(server, token, sender, now)?;
-    let scope_values = scope_values(&local.claims)?;
+    if code.code.is_empty() || code.code.contains('\0') {
+        return Err(RootExchangeError::MalformedRequest("code"));
+    }
+    if now >= code.code_expires_at {
+        return Err(RootExchangeError::AssertionExpired);
+    }
+    if code.token_exp <= now {
+        return Err(RootExchangeError::ClaimInvalid("exp"));
+    }
+    super::sender::check_constraint(code.sender_constraint, sender.0)?;
+    let mut claims = Map::new();
+    claims.insert("iss".to_owned(), Value::String(server.issuer.to_owned()));
+    claims.insert("sub".to_owned(), Value::String(code.subject.to_owned()));
+    claims.insert(
+        "client_id".to_owned(),
+        Value::String(code.client_id.to_owned()),
+    );
+    claims.insert(
+        "resource".to_owned(),
+        Value::String(code.resource.to_owned()),
+    );
+    if !code.scopes.is_empty() {
+        claims.insert("scope".to_owned(), Value::String(code.scopes.join(" ")));
+    }
+    claims.insert("iat".to_owned(), Value::from(now));
+    claims.insert("exp".to_owned(), Value::from(code.token_exp));
+    let principal = required_string(&claims, "sub")?.to_owned();
+    required_string(&claims, "client_id")?;
+    required_string(&claims, "resource")?;
+    let scope_values = scope_values(&claims)?;
+    let code_digest = Sha256Digest::from_hash(sha256(code.code.as_bytes()));
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
-            namespace: ReplayNamespace::Assertion(KIND),
+            namespace: ReplayNamespace::LocalAsIssue,
             issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: local.jti,
+            id: code_digest.to_bare_hex(),
         },
         issuer: LOCAL_AS_ISSUER.to_owned(),
-        principal: local.principal,
+        principal,
         tenant: server.issuer.to_owned(),
-        token_iat: local.iat,
-        token_exp: local.exp,
+        token_iat: now,
+        token_exp: code.token_exp,
         jws: None,
-        artifact_digest: Some(local.token_digest),
-        request_digest: local.token_digest,
-        claims: local.claims,
+        artifact_digest: Some(code_digest),
+        request_digest: code.request_digest,
+        claims,
         scope_values,
         provider_id: None,
         scope_bound: None,
         holder: None,
+        sender_constraint: code.sender_constraint.cloned(),
     })
 }
 
@@ -218,7 +272,7 @@ pub fn verify_reexchange(
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
-            namespace: ReplayNamespace::LocalReExchange,
+            namespace: ReplayNamespace::Assertion(KIND),
             issuer: LOCAL_AS_ISSUER.to_owned(),
             id: local.jti,
         },
@@ -235,5 +289,6 @@ pub fn verify_reexchange(
         provider_id: None,
         scope_bound: Some(root_scope),
         holder: None,
+        sender_constraint: local.sender_constraint,
     })
 }

@@ -1336,8 +1336,9 @@ fn local_issue_refusals() {
         HeaderValue::from_static("proof"),
     );
     let other_cert = mtls_sender("other-thumbprint");
+    type CodeEdit = Box<dyn FnOnce(&mut CodeFixture)>;
     let cases: Vec<(
-        Box<dyn FnOnce(&mut CodeFixture)>,
+        CodeEdit,
         SenderRequest<'_>,
         RootExchangeError,
         OAuthErrorCode,
