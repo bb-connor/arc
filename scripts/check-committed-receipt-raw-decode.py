@@ -30,7 +30,7 @@ import (`use path::ChioReceipt as Receipt`) is read as an alias.
 
 The scan resolves lexical crate/module paths, type aliases and imports before
 computing the strict wrapper closure. It does not perform Rust type inference,
-trait dispatch or macro expansion, or follow generic helpers in other crates.
+trait dispatch or general macro expansion, or follow generic helpers in other crates.
 A pass is evidence for the listed forms only.
 """
 
@@ -67,6 +67,22 @@ _resolution = _load("receipt_type_resolution", ROOT / "scripts/receipt_type_reso
 # The receipt types that carry a serde_json::Value member (action parameters,
 # metadata). Derived impls already refuse a duplicate field of a Chio object;
 # only a Value member can keep the last of two duplicate keys.
+EXCLUDED_TYPE_MODULES = {
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1":
+        "Generated wire mirrors are decoded through the typed v1 decoder, outside raw receipt strictness.",
+}
+
+ALLOWED_TYPE_PATHS: dict[tuple[str, str], str] = {}
+
+ALLOWED_INCLUDES = {
+    ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", 'concat!(env!("OUT_DIR"),"/proof_fixture_files.rs")'):
+        "proof_fixture_build.rs emits only the EmbeddedProofFixtureFile constant array, not types or decoders.",
+    ("crates/products/chio-proof-room/src/lib.rs", 'concat!(env!("OUT_DIR"),"/proof_fixture_files.rs")'):
+        "proof_fixture_build.rs emits only the EmbeddedProofFixtureFile constant array, not types or decoders.",
+    ("crates/protocol/chio-a2a-adapter/src/lib.rs", '"fuzz.rs"'):
+        "The fuzz-only source is outside the production decode gate, matching production_files exclusions.",
+}
+
 STRICT_TYPES = frozenset({
     "ChioReceipt",
     "ChioReceiptBody",
@@ -424,6 +440,22 @@ def without_test_items(code: str) -> str:
     output = list(code)
     for match in re.finditer(r"#\[cfg\(test\)\]", code):
         start = match.end()
+        prefix = re.match(r"\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?", code[start:])
+        fragment = start + prefix.end()
+        item = re.match(r"(?:async\s+|unsafe\s+)?(?:fn|mod|struct|enum|impl|trait|type|const|static|use)\b", code[fragment:])
+        if not item:
+            end = fragment
+            depth = 0
+            while end < len(code):
+                char = code[end]
+                if depth == 0 and char in ",;}":
+                    end += char in ",;"
+                    break
+                depth += char in "<([{"
+                depth -= char in ">)]}" and depth > 0
+                end += 1
+            output[match.start():end] = " " * (end - match.start())
+            continue
         while start < len(code) and code[start] not in "{;":
             start += 1
         end = start + 1
@@ -455,6 +487,15 @@ def production_files(root: Path) -> list[tuple[str, str]]:
             continue
         code = _lexer.blank_rust_noise(path.read_text(encoding="utf-8"))
         files.append((rel, without_test_items(code)))
+    seen = {rel for rel, _ in files}
+    for rel, code in files:
+        for _, child, expression in _resolution.include_paths(root, rel, code, _contracts, crate_of):
+            if (rel, expression) in ALLOWED_INCLUDES or child is None or child in seen:
+                continue
+            path = root / child
+            if path.is_file() and path.suffix in {".rs", ".inc"} and path.resolve().is_relative_to(root.resolve()):
+                seen.add(child)
+                files.append((child, without_test_items(_lexer.blank_rust_noise(path.read_text(encoding="utf-8")))))
     return files
 
 
@@ -847,7 +888,7 @@ def scan(root: Path) -> list[str]:
                 target = explicit if explicit is not None else item.group(2)
                 if strict.mentions(target, rel, item.start() + offset):
                     findings.append((rel, f"static {item.group(1)}", call_text(initializer, offset), "decode", kind))
-    errors = []
+    errors = [f"{rel}: unresolved type path {path}" for rel, path in sorted(strict.unresolved)]
     remaining = list(findings)
     by_path = dict(files)
     for entry in ALLOWED:
@@ -947,19 +988,26 @@ FIXTURES = {
 
 
 def self_test() -> None:
+    def write_fixture(path, text, **kwargs):
+        declarations = "type Other = (); type E = (); type R = (); type Value = serde_json::Value; use std::sync::LazyLock;\n"
+        path.write_text(declarations + text, **kwargs)
+
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         source = root / "crates/demo/src/lib.rs"
         source.parent.mkdir(parents=True)
+        other = root / "crates/other/src/lib.rs"
+        other.parent.mkdir(parents=True, exist_ok=True)
+        other.write_text("pub struct Thing {}\n", encoding="utf-8")
         for label, (code, expected) in FIXTURES.items():
-            source.write_text(code + "\n", encoding="utf-8")
+            write_fixture(source, code + "\n", encoding="utf-8")
             found = len(scan(root))
             if found != expected + len(ALLOWED):
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found - len(ALLOWED)}")
         for label, name, expected in (("included fragment", "part.inc", 1), ("test fragment", "part_tests.inc", 0)):
             fragment = root / "crates/demo/src" / name
-            fragment.write_text("fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
-            source.write_text("\n", encoding="utf-8")
+            write_fixture(fragment, "fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
+            write_fixture(source, "\n", encoding="utf-8")
             found = len(scan(root)) - len(ALLOWED)
             fragment.unlink()
             if found != expected:
@@ -978,7 +1026,7 @@ def self_test() -> None:
         allowed = ALLOWED[0]
         target = root / allowed["path"]
         target.parent.mkdir(parents=True)
-        source.write_text("\n", encoding="utf-8")
+        write_fixture(source, "\n", encoding="utf-8")
         signed = "UntrustedJsonText::new(raw).decode_signed()"
         for label, body, producer, expected in (
             ("approved call", "let receipt: ChioReceipt = serde_json::from_value(value)?;", signed, 0),
@@ -986,7 +1034,7 @@ def self_test() -> None:
             ("producer regressed to a raw decode", "let receipt: ChioReceipt = serde_json::from_value(value)?;", "serde_json::from_str(raw)", 1),
             ("producer with a raw decode beside decode_signed", "let receipt: ChioReceipt = serde_json::from_value(value)?;", f"{{ let _: Value = serde_json::from_str(raw)?; {signed} }}", 1),
         ):
-            target.write_text(
+            write_fixture(target,
                 f"fn decode_stored_json(raw: &str) -> Result<Value, E> {{ {producer} }}\n"
                 f"fn {allowed['owner']}(raw: &str) -> Result<ChioReceipt, E> {{\n"
                 f"    let value = decode_stored_json(raw)?;\n    {body}\n    Ok(receipt)\n}}\n",
@@ -995,20 +1043,20 @@ def self_test() -> None:
             found = len(scan(root)) - (len(ALLOWED) - 1)
             if found != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
-        target.write_text("\n", encoding="utf-8")
+        write_fixture(target, "\n", encoding="utf-8")
         other = root / "crates/other/src/lib.rs"
-        other.parent.mkdir(parents=True)
+        other.parent.mkdir(parents=True, exist_ok=True)
         other.write_text("fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\n", encoding="utf-8")
         for label, code, expected in (
             ("same-named helper in another crate", "fn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 0),
             ("helper in the same crate", "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 1),
         ):
-            source.write_text(code + "\n", encoding="utf-8")
+            write_fixture(source, code + "\n", encoding="utf-8")
             found = len(scan(root)) - len(ALLOWED)
             if found != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
         other.write_text("\n", encoding="utf-8")
-        source.write_text("\n", encoding="utf-8")
+        write_fixture(source, "\n", encoding="utf-8")
         member = next(entry for entry in ALLOWED if entry["owner"] == "extract_financial_metadata")
         target = root / member["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1016,7 +1064,7 @@ def self_test() -> None:
             ("receipt member", "receipt.metadata.as_ref()", 0),
             ("receipt member read from elsewhere", "other.as_ref()", 1),
         ):
-            target.write_text(
+            write_fixture(target,
                 f"fn {member['owner']}(receipt: &ChioReceipt, other: Option<Value>) {{ let value = {read}; "
                 f"let projection = {member['call']}; }}\n",
                 encoding="utf-8",
@@ -1024,7 +1072,7 @@ def self_test() -> None:
             matched = [error for error in scan(root) if member["owner"] in error]
             if len(matched) != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {matched}")
-        target.write_text("\n", encoding="utf-8")
+        write_fixture(target, "\n", encoding="utf-8")
         helper_entry = next(entry for entry in ALLOWED if entry["owner"] == "verify_backfill_receipts")
         target = root / helper_entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1032,7 +1080,7 @@ def self_test() -> None:
             ("approved Value helper", "serde_json::from_value(value.clone())", 0),
             ("approved helper reading text", "serde_json::from_str(value.as_str())", 2),
         ):
-            target.write_text(
+            write_fixture(target,
                 "fn load_and_build_report(bytes: &[u8]) { parse_shadow_migration_input(bytes); }\n"
                 "fn parse_shadow_migration_input(bytes: &[u8]) -> R { UntrustedJsonText::from_wire(bytes, 1)?.decode_signed() }\n"
                 f"fn strict_typed_value<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, E> {{ Ok({reader}?) }}\n"

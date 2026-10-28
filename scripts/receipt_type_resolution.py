@@ -2,11 +2,48 @@
 from collections import defaultdict
 from pathlib import Path
 import re
+import posixpath
 import tomllib
 
 PATH = re.compile(r"(?<![\w])(?:::)?[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*")
 MODULE = re.compile(r"\bmod\s+(\w+)\s*\{")
 ALIAS = re.compile(r"\btype\s+(\w+)\b[^=;]*=\s*([^;]+);")
+
+
+PRIMITIVES = frozenset({
+    "bool", "char", "str", "u8", "u16", "u32", "u64", "u128", "usize",
+    "i8", "i16", "i32", "i64", "i128", "isize", "f32", "f64",
+})
+PRELUDE_TYPES = frozenset({
+    "Box", "String", "Vec", "Option", "Result", "Send", "Sync", "Sized",
+    "Unpin", "Clone", "Copy", "Default", "Drop", "Eq", "PartialEq", "Ord",
+    "PartialOrd", "Iterator", "IntoIterator", "From", "Into", "TryFrom", "TryInto",
+    "AsRef", "AsMut", "ToOwned", "ToString", "Fn", "FnMut", "FnOnce",
+})
+EXTERNAL_ROOTS = {
+    "std": "Rust standard library; generic arguments are resolved separately.",
+    "core": "Rust core library; generic arguments are resolved separately.",
+    "alloc": "Rust allocation library; generic arguments are resolved separately.",
+    "serde": "Serialization traits cannot contain Chio receipt fields.",
+    "serde_json": "JSON library types are not typed Chio receipt wrappers.",
+}
+
+def include_paths(root, rel, code, contracts, crate_of):
+    raw = (root / rel).read_text()
+    for included in re.finditer(r"\binclude\s*!\s*\(", code):
+        opening = included.end() - 1
+        closing = contracts.closing(code, opening, "(", ")")
+        expression = raw[opening + 1:closing - 1].strip()
+        literal = re.fullmatch(r'"([^"\n]+)"', expression)
+        manifest = re.fullmatch(
+            r'concat!\(\s*env!\(\s*"CARGO_MANIFEST_DIR"\s*\)\s*,\s*"([^"\n]+)"\s*,?\s*\)', expression
+        )
+        child = None
+        if literal:
+            child = Path(rel).parent / literal.group(1)
+        elif manifest:
+            child = Path(crate_of(rel)) / manifest.group(1).lstrip("/")
+        yield included.start(), posixpath.normpath(child.as_posix()) if child else None, re.sub(r"\s+", "", expression)
 
 
 def use_leaves(text, prefix=()):
@@ -45,6 +82,9 @@ class TypeResolver:
         self.bases = {}
         self.spans = {}
         self.definitions = defaultdict(list)
+        self.definition_sources = {}
+        self.unresolved = set()
+        self.parameters = defaultdict(set)
         self.imports = defaultdict(dict)
         self.globs = defaultdict(list)
         self.crates = {}
@@ -81,35 +121,41 @@ class TypeResolver:
                 spans.append((match.start(), end, match.group(1)))
             pairs = gate.brace_pairs(code)
             for row in gate._contracts.functions(code):
-                spans.append((row[2], row[3], "@" + str(row[1])))
+                spans.append((row[2], row[3], "@" + rel + ":" + str(row[1])))
                 for opening, closing in pairs.items():
                     if row[2] < opening < closing < row[3]:
-                        spans.append((opening, closing, "@block" + str(opening)))
+                        spans.append((opening, closing, "@block" + rel + ":" + str(opening)))
             self.spans[rel] = sorted(spans)
         self._module_paths()
         for rel, code in files:
+            for row in gate._contracts.functions(code):
+                names = self.generic_names(code[row[1]:row[2]])
+                for scope in self.scopes(rel, row[2] + 1):
+                    self.parameters[scope].update(names)
             for statement in gate.USE_STATEMENT.finditer(code):
-                scope = self.scope(rel, statement.start())
-                for path, alias in use_leaves(statement.group()[3:-1]):
-                    if alias == "*":
-                        self.globs[scope].append(path[:-1])
-                    else:
-                        self.imports[scope][alias] = path
+                for scope in self.scopes(rel, statement.start()):
+                    for path, alias in use_leaves(statement.group()[3:-1]):
+                        if alias == "*":
+                            self.globs[scope].append(path[:-1])
+                        else:
+                            self.imports[scope][alias] = path
+            for match in re.finditer(r"\b(?:struct\s+(\w+)\s*;|trait\s+(\w+)|const\s+(\w+)\s*:)", code):
+                self.define(rel, match.start(), next(name for name in match.groups() if name), "")
             for match in gate.TYPE_DEFINITION.finditer(code):
                 opening = match.end(2) - 1
                 closing = ")" if code[opening] == "(" else "}"
                 end = gate._contracts.closing(code, opening, code[opening], closing)
                 body = code[opening:end]
                 if match.group().startswith("enum"):
-                    body = gate.VARIANT_NAME.sub(r"\1", body)
+                    body = self.enum_fields(body)
+                body = re.sub(r"\bpub(?:\([^)]*\))?\s+", "", body)
                 body = re.sub(r"\b\w+\s*:(?!:)", "", body)
-                if not match.group(1).endswith("Error"):
-                    scope = self.scope(rel, match.start())
-                    self.definitions[scope + (match.group(1),)].append((body, scope))
+                self.define(rel, match.start(), match.group(1), "" if match.group(1).endswith("Error") else body, self.generic_names(code[match.start():opening]))
             for match in ALIAS.finditer(code):
                 if not any(a < match.start() < b for a, b, _ in gate.block_spans(code)):
-                    scope = self.scope(rel, match.start())
-                    self.definitions[scope + (match.group(1),)].append((match.group(2), scope))
+                    self.define(rel, match.start(), match.group(1), match.group(2), self.generic_names(match.group().split("=", 1)[0]))
+        self.modules = {key[:end] for key in self.definitions for end in range(1, len(key))}
+        self.macro_types(files)
         self.strict = {
             key for key in self.definitions
             if key[-1] in gate.STRICT_TYPES
@@ -119,7 +165,7 @@ class TypeResolver:
         self.strict |= self.seeds
         self.resolve_cache = {}
         edges = {
-            key: set().union(*(self.references(body, scope) for body, scope in bodies))
+            key: set().union(*(self.references(body, scope, rel, parameters) for body, scope, rel, parameters in bodies))
             for key, bodies in self.definitions.items()
         }
         changed = True
@@ -128,43 +174,151 @@ class TypeResolver:
             self.strict.update(additions)
             changed = bool(additions)
 
+    def macro_types(self, files):
+        templates = {}
+        for rel, code in files:
+            for macro in re.finditer(r"\bmacro_rules!\s*(\w+)\s*\{", code):
+                end = self.gate._contracts.closing(code, macro.end() - 1, "{", "}")
+                template = code[macro.end():end]
+                matcher = template.split("=>", 1)[0]
+                captures = re.findall(r"\$(\w+)\s*:\s*(ident|ty|expr)", matcher)
+                if not captures:
+                    continue
+                for item in re.finditer(r"\b(?:struct|enum)\s+\$(\w+)\s*([({])", template):
+                    if item.group(1) != captures[0][0]:
+                        continue
+                    opening = item.end(2) - 1
+                    closing = ")" if template[opening] == "(" else "}"
+                    stop = self.gate._contracts.closing(template, opening, template[opening], closing)
+                    body = re.sub(r"#\[[^\]]*\]", "", template[opening:stop])
+                    if item.group().startswith("enum"):
+                        body = self.enum_fields(body)
+                    body = re.sub(r"\b\w+\s*:(?!:)", "", body)
+                    repeated = bool(re.search(r"\$\(\s*\$" + item.group(1) + r"\s*:\s*ident\s*\)\s*,\s*[+*]", matcher))
+                    for scope in self.scopes(rel, macro.start()):
+                        key = scope + (macro.group(1),)
+                        self.definitions[key].append(("", scope, rel, frozenset()))
+                        templates[key] = (body, captures, repeated)
+        names = {key[-1] for key in templates}
+        names |= {alias for imports in self.imports.values() for alias, path in imports.items() if path[-1] in names}
+        for rel, code in files:
+            for call in re.finditer(r"\b(\w+(?:::\w+)*)!\s*([({])", code):
+                if call.group(1).split("::")[-1] not in names:
+                    continue
+                opening = call.end(2) - 1
+                closing = ")" if code[opening] == "(" else "}"
+                end = self.gate._contracts.closing(code, opening, code[opening], closing)
+                arguments = re.sub(r"#\[[^\]]*\]", "", code[opening + 1:end - 1]).strip()
+                keys = set().union(*(self.resolve(tuple(call.group(1).split("::")), scope) for scope in self.scopes(rel, call.start())))
+                for key in keys & templates.keys():
+                    body, captures, repeated = templates[key]
+                    if repeated and re.fullmatch(r"[\w\s,]+", arguments):
+                        bindings = [{captures[0][0]: name} for name in re.findall(r"\w+", arguments)]
+                    else:
+                        match = re.match(r"(\w+)\s*(?:\(\s*([\w:]+)\s*\)|,\s*([\w:]+))?", arguments)
+                        if not match:
+                            continue
+                        values = [match.group(1), match.group(2) or match.group(3)]
+                        bindings = [{name: value for (name, _), value in zip(captures, values) if value}]
+                    for binding in bindings:
+                        expanded = body
+                        for name, value in binding.items():
+                            expanded = re.sub(r"\$" + name + r"\b", value, expanded)
+                        if re.search(r"\$(?!crate\b)\w+", expanded):
+                            continue
+                        self.define(rel, call.start(), binding[captures[0][0]], expanded)
+
+    @staticmethod
+    def enum_fields(body):
+        output = []
+        start = 1
+        depth = 0
+        for index, char in enumerate(body[1:-1], 1):
+            depth += char in "([{<"
+            depth -= char in ")]}>" and depth > 0
+            if char == "," and depth == 0:
+                output.append(re.sub(r"^\s*(?:#\[[^\]]*\]\s*)*\w+", "", body[start:index]))
+                start = index + 1
+        output.append(re.sub(r"^\s*(?:#\[[^\]]*\]\s*)*\w+", "", body[start:-1]))
+        return ",".join(output)
+
+    def generic_names(self, header):
+        match = re.search(r"\b(?:fn|struct|enum|type|trait)\s+\w+\s*<", header)
+        if not match:
+            return set()
+        content, _ = self.gate.angle_argument(header, match.end() - 1)
+        parts = []
+        start = depth = 0
+        for index, char in enumerate(content):
+            depth += char in "<(["
+            depth -= char in ">)]" and depth > 0
+            if char == "," and depth == 0:
+                parts.append(content[start:index])
+                start = index + 1
+        parts.append(content[start:])
+        return {match.group(1) for part in parts if (match := re.match(r"\s*(?:const\s+)?(\w+)", part))}
+
+    def define(self, rel, offset, name, body, parameters=frozenset()):
+        if self.excluded(rel):
+            body = ""
+        for scope in self.scopes(rel, offset):
+            self.definitions[scope + (name,)].append((body, scope, rel, parameters))
+
     def _module_paths(self):
-        """Bind out-of-line files to declared modules, including path attributes."""
+        """Propagate every module and include context without conflating shared files."""
         declarations = re.compile(
             r'(?:#\[path\s*=\s*"([^"\n]+)"\]\s*)?(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;'
         )
-        for _ in range(len(self.files)):
+        edges = []
+        for rel, code in self.files.items():
+            raw = (self.root / rel).read_text()
+            parent = Path(rel).parent
+            if Path(rel).stem not in {"lib", "main", "mod"}:
+                parent /= Path(rel).stem
+            for offset, child, expression in include_paths(self.root, rel, code, self.gate._contracts, self.gate.crate_of):
+                if (rel, expression) in self.gate.ALLOWED_INCLUDES:
+                    continue
+                if child in self.bases:
+                    edges.append((rel, offset, child, ()))
+                else:
+                    self.unresolved.add((rel, "include source " + (child or expression)))
+            for match in declarations.finditer(raw):
+                keyword = raw.rfind("mod", match.start(), match.end())
+                if code[keyword:keyword + 3] != "mod":
+                    continue
+                inline = self.local_scope(rel, match.start())
+                directory = parent.joinpath(*inline)
+                if match.group(1):
+                    directory = directory if inline else Path(rel).parent
+                    candidates = [directory / match.group(1)]
+                else:
+                    candidates = [directory / (match.group(2) + ".rs"), directory / match.group(2) / "mod.rs"]
+                for child in candidates:
+                    child = posixpath.normpath(child.as_posix())
+                    if child in self.bases:
+                        edges.append((rel, match.start(), child, (match.group(2),)))
+        incoming = {child for _, _, child, _ in edges}
+        contexts = {rel: {base} if rel not in incoming else set() for rel, base in self.bases.items()}
+        for _ in range(len(self.files) + 1):
             changed = False
-            for rel, code in self.files.items():
-                raw = (self.root / rel).read_text()
-                parent = Path(rel).parent
-                if Path(rel).stem not in {"lib", "main", "mod"}:
-                    parent /= Path(rel).stem
-                for match in declarations.finditer(raw):
-                    keyword = raw.rfind("mod", match.start(), match.end())
-                    if code[keyword:keyword + 3] != "mod":
-                        continue
-                    scope = self.scope(rel, match.start())
-                    inline = scope[len(self.bases[rel]):]
-                    directory = parent.joinpath(*inline)
-                    if match.group(1):
-                        directory = directory if inline else Path(rel).parent
-                        candidates = [directory / match.group(1)]
-                    else:
-                        candidates = [directory / (match.group(2) + ".rs"), directory / match.group(2) / "mod.rs"]
-                    for child in candidates:
-                        child = child.as_posix()
-                        if child in self.bases:
-                            base = scope + (match.group(2),)
-                            if self.bases[child] != base:
-                                self.bases[child] = base
-                                changed = True
+            for rel, offset, child, suffix in edges:
+                targets = {base + self.local_scope(rel, offset) + suffix for base in contexts[rel]}
+                additions = targets - contexts[child]
+                contexts[child].update(additions)
+                changed |= bool(additions)
             if not changed:
+                for rel, scopes in contexts.items():
+                    if not scopes:
+                        self.unresolved.add((rel, "cyclic module/include binding"))
+                self.bases = contexts
                 return
-        raise ValueError("cyclic Rust module path declarations")
+        raise ValueError("cyclic Rust module/include declarations")
 
-    def scope(self, rel, offset):
-        return self.bases[rel] + tuple(name for a, b, name in self.spans[rel] if a < offset < b)
+    def local_scope(self, rel, offset):
+        return tuple(name for a, b, name in self.spans[rel] if a < offset < b)
+
+    def scopes(self, rel, offset):
+        return {base + self.local_scope(rel, offset) for base in self.bases[rel]}
 
     @staticmethod
     def module(scope):
@@ -185,6 +339,8 @@ class TypeResolver:
         external = dependency.get("package", path[0]) if isinstance(dependency, dict) else path[0]
         if external.replace("-", "_") in self.crates:
             return (self.crates[external.replace("-", "_")],) + path[1:]
+        if path[0] in EXTERNAL_ROOTS or dependency is not None and not (isinstance(dependency, dict) and "path" in dependency):
+            return (":external", external) + path[1:]
         return None
 
     def resolve(self, path, scope, seen=None):
@@ -202,6 +358,8 @@ class TypeResolver:
             return self.lookup(direct, seen)
         current = scope
         while current:
+            if len(path) == 1 and path[0] in self.parameters[current]:
+                return {(":parameter", *current, path[0])}
             key = current + path
             if key in self.definitions:
                 return {key}
@@ -210,7 +368,11 @@ class TypeResolver:
             if alias and edge not in seen:
                 seen.add(edge)
                 return self.resolve(alias + path[1:], current, seen)
-            found = self.lookup(key, seen)
+            if len(path) > 1 and current + path[:1] in self.modules:
+                return self.lookup(key, seen)
+            external = self.absolute(path, scope) if not current[-1].startswith("@") else None
+            external_refs = self.lookup(external, set(seen)) if external else set()
+            found = self.lookup(key, seen) | external_refs
             if found:
                 return found
             found = set()
@@ -227,11 +389,15 @@ class TypeResolver:
         external = self.absolute(path, scope)
         if external:
             return self.lookup(external, seen)
+        if len(path) == 1 and path[0] in PRIMITIVES | PRELUDE_TYPES:
+            return {(":prelude", path[0])}
         if path[-1] in self.gate.STRICT_TYPES:
             return {(":seed", path[-1])}
         return set()
 
     def lookup(self, key, seen):
+        if key[0] == ":external":
+            return {key}
         if key in self.definitions:
             return {key}
         for split in range(len(key) - 1, 0, -1):
@@ -250,15 +416,29 @@ class TypeResolver:
                     found |= self.resolve(glob + key[-1:], key[:-1], seen)
         return found
 
-    def references(self, text, scope):
+    def excluded(self, rel):
+        return any(rel == prefix + ".rs" or rel.startswith(prefix + "/") for prefix in self.gate.EXCLUDED_TYPE_MODULES)
+
+    def references(self, text, scope, rel=None, parameters=frozenset()):
         found = set()
+        text = re.sub(r"#\[[^\]]*\]|\'\w+", " ", text)
         for match in PATH.finditer(text):
             path = tuple(x.strip() for x in match.group().split("::"))
+            if len(path) == 1 and path[0] in parameters | {"mut", "dyn", "fn", "unsafe", "extern", "impl", "const", "_", "as", "for"}:
+                continue
             marker = (path, scope)
             if marker not in self.resolve_cache:
                 self.resolve_cache[marker] = self.resolve(path, scope)
-            found |= self.resolve_cache[marker]
+            refs = self.resolve_cache[marker]
+            if not refs and rel:
+                exception = self.gate.ALLOWED_TYPE_PATHS.get((rel, "::".join(path)), "")
+                if not self.excluded(rel) and not exception.strip():
+                    self.unresolved.add((rel, "::".join(path)))
+            found |= refs
         return found
 
     def mentions(self, text, rel, offset):
-        return bool(self.references(text, self.scope(rel, offset)) & self.strict)
+        if self.excluded(rel):
+            return False
+        references = [self.references(text, scope, rel) for scope in self.scopes(rel, offset)]
+        return any(refs & self.strict for refs in references)
