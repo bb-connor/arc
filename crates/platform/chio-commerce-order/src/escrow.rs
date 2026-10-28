@@ -397,12 +397,13 @@ pub fn accept(
 
 /// Drains custody to the order merchant.
 ///
-/// Every binding of the public `acceptance` is re-derived: the ledger passes
-/// [`CommerceEscrowLedger::validate`], recomputes to the pinned escrow digest,
-/// and is bound to the accepted order; the settlement packet is signed by a
-/// pinned settlement authority, is the packet the accepted context pins, and
-/// carries the locked merchant, amount, currency, and quote digest.
-/// The advanced context must preserve the accepted context's immutable fields
+/// Every binding of the public `acceptance` is re-derived: the accepted quote
+/// digest recomputes; the ledger passes [`CommerceEscrowLedger::validate`],
+/// recomputes to the pinned escrow digest, and is bound to the accepted order;
+/// the settlement packet is signed by a pinned settlement authority, is the
+/// packet the accepted context pins, and carries the accepted packet and
+/// reconciliation references and the locked merchant, amount, currency, and
+/// quote digest. The advanced context must preserve the accepted context's immutable fields
 /// and be in a state that allows settlement reconciliation. The execution
 /// instruction must be signed by a pinned execution authority, validate, be a
 /// matched `release_reserve` paying the order merchant the locked amount
@@ -418,6 +419,7 @@ pub fn release(
         return Err(CommerceEscrowError::AcceptanceDigestMismatch.into());
     }
     accepted.validate_shape()?;
+    crate::verify_quote_digest(accepted)?;
     if accepted.escrow_digest.as_deref() != Some(acceptance.escrow_digest.as_str()) {
         return Err(CommerceEscrowError::AcceptedContextUnbound.into());
     }
@@ -629,6 +631,14 @@ fn bind_settlement_packet(
 ) -> Result<(), CommerceEscrowError> {
     let bindings = [
         ("order_id", packet.order_id == accepted.order_id),
+        (
+            "settlement_packet_ref",
+            packet.id == accepted.settlement_packet_ref,
+        ),
+        (
+            "reconciliation_ref",
+            packet.reconciliation_ref == accepted.reconciliation_ref,
+        ),
         (
             "merchant_subject",
             packet.merchant_subject == ledger.beneficiary_account,
