@@ -74,6 +74,22 @@ pub(crate) fn current_receipt_evaluation_scope_key() -> Option<String> {
     RECEIPT_EVALUATION_SCOPE_KEY.try_with(Clone::clone).ok()
 }
 
+pub(crate) struct ScopedKernelReceiptSessionAnchor {
+    pub(super) scope_key: String,
+    pub(super) anchors: Arc<DashMap<String, chio_core::session::SessionAnchorReference>>,
+    pub(super) previous: Option<chio_core::session::SessionAnchorReference>,
+}
+
+impl Drop for ScopedKernelReceiptSessionAnchor {
+    fn drop(&mut self) {
+        if let Some(previous) = self.previous.take() {
+            self.anchors.insert(self.scope_key.clone(), previous);
+        } else {
+            self.anchors.remove(&self.scope_key);
+        }
+    }
+}
+
 pub(crate) struct ScopedKernelReceiptTenantId {
     pub(super) scope_key: String,
     pub(super) tenant_ids: Arc<DashMap<String, String>>,

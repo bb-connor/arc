@@ -1044,6 +1044,12 @@
       "schemaFile": "spec/schemas/chio-pheromone/v1/relay-trend-report.schema.json"
     },
     {
+      "schema": "chio.receipt-session-anchor.v1",
+      "artifactKind": "receipt_session_anchor",
+      "introducedBy": "receipt-session-anchor-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json"
+    },
+    {
       "schema": "chio.receipt_lineage_statement.v1",
       "artifactKind": "receipt_lineage",
       "introducedBy": "schema-registry/v1/receipt-lineage-v1",

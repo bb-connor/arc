@@ -906,6 +906,34 @@ a signed receipt-lineage statement, or a verified continuation token scoped by
 the relevant session anchor. Reports and exports must preserve that evidence
 class boundary instead of silently upgrading caller input into proof.
 
+A receipt the kernel signs for an evaluation inside a session carries the
+top-level `session_anchor` block (schema `chio.receipt-session-anchor.v1`).
+The block is `{ schema, session_anchor_commitment }`, where the commitment is
+the lowercase hex SHA-256 of the bytes `chio.receipt-session-anchor.v1`, one
+zero byte, and the canonical JSON of the session anchor reference
+`{ sessionAnchorHash, sessionAnchorId }` current when the evaluation began.
+Only the session scope writes it: metadata reaching the signing path that
+already names `session_anchor` is refused, and a receipt signed outside a
+session carries no block. The block shape is
+`spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json`.
+
+A continuation token that names `parent_session_anchor` while no live parent
+session context is available is verified against its persisted parent
+receipt, and the token is accepted only when all of these hold:
+
+- the token carries `parent_receipt_hash` and it equals the SHA-256 of the
+  parent receipt's canonical JSON
+- the parent receipt signature verifies under the receipt crypto floor and
+  its `kernel_key` is this kernel's receipt key or a key in the trust-control
+  authority set; neither a capability CA key nor the receipt's own embedded
+  key is trusted for this purpose
+- the parent is a mediated, preventive `allow` decision receipt
+- the parent carries a well-formed `session_anchor` block whose commitment
+  equals the commitment recomputed from the token's `parent_session_anchor`
+
+Any other outcome denies the request. The accepted `sessionAnchorId` is the
+token's anchor id, now bound to the parent receipt's signed block.
+
 ### 5.3 Verification Rules
 
 The kernel and trust surfaces verify, at minimum:
@@ -1166,7 +1194,9 @@ The current launch-candidate safety inventory is:
 - `P7` receipt-lineage soundness: a `verified` receipt edge implies both
   receipts verify and the linkage was signed by a trusted kernel
 - `P8` session continuity soundness: continued provenance can only claim
-  session continuity through a valid session anchor and continuation artifact
+  session continuity through a valid session anchor and continuation artifact;
+  for a persisted parent, the anchor is the one committed in the parent
+  receipt's signed `session_anchor` block
 - `P9` delegation/provenance consistency: verified call-chain subjects and
   parent capability references remain consistent with capability lineage
 - `P10` report truthfulness: enterprise/report/export surfaces never label
@@ -1573,6 +1603,7 @@ unsupported schema versions fail closed.
 | `caller_delivery` | Chio signer | committed-safe | `chio.authenticated-caller-observation.v1` | Authenticated caller observation report and authorization digests, executor and claim identity and times; no raw output. Read by the kernel's return-context, terminal and replay paths. |
 | `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
 | `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
+| `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The anchor id embeds the random session id, so the commitment confirms no guessed auth context. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
 | `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
 | `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
 | `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |

@@ -7,11 +7,10 @@ const PARENT_TIMESTAMP: u64 = 1_800_000_000;
 const DENIED: &str = "governed transaction denied: ";
 
 fn anchor_block(reference: &SessionAnchorReference) -> serde_json::Value {
-    serde_json::json!({
-        "schema": "chio.receipt-session-anchor.v1",
-        "session_anchor_id": reference.session_anchor_id,
-        "session_anchor_hash": reference.session_anchor_hash,
-    })
+    chio_core::receipt::metadata::ReceiptSessionAnchorV1::commit(reference)
+        .unwrap()
+        .to_metadata_value()
+        .unwrap()
 }
 
 fn session_anchor_of(kernel: &ChioKernel, session_id: &SessionId) -> SessionAnchorReference {
@@ -369,18 +368,21 @@ fn malformed_parent_session_anchor_block_is_refused() {
     extra_member["session_id"] = serde_json::json!(session_id.to_string());
     let mut wrong_schema = anchor_block(&anchor);
     wrong_schema["schema"] = serde_json::json!("chio.receipt-session-anchor.v2");
-    let mut short_hash = anchor_block(&anchor);
-    short_hash["session_anchor_hash"] = serde_json::json!("abcd");
-    let mut missing_id = anchor_block(&anchor);
-    missing_id
+    let mut short_commitment = anchor_block(&anchor);
+    short_commitment["session_anchor_commitment"] = serde_json::json!("abcd");
+    let mut uppercase_commitment = anchor_block(&anchor);
+    uppercase_commitment["session_anchor_commitment"] = serde_json::json!("AB".repeat(32));
+    let mut missing_commitment = anchor_block(&anchor);
+    missing_commitment
         .as_object_mut()
         .unwrap()
-        .remove("session_anchor_id");
+        .remove("session_anchor_commitment");
     for block in [
         extra_member,
         wrong_schema,
-        short_hash,
-        missing_id,
+        short_commitment,
+        uppercase_commitment,
+        missing_commitment,
         serde_json::json!("not-an-object"),
     ] {
         let parent = signed_parent(
@@ -519,4 +521,38 @@ fn session_anchor_is_a_reserved_kernel_written_key() {
         chio_core::receipt::metadata::reserved_receipt_metadata_keys()
             .any(|key| key == "session_anchor")
     );
+}
+
+/// A `session_anchor` block forwarded into the signing boundary by any layer
+/// other than the session scope is refused, so a signed receipt can only ever
+/// carry the anchor of the session it was evaluated in.
+#[test]
+fn forwarded_session_anchor_metadata_is_refused_at_signing() {
+    let (kernel, agent) = echo_kernel();
+    let session_id = open_anchored_session(&kernel, &agent);
+    let anchor = session_anchor_of(&kernel, &session_id);
+    let result = kernel.build_and_sign_receipt(ReceiptParams {
+        request_id: Some("req-forwarded-anchor"),
+        capability_id: "cap-forwarded-anchor",
+        tool_name: "delegate",
+        server_id: "srv-echo",
+        decision: Decision::Allow,
+        action: ToolCallAction::from_parameters(serde_json::json!({ "stage": "forwarded" }))
+            .unwrap(),
+        content_hash: chio_core::crypto::sha256_hex(b"forwarded-anchor"),
+        canonical_content: b"forwarded-anchor".to_vec(),
+        metadata: Some(serde_json::json!({ "session_anchor": anchor_block(&anchor) })),
+        timestamp: PARENT_TIMESTAMP,
+        trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+        tenant_id: None,
+    });
+    assert!(
+        matches!(
+            &result,
+            Err(KernelError::ReceiptSigningFailed(reason))
+                if reason == "receipt metadata already carries a session anchor block"
+        ),
+        "{result:?}"
+    );
+    assert!(kernel.receipt_log().is_empty());
 }

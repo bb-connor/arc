@@ -162,6 +162,13 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         "Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit.",
     ),
     spec(
+        super::SESSION_ANCHOR_METADATA_KEY,
+        ChioInternal,
+        CommittedSafe,
+        Some(super::RECEIPT_SESSION_ANCHOR_SCHEMA),
+        "The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The anchor id embeds the random session id, so the commitment confirms no guessed auth context. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier.",
+    ),
+    spec(
         "receipt_context",
         ChioInternal,
         Unsafe,

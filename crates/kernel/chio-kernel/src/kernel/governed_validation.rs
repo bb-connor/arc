@@ -298,6 +298,69 @@ impl ChioKernel {
         Err("approval signer is not in configured roster".to_string())
     }
 
+    /// Keys trusted to sign a persisted continuation parent: this kernel's own
+    /// receipt key and the trust-control authority set. CA keys sign
+    /// capabilities, never receipts, and the receipt's embedded key is never
+    /// trusted on its own.
+    fn trusted_persisted_parent_signers(&self) -> Vec<chio_core::PublicKey> {
+        let mut trusted = self.capability_authority.trusted_public_keys();
+        let kernel_pk = self.config.keypair.public_key();
+        if !trusted.contains(&kernel_pk) {
+            trusted.push(kernel_pk);
+        }
+        trusted
+    }
+
+    /// Verify a continuation token's parent anchor against the session anchor
+    /// block signed into the persisted parent receipt. The caller has already
+    /// verified the receipt signature and, when present, its artifact hash.
+    fn verify_persisted_parent_session_anchor(
+        &self,
+        parent: Option<&LocalReceiptArtifact>,
+        parent_receipt_hash: Option<&str>,
+        token_anchor: &chio_core::session::SessionAnchorReference,
+    ) -> Result<(), KernelError> {
+        let denied = |reason: &str| {
+            KernelError::GovernedTransactionDenied(format!(
+                "governed call_chain continuation {reason}"
+            ))
+        };
+        if parent_receipt_hash.is_none() {
+            return Err(denied(
+                "token parent_receipt_hash is required for a persisted parent",
+            ));
+        }
+        let Some(LocalReceiptArtifact::Tool(parent)) = parent else {
+            return Err(denied("parent receipt carries no session anchor"));
+        };
+        if !self
+            .trusted_persisted_parent_signers()
+            .contains(&parent.kernel_key)
+        {
+            return Err(denied("parent receipt signer is not trusted"));
+        }
+        if parent.decision != Some(Decision::Allow)
+            || parent.receipt_kind != chio_core::receipt::kinds::ReceiptKind::MediatedDecision
+            || parent.boundary_class != chio_core::receipt::kinds::BoundaryClass::Prevent
+        {
+            return Err(denied("parent receipt is not an allowed decision"));
+        }
+        let block = chio_core::receipt::metadata::ReceiptSessionAnchorV1::from_receipt_metadata(
+            parent.metadata.as_ref(),
+        )
+        .map_err(|_| denied("parent session anchor block is malformed"))?
+        .ok_or_else(|| denied("parent receipt carries no session anchor"))?;
+        let binds = block
+            .binds(token_anchor)
+            .map_err(|_| denied("token session anchor does not match the parent receipt"))?;
+        if !binds {
+            return Err(denied(
+                "token session anchor does not match the parent receipt",
+            ));
+        }
+        Ok(())
+    }
+
     fn trusted_governance_authorities(&self) -> Vec<chio_core::PublicKey> {
         let kernel_pk = self.config.keypair.public_key();
         let mut trusted = self.config.ca_public_keys.clone();
@@ -967,9 +1030,16 @@ impl ChioKernel {
                 continuation_token.parent_session_anchor.as_ref()
             {
                 let Some(parent_context) = parent_context else {
-                    return Err(KernelError::GovernedTransactionDenied(
-                        "governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage".to_string(),
-                    ));
+                    self.verify_persisted_parent_session_anchor(
+                        local_parent_receipt.as_ref(),
+                        continuation_token.parent_receipt_hash.as_deref(),
+                        parent_session_anchor,
+                    )?;
+                    return Ok(Some(ValidatedGovernedCallChainProof {
+                        upstream_proof: None,
+                        continuation_token_id: Some(continuation_token.token_id.clone()),
+                        session_anchor_id: Some(parent_session_anchor.session_anchor_id.clone()),
+                    }));
                 };
                 let authoritative_parent_anchor =
                     self.with_session(&parent_context.session_id, |session| {

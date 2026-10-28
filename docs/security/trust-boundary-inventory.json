@@ -7787,6 +7787,9 @@
     ],
     "crates/tooling/chio-bundle-verify/src/read.rs": [
       "decode_strict::from_value"
+    ],
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": [
+      "from_receipt_metadata::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -13286,6 +13289,22 @@
       "readers": [
         {
           "reader": "decode_strict",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
+      "readers": [
+        {
+          "reader": "from_receipt_metadata",
           "decoders": [
             "from_value"
           ],

@@ -137,7 +137,7 @@ pub(crate) use kernel_scopes::{
     current_scoped_receipt_tenant_id, extract_tenant_id_from_auth_context,
     scope_async_receipt_context, scope_receipt_federation_admission, scope_receipt_tenant_id,
     ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
-    ScopedKernelReceiptTenantId,
+    ScopedKernelReceiptSessionAnchor, ScopedKernelReceiptTenantId,
 };
 pub(crate) use kernel_struct::{
     capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,

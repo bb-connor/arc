@@ -44,6 +44,7 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("caller_delivery", Registered(ChioInternal, CommittedSafe)),
     ("protocol_refusal", Registered(ChioInternal, Unsafe)),
     ("chio_runtime", Registered(ChioInternal, CommittedSafe)),
+    ("session_anchor", Registered(ChioInternal, CommittedSafe)),
     ("receipt_context", Registered(ChioInternal, Unsafe)),
     (
         "governed_transaction_diagnostics",
