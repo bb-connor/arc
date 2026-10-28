@@ -582,6 +582,10 @@ pub(super) fn owner_invalid(detail: impl Into<String>) -> SqliteServingOwnerErro
 mod tests;
 
 #[cfg(test)]
+#[path = "../tests/root_exchange_support/mod.rs"]
+mod support;
+
+#[cfg(test)]
 mod recovery_tests;
 
 #[cfg(test)]
