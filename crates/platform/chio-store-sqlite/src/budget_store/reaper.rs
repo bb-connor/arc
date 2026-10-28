@@ -494,10 +494,14 @@ mod tests {
     };
     use std::collections::HashMap;
 
-    fn open_temp_store() -> SqliteBudgetStore {
-        let dir = std::env::temp_dir().join(format!("chio-reaper-{}", uuid::Uuid::now_v7()));
-        std::fs::create_dir_all(&dir).unwrap();
-        SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap()
+    fn open_temp_store() -> (tempfile::TempDir, SqliteBudgetStore) {
+        let root = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("chio-reaper-")
+            .tempdir_in(root)
+            .unwrap();
+        let store = SqliteBudgetStore::open(dir.path().join("budget.sqlite")).unwrap();
+        (dir, store)
     }
 
     fn authorize(store: &SqliteBudgetStore, hold_id: &str, cap: &str) {
@@ -572,7 +576,7 @@ mod tests {
     fn ttl_reaper_settles_expired_unreconciled_reserved_holds_at_worst_case() {
         use chio_kernel::budget_store::{BudgetHoldDispositionView, BudgetReconcileHoldRequest};
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         // Expired reserved hold.
         authorize(&store, "hold-expired", "cap-a");
         store
@@ -686,7 +690,7 @@ mod tests {
     fn ttl_reaper_settles_expired_hold_after_invocation_capture() {
         use chio_kernel::budget_store::BudgetHoldDispositionView;
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         authorize(&store, "hold-captured-expired", "cap-captured-expired");
         store
             .mark_hold_reserved_until(
@@ -721,7 +725,7 @@ mod tests {
     fn budget_hold_snapshot_projects_reserved_hold() {
         use chio_kernel::budget_store::BudgetHoldDispositionView;
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         authorize(&store, "hold-snap", "cap-snap");
         assert!(store
             .budget_hold_snapshot("hold-missing")
@@ -766,7 +770,7 @@ mod tests {
 
     #[test]
     fn mark_hold_reserved_on_missing_hold_fails_closed() {
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         assert!(store
             .mark_hold_reserved_until("nope", 100, "USD", None, &ReservedHoldEnvelope::default())
             .is_err());
@@ -774,7 +778,7 @@ mod tests {
 
     #[test]
     fn request_id_has_reserved_hold_matches_by_prefix_and_escapes_like_metacharacters() {
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         // A reservation under capability A binds request_id `axc` to a hold whose
         // id embeds A. The reuse guard must report `axc` taken regardless of the
         // capability that opened it.
@@ -810,7 +814,7 @@ mod tests {
         // SIGKILL after authorize commits but before reconcile. A naive
         // "release Open on restart" would enable double-spend; instead the
         // durable receipt log arbitrates.
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         authorize(&store, "hold-admitted", "cap-a"); // durably admitted, realized 40
         authorize(&store, "hold-orphan", "cap-b"); // never admitted downstream
                                                    // Before reap both holds inflate committed_cost by their worst-case 100.
@@ -853,7 +857,7 @@ mod tests {
 
     #[test]
     fn reaper_forfeits_captured_orphan_at_worst_case() {
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         authorize(&store, "hold-captured", "cap-captured");
         capture_invocation(&store, "hold-captured", "cap-captured");
 
@@ -886,7 +890,7 @@ mod tests {
             BudgetHoldDispositionView, BudgetReverseHoldRequest, BudgetStore,
         };
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         // Debit the single invocation exactly as the reserve path does, then adopt
         // it into a durable zero-exposure reserved hold.
         authorize_invocation(&store, "hold-inv", "cap-inv");
@@ -978,7 +982,7 @@ mod tests {
     fn reaper_forfeits_expired_invocation_reserve_keeping_it_consumed() {
         use chio_kernel::budget_store::{BudgetHoldDispositionView, BudgetStore};
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         authorize_invocation(&store, "hold-inv", "cap-inv");
         store
             .reserve_invocation_hold(
@@ -1019,7 +1023,7 @@ mod tests {
         // authorize leaves them open; the reaper must load and present each hold's
         // stored authority so the store's authority check passes and the orphaned
         // holds are reclaimed rather than left reserved indefinitely.
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
         let authority = BudgetEventAuthority {
             authority_id: "kernel-authority".to_string(),
             lease_id: "lease-1".to_string(),
@@ -1059,7 +1063,7 @@ mod tests {
     fn list_open_delegated_reserved_hold_ids_enumerates_only_open_delegated_reserved() {
         use chio_kernel::budget_store::BudgetReconcileHoldRequest;
 
-        let store = open_temp_store();
+        let (_dir, store) = open_temp_store();
 
         // (a) Open delegated reserve-for-caller hold: reserved with delegation
         // depth one, so its child's sibling-sum share stays admitted against the

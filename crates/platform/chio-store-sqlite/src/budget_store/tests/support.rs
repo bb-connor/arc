@@ -1,5 +1,13 @@
 use super::*;
 
+pub(super) fn canonical_tempdir(prefix: &str) -> tempfile::TempDir {
+    let root = std::fs::canonicalize(std::env::temp_dir()).expect("canonical temp root");
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(root)
+        .expect("private temp dir")
+}
+
 pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

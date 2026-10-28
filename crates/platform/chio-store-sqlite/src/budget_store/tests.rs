@@ -1459,15 +1459,14 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
 #[test]
 fn sqlite_store_reports_truthful_single_node_guarantee_level() {
     use chio_kernel::budget_store::{BudgetGuaranteeLevel, BudgetStore};
-    let dir = std::env::temp_dir().join(format!("chio-glevel-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = canonical_tempdir("chio-glevel-");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
             .expect("secure directory");
     }
-    let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
+    let store = SqliteBudgetStore::open(dir.path().join("budget.sqlite")).unwrap();
     assert_eq!(
         store.budget_guarantee_level(),
         BudgetGuaranteeLevel::SingleNodeAtomic
@@ -1484,15 +1483,14 @@ fn reap_orphaned_holds_is_reachable_through_budget_store_trait() {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    let dir = std::env::temp_dir().join(format!("chio-reap-trait-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = canonical_tempdir("chio-reap-trait-");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
             .expect("secure directory");
     }
-    let store = SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap();
+    let store = SqliteBudgetStore::open(dir.path().join("budget.sqlite")).unwrap();
 
     // Authorize a hold so there is an open hold to reap.
     let decision = store
@@ -1544,8 +1542,7 @@ fn open_hold_stays_reserved_without_reap() {
     };
     use std::sync::Arc;
 
-    let dir = std::env::temp_dir().join(format!("chio-noreap-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = canonical_tempdir("chio-noreap-");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -1553,7 +1550,7 @@ fn open_hold_stays_reserved_without_reap() {
             .expect("secure directory");
     }
     let store: Arc<dyn BudgetStore> =
-        Arc::new(SqliteBudgetStore::open(dir.join("budget.sqlite")).unwrap());
+        Arc::new(SqliteBudgetStore::open(dir.path().join("budget.sqlite")).unwrap());
 
     let decision = store
         .authorize_budget_hold(BudgetAuthorizeHoldRequest {

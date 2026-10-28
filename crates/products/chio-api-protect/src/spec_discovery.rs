@@ -121,18 +121,16 @@ fn host_is_loopback(host: &Host<&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn load_spec_from_existing_file() -> Result<(), Box<dyn std::error::Error>> {
-        let suffix = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let dir = std::env::temp_dir().join(format!("chio-api-protect-test-{suffix}"));
-        std::fs::create_dir_all(&dir)?;
-        let path = dir.join("spec.json");
+        let dir = tempfile::Builder::new()
+            .prefix("chio-api-protect-test-")
+            .tempdir_in(std::fs::canonicalize(std::env::temp_dir())?)?;
+        let path = dir.path().join("spec.json");
         std::fs::write(&path, r#"{"openapi":"3.1.0"}"#)?;
         let spec = load_spec_from_file(&path.to_string_lossy())?;
         assert!(spec.contains("3.1.0"));
-        let _ = std::fs::remove_dir_all(&dir);
         Ok(())
     }
 
