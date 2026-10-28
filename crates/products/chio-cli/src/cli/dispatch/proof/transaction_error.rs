@@ -243,9 +243,11 @@ fn commerce_escrow_error_spec(
     match error {
         Error::LedgerSchemaUnsupported(_)
         | Error::ReservationSchemaUnsupported(_)
+        | Error::AcceptanceSchemaUnsupported(_)
         | Error::Canonicalization(_) => &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
         Error::AcceptanceDigestMismatch => &TRANSACTION_ARTIFACT_HASH_MISMATCH,
         Error::OfferSignatureInvalid
+        | Error::AcceptanceSignatureInvalid
         | Error::ReservationSignatureInvalid
         | Error::SettlementSignatureInvalid
         | Error::ExecutionSignatureInvalid => &TRANSACTION_SIGNATURE_INVALID,
@@ -253,6 +255,7 @@ fn commerce_escrow_error_spec(
         | Error::OfferOutsideValidityWindow
         | Error::OfferSelfIssued
         | Error::AcceptorNotSubject
+        | Error::AcceptanceUnbound(_)
         | Error::OfferLiabilityInvalid(_)
         | Error::LiabilityCurrencyMismatch
         | Error::LiabilityQuoteMismatch
