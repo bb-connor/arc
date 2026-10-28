@@ -153,7 +153,7 @@ pub(crate) struct BackfillEvidence {
     pub(crate) lineage_label: InformationLabel,
     pub(crate) session_label: InformationLabel,
     pub(crate) context_generation: u64,
-    pub(crate) legacy_session_closed: bool,
+    pub(crate) pre_enablement_session_closed: bool,
 }
 
 impl BackfillEvidence {
@@ -386,7 +386,7 @@ pub(crate) struct SessionBackfillRecord {
     context_generation: u64,
     evidence_receipt_ids: Vec<String>,
     assigned_top_due_to_missing_evidence: bool,
-    pub(crate) legacy_session_closed: bool,
+    pub(crate) pre_enablement_session_closed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -1261,9 +1261,9 @@ fn build_backfill_report(
             context_generation: max_context_generation(target_evidence),
             evidence_receipt_ids: evidence_ids(target_evidence),
             assigned_top_due_to_missing_evidence: missing,
-            legacy_session_closed: target_evidence
+            pre_enablement_session_closed: target_evidence
                 .iter()
-                .any(|item| item.evidence.legacy_session_closed),
+                .any(|item| item.evidence.pre_enablement_session_closed),
         });
     }
 

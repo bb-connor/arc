@@ -101,7 +101,7 @@ fn base_input(signer: &Keypair) -> ShadowMigrationInput {
 fn backfill_evidence(
     manifest_digest: String,
     session_id: &str,
-    legacy_session_closed: bool,
+    pre_enablement_session_closed: bool,
 ) -> BackfillEvidence {
     BackfillEvidence {
         schema: BACKFILL_EVIDENCE_SCHEMA.to_string(),
@@ -116,7 +116,7 @@ fn backfill_evidence(
         lineage_label: InformationLabel::bottom(),
         session_label: InformationLabel::bottom(),
         context_generation: 7,
-        legacy_session_closed,
+        pre_enablement_session_closed,
     }
 }
 
@@ -302,18 +302,18 @@ fn backfill_requires_pinned_receipts_and_verified_manifest_evidence() {
         tenant_id: "tenant.one".to_string(),
         principal_id: "principal.one".to_string(),
         lineage_id: "lineage.one".to_string(),
-        session_id: "session.legacy".to_string(),
+        session_id: "session.pre-enablement".to_string(),
         isolation_epoch_id: "epoch.one".to_string(),
     }];
     input.backfill_receipts.push(signed_backfill_receipt(
         &receipt_signer,
-        backfill_evidence(source_digest, "session.legacy", true),
+        backfill_evidence(source_digest, "session.pre-enablement", true),
     ));
 
     let report = build_shadow_migration_report(input.clone()).test_expect("verified backfill");
     assert_eq!(report.backfill.principal_records_from_verified_evidence, 1);
     assert_eq!(report.backfill.principal_records_assigned_top, 0);
-    assert!(report.backfill.sessions[0].legacy_session_closed);
+    assert!(report.backfill.sessions[0].pre_enablement_session_closed);
 
     let mut wrong_key = input;
     wrong_key.receipt_public_keys[0].public_key = key(6).public_key();
@@ -321,7 +321,7 @@ fn backfill_requires_pinned_receipts_and_verified_manifest_evidence() {
 }
 
 #[test]
-fn absent_legacy_session_evidence_assigns_top_and_preserves_principal_knowledge() {
+fn pre_enablement_session_without_evidence_assigns_top_and_preserves_principal_knowledge() {
     let manifest_signer = key(7);
     let receipt_signer = key(8);
     let mut input = base_input(&manifest_signer);
