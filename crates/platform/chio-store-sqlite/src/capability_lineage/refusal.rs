@@ -7,6 +7,14 @@ pub(crate) enum LineageReaderRefusal {
     Validation(Box<ReceiptStoreError>),
     #[error(transparent)]
     SignedInput(Box<UntrustedJsonError>),
+    #[error("capability_lineage.{field} must be non-negative, got {value} at column {column}")]
+    NegativeInteger {
+        column: usize,
+        field: &'static str,
+        value: i64,
+    },
+    #[error("capability_lineage.provenance has unsupported value {value:?} at column {column}")]
+    UnknownProvenance { column: usize, value: String },
     #[error("invalid capability lineage value at column {column}")]
     Conversion { column: usize },
     #[error("invalid capability lineage type at column {column}")]
@@ -21,6 +29,10 @@ impl LineageReaderRefusal {
     pub(crate) fn from_sql(error: rusqlite::Error) -> Result<Self, rusqlite::Error> {
         match error {
             rusqlite::Error::FromSqlConversionFailure(column, _, source) => {
+                let source = match source.downcast::<Self>() {
+                    Ok(refusal) => return Ok(*refusal),
+                    Err(source) => source,
+                };
                 let source = match source.downcast::<ReceiptStoreError>() {
                     Ok(error) => return Ok(Self::Validation(error)),
                     Err(source) => source,

@@ -78,11 +78,12 @@ pub(crate) fn provenance_from_row(
     row: &Row<'_>,
     column: usize,
 ) -> rusqlite::Result<CapabilitySnapshotProvenance> {
-    row.get::<_, String>(column)?.parse().map_err(|error| {
+    let value = row.get::<_, String>(column)?;
+    value.parse().map_err(|_| {
         rusqlite::Error::FromSqlConversionFailure(
             column,
             Type::Text,
-            Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+            Box::new(LineageReaderRefusal::UnknownProvenance { column, value }),
         )
     })
 }
@@ -260,10 +261,11 @@ fn negative_lineage_integer_error(
     rusqlite::Error::FromSqlConversionFailure(
         column,
         Type::Integer,
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("capability_lineage.{field_name} must be non-negative, got {value}"),
-        )),
+        Box::new(LineageReaderRefusal::NegativeInteger {
+            column,
+            field: field_name,
+            value,
+        }),
     )
 }
 
