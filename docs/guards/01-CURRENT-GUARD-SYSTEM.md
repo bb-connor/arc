@@ -214,12 +214,16 @@ reordering mechanism on `ChioKernel` itself.
 The `chio-guards` crate provides `GuardPipeline`, which itself implements
 `Guard`:
 
-It evaluates its children in order. The first deny or error stops the
-pipeline: a deny is returned as `KernelError::GuardDenied` naming the child,
-and an error is wrapped as a fail-closed denial. Evidence from every child
-is collected. A child's decision-model witness is forwarded on the
-pipeline's decision, including when a later child denies; a second witness
-from another child is refused with `GuardDenied`.
+It evaluates its children in order and collects their evidence. The first
+child deny or child error stops the pipeline and returns
+`Ok(GuardDecision::deny(evidence))`: a deny appends
+`action=deny; reason=guard denied request` for that child, and an error
+appends `action=error; reason=fail-closed; error=...`. A
+`PendingApproval` child keeps the pipeline running and makes its final
+verdict `PendingApproval` unless a later child denies. A child's
+decision-model witness is forwarded on the pipeline's decision, including
+when a later child denies or errors. The only `Err` that `evaluate` returns
+is `KernelError::GuardDenied` for a second witness from another child.
 
 A `GuardPipeline` can be registered as a single guard on the kernel:
 
@@ -247,7 +251,7 @@ by a verified model card (`chio_weights::VerifiedModelCard`).
 let guard = PredicateDagGuard::load(
     &verified_card,
     &artifact_bytes,
-    Box::new(ExactPredicateSource::new(predicates)),
+    Box::new(ExactPredicateSource::new(predicates)?),
     &DecisionModelBinding { requested_scopes, requested_tools },
     work_cap,
 )?;
@@ -275,8 +279,11 @@ fell back (and why), and the work charged. Equal inputs on the public
 tuple give byte-identical witnesses whatever the argument values.
 
 `ExactPredicateSource` scores atoms from deterministic predicates over the
-request (tool name, server id, argument presence, argument JSON kind). A
-deployment with a learned scorer implements `ScoreSource` itself.
+request (tool name, server id, argument presence, argument JSON kind).
+Predicate `i` scores atom `i`; construction refuses more than `MAX_ATOMS`
+predicates (`ExactPredicateSourceError::TooManyPredicates`), and `load`
+refuses a source whose predicate count differs from the artifact's atom
+count. A deployment with a learned scorer implements `ScoreSource` itself.
 
 ---
 
