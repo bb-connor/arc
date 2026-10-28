@@ -20,8 +20,8 @@ fn replace(
 }
 
 #[test]
-fn requalification_retains_history_and_refuses_superseded_authority(
-) -> Result<(), Box<dyn Error>> {
+fn requalification_retains_history_and_refuses_superseded_authority() -> Result<(), Box<dyn Error>>
+{
     let fixture = fixture();
     let original = Source::new(&fixture, Behavior::Normal);
     let prior = install(&fixture, &original)?;
@@ -61,7 +61,10 @@ fn requalification_retains_history_and_refuses_superseded_authority(
         crate::admission_operation_store::verify_runtime_source_projection_coverage(&connection)?;
         verify_admission_operation_invariants(&connection)?;
     }
-    assert_eq!(replace(&fixture, &prior, &replacement, &fixture.fence)?, current);
+    assert_eq!(
+        replace(&fixture, &prior, &replacement, &fixture.fence)?,
+        current
+    );
     assert_eq!(source_count(&fixture.store), 2);
     assert_eq!(global_count(&fixture.store), before + 2);
     Ok(())

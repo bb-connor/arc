@@ -1,4 +1,4 @@
-use super::{records, INSTALL_MUTATION, PROJECTION_KIND};
+use super::{records, supersession, INSTALL_MUTATION, PROJECTION_KIND};
 use crate::serving_owner::SqliteServingOwnerError;
 use rusqlite::{params, Connection};
 
@@ -11,20 +11,36 @@ pub(crate) fn runtime_source_projection_reference(
     key: &str,
     sequence: u64,
 ) -> Result<String, SqliteServingOwnerError> {
-    if sequence != 1 {
-        return Err(invalid("runtime source projection sequence must be one"));
+    let records = records::verify_all_records(connection).map_err(invalid)?;
+    match sequence {
+        1 => records
+            .into_iter()
+            .find(|record| record.qualification.runtime_authority_id() == key)
+            .map(|record| record.record_digest)
+            .ok_or_else(|| invalid("global projection names an absent runtime source")),
+        2 => supersession::load_all(connection, &records)
+            .map_err(invalid)?
+            .into_iter()
+            .find(|record| record.prior_runtime == key)
+            .ok_or_else(|| {
+                invalid("global projection names an absent runtime source supersession")
+            })?
+            .digest()
+            .map_err(invalid),
+        _ => Err(invalid(
+            "runtime source projection sequence must be one or two",
+        )),
     }
-    let record = records::load_record(connection, key)
-        .map_err(invalid)?
-        .ok_or_else(|| invalid("global projection names an absent runtime source"))?;
-    Ok(record.record_digest)
 }
 
 pub(crate) fn verify_runtime_source_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
     let records = records::verify_all_records(connection).map_err(invalid)?;
-    if global_count(connection)? != i64::try_from(records.len()).map_err(invalid)? {
+    let supersessions = supersession::load_all(connection, &records).map_err(invalid)?;
+    if global_count(connection)?
+        != i64::try_from(records.len() + supersessions.len()).map_err(invalid)?
+    {
         return Err(invalid(
             "runtime sources and global references have different counts",
         ));
@@ -51,6 +67,31 @@ pub(crate) fn verify_runtime_source_projection_coverage(
         if count != 1 {
             return Err(invalid(
                 "runtime source lacks exactly one matching global commit",
+            ));
+        }
+    }
+    for record in supersessions {
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM authority_global_commits
+             WHERE projection_kind = ?1 AND projection_key = ?2 AND projection_sequence = 2
+               AND mutation_kind = ?3 AND projection_reference_digest = ?4 AND store_uuid = ?5
+               AND store_lease_id = ?6 AND store_owner_epoch = ?7",
+                params![
+                    PROJECTION_KIND,
+                    record.prior_runtime,
+                    supersession::MUTATION,
+                    record.digest().map_err(invalid)?,
+                    record.fence.store_uuid,
+                    record.fence.lease_id,
+                    i64::try_from(record.fence.owner_epoch).map_err(invalid)?
+                ],
+                |row| row.get(0),
+            )
+            .map_err(invalid)?;
+        if count != 1 {
+            return Err(invalid(
+                "runtime source supersession lacks exactly one matching global commit",
             ));
         }
     }

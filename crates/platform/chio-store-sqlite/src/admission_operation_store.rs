@@ -225,7 +225,7 @@ use projection::{
     verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
 pub(crate) use runtime_participant::verify_runtime_budget_selection_tx;
-pub use runtime_source::RuntimeSourceRecordV1;
+pub use runtime_source::{RuntimeSourceRecordV1, RuntimeSourceRequalificationInput};
 pub(crate) use runtime_source::{
     runtime_source_projection_reference, verify_runtime_source_pristine,
     verify_runtime_source_projection_coverage,
