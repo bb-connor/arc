@@ -403,12 +403,13 @@ pub fn accept(
 /// the settlement packet is signed by a pinned settlement authority, is the
 /// packet the accepted context pins, and carries the accepted packet and
 /// reconciliation references and the locked merchant, amount, currency, and
-/// quote digest. The advanced context must preserve the accepted context's immutable fields
-/// and be in a state that allows settlement reconciliation. The execution
-/// instruction must be signed by a pinned execution authority, validate, be a
-/// matched `release_reserve` paying the order merchant the locked amount
-/// against the packet's reconciliation reference, and be issued and observed
-/// no later than `released_at`.
+/// quote digest. The advanced context must carry every accepted context field
+/// except the ones settlement progress advances and be in a state that allows
+/// settlement reconciliation. The execution instruction must be signed by a
+/// pinned execution authority, validate, be a matched `release_reserve` of the
+/// depositor's reserve paying the order merchant the locked amount against the
+/// packet's reconciliation reference, and be issued and observed no later than
+/// `released_at`.
 pub fn release(
     request: CommerceEscrowReleaseRequest<'_>,
 ) -> Result<CommerceEscrowRelease, CommerceOrderError> {
@@ -653,60 +654,44 @@ fn bind_settlement_packet(
     }
 }
 
-/// Fields the release context must carry unchanged from the accepted context.
+/// Order context fields that settlement progress advances between acceptance
+/// and release. Every other field, including any field added later, must be
+/// carried unchanged from the accepted context.
+const RELEASE_ADVANCED_CONTEXT_FIELDS: [&str; 5] = [
+    "id",
+    "issued_at",
+    "current_state",
+    "event_log_sha256",
+    "payment_lifecycle_sha256",
+];
+
 fn bind_release_context(
     accepted: &CommerceOrderContext,
     advanced: &CommerceOrderContext,
 ) -> Result<(), CommerceEscrowError> {
-    let bindings = [
-        ("order_id", accepted.order_id == advanced.order_id),
-        (
-            "buyer_subject",
-            accepted.buyer_subject == advanced.buyer_subject,
-        ),
-        (
-            "agent_subject",
-            accepted.agent_subject == advanced.agent_subject,
-        ),
-        (
-            "merchant_subject",
-            accepted.merchant_subject == advanced.merchant_subject,
-        ),
-        ("quote_id", accepted.quote_id == advanced.quote_id),
-        (
-            "quote_amount_minor",
-            accepted.quote_amount_minor == advanced.quote_amount_minor,
-        ),
-        (
-            "quote_currency",
-            accepted.quote_currency == advanced.quote_currency,
-        ),
-        (
-            "quote_sha256",
-            accepted.quote_sha256 == advanced.quote_sha256,
-        ),
-        (
-            "settlement_packet_ref",
-            accepted.settlement_packet_ref == advanced.settlement_packet_ref,
-        ),
-        (
-            "settlement_packet_sha256",
-            accepted.settlement_packet_sha256 == advanced.settlement_packet_sha256,
-        ),
-        (
-            "reconciliation_ref",
-            accepted.reconciliation_ref == advanced.reconciliation_ref,
-        ),
-        (
-            "escrow_digest",
-            accepted.escrow_digest == advanced.escrow_digest,
-        ),
-    ];
-    match bindings.iter().find(|(_, bound)| !bound) {
-        Some((field, _)) => Err(CommerceEscrowError::ReleaseContextMismatch(
-            field.to_string(),
-        )),
+    let accepted = context_fields(accepted)?;
+    let advanced = context_fields(advanced)?;
+    let unbound = accepted
+        .keys()
+        .chain(advanced.keys())
+        .filter(|field| !RELEASE_ADVANCED_CONTEXT_FIELDS.contains(&field.as_str()))
+        .find(|field| accepted.get(*field) != advanced.get(*field));
+    match unbound {
+        Some(field) => Err(CommerceEscrowError::ReleaseContextMismatch(field.clone())),
         None => Ok(()),
+    }
+}
+
+fn context_fields(
+    context: &CommerceOrderContext,
+) -> Result<serde_json::Map<String, serde_json::Value>, CommerceEscrowError> {
+    match serde_json::to_value(context)
+        .map_err(|error| CommerceEscrowError::Canonicalization(error.to_string()))?
+    {
+        serde_json::Value::Object(fields) => Ok(fields),
+        _ => Err(CommerceEscrowError::Canonicalization(
+            "order context is not a JSON object".to_string(),
+        )),
     }
 }
 
@@ -744,6 +729,9 @@ fn verify_execution(
     }
     if body.counterparty_id != ledger.beneficiary_account {
         return Err(CommerceEscrowError::ExecutionUnbound("counterparty_id"));
+    }
+    if body.subject_key != ledger.depositor_account {
+        return Err(CommerceEscrowError::ExecutionUnbound("subject_key"));
     }
     if body.issued_at > released_at {
         return Err(CommerceEscrowError::ExecutionAfterRelease("issued_at"));

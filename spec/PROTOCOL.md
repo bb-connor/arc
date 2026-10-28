@@ -1955,7 +1955,10 @@ no escrow. A ledger is locked only against a
 `chio.commerce.reservation-receipt.v1` that a pinned reservation authority
 signed for the order and the exact offer token, and released only against a
 matched capital execution instruction that a pinned execution authority signed
-for the ledger amount, beneficiary, and settlement reconciliation reference.
+over the depositor's reserve for the ledger amount, beneficiary, and settlement
+reconciliation reference. The order context presented at release MUST carry
+every accepted order context field unchanged except `id`, `issued_at`,
+`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`.
 
 Commerce verification fails closed on currency drift, amount drift,
 merchant/provider mismatch, untrusted provider evidence, expired or overused
