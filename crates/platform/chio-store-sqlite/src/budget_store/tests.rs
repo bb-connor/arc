@@ -2052,7 +2052,7 @@ pub(super) fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMu
 }
 
 #[test]
-fn mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max(
+fn mutation_event_witness_returns_this_events_seq_not_authority_max(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // The quorum-witness token must wait on THIS write's own event_seq (looked up
     // by event_id), not MAX(event_seq) for the authority, which a later
@@ -2067,9 +2067,15 @@ fn mutation_event_seq_for_event_id_returns_this_events_seq_not_authority_max(
             ack_head_event(2, "e2", "http://a"),
         ],
     )?;
-    assert_eq!(store.mutation_event_seq_for_event_id("e1")?, Some(1));
-    assert_eq!(store.mutation_event_seq_for_event_id("e2")?, Some(2));
-    assert_eq!(store.mutation_event_seq_for_event_id("missing")?, None);
+    assert_eq!(
+        store.mutation_event_witness_for_event_id("e1")?,
+        Some((1, Some("http://a".to_owned()), Some(1)))
+    );
+    assert_eq!(
+        store.mutation_event_witness_for_event_id("e2")?,
+        Some((2, Some("http://a".to_owned()), Some(1)))
+    );
+    assert_eq!(store.mutation_event_witness_for_event_id("missing")?, None);
     // The authority MAX is 2 - the WRONG seq for e1's quorum wait; the by-id
     // lookup returns 1, so e1's wait targets its own event.
     assert_eq!(store.max_mutation_event_seq_for_authority("http://a")?, 2);

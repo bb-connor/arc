@@ -108,41 +108,6 @@ impl SqliteBudgetStore {
         Ok(seq)
     }
 
-    /// The exact event_seq of the mutation event written under `event_id`, or
-    /// None if no such event exists (or it predates seq assignment). The
-    /// cluster budget-write handler waits on THIS write's own event_seq, looked
-    /// up by the write's event_id, instead of MAX(event_seq) for the authority:
-    /// a concurrent same-authority commit (or an idempotent retry while later
-    /// same-origin events already exist) can raise that MAX above this write's
-    /// seq, making the quorum wait target the wrong (higher) seq and roll back a
-    /// write that itself reached quorum. Looked up by the unique event_id, this
-    /// is race-free and, for an idempotent retry, returns the ORIGINAL event's
-    /// seq.
-    pub fn mutation_event_seq_for_event_id(
-        &self,
-        event_id: &str,
-    ) -> Result<Option<u64>, BudgetStoreError> {
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let seq: Option<Option<i64>> = transaction
-            .query_row(
-                "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",
-                rusqlite::params![event_id],
-                |row| row.get::<_, Option<i64>>(0),
-            )
-            .optional()?;
-        transaction.rollback()?;
-        seq.flatten()
-            .map(|value| {
-                u64::try_from(value).map_err(|_| {
-                    BudgetStoreError::Invariant(
-                        "budget mutation event has a negative event sequence".to_string(),
-                    )
-                })
-            })
-            .transpose()
-    }
-
     pub fn mutation_event_for_event_id(
         &self,
         event_id: &str,
