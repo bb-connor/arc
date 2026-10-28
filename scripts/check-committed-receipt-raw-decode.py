@@ -22,8 +22,9 @@ value-preserving flows: `Ok`/`Some`/`Box::new` wrappers, `?`, `.await` and
 error- or option-adapting methods, the tail of an `if` branch, `match` arm,
 block or `and_then` closure, and an unannotated `let` binding the function
 returns. A `match` or `if let` scrutinee takes the types its arm patterns
-name when some arm constrains every position and names no type whose type
-parameters the pattern leaves uninferred (otherwise a pattern that names no
+name when some arm constrains every position and names only workspace
+types without type parameters (a std, external or generic type such as
+`Option::None` leaves its parameters uninferred) (otherwise a pattern that names no
 strict type leaves the target inferred), or the construct's own context when every value-carrying arm forwards
 the value unchanged; a closure that consumes the value gives its annotated
 parameter type. A `_` placeholder in a target is completed by that context. A decode
@@ -47,6 +48,8 @@ computing the strict wrapper closure, and resolves renamed `serde_json` crates,
 modules, functions and `Deserializer` imports. It does not perform Rust type
 inference, trait dispatch or general macro expansion, or follow generic helpers
 in other crates; inferred targets it cannot name fail closed instead.
+Inside a generic `impl`, the impl's type parameters are read as unknown
+members of the target, so a strict type it also names is still flagged.
 A pass is evidence for the listed forms only.
 """
 
@@ -1549,13 +1552,14 @@ def scan(root: Path) -> list[str]:
     findings, inferred = [], []
 
     def names_generic(text, rel, offset):
-        """Whether a pattern names a type with type parameters, which a pattern leaves uninferred."""
-        return any(
-            entry[3]
-            for match in _resolution.PATH.finditer(text)
-            for key in resolve_path(match.group(), rel, offset)
-            for entry in strict.definitions.get(key, ())
-        )
+        """Whether a pattern names a type it cannot complete: one with type
+        parameters the pattern leaves uninferred, or one outside the workspace
+        (`Option`, `Result`, external crates) whose parameters are unknown."""
+        for match in _resolution.PATH.finditer(text):
+            keys = resolve_path(match.group(), rel, offset)
+            if not keys or any(key not in strict.definitions or any(entry[3] for entry in strict.definitions[key]) for key in keys):
+                return True
+        return False
 
     def record(rel, owner, call, kind, target, offset):
         expansion, macro = expanded(target, rel, offset)
@@ -1646,8 +1650,11 @@ def scan(root: Path) -> list[str]:
                     target = re.sub(r"\bSelf\b", self_type, target)
                 if not target and placeholder_strict(explicit, lambda text: mentions_target(text, rel, row[1] + offset)):
                     target = PLACEHOLDER.sub("()", explicit)
-                if not target and (parameters or impl_deserialize_parameters(code, row[1])) or set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}:
+                if not target and (parameters or impl_deserialize_parameters(code, row[1])):
                     continue
+                generic = set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}
+                if generic:
+                    target = re.sub(r"\b(?:" + "|".join(sorted(generic)) + r")\b", "()", target)
                 record(rel, owner, call_text(fn_code, offset), kind, target, row[1] + offset)
         for item in STATIC_ITEM.finditer(code):
             if any(row[1] < item.start() < row[3] for row in rows):

@@ -696,7 +696,8 @@ class TypeResolutionTests(unittest.TestCase):
             "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(either::Either::Left(r)) => stamp(r), _ => 0 } }",
         ]:
             with self.subTest(body=body):
-                self.assertEqual(self.findings({"crates/demo/src/lib.rs": stamp + body}), inferred)
+                manifest = '[package]\nname = "demo"\nversion = "0.1.0"\n[dependencies]\neither = "1"\n'
+                self.assertEqual(self.findings({"crates/demo/Cargo.toml": manifest, "crates/demo/src/lib.rs": stamp + body}), inferred)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": "enum Mode { On, Off } fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Mode::On) => 1, Ok(Mode::Off) => 0, Err(_) => 0 } }"}), [])
 
     def test_complete_scrutinee_patterns_name_the_target(self):
