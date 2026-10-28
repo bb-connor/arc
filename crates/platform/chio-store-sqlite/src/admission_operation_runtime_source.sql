@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS runtime_source_qualifications (
     ),
     qualification_id TEXT NOT NULL UNIQUE CHECK (
         typeof(qualification_id) = 'text' AND length(qualification_id) = 64
-        AND octet_length(qualification_id) = 64 AND instr(qualification_id, char(0)) = 0
+        AND octet_length(qualification_id) <= 128 AND instr(qualification_id, char(0)) = 0
         AND qualification_id NOT GLOB '*[^0-9a-f]*'
     ),
     destination_store_uuid TEXT NOT NULL CHECK (
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS runtime_source_qualifications (
     store_owner_epoch INTEGER NOT NULL CHECK (typeof(store_owner_epoch) = 'integer' AND store_owner_epoch > 0),
     record_digest TEXT NOT NULL CHECK (
         typeof(record_digest) = 'text' AND length(record_digest) = 64 AND record_digest NOT GLOB '*[^0-9a-f]*'
-        AND octet_length(record_digest) = 64 AND instr(record_digest, char(0)) = 0
+        AND octet_length(record_digest) <= 128 AND instr(record_digest, char(0)) = 0
     ),
     FOREIGN KEY (destination_store_uuid, store_owner_epoch) REFERENCES chio_serving_leases(store_uuid, owner_epoch)
 ) WITHOUT ROWID;
