@@ -16,10 +16,10 @@ not claims that those operational stages have run.
 - Only signed `chio.manifest.v1` manifests may opt into flow enforcement.
 - Every constructor serving an opted-in tool installs one complete `SecurityRuntime` authority bundle atomically.
 - Unknown historical information is `Top`. It is never inferred as `Bottom`.
-- Principal and capability-lineage taint survives legacy session closure. Only a verified isolation-epoch transition starts an isolated successor.
+- Principal and capability-lineage taint survives closure of a session that predates enablement. Only a verified isolation-epoch transition starts an isolated successor.
 - Only verified internal security events may produce an automatic-response finding.
 - Truncated causal scope, an unavailable authority, an unverified receipt, or an incomplete rollback denies automatic promotion.
-- Once a tool, provider, or server is marked enforced, an operational failure denies service. It never selects the legacy path.
+- Once a tool, provider, or server is marked enforced, an operational failure denies service. It never falls back to unenforced service.
 - Permanent revocation remains manual.
 
 ## Inventory and migration report
@@ -57,7 +57,7 @@ Each manifest entry contains:
 
 The verifier refuses any body whose schema id is not `chio.manifest.v1`, then parses the body as the closed normative type, so an older shape carrying that id is refused by structure. The parsed manifest is verified against the registered key through the manifest verifier. The command has no conversion path and no signing input.
 
-Backfill evidence is accepted only from the signed receipt metadata member `active_defense_backfill_v1`, whose schema is `chio.active-defense.backfill-evidence.v1`. The receipt key must match a registered receipt key, the receipt signature and parameter hash must verify, and the evidence must name the exact digest of a registered, successfully verified signed `chio.manifest.v1` manifest containing the receipt's server and tool. A target without that evidence is assigned `Top`. If any inventoried legacy session for a principal or lineage lacks evidence, the durable principal or lineage record is also assigned `Top`, including when another signed receipt says that a legacy session closed.
+Backfill evidence is accepted only from the signed receipt metadata member `active_defense_backfill_v1`, whose schema is `chio.active-defense.backfill-evidence.v1`. The receipt key must match a registered receipt key, the receipt signature and parameter hash must verify, and the evidence must name the exact digest of a registered, successfully verified signed `chio.manifest.v1` manifest containing the receipt's server and tool. A target without that evidence is assigned `Top`. If any inventoried pre-enablement session for a principal or lineage lacks evidence, the durable principal or lineage record is also assigned `Top`, including when another signed receipt says that a pre-enablement session closed.
 
 The report is canonical JSON written by file synchronization plus atomic rename. No output file is changed until the complete input, every manifest, and every backfill receipt verifies. The report emits these metric names without embedding promotion thresholds:
 
