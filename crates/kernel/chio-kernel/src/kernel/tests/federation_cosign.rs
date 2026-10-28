@@ -346,11 +346,12 @@ fn unverified_treaty_denial(
 
     let trust = KernelTrustExchange::new(local_kernel_id, kernel.config.keypair.clone())
         .with_trusted_peer(origin_kernel_id, origin_keypair.public_key());
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0);
-    let peer = handshake_and_pin(&trust, origin_kernel_id, &origin_keypair, now);
+    let peer = handshake_and_pin(
+        &trust,
+        origin_kernel_id,
+        &origin_keypair,
+        current_unix_timestamp(),
+    );
     let mut kernel = kernel.with_federation_peers(vec![peer]);
     kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
         origin_kernel_id,
