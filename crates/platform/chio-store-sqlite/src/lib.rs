@@ -514,8 +514,6 @@ pub use frost_store::{
     StagedFrostRotation, StoredFrostCeremonyCompletion,
 };
 pub use governed_approval_replay_store::{
-    GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourceSeal,
-    GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use iou_store::SqliteIouEnvelopeStore;
