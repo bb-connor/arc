@@ -312,6 +312,10 @@ use lifecycle::acquire_broker_socket_lifecycle_lock;
 #[path = "error_wire_tests.rs"]
 mod error_wire_tests;
 
+#[cfg(all(test, unix))]
+#[path = "ipc_lifecycle_lock_tests.rs"]
+mod ipc_lifecycle_lock_tests;
+
 #[cfg(unix)]
 pub(super) use lifecycle::{validate_broker_socket_identity, ProvisionalBrokerSocketCleanup};
 #[cfg(test)]
