@@ -24,7 +24,8 @@ fn serve_once(response: &'static str) -> (String, thread::JoinHandle<()>) {
 fn agent_for(authority: &str, max_response_bytes: u64) -> BlockingContractAgent {
     let mut contract = HttpEgressContract::permissive_for_tests(authority);
     contract.max_response_bytes = max_response_bytes;
-    BlockingContractAgent::new(&contract, Duration::from_secs(2)).expect("agent")
+    BlockingContractAgent::new(&contract, Duration::from_secs(2), Duration::from_secs(10))
+        .expect("agent")
 }
 
 #[test]
@@ -98,6 +99,73 @@ fn response_over_the_byte_ceiling_is_refused() {
             observed: 17,
             max: 16
         }
+    );
+    handle.join().expect("server");
+}
+
+#[test]
+fn one_private_record_in_the_answer_refuses_the_host() {
+    let prepared = HttpEgressContract::permissive_for_tests("rail.example:443")
+        .prepare()
+        .expect("prepared");
+    let public: SocketAddr = "93.184.216.34:443".parse().expect("public");
+    let private: SocketAddr = "10.0.0.1:443".parse().expect("private");
+    for answer in [vec![public, private], vec![private, public]] {
+        assert_eq!(
+            enforce_resolved_addresses(&prepared, "rail.example", answer),
+            Err(HttpEgressError::PrivateNetworkDenied {
+                host: "rail.example resolved to 10.0.0.1".to_string()
+            })
+        );
+    }
+    assert_eq!(
+        enforce_resolved_addresses(&prepared, "rail.example", vec![public]),
+        Ok(vec![public])
+    );
+}
+
+#[test]
+fn deadline_bounds_a_response_that_drips_inside_the_phase_timeout() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let authority = listener.local_addr().expect("address").to_string();
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !request.ends_with(b"\r\n\r\n") {
+            if stream.read(&mut byte).expect("read") == 0 {
+                return;
+            }
+            request.push(byte[0]);
+        }
+        if stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 40\r\nConnection: close\r\n\r\n")
+            .is_err()
+        {
+            return;
+        }
+        for _ in 0..40 {
+            thread::sleep(Duration::from_millis(100));
+            if stream
+                .write_all(b"x")
+                .and_then(|()| stream.flush())
+                .is_err()
+            {
+                return;
+            }
+        }
+    });
+    let contract = HttpEgressContract::permissive_for_tests(&authority);
+    let agent =
+        BlockingContractAgent::new(&contract, Duration::from_secs(2), Duration::from_secs(1))
+            .expect("agent");
+    let outcome = agent
+        .get(&format!("http://{authority}/"))
+        .expect("allowed")
+        .call();
+    assert!(
+        matches!(outcome, Err(HttpEgressError::Transport(_))),
+        "a 4 second drip must exceed the 1 second deadline: {outcome:?}"
     );
     handle.join().expect("server");
 }

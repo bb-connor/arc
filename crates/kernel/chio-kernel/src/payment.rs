@@ -916,7 +916,8 @@ fn payment_rail_agent(
     timeout: Duration,
 ) -> Result<BlockingContractAgent, PaymentError> {
     let contract = payment_rail_contract(base_url, path, bearer_token)?;
-    BlockingContractAgent::new(&contract, timeout).map_err(map_rail_egress_error)
+    BlockingContractAgent::new(&contract, timeout, timeout.saturating_mul(3))
+        .map_err(map_rail_egress_error)
 }
 
 fn normalize_http_path(path: &str) -> String {

@@ -365,9 +365,12 @@ impl fmt::Debug for X402PaymentAdapter {
 }
 
 impl X402PaymentAdapter {
-    /// Refuses a facilitator URL that is not `https` (or `http` on loopback),
-    /// that carries credentials, a query or a fragment, or whose host is a
-    /// private, loopback, link-local or unique-local address. `clock` is the
+    /// Refuses a facilitator URL that is not `https` or loopback `http`, that
+    /// carries credentials, a query or a fragment, whose host is a private,
+    /// link-local or unique-local address literal, or that names a loopback
+    /// host over `https`. A hostname that resolves to a private, loopback,
+    /// link-local or unique-local address is refused when a request connects.
+    /// `clock` is the
     /// trusted time the validity window is checked against; `replay` holds
     /// each accepted authorization key until its `validBefore` and must be
     /// durable for single use to survive a restart.

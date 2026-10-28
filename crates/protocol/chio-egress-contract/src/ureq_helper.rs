@@ -18,11 +18,17 @@ pub struct BlockingContractAgent {
 }
 
 impl BlockingContractAgent {
-    /// `timeout` bounds connect, read and write separately.
-    pub fn new(contract: &HttpEgressContract, timeout: Duration) -> Result<Self, HttpEgressError> {
+    /// `timeout` bounds connect, each read and each write. `deadline` bounds
+    /// the whole request, from resolution to the last body byte.
+    pub fn new(
+        contract: &HttpEgressContract,
+        timeout: Duration,
+        deadline: Duration,
+    ) -> Result<Self, HttpEgressError> {
         let prepared = contract.prepare()?;
         prepared.validate_dispatchable_with_pinned_dns()?;
         let agent = ureq::AgentBuilder::new()
+            .timeout(deadline)
             .timeout_connect(timeout)
             .timeout_read(timeout)
             .timeout_write(timeout)
@@ -180,6 +186,16 @@ fn resolve_with_contract(
             details: error.to_string(),
         })?
         .collect::<Vec<_>>();
+    enforce_resolved_addresses(prepared, host, addresses)
+}
+
+/// Every address in the answer must pass, so one private record refuses the
+/// host.
+fn enforce_resolved_addresses(
+    prepared: &PreparedHttpEgressContract,
+    host: &str,
+    addresses: Vec<SocketAddr>,
+) -> Result<Vec<SocketAddr>, HttpEgressError> {
     if addresses.is_empty() {
         return Err(HttpEgressError::DnsResolutionFailed {
             host: host.to_string(),

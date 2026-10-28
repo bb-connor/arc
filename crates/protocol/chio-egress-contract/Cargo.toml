@@ -33,6 +33,10 @@ reqwest-egress = ["dep:http", "dep:reqwest", "dep:serde_json", "dep:tokio", "dep
 # follows redirects.
 ureq-egress = ["dep:ureq"]
 
+[[test]]
+name = "ureq_proxy_env"
+required-features = ["ureq-egress"]
+
 [dev-dependencies]
 reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
