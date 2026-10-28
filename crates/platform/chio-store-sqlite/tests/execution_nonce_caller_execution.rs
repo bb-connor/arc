@@ -323,3 +323,7 @@ fn a_second_reservation_is_bounded_by_the_shared_budget() -> TestResult {
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
+
+#[cfg(feature = "pq")]
+#[path = "execution_nonce_caller_execution/signing_identity.rs"]
+mod signing_identity;

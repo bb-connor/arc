@@ -53,6 +53,21 @@ impl DurableToolAdmission {
 }
 
 impl ChioKernel {
+    fn require_durable_nonce_signing_identity(&self) -> Result<(), KernelError> {
+        let identity = self.freeze_receipt_signing_identity()?;
+        let claimant =
+            crate::admission_operation::execution_nonce_coordinator_id(identity.public_key())?;
+        if self.durable_runtime()?.claimant_id != claimant {
+            return Err(KernelError::AdmissionRecovery(Box::new(
+                crate::admission_operation::AdmissionRecoveryError::Item {
+                    kind: crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                    detail: "durable admission signing identity changed".into(),
+                },
+            )));
+        }
+        Ok(())
+    }
+
     /// Check the original physically reserved nonce at its exact retained
     /// proposal binding time. This neither reacquires nor renews authority.
     pub(crate) fn verify_bound_execution_nonce_reservation(
@@ -134,6 +149,7 @@ impl ChioKernel {
                 "admission store lacks the operation-owned execution nonce participant".to_owned(),
             ));
         }
+        self.require_durable_nonce_signing_identity()?;
         Ok(true)
     }
 
@@ -371,6 +387,7 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<Box<SignedExecutionNonce>, KernelError> {
+        self.require_durable_nonce_signing_identity()?;
         let config = self.execution_nonce_config.as_ref().ok_or_else(|| {
             KernelError::DurableAdmission(
                 "execution nonce configuration disappeared before issuance".to_owned(),

@@ -29,6 +29,49 @@ fn durable_nonce_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
         nonce.nonce.issued_at,
     )?;
     assert_eq!(nonce.signature.algorithm(), SigningAlgorithm::Hybrid);
+    let wrong_key = chio_core::crypto::Keypair::from_seed(&[88; 32]).public_key();
+    let wrong_issuer = chio_kernel::admission_operation::verify_operation_execution_nonce_at(
+        &nonce,
+        &operation_id,
+        &wrong_key,
+        &nonce.nonce.bound_to,
+        nonce.nonce.issued_at,
+    )
+    .err()
+    .ok_or("foreign nonce issuer accepted")?;
+    assert!(
+        matches!(wrong_issuer,
+        chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(ref detail)
+            if detail == "operation-bound execution nonce signature is invalid"),
+        "{wrong_issuer}"
+    );
+    let signing_bytes = chio_core::canonical::canonical_json_bytes(&serde_json::json!({
+        "schema": "chio.admission-execution-nonce-signature.v1",
+        "operation_id": operation_id,
+        "nonce": nonce.nonce,
+    }))?;
+    let mut classical_only = nonce.clone();
+    classical_only.signature = fixture.signer.sign(&signing_bytes);
+    assert!(fixture
+        .signer
+        .public_key()
+        .verify(&signing_bytes, &classical_only.signature));
+    let downgraded = chio_kernel::admission_operation::verify_operation_execution_nonce_at(
+        &classical_only,
+        &operation_id,
+        &key,
+        &nonce.nonce.bound_to,
+        nonce.nonce.issued_at,
+    )
+    .err()
+    .ok_or("classical-only nonce accepted under hybrid issuer")?;
+    assert!(
+        matches!(downgraded,
+        chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(ref detail)
+            if detail == "operation-bound execution nonce signature is invalid"),
+        "{downgraded}"
+    );
+
     assert_eq!(
         count_rows(&fixture, "admission_execution_nonce_issuances")?,
         1
