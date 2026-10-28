@@ -364,6 +364,23 @@ mod tests {
     }
 
     #[test]
+    fn capture_retry_after_refund_keeps_refunded_status() {
+        let adapter = SimPaymentAdapter::new();
+        let id = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        let captured = adapter.capture(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(captured.settlement_status, RailSettlementStatus::Settled);
+        adapter.refund(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(status(&adapter, "req-1"), RailSettlementStatus::Refunded);
+
+        let replayed = adapter.capture(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(replayed, captured);
+        assert_eq!(status(&adapter, "req-1"), RailSettlementStatus::Refunded);
+    }
+
+    #[test]
     fn terminal_calls_reject_unknown_or_mismatched_bindings() {
         let adapter = SimPaymentAdapter::new();
         let unknown = adapter.capture("sim-x", 1, "USD", "req-1").unwrap_err();
