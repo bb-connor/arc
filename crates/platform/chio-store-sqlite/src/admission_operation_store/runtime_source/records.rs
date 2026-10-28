@@ -52,15 +52,18 @@ pub(super) fn insert(
     Ok(())
 }
 
+pub(super) fn source_table_exists(connection: &Connection) -> IntegrityResult<bool> {
+    connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'runtime_source_qualifications')",
+        [], |row| row.get(0),
+    ).map_err(|error| error.to_string())
+}
+
 pub(in crate::admission_operation_store) fn verify_all_records(
     connection: &Connection,
 ) -> IntegrityResult<Vec<RuntimeSourceRecordV1>> {
-    let exists: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'runtime_source_qualifications')",
-        [], |row| row.get(0),
-    ).map_err(|error| error.to_string())?;
-    if !exists {
-        return Ok(Vec::new());
+    if !source_table_exists(connection)? {
+        return Err("runtime source qualification table is absent".into());
     }
     let count: i64 = connection
         .query_row(
