@@ -83,6 +83,11 @@ pub enum RootExchangeStoreError {
     TagInputContainsNul { field: &'static str },
     #[error("invalid mint request: {0}")]
     InvalidMintRequest(MintRequestRefusal),
+    /// The change may have committed: the commit or the anchor sync after it
+    /// failed, or the owner is poisoned by such a failure. Never a definite
+    /// refusal, and never retried as a fresh mint.
+    #[error("root exchange outcome is unknown: {0}")]
+    OutcomeUnknown(String),
     #[error("root exchange store is unavailable: {0}")]
     Unavailable(String),
     #[error("root exchange store invariant failed: {0}")]
@@ -544,3 +549,6 @@ pub(super) fn owner_invalid(detail: impl Into<String>) -> SqliteServingOwnerErro
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod recovery_tests;
