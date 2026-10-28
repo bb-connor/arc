@@ -1,5 +1,7 @@
 use crate as runtime_api;
-include!("../support/runtime_admission.rs");
+#[path = "../support/runtime_admission.rs"]
+mod fixtures;
+use fixtures::*;
 
 fn prepare_denial<S: RuntimeAdmissionStore + Send + Sync>(
     hook: &ChioRuntimeAdmissionHook<S>,
@@ -1350,3 +1352,6 @@ fn uninstalled_binding() -> Result<
         AdmissionIdentifier::try_new("qualification_id", "a".repeat(64))?,
     ))
 }
+
+#[path = "request_preparation.rs"]
+mod request_preparation;
