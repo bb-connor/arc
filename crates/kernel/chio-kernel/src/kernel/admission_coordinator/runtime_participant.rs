@@ -118,7 +118,7 @@ pub(super) fn validate_recovery_history(
             || claim.reference.episode_id() != claim.intent.episode_id()
             || claim.intent.request_binding_hash() != operation.binding().request_binding_hash()
             || claim.intent.runtime_authority_id() != first.intent.runtime_authority_id()
-            || claim.intent.expectation_id() != first.intent.expectation_id()
+            || claim.intent.qualification_id() != first.intent.qualification_id()
             || !episodes.insert(claim.reference.episode_id().as_str())
         {
             return Err(custody_error(

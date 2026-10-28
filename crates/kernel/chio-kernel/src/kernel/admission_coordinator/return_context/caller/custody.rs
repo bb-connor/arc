@@ -219,7 +219,7 @@ impl ChioKernel {
             for claim in claims {
                 claim.intent.validate().map_err(durable_store_error)?;
                 if claim.intent.runtime_authority_id() != authority.runtime_authority_id()
-                    || claim.intent.expectation_id() != authority.expectation_id()
+                    || claim.intent.qualification_id() != authority.qualification_id()
                 {
                     return Err(invalid("caller runtime custody selected another authority"));
                 }
