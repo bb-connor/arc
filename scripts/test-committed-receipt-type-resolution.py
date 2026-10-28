@@ -583,12 +583,14 @@ class TypeResolutionTests(unittest.TestCase):
                 findings = self.findings({"crates/demo/src/lib.rs": helper + source})
                 self.assertEqual(len(findings), expected, findings)
 
-    def test_generic_helper_with_an_inferred_decode_checks_its_callers(self):
+    def test_generic_helper_with_an_inferred_decode_is_refused(self):
         helper = "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { let v = serde_json::from_str(t)?; post(v) } "
-        self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn good(t: &str) -> Result<u32, E> { decode(t) }"}), [])
-        findings = self.findings({"crates/demo/src/lib.rs": helper + "fn bad(t: &str) -> Result<ChioReceipt, E> { decode(t) }"})
-        self.assertEqual(len(findings), 1, findings)
-        self.assertIn("::bad: raw decode decode(t)", findings[0])
+        refused = ["crates/demo/src/lib.rs::decode: inferred decode target serde_json::from_str(t)"]
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn good(t: &str) -> Result<u32, E> { decode(t) }"}), refused)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn bad(t: &str) -> Result<ChioReceipt, E> { decode(t) }"}), refused)
+        tied = "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { let v = serde_json::from_str(t)?; Ok(v) } "
+        findings = self.findings({"crates/demo/src/lib.rs": tied + "fn bad(t: &str) -> Result<ChioReceipt, E> { decode(t) }"})
+        self.assertEqual(findings, ["crates/demo/src/lib.rs::bad: raw decode decode(t)"])
 
     def test_tail_decode_through_a_closure_argument(self):
         findings = self.raw_decodes("fn bad(v: &str) -> Result<ChioReceipt, E> { serde_json::from_str(v).map_err(|_| { wrap() }) }")
@@ -719,6 +721,16 @@ class TypeResolutionTests(unittest.TestCase):
                 findings = self.findings({"crates/demo/src/lib.rs": helper + alias + "fn bad(s: &str) -> Result<ChioReceipt, E> { " + name + "::decode(s) }"})
                 self.assertEqual(findings, ["crates/demo/src/lib.rs::bad: raw decode " + name + "::decode(s)"])
                 self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + alias + "fn good(s: &str) -> Result<u32, E> { " + name + "::decode(s) }"}), [])
+
+    def test_serde_json_glob_import_reaches_submodule_qualifiers(self):
+        for source in [
+            "use serde_json::*; fn bad(s: &str) { de::from_str::<ChioReceipt>(s); }",
+            "use serde_json as json; use json::*; fn bad(v: Value) { value::from_value::<ChioReceipt>(v); }",
+            "use serde_json::*; mod inner { use super::*; fn bad(s: &str) { de::from_str::<ChioReceipt>(s); } }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(len(self.raw_decodes(source)), 1, source)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "mod de { pub fn from_str(s: &str) -> u32 { 0 } } fn good(s: &str) { de::from_str(s); }"}), [])
 
     def test_macro_invocations_end_at_their_matching_delimiter(self):
         decode = "macro_rules! decode { ($s:expr) => { serde_json::from_str($s) }; } "
