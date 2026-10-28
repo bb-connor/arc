@@ -147,6 +147,9 @@ EXPECTED_SUPPLY_CHAIN_GATE_SHA256 = (
     "ee8e1614707e35ab41a1ce6f7abab65b5d8beae3b813a9d191cf9840d7950bb4"
 )
 EXPECTED_TEMPORAL_STEP_SHELL = "/bin/bash --noprofile --norc -p -e {0}"
+EXPECTED_FORMAL_TRACEABILITY_RUN = (
+    "bash scripts/check-mapping.sh\n" "bash scripts/tests/check-mapping.test.sh\n"
+)
 EXPECTED_TEMPORAL_GATE_RUN = rf"""
 set -euo pipefail
 readonly temporal_runner="scripts/check-temporal-security.sh"
@@ -1207,7 +1210,7 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "python3 scripts/check-security-apk-sources.py\n"
         "python3 scripts/tests/check-security-apk-sources.test.py",
     ),
-    ("Formal traceability gate", "bash scripts/check-mapping.sh"),
+    ("Formal traceability gate", EXPECTED_FORMAL_TRACEABILITY_RUN),
     ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
     ("Workspace format", "cargo fmt --all -- --check"),
     (
@@ -9249,7 +9252,7 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("required CI revocation regression gate is not exact and adjacent")
     mapping = named_step(check_job, "Formal traceability gate")
-    if mapping.get("run") != "bash scripts/check-mapping.sh":
+    if mapping.get("run") != EXPECTED_FORMAL_TRACEABILITY_RUN:
         raise ContractError("required CI omits the exact formal traceability gate")
     if (
         step_position(check_job, "Formal traceability gate")

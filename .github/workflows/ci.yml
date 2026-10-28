@@ -357,7 +357,9 @@ jobs:
           finish_gates
 
       - name: Formal traceability gate
-        run: bash scripts/check-mapping.sh
+        run: |
+          bash scripts/check-mapping.sh
+          bash scripts/tests/check-mapping.test.sh
 
       - name: Temporal security gate
         env:
