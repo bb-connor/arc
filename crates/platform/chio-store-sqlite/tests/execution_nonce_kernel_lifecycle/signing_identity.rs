@@ -112,7 +112,7 @@ fn durable_nonce_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
         let issuer: String =
             connection.query_row(&format!("SELECT issuer FROM {table}"), [], |row| row.get(0))?;
         assert_eq!(issuer, key.to_hex());
-        assert!(issuer.len() > 64 && issuer.len() <= 4129);
+        assert!(issuer.len() > 64 && issuer.len() <= chio_core::crypto::MAX_KEY_WIRE_BYTES);
     }
     let replay = execute(&runtime, &request, &redelivered)?;
     assert_eq!(replay.receipt.id, executed.receipt.id);

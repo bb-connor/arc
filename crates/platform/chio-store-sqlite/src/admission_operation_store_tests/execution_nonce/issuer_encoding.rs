@@ -39,7 +39,7 @@ fn nonce_issuer_readers_refuse_noncanonical_and_oversized_keys() -> TestResult {
                     "durable nonce issuer is not canonical",
                 ),
                 _ => (
-                    "a".repeat(4130),
+                    "a".repeat(chio_core::crypto::MAX_KEY_WIRE_BYTES + 1),
                     if table.ends_with("issuances") {
                         "durable nonce issuance exceeds its storage bound"
                     } else {
@@ -85,4 +85,25 @@ fn nonce_issuer_readers_refuse_noncanonical_and_oversized_keys() -> TestResult {
         }
     }
     Ok(())
+}
+
+#[test]
+fn nonce_issuer_storage_bounds_match_the_public_key_wire_bound() {
+    let predicate = format!(
+        "octet_length(issuer) BETWEEN 1 AND {}",
+        chio_core::crypto::MAX_KEY_WIRE_BYTES
+    );
+    for (source, count) in [
+        (include_str!("../../admission_operation_nonce.sql"), 2),
+        (
+            include_str!("../../admission_operation_store/execution_nonce.rs"),
+            1,
+        ),
+        (
+            include_str!("../../admission_operation_store/execution_nonce/issuance/record.rs"),
+            1,
+        ),
+    ] {
+        assert_eq!(source.matches(predicate.as_str()).count(), count);
+    }
 }
