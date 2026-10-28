@@ -2,35 +2,6 @@ use super::*;
 
 pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Result<(), CliError> {
     match command {
-        ChioRuntimeCommands::Admit {
-            request,
-            admission_profile,
-            admission_bundle,
-            runtime_trust_input,
-            trusted_verifiers,
-            pheromone_query_report,
-            runtime_pheromone_policy,
-            runtime_peer_weights,
-            action_class_id,
-            trust_floor_state,
-            store,
-            now_unix_ms,
-            report,
-        } => cmd_chio_runtime_admit(
-            &request,
-            &admission_profile,
-            &admission_bundle,
-            runtime_trust_input.as_deref(),
-            trusted_verifiers.as_deref(),
-            pheromone_query_report.as_deref(),
-            runtime_pheromone_policy.as_deref(),
-            runtime_peer_weights.as_deref(),
-            action_class_id.as_deref(),
-            trust_floor_state.as_deref(),
-            &store,
-            now_unix_ms,
-            &report,
-        ),
         ChioRuntimeCommands::SignTrustInput {
             body,
             signing_seed_file,
@@ -59,27 +30,6 @@ pub(crate) fn dispatch_chio_runtime_command(command: ChioRuntimeCommands) -> Res
                 signing_seed_file,
                 out,
             } => cmd_chio_runtime_sign_pheromone_query_report(&body, &signing_seed_file, &out),
-            ChioRuntimePheromoneCommands::Evaluate {
-                admission_bundle,
-                runtime_trust_input,
-                trusted_verifiers,
-                pheromone_query_report,
-                runtime_pheromone_policy,
-                runtime_peer_weights,
-                action_class_id,
-                now_unix_ms,
-                report,
-            } => cmd_chio_runtime_pheromone_evaluate(
-                &admission_bundle,
-                &runtime_trust_input,
-                &trusted_verifiers,
-                &pheromone_query_report,
-                &runtime_pheromone_policy,
-                &runtime_peer_weights,
-                action_class_id.as_deref(),
-                now_unix_ms,
-                &report,
-            ),
         },
         ChioRuntimeCommands::Orchestrate { command } => match command {
             ChioRuntimeOrchestrateCommands::Lint { profile, report } => {

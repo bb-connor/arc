@@ -1,5 +1,3 @@
-#[path = "runtime/admission.rs"]
-mod admission;
 #[path = "runtime/io.rs"]
 mod io;
 #[path = "runtime/loopback.rs"]
@@ -14,7 +12,6 @@ mod signing;
 #[cfg(test)]
 use crate::CliError;
 
-pub(crate) use admission::{cmd_chio_runtime_admit, cmd_chio_runtime_pheromone_evaluate};
 pub(crate) use io::validate_runtime_relative_path;
 pub(crate) use loopback::cmd_chio_runtime_run_loopback;
 pub(crate) use ops::{
