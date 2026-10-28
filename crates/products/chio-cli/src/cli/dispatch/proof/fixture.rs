@@ -1812,6 +1812,13 @@ fn refresh_commerce_order_passport_graph_binding(
     } else {
         None
     };
+    let escrow_ledger_bytes = load_commerce_escrow_ledger_bytes(
+        bundle,
+        &mut budget,
+        &graph.nodes,
+        &order_context,
+        "commerce fixture",
+    )?;
     let commerce_authority_key = Keypair::from_seed(&[7u8; 32]).public_key();
     let report = chio_commerce_order::verify_commerce_order(
         &chio_commerce_order::CommerceOrderVerificationBundle {
@@ -1826,7 +1833,7 @@ fn refresh_commerce_order_passport_graph_binding(
             settlement_packet_bytes,
             mandate_protocol_payloads,
             risk_comptroller_report_bytes,
-            escrow_ledger_bytes: None,
+            escrow_ledger_bytes,
             verified_trust_market_context: fixture_commerce_trust_market_context(
                 bundle,
                 &order_context,

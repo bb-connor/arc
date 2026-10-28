@@ -23,6 +23,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod archive;
 #[path = "support/bundles.rs"]
 mod bundles;
+#[path = "support/escrow.rs"]
+mod escrow;
 #[path = "support/receipt_evidence.rs"]
 mod receipt_evidence;
 pub(crate) use archive::{
@@ -31,6 +33,7 @@ pub(crate) use archive::{
 pub(crate) use bundles::{
     build_minimal_passport_proof_room_bundle, copy_proof_room_bundle_to_temp,
 };
+pub(crate) use escrow::build_commerce_escrow_bundle;
 pub(crate) use receipt_evidence::{sign_terminal_receipt, signed_terminal_receipt};
 
 pub(crate) const PROOF_ROOM_DSSE_PAYLOAD_TYPE: &str =
@@ -2463,6 +2466,8 @@ fn refresh_commerce_order_passport(bundle: &Path, evidence_graph: &mut serde_jso
             std::fs::read(bundle.join(&requirement.risk_comptroller_report_path))
                 .test_expect("read risk comptroller report")
         });
+    let escrow_ledger_bytes =
+        escrow::pinned_escrow_ledger_bytes(bundle, evidence_graph, &order_context);
     let verification_bundle = chio_commerce_order::CommerceOrderVerificationBundle {
         order_context,
         event_log_bytes,
@@ -2475,7 +2480,7 @@ fn refresh_commerce_order_passport(bundle: &Path, evidence_graph: &mut serde_jso
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
-        escrow_ledger_bytes: None,
+        escrow_ledger_bytes,
         verified_trust_market_context: None,
         trusted_event_authority_receipt_kernel_keys: trusted_public_keys(
             COMMERCE_FIXTURE_TRUSTED_EVENT_AUTHORITY_RECEIPT_KERNEL_KEYS,
