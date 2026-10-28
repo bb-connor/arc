@@ -31,11 +31,19 @@ The public-repo GitHub Actions free tier is 2,000 runner-minutes per month.
 The continuous-fuzzing program self-caps at 1,800 min/30d for fuzz-related
 runs (200 min/month headroom for everything else). Enforcement:
 
-- `scripts/check-fuzz-budget.sh` queries the trailing-30d billed-second
-  total for `cflite_pr.yml`, `cflite_batch.yml`, `fuzz.yml`,
-  `mutants.yml`, `mutants-fuzz-cocoverage.yml`, and `proof-mutants.yml`, sums
-  them, and exits non-zero when the sum crosses the cap unless a lane
-  explicitly opts into `GH_FUZZ_BUDGET_CAP_MODE=warn`.
+- `scripts/check-fuzz-budget.sh` sums trailing-30d runner-executed job time
+  for `cflite_pr.yml`, `cflite_batch.yml`, `fuzz.yml`,
+  `mutants.yml`, `mutants-fuzz-cocoverage.yml`, and `proof-mutants.yml`, and
+  exits non-zero when the sum crosses the cap unless a lane explicitly opts
+  into `GH_FUZZ_BUDGET_CAP_MODE=warn`. A job counts from runner pickup to
+  completion: queue time and jobs that never received a runner (GitHub
+  cancels those after 24 hours) are not runner minutes, and parallel matrix
+  jobs each count in full. Run listings beyond GitHub's 1,000-result search
+  limit are split by day, and a day that still exceeds it fails closed.
+- Job timing costs one API call per run, so workflows restore and save a
+  shared ledger (`GH_FUZZ_BUDGET_LEDGER`, kept in the Actions cache) that
+  holds the executed seconds of completed runs; each check queries only runs
+  the ledger has not seen.
 - PR-time CFLite budget checks are advisory when the shared trailing window is
   already over cap. The PR still runs changed-target sampling, but shared
   budget exhaustion does not block unrelated merge readiness.
@@ -116,22 +124,28 @@ for them.
 
 ## ClusterFuzzLite bridge
 
-### Observed selector limitation (October 11, 2026)
+### Selector transport
 
-`FUZZ-SELECTOR-TRANSPORT` is an open P3 efficiency follow-up in the
-[landing ledger](../security/landing-ledger.md). On PR #1160 head `36d77fe276`,
-job `114428079323` supplies `CHIO_CFLITE_TARGETS` to the outer action, but the
-nested builder container receives neither selector variable. It builds the full
-33-target inventory. This PR requests all 33, so the transport defect does not
-omit coverage or explain a difference between its requested and actual workload.
-Other subset requests can unnecessarily build the full inventory.
+The ClusterFuzzLite actions do not forward workflow environment into the
+nested builder container (observed on PR #1160 job `114428079323`, which
+built the full inventory for a subset request and was cancelled at 75
+minutes). Workflows therefore write the selected target names to
+`.clusterfuzzlite/selected-targets` in the checkout before `build_fuzzers`;
+the checkout is the container's `$SRC/chio`, and `.clusterfuzzlite/build.sh`
+builds exactly the listed targets, rejecting an empty list, a non-file path or
+an unknown name. Without the file it builds every target (`fuzz: full`).
+`cflite_pr.yml` writes the changed-target selection and `cflite_batch.yml`
+writes the night's rotation target.
 
-Repair acceptance is an actual container-boundary control for a subset, full
-selection, unknown names and conflicting selectors, preserving each target's
-features, sanitizer, seed handling and sampling budget. No repair or new fuzz
-campaign is claimed here. The current job's 75-minute cancellation still leaves
-sampling incomplete after its 70-minute-20-second build. Complete earlier runs
-are source-specific evidence, not qualification of the cancelled job.
+`scripts/select-fuzz-targets.py` computes the PR selection. Trigger globs in
+`fuzz/target-map.toml` select their targets. Fuzz build inputs select the
+whole inventory: `.cargo/`, `.clusterfuzzlite/`, the root `Cargo.toml`
+(members inherit workspace dependencies from it), `fuzz/Cargo.toml`,
+`fuzz/Cargo.lock`, the target map and the selector. A member crate manifest
+selects the whole inventory only when its package (at the head or the merge
+base) is a path package in `fuzz/Cargo.lock`; the root `Cargo.lock` and
+manifests of crates outside the fuzz dependency graph cannot change the fuzz
+build, which resolves against its own lock.
 
 The descriptions below state the intended selection behavior.
 
@@ -140,7 +154,7 @@ coverage into the bridge that carries Chio through the OSS-Fuzz acceptance
 window and remains the documented permanent fallback after acceptance lands:
 
 - `.github/workflows/cflite_pr.yml` -- changed-target sampling per
-  `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
+  `scripts/select-fuzz-targets.py` and `fuzz/target-map.toml`. Default per-target wall budget is 60s (1-6 targets
   per PR after the glob match). Opt-in `fuzz: full` PR label promotes the
   run to a full-corpus sweep across all 27 targets at 120s each
   (release-cut PRs and trust-boundary edits).

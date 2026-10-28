@@ -1,113 +1,179 @@
 #!/usr/bin/env python3
-"""Every workspace manifest must select the full fuzz inventory."""
+"""Behavior tests for scripts/select-fuzz-targets.py."""
 
-import re
+from __future__ import annotations
+
+import os
 import subprocess
+import sys
 import tempfile
 import tomllib
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[2]
-workflow = (root / ".github/workflows/cflite_pr.yml").read_text()
-matches = re.findall(r"if grep -qE '([^']+)' changed\.txt; then", workflow)
-assert len(matches) == 1, "fuzz inventory fallback must have one explicit selector"
-selector = re.compile(matches[0])
-paths = subprocess.check_output(
-    ["git", "ls-files", "--", "*Cargo.toml"], cwd=root, text=True
-).splitlines()
-assert len(paths) > 100, "manifest discovery unexpectedly omitted workspace members"
-for path in paths + [
-    "crates/future/new-member/Cargo.toml",
-    "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
-    "Cargo.lock",
-    "fuzz/target-map.toml",
-]:
-    assert selector.search(path), (
-        f"manifest/control edit does not select full fuzz inventory: {path}"
-    )
-for path in [
-    "docs/Cargo.toml.example",
-    "src/Cargo.toml.rs",
-    "crates/core/chio-core/src/lib.rs",
-]:
-    assert not selector.search(path), (
-        f"non-manifest edit unexpectedly selected full inventory: {path}"
-    )
-assert 'fired=("${targets[@]}")' in workflow
-# Execute the owning fallback and output projection with the real target-map
-# inventory. A matching predicate alone does not prove all targets are emitted.
-inventory = sorted(
-    tomllib.loads((root / "fuzz/target-map.toml").read_text())["targets"]
-)
-assert inventory, "fuzz target inventory must not be empty"
-fallback_start = workflow.index("          if grep -qE '")
-fallback_end = workflow.index("          fired_count=", fallback_start)
-fallback = "\n".join(
-    line[10:] for line in workflow[fallback_start:fallback_end].splitlines()
-)
-with tempfile.TemporaryDirectory() as temporary:
-    directory = Path(temporary)
+ROOT = Path(__file__).resolve().parents[2]
+SELECTOR = Path(os.environ.get("FUZZ_SELECTOR", ROOT / "scripts/select-fuzz-targets.py"))
+INVENTORY = sorted(tomllib.loads((ROOT / "fuzz/target-map.toml").read_text())["targets"])
+GRAPH = {
+    package["name"]
+    for package in tomllib.loads((ROOT / "fuzz/Cargo.lock").read_text())["package"]
+    if "source" not in package
+}
+
+
+def select(
+    changed: list[str], root: Path = ROOT, base: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryDirectory() as temporary:
+        listing = Path(temporary) / "changed.txt"
+        listing.write_text("".join(path + "\n" for path in changed))
+        command = [sys.executable, str(SELECTOR), "--changed", str(listing), "--root", str(root)]
+        if base is not None:
+            command += ["--base", base]
+        return subprocess.run(command, capture_output=True, text=True, check=False)
+
+
+def selected(changed: list[str], **kwargs: object) -> list[str]:
+    result = select(changed, **kwargs)  # type: ignore[arg-type]
+    assert result.returncode == 0, (changed, result.stderr)
+    return result.stdout.splitlines()
+
+
+def manifests() -> list[tuple[str, str | None]]:
+    paths = subprocess.check_output(
+        ["git", "ls-files", "--", "*Cargo.toml"], cwd=ROOT, text=True
+    ).splitlines()
+    assert len(paths) > 100, "manifest discovery unexpectedly omitted workspace members"
+    found = []
+    for path in paths:
+        package = tomllib.loads((ROOT / path).read_text()).get("package", {})
+        found.append((path, package.get("name")))
+    return found
+
+
+def fuzz_graph_manifests_select_full_inventory() -> None:
+    in_graph = [path for path, name in manifests() if name in GRAPH]
+    assert len(in_graph) > 50, in_graph
+    for path in in_graph:
+        assert selected([path]) == INVENTORY, path
+
+
+def build_inputs_select_full_inventory() -> None:
     for path in [
-        "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
-        "crates/future/deep/new/member/Cargo.toml",
+        "Cargo.toml",
+        "fuzz/Cargo.toml",
+        "fuzz/Cargo.lock",
+        "fuzz/target-map.toml",
+        ".clusterfuzzlite/build.sh",
+        ".cargo/config.toml",
+        ".github/workflows/cflite_pr.yml",
+        "scripts/select-fuzz-targets.py",
+        "Makefile",
+        "crates/future/new-member/Cargo.toml",
+        "deploy/docker/chio-workspace/Cargo.toml",
     ]:
-        (directory / "changed.txt").write_text(path + "\n")
-        subprocess.run(
-            [
-                "bash",
-                "-euc",
-                'targets=("$@"); fired=()\n' + fallback,
-                "fuzz-selector",
-                *inventory,
-            ],
-            cwd=directory,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        assert (directory / "fired.txt").read_text().splitlines() == inventory, path
-    (directory / "changed.txt").write_text("docs/Cargo.toml.example\n")
-    subprocess.run(
-        [
-            "bash",
-            "-euc",
-            'targets=("$@"); fired=()\n' + fallback,
-            "fuzz-selector",
-            *inventory,
-        ],
-        cwd=directory,
-        check=True,
-        capture_output=True,
+        assert selected([path]) == INVENTORY, path
+
+
+def manifests_outside_fuzz_graph_select_nothing() -> None:
+    outside = [path for path, name in manifests() if name is not None and name not in GRAPH]
+    assert "crates/core/chio-adversarial-suite/Cargo.toml" in outside, outside
+    for path in outside:
+        assert selected([path]) != INVENTORY, path
+    assert selected(["crates/core/chio-adversarial-suite/Cargo.toml"]) == []
+
+
+def root_lockfile_selects_nothing() -> None:
+    assert selected(["Cargo.lock"]) == []
+
+
+def triggers_select_mapped_targets() -> None:
+    fired = selected(["crates/core/chio-core-types/src/canonical.rs", "docs/Cargo.toml.example"])
+    assert "canonical_json" in fired and fired != INVENTORY, fired
+    assert selected(["src/Cargo.toml.rs", "docs/README.md"]) == []
+
+
+def single_star_does_not_cross_directories() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fake_repo(root, triggers=["src/*.rs"], graph=["alpha"])
+        assert selected(["src/lib.rs"], root=root) == ["only"]
+        assert selected(["src/deep/lib.rs"], root=root) == []
+        assert selected(["src/lib.rs.bak"], root=root) == []
+
+
+def renamed_member_uses_base_name() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fake_repo(root, triggers=["src/**"], graph=["alpha"])
+        manifest = root / "crates/alpha/Cargo.toml"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text('[package]\nname = "alpha"\n')
+        git(root, "add", "-A")
+        git(root, "commit", "-qm", "base")
+        base = git(root, "rev-parse", "HEAD").strip()
+        manifest.write_text('[package]\nname = "renamed"\n')
+        assert selected(["crates/alpha/Cargo.toml"], root=root) == []
+        assert selected(["crates/alpha/Cargo.toml"], root=root, base=base) == ["only"]
+        manifest.unlink()
+        assert selected(["crates/alpha/Cargo.toml"], root=root, base=base) == ["only"]
+        assert selected(["crates/alpha/Cargo.toml"], root=root) == ["only"]
+
+
+def invalid_inputs_fail_closed() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fake_repo(root, triggers=[], graph=["alpha"])
+        result = select(["src/lib.rs"], root=root)
+        assert result.returncode == 2 and "has no triggers" in result.stderr, result
+        fake_repo(root, triggers=["src/**"], graph=[])
+        result = select(["src/lib.rs"], root=root)
+        assert result.returncode == 2 and "records no path packages" in result.stderr, result
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.check_output(
+        ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
+        cwd=root,
         text=True,
     )
-    assert (directory / "fired.txt").read_text() == ""
 
-    gate_start = workflow.index("        run: |\n", workflow.index(
-        "- name: Fail if no targets fired (changed-target mode)"
-    )) + len("        run: |\n")
-    gate_end = workflow.index("\n\n", gate_start)
-    no_target_gate = "\n".join(
-        line[10:] for line in workflow[gate_start:gate_end].splitlines()
-    )
-    for changed, passes in [
-        ("crates/store/chio-store-sqlite/tests/receipt_query_snapshot.rs\n", True),
-        ("crates/core/chio-core/src/receipt/tests/fixtures.rs\n", True),
-        ("crates/core/chio-core/src/receipt_tests.rs\ndocs/fuzzing/README.md\n", True),
-        ("crates/core/chio-core/README.md\nspec/schemas/x.json\n", True),
-        ("crates/core/chio-core/src/lib.rs\n", False),
-        ("crates/core/chio-core/tests/a.rs\ncrates/core/chio-core/build.rs\n", False),
-        ('"crates/core/chio-core/src/\\303\\251.rs"\n', False),
-        ("", False),
-    ]:
-        (directory / "changed.txt").write_text(changed)
-        result = subprocess.run(
-            ["bash", "-euc", no_target_gate],
-            cwd=directory,
-            capture_output=True,
-            text=True,
-        )
-        assert (result.returncode == 0) == passes, (changed, result.stderr)
-print(
-    f"fuzz manifest selection passed ({len(paths)} tracked manifests plus future-member controls)"
-)
-print(f"nested manifest fallback emitted all {len(inventory)} owning targets")
+
+def fake_repo(root: Path, triggers: list[str], graph: list[str]) -> None:
+    (root / "fuzz").mkdir(exist_ok=True)
+    quoted = ", ".join(f'"{trigger}"' for trigger in triggers)
+    (root / "fuzz/target-map.toml").write_text(f"[targets.only]\ntriggers = [{quoted}]\n")
+    packages = "".join(f'[[package]]\nname = "{name}"\nversion = "0.1.0"\n\n' for name in graph)
+    packages += '[[package]]\nname = "serde"\nversion = "1.0.0"\nsource = "registry+x"\n'
+    (root / "fuzz/Cargo.lock").write_text("version = 4\n\n" + packages)
+    if not (root / ".git").exists():
+        git(root, "init", "-q")
+
+
+CASES = [
+    fuzz_graph_manifests_select_full_inventory,
+    build_inputs_select_full_inventory,
+    manifests_outside_fuzz_graph_select_nothing,
+    root_lockfile_selects_nothing,
+    triggers_select_mapped_targets,
+    single_star_does_not_cross_directories,
+    renamed_member_uses_base_name,
+    invalid_inputs_fail_closed,
+]
+
+
+def main() -> int:
+    failures = 0
+    for case in CASES:
+        try:
+            case()
+        except AssertionError as error:
+            failures += 1
+            print(f"FAIL {case.__name__}: {error}")
+        else:
+            print(f"PASS {case.__name__}")
+    print(f"{len(CASES) - failures}/{len(CASES)} fuzz selection cases passed")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
