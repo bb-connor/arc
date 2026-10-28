@@ -438,6 +438,11 @@ async fn every_kind_reaches_the_same_prepare() {
         } else {
             assert_eq!(prepared.context().anchor.artifact_digest, None, "{kind:?}");
         }
+        assert_eq!(
+            prepared.artifact_digest(),
+            artifact_digest.as_ref(),
+            "{kind:?}"
+        );
         assert_eq!(prepared.anchor().kind, kind);
         assert_eq!(prepared.context().anchor.kind, kind);
         assert_eq!(prepared.context().anchor.issuer.as_str(), issuer);

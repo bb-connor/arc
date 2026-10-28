@@ -444,6 +444,7 @@ async fn id_jag_context_carries_the_assertion_digest() {
     let prepared = harness.run_body(&body, None, NOW).await.unwrap();
     let digest = Sha256Digest::from_hash(sha256(id_jag.as_bytes()));
     assert_eq!(prepared.context().anchor.artifact_digest, Some(digest));
+    assert_eq!(prepared.artifact_digest(), Some(&digest));
 }
 
 #[tokio::test]

@@ -190,7 +190,7 @@ in the signed root.
 - `holder` is `edge_session` or `caller` (section 5.6.6).
 - `key_snapshot_digest`, `kid`, `alg` and `artifact_digest` are present for
   the JWS-verified kinds (`oauth_id_jag`, `entra_jwt`, `entra_agent_id` and
-  `oidc_jwt`).
+  `oidc_jwt`). `artifact_digest` is absent for every other kind.
 
 #### 5.6.4 `chio.root-policy.v1`, provider records and `chio.idp-key-snapshot.v1`
 

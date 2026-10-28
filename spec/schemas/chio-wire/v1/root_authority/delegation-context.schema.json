@@ -213,6 +213,13 @@
               "alg",
               "artifact_digest"
             ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "artifact_digest"
+              ]
+            }
           }
         },
         {
