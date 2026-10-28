@@ -290,3 +290,7 @@ pub(super) fn run(state: &Path, action: Action) -> Result<(), CliError> {
 #[cfg(test)]
 #[path = "stop_control_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "stop_control_reader_tests.rs"]
+mod reader_tests;

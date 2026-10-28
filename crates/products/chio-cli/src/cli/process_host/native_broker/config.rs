@@ -266,3 +266,7 @@ pub(super) fn read_signer(
     }
     Ok(Arc::new(Ed25519Backend::new(key)))
 }
+
+#[cfg(test)]
+#[path = "config_reader_tests.rs"]
+mod reader_tests;
