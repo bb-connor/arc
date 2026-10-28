@@ -321,6 +321,57 @@ async fn a_session_send_failure_answers_the_fixed_urn_without_its_cause() -> Tes
     Ok(())
 }
 
+#[tokio::test]
+async fn governed_denial_details_never_enter_the_http_body() -> TestResult {
+    for detail in [
+        "verifier rejected /srv/chio/private-key.json for tenant secret-tenant",
+        "governed approval token verification failed: bearer secret-token",
+        "unknown future denial containing https://private.example/authority",
+        "denied",
+        "",
+    ] {
+        let response = remote_session_send_error(CliError::Kernel(
+            chio_kernel::KernelError::GovernedTransactionDenied(detail.to_owned()),
+        ));
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(response.headers()[CONTENT_TYPE], "application/json");
+        let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+        let value: Value = serde_json::from_slice(&body)?;
+        assert_eq!(
+            value,
+            json!({
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32003,
+                    "message": "Governed transaction denied",
+                    "data": { "reason": "denied" }
+                }
+            }),
+            "detail: {detail}"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn ingress_capacity_keeps_its_distinct_public_refusal() -> TestResult {
+    let response = remote_session_send_error(CliError::Adapter(AdapterError::IngressCapacity));
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    let value: Value = serde_json::from_slice(&body)?;
+    assert_eq!(
+        value,
+        json!({
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32000,
+                "message": "urn:chio:error:transport:stream-capacity-exceeded"
+            }
+        })
+    );
+    Ok(())
+}
+
 fn introspection_verifier(url: &str, contract: bool) -> TestResult<IntrospectionBearerVerifier> {
     let url = Url::parse(url)?;
     let authority = format!(

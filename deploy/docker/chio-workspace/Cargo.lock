@@ -4034,6 +4034,7 @@ dependencies = [
  "chio-file-custody",
  "chio-http-serve",
  "chio-kernel",
+ "chio-log-redact",
  "chio-manifest",
  "chio-mcp-adapter",
  "chio-metrics-spec",

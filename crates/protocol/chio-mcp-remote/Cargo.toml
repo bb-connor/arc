@@ -24,6 +24,7 @@ chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 chio-errors = { workspace = true }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-log-redact = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-manifest = { workspace = true }
 chio-metrics-spec = { workspace = true }
