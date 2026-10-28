@@ -11,8 +11,9 @@ is refused because it hides what it binds. Paths are matched over the whole
 source, so a path split across lines or written from the crate root (`::ureq`)
 still matches, and a client function named without a call still counts. A
 constructor alias matches under any path prefix (`crate::`, `self::`,
-`super::`, `::`), and a qualified type path `<T>::` or `<T as Trait>::` counts
-when `T` names an agent type or an alias of one.
+`super::`, `::`), and a qualified path `<T>::` or `<T as Trait>::` counts when
+its self type `T`, read with bracket depth and without transparent
+parentheses, names an agent type or an alias of one.
 
 A finding outside the kernel is accepted when one of the four lines above it
 carries the classification marker for its crate. Kernel crates take no
@@ -50,7 +51,7 @@ UNSCANNED_PACKAGES = frozenset(
 DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 USE_STATEMENT = re.compile(r"\b(pub(?:\([^)]*\))?\s+)?use\s+([^;]*);", re.S)
 EXTERN_CRATE = re.compile(r"\bextern\s+crate\s+([A-Za-z_]\w*)\s+as\s+([A-Za-z_]\w*)\s*;")
-QUALIFIED_TYPE_PATH = re.compile(r"(?<![\w:])<\s*([\w:\s]+?)\s*(?:>\s*::|\bas\b)")
+QUALIFIED_PATH_START = re.compile(r"(?<![\w:])<")
 TYPE_ALIAS = re.compile(r"\btype\s+([A-Za-z_]\w*)\s*(?:<[^=;]*>)?\s*=\s*([^;]+);")
 
 
@@ -204,9 +205,47 @@ def bind_names(text: str, ureq_roots: set[str], hyper_roots: set[str]):
             return constructors, findings
 
 
-def names_agent_type(qualified: str, ureq_roots: set[str], constructors: set[str]) -> bool:
-    """True when `<T>` or `<T as Trait>` names a ureq agent type or an alias of one."""
-    segments = [s.strip() for s in re.split(r"\s+as\s+", qualified, maxsplit=1)[0].split("::") if s.strip()]
+def qualified_self_types(text: str):
+    """Yield (offset, T) for each qualified path `<T>::` or `<T as Trait>`.
+
+    T is read with bracket depth so generic arguments and parentheses inside
+    it, or in the trait, do not end it early. A `<` that follows a path
+    separator is a turbofish, not a qualified path.
+    """
+    for match in QUALIFIED_PATH_START.finditer(text):
+        start = match.end()
+        depth = 0
+        index = start
+        while index < len(text):
+            char = text[index]
+            if char in ";{}":
+                break
+            if char in "<([":
+                depth += 1
+            elif char in ">)]" and not (char == ">" and text[index - 1] == "-"):
+                if depth == 0:
+                    if char == ">" and re.match(r"\s*::", text[index + 1 :]):
+                        yield match.start(), text[start:index]
+                    break
+                depth -= 1
+            elif (
+                depth == 0
+                and text.startswith("as", index)
+                and not re.match(r"\w", text[index - 1])
+                and not re.match(r"\w", text[index + 2 : index + 3])
+            ):
+                yield match.start(), text[start:index]
+                break
+            index += 1
+
+
+def names_agent_type(self_type: str, ureq_roots: set[str], constructors: set[str]) -> bool:
+    """True when a qualified path's self type names a ureq agent type or an alias of one."""
+    self_type = self_type.strip()
+    while self_type.startswith("(") and self_type.endswith(")"):
+        self_type = self_type[1:-1].strip()
+    self_type = re.sub(r"<.*", "", self_type, flags=re.S)
+    segments = [s.strip() for s in self_type.split("::") if s.strip()]
     if segments and segments[-1] in constructors:
         return True
     return any(
@@ -239,9 +278,9 @@ def scan_file(rel: str, raw: str, roots: dict[str, set[str]]) -> list[tuple[int,
     for family, pattern in patterns:
         for match in pattern.finditer(text):
             found.add((match.start(), family))
-    for match in QUALIFIED_TYPE_PATH.finditer(text):
-        if names_agent_type(match.group(1), ureq_roots, constructors):
-            found.add((match.start(), "ureq"))
+    for offset, self_type in qualified_self_types(text):
+        if names_agent_type(self_type, ureq_roots, constructors):
+            found.add((offset, "ureq"))
     raw_lines = raw.split("\n")
     result = set()
     for offset, family in found:
