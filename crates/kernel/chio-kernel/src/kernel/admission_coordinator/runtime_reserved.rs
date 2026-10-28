@@ -59,7 +59,7 @@ impl ChioKernel {
         if claim.intent.phase() != RuntimeParticipantPhase::Dispatch
             || usize::try_from(claim.intent.grant_index()).ok() != Some(grant)
             || claim.intent.runtime_authority_id() != binding.runtime_authority_id()
-            || claim.intent.expectation_id() != binding.expectation_id()
+            || claim.intent.qualification_id() != binding.qualification_id()
             || source.destination_authority_id() != runtime.fence.store_uuid
             || source.runtime_authority_id() != binding.runtime_authority_id().as_str()
         {
