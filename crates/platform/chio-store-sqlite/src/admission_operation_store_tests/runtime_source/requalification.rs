@@ -171,3 +171,68 @@ fn missing_supersession_refuses_global_projection_coverage() -> Result<(), Box<d
     ));
     Ok(())
 }
+
+#[test]
+fn requalification_callback_reentry_and_owner_change_refuse_atomically(
+) -> Result<(), Box<dyn Error>> {
+    for behavior in [Behavior::Reenter, Behavior::ChangeOwner] {
+        let fixture = fixture();
+        let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+        let before = global_count(&fixture.store);
+        let replacement = Source::new(&fixture, behavior);
+        let expected = match behavior {
+            Behavior::Reenter => AdmissionOperationStoreError::Invariant(
+                "invalid sqlite authority store: replay source migration is already in progress"
+                    .into(),
+            ),
+            Behavior::ChangeOwner => AdmissionOperationStoreError::Fenced,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            replace(&fixture, &prior, &replacement, &fixture.fence),
+            Err(expected)
+        );
+        assert_eq!(source_count(&fixture.store), 1);
+        assert_eq!(global_count(&fixture.store), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn requalification_survives_reopen_with_retained_prior_source() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+    let replacement = Source::new(&fixture, Behavior::Normal);
+    let current = replace(&fixture, &prior, &replacement, &fixture.fence)?;
+    drop(replacement);
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        fence: _,
+        _clock,
+    } = fixture;
+    drop(store);
+    drop(authority);
+    let authority = crate::test_authority::open_serving(&database, &lock_root)?;
+    let store = authority.admission_operation_store();
+    let fence = authority.mutation_fence();
+    assert_eq!(
+        store.load_runtime_source(
+            &identifier("runtime", "replacement-runtime"),
+            &fence,
+            now_ms()
+        )?,
+        Some(current),
+    );
+    assert_eq!(
+        store.load_runtime_source(&identifier("runtime", RUNTIME_ID), &fence, now_ms()),
+        Err(AdmissionOperationStoreError::Invariant(
+            "runtime source qualification has been superseded".into(),
+        )),
+    );
+    assert_eq!(source_count(&store), 2);
+    Ok(())
+}
