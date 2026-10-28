@@ -4800,10 +4800,11 @@ before the lifecycle registry is written:
 - every integer in both documents is at most 2^53 - 1; a cursor above that
   bound, a missing cursor, or any other query member is refused as a client
   error
-- the publisher refuses to sign when the oracle file is missing, when the
-  lifecycle registry records more revoked passports than the oracle holds
-  passport leaves, or when the authority clock reads earlier than the oracle's
-  last commit; it refuses a page that would carry a leaf of any other kind
+- the publisher signs the root of one oracle snapshot, and refuses to sign
+  when the oracle file is missing, when that snapshot lacks the passport key
+  or any credential key of a passport the lifecycle registry records as
+  revoked, or when the authority clock reads earlier than the oracle's last
+  commit; it refuses a page that would carry a leaf of any other kind
 - both reads share the bounded public passport admission lane and refuse at
   capacity instead of queueing
 

@@ -16,8 +16,9 @@ use std::path::Path;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_credentials::PassportLifecycleState;
 use chio_revocation_oracle::{
-    Ed25519RootSigner, Ed25519RootVerifier, EpochRoot, PassportRevocationLeaf,
-    PassportRevocationLeafKind, SignedEpochRoot, SqliteRevocationOracle,
+    credential_revocation_key, passport_revocation_key, Ed25519RootSigner, Ed25519RootVerifier,
+    EpochRoot, InMemoryRevocationOracle, PassportRevocationLeaf, RevocationOracle, SignedEpochRoot,
+    SqliteRevocationOracle,
 };
 use serde::{Deserialize, Serialize};
 
@@ -48,10 +49,6 @@ pub enum PassportRevocationFeedError {
     OracleUnavailable(String),
     #[error("passport lifecycle registry unavailable: {0}")]
     RegistryUnavailable(String),
-    #[error(
-        "passport lifecycle registry holds {revoked} revoked passports but the revocation oracle holds {passport_leaves} passport leaves"
-    )]
-    OracleBehindRegistry { revoked: u64, passport_leaves: u64 },
     #[error("passport lifecycle registry revokes `{passport_id}` but the revocation oracle snapshot lacks its key `{subject}`")]
     OracleMissingRevocation {
         passport_id: String,
@@ -148,29 +145,35 @@ fn require_oracle_file(registry: &Path) -> Result<(), PassportRevocationFeedErro
     Ok(())
 }
 
-/// Refuses when the registry at `registry` records more revoked passports
-/// than the oracle holds passport leaves. Every revocation writes the oracle
-/// before the registry, so the oracle can only lead.
-fn require_oracle_covers_registry(
-    oracle: &SqliteRevocationOracle,
+/// Refuses unless `snapshot` holds the passport key and every credential key
+/// of each passport the registry at `registry` records as revoked. Every
+/// revocation writes the oracle before the registry, so a complete oracle
+/// holds them all.
+fn require_snapshot_covers_registry(
+    snapshot: &InMemoryRevocationOracle,
     registry: &Path,
 ) -> Result<(), PassportRevocationFeedError> {
     let lifecycle = PassportStatusRegistry::load(registry)
         .map_err(|error| PassportRevocationFeedError::RegistryUnavailable(error.to_string()))?;
-    let revoked = lifecycle
+    for record in lifecycle
         .passports
         .values()
         .filter(|record| record.status == PassportLifecycleState::Revoked)
-        .count();
-    let revoked = u64::try_from(revoked).unwrap_or(u64::MAX);
-    let passport_leaves = oracle
-        .leaf_count_with_nonce(PassportRevocationLeafKind::Passport.epoch_nonce())
-        .map_err(|error| PassportRevocationFeedError::OracleUnavailable(error.to_string()))?;
-    if revoked > passport_leaves {
-        return Err(PassportRevocationFeedError::OracleBehindRegistry {
-            revoked,
-            passport_leaves,
-        });
+    {
+        let keys = std::iter::once(passport_revocation_key(&record.passport_id)).chain(
+            record
+                .credential_digests
+                .iter()
+                .map(|digest| credential_revocation_key(digest)),
+        );
+        for key in keys {
+            if !snapshot.contains(&key) {
+                return Err(PassportRevocationFeedError::OracleMissingRevocation {
+                    passport_id: record.passport_id.clone(),
+                    subject: key.subject_id.as_str().to_owned(),
+                });
+            }
+        }
     }
     Ok(())
 }
@@ -182,8 +185,9 @@ fn json_safe(field: &'static str, value: u64) -> Result<(), PassportRevocationFe
     Ok(())
 }
 
-/// Signs the current root of `oracle`, the oracle beside `registry`, at
-/// `now_unix_ms`.
+/// Signs the root of one snapshot of `oracle`, the oracle beside `registry`,
+/// at `now_unix_ms`, once that snapshot holds every revocation the registry
+/// records.
 pub fn sign_passport_revocation_root(
     oracle: &SqliteRevocationOracle,
     registry: &Path,
@@ -191,10 +195,11 @@ pub fn sign_passport_revocation_root(
     now_unix_ms: u64,
 ) -> Result<SignedEpochRoot, PassportRevocationFeedError> {
     require_oracle_file(registry)?;
-    let root = oracle
-        .current_epoch_root()
+    let snapshot = oracle
+        .snapshot()
         .map_err(|error| PassportRevocationFeedError::OracleUnavailable(error.to_string()))?;
-    require_oracle_covers_registry(oracle, registry)?;
+    require_snapshot_covers_registry(&snapshot, registry)?;
+    let root = snapshot.epoch_root();
     if now_unix_ms < root.issued_at_unix_ms {
         return Err(PassportRevocationFeedError::ClockBehindOracle {
             now_unix_ms,

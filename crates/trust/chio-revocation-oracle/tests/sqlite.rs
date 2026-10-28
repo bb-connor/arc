@@ -544,22 +544,20 @@ fn a_stamped_catalog_with_an_extra_oracle_index_is_refused() -> TestResult {
 }
 
 #[test]
-fn leaf_counts_are_kept_per_nonce() -> TestResult {
-    let oracle = SqliteRevocationOracle::open_in_memory()?;
-    oracle.transact(10, |txn| {
-        txn.revoke(&passport_revocation_key("passport-a"))?;
-        txn.revoke(&passport_revocation_key("passport-b"))?;
-        txn.revoke(&credential_revocation_key(&"ab".repeat(32)))?;
-        Ok(())
-    })?;
-    assert_eq!(
-        oracle.leaf_count_with_nonce(PassportRevocationLeafKind::Passport.epoch_nonce())?,
-        2
-    );
-    assert_eq!(
-        oracle.leaf_count_with_nonce(PassportRevocationLeafKind::Credential.epoch_nonce())?,
-        1
-    );
-    assert_eq!(oracle.leaf_count_with_nonce(EpochNonce::new(7))?, 0);
+fn a_snapshot_answers_root_and_membership_from_one_committed_state() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("oracle.sqlite3");
+    let writer = SqliteRevocationOracle::open(&path)?;
+    let reader = SqliteRevocationOracle::open(&path)?;
+    let first = writer.revoke(passport_revocation_key("passport-a"), 10)?;
+
+    let snapshot = reader.snapshot()?;
+    assert!(snapshot.contains(&passport_revocation_key("passport-a")));
+    assert_eq!(snapshot.epoch_root(), first);
+
+    let second = writer.revoke(credential_revocation_key(&"ab".repeat(32)), 20)?;
+    assert!(!snapshot.contains(&credential_revocation_key(&"ab".repeat(32))));
+    assert_eq!(snapshot.epoch_root(), first);
+    assert_eq!(reader.snapshot()?.epoch_root(), second);
     Ok(())
 }

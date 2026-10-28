@@ -245,16 +245,10 @@ impl SqliteRevocationOracle {
         Ok(leaves)
     }
 
-    /// The number of committed leaves whose key carries `nonce`.
-    pub fn leaf_count_with_nonce(&self, nonce: EpochNonce) -> Result<u64> {
-        let connection = self.lock_connection()?;
-        let count: i64 = connection.query_row(
-            "SELECT count(*) FROM chio_revocation_oracle_leaves WHERE epoch_nonce = ?1",
-            params![nonce.get().to_be_bytes().as_slice()],
-            |row| row.get(0),
-        )?;
-        u64::try_from(count)
-            .map_err(|_| SqliteRevocationOracleError::CorruptRecord("leaf count".to_string()))
+    /// The committed tree at one instant. Its root and its membership answer
+    /// from that one state, so a check of its members binds the root it yields.
+    pub fn snapshot(&self) -> Result<InMemoryRevocationOracle> {
+        self.current()
     }
 
     pub fn current_epoch_root(&self) -> Result<EpochRoot> {
