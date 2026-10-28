@@ -163,6 +163,7 @@ async fn drive(
     let mut active = JoinSet::new();
     let mut active_ids: BTreeSet<usize> = BTreeSet::new();
     let mut observations = BTreeMap::new();
+    let mut cancellation: BTreeMap<usize, tokio::sync::watch::Sender<bool>> = BTreeMap::new();
     let mut retry_at = BTreeMap::new();
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut interrupt = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
@@ -195,16 +196,29 @@ async fn drive(
         loop {
             if server.is_finished() { return Err(error("worker listener stopped")); }
             journal.discover()?;
-            if plan.failure_policy != FailurePolicy::Stop {
-                journal.fail_dependents()?;
-            }
             let snapshots = journal.snapshots()?;
-            for worker in &journal.workers {
-                if host.runtime.process(&worker.process).map_err(error)?.state != chio_process::ProcessState::Running {
-                    return Err(error("run worker was cancelled"));
+            let mut cancelled = BTreeSet::new();
+            for index in 0..journal.workers.len() {
+                let worker = journal.workers[index].clone();
+                match host.runtime.process(&worker.process).map_err(error)?.state {
+                    chio_process::ProcessState::Running => {},
+                    chio_process::ProcessState::Cancelled => {
+                        service.revoke_credentials(&worker.process).map_err(error)?;
+                        cancelled.insert(worker.process.clone());
+                        if snapshots.iter().any(|s| s.process == worker.process && s.state == "pending") {
+                            journal.cancel_pending(&worker)?;
+                        }
+                        if let Some(signal) = cancellation.get(&index) {
+                            signal.send_replace(true);
+                        }
+                    },
                 }
             }
-            let stopping = plan.failure_policy == FailurePolicy::Stop && snapshots.iter().any(|s| s.state == "failed");
+            journal.fail_dependents()?;
+            let snapshots = journal.snapshots()?;
+            let stopping = plan.failure_policy == FailurePolicy::Stop && journal.has_stop_failure(&snapshots, &cancelled)?;
+            let draining = !cancelled.is_empty();
+            if draining && active.is_empty() { return Err(error("run worker was cancelled")); }
             if snapshots.iter().any(|s| s.state == "failed") {
                 let finishing_failed = active_ids.iter().any(|index| snapshots.iter().any(|snapshot| snapshot.process == journal.workers[*index].process && snapshot.state == "failed"));
                 if stopping && !finishing_failed {
@@ -241,7 +255,7 @@ async fn drive(
             for snapshot in &snapshots {
                 *root_attempts.entry(journal.root(&snapshot.process).to_owned()).or_default() += snapshot.attempts;
             }
-            while !stopping && active.len() < plan.max_parallel {
+            while !stopping && !draining && active.len() < plan.max_parallel {
                 let Some(position) = (0..ready.len()).min_by_key(|&position| {
                     let root = journal.root(&journal.workers[ready[position]].process);
                     (root_active.get(root).copied().unwrap_or(0), root_attempts.get(root).copied().unwrap_or(0), ready[position])
@@ -271,13 +285,16 @@ async fn drive(
                 let timeout = Duration::from_secs(worker.timeout_seconds);
                 let resident_ceiling = worker.resources.and_then(|resources| resources.max_resident_bytes);
                 active_ids.insert(index);
+                let (cancel, cancelled) = tokio::sync::watch::channel(false);
+                cancellation.insert(index, cancel);
                 let launch_authority = launch_authority.clone();
                 active.spawn(async move {
                     let (result, diagnostics, cleanup) = if let Some((lease, writer)) = container {
-                        let (result, cleanup) = container::run(writer, lease, worker, socket, input, attempt, launch_authority).await;
+                        let control = container::AttemptControl { authority: launch_authority, cancellation: Some(cancelled) };
+                        let (result, cleanup) = container::run(writer, lease, worker, socket, input, attempt, control).await;
                         (result.map_err(|failure| std::io::Error::other(failure.to_string())), None, Some(cleanup))
                     } else { match match spawned {
-                        Some(Ok(child)) => child::observe(child, input, None, timeout, resident_ceiling, None).await,
+                        Some(Ok(child)) => child::observe(child, input, None, timeout, resident_ceiling, None, Some(cancelled)).await,
                         Some(Err(failure)) => Err(failure),
                         None => Err(std::io::Error::other("missing direct worker launch")),
                     } {
@@ -295,6 +312,7 @@ async fn drive(
                     match result.map_err(error)? {
                         Supervised::Worker(mut attempt) => {
                             let index = attempt.index;
+                            cancellation.remove(&index);
                             observations.remove(&index);
                             let recorded = record_attempt(host, journal, logs, service, &attempt);
                             if let Some(diagnostics) = attempt.diagnostics.take() {
@@ -424,15 +442,15 @@ fn record_attempt(
     };
     let end = if outcome.success {
         Completion::Completed(&outcome.reason)
-    } else if host.runtime.process(&worker.process).map_err(error)?.state
-        == chio_process::ProcessState::Cancelled
-    {
-        Completion::Terminal("process_cancelled")
     } else if matches!(
         outcome.reason.as_str(),
         "container_attachment_lost" | "container_state_unknown"
     ) {
         Completion::Terminal(&outcome.reason)
+    } else if host.runtime.process(&worker.process).map_err(error)?.state
+        == chio_process::ProcessState::Cancelled
+    {
+        Completion::Terminal("process_cancelled")
     } else if outcome.reason == "exit_75"
         && host
             .runtime

@@ -269,10 +269,12 @@ process, completed supervisor, settled child and settlement request ID. Thus
 logs continue to expose those workers as failed. Cleanup, drain and authority
 requirements still apply before the command can exit zero.
 
-Cancellation, signals sent to the runner, kernel or storage failures, listener
-failures and container ownership or reconciliation errors still stop the entire run. The
+Signals sent to the runner, kernel or storage failures, listener failures and
+container ownership or reconciliation errors still stop the entire run. The
 policy isolates ordinary worker failures, not a failure of the host's execution
-or authority boundary.
+or authority boundary. Cancellation ends the run under both policies: the
+runner launches no further workers, terminates the cancelled subtree's workers
+and lets unrelated running workers finish, then exits incomplete.
 
 Run the same command after a host interruption. `runner.db` binds the plan,
 version, qualified authority and signing key. It reserves attempts before
@@ -309,8 +311,9 @@ work to move normally while unresolved filesystem ownership stays on its host.
 Previously admitted kernel calls can still finish. SIGINT/SIGTERM stop workers
 and drain admitted kernel calls. A tool that never returns can keep that drain
 open; forced host death leaves durable admission to classify the outcome.
-Cancelled Chio processes stop the application, and their active direct workers
-are terminated. Host interruption does not permanently cancel Chio identities.
+Cancelled Chio processes lose their credentials and their active workers are
+terminated; no further workers launch, and unrelated running workers keep
+their authority until they finish. Host interruption does not permanently cancel Chio identities.
 
 Native mailbox and external tool effects still use the kernel's existing
 durable outcome rules. If the host dies after an effect but before recording
@@ -401,8 +404,8 @@ rejects cycles across declared dependencies and recorded joins before
 committing a wait. Waiting parents release their OS slot on exit, allowing
 fork/join to complete even at `max_parallel: 1`. Joins remain recorded across
 host interruption; pending parents wait for those children before relaunch.
-Child failure follows the selected run failure policy. Cancellation stops the
-application under both policies. There are at most 128 total declared and dynamic workers;
+Child failure follows the selected run failure policy. Cancellation ends the
+run under both policies without stopping unrelated running workers. There are at most 128 total declared and dynamic workers;
 process-tree depth, count, shared logical-call limits and sibling budget
 shares can impose lower ceilings. Cancelled slots and shares remain allocated.
 
