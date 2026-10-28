@@ -972,7 +972,9 @@ wasm_sha256: deadbeef
             "version": "0.1.0",
         }))
         .unwrap();
-        let signature = keypair.sign_wrapped(WASM_MODULE_SCHEMA, &statement).unwrap();
+        let signature = keypair
+            .sign_wrapped(WASM_MODULE_SCHEMA, &statement)
+            .unwrap();
         let signed = SignedWasmModule {
             module_hash,
             module_name: "g".to_string(),

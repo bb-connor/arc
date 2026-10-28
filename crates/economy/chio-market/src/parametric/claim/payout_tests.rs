@@ -862,7 +862,10 @@ fn signed_artifact_capture_parametric_contest() {
         ),
         "contest",
     );
-    let signed = required(SignedParametricContestV1::sign(contest, &keypair), "sign contest");
+    let signed = required(
+        SignedParametricContestV1::sign(contest, &keypair),
+        "sign contest",
+    );
     required(
         VerifiedParametricContestV1::verify(signed, "contestant-1", &keypair.public_key()),
         "verify contest",
