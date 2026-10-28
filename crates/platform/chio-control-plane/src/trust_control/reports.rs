@@ -522,12 +522,14 @@ pub fn issue_signed_capital_execution_instruction(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<SignedCapitalExecutionInstruction, CliError> {
     issue_signed_capital_execution_instruction_detailed(
         receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
+        capital_authority,
     )
     .map_err(CliError::from)
 }
@@ -537,8 +539,13 @@ pub(crate) fn issue_signed_capital_execution_instruction_detailed(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CapitalExecutionInstructionRequest,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<SignedCapitalExecutionInstruction, TrustHttpError> {
-    let artifact = build_capital_execution_instruction_artifact_from_store(receipt_store, request)?;
+    let artifact = build_capital_execution_instruction_artifact_from_store(
+        receipt_store,
+        request,
+        capital_authority,
+    )?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedCapitalExecutionInstruction::sign(artifact, &keypair)
         .map_err(|error| TrustHttpError::internal(error.to_string()))
@@ -551,6 +558,7 @@ pub fn issue_signed_capital_allocation_decision(
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<SignedCapitalAllocationDecision, CliError> {
     issue_signed_capital_allocation_decision_detailed(
         receipt_store,
@@ -559,6 +567,7 @@ pub fn issue_signed_capital_allocation_decision(
         authority_db_path,
         certification_registry_file,
         request,
+        capital_authority,
     )
     .map_err(CliError::from)
 }
@@ -570,6 +579,7 @@ pub(crate) fn issue_signed_capital_allocation_decision_detailed(
     authority_db_path: Option<&Path>,
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<SignedCapitalAllocationDecision, TrustHttpError> {
     // Load the signing keypair up front so its public key anchors the
     // reputation scoring trust set, then reuse it to sign the artifact.
@@ -582,6 +592,7 @@ pub(crate) fn issue_signed_capital_allocation_decision_detailed(
         certification_registry_file,
         request,
         &trusted_kernel_keys,
+        capital_authority,
     )?;
     SignedCapitalAllocationDecision::sign(artifact, &keypair)
         .map_err(|error| TrustHttpError::internal(error.to_string()))
@@ -597,6 +608,7 @@ fn build_capital_allocation_decision_artifact_from_store(
     certification_registry_file: Option<&Path>,
     request: &CapitalAllocationDecisionRequest,
     trusted_kernel_keys: &[String],
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<CapitalAllocationDecisionArtifact, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
     let issued_at = clock_now;
@@ -609,6 +621,7 @@ fn build_capital_allocation_decision_artifact_from_store(
         &request.execution_window,
         &request.rail,
         issued_at,
+        capital_authority,
     )?;
 
     let behavioral_query = BehavioralFeedQuery {

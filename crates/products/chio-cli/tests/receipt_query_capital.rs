@@ -663,6 +663,7 @@ fn test_capital_instruction_issue_surfaces() {
             "--input-file",
             input_file.to_str().expect("capital instruction input file"),
         ])
+        .args(capital_authority_key_args())
         .output()
         .expect("run capital instruction CLI");
     assert!(
@@ -1112,6 +1113,7 @@ fn test_capital_allocation_issue_surfaces() {
             "--input-file",
             input_file.to_str().expect("capital allocation input file"),
         ])
+        .args(capital_authority_key_args())
         .output()
         .expect("run capital allocation CLI");
     assert!(

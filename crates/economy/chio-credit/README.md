@@ -7,29 +7,31 @@ input evidence; SQLite stores and the control plane consume these contracts.
 
 ## Usage
 
-Create and verify one signed capital authority step. The fixed seed is for this
-local example; deployed signers need their own protected keys.
+Create one signed capital authority step and verify it against a pinned
+capital authority trust set. The fixed seed is for this local example;
+deployed signers need their own protected keys.
 
 ```rust
 use chio_credit::{
-    crypto::Keypair, validate_capital_execution_authority_step_proof,
-    CapitalExecutionAuthorityStep, CapitalExecutionRole,
+    crypto::Keypair, CapitalExecutionAuthorityStep, CapitalExecutionRole,
+    TrustedCapitalAuthority,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer = Keypair::from_seed(&[7; 32]);
+    let trusted = TrustedCapitalAuthority::new(vec![signer.public_key()])?;
     let step = CapitalExecutionAuthorityStep::signed(
         CapitalExecutionRole::OperatorTreasury, &signer, 100, 200, None,
     )?;
-    validate_capital_execution_authority_step_proof(&step)?;
-    assert_eq!(step.principal_id, signer.public_key().to_hex());
+    trusted.verify_step(&step)?;
     Ok(())
 }
 ```
 
-This validator checks the proof signature and its agreement with the step.
-`validate_capital_execution_envelope` additionally checks issuance timing,
-execution-window coverage, and custody-provider approval.
+`TrustedCapitalAuthority` refuses an empty key set, a step signed outside the
+set, and a proof that does not verify under the matched trusted key.
+`validate_capital_execution_envelope` checks issuance timing, execution-window
+coverage, and custody-provider approval; it does not establish signer trust.
 
 ## Features
 

@@ -187,7 +187,6 @@ pub fn validate_capital_execution_envelope(
             &step.principal_id,
             "capital execution authorityChain principalId",
         )?;
-        validate_capital_execution_authority_step_proof(step)?;
         if step.approved_at > step.expires_at {
             return Err(
                 "capital execution authorityChain requires approvedAt <= expiresAt".to_string(),

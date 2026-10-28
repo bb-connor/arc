@@ -53,11 +53,18 @@ pub(crate) async fn handle_issue_capital_execution_instruction(
         }
     };
 
+    let capital_authority =
+        match require_capital_authority(state.config.capital_authority.as_ref()) {
+            Ok(trust) => trust,
+            Err(error) => return error.into_response(),
+        };
+
     match issue_signed_capital_execution_instruction_detailed(
         receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
+        capital_authority,
     ) {
         Ok(signed) => Json::<SignedCapitalExecutionInstruction>(signed).into_response(),
         Err(error) => error.into_response(),
@@ -83,6 +90,12 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
         }
     };
 
+    let capital_authority =
+        match require_capital_authority(state.config.capital_authority.as_ref()) {
+            Ok(trust) => trust,
+            Err(error) => return error.into_response(),
+        };
+
     match issue_signed_capital_allocation_decision_detailed(
         receipt_store,
         state.config.budget_db_path.as_deref(),
@@ -90,6 +103,7 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
         state.config.authority_db_path.as_deref(),
         state.config.certification_registry_file.as_deref(),
         &request,
+        capital_authority,
     ) {
         Ok(signed) => Json::<SignedCapitalAllocationDecision>(signed).into_response(),
         Err(error) => error.into_response(),

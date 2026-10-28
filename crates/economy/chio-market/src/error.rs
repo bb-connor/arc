@@ -15,6 +15,9 @@ pub enum MarketErrorCode {
     /// An embedded signed envelope or authority-step proof failed
     /// signature verification.
     SignatureInvalid,
+    /// An authority-step proof is signed by a key outside the operator
+    /// trust set.
+    AuthorityUntrusted,
     /// A field is missing, empty, malformed, duplicated, or present where
     /// the artifact shape forbids it.
     FieldInvalid,
@@ -41,6 +44,7 @@ impl MarketErrorCode {
         match self {
             Self::SchemaUnsupported => "schema_unsupported",
             Self::SignatureInvalid => "signature_invalid",
+            Self::AuthorityUntrusted => "authority_untrusted",
             Self::FieldInvalid => "field_invalid",
             Self::AmountOutOfBounds => "amount_out_of_bounds",
             Self::CurrencyMismatch => "currency_mismatch",
@@ -99,6 +103,12 @@ impl MarketError {
     #[must_use]
     pub fn signature_invalid(detail: impl Into<String>) -> Self {
         Self::new(MarketErrorCode::SignatureInvalid, detail)
+    }
+
+    /// An authority proof signer is outside the operator trust set.
+    #[must_use]
+    pub fn authority_untrusted(detail: impl Into<String>) -> Self {
+        Self::new(MarketErrorCode::AuthorityUntrusted, detail)
     }
 
     /// A required field is missing, empty, malformed, or duplicated.

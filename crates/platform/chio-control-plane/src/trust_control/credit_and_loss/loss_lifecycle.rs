@@ -440,6 +440,7 @@ pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
+    capital_authority: Option<&TrustedCapitalAuthority>,
 ) -> Result<SignedCreditLossLifecycle, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
     let mut report = build_credit_loss_lifecycle_report_from_store(receipt_store, &request.query)?;
@@ -467,6 +468,7 @@ pub(crate) fn issue_signed_credit_loss_lifecycle_detailed(
             &execution_window,
             &rail,
             issued_at,
+            require_capital_authority(capital_authority)?,
         )?;
         let bond_row = receipt_store
             .resolve_credit_bond(&request.query.bond_id)

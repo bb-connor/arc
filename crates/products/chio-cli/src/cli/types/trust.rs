@@ -172,6 +172,11 @@ pub(crate) enum TrustCommands {
         /// roster anchor) for liability adjudication enforcement.
         #[arg(long)]
         roster_policy_file: Option<PathBuf>,
+
+        /// Trusted capital execution authority public key (hex). Repeat for
+        /// each key. Capital issuance refuses when no key is configured.
+        #[arg(long = "capital-authority-key")]
+        capital_authority_keys: Vec<String>,
     },
 
     /// Manage enterprise federation provider-admin records.
@@ -772,6 +777,10 @@ pub(crate) enum TrustCapitalInstructionCommands {
         /// JSON or YAML capital-instruction input file.
         #[arg(long)]
         input_file: PathBuf,
+        /// Trusted capital execution authority public key (hex). Repeat for
+        /// each key. Local issuance without --control-url refuses when unset.
+        #[arg(long = "capital-authority-key")]
+        capital_authority_keys: Vec<String>,
     },
 }
 
@@ -785,6 +794,10 @@ pub(crate) enum TrustCapitalAllocationCommands {
         /// Optional local certification registry file used when not using --control-url.
         #[arg(long)]
         certification_registry_file: Option<PathBuf>,
+        /// Trusted capital execution authority public key (hex). Repeat for
+        /// each key. Local issuance without --control-url refuses when unset.
+        #[arg(long = "capital-authority-key")]
+        capital_authority_keys: Vec<String>,
     },
 }
 
@@ -1052,6 +1065,10 @@ pub(crate) enum TrustCreditLossLifecycleCommands {
         /// Optional reserve-control description recorded on the lifecycle artifact.
         #[arg(long)]
         description: Option<String>,
+        /// Trusted capital execution authority public key (hex). Repeat for
+        /// each key. Local issuance without --control-url refuses when unset.
+        #[arg(long = "capital-authority-key")]
+        capital_authority_keys: Vec<String>,
     },
 
     /// List persisted bond loss-lifecycle artifacts.
@@ -1318,6 +1335,10 @@ pub(crate) enum TrustLiabilityMarketCommands {
         /// JSON file containing the operator roster policy. Required when --control-url is not set.
         #[arg(long)]
         roster_policy_file: Option<PathBuf>,
+        /// Trusted capital execution authority public key (hex). Repeat for
+        /// each key. Local issuance without --control-url refuses when unset.
+        #[arg(long = "capital-authority-key")]
+        capital_authority_keys: Vec<String>,
     },
 
     /// Issue and persist a signed liability claim settlement receipt from JSON or YAML input.

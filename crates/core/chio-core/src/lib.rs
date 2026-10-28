@@ -114,6 +114,7 @@ pub use canonical::{
 pub use credit::{
     ensure_capital_execution_custodian_authority, ensure_capital_execution_owner_authority,
     validate_capital_execution_envelope, CapitalAllocationDecisionArtifact,
+    CapitalAuthorityTrustError, TrustedCapitalAuthority,
     CapitalAllocationDecisionFinding, CapitalAllocationDecisionOutcome,
     CapitalAllocationDecisionReasonCode, CapitalAllocationDecisionSupportBoundary,
     CapitalAllocationInstructionDraft, CapitalBookEvent, CapitalBookEventKind,

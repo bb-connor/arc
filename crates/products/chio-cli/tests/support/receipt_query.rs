@@ -317,6 +317,7 @@ pub(crate) fn spawn_trust_service(
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])
+        .args(capital_authority_key_args())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())

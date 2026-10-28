@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::scope::MonetaryAmount;
 use crate::credit::{
-    validate_capital_execution_authority_step_proof, CapitalBookSourceKind,
-    CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction, CapitalExecutionObservation,
+    CapitalAuthorityTrustError, CapitalBookSourceKind, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction, CapitalExecutionObservation,
     CapitalExecutionRail, CapitalExecutionReconciledState, CapitalExecutionRole,
     CapitalExecutionWindow, SignedCapitalBookReport, SignedCapitalExecutionInstruction,
+    TrustedCapitalAuthority,
 };
 use crate::receipt::lineage::SignedExportEnvelope;
 
@@ -434,8 +434,6 @@ impl LiabilityClaimSettlementInstructionArtifact {
                     "claim settlement authority_chain principal_id cannot be empty",
                 ));
             }
-            validate_capital_execution_authority_step_proof(step)
-                .map_err(MarketError::signature_invalid)?;
             if step.approved_at > step.expires_at {
                 return Err(MarketError::window_invalid(
                     "claim settlement authority_chain requires approved_at <= expires_at",
@@ -471,6 +469,33 @@ impl LiabilityClaimSettlementInstructionArtifact {
             ));
         }
         Ok(())
+    }
+}
+
+impl LiabilityClaimSettlementInstructionArtifact {
+    /// Structural validation plus every authority step verified under the
+    /// trusted capital authority key matching its signer.
+    pub fn validate_with_capital_authority(
+        &self,
+        trust: &TrustedCapitalAuthority,
+    ) -> Result<(), MarketError> {
+        self.validate()?;
+        trust
+            .verify_chain(&self.authority_chain)
+            .map_err(market_error_from_capital_authority)
+    }
+}
+
+/// Maps a capital authority refusal onto the market error family.
+pub fn market_error_from_capital_authority(error: CapitalAuthorityTrustError) -> MarketError {
+    match error {
+        CapitalAuthorityTrustError::Unconfigured
+        | CapitalAuthorityTrustError::UntrustedSigner { .. } => {
+            MarketError::authority_untrusted(error.to_string())
+        }
+        CapitalAuthorityTrustError::InvalidProof(_) => {
+            MarketError::signature_invalid(error.to_string())
+        }
     }
 }
 

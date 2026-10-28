@@ -48,6 +48,8 @@ impl From<CliError> for TrustHttpError {
 pub(crate) fn liability_market_http_error(message: &str) -> Response {
     let status = if message.contains("not found") {
         StatusCode::NOT_FOUND
+    } else if message.contains("outside the trusted capital authority set") {
+        StatusCode::FORBIDDEN
     } else if message.contains("already")
         || message.contains("stale")
         || message.contains("unsupported")

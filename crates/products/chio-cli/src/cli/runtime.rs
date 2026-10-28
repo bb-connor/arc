@@ -1533,6 +1533,36 @@ pub(crate) fn load_roster_policy(path: &Path) -> Result<trust_control::RosterPol
     })
 }
 
+/// Parses `--capital-authority-key` values. No keys yields `None`, which
+/// the service treats as unconfigured and refuses capital issuance.
+pub(crate) fn parse_capital_authority_keys(
+    keys: &[String],
+) -> Result<Option<chio_kernel::TrustedCapitalAuthority>, CliError> {
+    if keys.is_empty() {
+        return Ok(None);
+    }
+    let parsed = keys
+        .iter()
+        .map(|key| {
+            chio_core::crypto::PublicKey::from_hex(key).map_err(|error| {
+                CliError::cli_other_error(format!("invalid --capital-authority-key `{key}`: {error}"))
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    chio_kernel::TrustedCapitalAuthority::new(parsed)
+        .map(Some)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
+/// Local capital issuance requires at least one `--capital-authority-key`.
+pub(crate) fn require_local_capital_authority(
+    keys: &[String],
+) -> Result<chio_kernel::TrustedCapitalAuthority, CliError> {
+    parse_capital_authority_keys(keys)?.ok_or_else(|| {
+        CliError::cli_other_error(chio_kernel::CapitalAuthorityTrustError::Unconfigured.to_string())
+    })
+}
+
 pub(crate) fn cmd_trust_serve(
     transport: chio_http_serve::ServerTransportConfig,
     listen: SocketAddr,
@@ -1572,6 +1602,7 @@ pub(crate) fn cmd_trust_serve(
     cluster_sync_interval_ms: u64,
     authority_replication_max_future_skew_seconds: u64,
     roster_policy_file: Option<&Path>,
+    capital_authority_keys: &[String],
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(&transport, listen)?;
@@ -1600,6 +1631,7 @@ pub(crate) fn cmd_trust_serve(
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
     let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
+    let capital_authority = parse_capital_authority_keys(capital_authority_keys)?;
     let fiscal_runtime = match (
         fiscal_genesis_policy,
         fiscal_anchor_url,
@@ -1660,6 +1692,7 @@ pub(crate) fn cmd_trust_serve(
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
         authority_replication_max_future_skew_seconds,
         roster_policy,
+        capital_authority,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         // The finding surfaces stay at 409 until an operator-supplied
         // authority roster is wired through; serving them from defaults

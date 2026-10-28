@@ -514,12 +514,19 @@ pub(crate) async fn handle_issue_liability_claim_settlement_instruction(
         }
     };
 
+    let capital_authority =
+        match require_capital_authority(state.config.capital_authority.as_ref()) {
+            Ok(trust) => trust,
+            Err(error) => return error.into_response(),
+        };
+
     match issue_signed_liability_claim_settlement_instruction(
         receipt_store,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
         roster_policy,
+        capital_authority,
     ) {
         Ok(artifact) => Json::<SignedLiabilityClaimSettlementInstruction>(artifact).into_response(),
         Err(error @ CliError::Chio(_)) => liability_market_http_error(&error.to_string()),

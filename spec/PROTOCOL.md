@@ -4595,7 +4595,9 @@ instruction artifact carrying:
   completion-flow row id so downstream settlement stays bound to exactly one
   receipt-scoped economic flow
 - one explicit authority chain with role, principal, approval time, and
-  expiry for each approving or executing actor
+  expiry for each approving or executing actor; every step carries a signed
+  proof that the issuer verifies under a key in its configured capital
+  authority trust set, and the step principal must equal that trusted key
 - one explicit execution window plus one custody-neutral rail descriptor
 - one separate intended-state versus reconciled-state projection so Chio never
   claims external execution from intent alone
@@ -4604,6 +4606,10 @@ instruction artifact carrying:
 
 This surface is also intentionally conservative. It fails closed when:
 
+- the issuer has no capital authority trust set configured (`409 Conflict`)
+- any authority step is signed by a key outside the configured capital
+  authority trust set (`403 Forbidden`) or its proof does not verify under the
+  matched trusted key (`400 Bad Request`)
 - the requested action does not match the selected live source kind
 - the execution window is already expired or internally contradictory
 - any authority step is stale, malformed, or expires before the execution
@@ -4649,6 +4655,8 @@ This surface is intentionally conservative too. It fails closed when:
   scoped subject/currency posture
 - the authority chain is stale, the custody step is missing, or the shared
   execution envelope is internally contradictory
+- the issuer has no capital authority trust set configured, or any authority
+  step is not signed by a key in that set
 - no active live source-of-funds state can explain the requested governed
   action honestly
 - reserve backing would need to be created implicitly rather than tied to one
@@ -4837,6 +4845,8 @@ claims explicit:
   plus available reserve backing
 - stale authority, missing execution metadata, contradictory observed movement,
   and invalid appeal windows fail closed during reserve-control issuance
+- reserve-control issuance requires a configured capital authority trust set
+  and verifies every authority step under a key in that set
 
 This is still bounded lifecycle accounting rather than a claims network or
 live escrow engine. Phases `87`, `113`, `115`, and `116` now make bond-backed
@@ -4894,8 +4904,9 @@ shipping evidence plus deterministic operator-visible runtime evaluation:
   fail-closed duplicate, stale-window, and mismatch handling
 - claim-settlement instruction and settlement-receipt artifacts that make one
   reimbursement or recovery topology explicit over matched payout and
-  capital-book truth, with fail-closed stale-authority and counterparty- or
-  amount-mismatch handling
+  capital-book truth, with fail-closed stale-authority, untrusted-authority
+  (every authority step must verify under the configured capital authority
+  trust set), and counterparty- or amount-mismatch handling
 - runtime-assurance-aware issuance and governed-execution constraints
 
 The current liability-market claim is intentionally bounded: Chio now proves a

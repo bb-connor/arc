@@ -584,6 +584,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
                 .to_str()
                 .expect("payout capital instruction path"),
         ])
+        .args(capital_authority_key_args())
         .output()
         .expect("run payout capital instruction CLI");
     assert!(
@@ -717,6 +718,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--roster-policy-file",
             roster_policy_path.to_str().expect("roster policy path"),
         ])
+        .args(capital_authority_key_args())
         .output()
         .expect("run stale settlement instruction CLI");
     assert!(
@@ -771,6 +773,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
             "--roster-policy-file",
             roster_policy_path.to_str().expect("roster policy path"),
         ])
+        .args(capital_authority_key_args())
         .output()
         .expect("run settlement instruction CLI");
     assert!(

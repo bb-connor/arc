@@ -718,6 +718,7 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
     authority_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    capital_authority_keys: &[String],
 ) -> Result<(), CliError> {
     let request: trust_control::CapitalExecutionInstructionRequest = load_json_or_yaml(input_file)?;
 
@@ -732,6 +733,7 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
                     .to_string(),
             )
         })?;
+        let capital_authority = require_local_capital_authority(capital_authority_keys)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         crate::trust_commands_cli::provision_local_issuance_authority(
             authority_seed_path,
@@ -742,6 +744,7 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
             authority_seed_path,
             authority_db_path,
             &request,
+            &capital_authority,
         )?
     };
 
@@ -772,6 +775,7 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
 
 pub(crate) fn cmd_trust_capital_allocation_issue(
     input_file: &Path,
+    capital_authority_keys: &[String],
     backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request: trust_control::CapitalAllocationDecisionRequest = load_json_or_yaml(input_file)?;
@@ -787,6 +791,7 @@ pub(crate) fn cmd_trust_capital_allocation_issue(
                     .to_string(),
             )
         })?;
+        let capital_authority = require_local_capital_authority(capital_authority_keys)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         crate::trust_commands_cli::provision_local_issuance_authority(
             backend.authority_seed_path,
@@ -799,6 +804,7 @@ pub(crate) fn cmd_trust_capital_allocation_issue(
             backend.authority_db_path,
             backend.certification_registry_file,
             &request,
+            &capital_authority,
         )?
     };
 

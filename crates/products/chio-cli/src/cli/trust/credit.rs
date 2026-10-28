@@ -116,6 +116,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
     authority_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    capital_authority_keys: &[String],
 ) -> Result<(), CliError> {
     let request = trust_control::CreditLossLifecycleIssueRequest {
         query: build_credit_loss_lifecycle_query(
@@ -152,6 +153,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
                     .to_string(),
             )
         })?;
+        let capital_authority = parse_capital_authority_keys(capital_authority_keys)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         crate::trust_commands_cli::provision_local_issuance_authority(
             authority_seed_path,
@@ -162,6 +164,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
             authority_seed_path,
             authority_db_path,
             &request,
+            capital_authority.as_ref(),
         )?
     };
 

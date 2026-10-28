@@ -144,29 +144,74 @@
         assert!(error.contains("source-owner approval"));
     }
 
-    #[test]
-    fn capital_execution_instruction_rejects_authority_proof_principal_mismatch() {
-        let mut artifact = valid_capital_instruction_artifact();
-        artifact.authority_chain[0].principal_id = "treasury-self-asserted".to_string();
-
-        let error = validation_error(
-            artifact.validate(),
-            "self-asserted authority principal must reject",
-        );
-        assert!(error.contains("authority proof signer must match principalId"));
+    fn chain_signer_authority(
+        authority_chain: &[CapitalExecutionAuthorityStep],
+    ) -> TrustedCapitalAuthority {
+        TrustedCapitalAuthority::new(
+            authority_chain
+                .iter()
+                .map(|step| step.authority_proof.signer_key.clone())
+                .collect(),
+        )
+        .unwrap()
     }
 
     #[test]
-    fn capital_execution_instruction_rejects_tampered_authority_proof_body() {
+    fn trusted_capital_authority_rejects_empty_key_set() {
+        assert_eq!(
+            TrustedCapitalAuthority::new(Vec::new()),
+            Err(CapitalAuthorityTrustError::Unconfigured)
+        );
+    }
+
+    #[test]
+    fn trusted_capital_authority_accepts_chain_signed_by_pinned_keys() {
+        let artifact = valid_capital_instruction_artifact();
+        let trust = chain_signer_authority(&artifact.authority_chain);
+
+        assert_eq!(trust.verify_chain(&artifact.authority_chain), Ok(()));
+    }
+
+    #[test]
+    fn trusted_capital_authority_rejects_foreign_signer() {
+        let artifact = valid_capital_instruction_artifact();
+        let trust = TrustedCapitalAuthority::new(vec![Keypair::generate().public_key()]).unwrap();
+
+        assert_eq!(
+            trust.verify_chain(&artifact.authority_chain),
+            Err(CapitalAuthorityTrustError::UntrustedSigner {
+                principal_id: artifact.authority_chain[0].principal_id.clone(),
+            })
+        );
+    }
+
+    #[test]
+    fn trusted_capital_authority_rejects_principal_mismatch() {
         let mut artifact = valid_capital_instruction_artifact();
+        let trust = chain_signer_authority(&artifact.authority_chain);
+        artifact.authority_chain[0].principal_id = "treasury-self-asserted".to_string();
+
+        assert_eq!(
+            trust.verify_chain(&artifact.authority_chain),
+            Err(CapitalAuthorityTrustError::InvalidProof(
+                "signer must match principalId".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn trusted_capital_authority_rejects_tampered_proof_body() {
+        let mut artifact = valid_capital_instruction_artifact();
+        let trust = chain_signer_authority(&artifact.authority_chain);
         artifact.authority_chain[0].authority_proof.body.role =
             CapitalExecutionRole::FacilityProvider;
 
-        let error = validation_error(
-            artifact.validate(),
-            "tampered authority proof body must reject",
+        assert_eq!(
+            trust.verify_chain(&artifact.authority_chain),
+            Err(CapitalAuthorityTrustError::InvalidProof(
+                "signature verification failed".to_string()
+            ))
         );
-        assert!(error.contains("authority proof signature verification failed"));
     }
 
     #[test]
