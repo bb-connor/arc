@@ -20,21 +20,21 @@ fn host_reader_signer_regular_seed_and_pin_controls() -> TestResult {
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     read_signer(&path, &key.public_key())?;
     let wrong = chio_core_types::Keypair::from_seed_hex(&"02".repeat(32))?;
-    let failure = match read_signer(&path, &wrong.public_key()) {
-        Err(failure) => failure,
-        Ok(_) => return Err("wrong signing pin accepted".into()),
+    let Err(CliError::Chio(failure)) = read_signer(&path, &wrong.public_key()) else {
+        return Err("wrong signing pin accepted or wrong refusal type".into());
     };
-    assert!(failure
-        .to_string()
-        .contains("broker authority seed differs from the operator's signing-key pin"));
+    assert_eq!(
+        failure.message(),
+        "process host: broker authority seed differs from the operator's signing-key pin"
+    );
     std::fs::write(&path, format!("{seed}\n\n"))?;
-    let failure = match read_signer(&path, &key.public_key()) {
-        Err(failure) => failure,
-        Ok(_) => return Err("oversized seed accepted".into()),
+    let Err(CliError::Chio(failure)) = read_signer(&path, &key.public_key()) else {
+        return Err("oversized seed accepted or wrong refusal type".into());
     };
-    assert!(failure
-        .to_string()
-        .contains("broker authority seed is oversized"));
+    assert_eq!(
+        failure.message(),
+        "process host: broker authority seed is oversized"
+    );
     Ok(())
 }
 
@@ -88,5 +88,40 @@ fn host_reader_signer_refuses_growth_after_metadata() -> TestResult {
         failure.message(),
         "process host: broker authority seed is oversized"
     );
+    Ok(())
+}
+
+#[test]
+fn host_reader_signer_preserves_private_file_checks() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("seed");
+    let alias = directory.path().join("alias");
+    let seed = "01".repeat(32);
+    let key = chio_core_types::Keypair::from_seed_hex(&seed)?;
+    std::fs::write(&path, &seed)?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
+    let Err(CliError::Chio(failure)) = read_signer(&path, &key.public_key()) else {
+        return Err("nonprivate seed accepted".into());
+    };
+    assert_eq!(
+        failure.message(),
+        "process host: broker authority seed must be a private regular file owned by the host"
+    );
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    std::fs::hard_link(&path, &alias)?;
+    let Err(CliError::Chio(failure)) = read_signer(&path, &key.public_key()) else {
+        return Err("hardlinked seed accepted".into());
+    };
+    assert_eq!(
+        failure.message(),
+        "process host: broker authority seed must be a private regular file owned by the host"
+    );
+    std::fs::remove_file(&alias)?;
+    std::os::unix::fs::symlink(&path, &alias)?;
+    let Err(CliError::Io(failure)) = read_signer(&alias, &key.public_key()) else {
+        return Err("symlink seed accepted".into());
+    };
+    assert_eq!(failure.raw_os_error(), Some(libc::ELOOP));
+    read_signer(&path, &key.public_key())?;
     Ok(())
 }

@@ -5,9 +5,7 @@
 //! host's user and present the control token the serving host writes beside
 //! it. Both paths drive the same durable stop chain.
 
-use std::fs::OpenOptions;
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
 use chio_kernel::stop::{
@@ -131,13 +129,8 @@ impl ControlServer {
         let mut bytes = [0_u8; 32];
         OsRng.try_fill_bytes(&mut bytes).map_err(error)?;
         let token = hex::encode(bytes);
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(directory.join(TOKEN_FILE))?;
+        let mut file = crate::input::create_regular(&directory.join(TOKEN_FILE))?;
+        file.set_len(0)?;
         file.write_all(token.as_bytes())?;
         file.sync_all()?;
         let listener = UnixListener::bind(&socket)?;
@@ -228,7 +221,7 @@ fn via_socket(state: &Path, op: ControlOp) -> Result<Option<serde_json::Value>, 
         }
         Err(error) => return Err(error.into()),
     };
-    let token = std::fs::read_to_string(state.join(TOKEN_FILE))?;
+    let token = crate::input::read_text_bounded(&state.join(TOKEN_FILE), 64)?;
     let mut request = serde_json::to_vec(&ControlRequest {
         token: token.trim().to_owned(),
         request: op,
