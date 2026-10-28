@@ -176,7 +176,7 @@ fn pinned_source_decoder_rejects_noncanonical_corrupt_and_oversized_evidence() -
         false,
     ));
     for (bytes, decode_failure) in bad_values {
-        let error = RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&bytes)
+        let error = RuntimeSourceQualificationV1::from_canonical_bytes(&bytes)
             .expect_err("untrusted evidence must reject");
         if decode_failure {
             assert!(
@@ -234,7 +234,7 @@ fn decoder_rejects_self_consistent_duplicate_unsorted_and_excessive_markers() ->
         let encoded = canonical_json_bytes(
             &serde_json::json!({"body":body,"inventorySha256":sha256_hex(&preimage)}),
         )?;
-        let error = RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&encoded).expect_err(case);
+        let error = RuntimeSourceQualificationV1::from_canonical_bytes(&encoded).expect_err(case);
         let wanted = match case {
             "duplicate" | "unsorted" => "source markers are not sorted and unique",
             "too-many" => "source snapshot marker limit exceeded",
@@ -255,13 +255,13 @@ struct MisboundSource<'a> {
     changed_binding: usize,
 }
 
-impl RuntimeReplaySourcePort for MisboundSource<'_> {
+impl RuntimeSourcePort for MisboundSource<'_> {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime_authority_id: &AdmissionIdentifier,
         destination_authority_id: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         self.inner.observe("preview")?;
         let mut binding = [
             source_id.as_str(),
@@ -274,14 +274,14 @@ impl RuntimeReplaySourcePort for MisboundSource<'_> {
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.inner.seal_exact(expected)
     }
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.inner.verify_exact(expected)
     }

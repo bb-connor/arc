@@ -14,7 +14,7 @@ pub(crate) fn admission_operation_schema_sql() -> Result<String, AdmissionOperat
         include_str!("../admission_operation_recovery.sql"),
         include_str!("../admission_operation_nonce.sql"),
         include_str!("../admission_operation_nonce_preflight.sql"),
-        RUNTIME_REPLAY_MIGRATION_SCHEMA,
+        RUNTIME_SOURCE_SCHEMA,
         RUNTIME_PARTICIPANT_SCHEMA,
         GOVERNED_APPROVAL_AUTHORITY_SCHEMA,
         GOVERNED_APPROVAL_CLAIM_SCHEMA,
@@ -387,6 +387,8 @@ fn admission_operation_schema_catalog(
                OR tbl_name GLOB 'obligation_*'
                OR name GLOB 'credit_exposure_*'
                OR tbl_name GLOB 'credit_exposure_*'
+               OR lower(name) GLOB 'runtime_source_*'
+               OR lower(tbl_name) GLOB 'runtime_source_*'
                OR lower(name) GLOB 'runtime_replay_*'
                OR lower(tbl_name) GLOB 'runtime_replay_*'
                OR lower(name) GLOB 'governed_approval_replay_*'

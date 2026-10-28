@@ -399,7 +399,7 @@ pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
 
 pub use admission_operation_store::{
     CreditExposureAccountSnapshot, DpopReplayMigrationRecordV1, DurableObligationV1,
-    RuntimeReplayMigrationRecordV1, SecurityParticipantEgressHistory,
+    RuntimeSourceRecordV1, SecurityParticipantEgressHistory,
     SecurityParticipantFlowJoinHistory, SecurityParticipantMigrationPhase,
     SecurityParticipantMigrationRecord, SecurityParticipantStateInitialization,
     SqliteAdmissionOperationStore,

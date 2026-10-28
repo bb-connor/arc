@@ -46,7 +46,6 @@ impl SqliteRuntimeOrchestrationStore {
                 run_counts.insert(status, sqlite_u64(count, "runtime run count")?);
             }
         }
-        let consumed_lease_count = query_count(&connection, "runtime_consumed_leases")?;
         let trust_floor_count = query_count(&connection, "runtime_trust_floors")?;
         let latest_failure_code: Option<String> = connection
             .query_row(
@@ -79,7 +78,6 @@ impl SqliteRuntimeOrchestrationStore {
             store_backend: "sqlite".to_string(),
             store_path_sha256: sha256_hex(self.path.to_string_lossy().as_bytes()),
             run_counts,
-            consumed_lease_count,
             trust_floor_count,
             latest_failure_code,
             evidence_sink_healthy,
@@ -247,7 +245,6 @@ impl SqliteRuntimeOrchestrationStore {
         let profile_stale =
             now_unix_ms < profile.issued_at_unix_ms || now_unix_ms >= profile.expires_at_unix_ms;
         let run_counts = runtime_run_counts(&connection)?;
-        let consumed_lease_count = query_count(&connection, "runtime_consumed_leases")?;
         let active_lease_count = lease_count_by_state(&connection, "active")?;
         let stale_lease_count =
             stale_lease_count(&connection, now_unix_ms, profile.stale_run_after_ms)?;
@@ -280,7 +277,6 @@ impl SqliteRuntimeOrchestrationStore {
             run_counts,
             active_lease_count,
             stale_lease_count,
-            consumed_lease_count,
             evidence_sink_healthy,
             provider_healthy,
             ready: !degraded,

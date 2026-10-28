@@ -332,7 +332,7 @@ fn public_facade_reserved_revalidation_preserves_binding_and_source_refusals() -
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,
@@ -371,7 +371,7 @@ fn public_facade_reserved_revalidation_preserves_binding_and_source_refusals() -
         Err(error) => error,
     };
     let expected =
-        match chio_runtime::ChioRuntimeAdmissionStore::verify_operation_owned_replay_source(
+        match chio_runtime::ChioRuntimeAdmissionStore::verify_operation_owned_runtime_source(
             &SqliteRuntimeOrchestrationStore::open(fixture.directory.path().join("other.sqlite3"))?,
             &source,
         ) {
@@ -408,7 +408,7 @@ fn public_facade_reserved_revalidation_rejects_changed_prepared_plan() -> TestRe
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,

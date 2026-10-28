@@ -2,9 +2,8 @@
 
 use super::*;
 use crate::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
-use crate::admission_operation::{AdmissionRecoveryLease, RuntimeReplaySourceSnapshotV1};
+use crate::admission_operation::{AdmissionRecoveryLease, RuntimeSourceQualificationV1};
 use crate::RuntimeParticipantClaimAuthority;
-use chio_core::canonical::canonical_json_bytes;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) enum ClaimMode {
@@ -24,32 +23,19 @@ impl TestRuntimeRecovery {
         &self,
         binding: &RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         if !self.0.lock().expect("fixture").enabled {
             return Err(AdmissionOperationStoreError::Unavailable(
                 "unsupported test source".into(),
             ));
         }
-        // This is deliberately fabricated canonical data supplied by a trusted
-        // test port. It neither seals a source nor proves activation.
-        let body = serde_json::json!({
-            "schema": "chio.runtime-replay-source-seal.v1",
-            "binding": {
-                "sourceId": "test-source",
-                "runtimeAuthorityId": binding.runtime_authority_id(),
-                "destinationAuthorityId": fence.store_uuid,
-            },
-            "device": "1", "inode": "2", "linkCount": 1,
-            "barrierSha256": "b".repeat(64),
-            "markerCounts": [0, 0, 0], "markers": [],
-        });
-        let mut preimage = b"chio.runtime-replay-source-seal.v1\0".to_vec();
-        preimage.extend(canonical_json_bytes(&body).expect("canonical body"));
-        RuntimeReplaySourceSnapshotV1::from_canonical_bytes(
-            &canonical_json_bytes(&serde_json::json!({
-                "body": body, "inventorySha256": sha256_hex(&preimage),
-            }))
-            .expect("canonical snapshot"),
+        RuntimeSourceQualificationV1::new(
+            AdmissionIdentifier::try_new("source", "test-source")?,
+            binding.runtime_authority_id().clone(),
+            AdmissionIdentifier::try_new("destination", &fence.store_uuid)?,
+            1,
+            2,
+            1,
         )
     }
 

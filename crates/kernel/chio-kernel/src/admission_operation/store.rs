@@ -498,12 +498,12 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// fenced, anchored read. An imported-inactive source must reject. Serving
     /// configuration alone is not evidence that the source replay authority
     /// retired.
-    fn load_runtime_participant_activation(
+    fn load_runtime_source_qualification(
         &self,
         _binding: &RuntimeParticipantAuthorityBindingV1,
         _fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
-    ) -> Result<super::RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<super::RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         Err(AdmissionOperationStoreError::Unavailable(
             "operation-owned runtime replay activation is unsupported".into(),
         ))

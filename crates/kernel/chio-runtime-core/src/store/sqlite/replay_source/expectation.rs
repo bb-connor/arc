@@ -1,6 +1,6 @@
 use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationStoreError, RuntimeReplaySourcePort,
-    RuntimeReplaySourceSnapshotV1,
+    AdmissionIdentifier, AdmissionOperationStoreError, RuntimeSourcePort,
+    RuntimeSourceQualificationV1,
 };
 
 use super::*;
@@ -13,7 +13,7 @@ impl SqliteRuntimeOrchestrationStore {
     pub fn preview_legacy_replay_source(
         &self,
         binding: &RuntimeReplaySourceBinding,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, ChioRuntimeError> {
+    ) -> Result<RuntimeSourceQualificationV1, ChioRuntimeError> {
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Deferred)
@@ -21,7 +21,7 @@ impl SqliteRuntimeOrchestrationStore {
         ensure_legacy_replay_writable(&tx)?;
         let candidate = self.candidate_replay_source_seal(&tx, binding)?;
         let snapshot =
-            RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&candidate.canonical_bytes()?)
+            RuntimeSourceQualificationV1::from_canonical_bytes(&candidate.canonical_bytes()?)
                 .map_err(|error| invalid(format!("replay source snapshot is invalid: {error}")))?;
         tx.commit().map_err(sqlite_error)?;
         Ok(snapshot)
@@ -33,7 +33,7 @@ impl SqliteRuntimeOrchestrationStore {
     /// This method does not authenticate destination provisioning or activate it.
     pub fn seal_expected_legacy_replay_source(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<RuntimeReplaySourceSeal, ChioRuntimeError> {
         let binding = snapshot_binding(expected)?;
         self.seal_replay_source(&binding, Some(expected.canonical_bytes()))
@@ -41,7 +41,7 @@ impl SqliteRuntimeOrchestrationStore {
 
     pub(in crate::store::sqlite) fn verify_expected_replay_source(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), ChioRuntimeError> {
         let binding = snapshot_binding(expected)?;
         let seal = self
@@ -54,13 +54,13 @@ impl SqliteRuntimeOrchestrationStore {
 /// This adapter is trusted installed code, not authority conveyed by the DTO.
 /// Destination provisioning chooses the adapter and pins the independent source
 /// expectation before asking it to seal or verify anything.
-impl RuntimeReplaySourcePort for SqliteRuntimeOrchestrationStore {
+impl RuntimeSourcePort for SqliteRuntimeOrchestrationStore {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime_authority_id: &AdmissionIdentifier,
         destination_authority_id: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         let binding = RuntimeReplaySourceBinding::new(
             source_id.as_str(),
             runtime_authority_id.as_str(),
@@ -73,7 +73,7 @@ impl RuntimeReplaySourcePort for SqliteRuntimeOrchestrationStore {
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.seal_expected_legacy_replay_source(expected)
             .map(|_| ())
@@ -82,7 +82,7 @@ impl RuntimeReplaySourcePort for SqliteRuntimeOrchestrationStore {
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.verify_expected_replay_source(expected)
             .map_err(port_error)
@@ -90,7 +90,7 @@ impl RuntimeReplaySourcePort for SqliteRuntimeOrchestrationStore {
 }
 
 fn snapshot_binding(
-    expected: &RuntimeReplaySourceSnapshotV1,
+    expected: &RuntimeSourceQualificationV1,
 ) -> Result<RuntimeReplaySourceBinding, ChioRuntimeError> {
     RuntimeReplaySourceBinding::new(
         expected.source_id(),
@@ -130,15 +130,15 @@ mod tests {
             Vec::new(),
         )?;
         let expected =
-            RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&candidate.canonical_bytes()?)?;
+            RuntimeSourceQualificationV1::from_canonical_bytes(&candidate.canonical_bytes()?)?;
         let error = store
             .seal_expected_legacy_replay_source(&expected)
             .err()
             .ok_or("unsupported source accepted an expected snapshot")?;
         assert_eq!(error.code(), "runtime_replay_source_invalid");
         assert!(error.to_string().contains("requires Unix"));
-        assert!(RuntimeReplaySourcePort::seal_exact(&store, &expected).is_err());
-        assert!(RuntimeReplaySourcePort::verify_exact(&store, &expected).is_err());
+        assert!(RuntimeSourcePort::seal_exact(&store, &expected).is_err());
+        assert!(RuntimeSourcePort::verify_exact(&store, &expected).is_err());
         assert!(store.load_legacy_replay_source_seal(&binding)?.is_none());
         let raw = Connection::open(&path)?;
         let objects: i64 = raw.query_row(

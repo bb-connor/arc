@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::store_connection::StoreConnection;
 
-use chio_kernel::admission_operation::{RuntimeReplaySourcePort, RuntimeReplaySourceSnapshotV1};
+use chio_kernel::admission_operation::{RuntimeSourcePort, RuntimeSourceQualificationV1};
 
 #[path = "runtime_replay/activation.rs"]
 mod activation;
@@ -66,7 +66,7 @@ impl Source {
         source_id: &str,
         runtime_authority_id: &str,
         destination_authority_id: &str,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         let state = self.state.lock().expect("source state");
         let markers = if state.empty {
             serde_json::json!([])
@@ -99,7 +99,7 @@ impl Source {
             "inventorySha256":sha256_hex(&preimage)
         }))
         .expect("canonical fixture evidence");
-        RuntimeReplaySourceSnapshotV1::from_canonical_bytes(&evidence)
+        RuntimeSourceQualificationV1::from_canonical_bytes(&evidence)
     }
 
     fn calls(&self) -> Vec<&'static str> {
@@ -107,13 +107,13 @@ impl Source {
     }
 }
 
-impl RuntimeReplaySourcePort for Source {
+impl RuntimeSourcePort for Source {
     fn preview(
         &self,
         source_id: &AdmissionIdentifier,
         runtime_authority_id: &AdmissionIdentifier,
         destination_authority_id: &AdmissionIdentifier,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         self.observe("preview")?;
         if self.state.lock().expect("source state").sealed.is_some() {
             return Err(AdmissionOperationStoreError::Invariant(
@@ -129,7 +129,7 @@ impl RuntimeReplaySourcePort for Source {
 
     fn seal_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.observe("seal")?;
         let current = self.snapshot(
@@ -163,7 +163,7 @@ impl RuntimeReplaySourcePort for Source {
 
     fn verify_exact(
         &self,
-        expected: &RuntimeReplaySourceSnapshotV1,
+        expected: &RuntimeSourceQualificationV1,
     ) -> Result<(), AdmissionOperationStoreError> {
         self.observe("verify")?;
         let current = self.snapshot(
@@ -186,7 +186,7 @@ impl RuntimeReplaySourcePort for Source {
 fn pin(
     fixture: &Fixture,
     source: &Source,
-) -> Result<RuntimeReplayMigrationRecordV1, AdmissionOperationStoreError> {
+) -> Result<RuntimeSourceRecordV1, AdmissionOperationStoreError> {
     fixture.store.expect_runtime_replay_source(
         &identifier("source_id", SOURCE_ID),
         &identifier("runtime_authority_id", RUNTIME_ID),
@@ -199,8 +199,8 @@ fn pin(
 fn import(
     fixture: &Fixture,
     source: &Source,
-    pin: &RuntimeReplayMigrationRecordV1,
-) -> Result<RuntimeReplayMigrationRecordV1, AdmissionOperationStoreError> {
+    pin: &RuntimeSourceRecordV1,
+) -> Result<RuntimeSourceRecordV1, AdmissionOperationStoreError> {
     fixture.store.import_runtime_replay_source(
         &identifier("runtime_authority_id", RUNTIME_ID),
         pin.expectation_id(),
@@ -212,7 +212,7 @@ fn import(
 
 fn load(
     fixture: &Fixture,
-) -> Result<Option<RuntimeReplayMigrationRecordV1>, AdmissionOperationStoreError> {
+) -> Result<Option<RuntimeSourceRecordV1>, AdmissionOperationStoreError> {
     fixture.store.load_runtime_replay_migration(
         &identifier("runtime_authority_id", RUNTIME_ID),
         &fixture.fence,
@@ -231,8 +231,8 @@ fn global_count(store: &SqliteAdmissionOperationStore) -> i64 {
 }
 
 fn assert_record_equal(
-    actual: &RuntimeReplayMigrationRecordV1,
-    expected: &RuntimeReplayMigrationRecordV1,
+    actual: &RuntimeSourceRecordV1,
+    expected: &RuntimeSourceRecordV1,
 ) {
     assert_eq!(
         actual.snapshot().canonical_bytes(),

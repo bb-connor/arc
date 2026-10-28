@@ -25,7 +25,7 @@ fn persisted_source_bytes(
 fn facade_source_port_preserves_exact_preview_seal_verify_and_rejection_errors(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::admission_operation::{
-        AdmissionIdentifier, AdmissionOperationStoreError, RuntimeReplaySourcePort,
+        AdmissionIdentifier, AdmissionOperationStoreError, RuntimeSourcePort,
     };
 
     let directory = tempfile::tempdir()?;
@@ -39,9 +39,9 @@ fn facade_source_port_preserves_exact_preview_seal_verify_and_rejection_errors(
         source.consume_treaty_continuation("treaty", "historical-treaty")?;
         source.consume_swarm_continuation("swarm", "historical-swarm")?;
     }
-    let facade: &dyn RuntimeReplaySourcePort = &store;
-    let core: &dyn RuntimeReplaySourcePort = &core_store;
-    let other_port: &dyn RuntimeReplaySourcePort = &other;
+    let facade: &dyn RuntimeSourcePort = &store;
+    let core: &dyn RuntimeSourcePort = &core_store;
+    let other_port: &dyn RuntimeSourcePort = &other;
     let source_id = AdmissionIdentifier::try_new("source_id", "source")?;
     let runtime = AdmissionIdentifier::try_new("runtime_authority_id", "runtime")?;
     let destination = AdmissionIdentifier::try_new("destination_authority_id", "destination")?;
@@ -49,7 +49,7 @@ fn facade_source_port_preserves_exact_preview_seal_verify_and_rejection_errors(
     let before = persisted_source_bytes(&path)?;
     let expected = facade.preview(&source_id, &runtime, &destination)?;
     assert!(store
-        .verify_operation_owned_replay_source(&expected)
+        .verify_operation_owned_runtime_source(&expected)
         .is_err());
     assert_eq!(expected, core.preview(&source_id, &runtime, &destination)?);
     assert_eq!(expected.markers().len(), 3);
@@ -109,9 +109,9 @@ fn facade_source_port_preserves_exact_preview_seal_verify_and_rejection_errors(
     facade.seal_exact(&expected)?;
     facade.verify_exact(&expected)?;
     core.verify_exact(&expected)?;
-    store.verify_operation_owned_replay_source(&expected)?;
+    store.verify_operation_owned_runtime_source(&expected)?;
     assert!(other
-        .verify_operation_owned_replay_source(&expected)
+        .verify_operation_owned_runtime_source(&expected)
         .is_err());
     let seal = store
         .load_legacy_replay_source_seal(&binding)?
