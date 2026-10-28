@@ -12,7 +12,7 @@ impl SqliteBudgetStore {
         validate_budget_grant_index(grant_index)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_legacy_admission_after_composite_history(
+        Self::reject_standalone_admission_after_composite_history(
             &transaction,
             capability_id,
             grant_index,

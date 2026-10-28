@@ -46,7 +46,10 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn reverse_charge_cost_with_expected_state(
         &mut self,
         capability_id: &str,
@@ -81,7 +84,10 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn reverse_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,
@@ -169,16 +175,16 @@ impl InMemoryBudgetStoreInner {
                     ));
                 }
             }
-            if let Some(quota) = &hold.legacy_captured_invocation_quota {
+            if let Some(quota) = &hold.standalone_captured_invocation_quota {
                 let state = self.invocation_quotas.get(&quota.key).ok_or_else(|| {
                     BudgetStoreError::Invariant(
-                        "missing captured legacy invocation quota".to_string(),
+                        "missing captured standalone invocation quota".to_string(),
                     )
                 })?;
                 if state.max_invocations != quota.max_invocations || state.captured_invocations == 0
                 {
                     return Err(BudgetStoreError::Invariant(
-                        "legacy invocation quota does not match its hold".to_string(),
+                        "standalone invocation quota does not match its hold".to_string(),
                     ));
                 }
             }
@@ -251,12 +257,12 @@ impl InMemoryBudgetStoreInner {
                         .to_string(),
                 ));
             }
-            let legacy_reversible = self
-                .legacy_reversible_invocations
+            let standalone_reversible = self
+                .standalone_reversible_invocations
                 .get(&(capability_id.to_string(), grant_index))
                 .copied()
                 .unwrap_or(0);
-            if legacy_reversible == 0 {
+            if standalone_reversible == 0 {
                 return Err(BudgetStoreError::Invariant(
                     "no reversible unheld invocation exists".to_string(),
                 ));
@@ -265,7 +271,7 @@ impl InMemoryBudgetStoreInner {
 
         let affected_quotas = if let Some(hold) = &hold_snapshot {
             let mut quotas = hold.invocation_quotas.clone();
-            if let Some(quota) = &hold.legacy_captured_invocation_quota {
+            if let Some(quota) = &hold.standalone_captured_invocation_quota {
                 quotas.push(quota.clone());
             }
             quotas
@@ -395,15 +401,15 @@ impl InMemoryBudgetStoreInner {
             }
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());
         } else {
-            let legacy_reversible = self
-                .legacy_reversible_invocations
+            let standalone_reversible = self
+                .standalone_reversible_invocations
                 .get_mut(&(capability_id.to_string(), grant_index))
                 .ok_or_else(|| {
                     BudgetStoreError::Invariant(
                         "validated reversible invocation disappeared".to_string(),
                     )
                 })?;
-            *legacy_reversible = InvocationCount::new(*legacy_reversible)
+            *standalone_reversible = InvocationCount::new(*standalone_reversible)
                 .try_sub(InvocationCount::new(1))?
                 .get();
             invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;
@@ -633,7 +639,7 @@ impl InMemoryBudgetStoreInner {
                 ));
             }
             if self
-                .legacy_reversible_invocations
+                .standalone_reversible_invocations
                 .get(&(capability_id.to_string(), grant_index))
                 .copied()
                 .unwrap_or(0)
@@ -797,7 +803,10 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
@@ -829,7 +838,10 @@ impl InMemoryBudgetStoreInner {
         )
     }
 
-    #[allow(clippy::too_many_arguments, reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules.")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+    )]
     fn settle_charge_cost_with_mutation(
         &mut self,
         capability_id: &str,
@@ -913,7 +925,7 @@ impl InMemoryBudgetStoreInner {
                 ));
             }
             if self
-                .legacy_reversible_invocations
+                .standalone_reversible_invocations
                 .get(&(capability_id.to_string(), grant_index))
                 .copied()
                 .unwrap_or(0)
@@ -976,11 +988,11 @@ impl InMemoryBudgetStoreInner {
             hold.remaining_exposure_units = 0;
             hold.monetary_state = terminal_state;
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());
-        } else if let Some(legacy_reversible) = self
-            .legacy_reversible_invocations
+        } else if let Some(standalone_reversible) = self
+            .standalone_reversible_invocations
             .get_mut(&(capability_id.to_string(), grant_index))
         {
-            *legacy_reversible = InvocationCount::new(*legacy_reversible)
+            *standalone_reversible = InvocationCount::new(*standalone_reversible)
                 .try_sub(InvocationCount::new(1))?
                 .get();
         }

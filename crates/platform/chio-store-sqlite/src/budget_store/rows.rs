@@ -248,7 +248,7 @@ pub(super) fn appended_event_lifecycle(
     })
 }
 
-pub(super) fn validate_legacy_event_lifecycle(
+pub(super) fn validate_standalone_event_lifecycle(
     record: &BudgetMutationRecord,
 ) -> Result<(), BudgetStoreError> {
     let money_for_exposure = if record.exposure_units == 0 {
@@ -369,14 +369,14 @@ pub(super) fn validate_legacy_event_lifecycle(
     };
     if !valid {
         return Err(BudgetStoreError::Invariant(format!(
-            "budget mutation `{}` has an invalid legacy lifecycle projection",
+            "budget mutation `{}` has an invalid standalone lifecycle projection",
             record.event_id
         )));
     }
     Ok(())
 }
 
-pub(super) fn legacy_event_lifecycle_is_unset(record: &BudgetMutationRecord) -> bool {
+pub(super) fn standalone_event_lifecycle_is_unset(record: &BudgetMutationRecord) -> bool {
     record.authorization_outcome.is_none()
         && record.invocation_state_before == BudgetInvocationState::Absent
         && record.invocation_state_after == BudgetInvocationState::Absent

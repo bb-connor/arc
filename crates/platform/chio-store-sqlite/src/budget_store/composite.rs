@@ -262,21 +262,24 @@ impl SqliteBudgetStore {
         let request_includes_grant_quota = quotas.iter().any(|quota| {
             quota.key == BudgetQuotaKey::grant(request.capability_id.clone(), grant_index)
         });
-        let legacy_grant_limit =
-            legacy_grant_quota_limit(&transaction, &request.capability_id, request.grant_index)?;
+        let standalone_grant_limit = standalone_grant_quota_limit(
+            &transaction,
+            &request.capability_id,
+            request.grant_index,
+        )?;
         if durable_grant_quota_exists && !request_includes_grant_quota {
             return Err(BudgetStoreError::Invariant(format!(
                 "structured authorization omitted durable grant quota for `{}` grant {}",
                 request.capability_id, request.grant_index
             )));
         }
-        if let Some(legacy_limit) = legacy_grant_limit {
+        if let Some(standalone_limit) = standalone_grant_limit {
             let requested = quotas.iter().find(|quota| {
                 quota.key == BudgetQuotaKey::grant(request.capability_id.clone(), grant_index)
             });
-            if requested.map(|quota| quota.max_invocations) != Some(legacy_limit) {
+            if requested.map(|quota| quota.max_invocations) != Some(standalone_limit) {
                 return Err(BudgetStoreError::Invariant(format!(
-                    "structured authorization must preserve legacy grant quota {legacy_limit} for `{}` grant {}",
+                    "structured authorization must preserve standalone grant quota {standalone_limit} for `{}` grant {}",
                     request.capability_id, request.grant_index
                 )));
             }
@@ -364,7 +367,7 @@ impl SqliteBudgetStore {
                         == BudgetQuotaKey::grant(request.capability_id.clone(), grant_index);
                     let mut state = QuotaState::new(quota);
                     if is_grant_quota && current.invocation_count != 0 {
-                        if legacy_grant_limit != Some(quota.max_invocations) {
+                        if standalone_grant_limit != Some(quota.max_invocations) {
                             return Err(BudgetStoreError::Invariant(
                                 "cannot define a grant quota after untracked invocations"
                                     .to_string(),
@@ -372,7 +375,7 @@ impl SqliteBudgetStore {
                         }
                         if current.invocation_count > quota.max_invocations {
                             return Err(BudgetStoreError::Invariant(format!(
-                                "legacy usage for `{}` grant {} exceeds its grant quota",
+                                "standalone usage for `{}` grant {} exceeds its grant quota",
                                 request.capability_id, request.grant_index
                             )));
                         }

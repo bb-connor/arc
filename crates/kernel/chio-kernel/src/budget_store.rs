@@ -214,7 +214,7 @@ impl BudgetAuthorizeHoldRequest {
                 .any(|quota| quota.key == expected_key && quota.max_invocations == max_invocations)
             {
                 return Err(BudgetStoreError::Invariant(
-                    "legacy max_invocations must match the structured grant quota".to_string(),
+                    "standalone max_invocations must match the structured grant quota".to_string(),
                 ));
             }
         }
@@ -1257,9 +1257,9 @@ mod tests {
     }
 
     #[test]
-    fn unlimited_legacy_authorization_remains_unstructured() {
+    fn unlimited_standalone_authorization_remains_unstructured() {
         let request = BudgetAuthorizeHoldRequest {
-            capability_id: "cap-unlimited-legacy".to_string(),
+            capability_id: "cap-unlimited-standalone".to_string(),
             grant_index: 0,
             max_invocations: None,
             invocation_quotas: Vec::new(),

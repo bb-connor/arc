@@ -311,8 +311,8 @@ async fn standalone_holds_use_exact_versioned_rich_lifecycle(
     };
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    struct LegacyBudgetClock(AtomicU64);
-    impl Clock for LegacyBudgetClock {
+    struct StandaloneBudgetClock(AtomicU64);
+    impl Clock for StandaloneBudgetClock {
         fn read(&self) -> Result<ClockReading, ClockError> {
             let seconds = self.0.load(Ordering::SeqCst);
             Ok(ClockReading::new(
@@ -327,7 +327,7 @@ async fn standalone_holds_use_exact_versioned_rich_lifecycle(
     }
 
     let temp = crate::durable_admission::private_tempdir()?;
-    let clock = Arc::new(LegacyBudgetClock(AtomicU64::new(1_000)));
+    let clock = Arc::new(StandaloneBudgetClock(AtomicU64::new(1_000)));
     let sqlite = Arc::new(SqliteBudgetStore::open_with_clock(
         temp.path().join("standalone-budget.sqlite3"),
         clock.clone(),
@@ -719,7 +719,7 @@ async fn trust_control_metrics_accepts_valid_service_token() {
 }
 
 #[tokio::test]
-async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
+async fn v1_lifecycle_uses_joint_store_when_standalone_handle_is_mismatched(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     crate::create_private_directory(temp.path())?;
@@ -732,11 +732,11 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
         &lock_root,
         chio_test_support::clock::clock(),
     )?);
-    let legacy = Arc::new(SqliteBudgetStore::open(
-        temp.path().join("legacy-budget.sqlite3"),
+    let standalone = Arc::new(SqliteBudgetStore::open(
+        temp.path().join("standalone-budget.sqlite3"),
     )?);
-    let legacy_revocations = Arc::new(SqliteRevocationStore::open(
-        temp.path().join("legacy-revocations.sqlite3"),
+    let standalone_revocations = Arc::new(SqliteRevocationStore::open(
+        temp.path().join("standalone-revocations.sqlite3"),
     )?);
     let fence = joint.mutation_fence();
     let authority = BudgetEventAuthority {
@@ -781,8 +781,8 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
 
     let mut state = metrics_state("service-secret");
     state.joint_authority_store = Some(joint.clone());
-    state.budget_store = Some(legacy.clone());
-    state.revocation_store = Some(legacy_revocations.clone());
+    state.budget_store = Some(standalone.clone());
+    state.revocation_store = Some(standalone_revocations.clone());
     state
         .revocation_store()
         .map_err(|_| std::io::Error::other("joint revocation store was unavailable"))?
@@ -794,7 +794,7 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
             .revoked
     );
     assert!(
-        !legacy_revocations
+        !standalone_revocations
             .observe_revocation("joint-revocation")?
             .revoked
     );
@@ -835,7 +835,7 @@ async fn v1_lifecycle_uses_joint_store_when_legacy_handle_is_mismatched(
             .and_then(|authority| authority.budget_commit_index),
         Some(event_commit)
     );
-    assert!(legacy.get_usage(capability_id, 0)?.is_none());
+    assert!(standalone.get_usage(capability_id, 0)?.is_none());
     assert_eq!(
         joint_budget
             .get_usage(capability_id, 0)?
