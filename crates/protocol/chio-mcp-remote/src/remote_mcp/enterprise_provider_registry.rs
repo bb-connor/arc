@@ -17,6 +17,10 @@ use tracing::{info, warn};
 
 use crate::RemoteClock;
 
+#[path = "enterprise_provider_scope.rs"]
+mod scope;
+pub(crate) use scope::RegistryDigestScope;
+
 /// A change to the file's last status change time later than this many
 /// milliseconds lands on a later timestamp tick on every supported filesystem.
 const SETTLE_MILLIS: u64 = 2_000;
@@ -36,6 +40,7 @@ pub(crate) struct EnterpriseProviderRegistryFile {
 #[derive(Clone, Debug)]
 struct CachedDigest {
     identity: FileIdentity,
+    scope: RegistryDigestScope,
     digest: String,
 }
 
@@ -117,48 +122,61 @@ impl EnterpriseProviderRegistryFile {
             .map_err(EnterpriseProviderRegistryRefusal::logged)
     }
 
-    /// Digest of the registry as it reads now, over its canonical validated
-    /// form, so any provider change yields a different digest. A digest is
-    /// reused only while a stat shows the settled identity it was read under;
-    /// a failed stat reads the file, so an unusable registry always refuses.
+    /// Digest of registry globals and the validated provider selection cohort.
+    /// A cached digest binds the complete selection scope and the settled file
+    /// identity; a failed stat reads the file and preserves reader refusals.
     pub(crate) fn digest(
         &self,
+        scope: &RegistryDigestScope,
         clock: &RemoteClock,
     ) -> Result<String, EnterpriseProviderRegistryRefusal> {
         let before = FileIdentity::of(&self.path);
-        if let Some(digest) = before.and_then(|identity| self.cached_digest(identity)) {
+        if let Some(digest) = before.and_then(|identity| self.cached_digest(identity, scope)) {
             return Ok(digest);
         }
-        let digest = self.read_digest()?;
+        let digest = self.read_digest(scope)?;
         if let (Some(identity), Ok(now)) = (before, clock.millis()) {
             if identity.settled_at(now) && FileIdentity::of(&self.path) == Some(identity) {
-                self.store_digest(identity, &digest);
+                self.store_digest(identity, scope, &digest);
             }
         }
         Ok(digest)
     }
 
-    fn cached_digest(&self, identity: FileIdentity) -> Option<String> {
+    fn cached_digest(&self, identity: FileIdentity, scope: &RegistryDigestScope) -> Option<String> {
         let cache = self.digest_cache.lock().ok()?;
         cache
             .as_ref()
-            .filter(|cached| cached.identity == identity)
+            .filter(|cached| cached.identity == identity && &cached.scope == scope)
             .map(|cached| cached.digest.clone())
     }
 
-    fn store_digest(&self, identity: FileIdentity, digest: &str) {
+    fn store_digest(&self, identity: FileIdentity, scope: &RegistryDigestScope, digest: &str) {
         if let Ok(mut cache) = self.digest_cache.lock() {
             *cache = Some(CachedDigest {
                 identity,
+                scope: scope.clone(),
                 digest: digest.to_owned(),
             });
         }
     }
 
-    fn read_digest(&self) -> Result<String, EnterpriseProviderRegistryRefusal> {
+    fn read_digest(
+        &self,
+        scope: &RegistryDigestScope,
+    ) -> Result<String, EnterpriseProviderRegistryRefusal> {
         self.read()
-            .and_then(|registry| {
-                canonical_json_bytes(&registry)
+            .and_then(|mut registry| {
+                if scope
+                    .selected_provider()
+                    .is_some_and(|id| !registry.providers.contains_key(id))
+                {
+                    return Err(EnterpriseProviderRegistryRefusal::Invalid(
+                        CliError::cli_other_error("session enterprise provider record is absent"),
+                    ));
+                }
+                scope.retain_cohort(&mut registry);
+                canonical_json_bytes(&("enterprise-provider-selection", scope, &registry))
                     .map_err(|error| EnterpriseProviderRegistryRefusal::Invalid(error.into()))
             })
             .map(|encoded| sha256_hex(&encoded))
@@ -374,6 +392,17 @@ mod tests {
         }
     }
 
+    fn test_scope(selected: Option<&str>) -> RegistryDigestScope {
+        match selected {
+            Some(id) => RegistryDigestScope::OAuth {
+                issuer: Some("https://issuer-a.example".to_string()),
+                provider_kind: Some("oidc_jwks".to_string()),
+                selected_provider: Some(id.to_string()),
+            },
+            None => RegistryDigestScope::Globals,
+        }
+    }
+
     #[test]
     fn digest_is_kept_only_for_a_settled_identity() {
         let directory = chio_test_support::private_tempdir().unwrap();
@@ -382,14 +411,26 @@ mod tests {
         let file = EnterpriseProviderRegistryFile::new(&path);
 
         let fresh = file
-            .digest(&clock_after_change(&path, SETTLE_MILLIS - 1))
+            .digest(
+                &test_scope(Some("enterprise-login")),
+                &clock_after_change(&path, SETTLE_MILLIS - 1),
+            )
             .unwrap();
         assert_eq!(cached(&file), None, "an unsettled identity was cached");
 
         let settled = clock_after_change(&path, SETTLE_MILLIS);
-        assert_eq!(file.digest(&settled).unwrap(), fresh);
+        assert_eq!(
+            file.digest(&test_scope(Some("enterprise-login")), &settled)
+                .unwrap(),
+            fresh
+        );
         assert_eq!(cached(&file), Some(fresh.clone()));
-        assert_eq!(file.clone().digest(&settled).unwrap(), fresh);
+        assert_eq!(
+            file.clone()
+                .digest(&test_scope(Some("enterprise-login")), &settled)
+                .unwrap(),
+            fresh
+        );
     }
 
     #[test]
@@ -402,7 +443,9 @@ mod tests {
         std::fs::write(&path, &original).unwrap();
         let file = EnterpriseProviderRegistryFile::new(&path);
         let settled = clock_after_change(&path, SETTLE_MILLIS);
-        let before = file.digest(&settled).unwrap();
+        let before = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_eq!(cached(&file), Some(before.clone()));
         let admitted = FileIdentity::of(&path).unwrap();
         let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
@@ -421,7 +464,9 @@ mod tests {
         assert_eq!(rewritten_identity.len, admitted.len);
         assert_eq!(rewritten_identity.mtime, admitted.mtime);
 
-        let after = file.digest(&settled).unwrap();
+        let after = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_ne!(
             after, before,
             "a rewrite under the cached identity was missed"
@@ -429,7 +474,10 @@ mod tests {
         assert_eq!(
             after,
             EnterpriseProviderRegistryFile::new(&path)
-                .digest(&RemoteClock::new(Arc::new(FixedClock(0))))
+                .digest(
+                    &test_scope(Some("enterprise-login")),
+                    &RemoteClock::new(Arc::new(FixedClock(0)))
+                )
                 .unwrap()
         );
     }
@@ -437,7 +485,10 @@ mod tests {
     /// A digest of `path` read by a handle that holds no cached entry.
     fn fresh_digest(path: &Path) -> String {
         EnterpriseProviderRegistryFile::new(path)
-            .digest(&RemoteClock::new(Arc::new(FixedClock(0))))
+            .digest(
+                &test_scope(Some("enterprise-login")),
+                &RemoteClock::new(Arc::new(FixedClock(0))),
+            )
             .unwrap()
     }
 
@@ -452,7 +503,9 @@ mod tests {
         std::fs::write(&path, &original).unwrap();
         let file = EnterpriseProviderRegistryFile::new(&path);
         let settled = clock_after_change(&path, SETTLE_MILLIS);
-        let before = file.digest(&settled).unwrap();
+        let before = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_eq!(cached(&file), Some(before.clone()));
         let admitted = FileIdentity::of(&path).unwrap();
         let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
@@ -472,7 +525,9 @@ mod tests {
             (admitted.dev, admitted.len, admitted.mtime)
         );
 
-        let after = file.digest(&settled).unwrap();
+        let after = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_ne!(
             after, before,
             "a rename-replace under the cached digest was missed"
@@ -494,7 +549,9 @@ mod tests {
         // ctime differs from any later write whether or not the inode is reused.
         std::thread::sleep(std::time::Duration::from_millis(SETTLE_MILLIS + 100));
         let file = EnterpriseProviderRegistryFile::new(&path);
-        let before = file.digest(&settled).unwrap();
+        let before = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_eq!(cached(&file), Some(before.clone()));
         let admitted = FileIdentity::of(&path).unwrap();
 
@@ -513,7 +570,9 @@ mod tests {
         );
         assert_ne!(recreated_identity.ctime, admitted.ctime);
 
-        let after = file.digest(&settled).unwrap();
+        let after = file
+            .digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert_ne!(
             after, before,
             "a recreated registry under the cached digest was missed"
@@ -528,12 +587,13 @@ mod tests {
         std::fs::write(&path, registry_bytes("https://issuer-a.example")).unwrap();
         let file = EnterpriseProviderRegistryFile::new(&path);
         let settled = clock_after_change(&path, SETTLE_MILLIS);
-        file.digest(&settled).unwrap();
+        file.digest(&test_scope(Some("enterprise-login")), &settled)
+            .unwrap();
         assert!(cached(&file).is_some());
 
         std::fs::remove_file(&path).unwrap();
         assert!(matches!(
-            file.digest(&settled),
+            file.digest(&test_scope(Some("enterprise-login")), &settled),
             Err(EnterpriseProviderRegistryRefusal::Unreadable(_))
         ));
     }
@@ -558,5 +618,101 @@ mod tests {
             !file.clone().record_health(RegistryHealth::Readable),
             "a clone kept its own health"
         );
+    }
+
+    #[test]
+    fn settled_digest_cache_is_scoped_to_each_provider_and_registry_globals() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_slice(&registry_bytes("https://issuer-a.example")).unwrap();
+        let mut other = registry["providers"]["enterprise-login"].clone();
+        other["provider_id"] = serde_json::json!("other-login");
+        registry["providers"]["other-login"] = other;
+        std::fs::write(&path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        let clock = clock_after_change(&path, SETTLE_MILLIS);
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let first = file
+            .digest(&test_scope(Some("enterprise-login")), &clock)
+            .unwrap();
+        let other = file
+            .digest(&test_scope(Some("other-login")), &clock)
+            .unwrap();
+        let globals = file.digest(&test_scope(None), &clock).unwrap();
+        assert_ne!(first, other);
+        assert_ne!(first, globals);
+        assert_ne!(other, globals);
+        for (selection, expected) in [
+            (Some("other-login"), other),
+            (Some("enterprise-login"), first),
+            (None, globals),
+        ] {
+            assert_eq!(
+                file.digest(&test_scope(selection), &clock).unwrap(),
+                expected
+            );
+            assert_eq!(
+                file.clone().digest(&test_scope(selection), &clock).unwrap(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn a_missing_selected_provider_refuses_even_with_a_settled_cached_digest() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        std::fs::write(&path, registry_bytes("https://issuer-a.example")).unwrap();
+        let clock = clock_after_change(&path, SETTLE_MILLIS);
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        file.digest(&test_scope(Some("enterprise-login")), &clock)
+            .unwrap();
+        let error = file
+            .digest(&test_scope(Some("missing-login")), &clock)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            EnterpriseProviderRegistryRefusal::Invalid(_)
+        ));
+        assert_eq!(
+            error.to_string(),
+            "urn:chio:error:transport:provider-registry-invalid"
+        );
+        file.digest(&test_scope(None), &clock).unwrap();
+    }
+    #[test]
+    fn oauth_cohort_cache_binds_issuer_kind_and_empty_selection() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        std::fs::write(&path, registry_bytes("https://issuer-a.example/")).unwrap();
+        let clock = clock_after_change(&path, SETTLE_MILLIS);
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let oauth = |issuer: &str, kind: &str| RegistryDigestScope::OAuth {
+            issuer: Some(crate::canonicalize_federated_issuer(issuer)),
+            provider_kind: Some(kind.to_string()),
+            selected_provider: None,
+        };
+        let selected = oauth("https://issuer-a.example", "oidc_jwks");
+        let equivalent = oauth("https://issuer-a.example/", "oidc_jwks");
+        let other_issuer = oauth("https://issuer-b.example", "oidc_jwks");
+        let other_kind = oauth("https://issuer-a.example", "oauth_introspection");
+        let first = file.digest(&selected, &clock).unwrap();
+        assert_eq!(file.digest(&equivalent, &clock).unwrap(), first);
+        let scopes = [RegistryDigestScope::Globals, other_issuer, other_kind];
+        let mut digests = vec![first.clone()];
+        for scope in &scopes {
+            let digest = file.digest(scope, &clock).unwrap();
+            assert!(!digests.contains(&digest));
+            digests.push(digest);
+            assert_eq!(file.digest(&selected, &clock).unwrap(), first);
+        }
+        let mut registry: serde_json::Value =
+            serde_json::from_slice(&registry_bytes("https://issuer-a.example/")).unwrap();
+        registry["providers"]["enterprise-login"]["enabled"] = false.into();
+        std::fs::write(&path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        assert_ne!(file.digest(&selected, &clock).unwrap(), first);
+        for (scope, expected) in scopes.iter().zip(&digests[1..]) {
+            assert_eq!(file.digest(scope, &clock).unwrap(), *expected);
+        }
     }
 }

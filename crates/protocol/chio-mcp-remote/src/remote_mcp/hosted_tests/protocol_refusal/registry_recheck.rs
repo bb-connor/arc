@@ -1,12 +1,7 @@
-//! A session credential request reads the enterprise provider registry the
-//! way a fresh session admission does: a registry that no longer reads as it
-//! did when the session was admitted refuses the request.
-
 use super::*;
 
 const ISSUER: &str = "https://issuer.enterprise.example";
 const PING: &[u8] = br#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#;
-const CREDENTIAL_REFUSAL: &[u8] = b"invalid, expired, or revoked session credential";
 
 fn provider_record(enabled: bool, issuer: &str, jwks_url: &str) -> Value {
     json!({
@@ -80,6 +75,14 @@ impl RegistryFixture {
             .clone()
             .ok_or("registry path")?;
         let session = initialize(&http).await?;
+        let Some(RemoteSessionEntry::Active(bound)) = http.state.sessions.lookup(&session).await
+        else {
+            return Err("initialized session is not active".into());
+        };
+        assert!(matches!(
+            bound.auth_context.method,
+            SessionAuthMethod::StaticBearer { .. }
+        ));
         let token = credential(&http, &session).await?;
         let fixture = Self {
             http,
@@ -140,15 +143,13 @@ impl RegistryFixture {
 }
 
 #[tokio::test]
-async fn session_credential_is_refused_after_its_provider_is_disabled() -> TestResult {
+async fn static_session_credential_survives_provider_disable() -> TestResult {
     let fixture = RegistryFixture::admitted().await?;
     write_record(
         &fixture.registry_path,
         provider_record(false, ISSUER, "https://issuer.enterprise.example/jwks"),
     )?;
-    fixture
-        .assert_refused(StatusCode::UNAUTHORIZED, CREDENTIAL_REFUSAL)
-        .await?;
+    fixture.assert_accepted().await?;
     fixture.shutdown().await
 }
 
@@ -179,17 +180,15 @@ async fn session_credential_is_refused_after_the_registry_becomes_unreadable() -
 }
 
 #[tokio::test]
-async fn session_credential_is_refused_after_its_provider_is_removed() -> TestResult {
+async fn static_session_credential_survives_provider_removal() -> TestResult {
     let fixture = RegistryFixture::admitted().await?;
     write_providers(&fixture.registry_path, json!({}))?;
-    fixture
-        .assert_refused(StatusCode::UNAUTHORIZED, CREDENTIAL_REFUSAL)
-        .await?;
+    fixture.assert_accepted().await?;
     fixture.shutdown().await
 }
 
 #[tokio::test]
-async fn session_credential_is_refused_after_its_provider_issuer_changes() -> TestResult {
+async fn static_session_credential_survives_provider_issuer_change() -> TestResult {
     let fixture = RegistryFixture::admitted().await?;
     write_record(
         &fixture.registry_path,
@@ -199,14 +198,12 @@ async fn session_credential_is_refused_after_its_provider_issuer_changes() -> Te
             "https://issuer.enterprise.example/jwks",
         ),
     )?;
-    fixture
-        .assert_refused(StatusCode::UNAUTHORIZED, CREDENTIAL_REFUSAL)
-        .await?;
+    fixture.assert_accepted().await?;
     fixture.shutdown().await
 }
 
 #[tokio::test]
-async fn session_credential_is_refused_after_its_provider_keys_change() -> TestResult {
+async fn static_session_credential_survives_provider_key_change() -> TestResult {
     let fixture = RegistryFixture::admitted().await?;
     write_record(
         &fixture.registry_path,
@@ -216,9 +213,7 @@ async fn session_credential_is_refused_after_its_provider_keys_change() -> TestR
             "https://issuer.enterprise.example/rotated-jwks",
         ),
     )?;
-    fixture
-        .assert_refused(StatusCode::UNAUTHORIZED, CREDENTIAL_REFUSAL)
-        .await?;
+    fixture.assert_accepted().await?;
     fixture.shutdown().await
 }
 
@@ -227,6 +222,20 @@ async fn session_credential_is_accepted_while_the_registry_is_unchanged() -> Tes
     let fixture = RegistryFixture::admitted().await?;
     fixture.assert_accepted().await?;
     write_record(&fixture.registry_path, enabled_record())?;
+    fixture.assert_accepted().await?;
+    fixture.shutdown().await
+}
+
+#[tokio::test]
+async fn static_session_credential_survives_an_unrelated_provider_addition() -> TestResult {
+    let fixture = RegistryFixture::admitted().await?;
+    let mut other = enabled_record();
+    other["provider_id"] = json!("unrelated-login");
+    other["enabled"] = json!(false);
+    write_providers(
+        &fixture.registry_path,
+        json!({"enterprise-login": enabled_record(), "unrelated-login": other}),
+    )?;
     fixture.assert_accepted().await?;
     fixture.shutdown().await
 }

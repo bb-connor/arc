@@ -1,9 +1,15 @@
 use super::*;
 
 impl RemoteSessionFactory {
-    /// The auth contract as it reads now, including the provider registry digest.
-    pub(super) fn auth_contract_fingerprint(&self) -> Result<String, CliError> {
-        fingerprint_remote_auth_contract(&self.config, self.enterprise_provider_registry.as_ref())
+    pub(super) fn auth_contract_fingerprint(
+        &self,
+        auth_context: &SessionAuthContext,
+    ) -> Result<String, CliError> {
+        fingerprint_remote_auth_contract(
+            &self.config,
+            self.enterprise_provider_registry.as_ref(),
+            auth_context,
+        )
     }
 
     pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
@@ -390,7 +396,7 @@ impl RemoteSessionFactory {
         let session_id = Keypair::generate().public_key().to_hex();
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let dpop_authority = self.config.dpop_replay_authority.clone();
-        let auth_mode_fingerprint = self.auth_contract_fingerprint()?;
+        let auth_mode_fingerprint = self.auth_contract_fingerprint(&auth_context)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         let hosted_isolation = self.configured_hosted_isolation();
@@ -594,7 +600,7 @@ impl RemoteSessionFactory {
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let dpop_authority = self.config.dpop_replay_authority.clone();
-        let auth_mode_fingerprint = self.auth_contract_fingerprint()?;
+        let auth_mode_fingerprint = self.auth_contract_fingerprint(&record.auth_context)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         if default_capabilities.iter().any(|cap| {
