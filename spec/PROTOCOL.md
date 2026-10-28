@@ -3084,12 +3084,16 @@ cancelled call, a pending approval) is `"none"` with `output: null`.
 the same signed `receipt`, its `receiptId` and the kernel `terminalState`.
 
 The rendered MCP `content` and `structuredContent` are projections and are not
-the signed commitment. A verifier MUST check the receipt signature against the
-operator-pinned kernel key, the tool, server and argument hash, the request ID
-it supplied, and, for `"value"`, that `receipt.content_hash` equals the SHA-256
-of the canonical `output`. A verifier MUST fail closed when the evidence is
-absent or the receipt does not verify, and MUST NOT retry an uncertain external
-effect on that basis alone.
+the signed commitment. `outputKind` and `output` are not signed. A verifier
+MUST check the receipt signature against the operator-pinned kernel key, the
+tool, server and argument hash, and the request ID it supplied. It MUST bind
+`outputKind` to the signed decision: it accepts `"value"` only when
+`receipt.decision.verdict` is `"allow"` and `receipt.content_hash` equals the
+SHA-256 of the canonical `output`. A receipt whose decision is not `"allow"`
+never yields tool output, whatever `outputKind` and `output` claim; a
+relabeled signed denial MUST be rejected or treated as that denial. A verifier
+MUST fail closed when the evidence is absent or the receipt does not verify,
+and MUST NOT retry an uncertain external effect on that basis alone.
 
 The edge overwrites any upstream `_meta.chio` or `_meta.chioEvidence`, and
 replaces a non-object upstream `_meta` with an object, before it installs the
