@@ -48,9 +48,11 @@ use chio_kernel_core::{
 #[cfg(test)]
 use chio_core_types::crypto::Keypair;
 
+mod input;
 mod lifecycle;
 mod observation_store;
 
+use input::decode_evaluate_request;
 use observation_store::{DynamoStore, ObservationRecord, ObservationStore, WRITE_TIMEOUT};
 
 /// Name the extension registers as with the Runtime API. The Lambda
@@ -330,14 +332,6 @@ async fn handle(
         ),
     };
     Ok(response)
-}
-
-fn decode_evaluate_request(body: &[u8]) -> Result<EvaluateRequest, String> {
-    let text = std::str::from_utf8(body)
-        .map_err(|error| format!("failed to decode evaluate request: {error}"))?;
-    UntrustedJsonText::new(text)
-        .decode_signed()
-        .map_err(|error| format!("failed to decode evaluate request: {error}"))
 }
 
 async fn read_body(body: Incoming) -> Result<Vec<u8>, hyper::Error> {
