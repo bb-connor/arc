@@ -482,3 +482,71 @@ fn frozen_return_context_binds_the_decision_model_witness_into_the_terminal_rece
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
+
+struct DecisionModelWitnessGuard(chio_core::receipt::metadata::DecisionModelWitness);
+
+impl Guard for DecisionModelWitnessGuard {
+    fn name(&self) -> &str {
+        "decision-model-witness"
+    }
+
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
+    fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
+        Ok(GuardDecision::allow().with_witness(self.0.clone()))
+    }
+}
+
+/// A completed replay validates the retained receipt against the retained raw
+/// outcome, so the witness persisted with that outcome is part of the
+/// expectation and the replay returns the original witness without
+/// re-dispatching.
+#[test]
+fn completed_replay_returns_the_retained_decision_model_witness() -> TestResult {
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY,
+    };
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("completed-dm-witness-replay");
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    kernel.add_guard(Box::new(DecisionModelWitnessGuard(witness.clone())));
+    let response = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    let original = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY))
+        .cloned()
+        .ok_or("original receipt carries no witness")?;
+    assert_eq!(
+        serde_json::from_value::<DecisionModelWitness>(original.clone())?,
+        witness
+    );
+
+    let replay = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_same_receipt(&replay.receipt, &response.receipt);
+    assert_eq!(
+        replay
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY)),
+        Some(&original)
+    );
+    assert_eq!(replay.output, response.output);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
