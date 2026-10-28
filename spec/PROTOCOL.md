@@ -4849,6 +4849,25 @@ in an operator-local `chio.revocation-partner-registry.v1` registry:
 - a mirror refuses a passport when it holds the passport leaf or the
   credential leaf of any credential digest checked with it
 
+Every passport door (the service and public challenge verifications, the
+OID4VP direct post and federated issuance) consults the partner mirrors when
+the operator configures a partner registry:
+
+- the door re-reads the registry on every admission and refuses when it is
+  missing or invalid
+- a native passport is matched to every partner one of whose
+  `issuerPublicKeys` signed one of its credentials, and is checked by its
+  passport id and by the digest of each credential that partner signed; a
+  portable credential is matched by its `iss` and checked by its passport id
+- before its acceptance instant the door syncs every matched mirror that is
+  not fresh, and refuses when a sync fails
+- after the last network wait the door reads its clock once and, at that one
+  instant, revalidates the presentation, the challenge or request window, the
+  lifecycle state and, for federated issuance, the delegation policy and
+  parent capability bounds, then requires every matched mirror to be fresh
+  and to hold none of the passport keys before it consumes the challenge or
+  request
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 

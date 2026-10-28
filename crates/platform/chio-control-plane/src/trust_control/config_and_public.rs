@@ -1328,7 +1328,9 @@ pub use partner_revocation_sync::sync_partner_revocation_mirror;
 mod partner_revocation_door;
 #[cfg(test)]
 pub(crate) use partner_revocation_door::PartnerMirrorSync;
-pub(crate) use partner_revocation_door::PartnerRevocationDoor;
+pub(crate) use partner_revocation_door::{
+    PartnerPassportBinding, PartnerRevocationDoor, PreparedPartnerDoor,
+};
 #[cfg(test)]
 pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
 pub(crate) fn build_enterprise_admission_audit(
