@@ -53,8 +53,7 @@ pub fn sign_wrapped_json_ed25519(
     input_json: &str,
     seed_hex: &str,
 ) -> Result<WrappedJsonSignature> {
-    let canonical =
-        chio_core::canonical::CanonicalBytes::from_value(&json_document(input_json)?)?;
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&json_document(input_json)?)?;
     let keypair = chio_core::Keypair::from_seed_hex(seed_hex)?;
     let signature = keypair.sign_wrapped(schema_id, &canonical)?;
     let canonical_json = String::from_utf8(canonical.into_vec())

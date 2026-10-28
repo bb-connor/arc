@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use chio_core::crypto::{sign_canonical_with_backend_for_identity, PublicKey, SigningBackend};
+use chio_core::crypto::{sign_wrapped_for_identity, PublicKey, SigningBackend};
 use chio_core::root_authority::idp_key_snapshot::IdpKeySnapshotSigningBody;
 use chio_core::root_authority::{
     EnterpriseProviderIdentity, HttpsUrl, IdpKeySnapshot, IdpKeySnapshotFields, Jwk, JwsAlgorithm,
@@ -93,9 +93,10 @@ impl ExchangeSigner {
         keys: Vec<Jwk>,
         observed_at: u64,
     ) -> Result<IdpKeySnapshot, KeyResolutionError> {
-        let (outcome, _) = sign_canonical_with_backend_for_identity(
+        let (outcome, _) = sign_wrapped_for_identity(
             self.backend.as_ref(),
             &self.key,
+            CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
             &IdpKeySnapshotSigningBody {
                 schema: CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
                 issuer,

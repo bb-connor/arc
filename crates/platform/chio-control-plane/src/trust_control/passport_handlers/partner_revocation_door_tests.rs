@@ -960,7 +960,13 @@ fn delegation_policy(
         purpose: None,
         parent_capability_id,
     };
-    let (signature, _) = door.authority.sign_canonical(&body).test_unwrap();
+    let signature = door
+        .authority
+        .sign_wrapped(
+            FEDERATED_DELEGATION_POLICY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body).test_unwrap(),
+        )
+        .test_unwrap();
     FederatedDelegationPolicyDocument { body, signature }
 }
 
