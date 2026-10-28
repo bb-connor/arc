@@ -11,6 +11,8 @@ pub fn resolve_public_certification(
             "public certification registry URL must not be empty".to_string(),
         ));
     }
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: public certification registry at the operator-supplied
+    // registry URL
     let agent = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .build();
@@ -81,6 +83,8 @@ fn public_certification_get_json<T: for<'de> Deserialize<'de>>(
             "public certification registry URL must not be empty".to_string(),
         ));
     }
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: public certification registry at the operator-supplied
+    // registry URL
     let agent = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .build();
@@ -109,6 +113,8 @@ fn public_registry_get_json<T: for<'de> Deserialize<'de>>(
             "public registry URL must not be empty".to_string(),
         ));
     }
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: public certification registry at the operator-supplied
+    // registry URL
     let agent = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .build();
@@ -146,6 +152,8 @@ fn public_registry_get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de
     } else {
         format!("{endpoint}{path}?{encoded_query}")
     };
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: public certification registry at the operator-supplied
+    // registry URL
     let agent = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .build();
@@ -182,6 +190,8 @@ fn public_certification_get_json_with_query<Q: Serialize, T: for<'de> Deserializ
     } else {
         format!("{endpoint}{path}?{encoded_query}")
     };
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: public certification registry at the operator-supplied
+    // registry URL
     let agent = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .build();

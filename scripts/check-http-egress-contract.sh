@@ -34,7 +34,8 @@ set -euo pipefail
 
 # Allow callers to override the search root (used by the self-test). Default
 # to the repo root that contains this script.
-REPO_ROOT="${CHIO_EGRESS_LINT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${CHIO_EGRESS_LINT_ROOT:-$(dirname "$SCRIPT_DIR")}"
 cd "$REPO_ROOT"
 
 ALLOW_LIST=(
@@ -123,7 +124,8 @@ REQWEST_EXECUTE_GAP_LINE_REGEX="(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*\\.)*([A
 line_is_classified() {
     local file="$1"
     local line_no="$2"
-    awk -v line_no="$line_no" -v marker="$CLASSIFICATION_MARKER" '
+    local marker="${3:-$CLASSIFICATION_MARKER}"
+    awk -v line_no="$line_no" -v marker="$marker" '
         NR >= line_no - 4 && NR <= line_no {
             if (index($0, marker) > 0) {
                 found = 1
@@ -152,6 +154,21 @@ unclassified_reqwest_lines() {
 }
 
 failed=()
+is_test_source() {
+    local rel="$1" file="$2"
+    case "$rel" in
+        */tests.rs|*/tests/*|*-tests.rs)
+            return 0
+            ;;
+        */*_tests/*)
+            # Require a compiler-enforced file boundary. A guarded ancestor can
+            # also import this file through a production alias or be unreachable.
+            [[ "$(head -n 1 "$file")" == '#![cfg(test)]' ]] && return 0
+            ;;
+    esac
+    return 1
+}
+
 for file in "${CANDIDATE_FILES[@]}"; do
     rel="${file#./}"
 
@@ -167,19 +184,9 @@ for file in "${CANDIDATE_FILES[@]}"; do
         continue
     fi
 
-    # Skip test sources.
-    case "$rel" in
-        */tests.rs|*/tests/*|*-tests.rs)
-            continue
-            ;;
-        */*_tests/*)
-            # Require a compiler-enforced file boundary. A guarded ancestor can
-            # also import this file through a production alias or be unreachable.
-            if [[ "$(head -n 1 "$file")" == '#![cfg(test)]' ]]; then
-                continue
-            fi
-            ;;
-    esac
+    if is_test_source "$rel" "$file"; then
+        continue
+    fi
 
     # send_with_contract accepts only a ContractClient. A caller file that
     # also names a plain reqwest client or request builder type fails.
@@ -225,8 +232,20 @@ for file in "${CANDIDATE_FILES[@]}"; do
     continue
 done
 
+# ureq and hyper clients, renamed dependencies and HTTP client crates the
+# lint does not parse. See scripts/http_egress_client_scan.py.
+scan_status=0
+scan_output="$(python3 "$SCRIPT_DIR/http_egress_client_scan.py" "$REPO_ROOT")" || scan_status=$?
+if [[ $scan_status -ne 0 && -z "$scan_output" ]]; then
+    echo "http_egress_client_scan.py failed with status $scan_status" >&2
+    exit 1
+fi
+while IFS= read -r finding; do
+    [[ -n "$finding" ]] && failed+=("$finding")
+done <<< "$scan_output"
+
 if [[ ${#failed[@]} -gt 0 ]]; then
-    echo "HttpEgressContract coverage gap: the following production crates use reqwest::Client without enforcing the typed egress contract:" >&2
+    echo "HttpEgressContract coverage gap: the following production sites build an HTTP client or dispatch a request without enforcing the typed egress contract:" >&2
     for f in "${failed[@]}"; do
         echo "  $f" >&2
     done
@@ -234,6 +253,9 @@ if [[ ${#failed[@]} -gt 0 ]]; then
     echo "Add either an explicit HttpEgressContract field on the dispatch struct" >&2
     echo "or route every call through chio_egress_contract::send_with_contract" >&2
     echo "with a ContractClient from client_builder_with_contract." >&2
+    echo "Blocking ureq callers use chio_egress_contract::BlockingContractAgent;" >&2
+    echo "a reviewed non-substrate caller states why with" >&2
+    echo "CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: or CHIO_EGRESS_LINT_ALLOW_DIRECT_HYPER_CLIENT:." >&2
     exit 1
 fi
 

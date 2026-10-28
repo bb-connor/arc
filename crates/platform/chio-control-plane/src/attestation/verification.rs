@@ -211,6 +211,8 @@ impl From<OidcRsaKeyResolveError> for GoogleConfidentialVmVerificationError {
 pub fn fetch_azure_maa_openid_metadata(
     metadata_url: &str,
 ) -> Result<AzureMaaOpenIdMetadata, AzureMaaVerificationError> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
+    // helper has no production caller in the workspace
     let response = ureq::get(metadata_url).call().map_err(|error| {
         AzureMaaVerificationError::MetadataFetch {
             url: metadata_url.to_string(),
@@ -226,6 +228,8 @@ pub fn fetch_azure_maa_openid_metadata(
 }
 
 pub fn fetch_azure_maa_jwks(jwks_url: &str) -> Result<AzureMaaJwks, AzureMaaVerificationError> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
+    // helper has no production caller in the workspace
     let response =
         ureq::get(jwks_url)
             .call()
@@ -244,6 +248,8 @@ pub fn fetch_azure_maa_jwks(jwks_url: &str) -> Result<AzureMaaJwks, AzureMaaVeri
 pub fn fetch_google_confidential_vm_openid_metadata(
     metadata_url: &str,
 ) -> Result<GoogleConfidentialVmOpenIdMetadata, GoogleConfidentialVmVerificationError> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
+    // helper has no production caller in the workspace
     let response = ureq::get(metadata_url).call().map_err(|error| {
         GoogleConfidentialVmVerificationError::MetadataFetch {
             url: metadata_url.to_string(),
@@ -263,6 +269,8 @@ pub fn fetch_google_confidential_vm_openid_metadata(
 pub fn fetch_google_confidential_vm_jwks(
     jwks_url: &str,
 ) -> Result<GoogleConfidentialVmJwks, GoogleConfidentialVmVerificationError> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
+    // helper has no production caller in the workspace
     let response = ureq::get(jwks_url).call().map_err(|error| {
         GoogleConfidentialVmVerificationError::MetadataFetch {
             url: jwks_url.to_string(),

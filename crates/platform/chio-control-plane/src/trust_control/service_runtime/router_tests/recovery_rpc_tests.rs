@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Actual authenticated recovery RPCs over a private temporary joint authority.
 use super::*;
 

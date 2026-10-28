@@ -480,6 +480,8 @@ fn binding_digest<T: Serialize>(value: &T) -> Result<String> {
 }
 
 fn build_agent(timeout: Duration) -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: remote signer at the operator-configured signer endpoint,
+    // redirects off
     ureq::AgentBuilder::new()
         .timeout_connect(timeout)
         .timeout_read(timeout)

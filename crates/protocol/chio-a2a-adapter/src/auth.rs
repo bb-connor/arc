@@ -621,6 +621,8 @@ fn build_agent(
     transport_config: &A2aTransportConfig,
     tls_mode: A2aTlsMode,
 ) -> Result<ureq::Agent, AdapterError> {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: A2A transport with redirects off; a declared
+    // HttpEgressContract installs the contract resolver and every redirect hop is revalidated
     let mut builder = ureq::AgentBuilder::new().timeout(timeout);
     // HttpEgressContract: suppress ureq's built-in redirect follow so
     // `dispatch_with_redirect_validation` can validate every hop before

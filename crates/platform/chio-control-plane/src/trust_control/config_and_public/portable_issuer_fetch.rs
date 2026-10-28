@@ -464,6 +464,8 @@ pub(crate) fn build_portable_fetch_agent(
     deadline: &PortableFetchDeadline,
 ) -> Result<Agent, CliError> {
     let remaining = deadline.remaining()?;
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: strict portable issuer fetch: the resolver returns only
+    // the addresses pinned and checked before the fetch, and redirects are off
     let mut builder = ureq::AgentBuilder::new()
         .timeout_connect(remaining.min(PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT))
         .timeout_read(PORTABLE_ISSUER_FETCH_READ_TIMEOUT)

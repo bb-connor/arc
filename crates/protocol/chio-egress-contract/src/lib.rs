@@ -58,9 +58,9 @@ pub struct PreparedHttpEgressContract {
 /// Fail-closed reasons returned by HTTP egress contract enforcement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpEgressError {
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     #[error("urn:chio:error:transport:http-failed")]
-    Transport(#[from] reqwest_helper::RequestFailure),
+    Transport(#[from] RequestFailure),
     #[error("outbound HTTP egress requires a declared HttpEgressContract")]
     MissingContract,
     #[error("invalid HttpEgressContract: {0}")]
@@ -322,7 +322,7 @@ impl HttpEgressContract {
         Ok(false)
     }
 
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.prepare()?.enforce_resolver_hostname(host)
     }
@@ -439,7 +439,7 @@ impl PreparedHttpEgressContract {
         Ok(())
     }
 
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.validate_dispatchable_with_pinned_dns()?;
         let normalized = normalize_domain_name(host);
@@ -657,6 +657,18 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
     address.is_unspecified()
         || address.is_multicast()
         || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+        || embeds_ipv4_destination(&segments)
+}
+
+/// NAT64 (64:ff9b::/96, 64:ff9b:1::/48), IPv4-compatible (::/96), 6to4
+/// (2002::/16) and Teredo (2001::/32) addresses deliver to an IPv4 host the
+/// address classes above do not see, so they are refused without decoding.
+fn embeds_ipv4_destination(segments: &[u16; 8]) -> bool {
+    let nat64 = segments[0] == 0x0064
+        && segments[1] == 0xff9b
+        && (segments[2] == 0x0001 || segments[2..6] == [0, 0, 0, 0]);
+    let ipv4_compatible = segments[..6] == [0, 0, 0, 0, 0, 0];
+    nat64 || ipv4_compatible || segments[0] == 0x2002 || (segments[0] == 0x2001 && segments[1] == 0)
 }
 
 /// Optional reqwest transport that dispatches only through a
@@ -665,6 +677,19 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
 /// a single fail-closed entry point.
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper;
+
+#[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+mod transport_failure;
+#[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+pub use transport_failure::RequestFailure;
+
+/// Optional blocking ureq transport that dispatches only through a
+/// `BlockingContractAgent` under `HttpEgressContract` enforcement.
+#[cfg(feature = "ureq-egress")]
+pub mod ureq_helper;
+
+#[cfg(feature = "ureq-egress")]
+pub use ureq_helper::{BlockingContractAgent, BlockingContractRequest, BlockingContractResponse};
 
 #[cfg(feature = "reqwest-egress")]
 mod operator_readiness;

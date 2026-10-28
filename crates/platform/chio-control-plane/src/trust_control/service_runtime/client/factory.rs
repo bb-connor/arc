@@ -68,6 +68,8 @@ fn build_client_with_cluster_peer(
         ));
     }
     // Credential-bearing and public clients use the same fixed authority boundary.
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: trust-control client for the operator-configured control
+    // endpoints, redirects off
     let http = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .redirects(0)

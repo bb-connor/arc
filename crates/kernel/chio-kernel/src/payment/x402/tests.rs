@@ -477,6 +477,23 @@ fn facilitator_url_is_validated_at_construction() {
 }
 
 #[test]
+fn facilitator_outside_the_public_network_is_refused_at_construction() {
+    for url in [
+        "https://10.0.0.1",
+        "https://localhost",
+        "https://[fd00::1]",
+        "https://169.254.169.254",
+    ] {
+        let error = X402PaymentAdapter::new(url, test_rail(), clock_at(NOW), replay_store())
+            .expect_err(url);
+        assert!(
+            matches!(&error, PaymentError::RailError(message) if message == "payment rail egress denied"),
+            "{url}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn settlement_without_a_payer_is_rejected() {
     let mut response = settle_success();
     response

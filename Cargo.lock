@@ -3641,6 +3641,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "ureq 2.12.1",
  "url",
 ]
 
@@ -4275,6 +4276,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-egress-contract",
  "chio-federation",
  "chio-kernel",
  "chio-kernel-core",
@@ -4313,7 +4315,6 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tracing",
- "ureq 2.12.1",
  "url",
  "uuid",
 ]

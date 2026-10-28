@@ -271,6 +271,8 @@ fn http_status_error(status: u16, response: ureq::Response) -> CliError {
 /// response body is the canonical artifact and never a reserialization.
 pub(super) fn fetch_finding_bytes(control_url: &str, finding_id: &str) -> Result<String, CliError> {
     let url = finding_endpoint(control_url, &format!("/v1/findings/{finding_id}"));
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     match ureq::get(&url)
         .timeout(std::time::Duration::from_secs(30))
         .call()
@@ -315,6 +317,8 @@ fn cmd_finding_publish(
 
     let accepted = finding_verify::strict_finding_ingress(artifact, "publish input")?;
     let endpoint = finding_endpoint(url, FINDING_PUBLISH_PATH);
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let response = match ureq::post(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
@@ -428,6 +432,8 @@ fn cmd_finding_search(
     })?;
     let endpoint = format!("{}?{encoded}", finding_endpoint(url, FINDING_SEARCH_PATH));
 
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let body = match ureq::get(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .call()
@@ -583,6 +589,8 @@ fn cmd_finding_buy(
 
     let request_bytes = chio_core::canonical_json_bytes(&request)?;
     let endpoint = finding_endpoint(url, &format!("/v1/findings/{finding_id}/purchase"));
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let response = match ureq::post(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
@@ -1077,6 +1085,8 @@ fn cmd_finding_status(
         url,
         &format!("/v1/findings/status/{encoded_feed}/proof/{finding_id}"),
     );
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let response = match ureq::get(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .call()
