@@ -125,7 +125,7 @@ Recommendation: phase 1 and 2 are a self-contained bounded analyzer with zero ne
 ### CLI UX and product spec
 
 ```
-chio policy analyze <policy.yaml> [--against <old.yaml>] [--format table|json] [--fail-on notice|warning|error]
+chio policy analyze <policy.yaml> [--against <old.yaml>] [--format human|json] [--fail-on notice|warning|error]
 ```
 
 - Human output: a findings table (finding id, severity, block, rule reference, one-line explanation, witness when present).

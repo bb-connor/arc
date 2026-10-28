@@ -22307,7 +22307,8 @@
       "resolve_peers_lock_path::shared-reader::crates/tooling/chio-conformance/src/peers.rs::default_peers_lock_path"
     ],
     "crates/products/chio-cli/src/cli/dispatch/federation.rs": [
-      "dispatch_chio_authority_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation/replication.rs::pin"
+      "dispatch_chio_authority_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation/replication.rs::pin",
+      "dispatch_chio_federation_command::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation.rs::dispatch_chio_authority_command"
     ],
     "crates/products/chio-cli/src/cli/dispatch/federation/replication.rs": [
       "pin::original-json-reader::UntrustedJsonText"
@@ -22352,7 +22353,8 @@
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_deployment_digest",
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_deployment_validate",
       "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_store_build",
-      "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_store_digest"
+      "run::shared-reader::crates/products/chio-cli/src/active_response_authority.rs::cmd_authority_store_digest",
+      "run::shared-reader::crates/products/chio-cli/src/cli/dispatch/federation.rs::dispatch_chio_federation_command"
     ],
     "crates/products/chio-cli/src/cli/dispatch/proof.rs": [
       "attach_runtime_proof_parity_report::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof.rs::validate_runtime_proof_regeneration_artifacts_from_graph",

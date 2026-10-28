@@ -68,15 +68,15 @@ fn policy_analysis_refinement_emits_a_witness() {
 }
 
 #[test]
-fn policy_analysis_table_includes_stable_finding_ids() {
+fn policy_analysis_human_output_includes_stable_finding_ids() {
     let output = Command::new(chio())
         .args(["policy", "analyze"])
         .arg(fixture("contradictory.yaml"))
-        .args(["--format", "table"])
+        .args(["--format", "human"])
         .output()
-        .expect("run policy analyzer table output");
+        .expect("run policy analyzer human output");
     assert_eq!(output.status.code(), Some(1));
-    let stdout = String::from_utf8(output.stdout).expect("table output is UTF-8");
+    let stdout = String::from_utf8(output.stdout).expect("human output is UTF-8");
     assert!(stdout.contains("ID           SEVERITY"));
     assert!(stdout.contains("CONTRA-0001"));
 }
