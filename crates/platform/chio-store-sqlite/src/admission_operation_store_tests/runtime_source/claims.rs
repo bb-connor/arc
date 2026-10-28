@@ -1,6 +1,8 @@
 use super::*;
 #[path = "claims/dispatch_snapshot.rs"]
 mod dispatch_snapshot;
+#[path = "claims/requalification.rs"]
+mod requalification;
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantClaimIntentInput, RuntimeParticipantClaimIntentV1, RuntimeParticipantPhase,
     RuntimeParticipantResourceV1,
