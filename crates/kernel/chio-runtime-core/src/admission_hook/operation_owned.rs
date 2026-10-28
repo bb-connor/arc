@@ -1,6 +1,3 @@
-//! One atomic replay claim for the exact prepared runtime plan. Every legacy
-//! consume/release callback is excluded from this path.
-
 use super::preparation::PreparedHookAdmission;
 use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
