@@ -25,7 +25,8 @@ pub(crate) fn pinned_escrow_ledger_bytes(
 /// The offline PSP commerce bundle with its completed order backed by a
 /// released escrow ledger pinned in the order context. Without
 /// `keep_ledger_node` the ledger node is dropped from the transaction evidence
-/// graph after the bundle is sealed, so the pin has no ledger to prove it.
+/// graph after the bundle is sealed and the proof-room layer is removed, so
+/// the transaction passport is verified directly and its pin has no ledger.
 pub(crate) fn build_commerce_escrow_bundle(keep_ledger_node: bool) -> (tempfile::TempDir, PathBuf) {
     let tempdir = tempfile::tempdir().test_expect("tempdir");
     let source = workspace_root().join("fixtures/proof-room/commerce-payments/offline-psp-valid");
@@ -75,14 +76,13 @@ pub(crate) fn build_commerce_escrow_bundle(keep_ledger_node: bool) -> (tempfile:
             .test_expect("graph nodes array")
             .retain(|node| node["role"].as_str() != Some(COMMERCE_ESCROW_LEDGER_ROLE));
         write_transaction_graph(&bundle, &mut evidence_graph);
-        for artifact_path in ["transaction-passport.json", "evidence-graph.json"] {
-            std::fs::copy(
-                bundle.join(artifact_path),
-                bundle.join("roots").join(artifact_path),
-            )
-            .test_expect("sync proof-room root artifact");
+        for directory in ["roots", "verifier", "ui"] {
+            std::fs::remove_dir_all(bundle.join(directory))
+                .test_expect("drop proof-room layer directory");
         }
-        refresh_existing_manifest_artifacts(&bundle);
+        for file in ["manifest.json", "bundle-signature.dsse.json"] {
+            std::fs::remove_file(bundle.join(file)).test_expect("drop proof-room layer file");
+        }
     }
 
     (tempdir, bundle)
