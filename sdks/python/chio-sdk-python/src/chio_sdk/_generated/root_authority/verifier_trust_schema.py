@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a7762f49cfa77fd7ddcf7cfce82b6289601c6482fc8d9a869103048118492e74
+# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, constr
 
 from . import root_anchor_schema
 
@@ -25,6 +25,48 @@ class RequiredColumn(Enum):
     decision = "decision"
     content = "content"
     settlement = "settlement"
+
+
+class Kind(Enum):
+    local_log = "local_log"
+    transparency_service = "transparency_service"
+    immutable_record = "immutable_record"
+    chain_anchor = "chain_anchor"
+
+
+class PublicationIdentity(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Kind
+    identity: constr(min_length=1, max_length=2048)
+
+
+class Kind20(Enum):
+    operator_root = "operator_root"
+    did = "did"
+    x509_root = "x509_root"
+    transparency_root = "transparency_root"
+    chain_root = "chain_root"
+
+
+class TrustAnchorIdentity(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Kind20
+    identity: constr(min_length=1, max_length=2048)
+
+
+class CheckpointTrustAnchorBinding(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    publicationIdentity: PublicationIdentity
+    trustAnchorIdentity: TrustAnchorIdentity
+    trustAnchorRef: constr(min_length=1, max_length=2048)
+    signerCertRef: constr(min_length=1, max_length=2048)
+    publicationProfileVersion: constr(min_length=1, max_length=2048)
 
 
 class ChioVerifierTrust(BaseModel):
@@ -40,10 +82,16 @@ class ChioVerifierTrust(BaseModel):
         ..., max_length=64, min_length=1
     )
     exchange_keys: list[root_anchor_schema.PublicKeyHex] = Field(
-        ..., max_length=64, min_length=1
+        ...,
+        description="Keys that may sign anchored roots.",
+        max_length=64,
+        min_length=0,
     )
     root_policy_keys: list[root_anchor_schema.PublicKeyHex] = Field(
-        ..., max_length=64, min_length=1
+        ...,
+        description="Keys that may sign root policies.",
+        max_length=64,
+        min_length=0,
     )
     idp_keys: dict[str, list[root_anchor_schema.Jwk]] | None = Field(
         None,
@@ -54,5 +102,9 @@ class ChioVerifierTrust(BaseModel):
     )
     checkpoint_keys: list[root_anchor_schema.PublicKeyHex] | None = Field(
         None, max_length=64
+    )
+    checkpoint_trust_anchor: CheckpointTrustAnchorBinding | None = Field(
+        None,
+        description="The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews.",
     )
     required_columns: list[RequiredColumn] | None = Field(None, max_length=5)
