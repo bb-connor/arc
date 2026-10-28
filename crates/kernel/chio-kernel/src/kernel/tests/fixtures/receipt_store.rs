@@ -265,13 +265,20 @@ impl SqliteReceiptStore {
                 );
             }
         }
+        let predecessor = previous_checkpoint
+            .as_ref()
+            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .transpose()
+            .map_err(|error| {
+                ReceiptStoreError::Conflict(format!("checkpoint predecessor invalid: {error}"))
+            })?;
         let checkpoint = build_checkpoint_with_previous(
             checkpoint_seq,
             batch_start_seq,
             batch_end_seq,
             &receipt_bytes,
             keypair,
-            previous_checkpoint.as_ref(),
+            predecessor.as_ref(),
             &prior_chain_leaf_hashes,
         )
         .map_err(|error| {

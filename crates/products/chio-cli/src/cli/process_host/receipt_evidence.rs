@@ -22,8 +22,8 @@ impl Evidence {
         key: &PublicKey,
         observed_at: u64,
     ) -> Result<(), CliError> {
-        validate_checkpoint(&self.checkpoint).map_err(error)?;
-        let body = &self.checkpoint.body;
+        let checkpoint = validate_checkpoint(&self.checkpoint).map_err(error)?;
+        let body = &checkpoint.body;
         let proof = &self.inclusion;
         if body.kernel_key != *key
             || body.issued_at < receipt.timestamp

@@ -484,7 +484,7 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &kp,
-        Some(&first),
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -497,7 +497,7 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         6,
         &[b"five".to_vec(), b"six".to_vec()],
         &kp,
-        Some(&second),
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&second).test_unwrap()),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -607,7 +607,7 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
-        Some(&first),
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),

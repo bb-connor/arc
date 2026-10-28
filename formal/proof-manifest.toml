@@ -670,10 +670,10 @@ rust_symbols = [
   "build_inclusion_proof",
   "verify_checkpoint_signature",
 ]
-normalized_sha256 = "15d09dfdf6b957066b500fda0e8559371173bcde429b5a4e055a8229063a88a6"
+normalized_sha256 = "6c84f0408b67ec7c5f3aee3cd0538cbddab2ed27ae0da57ff3c84697a10f15b7"
 symbol_sha256 = [
   { symbol = "build_inclusion_proof", sha256 = "39fb10be9c0cf8f290ac73e3fd18cf4cc4952c96a20aeb761ce6a34a622ca194" },
-  { symbol = "verify_checkpoint_signature", sha256 = "0e334fe65f747698ba9302ba2f23a49cb5280bc86c0c30bc7c9ce09081027241" },
+  { symbol = "verify_checkpoint_signature", sha256 = "787431db81ff3280fd345905d31372c779483ada66cc0c72ea7b72fb5b69a772" },
 ]
 
 # The bounded model projects only checkpoint sequence and Merkle root.
@@ -688,11 +688,11 @@ rust_symbols = [
   "build_checkpoint_with_previous_at",
   "build_checkpoint_with_chain_frontier_at",
 ]
-normalized_sha256 = "b62a6e71f294d28aa573f3c81955dda9c4e093f6a3b197d03973c94ad46a4c13"
+normalized_sha256 = "d7f84cdb9c394a42cbd635382e8bafbb0aac44793c67c1d64ec4c7be36ce47d9"
 symbol_sha256 = [
   { symbol = "CheckpointSigningContext", sha256 = "470cd3aec02d4f9589c096df83d8678e824104840d05ea3c3e7cd7612b07a197" },
-  { symbol = "build_checkpoint_with_previous_at", sha256 = "d5c9e15d7bad17f335e225fd207691be8a60f4b673fee3aff023c73c12214936" },
-  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "142018cec6b882a4193d304437790e421fc755845905ee05d0b2f12d94460edd" },
+  { symbol = "build_checkpoint_with_previous_at", sha256 = "93993dd22868a43c51dcbe5f74f3726bce98bbbef7ea1621399cc85e16fc9a44" },
+  { symbol = "build_checkpoint_with_chain_frontier_at", sha256 = "923bd286d525cf8fccfba059a73cd5ede10a444c2ff14e11f00e120773a4ea0e" },
 ]
 
 [[mirror]]
@@ -705,11 +705,11 @@ rust_symbols = [
   "build_checkpoint_with_previous",
   "build_checkpoint_with_chain_frontier",
 ]
-normalized_sha256 = "a38ed82a6a721339887c7e3edc9bc466eea8cbc0a31bab235fa650590bc09064"
+normalized_sha256 = "cf54d83daf8bf2f277e15a871bac5267b3cdf78ee2194e602ee9ed9b28ea4cc4"
 symbol_sha256 = [
   { symbol = "build_checkpoint", sha256 = "43f68cff56db2effbf22622b756c4c14160b55a7f9a5229b914feb28c2c66e3e" },
-  { symbol = "build_checkpoint_with_previous", sha256 = "e853f8494246e1b2d30f9bf74d84bc89786b6737bc387ee72ff9f57e79075ae1" },
-  { symbol = "build_checkpoint_with_chain_frontier", sha256 = "645d086c4522657c579d18574ba6930fcd6f2719869ea8d4a694d32f1692e468" },
+  { symbol = "build_checkpoint_with_previous", sha256 = "09870a5460eca56decf2541861bedea439d399ae9f6b80336571fb9f74b996a6" },
+  { symbol = "build_checkpoint_with_chain_frontier", sha256 = "33ef74fae04611e183b022ee8d81b8369a9a8157d4efa3709ecef973efee5b11" },
 ]
 
 # TLA records are abstraction anchors. Their hashes force model review when the

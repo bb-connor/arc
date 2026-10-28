@@ -35,7 +35,7 @@ use chio_core_types::receipt::kinds::{
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_kernel_core::evidence_verify::{
     build_evidence_transparency_claims, build_trust_anchored_checkpoint_publication,
-    checkpoint_chain_leaf_hash, checkpoint_log_id,
+    checkpoint_chain_leaf_hash, checkpoint_log_id, validate_checkpoint,
 };
 use chio_test_support::prelude::*;
 use support::*;
@@ -405,7 +405,7 @@ fn two_checkpoints(
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         keypair,
-        Some(&first),
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
         &[checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
     )
     .test_unwrap();
@@ -429,7 +429,7 @@ fn checkpoint_transparency_verification_fails_closed_on_duplicate_checkpoint_for
         4,
         &[b"five".to_vec(), b"six".to_vec()],
         &keypair,
-        Some(&checkpoints[0]),
+        Some(&validate_checkpoint(&checkpoints[0]).test_unwrap()),
         &[checkpoint_chain_leaf_hash(&checkpoints[0].body).test_unwrap()],
     )
     .test_unwrap();

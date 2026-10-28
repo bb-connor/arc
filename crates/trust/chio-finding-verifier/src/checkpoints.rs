@@ -180,13 +180,12 @@ fn verify_checkpoint_membership_inner(
     let mut by_seq = BTreeMap::new();
     for checkpoint in checkpoints {
         let seq = checkpoint.body.checkpoint_seq;
-        if validate_checkpoint(checkpoint).is_err() {
-            return Err(CheckpointMembershipError::CheckpointInvalid(seq));
-        }
-        if !has_strict_checkpoint_signature(checkpoint) {
+        let checkpoint = validate_checkpoint(checkpoint)
+            .map_err(|_| CheckpointMembershipError::CheckpointInvalid(seq))?;
+        if !has_strict_checkpoint_signature(&checkpoint) {
             return Err(CheckpointMembershipError::CheckpointSignatureInvalid(seq));
         }
-        let log_id = checkpoint_log_id(checkpoint);
+        let log_id = checkpoint_log_id(&checkpoint);
         // Checkpoint-reference grammar: `<log_id>#<checkpoint_seq>`. Every
         // supplied checkpoint identity must equal the finding's single
         // evidence_checkpoint_ref; substitution denies.
@@ -397,12 +396,15 @@ mod tests {
         )?;
         let signer = Keypair::from_seed(&[7; 32]);
         let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
-        assert!(verify_checkpoint_signature(&checkpoint)?);
+        verify_checkpoint_signature(&checkpoint)?;
         assert!(has_strict_checkpoint_signature(&checkpoint));
         checkpoint.body.kernel_key = weak_key;
         checkpoint.signature = forged_signature;
 
-        assert!(!verify_checkpoint_signature(&checkpoint)?);
+        assert!(matches!(
+            verify_checkpoint_signature(&checkpoint),
+            Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
+        ));
         assert!(!has_strict_checkpoint_signature(&checkpoint));
         Ok(())
     }

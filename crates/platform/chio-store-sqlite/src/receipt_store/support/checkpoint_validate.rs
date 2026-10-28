@@ -847,6 +847,12 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
             .checkpoint_seq()
             .checked_add(1)
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
+        let predecessor = staged_head
+            .latest_checkpoint
+            .as_ref()
+            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .transpose()
+            .map_err(checkpoint_error_to_receipt_store)?;
         let checkpoint =
             chio_kernel_core::evidence_verify::build_checkpoint_with_chain_frontier_at(
                 checkpoint_seq,
@@ -857,7 +863,7 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
                     keypair: &signer.keypair,
                     issued_at: clock.unix_millis()?,
                 },
-                staged_head.latest_checkpoint.as_ref(),
+                predecessor.as_ref(),
                 &frontier,
             )
             .map_err(checkpoint_error_to_receipt_store)?;
@@ -1207,6 +1213,11 @@ fn create_next_receipt_checkpoint_tx(
             })
     })?;
     let chain_leaf_hashes = load_checkpoint_chain_leaf_hashes(connection)?;
+    let predecessor = previous_checkpoint
+        .as_ref()
+        .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+        .transpose()
+        .map_err(checkpoint_error_to_receipt_store)?;
     let checkpoint = chio_kernel_core::evidence_verify::build_checkpoint_with_previous_at(
         checkpoint_seq,
         range.start_seq,
@@ -1216,7 +1227,7 @@ fn create_next_receipt_checkpoint_tx(
             keypair,
             issued_at: clock.unix_millis()?,
         },
-        previous_checkpoint.as_ref(),
+        predecessor.as_ref(),
         &chain_leaf_hashes,
     )
     .map_err(checkpoint_error_to_receipt_store)?;

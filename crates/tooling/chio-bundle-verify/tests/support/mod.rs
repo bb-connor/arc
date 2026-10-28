@@ -23,7 +23,7 @@ use chio_core_types::receipt::kinds::TrustLevel;
 use chio_core_types::root_authority::{VerifierTrust, CHIO_VERIFIER_TRUST_SCHEMA};
 use chio_kernel_core::evidence_verify::{
     build_checkpoint_with_previous_at, build_evidence_transparency_claims, build_inclusion_proof,
-    CheckpointError, CheckpointSigningContext,
+    CheckpointError, CheckpointSigningContext, VerifiedCheckpoint,
 };
 use chio_security_types::clock::UnixMillis;
 use chio_test_support::prelude::*;
@@ -98,7 +98,7 @@ pub fn build_checkpoint_with_previous(
     batch_end_seq: u64,
     batch: &[Vec<u8>],
     keypair: &Keypair,
-    previous: Option<&KernelCheckpoint>,
+    previous: Option<&VerifiedCheckpoint<'_>>,
     prior_chain: &[Hash],
 ) -> Result<KernelCheckpoint, CheckpointError> {
     build_checkpoint_with_previous_at(

@@ -31,9 +31,19 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
 
     let first = build_checkpoint(1, 1, 2, &batch_one, &kp).unwrap();
     let first_leaf = checkpoint_chain_leaf_hash(&first.body).unwrap();
-    let second =
-        build_checkpoint_with_previous(2, 3, 4, &batch_two, &kp, Some(&first), &[first_leaf])
-            .unwrap();
+    let second = build_checkpoint_with_previous(
+        2,
+        3,
+        4,
+        &batch_two,
+        &kp,
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                .expect("verified predecessor"),
+        ),
+        &[first_leaf],
+    )
+    .unwrap();
     let chain = [
         first_leaf,
         checkpoint_chain_leaf_hash(&second.body).unwrap(),

@@ -3,13 +3,38 @@
 //! Verification, transparency derivation and issuance with caller-supplied
 //! time live in `chio_kernel_core::evidence_verify`; this module only adds
 //! the `SystemClock` reading.
+//!
+//! A predecessor must arrive as a `VerifiedCheckpoint`, which only signature
+//! verification constructs. A predecessor that was never verified does not
+//! type-check:
+//!
+//! ```compile_fail,E0308
+//! use chio_core::crypto::Keypair;
+//! use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+//! use chio_kernel_core::evidence_verify::{checkpoint_chain_leaf_hash, CheckpointError};
+//! # fn main() -> Result<(), CheckpointError> {
+//! let keypair = Keypair::generate();
+//! let first = build_checkpoint(1, 1, 1, &[b"first".to_vec()], &keypair)?;
+//! let leaf = checkpoint_chain_leaf_hash(&first.body)?;
+//! let _ = build_checkpoint_with_previous(
+//!     2,
+//!     2,
+//!     2,
+//!     &[b"second".to_vec()],
+//!     &keypair,
+//!     Some(&first),
+//!     &[leaf],
+//! )?;
+//! # Ok(())
+//! # }
+//! ```
 
 use chio_core::crypto::Keypair;
 use chio_core::hashing::Hash;
 use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_kernel_core::evidence_verify::{
     build_checkpoint_with_chain_frontier_at, build_checkpoint_with_previous_at,
-    CheckpointChainFrontier, CheckpointError, CheckpointSigningContext,
+    CheckpointChainFrontier, CheckpointError, CheckpointSigningContext, VerifiedCheckpoint,
 };
 
 /// Build a signed kernel checkpoint from a batch of canonical receipt bytes.
@@ -49,7 +74,7 @@ pub fn build_checkpoint_with_previous(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain_leaf_hashes: &[Hash],
 ) -> Result<KernelCheckpoint, CheckpointError> {
     use chio_security_types::clock::{Clock, SystemClock};
@@ -75,7 +100,7 @@ pub fn build_checkpoint_with_chain_frontier(
     batch_end_seq: u64,
     receipt_canonical_bytes_batch: &[Vec<u8>],
     keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
+    previous_checkpoint: Option<&VerifiedCheckpoint<'_>>,
     prior_chain: &CheckpointChainFrontier,
 ) -> Result<KernelCheckpoint, CheckpointError> {
     use chio_security_types::clock::{Clock, SystemClock};

@@ -13,7 +13,7 @@ use super::*;
 use crate::evidence_verify::tests::{build_checkpoint, build_checkpoint_with_previous};
 use crate::evidence_verify::{
     build_checkpoint_transparency, build_trust_anchored_checkpoint_publication,
-    checkpoint_chain_leaf_hash,
+    checkpoint_chain_leaf_hash, validate_checkpoint,
 };
 
 #[test]
@@ -27,7 +27,7 @@ fn evidence_export_marks_unanchored_publication_as_transparency_preview() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &keypair,
-        Some(&first),
+        Some(&validate_checkpoint(&first).expect("verified predecessor")),
         &[checkpoint_chain_leaf_hash(&first.body).expect("first chain leaf")],
     )
     .expect("second checkpoint");
@@ -84,7 +84,7 @@ fn evidence_export_marks_bound_publication_as_trust_anchored() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &keypair,
-        Some(&first),
+        Some(&validate_checkpoint(&first).expect("verified predecessor")),
         &[checkpoint_chain_leaf_hash(&first.body).expect("first chain leaf")],
     )
     .expect("second checkpoint");
