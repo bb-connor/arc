@@ -28,7 +28,8 @@ pub(crate) fn initialize_root_exchange_schema(
 }
 
 /// Every root row passes its row check and has its mint event; every present opening has its root;
-/// every retained artifact matches its digest.
+/// every retained artifact matches its digest; every live replay binding and bearer mapping
+/// agrees with its recorded history.
 pub(crate) fn verify_root_exchange_invariants(
     connection: &Connection,
 ) -> std::result::Result<(), SqliteServingOwnerError> {
@@ -90,7 +91,7 @@ fn verify_integrity(
             Err(error) => return Err(unreadable(&error)),
         }
     }
-    Ok(())
+    super::bindings::verify_live_state(connection)
 }
 
 /// The digest the global commit chain references for one root exchange event.
@@ -104,21 +105,26 @@ pub(crate) fn projection_reference(
     }
     let sequence = i64::try_from(sequence)
         .map_err(|_| owner_invalid("root exchange projection sequence is out of range"))?;
-    let row: Option<(String, String, String)> = connection
+    let row: Option<(String, String, String, i64)> = connection
         .query_row(
-            "SELECT mutation, subject, digest FROM root_exchange_events WHERE sequence = ?1",
+            "SELECT mutation, subject, digest, occurred_at FROM root_exchange_events
+             WHERE sequence = ?1",
             [sequence],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()?;
-    let (mutation, subject, digest) =
+    let (mutation, subject, digest, occurred_at) =
         row.ok_or_else(|| owner_invalid("root exchange projection reference is absent"))?;
+    let (replay, bearer) = super::bindings::recorded(connection, sequence)?;
     let bytes = chio_core::canonical::canonical_json_bytes(&(
         "chio.root-exchange-event.v1",
         sequence,
         mutation,
         subject,
         digest,
+        occurred_at,
+        replay,
+        bearer,
     ))
     .map_err(|error| owner_invalid(error.to_string()))?;
     Ok(chio_core::sha256_hex(&bytes))

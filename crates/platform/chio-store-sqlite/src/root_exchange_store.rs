@@ -24,6 +24,7 @@ use crate::admission_operation_store::{verify_active_owner, verify_trusted_time}
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 use crate::store_connection::{StoreConnection, StoreGuard};
 
+mod bindings;
 mod maintenance;
 mod mint;
 mod projection;
@@ -366,6 +367,8 @@ struct Change {
     mutation: Mutation,
     subject: String,
     digest: String,
+    replay: Option<bindings::ReplayRecord>,
+    bearer: Option<bindings::BearerRecord>,
 }
 
 /// Serving-bound root exchange store. Construct it with
@@ -457,7 +460,7 @@ impl SqliteRootExchangeStore {
         let Some(change) = change else {
             return Ok((value, false));
         };
-        let sequence = append_event(tx, &change)?;
+        let sequence = append_event(tx, &change, trusted_now_unix_ms / 1000)?;
         self.serving_owner
             .append_global_commit(
                 tx,
@@ -471,7 +474,7 @@ impl SqliteRootExchangeStore {
     }
 }
 
-fn append_event(tx: &Transaction<'_>, change: &Change) -> Result<u64> {
+fn append_event(tx: &Transaction<'_>, change: &Change, now: u64) -> Result<u64> {
     let previous: i64 = tx
         .query_row(
             "SELECT COALESCE(MAX(sequence), 0) FROM root_exchange_events",
@@ -484,16 +487,18 @@ fn append_event(tx: &Transaction<'_>, change: &Change) -> Result<u64> {
         .and_then(|value| value.checked_add(1))
         .ok_or_else(|| invalid("root exchange event sequence overflow"))?;
     tx.execute(
-        "INSERT INTO root_exchange_events (sequence, mutation, subject, digest)
-         VALUES (?1, ?2, ?3, ?4)",
+        "INSERT INTO root_exchange_events (sequence, mutation, subject, digest, occurred_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
             sql_u64(sequence)?,
             change.mutation.as_str(),
             change.subject,
-            change.digest
+            change.digest,
+            sql_u64(now)?
         ],
     )
     .map_err(sqlite_error)?;
+    bindings::insert_records(tx, sequence, change.replay.as_ref(), change.bearer.as_ref())?;
     Ok(sequence)
 }
 

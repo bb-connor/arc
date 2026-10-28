@@ -647,6 +647,8 @@ fn root_exchange_store_refuses_nul_padding() -> TestResult {
     for (table, column) in [
         ("root_exchange_events", "digest"),
         ("root_exchange_replay", "replay_key_digest"),
+        ("root_exchange_replay_bindings", "replay_key_digest"),
+        ("root_exchange_bearer_bindings", "token_digest"),
         ("root_exchange_roots", "tag_key_id"),
         ("root_exchange_roots", "subject_tag"),
         ("root_exchange_roots", "tenant_tag"),
@@ -671,6 +673,8 @@ fn root_exchange_store_refuses_nul_padding() -> TestResult {
     for (table, column, valid) in [
         ("root_exchange_events", "subject", "cap-1"),
         ("root_exchange_replay", "capability_id", "cap-1"),
+        ("root_exchange_replay_bindings", "capability_id", "cap-1"),
+        ("root_exchange_bearer_bindings", "capability_id", "cap-1"),
         ("root_exchange_roots", "capability_id", "cap-1"),
         ("root_exchange_roots", "root_policy_rule_id", "rule-1"),
         ("root_exchange_roots", "client_id", "client-1"),
