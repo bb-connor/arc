@@ -60,6 +60,7 @@ pub mod patch_integrity;
 pub mod path_allowlist;
 mod pipeline;
 pub mod post_invocation;
+mod predicate_dag;
 pub mod prompt_injection;
 pub mod response_sanitization;
 pub mod secret_leak;
@@ -114,6 +115,10 @@ pub use pipeline::GuardPipeline;
 pub use post_invocation::{
     sanitize_json, PipelineOutcome, PostInvocationHook, PostInvocationHookIdentity,
     PostInvocationPipeline, PostInvocationVerdict, SanitizerHook,
+};
+pub use predicate_dag::{
+    AtomPredicate, DecisionModelBinding, DecisionModelLoadError, ExactPredicateSource, JsonKind,
+    PredicateDagGuard, ScoreError, ScoreSource, Scores, PREDICATE_DAG_GUARD_NAME,
 };
 pub use prompt_injection::{
     Detection as PromptInjectionDetection, PromptInjectionConfig, PromptInjectionGuard,
