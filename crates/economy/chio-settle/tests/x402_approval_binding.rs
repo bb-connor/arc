@@ -35,6 +35,26 @@ fn requirements(tokens: &[&str]) -> Result<X402PaymentRequirements, SettlementEr
 }
 
 #[test]
+fn x402_keeps_the_approved_rail_token_distinct_from_the_settlement_currency() {
+    let (dispatch, mut binding) = fixture();
+    binding.token_symbol = "USDC".to_string();
+    let requirements = build_x402_payment_requirements(
+        &dispatch,
+        &binding,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+    )
+    .test_unwrap();
+
+    assert_eq!(requirements.accepted_tokens, vec!["USDC".to_string()]);
+    assert_eq!(requirements.currency, "USD");
+    assert_eq!(requirements.amount_minor_units, dispatch.settlement_amount.units);
+    assert_eq!(requirements.pay_to, dispatch.beneficiary_address);
+}
+
+#[test]
 fn x402_rejects_an_extra_token_after_the_approved_token() {
     let result = requirements(&["USD", "EURC"]);
     assert!(
