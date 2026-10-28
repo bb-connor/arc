@@ -37,7 +37,7 @@ const OTHER_ISSUER: &str = "https://trust.globex.example";
 const NOW_MS: u64 = BASE_UNIX_SECS * 1_000;
 const VALID_FROM: u64 = 1_700_000_000;
 const VALID_UNTIL: u64 = 2_100_000_000;
-const PRESENTED_AT: u64 = 1_750_000_000;
+const PRESENTED_AT: u64 = BASE_UNIX_SECS - 5;
 const TTL_SECONDS: u64 = 60;
 
 /// A clock the tests and the sync seam move by hand.
@@ -320,17 +320,26 @@ impl Door {
         issued_at: u64,
         expires_at: u64,
     ) -> PassportPresentationChallenge {
-        create_passport_presentation_challenge_with_reference(PassportPresentationChallengeArgs {
-            verifier: ADVERTISE_URL.to_owned(),
-            challenge_id: challenge_id.map(str::to_owned),
-            nonce: "partner-door-nonce".to_owned(),
-            issued_at,
-            expires_at,
-            options: PassportPresentationOptions::default(),
-            policy_ref: None,
-            policy: Some(PassportVerifierPolicy::default()),
-        })
+        let challenge = create_passport_presentation_challenge_with_reference(
+            PassportPresentationChallengeArgs {
+                verifier: ADVERTISE_URL.to_owned(),
+                challenge_id: challenge_id.map(str::to_owned),
+                nonce: "partner-door-nonce".to_owned(),
+                issued_at,
+                expires_at,
+                options: PassportPresentationOptions::default(),
+                policy_ref: None,
+                policy: Some(PassportVerifierPolicy::default()),
+            },
+        )
+        .test_unwrap();
+        PassportVerifierChallengeStore::open(
+            configured_verifier_challenge_db_path(&self.config).test_unwrap(),
+        )
         .test_unwrap()
+        .register(&challenge)
+        .test_unwrap();
+        challenge
     }
 
     fn service_request(
@@ -371,15 +380,6 @@ impl Door {
             expected_challenge: None,
         };
         handle_public_verify_passport_challenge(State(self.state()), Json(request)).await
-    }
-
-    fn register_public_challenge(&self, challenge: &PassportPresentationChallenge) {
-        PassportVerifierChallengeStore::open(
-            configured_verifier_challenge_db_path(&self.config).test_unwrap(),
-        )
-        .test_unwrap()
-        .register(challenge)
-        .test_unwrap();
     }
 }
 
@@ -477,7 +477,6 @@ async fn the_service_challenge_door_refuses_a_partner_revoked_passport() {
 async fn the_public_challenge_door_refuses_a_partner_revoked_passport() {
     let (door, passport) = door_with_revoked_passport();
     let challenge = door.challenge(Some("partner-door-challenge"), VALID_FROM, VALID_UNTIL);
-    door.register_public_challenge(&challenge);
     let response = door.public_door(&passport, &challenge).await;
     let passport_id = passport_artifact_id(&passport).test_unwrap();
     assert_refused(response, revoked(PARTNER, &passport_id)).await;
@@ -646,7 +645,6 @@ async fn a_public_challenge_that_expires_during_the_partner_sync_is_refused_and_
         BASE_UNIX_SECS - 10,
         BASE_UNIX_SECS + 10,
     );
-    door.register_public_challenge(&challenge);
 
     let response = door.public_door(&passport, &challenge).await;
     let (status, body) = response_parts(response).await;
@@ -654,7 +652,8 @@ async fn a_public_challenge_that_expires_during_the_partner_sync_is_refused_and_
     assert_eq!(door.sync.calls(), 1);
 
     door.clock.set(NOW_MS);
-    assert_admitted(door.public_door(&passport, &challenge).await).await;
+    let (_, retry) = response_parts(door.public_door(&passport, &challenge).await).await;
+    assert!(retry.contains("has already expired"), "{retry}");
 }
 
 #[tokio::test]
