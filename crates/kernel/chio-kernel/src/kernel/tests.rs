@@ -173,6 +173,8 @@ use support_tool_approval::bind_test_tool_approval;
 mod capability_liveness;
 #[path = "tests/capability_validation.rs"]
 mod capability_validation;
+#[path = "tests/decision_model_witness.rs"]
+mod decision_model_witness;
 #[path = "tests/guard_pipeline.rs"]
 mod guard_pipeline;
 #[path = "tests/hot_path_deadlines.rs"]
