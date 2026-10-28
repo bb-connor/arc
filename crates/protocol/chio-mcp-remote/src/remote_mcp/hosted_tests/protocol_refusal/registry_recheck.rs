@@ -239,3 +239,70 @@ async fn static_session_credential_survives_an_unrelated_provider_addition() -> 
     fixture.assert_accepted().await?;
     fixture.shutdown().await
 }
+
+#[tokio::test]
+async fn enterprise_session_refuses_operator_session_credentials() -> TestResult {
+    let keypair = Keypair::generate();
+    let http = fixture_configured(None, |directory, config| {
+        let path = directory.join("enterprise-providers.json");
+        write_record(&path, enabled_record())?;
+        config.enterprise_providers_file = Some(path);
+        config.auth_token = None;
+        config.auth_jwt_public_key = Some(keypair.public_key().to_hex());
+        config.auth_jwt_issuer = Some(ISSUER.to_string());
+        config.auth_jwt_audience = Some("chio-mcp".to_string());
+        Ok(())
+    })?;
+    let bearer = support::sign_jwt(
+        &keypair,
+        &json!({
+            "iss": ISSUER, "sub": "user-123", "aud": "chio-mcp",
+            "scope": "mcp:invoke", "tid": "tenant-123", "org_id": "org-789",
+            "exp": support::unix_now() + 300,
+        }),
+    );
+    let session = initialize_with_token(&http, &bearer).await?;
+    let Some(RemoteSessionEntry::Active(bound)) = http.state.sessions.lookup(&session).await else {
+        return Err("initialized session is not active".into());
+    };
+    let SessionAuthMethod::OAuthBearer {
+        enterprise_identity: Some(identity),
+        ..
+    } = &bound.auth_context.method
+    else {
+        return Err("enterprise fixture lacks an authenticated identity".into());
+    };
+    assert_eq!(
+        identity.provider_record_id.as_deref(),
+        Some("enterprise-login")
+    );
+    let response = request(&http, MCP_ENDPOINT_PATH, &bearer, Some(&session), PING).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let _ = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+
+    let issuance = request(
+        &http,
+        &format!("/admin/sessions/{session}/credential"),
+        "admin-fixture",
+        None,
+        br#"{"ttlSeconds":300,"allowedTools":["echo_json"]}"#,
+    )
+    .await?;
+    let redemption = request(
+        &http,
+        MCP_ENDPOINT_PATH,
+        "chio_session_v1_unknown",
+        Some(&session),
+        PING,
+    )
+    .await?;
+    for response in [issuance, redemption] {
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(response.into_body(), 16 * 1024).await?;
+        assert_eq!(&body[..], b"session credentials require static operator auth, a distinct admin token, and a shared hosted owner");
+    }
+    assert_eq!(http.calls.load(Ordering::SeqCst), 0);
+    http.state.sessions.shutdown_all_active().await?;
+    http.state.factory.shutdown_shared_upstream_owner()?;
+    Ok(())
+}
