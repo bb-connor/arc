@@ -248,7 +248,7 @@ impl SqliteBudgetStore {
     /// Instead this first computes the GLOBAL contiguous head H (the largest seq
     /// such that every global event_seq in `1..=H` is present with no hole) as a
     /// single gaps-and-islands run over the whole stream (NOT partitioned),
-    /// anchored at genesis (island 0). A hole caps H below it. Legacy
+    /// anchored at genesis (island 0). A hole caps H below it. Standalone
     /// NULL-authority events still occupy their global slot, so they count for
     /// contiguity (a present slot is not a gap) but are never reported as an ack.
     /// It then reports, per origin, `MAX(event_seq)` among that origin's events
@@ -317,7 +317,7 @@ impl SqliteBudgetStore {
         // Fast path (avoid rescanning the ledger after a gap):
         // the contiguous run can only advance when the very next slot (W+1) is
         // FILLED (a mutation event or a recorded abandoned seq). When a real hole
-        // sits at W+1 (data loss, or a legacy snapshot that lacks abandoned slots),
+        // sits at W+1,
         // the head is pinned at W forever, yet the window query below still computes
         // ROW_NUMBER() over the whole suffix `> W` on every status-path call. Probe
         // the single W+1 slot first (an indexed point lookup): if it is absent, the
