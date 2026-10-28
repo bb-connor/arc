@@ -33,6 +33,7 @@ const KERNEL_OWNED_FIELDS: [&str; 17] = [
 struct RuntimeFieldHook {
     runtime: serde_json::Value,
     allow: bool,
+    unknown_top_level_key: bool,
     released: Mutex<Vec<serde_json::Value>>,
 }
 
@@ -41,12 +42,17 @@ impl RuntimeFieldHook {
         StdArc::new(Self {
             runtime,
             allow,
+            unknown_top_level_key: false,
             released: Mutex::new(Vec::new()),
         })
     }
 
     fn metadata(&self) -> serde_json::Value {
-        serde_json::json!({ "chio_runtime": self.runtime })
+        let mut metadata = serde_json::json!({ "chio_runtime": self.runtime });
+        if self.unknown_top_level_key {
+            metadata["not_a_hook_key"] = serde_json::json!(true);
+        }
+        metadata
     }
 
     fn released(&self) -> Vec<serde_json::Value> {
@@ -94,10 +100,23 @@ impl RuntimeAdmissionHook for RuntimeFieldHook {
 }
 
 fn forging(field: &str, allow: bool) -> StdArc<RuntimeFieldHook> {
+    forging_runtime(field, allow, false)
+}
+
+fn forging_runtime(
+    field: &str,
+    allow: bool,
+    unknown_top_level_key: bool,
+) -> StdArc<RuntimeFieldHook> {
     let mut runtime = serde_json::Map::new();
     runtime.insert("admission_id".into(), serde_json::json!("hook-admission"));
     runtime.insert(field.into(), serde_json::json!("forged"));
-    RuntimeFieldHook::new(serde_json::Value::Object(runtime), allow)
+    StdArc::new(RuntimeFieldHook {
+        runtime: serde_json::Value::Object(runtime),
+        allow,
+        unknown_top_level_key,
+        released: Mutex::new(Vec::new()),
+    })
 }
 
 fn assert_kernel_owned_field_refused(
@@ -157,6 +176,21 @@ fn hook_deny_naming_a_kernel_owned_runtime_field_is_refused() {
             .evaluate_tool_call_blocking(&request)
             .expect("runtime admission denial");
         assert_kernel_owned_field_refused(response, &hook, &invocations, field);
+    }
+}
+
+#[test]
+fn unknown_top_level_key_does_not_carry_a_kernel_owned_runtime_field_into_the_denial() {
+    for allow in [true, false] {
+        for field in KERNEL_OWNED_FIELDS {
+            let (mut kernel, request, _context, invocations) = fixture();
+            let hook = forging_runtime(field, allow, true);
+            kernel.set_runtime_admission_hook(hook.clone());
+            let response = kernel
+                .evaluate_tool_call_blocking(&request)
+                .expect("runtime admission denial");
+            assert_kernel_owned_field_refused(response, &hook, &invocations, field);
+        }
     }
 }
 
