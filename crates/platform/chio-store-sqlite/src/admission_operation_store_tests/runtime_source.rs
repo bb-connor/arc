@@ -220,3 +220,56 @@ fn owner_fence_change_during_source_callback_refuses_destination_installation() 
     assert_eq!(source_count(&fixture.store), 0);
     assert_eq!(global_count(&fixture.store), before);
 }
+
+#[test]
+fn runtime_and_governed_authority_projection_coverage_and_pristine_are_independent(
+) -> Result<(), Box<dyn Error>> {
+    use crate::admission_operation_store::{
+        verify_governed_approval_authority_pristine,
+        verify_governed_approval_authority_projection_coverage, verify_runtime_source_pristine,
+        verify_runtime_source_projection_coverage,
+    };
+    use crate::serving_owner::SqliteServingOwnerError;
+
+    let fixture = fixture();
+    {
+        let connection = fixture.store.connection()?;
+        verify_runtime_source_pristine(&connection)?;
+        verify_governed_approval_authority_pristine(&connection)?;
+        verify_runtime_source_projection_coverage(&connection)?;
+        verify_governed_approval_authority_projection_coverage(&connection)?;
+    }
+    let source = Source::new(&fixture, Behavior::Normal);
+    install(&fixture, &source)?;
+    {
+        let connection = fixture.store.connection()?;
+        verify_governed_approval_authority_pristine(&connection)?;
+        verify_runtime_source_projection_coverage(&connection)?;
+        verify_governed_approval_authority_projection_coverage(&connection)?;
+        assert!(matches!(verify_runtime_source_pristine(&connection),
+            Err(SqliteServingOwnerError::Invalid(detail))
+            if detail == "runtime source qualification integrity: runtime source qualification state is not pristine"));
+    }
+    let approval_binding = chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1::new(
+        identifier("authority", "approval-authority"),
+        identifier("generation", "approval-generation"),
+    );
+    fixture.store.install_governed_approval_authority(
+        &approval_binding,
+        8,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    {
+        let connection = fixture.store.connection()?;
+        verify_runtime_source_projection_coverage(&connection)?;
+        verify_governed_approval_authority_projection_coverage(&connection)?;
+        verify_admission_operation_invariants(&connection)?;
+        assert!(
+            matches!(verify_governed_approval_authority_pristine(&connection),
+            Err(SqliteServingOwnerError::Invalid(detail))
+            if detail == "governed approval authority integrity: governed approval authority state is not pristine")
+        );
+    }
+    Ok(())
+}
