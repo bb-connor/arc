@@ -210,12 +210,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized runtime buyer review integration suite; capped to current size until split",
         max_lines=2_068,
     ),
-    "crates/kernel/chio-runtime-core/tests/runtime_admission.rs": allow(
-        "2027-01-31",
-        "runtime admission integration suite; capped to current size after swarm authority split",
-        max_lines=3_673,
-        max_fragments=1,
-    ),
     "crates/platform/chio-transaction-passport/tests/transaction_passport.rs": allow(
         "2026-12-31",
         "transaction passport integration suite with runtime-security and transparency-anchor review regressions; capped until split",
