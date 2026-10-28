@@ -43,7 +43,6 @@ pub struct MercuryPublicationProfile {
     pub schema: String,
     pub checkpoint_continuity: String,
     pub inclusion_proofs_required: bool,
-    pub checkpoint_signatures_required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub witness_record: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -64,7 +63,6 @@ impl MercuryPublicationProfile {
             schema: MERCURY_PUBLICATION_PROFILE_SCHEMA.to_string(),
             checkpoint_continuity: CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW.to_string(),
             inclusion_proofs_required: true,
-            checkpoint_signatures_required: true,
             witness_record: None,
             trust_anchor: None,
             rotation_material: None,
@@ -449,7 +447,7 @@ impl MercuryProofPackage {
                 },
                 MercuryVerificationStep {
                     name: "chio_bundle_integrity".to_string(),
-                    detail: "tool and child receipt self-signatures, required checkpoint signatures, inclusion proofs, and unsigned capability-lineage ID uniqueness checks passed".to_string(),
+                    detail: "tool and child receipt self-signatures, checkpoint signatures, inclusion proofs, and unsigned capability-lineage ID uniqueness checks passed".to_string(),
                 },
                 MercuryVerificationStep {
                     name: "kernel_authority".to_string(),
@@ -1288,11 +1286,6 @@ fn verify_trusted_checkpoint_requirements(
             ));
         }
     };
-    if !publication_profile.checkpoint_signatures_required {
-        return Err(MercuryContractError::Validation(
-            "trusted Mercury verification requires checkpoint_signatures_required=true".to_string(),
-        ));
-    }
     if !publication_profile.inclusion_proofs_required {
         return Err(MercuryContractError::Validation(
             "trusted Mercury verification requires inclusion_proofs_required=true".to_string(),
