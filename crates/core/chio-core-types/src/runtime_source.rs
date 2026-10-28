@@ -1,7 +1,7 @@
-//! Identity of independently sealed runtime replay sources.
+//! Identity of physically qualified runtime sources.
 
-pub const RUNTIME_REPLAY_SOURCE_SCHEMA: &str = "chio.runtime-replay-source-seal.v1";
-pub const RUNTIME_REPLAY_SOURCE_DOMAIN: &[u8] = b"chio.runtime-replay-source-seal.v1\0";
+pub const RUNTIME_SOURCE_QUALIFICATION_SCHEMA: &str = "chio.runtime-source-qualification.v1";
+pub const RUNTIME_SOURCE_QUALIFICATION_DOMAIN: &[u8] = b"chio.runtime-source-qualification.v1\0";
 
 #[cfg(test)]
 mod identity_fixture_tests {
@@ -13,8 +13,8 @@ mod identity_fixture_tests {
             "../../../../spec/fixtures/shared-security-identifiers.json"
         ))?;
         for identity in [
-            RUNTIME_REPLAY_SOURCE_DOMAIN,
-            RUNTIME_REPLAY_SOURCE_SCHEMA.as_bytes(),
+            RUNTIME_SOURCE_QUALIFICATION_DOMAIN,
+            RUNTIME_SOURCE_QUALIFICATION_SCHEMA.as_bytes(),
             crate::security_event::EVENT_EVIDENCE_HASH_DOMAIN,
             crate::security_event::EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN,
         ] {
