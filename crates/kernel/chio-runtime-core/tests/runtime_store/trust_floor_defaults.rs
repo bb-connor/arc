@@ -21,7 +21,7 @@ fn assert_unsupported(result: Result<(), ChioRuntimeError>) {
 #[test]
 fn admission_default_and_blanket_floor_adapter_fail_closed_without_writing(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let store = StoreWithoutTreatyContinuationSupport::default();
+    let store = ReadWriteOnlyStore::default();
     assert_unsupported(
         RuntimeAdmissionStore::validate_and_record_runtime_trust_floor(&store, entry(), None),
     );

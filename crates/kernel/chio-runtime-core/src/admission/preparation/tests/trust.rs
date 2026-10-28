@@ -1,6 +1,7 @@
+use super::super::{prepare_runtime_admission, RuntimeAdmissionPreparation};
+use crate::*;
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_runtime_core::*;
 
 fn profile() -> RuntimeAdmissionProfile {
     RuntimeAdmissionProfile {
@@ -120,63 +121,29 @@ impl RuntimeAdmissionStore for TrustFloorFailingAdmissionStore {
         &self,
         evidence_kind: &str,
         evidence_id: &str,
-    ) -> Result<Option<chio_runtime_core::TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
+    ) -> Result<Option<crate::TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
         self.inner
             .treaty_runtime_artifact(evidence_kind, evidence_id)
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner.consume_destructive_lease(lease_id, admission_id)
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner.release_destructive_lease(lease_id, admission_id)
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner
-            .consume_treaty_continuation(continuation_id, admission_id)
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner
-            .release_treaty_continuation(continuation_id, admission_id)
     }
 
     fn runtime_trust_floor(
         &self,
         verifier_id: &str,
         key_id: &str,
-    ) -> Result<Option<chio_runtime_core::RuntimeTrustFloorEntry>, ChioRuntimeError> {
+    ) -> Result<Option<crate::RuntimeTrustFloorEntry>, ChioRuntimeError> {
         RuntimeAdmissionStore::runtime_trust_floor(&self.inner, verifier_id, key_id)
     }
 
     fn record_runtime_trust_floor(
         &self,
-        entry: chio_runtime_core::RuntimeTrustFloorEntry,
+        entry: crate::RuntimeTrustFloorEntry,
     ) -> Result<(), ChioRuntimeError> {
         RuntimeAdmissionStore::record_runtime_trust_floor(&self.inner, entry)
     }
 
     fn validate_and_record_runtime_trust_floor(
         &self,
-        _entry: chio_runtime_core::RuntimeTrustFloorEntry,
+        _entry: crate::RuntimeTrustFloorEntry,
         _previous_hash_sha256: Option<&str>,
     ) -> Result<(), ChioRuntimeError> {
         Err(ChioRuntimeError::Store(
@@ -301,7 +268,7 @@ fn strict_runtime_trust_input_binds_bundle_and_signer() -> Result<(), Box<dyn st
     let signed_weights = SignedExportEnvelope::sign(weights, &verifier)?;
     let advisory = signed_query_report(advisory(0.10), &verifier)?;
 
-    let accepted = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let accepted = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-1",
@@ -313,6 +280,10 @@ fn strict_runtime_trust_input_binds_bundle_and_signer() -> Result<(), Box<dyn st
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_001_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
 
     assert!(accepted.accepted);
@@ -333,7 +304,7 @@ fn strict_runtime_trust_input_binds_profile_verifier() -> Result<(), Box<dyn std
     let mut mismatched_profile = profile();
     mismatched_profile.verifier_id = "did:chio:other-verifier".to_string();
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let rejected = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &mismatched_profile,
         store: &store,
         admission_id: "adm-live-1",
@@ -345,6 +316,10 @@ fn strict_runtime_trust_input_binds_profile_verifier() -> Result<(), Box<dyn std
         runtime_pheromone_policy: None,
         runtime_peer_weights: None,
         now_unix_ms: 1_800_000_001_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
 
     assert!(!rejected.accepted);
@@ -371,14 +346,14 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
     let runtime_advisory = signed_query_report(advisory(0.10), &verifier)?;
 
     {
-        let store = chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path)?;
+        let store = crate::JsonRuntimeAdmissionStore::open(&store_path)?;
         let mut bundle_v2 = bundle();
         bundle_v2.admission_id = "adm-live-v2".to_string();
         store.insert_bundle(bundle_v2)?;
         let v1 = trust_body(1, None);
-        let previous_hash = chio_runtime_core::runtime_verifier_trust_bundle_sha256(&v1)?;
+        let previous_hash = crate::runtime_verifier_trust_bundle_sha256(&v1)?;
         let signed_v2 = SignedExportEnvelope::sign(trust_body(2, Some(previous_hash)), &verifier)?;
-        let accepted = evaluate_runtime_admission(RuntimeAdmissionInput {
+        let accepted = prepare_runtime_admission(RuntimeAdmissionInput {
             profile: &profile(),
             store: &store,
             admission_id: "adm-live-v2",
@@ -390,17 +365,23 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
             runtime_pheromone_policy: Some(&signed_policy),
             runtime_peer_weights: Some(&signed_weights),
             now_unix_ms: 1_800_000_001_000,
+        })
+        .and_then(|preparation| match preparation {
+            RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+            RuntimeAdmissionPreparation::Prepared(prepared) => {
+                prepared.commit_operation_owned(&store)
+            }
         })?;
         assert!(accepted.accepted);
     }
 
-    let store = chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path)?;
+    let store = crate::JsonRuntimeAdmissionStore::open(&store_path)?;
     let mut bundle_v1 = bundle();
     bundle_v1.admission_id = "adm-live-v1".to_string();
     bundle_v1.lease_id = Some("lease-live-v1".to_string());
     store.insert_bundle(bundle_v1)?;
     let signed_v1 = SignedExportEnvelope::sign(trust_body(1, None), &verifier)?;
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let rejected = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-v1",
@@ -412,6 +393,10 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_002_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
 
     assert!(!rejected.accepted);
@@ -423,11 +408,11 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
+fn runtime_trust_floor_rejects_same_version_conflict_without_advancing_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let store_path = dir.path().join("runtime-store.json");
-    let store = chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path)?;
+    let store = crate::JsonRuntimeAdmissionStore::open(&store_path)?;
     let verifier = Keypair::generate();
     let weights = peer_weights();
     let signed_policy =
@@ -437,7 +422,7 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
     let signed_trust_v1 = SignedExportEnvelope::sign(trust_body(1, None), &verifier)?;
 
     store.insert_bundle(bundle())?;
-    let accepted = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let accepted = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-1",
@@ -449,6 +434,10 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_001_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
     assert!(accepted.accepted);
 
@@ -458,7 +447,7 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
     store.insert_bundle(conflict_bundle)?;
     let mut conflicting_trust = trust_body(1, None);
     conflicting_trust.revocation_checkpoint_sha256 = "e".repeat(64);
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let rejected = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-conflict",
@@ -470,6 +459,10 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_002_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
 
     assert!(!rejected.accepted);
@@ -478,7 +471,7 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
         Some("runtime_trust_same_version_mismatch")
     );
 
-    let replay_after_rejection = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let retry_after_rejection = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-conflict",
@@ -490,17 +483,17 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_burning_lease(
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_003_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
-    assert!(
-        replay_after_rejection.accepted,
-        "{replay_after_rejection:#?}"
-    );
+    assert!(retry_after_rejection.accepted, "{retry_after_rejection:#?}");
     Ok(())
 }
 
 #[test]
-fn runtime_trust_floor_store_error_releases_reserved_destructive_lease(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn runtime_trust_floor_commit_propagates_store_error() -> Result<(), Box<dyn std::error::Error>> {
     let store = TrustFloorFailingAdmissionStore::new();
     let verifier = Keypair::generate();
     let weights = peer_weights();
@@ -510,7 +503,7 @@ fn runtime_trust_floor_store_error_releases_reserved_destructive_lease(
     let runtime_advisory = signed_query_report(advisory(0.10), &verifier)?;
     store.insert_bundle(bundle())?;
 
-    let failed = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let failed = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-1",
@@ -522,13 +515,16 @@ fn runtime_trust_floor_store_error_releases_reserved_destructive_lease(
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_001_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     });
     match failed {
         Ok(report) => panic!("expected injected trust-floor store failure, got {report:#?}"),
         Err(error) => assert_eq!(error.code(), "runtime_admission_store"),
     }
 
-    store.consume_destructive_lease("lease-live-1", "lease-probe-after-failure")?;
     Ok(())
 }
 
@@ -546,21 +542,18 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
     let runtime_advisory = signed_query_report(advisory(0.10), &verifier)?;
 
     {
-        let admission_store = chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path)?;
-        let trust_floor_store =
-            chio_runtime_core::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
-        let layered_store = chio_runtime_core::LayeredRuntimeAdmissionStore::new(
-            &admission_store,
-            &trust_floor_store,
-        );
+        let admission_store = crate::JsonRuntimeAdmissionStore::open(&store_path)?;
+        let trust_floor_store = crate::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
+        let layered_store =
+            crate::LayeredRuntimeAdmissionStore::new(&admission_store, &trust_floor_store);
         let mut bundle_v2 = bundle();
         bundle_v2.admission_id = "adm-live-v2".to_string();
         admission_store.insert_bundle(bundle_v2)?;
 
         let v1 = trust_body(1, None);
-        let previous_hash = chio_runtime_core::runtime_verifier_trust_bundle_sha256(&v1)?;
+        let previous_hash = crate::runtime_verifier_trust_bundle_sha256(&v1)?;
         let signed_v2 = SignedExportEnvelope::sign(trust_body(2, Some(previous_hash)), &verifier)?;
-        let accepted = evaluate_runtime_admission(RuntimeAdmissionInput {
+        let accepted = prepare_runtime_admission(RuntimeAdmissionInput {
             profile: &profile(),
             store: &layered_store,
             admission_id: "adm-live-v2",
@@ -572,6 +565,12 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
             runtime_pheromone_policy: Some(&signed_policy),
             runtime_peer_weights: Some(&signed_weights),
             now_unix_ms: 1_800_000_001_000,
+        })
+        .and_then(|preparation| match preparation {
+            RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+            RuntimeAdmissionPreparation::Prepared(prepared) => {
+                prepared.commit_operation_owned(&layered_store)
+            }
         })?;
         assert!(accepted.accepted);
     }
@@ -600,17 +599,16 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
         Some(1)
     );
 
-    let admission_store = chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path)?;
-    let trust_floor_store =
-        chio_runtime_core::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
+    let admission_store = crate::JsonRuntimeAdmissionStore::open(&store_path)?;
+    let trust_floor_store = crate::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
     let layered_store =
-        chio_runtime_core::LayeredRuntimeAdmissionStore::new(&admission_store, &trust_floor_store);
+        crate::LayeredRuntimeAdmissionStore::new(&admission_store, &trust_floor_store);
     let mut bundle_v1 = bundle();
     bundle_v1.admission_id = "adm-live-v1".to_string();
     bundle_v1.lease_id = Some("lease-live-v1".to_string());
     admission_store.insert_bundle(bundle_v1)?;
     let signed_v1 = SignedExportEnvelope::sign(trust_body(1, None), &verifier)?;
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let rejected = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &layered_store,
         admission_id: "adm-live-v1",
@@ -622,6 +620,12 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
         runtime_pheromone_policy: Some(&signed_policy),
         runtime_peer_weights: Some(&signed_weights),
         now_unix_ms: 1_800_000_002_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&layered_store)
+        }
     })?;
 
     assert!(!rejected.accepted);
@@ -651,11 +655,11 @@ fn runtime_trust_floor_store_reads_existing_json_and_normalizes_on_write(
         }))? + "\n",
     )?;
 
-    let store = chio_runtime_core::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
+    let store = crate::JsonRuntimeTrustFloorStateStore::open(&trust_floor_path)?;
     assert!(store
         .runtime_trust_floor("did:chio:buyer-verifier", "verifier-key-1")?
         .is_some());
-    store.record_runtime_trust_floor(chio_runtime_core::RuntimeTrustFloorEntry {
+    store.record_runtime_trust_floor(crate::RuntimeTrustFloorEntry {
         verifier_id: "did:chio:buyer-verifier".to_string(),
         key_id: "verifier-key-1".to_string(),
         highest_version: 2,
@@ -709,7 +713,7 @@ fn strict_runtime_trust_input_rejects_bundle_hash_mismatch(
         status: "active".to_string(),
     }];
 
-    let rejected = evaluate_runtime_admission(RuntimeAdmissionInput {
+    let rejected = prepare_runtime_admission(RuntimeAdmissionInput {
         profile: &profile(),
         store: &store,
         admission_id: "adm-live-1",
@@ -721,6 +725,10 @@ fn strict_runtime_trust_input_rejects_bundle_hash_mismatch(
         runtime_pheromone_policy: None,
         runtime_peer_weights: None,
         now_unix_ms: 1_800_000_001_000,
+    })
+    .and_then(|preparation| match preparation {
+        RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
+        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
     })?;
 
     assert!(!rejected.accepted);
