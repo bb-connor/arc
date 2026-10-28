@@ -6,6 +6,9 @@ use std::sync::Mutex;
 #[path = "runtime_source/claims.rs"]
 mod claims;
 
+#[path = "runtime_source/requalification.rs"]
+mod requalification;
+
 const SOURCE_ID: &str = "runtime-source";
 const RUNTIME_ID: &str = "runtime-authority";
 
