@@ -988,7 +988,7 @@ fn import_parent(
         &upstream,
     )
     .test_unwrap();
-    let snapshot = chio_kernel::capability_lineage::CapabilitySnapshot {
+    let snapshot = chio_core::receipt::evidence::CapabilitySnapshot {
         capability_id: token.id.clone(),
         subject_key: token.subject.to_hex(),
         issuer_key: token.issuer.to_hex(),
@@ -998,7 +998,7 @@ fn import_parent(
         delegation_depth: 0,
         parent_capability_id: None,
         federated_parent_capability_id: None,
-        provenance: chio_kernel::capability_lineage::CapabilitySnapshotProvenance::SignedToken,
+        provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken,
         signed_capability: Some(token.clone()),
     };
     store
