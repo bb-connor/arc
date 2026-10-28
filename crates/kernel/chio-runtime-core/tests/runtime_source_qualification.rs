@@ -4,7 +4,9 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
-use chio_kernel::admission_operation::{AdmissionIdentifier, AdmissionOperationStore};
+use chio_kernel::admission_operation::{
+    AdmissionIdentifier, AdmissionOperationStore, RuntimeSourcePort,
+};
 use chio_runtime_core::{RuntimeAdmissionStore, SqliteRuntimeOrchestrationStore};
 use chio_store_sqlite::SqliteAuthorityStore;
 
@@ -28,35 +30,35 @@ fn fresh_operation_owned_source_qualification_has_no_retired_replay_namespace(
     let fence = authority.mutation_fence();
     let now = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     let runtime = AdmissionIdentifier::try_new("runtime", "fresh-runtime")?;
-    let expected = store.expect_runtime_replay_source(
+    let installed = store.install_runtime_source(
         &AdmissionIdentifier::try_new("source", "fresh-source")?,
         &runtime,
         &source,
         &fence,
         now,
     )?;
-    store.import_runtime_replay_source(
+    let repeated = store.install_runtime_source(
+        &AdmissionIdentifier::try_new("source", "fresh-source")?,
         &runtime,
-        expected.expectation_id(),
         &source,
         &fence,
         now,
     )?;
+    assert_eq!(installed, repeated);
     let binding =
-        RuntimeParticipantAuthorityBindingV1::new(runtime, expected.expectation_id().clone());
-    store.activate_runtime_replay_source(&binding, &source, &fence, now)?;
-    let qualified = store.load_runtime_participant_activation(&binding, &fence, now)?;
-    source.verify_operation_owned_replay_source(&qualified)?;
+        RuntimeParticipantAuthorityBindingV1::new(runtime, installed.qualification_id().clone());
+    let qualified = store.load_runtime_source_qualification(&binding, &fence, now)?;
+    source.verify_operation_owned_runtime_source(&qualified)?;
     assert_eq!(qualified.source_id(), "fresh-source");
     assert_eq!(qualified.runtime_authority_id(), "fresh-runtime");
     assert_eq!(qualified.destination_authority_id(), fence.store_uuid);
 
     let other = SqliteRuntimeOrchestrationStore::open(directory.path().join("other.sqlite3"))?;
     let error = other
-        .verify_operation_owned_replay_source(&qualified)
+        .verify_operation_owned_runtime_source(&qualified)
         .err()
         .ok_or("another physical source accepted the qualified binding")?;
-    assert_eq!(error.code(), "runtime_replay_source_invalid");
+    assert_eq!(error.code(), "runtime_source_qualification_invalid");
 
     let source_raw = rusqlite::Connection::open(&source_path)?;
     let retired_source_objects: i64 = source_raw.query_row(
@@ -77,5 +79,76 @@ fn fresh_operation_owned_source_qualification_has_no_retired_replay_namespace(
         |row| row.get(0),
     )?;
     assert_eq!(retired_destination_objects, 0);
+    Ok(())
+}
+
+#[test]
+fn unsupported_source_schema_refuses_without_adoption() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let valid_path = directory.path().join("valid.sqlite3");
+    drop(SqliteRuntimeOrchestrationStore::open(&valid_path)?);
+    drop(SqliteRuntimeOrchestrationStore::open(&valid_path)?);
+    for (name, sql) in [
+        ("retired", "CREATE TABLE runtime_consumed_leases (lease_id TEXT PRIMARY KEY, admission_id TEXT)"),
+        ("partial", "CREATE TABLE runtime_source_qualification (singleton INTEGER PRIMARY KEY, canonical_bytes BLOB)"),
+        ("unknown", "CREATE TABLE unexpected_state (value TEXT)"),
+    ] {
+        let path = directory.path().join(format!("{name}.sqlite3"));
+        let raw = rusqlite::Connection::open(&path)?;
+        raw.execute_batch(sql)?;
+        let before: i64 = raw.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
+        let error = SqliteRuntimeOrchestrationStore::open(&path)
+            .err().ok_or("unsupported runtime schema was adopted")?;
+        assert_eq!(error.code(), "runtime_store_schema_mismatch");
+        let after: i64 = raw.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
+        assert_eq!(before, after);
+        let version: i64 = raw.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        assert_eq!(version, 0);
+    }
+    Ok(())
+}
+
+#[test]
+fn source_qualification_reopen_and_physical_identity_are_bound(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("source.sqlite3");
+    let source_id = AdmissionIdentifier::try_new("source", "source")?;
+    let runtime_id = AdmissionIdentifier::try_new("runtime", "runtime")?;
+    let destination_id = AdmissionIdentifier::try_new("destination", "destination")?;
+    let source = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let qualified = source.qualify(&source_id, &runtime_id, &destination_id)?;
+    assert_eq!(
+        source.qualify(&source_id, &runtime_id, &destination_id)?,
+        qualified
+    );
+    source.verify_exact(&qualified)?;
+    drop(source);
+    let source = SqliteRuntimeOrchestrationStore::open(&path)?;
+    source.verify_exact(&qualified)?;
+    let other_destination = AdmissionIdentifier::try_new("destination", "other")?;
+    let error = source
+        .qualify(&source_id, &runtime_id, &other_destination)
+        .err()
+        .ok_or("source qualification changed destination")?;
+    assert_eq!(error, chio_kernel::admission_operation::AdmissionOperationStoreError::Invariant(
+        "runtime admission rejected: runtime_source_qualification_invalid: runtime source is bound to another qualification".into(),
+    ));
+    source.verify_exact(&qualified)?;
+    drop(source);
+    let copy = directory.path().join("copy.sqlite3");
+    std::fs::copy(&path, &copy)?;
+    let error = SqliteRuntimeOrchestrationStore::open(&copy)
+        .err()
+        .ok_or("copied source retained physical qualification")?;
+    assert_eq!(error.code(), "runtime_source_qualification_invalid");
+    let source = SqliteRuntimeOrchestrationStore::open(&path)?;
+    let link = directory.path().join("hardlink.sqlite3");
+    std::fs::hard_link(&path, &link)?;
+    let error = source
+        .verify_operation_owned_runtime_source(&qualified)
+        .err()
+        .ok_or("hard-linked source retained qualification")?;
+    assert_eq!(error.code(), "runtime_source_qualification_invalid");
     Ok(())
 }

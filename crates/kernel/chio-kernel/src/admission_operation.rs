@@ -30,6 +30,7 @@ mod remote_projection;
 mod retained_request;
 pub mod runtime_participant;
 pub mod runtime_replay;
+pub mod runtime_source;
 mod sequencer;
 mod state;
 mod store;
@@ -80,11 +81,8 @@ pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::{
     AdmittedReceiptMetadata, RetainedToolAdmissionRequestV1, ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS,
 };
-pub use runtime_replay::{
-    RuntimeReplayParticipantKind, RuntimeReplaySourceMarkerV1, RuntimeReplaySourcePort,
-    RuntimeReplaySourceSnapshotV1, MAX_RUNTIME_REPLAY_SOURCE_BYTES,
-    MAX_RUNTIME_REPLAY_SOURCE_MARKERS,
-};
+pub use runtime_replay::RuntimeReplayParticipantKind;
+pub use runtime_source::{RuntimeSourcePort, RuntimeSourceQualificationV1, MAX_RUNTIME_SOURCE_BYTES};
 pub use sequencer::*;
 pub use store::*;
 

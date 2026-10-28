@@ -598,13 +598,13 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.approval_recovery.release(reference)
     }
 
-    fn load_runtime_participant_activation(
+    fn load_runtime_source_qualification(
         &self,
         binding: &crate::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
     ) -> Result<
-        crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        crate::admission_operation::RuntimeSourceQualificationV1,
         AdmissionOperationStoreError,
     > {
         self.require_fence(fence)?;

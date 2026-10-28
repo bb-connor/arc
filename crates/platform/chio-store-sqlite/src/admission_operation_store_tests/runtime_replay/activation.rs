@@ -13,7 +13,7 @@ fn activation_requires_exact_imported_source_and_is_immutable() -> AnchoredTestR
         );
         assert!(fixture
             .store
-            .load_runtime_participant_activation(&binding, &fixture.fence, now_ms())
+            .load_runtime_source_qualification(&binding, &fixture.fence, now_ms())
             .is_err());
         assert!(fixture
             .store
@@ -22,7 +22,7 @@ fn activation_requires_exact_imported_source_and_is_immutable() -> AnchoredTestR
         import(&fixture, &source, &expected)?;
         assert!(fixture
             .store
-            .load_runtime_participant_activation(&binding, &fixture.fence, now_ms())
+            .load_runtime_source_qualification(&binding, &fixture.fence, now_ms())
             .is_err());
         let before = global_count(&fixture.store);
         let active = fixture.store.activate_runtime_replay_source(
@@ -37,7 +37,7 @@ fn activation_requires_exact_imported_source_and_is_immutable() -> AnchoredTestR
         assert_eq!(active.event_sequence(), 3);
         assert_eq!(global_count(&fixture.store), before + 1);
         assert_eq!(
-            &fixture.store.load_runtime_participant_activation(
+            &fixture.store.load_runtime_source_qualification(
                 &binding,
                 &fixture.fence,
                 now_ms()

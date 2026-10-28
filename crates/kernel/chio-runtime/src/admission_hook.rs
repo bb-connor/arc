@@ -164,7 +164,7 @@ where
     fn revalidate_reserved_operation(
         &self,
         context: &chio_kernel::RuntimeAdmissionContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
     ) -> Result<chio_kernel::RuntimeAdmissionDecision, chio_kernel::KernelError> {
         chio_kernel::RuntimeAdmissionHook::revalidate_reserved_operation(
@@ -207,7 +207,7 @@ where
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &chio_kernel::RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), chio_kernel::KernelError> {
         chio_kernel::RuntimeAdmissionHook::revalidate_operation_owned_before_dispatch(
             &self.core_hook(),
@@ -219,7 +219,7 @@ where
     fn revalidate_operation_owned_for_native_capture(
         &self,
         context: &chio_kernel::RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         intent: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimIntentV1,
     ) -> Result<
         chio_kernel::admission_operation::runtime_participant::RuntimeDispatchValidity,

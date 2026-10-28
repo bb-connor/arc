@@ -361,16 +361,16 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
     > {
         Self::load_governed_approval_claim_history(self, operation_id, fence, now)
     }
-    fn load_runtime_participant_activation(
+    fn load_runtime_source_qualification(
         &self,
         binding: &RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<
-        chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         AdmissionOperationStoreError,
     > {
-        self.load_activated_runtime_source(binding, fence, trusted_now_unix_ms)
+        self.load_qualified_runtime_source(binding, fence, trusted_now_unix_ms)
     }
 
     fn claim_runtime_participants(

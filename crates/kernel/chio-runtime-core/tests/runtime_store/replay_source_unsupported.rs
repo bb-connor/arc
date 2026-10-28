@@ -1,4 +1,4 @@
-use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeReplaySourcePort};
+use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeSourcePort};
 use chio_runtime_core::{
     RuntimeAdmissionStore, RuntimeReplaySourceBinding, SqliteRuntimeOrchestrationStore,
 };
@@ -21,7 +21,7 @@ fn unsupported_platform_rejects_sealing_without_retiring_legacy_replay(
         .ok_or("unsupported platform unexpectedly previewed a source identity")?;
     assert_eq!(preview_error.code(), "runtime_replay_source_invalid");
     assert!(preview_error.to_string().contains("requires Unix"));
-    let port: &dyn RuntimeReplaySourcePort = &store;
+    let port: &dyn RuntimeSourcePort = &store;
     assert!(port
         .preview(
             &AdmissionIdentifier::try_new("source_id", "source")?,

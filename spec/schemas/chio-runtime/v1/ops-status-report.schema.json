@@ -4,7 +4,7 @@
   "title": "Chio Runtime Ops Status Report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "accepted", "generatedAtUnixMs", "supervisorProfileSha256", "runCounts", "activeLeaseCount", "staleLeaseCount", "consumedLeaseCount", "evidenceSinkHealthy", "providerHealthy", "ready", "degraded", "checks"],
+  "required": ["schema", "accepted", "generatedAtUnixMs", "supervisorProfileSha256", "runCounts", "activeLeaseCount", "staleLeaseCount", "evidenceSinkHealthy", "providerHealthy", "ready", "degraded", "checks"],
   "allOf": [
     {
       "if": { "properties": { "accepted": { "const": false } }, "required": ["accepted"] },
@@ -24,7 +24,6 @@
     "runCounts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
     "activeLeaseCount": { "type": "integer", "minimum": 0 },
     "staleLeaseCount": { "type": "integer", "minimum": 0 },
-    "consumedLeaseCount": { "type": "integer", "minimum": 0 },
     "evidenceSinkHealthy": { "type": "boolean" },
     "providerHealthy": { "type": "boolean" },
     "ready": { "type": "boolean" },
