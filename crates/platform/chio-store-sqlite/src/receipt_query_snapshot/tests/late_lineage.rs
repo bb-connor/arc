@@ -745,3 +745,105 @@ fn a_late_lineage_row_the_canonical_reader_refuses_is_refused_for_archived_histo
     );
     service.shutdown();
 }
+
+fn captured_lineage_reinsert(malformed: bool, export_first: bool) {
+    use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportQuery};
+    use chio_kernel::ReceiptQuerySnapshotError;
+
+    let fixture = Fixture::new(4);
+    record_lineage(&fixture);
+    record_signed_lineage(&fixture, OTHER, &holder());
+    fixture.append(&spec(0, CAPABILITY, None));
+    fixture.append(&spec(2, OTHER, None));
+    fixture.flush();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            recertify_interval: Duration::from_secs(3_600),
+            invalid_retry_backoff: Duration::from_secs(600),
+            ..config()
+        },
+    );
+    service.pause_extension_for_test(true);
+    assert!(service.wait_for_paused_extension_for_test(Duration::from_secs(60)));
+    let query = EvidenceExportQuery::tenant_scoped("tenant-a");
+    let valid = service
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap();
+    assert_eq!(valid.0.tool_receipts.len(), 2);
+    assert_eq!(valid.0.capability_lineage.len(), 2);
+    let before = service.status().watermark.unwrap().observed_at_unix_ms;
+    let mut connection = rusqlite::Connection::open(&fixture.live).unwrap();
+    let transaction = connection.transaction().unwrap();
+    transaction
+        .execute_batch(
+            "CREATE TEMP TABLE reinsert_lineage AS SELECT * FROM capability_lineage;
+             DELETE FROM capability_lineage WHERE capability_id = 'cap-late';
+             INSERT INTO capability_lineage SELECT * FROM reinsert_lineage WHERE capability_id = 'cap-late';",
+        )
+        .unwrap();
+    if malformed {
+        assert_eq!(
+            transaction
+                .execute(
+                    "UPDATE capability_lineage SET grants_json = 'x' WHERE capability_id = ?1",
+                    [CAPABILITY],
+                )
+                .unwrap(),
+            1
+        );
+    }
+    transaction.commit().unwrap();
+    let assert_refusal = || {
+        let error = service
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap_err();
+        assert!(
+            matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::ExportRefused(reason))) if reason == "capability lineage row contains invalid metadata"),
+            "{error:?}"
+        );
+        assert_eq!(service.status().state, ReceiptQuerySnapshotState::Ready);
+    };
+    if export_first {
+        assert_refusal();
+    }
+    service.pause_extension_for_test(false);
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        let status = service.status();
+        if status.state != ReceiptQuerySnapshotState::Ready
+            || status
+                .watermark
+                .is_some_and(|watermark| watermark.observed_at_unix_ms > before)
+        {
+            break;
+        }
+        assert!(Instant::now() < deadline, "extension did not finish");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    if malformed {
+        assert_refusal();
+    } else {
+        let valid = service
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap();
+        assert_eq!(valid.0.tool_receipts.len(), 2);
+        assert_eq!(valid.0.capability_lineage.len(), 2);
+    }
+    service.shutdown();
+}
+
+#[test]
+fn captured_lineage_reinsert_export_first_keeps_request_refusal() {
+    captured_lineage_reinsert(true, true);
+}
+
+#[test]
+fn captured_lineage_reinsert_extension_first_keeps_request_refusal() {
+    captured_lineage_reinsert(true, false);
+}
+
+#[test]
+fn captured_lineage_reinsert_valid_control_keeps_export_readable() {
+    captured_lineage_reinsert(false, false);
+}

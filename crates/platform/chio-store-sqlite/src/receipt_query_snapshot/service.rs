@@ -1573,6 +1573,17 @@ impl ReceiptQuerySnapshots {
             .is_ok_and(|(owned, _)| owned.lineage_rowid >= rowid)
     }
 
+    pub(super) fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
+        let started = Instant::now();
+        while !self.inner.extension_parked.load(Ordering::SeqCst) {
+            if started.elapsed() >= timeout {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        true
+    }
+
     pub(super) fn invalidate_for_test(&self, reason: &str) {
         self.inner.invalidate(reason);
     }
