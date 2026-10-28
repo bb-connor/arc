@@ -499,7 +499,8 @@ impl ChioKernel {
             || receipt
                 .metadata
                 .as_ref()
-                .and_then(|value| value.pointer("/chio_runtime/identity_disposition"))
+                .and_then(|value| value.get("chio_runtime"))
+                .and_then(|runtime| runtime.get(crate::kernel::runtime_field::IDENTITY_DISPOSITION))
                 .and_then(serde_json::Value::as_str)
                 != Some("terminal")
             || receipt

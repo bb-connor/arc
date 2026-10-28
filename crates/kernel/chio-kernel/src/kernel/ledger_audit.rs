@@ -361,15 +361,15 @@ impl ChioKernel {
         let pairs = [
             (
                 "reserved_destructive_lease_id",
-                "retained_destructive_lease_id",
+                crate::kernel::runtime_field::RETAINED_DESTRUCTIVE_LEASE_ID,
             ),
             (
                 "reserved_treaty_continuation_id",
-                "retained_treaty_continuation_id",
+                crate::kernel::runtime_field::RETAINED_TREATY_CONTINUATION_ID,
             ),
             (
                 "reserved_swarm_continuation_id",
-                "retained_swarm_continuation_id",
+                crate::kernel::runtime_field::RETAINED_SWARM_CONTINUATION_ID,
             ),
         ];
         let mut had_reservation = false;
@@ -396,7 +396,7 @@ impl ChioKernel {
         }
         debug_assert_eq!(
             runtime
-                .get("reservations_retained_fail_closed")
+                .get(crate::kernel::runtime_field::RESERVATIONS_RETAINED_FAIL_CLOSED)
                 .and_then(serde_json::Value::as_bool),
             had_reservation.then_some(true),
             "runtime reservation retention marker drifted from retained ids"

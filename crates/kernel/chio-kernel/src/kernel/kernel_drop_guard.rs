@@ -372,17 +372,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 .unwrap_or_default();
             // A fault observes unfinished cleanup. The original operation still
             // owns any terminal decision, regardless of its current custody.
-            runtime.remove("identity_disposition");
+            runtime.remove(crate::kernel::runtime_field::IDENTITY_DISPOSITION);
             runtime.insert(
-                "pre_dispatch_cleanup_failed".into(),
+                crate::kernel::runtime_field::PRE_DISPATCH_CLEANUP_FAILED.into(),
                 serde_json::json!(true),
             );
             runtime.insert(
-                "pre_dispatch_cleanup_faults".into(),
+                crate::kernel::runtime_field::PRE_DISPATCH_CLEANUP_FAULTS.into(),
                 serde_json::json!(fault_entries),
             );
             runtime.insert(
-                "pre_dispatch_cleanup_reason".into(),
+                crate::kernel::runtime_field::PRE_DISPATCH_CLEANUP_REASON.into(),
                 serde_json::json!(PRE_DISPATCH_CLEANUP_FAULT_REASON),
             );
             metadata.insert("chio_runtime".into(), serde_json::Value::Object(runtime));

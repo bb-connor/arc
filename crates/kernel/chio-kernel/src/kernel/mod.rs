@@ -188,28 +188,51 @@ fn hook_metadata_names_forbidden_key(metadata: Option<&serde_json::Value>) -> bo
 const HOOK_KERNEL_OWNED_RUNTIME_FIELD_REFUSAL: &str =
     "runtime admission hook metadata names a kernel-owned chio_runtime field";
 
+/// Names of the `chio_runtime` fields only the kernel writes. Every kernel
+/// write site and [`KERNEL_OWNED_RUNTIME_FIELDS`] use these constants.
+pub(crate) mod runtime_field {
+    pub(crate) const RETAINED_DESTRUCTIVE_LEASE_ID: &str = "retained_destructive_lease_id";
+    pub(crate) const RETAINED_TREATY_CONTINUATION_ID: &str = "retained_treaty_continuation_id";
+    pub(crate) const RETAINED_SWARM_CONTINUATION_ID: &str = "retained_swarm_continuation_id";
+    pub(crate) const RESERVATIONS_RETAINED_FAIL_CLOSED: &str = "reservations_retained_fail_closed";
+    pub(crate) const RESERVATION_RETAINED: &str = "reservation_retained";
+    pub(crate) const IDENTITY_DISPOSITION: &str = "identity_disposition";
+    pub(crate) const RETRYABLE_AFTER_RESUME: &str = "retryable_after_resume";
+    pub(crate) const PRE_DISPATCH_CLEANUP_FAILED: &str = "pre_dispatch_cleanup_failed";
+    pub(crate) const PRE_DISPATCH_CLEANUP_FAULTS: &str = "pre_dispatch_cleanup_faults";
+    pub(crate) const PRE_DISPATCH_CLEANUP_REASON: &str = "pre_dispatch_cleanup_reason";
+    pub(crate) const POST_EFFECT_FAULT: &str = "post_effect_fault";
+    pub(crate) const EVALUATION_STARTED_AT: &str = "evaluation_started_at";
+    pub(crate) const PAYMENT_CREDENTIAL_DISPOSITION: &str = "payment_credential_disposition";
+    pub(crate) const DISPATCH_CREDENTIAL_DISPOSITION: &str = "dispatch_credential_disposition";
+    pub(crate) const DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN: &str =
+        "dispatch_credential_retention_outcome_unknown";
+    pub(crate) const PRE_DISPATCH_PAYMENT_UNWIND: &str = "pre_dispatch_payment_unwind";
+    pub(crate) const FEDERATION_TREATY_DSSE: &str = "federation_treaty_dsse";
+}
+
 /// `chio_runtime` fields only the kernel writes: reservation retention,
 /// identity disposition, cleanup and post-effect faults, payment credential
 /// disposition and verified treaty evidence. A hook decision naming one is
 /// refused, so a signed receipt never carries a hook-asserted kernel record.
 const KERNEL_OWNED_RUNTIME_FIELDS: [&str; 17] = [
-    "retained_destructive_lease_id",
-    "retained_treaty_continuation_id",
-    "retained_swarm_continuation_id",
-    "reservations_retained_fail_closed",
-    "reservation_retained",
-    "identity_disposition",
-    "retryable_after_resume",
-    "pre_dispatch_cleanup_failed",
-    "pre_dispatch_cleanup_faults",
-    "pre_dispatch_cleanup_reason",
-    "post_effect_fault",
-    "evaluation_started_at",
-    "payment_credential_disposition",
-    "dispatch_credential_disposition",
-    "dispatch_credential_retention_outcome_unknown",
-    "pre_dispatch_payment_unwind",
-    "federation_treaty_dsse",
+    runtime_field::RETAINED_DESTRUCTIVE_LEASE_ID,
+    runtime_field::RETAINED_TREATY_CONTINUATION_ID,
+    runtime_field::RETAINED_SWARM_CONTINUATION_ID,
+    runtime_field::RESERVATIONS_RETAINED_FAIL_CLOSED,
+    runtime_field::RESERVATION_RETAINED,
+    runtime_field::IDENTITY_DISPOSITION,
+    runtime_field::RETRYABLE_AFTER_RESUME,
+    runtime_field::PRE_DISPATCH_CLEANUP_FAILED,
+    runtime_field::PRE_DISPATCH_CLEANUP_FAULTS,
+    runtime_field::PRE_DISPATCH_CLEANUP_REASON,
+    runtime_field::POST_EFFECT_FAULT,
+    runtime_field::EVALUATION_STARTED_AT,
+    runtime_field::PAYMENT_CREDENTIAL_DISPOSITION,
+    runtime_field::DISPATCH_CREDENTIAL_DISPOSITION,
+    runtime_field::DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN,
+    runtime_field::PRE_DISPATCH_PAYMENT_UNWIND,
+    runtime_field::FEDERATION_TREATY_DSSE,
 ];
 
 /// The first kernel-owned field, in list order, that hook `chio_runtime`

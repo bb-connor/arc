@@ -327,9 +327,9 @@ impl ChioKernel {
             metadata,
             Some(serde_json::json!({
                 "chio_runtime": {
-                    "payment_credential_disposition": disposition,
-                    "dispatch_credential_disposition": disposition,
-                    "dispatch_credential_retention_outcome_unknown":
+                    (crate::kernel::runtime_field::PAYMENT_CREDENTIAL_DISPOSITION): disposition,
+                    (crate::kernel::runtime_field::DISPATCH_CREDENTIAL_DISPOSITION): disposition,
+                    (crate::kernel::runtime_field::DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN):
                         disposition == PaymentCredentialDisposition::RetentionOutcomeUnknown
                 }
             })),
@@ -691,7 +691,7 @@ impl ChioKernel {
                         metadata,
                         Some(serde_json::json!({
                             "chio_runtime": {
-                                "pre_dispatch_payment_unwind": evidence
+                                (crate::kernel::runtime_field::PRE_DISPATCH_PAYMENT_UNWIND): evidence
                             }
                         })),
                     ),
@@ -732,7 +732,7 @@ impl ChioKernel {
                 runtime_admission_metadata,
                 Some(serde_json::json!({
                     "chio_runtime": {
-                        "pre_dispatch_payment_unwind": evidence
+                        (crate::kernel::runtime_field::PRE_DISPATCH_PAYMENT_UNWIND): evidence
                     }
                 })),
             ),
