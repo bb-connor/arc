@@ -92,6 +92,9 @@ pub struct TrustServiceConfig {
     pub verifier_policies_file: Option<PathBuf>,
     pub verifier_challenge_db_path: Option<PathBuf>,
     pub passport_statuses_file: Option<PathBuf>,
+    /// Revocation partner registry. Every passport door re-reads it, and the
+    /// mirror of each partner's revocation feed sits beside it.
+    pub revocation_partners_file: Option<PathBuf>,
     pub passport_issuance_offers_file: Option<PathBuf>,
     pub certification_registry_file: Option<PathBuf>,
     pub certification_discovery_file: Option<PathBuf>,
@@ -350,6 +353,7 @@ mod service_config_tests {
             verifier_policies_file: None,
             verifier_challenge_db_path: None,
             passport_statuses_file: None,
+            revocation_partners_file: None,
             passport_issuance_offers_file: None,
             certification_registry_file: None,
             certification_discovery_file: None,

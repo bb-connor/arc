@@ -22,7 +22,7 @@ use chio_test_support::prelude::*;
 
 /// A fixed point in the trusted-clock range used as every request's `iat`
 /// anchor so the tests never read wall-clock time.
-const BASE_UNIX_SECS: u64 = 2_000_000_000;
+pub(super) const BASE_UNIX_SECS: u64 = 2_000_000_000;
 
 /// An injected clock that reports `base_secs` for its first `steps_before_jump`
 /// reads and `jumped_secs` for every read after. It models trusted time
@@ -115,7 +115,7 @@ fn answer(stream: &mut TcpStream, body: &str) {
     }
 }
 
-fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustServiceState {
+pub(super) fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustServiceState {
     TrustServiceState {
         finding_challenge_clock: clock,
         config,
@@ -127,6 +127,7 @@ fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustService
         budget_store: None,
         revocation_store: None,
         passport_revocation_oracle: None,
+        partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
         receipt_store: None,
         receipt_query_snapshots: None,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
@@ -157,7 +158,7 @@ fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustService
     }
 }
 
-fn config_with(
+pub(super) fn config_with(
     advertise_url: &str,
     seed_path: &std::path::Path,
     db_path: &std::path::Path,
@@ -184,6 +185,7 @@ fn config_with(
         verifier_policies_file: None,
         verifier_challenge_db_path: Some(db_path.to_path_buf()),
         passport_statuses_file: None,
+        revocation_partners_file: None,
         passport_issuance_offers_file: None,
         certification_registry_file: None,
         certification_discovery_file: None,
@@ -241,7 +243,7 @@ fn build_passport_until(
     build_agent_passport(&subject_did, vec![credential]).test_unwrap()
 }
 
-fn register_request(
+pub(super) fn register_request(
     config: &TrustServiceConfig,
     issuer_allowlist: Vec<String>,
     now: u64,
@@ -264,7 +266,7 @@ fn register_request(
     request
 }
 
-async fn response_parts(response: Response) -> (StatusCode, String) {
+pub(super) async fn response_parts(response: Response) -> (StatusCode, String) {
     let status = response.status();
     let body = to_bytes(response.into_body(), usize::MAX)
         .await

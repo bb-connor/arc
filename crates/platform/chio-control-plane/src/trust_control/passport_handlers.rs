@@ -689,18 +689,19 @@ pub(crate) async fn handle_create_passport_challenge(
     .into_response()
 }
 
+/// Verifies a challenge presentation at `now`. With an `admission`, the
+/// prepared partner door admits at the same instant and the challenge is then
+/// consumed; without one nothing is consumed.
 fn verify_passport_challenge_payload(
     state: &TrustServiceState,
     payload: &VerifyPassportChallengeRequest,
     expected_challenge: Option<&PassportPresentationChallenge>,
-    consume: bool,
+    now: u64,
+    admission: Option<(&PreparedPartnerDoor, u64)>,
 ) -> Result<PassportPresentationVerification, Response> {
-    let clock_now = unix_timestamp_now()
-        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
     if let Err(error) = configured_verifier_challenge_db_path(&state.config) {
         return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()));
     }
-    let now = clock_now;
     let challenge = expected_challenge.unwrap_or(&payload.presentation.challenge);
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
         state.config.verifier_policies_file.as_deref(),
@@ -762,7 +763,10 @@ fn verify_passport_challenge_payload(
         }
         Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
     }
-    if consume {
+    if let Some((door, now_unix_ms)) = admission {
+        if let Err(error) = door.admit(now_unix_ms) {
+            return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
+        }
         match consume_challenge_if_configured(&state.config, challenge, now) {
             Ok(replay_state) => verification.replay_state = replay_state,
             Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
@@ -784,11 +788,31 @@ pub(crate) async fn handle_verify_passport_challenge(
         Ok(None) => {}
         Err(response) => return response,
     }
+    let expected_challenge = payload.expected_challenge.as_ref();
+    let (now, _) = match acceptance_instant(&state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
+    if let Err(response) =
+        verify_passport_challenge_payload(&state, &payload, expected_challenge, now, None)
+    {
+        return response;
+    }
+    let binding = PartnerPassportBinding::Native(payload.presentation.passport.clone());
+    let door = match prepare_partner_door(&state, binding).await {
+        Ok(door) => door,
+        Err(response) => return response,
+    };
+    let (now, now_unix_ms) = match acceptance_instant(&state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
     match verify_passport_challenge_payload(
         &state,
         &payload,
-        payload.expected_challenge.as_ref(),
-        true,
+        expected_challenge,
+        now,
+        Some((&door, now_unix_ms)),
     ) {
         Ok(verification) => Json(verification).into_response(),
         Err(response) => response,
@@ -824,17 +848,13 @@ pub(crate) async fn handle_public_verify_passport_challenge(
     State(state): State<TrustServiceState>,
     Json(payload): Json<VerifyPassportChallengeRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     match forward_public_passport_challenge_to_leader(&state, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
     let lane = Arc::clone(&state.public_passport_challenge_lane);
-    verify_public_passport_challenge_in_lane(&lane, state, payload, clock_now).await
+    verify_public_passport_challenge_in_lane(&lane, state, payload).await
 }
 
 /// Verifies one public holder submission on the blocking pool under a permit
@@ -848,7 +868,6 @@ pub(super) async fn verify_public_passport_challenge_in_lane(
     lane: &Arc<tokio::sync::Semaphore>,
     state: TrustServiceState,
     payload: VerifyPassportChallengeRequest,
-    clock_now: u64,
 ) -> Response {
     let Ok(permit) = Arc::clone(lane).try_acquire_owned() else {
         return plain_http_error(
@@ -857,7 +876,7 @@ pub(super) async fn verify_public_passport_challenge_in_lane(
         );
     };
     tokio::task::spawn_blocking(move || {
-        let response = verify_public_passport_challenge(&state, &payload, clock_now);
+        let response = verify_public_passport_challenge(&state, &payload);
         drop(permit);
         response
     })
@@ -870,12 +889,12 @@ pub(super) async fn verify_public_passport_challenge_in_lane(
     })
 }
 
-/// Checks one public holder submission against its stored challenge and
-/// builds the response.
+/// Checks one public holder submission against its stored challenge, syncs
+/// the matched partner mirrors, then verifies, admits and consumes at one
+/// acceptance instant sampled after the sync.
 fn verify_public_passport_challenge(
     state: &TrustServiceState,
     payload: &VerifyPassportChallengeRequest,
-    clock_now: u64,
 ) -> Response {
     let challenge_id = match payload
         .presentation
@@ -901,27 +920,78 @@ fn verify_public_passport_challenge(
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let stored_challenge = match store.fetch_active(&challenge_id, clock_now) {
+    let (now, _) = match acceptance_instant(state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
+    let stored_challenge = match stored_public_challenge(&store, &challenge_id, payload, now) {
+        Ok(challenge) => challenge,
+        Err(response) => return response,
+    };
+    if let Err(response) =
+        verify_passport_challenge_payload(state, payload, Some(&stored_challenge), now, None)
+    {
+        return response;
+    }
+    let door = match state.partner_revocation_door.prepare(
+        &state.config,
+        Arc::clone(&state.finding_challenge_clock),
+        &PartnerPassportBinding::Native(payload.presentation.passport.clone()),
+    ) {
+        Ok(door) => door,
+        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    };
+    let (now, now_unix_ms) = match acceptance_instant(state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
+    let stored_challenge = match stored_public_challenge(&store, &challenge_id, payload, now) {
+        Ok(challenge) => challenge,
+        Err(response) => return response,
+    };
+    match verify_passport_challenge_payload(
+        state,
+        payload,
+        Some(&stored_challenge),
+        now,
+        Some((&door, now_unix_ms)),
+    ) {
+        Ok(verification) => Json(verification).into_response(),
+        Err(response) => response,
+    }
+}
+
+/// The stored challenge `challenge_id` while it is active at `now`, refused
+/// when the submission names a different expected challenge.
+fn stored_public_challenge(
+    store: &PassportVerifierChallengeStore,
+    challenge_id: &str,
+    payload: &VerifyPassportChallengeRequest,
+    now: u64,
+) -> Result<PassportPresentationChallenge, Response> {
+    let stored_challenge = match store.fetch_active(challenge_id, now) {
         Ok(challenge) => challenge,
         Err(error) if error.to_string().contains("not registered") => {
-            return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
+            return Err(plain_http_error(StatusCode::NOT_FOUND, &error.to_string()));
         }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error) => {
+            return Err(plain_http_error(
+                StatusCode::BAD_REQUEST,
+                &error.to_string(),
+            ))
+        }
     };
     if let Some(expected_challenge) = payload.expected_challenge.as_ref() {
         if canonical_json_bytes(expected_challenge).ok()
             != canonical_json_bytes(&stored_challenge).ok()
         {
-            return plain_http_error(
+            return Err(plain_http_error(
                 StatusCode::BAD_REQUEST,
                 "provided expected challenge does not match the stored verifier challenge",
-            );
+            ));
         }
     }
-    match verify_passport_challenge_payload(state, payload, Some(&stored_challenge), true) {
-        Ok(verification) => Json(verification).into_response(),
-        Err(response) => response,
-    }
+    Ok(stored_challenge)
 }
 
 pub(crate) async fn handle_create_oid4vp_request(
@@ -1238,6 +1308,14 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(verification) => verification,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     };
+    let binding = PartnerPassportBinding::Portable {
+        issuer: credential.issuer.clone(),
+        passport_id: verified.passport_id.clone(),
+    };
+    let partner_door = match prepare_partner_door(&state, binding).await {
+        Ok(door) => door,
+        Err(response) => return response,
+    };
     let lifecycle = match plan_oid4vp_passport_lifecycle(
         &state.config,
         &verified.passport_id,
@@ -1266,9 +1344,9 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     // that expired during either remote wait is refused even while the verifier
     // request is still live. The atomic consume then enforces request expiry
     // against the same time and records it as the consumption instant.
-    let accept_now = match clock_unix_secs(clock) {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    let (accept_now, accept_unix_ms) = match acceptance_instant(&state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
     };
     let mut verification = match verify_oid4vp_direct_post_response_with_any_issuer_key(
         &payload.response,
@@ -1279,6 +1357,26 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(verification) => verification,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     };
+    match recheck_oid4vp_passport_lifecycle(
+        &state.config,
+        &verified.passport_id,
+        verified.passport_status.as_ref(),
+        lifecycle,
+        verify_now,
+        accept_now,
+    ) {
+        Ok(Some(lifecycle)) if lifecycle.state != PassportLifecycleState::Active => {
+            return plain_http_error(
+                StatusCode::FORBIDDEN,
+                &passport_lifecycle_reason(&lifecycle),
+            );
+        }
+        Ok(_) => {}
+        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    }
+    if let Err(error) = partner_door.admit(accept_unix_ms) {
+        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+    }
     if let Err(error) = store.consume(&request, &request_jwt, accept_now) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
@@ -1298,10 +1396,6 @@ pub(crate) async fn handle_federated_issue(
     headers: HeaderMap,
     Json(payload): Json<FederatedIssueRequest>,
 ) -> Response {
-    let clock_now = match unix_timestamp_now() {
-        Ok(now) => now,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-    };
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
@@ -1318,7 +1412,24 @@ pub(crate) async fn handle_federated_issue(
             );
         }
     }
-    let now = clock_now;
+    let (first_seen, _) = match acceptance_instant(&state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
+    if let Err(error) =
+        chio_credentials::verify_agent_passport(&payload.presentation.passport, first_seen)
+    {
+        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+    }
+    let binding = PartnerPassportBinding::Native(payload.presentation.passport.clone());
+    let partner_door = match prepare_partner_door(&state, binding).await {
+        Ok(door) => door,
+        Err(response) => return response,
+    };
+    let (now, accept_unix_ms) = match acceptance_instant(&state) {
+        Ok(instant) => instant,
+        Err(response) => return response,
+    };
     if let Some(policy) = payload.delegation_policy.as_ref() {
         if let Err(error) = verify_federated_delegation_policy(policy)
             .and_then(|_| ensure_federated_delegation_policy_active(policy, now))
@@ -1432,6 +1543,59 @@ pub(crate) async fn handle_federated_issue(
             }
         }
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    }
+    let mut store =
+        if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
+            match state.receipt_store() {
+                Ok(store) => Some(store),
+                Err(response) => return response,
+            }
+        } else {
+            None
+        };
+    let upstream_parent = if let Some(upstream_capability_id) =
+        payload.upstream_capability_id.as_deref()
+    {
+        let Some(store) = store.as_ref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "multi-hop federated issuance requires --receipt-db so imported upstream evidence can be resolved",
+            );
+        };
+        match store.get_federated_share_for_capability(upstream_capability_id) {
+            Ok(Some((share, snapshot))) => {
+                if let Some(policy) = payload.delegation_policy.as_ref() {
+                    if share.signer_public_key != policy.body.signer_public_key.to_hex() {
+                        return plain_http_error(
+                            StatusCode::FORBIDDEN,
+                            "delegation policy signer must match the signer that shared the imported upstream evidence package",
+                        );
+                    }
+                }
+                if let Err(error) = ensure_requested_capability_within_parent_snapshot(
+                    &payload.capability,
+                    &snapshot,
+                    now,
+                ) {
+                    return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+                }
+                Some((share.share_id, snapshot))
+            }
+            Ok(None) => {
+                return plain_http_error(
+                    StatusCode::NOT_FOUND,
+                    "imported upstream capability was not found in the local federated evidence-share index",
+                );
+            }
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            }
+        }
+    } else {
+        None
+    };
+    if let Err(error) = partner_door.admit(accept_unix_ms) {
+        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
     match consume_challenge_if_configured(&state.config, &payload.expected_challenge, now) {
         Ok(replay_state) => verification.replay_state = replay_state,
@@ -1575,56 +1739,6 @@ pub(crate) async fn handle_federated_issue(
         }
         enterprise_audit = Some(audit);
     }
-    let mut store =
-        if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
-            match state.receipt_store() {
-                Ok(store) => Some(store),
-                Err(response) => return response,
-            }
-        } else {
-            None
-        };
-    let upstream_parent = if let Some(upstream_capability_id) =
-        payload.upstream_capability_id.as_deref()
-    {
-        let Some(store) = store.as_ref() else {
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "multi-hop federated issuance requires --receipt-db so imported upstream evidence can be resolved",
-            );
-        };
-        match store.get_federated_share_for_capability(upstream_capability_id) {
-            Ok(Some((share, snapshot))) => {
-                if let Some(policy) = payload.delegation_policy.as_ref() {
-                    if share.signer_public_key != policy.body.signer_public_key.to_hex() {
-                        return plain_http_error(
-                            StatusCode::FORBIDDEN,
-                            "delegation policy signer must match the signer that shared the imported upstream evidence package",
-                        );
-                    }
-                }
-                if let Err(error) = ensure_requested_capability_within_parent_snapshot(
-                    &payload.capability,
-                    &snapshot,
-                    now,
-                ) {
-                    return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
-                }
-                Some((share.share_id, snapshot))
-            }
-            Ok(None) => {
-                return plain_http_error(
-                    StatusCode::NOT_FOUND,
-                    "imported upstream capability was not found in the local federated evidence-share index",
-                );
-            }
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-            }
-        }
-    } else {
-        None
-    };
     let authority = if payload.delegation_policy.is_some() {
         load_capability_authority_with_deferred_lineage(&state)
     } else {
@@ -1755,6 +1869,14 @@ pub(crate) async fn handle_federated_issue(
 #[cfg(test)]
 #[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
 mod oid4vp_issuer_fetch_tests;
+
+#[cfg(test)]
+#[path = "passport_handlers/partner_revocation_door_tests.rs"]
+mod partner_revocation_door_tests;
+
+#[path = "passport_handlers/partner_door.rs"]
+mod partner_door;
+use partner_door::{acceptance_instant, prepare_partner_door};
 
 #[path = "passport_handlers/issuer_authority.rs"]
 mod issuer_authority;

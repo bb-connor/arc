@@ -105,6 +105,10 @@ pub(crate) enum TrustCommands {
         #[arg(long)]
         passport_statuses_file: Option<PathBuf>,
 
+        /// Optional revocation partner registry whose partners' revoked passports every passport door refuses.
+        #[arg(long)]
+        revocation_partners_file: Option<PathBuf>,
+
         /// Optional file-backed passport issuance registry for OID4VCI-style pre-authorized offers.
         #[arg(long)]
         passport_issuance_offers_file: Option<PathBuf>,
