@@ -250,7 +250,46 @@ fn expected_commerce_escrow(error: &chio_commerce_order::CommerceEscrowError) ->
         | E::ReservationSignatureInvalid
         | E::SettlementSignatureInvalid
         | E::ExecutionSignatureInvalid => INTEGRITY,
-        _ => REQUIRED,
+        E::AcceptStateNotAllowed(_)
+        | E::OfferOutsideValidityWindow
+        | E::OfferSelfIssued
+        | E::AcceptorNotSubject
+        | E::OfferLiabilityInvalid(_)
+        | E::LiabilityCurrencyMismatch
+        | E::LiabilityQuoteMismatch
+        | E::NoTrustedReservationAuthority
+        | E::ReservationSignerUntrusted
+        | E::ReservationIdEmpty
+        | E::ReservationUnbound(_)
+        | E::ReservationCurrencyMismatch
+        | E::ReservationUnderCollateralized
+        | E::DispatchFieldEmpty(_)
+        | E::DispatchStatusNotDispatched(_)
+        | E::DispatchIssuedAtInvalid
+        | E::SettlementSigningFailed(_)
+        | E::LedgerZeroAmount
+        | E::LedgerCustodyAccount(_)
+        | E::LedgerAccountsNotDistinct
+        | E::LedgerLegsNotCanonical
+        | E::LedgerNotLocked
+        | E::LedgerOrderBinding(_)
+        | E::LedgerMissing
+        | E::LedgerUnpinned
+        | E::LedgerPinnedBeforeAccept(_)
+        | E::LedgerStatusMismatch { .. }
+        | E::AcceptedContextUnbound
+        | E::NoTrustedSettlementAuthority
+        | E::SettlementSignerUntrusted
+        | E::SettlementPacketUnbound(_)
+        | E::ReleaseContextMismatch(_)
+        | E::ReleaseStateNotAllowed(_)
+        | E::NoTrustedExecutionAuthority
+        | E::ExecutionSignerUntrusted
+        | E::ExecutionInvalid(_)
+        | E::ExecutionActionNotRelease
+        | E::ExecutionNotMatched
+        | E::ExecutionUnbound(_)
+        | E::ExecutionAfterRelease(_) => REQUIRED,
     }
 }
 
