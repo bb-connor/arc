@@ -463,9 +463,15 @@ Caller revocation request, signed by `revoker_key`:
 
 #### 5.6.8 Tenant and subject tags, and verifier trust
 
-- Tags are keyed index values of the provider's tenant index key set
-  (`--tenant-index-keys <dir>`, 32-byte keys), under the HKDF purpose subkeys
-  of section 6: `tenant_tag = HMAC-SHA256(K[tenant-tag], "chio.tenant-tag.v1" || 0x00 || issuer || 0x00 || tenant_value)`,
+- The provider's tenant index key set (`--tenant-index-keys <dir>`) holds one
+  active generation and zero or more retired generations, each one 32-byte set
+  key. A generation is named by
+  `key_id = SHA-256("chio.tenant-index-key-id.v1" || 0x00 || set key)`. Each
+  purpose uses its own subkey, never the set key:
+  `K[label] = HKDF-SHA256(IKM = set key, salt = "chio.tenant-index.v1", info = "chio.tenant-index.v1" || "/" || label, L = 32)`.
+  The labels form a closed set: `tenant-binding`, `tenant-tag`,
+  `subject-tag`, `enterprise-subject` and `active-defense-digest`.
+- Tags are keyed index values under those subkeys: `tenant_tag = HMAC-SHA256(K[tenant-tag], "chio.tenant-tag.v1" || 0x00 || issuer || 0x00 || tenant_value)`,
   where `issuer` is the provider record's issuer and `tenant_value` is the
   claim named by the record's `subject_mapping.tenant_id_field`, and
   `subject_tag = HMAC-SHA256(K[subject-tag], "chio.subject-tag.v1" || 0x00 || issuer || 0x00 || subject)`.
@@ -617,7 +623,8 @@ Startup refusals. `serve-http` refuses to start when:
 - the kernel signer is ephemeral or missing;
 - any two of the exchange, kernel, policy and local authorization server keys
   are equal;
-- a seed file is readable by group or other, or not owned by the process user;
+- a seed file, credential file or tenant index key file is readable by group
+  or other, or not owned by the process user;
 - the tenant index key set has no active key, a key that is not 32 bytes or a
   duplicate `key_id`, or lacks a generation a stored tag or revocation entry
   references;
