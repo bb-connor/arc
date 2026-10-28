@@ -2345,9 +2345,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::claim_runtime_participants", "require_intent"]
-normalized_sha256 = "b5a5084520db24dd4c6e0d429117cb708c1f2017c4f87b6447343de7dbbc61c4"
+normalized_sha256 = "70a2a7b0f49a419c63d3e52b764049efe6f378748a9b54e85dd4b0f95e36f046"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::claim_runtime_participants", sha256 = "9635d0812900bbcbb2671816e79b6f3dee12302544959e6c4700f4f47789c6eb" },
+  { symbol = "SqliteAdmissionOperationStore::claim_runtime_participants", sha256 = "a25cfacfdb5418d03eb5f3396ee2edd00d0c4dd96b250eb002c0042d9b57e565" },
   { symbol = "require_intent", sha256 = "294591c49e6d1683f7d53b0dc15ef24d54266759bd79297f57ca936f6bc12398" },
 ]
 
