@@ -1,8 +1,10 @@
 use crate as runtime_api;
+use crate::InMemoryRuntimeAdmissionStore;
 use crate::{
     sign_runtime_admission_report, verify_signed_runtime_admission_report, RuntimeAdmissionInput,
     TreatyRuntimeArtifactRecord,
 };
+use chio_federation::bilateral_dsse::DsseEnvelope;
 #[path = "../support/runtime_admission.rs"]
 mod fixtures;
 use fixtures::*;
