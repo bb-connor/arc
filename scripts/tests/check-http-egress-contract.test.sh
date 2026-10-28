@@ -460,12 +460,104 @@ http_client_case ureq_mention crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
 pub fn noop() {}
 EOF
 
+http_client_case ureq_agent_rename crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_multiline_group crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{
+    AgentBuilder,
+};
+
+pub fn agent() -> ureq::Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case hyper_module_alias crates/chio-fake/src/lib.rs <<'EOF'
+use hyper_util::client as http;
+use hyper_util::rt::TokioExecutor;
+
+pub fn client() {
+    let _ = http::legacy::Client::builder(TokioExecutor::new());
+}
+EOF
+http_client_case ureq_cargo_rename crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+http_client = { package = "ureq", version = "2" }
+EOF
+http_client_case ureq_cargo_rename crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> http_client::Agent {
+    http_client::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_workspace_rename Cargo.toml <<'EOF'
+[workspace.dependencies]
+fetch = { package = "ureq", version = "2" }
+EOF
+http_client_case ureq_workspace_rename crates/chio-fake/src/lib.rs <<'EOF'
+pub fn publish(url: &str) {
+    let _ = fetch::post(url).send_string("{}");
+}
+EOF
+http_client_case unscanned_renamed_crate crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+fetcher = { package = "isahc", version = "1" }
+EOF
+http_client_case ureq_glob crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::*;
+
+pub fn agent() -> Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_self_rename crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{self as h};
+
+pub fn fetch(url: &str) {
+    let _ = h::get(url).call();
+}
+EOF
+http_client_case ureq_extern_crate crates/chio-fake/src/lib.rs <<'EOF'
+extern crate ureq as h;
+
+pub fn publish(url: &str) {
+    let _ = h::post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_rename_classified crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the
+    // endpoint the operator named.
+    Http::new()
+}
+EOF
+http_client_case ureq_type_only crates/chio-fake/src/lib.rs <<'EOF'
+pub struct Rail {
+    pub http: ureq::Agent,
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
     reject:ureq_kernel_classified reject:ureq_kernel_type_only reject:hyper_client \
     reject:unscanned_client_crate accept:ureq_classified accept:ureq_contract_owner \
-    accept:ureq_test_source accept:ureq_mention; do
+    accept:ureq_test_source accept:ureq_mention reject:ureq_agent_rename \
+    reject:ureq_multiline_group reject:hyper_module_alias reject:ureq_cargo_rename \
+    reject:ureq_workspace_rename reject:unscanned_renamed_crate reject:ureq_glob \
+    reject:ureq_self_rename reject:ureq_extern_crate accept:ureq_rename_classified \
+    accept:ureq_type_only; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
@@ -478,4 +570,4 @@ for expectation in \
     fi
 done
 
-echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients, any ureq in kernel crates, and unscanned HTTP client crates."
+echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients under renamed imports, aliases, globs and renamed dependencies, any ureq in kernel crates, and unscanned HTTP client crates."
