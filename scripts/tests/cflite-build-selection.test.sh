@@ -91,6 +91,32 @@ expect empty_selection_rejected 1 "" "names no targets"
 run_build non_file_selection_rejected dir
 expect non_file_selection_rejected 1 "" "is not a regular file"
 
+# Every build script, the target map and the scheduled matrix name the same
+# fuzz inventory.
+inventory_of_build() {
+    sed -n '/^TARGETS=(/,/^)/p' "$1" | grep -E '^[[:space:]]+[a-z0-9_]+$' | tr -d ' ' | sort
+}
+reference="$(sed -n 's/^\[targets\.\([a-z0-9_]*\)\]$/\1/p' "${ROOT}/fuzz/target-map.toml" | sort)"
+matrix="$(sed -n '/fuzz-scheduled:/,/steps:/p' "${ROOT}/.github/workflows/fuzz.yml" \
+    | sed -n 's/^ *- \([a-z0-9_]*\)$/\1/p' | sort)"
+cargo_bins="$(awk '/^\[\[bin\]\]/ { in_bin = 1; next }
+    in_bin && /^name = "/ { gsub(/^name = "|"$/, ""); print; in_bin = 0 }' \
+    "${ROOT}/fuzz/Cargo.toml" | sort)"
+for source in "${ROOT}/.clusterfuzzlite/build.sh" "${ROOT}/fuzz/oss-fuzz/build.sh" matrix cargo_bins; do
+    case "${source}" in
+        matrix) listed="${matrix}" ;;
+        cargo_bins) listed="${cargo_bins}" ;;
+        *) listed="$(inventory_of_build "${source}")" ;;
+    esac
+    if [[ "${listed}" != "${reference}" ]]; then
+        echo "FAIL inventory_matches_target_map: ${source#"${ROOT}/"}"
+        diff <(printf '%s\n' "${reference}") <(printf '%s\n' "${listed}") | sed 's/^/  /'
+        failures=$(( failures + 1 ))
+    else
+        echo "PASS inventory_matches_target_map: ${source#"${ROOT}/"}"
+    fi
+done
+
 if [[ "${failures}" -ne 0 ]]; then
     echo "${failures} cflite build selection case(s) failed"
     exit 1
