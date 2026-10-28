@@ -771,6 +771,19 @@ pub const KERNEL_RESUME_REFUSED: ErrorCodeSpec = ErrorCodeSpec {
     ],
 };
 
+pub const KERNEL_OUTPUT_WITHHELD: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:output-withheld",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Durable output is retained while the kernel is stopped.",
+    help: "After resume, retry the retained request with the same identity.",
+    string_code: "CHIO-KERNEL-OUTPUT-WITHHELD",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-process", "chio-control-plane"],
+};
+
 pub const KERNEL_INTERNAL_ERROR: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:internal-error",
     domain: Domain::Kernel,
@@ -4032,6 +4045,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_STOP_HEAD_MOVED,
     KERNEL_STOP_NOT_READY,
     KERNEL_RESUME_REFUSED,
+    KERNEL_OUTPUT_WITHHELD,
     KERNEL_INTERNAL_ERROR,
     KERNEL_RUNTIME_ADMISSION_READINESS_TIMEOUT,
     KERNEL_SESSION_NOT_INITIALIZED,

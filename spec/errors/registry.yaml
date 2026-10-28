@@ -742,6 +742,18 @@ codes:
       - chio-control-plane
       - chio-mcp-remote
       - chio-api-protect
+  - urn: "urn:chio:error:kernel:output-withheld"
+    domain: kernel
+    severity: error
+    summary: "Durable output is retained while the kernel is stopped."
+    help: "After resume, retry the retained request with the same identity."
+    string_code: "CHIO-KERNEL-OUTPUT-WITHHELD"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-process
+      - chio-control-plane
   - urn: "urn:chio:error:kernel:internal-error"
     domain: kernel
     severity: fatal

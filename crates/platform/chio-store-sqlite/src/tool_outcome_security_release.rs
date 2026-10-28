@@ -122,7 +122,18 @@ pub(super) fn verify_projection(
 pub(crate) fn require_terminal_release(
     connection: &Connection,
     operation: &AdmissionOperationV1,
+    authority_id: &str,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if matches!(
+        operation.state(),
+        chio_kernel::admission_operation::AdmissionOperationState::Finalizing
+            | chio_kernel::admission_operation::AdmissionOperationState::Completed
+    ) {
+        crate::admission_operation_store::stop_epoch::require_output_release(
+            connection,
+            authority_id,
+        )?;
+    }
     let verify = || -> Result<(), ToolOutcomeStoreError> {
         let Some(outcome) =
             load_outcome_connection(connection, operation.binding().operation_id().as_str())?

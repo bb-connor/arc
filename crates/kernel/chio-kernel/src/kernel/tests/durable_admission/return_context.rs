@@ -4,6 +4,9 @@ use crate::admission_operation::I_JSON_MAX_SAFE_INTEGER;
 #[path = "return_signing.rs"]
 mod signing;
 
+#[path = "stop_output.rs"]
+mod stop_output;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 pub(super) fn substitute_captured_participant(

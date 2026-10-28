@@ -16,12 +16,19 @@ impl ChioKernel {
             request_id: AdmissionIdentifier::try_new("request_id", request_id)?,
         };
         let _mutation_guard = runtime.lock_mutations()?;
-        if runtime
+        if let Some(operation) = runtime
             .store
             .load_by_replay_key(&key)
             .map_err(durable_store_error)?
-            .is_some()
         {
+            if self.is_emergency_stopped()
+                && matches!(
+                    operation.state(),
+                    AdmissionOperationState::Finalizing | AdmissionOperationState::Completed
+                )
+            {
+                return Err(KernelError::OutputWithheld);
+            }
             return Err(KernelError::DurableAdmission(
                 "request identity is already owned by a durable operation".into(),
             ));

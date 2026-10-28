@@ -359,6 +359,7 @@ fn withhold_output(mut result: Value) -> Option<Value> {
 
 fn error_code(error: &ProcessError) -> &'static str {
     match error {
+        ProcessError::Kernel(chio_kernel::KernelError::OutputWithheld) => "output_withheld",
         ProcessError::Unauthenticated => "unauthenticated",
         ProcessError::Invalid(_) | ProcessError::Json(_) => "invalid_request",
         ProcessError::Cancelled(_) => "cancelled",

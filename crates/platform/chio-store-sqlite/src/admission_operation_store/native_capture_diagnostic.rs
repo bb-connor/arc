@@ -81,6 +81,7 @@ impl NativeCaptureStage {
 
 #[derive(Clone, Copy)]
 enum Category {
+    OutputWithheld,
     Fenced,
     OutcomeUnknown,
     Invariant,
@@ -96,6 +97,7 @@ enum Category {
 impl Category {
     fn token(self) -> &'static str {
         match self {
+            Self::OutputWithheld => "output_withheld",
             Self::Fenced => "fenced",
             Self::OutcomeUnknown => "outcome_unknown",
             Self::Invariant => "invariant",
@@ -125,6 +127,7 @@ impl Category {
 
     fn admission(error: &AdmissionOperationStoreError) -> Self {
         match error {
+            AdmissionOperationStoreError::KernelStopped => Self::OutputWithheld,
             AdmissionOperationStoreError::Fenced => Self::Fenced,
             AdmissionOperationStoreError::OutcomeUnknown(_) => Self::OutcomeUnknown,
             AdmissionOperationStoreError::Invariant(_) => Self::Invariant,
