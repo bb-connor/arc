@@ -427,3 +427,69 @@ fn migration_command_writes_one_canonical_report_after_full_verification() {
     assert_eq!(value["schema"], SHADOW_MIGRATION_REPORT_SCHEMA);
     assert_eq!(value["shadow_metrics"].as_array().map(Vec::len), Some(9));
 }
+
+fn input_bytes_with(signer: &Keypair, field: &str) -> Vec<u8> {
+    let mut value = serde_json::to_value(base_input(signer)).test_expect("input value");
+    value
+        .as_object_mut()
+        .test_expect("input object")
+        .insert(field.to_string(), serde_json::json!([]));
+    chio_core::canonical_json_bytes(&value).test_expect("canonical input")
+}
+
+#[test]
+fn input_refuses_backfill_receipts_and_receipt_keys() {
+    let signer = key(11);
+    for field in ["backfill_receipts", "receipt_public_keys"] {
+        let expected = format!(
+            "unknown field `{field}`, expected one of `schema`, `manifest_public_keys`, `manifests`, `backfill_targets`, `shadow_observations`"
+        );
+        let result = parse_shadow_migration_input(&input_bytes_with(&signer, field));
+        assert!(
+            matches!(&result,
+                Err(ShadowMigrationError::Input(chio_core::canonical::UntrustedJsonError::Decode(error)))
+                    if error.to_string() == expected),
+            "{field}: {result:?}"
+        );
+    }
+}
+
+#[test]
+fn every_backfill_target_is_assigned_top_with_no_evidence_fields() {
+    let mut input = base_input(&key(12));
+    input.backfill_targets = vec![BackfillTarget {
+        tenant_id: "tenant.one".to_string(),
+        principal_id: "principal.one".to_string(),
+        lineage_id: "lineage.one".to_string(),
+        session_id: "session.pre-enablement".to_string(),
+        isolation_epoch_id: "epoch.one".to_string(),
+    }];
+
+    let report = build_shadow_migration_report(input).test_expect("backfill report");
+    let value = serde_json::to_value(&report).test_expect("report value");
+    assert!(value.get("verified_receipts").is_none(), "{value}");
+    let top = serde_json::to_value(InformationLabel::Top).test_expect("top label");
+    assert_eq!(
+        value["backfill"],
+        serde_json::json!({
+            "principals": [{
+                "tenant_id": "tenant.one",
+                "principal_id": "principal.one",
+                "label": top,
+            }],
+            "lineages": [{
+                "tenant_id": "tenant.one",
+                "lineage_id": "lineage.one",
+                "label": top,
+            }],
+            "sessions": [{
+                "tenant_id": "tenant.one",
+                "principal_id": "principal.one",
+                "lineage_id": "lineage.one",
+                "session_id": "session.pre-enablement",
+                "isolation_epoch_id": "epoch.one",
+                "label": top,
+            }],
+        })
+    );
+}

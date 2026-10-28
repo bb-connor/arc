@@ -261,6 +261,17 @@ fn unknown_metadata_key_is_refused() {
 }
 
 #[test]
+fn active_defense_backfill_key_is_unregistered() {
+    assert!(metadata_key_spec("active_defense_backfill_v1").is_none());
+    let error = check_internal_receipt_metadata(&json!({ "active_defense_backfill_v1": {} }))
+        .expect_err("the retired backfill key must refuse");
+    assert_eq!(
+        error.to_string(),
+        "canonical JSON error: receipt metadata key \"active_defense_backfill_v1\" is not registered"
+    );
+}
+
+#[test]
 fn unsafe_and_caller_keys_are_refused_in_internal_metadata() {
     for spec in RECEIPT_METADATA_KEYS {
         let result = check_internal_receipt_metadata(&json!({ spec.key: {} }));
