@@ -64,6 +64,52 @@ pub(super) fn post_form_url<T: DeserializeOwned>(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+
+    fn read_request_head(stream: &mut TcpStream) -> String {
+        let mut head = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !head.ends_with(b"\r\n\r\n") && stream.read(&mut byte).unwrap_or(0) == 1 {
+            head.push(byte[0]);
+        }
+        String::from_utf8_lossy(&head).into_owned()
+    }
+
+    #[test]
+    fn redirect_to_a_second_authority_is_not_followed() {
+        let second = TcpListener::bind("127.0.0.1:0").unwrap();
+        let second_address = second.local_addr().unwrap();
+        let second_server = std::thread::spawn(move || {
+            let (mut stream, _) = second.accept().unwrap();
+            let head = read_request_head(&mut stream);
+            let _ = stream.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+            );
+            head.starts_with("GET /document ")
+        });
+        let first = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/document", first.local_addr().unwrap());
+        let first_server = std::thread::spawn(move || {
+            let (mut stream, _) = first.accept().unwrap();
+            read_request_head(&mut stream);
+            let reply = format!(
+                "HTTP/1.1 302 Found\r\nLocation: http://{second_address}/document\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let _ = stream.write_all(reply.as_bytes());
+        });
+
+        let outcome = fetch_json_url::<serde_json::Value>(&url);
+        first_server.join().unwrap();
+        let _ = TcpStream::connect(second_address)
+            .and_then(|mut probe| probe.write_all(b"GET /probe HTTP/1.1\r\n\r\n"));
+        assert!(
+            !second_server.join().unwrap(),
+            "the passport document fetch followed a redirect to a second authority"
+        );
+        assert!(outcome.is_err());
+    }
+
     #[test]
     fn remote_document_limits_and_original_duplicate_rejection() {
         let response = ureq::Response::new(200, "OK", r#"{"rule":1,"rule":2}"#).unwrap();
