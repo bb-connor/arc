@@ -7,6 +7,13 @@
 //! `{ x402Version, paymentPayload, paymentRequirements }` before the tool runs,
 //! so every authorization is a final prepayment.
 //!
+//! Before contacting the facilitator the adapter checks the EIP-3009 validity
+//! window against its injected trusted clock and refuses an authorization key
+//! (network, asset, payer, nonce) its durable replay store already holds. The
+//! key is reserved after `/verify` and before `/settle`, the first call that
+//! can broadcast, so a verification refusal leaves the nonce unspent and a
+//! settlement of any outcome consumes it.
+//!
 //! The adapter holds no keys and never broadcasts. It has no rail status
 //! query: `settlement_state` answers `Unavailable`, so a settlement whose
 //! acknowledgement was lost ends in `ReconcileFailed` and a dead letter for the
@@ -14,9 +21,11 @@
 //! carries the broadcast transaction so the operator can reconcile on chain.
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256};
+use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -25,6 +34,7 @@ use super::{
     PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
     X402SettlementRef,
 };
+use crate::execution_nonce::ExecutionNonceStore;
 
 /// x402 protocol version this adapter speaks.
 pub const X402_VERSION: u8 = 2;
@@ -71,6 +81,14 @@ pub enum X402Refusal {
     OutlivesAuthority,
     #[error("x402 authority expiry is unknown")]
     AuthorityExpiryMissing,
+    /// EIP-3009 accepts an authorization only once `now > validAfter`.
+    #[error("x402 authorization is not valid until after {valid_after} (now {now})")]
+    NotYetValid { now: u64, valid_after: u64 },
+    /// EIP-3009 refuses an authorization once `now >= validBefore`.
+    #[error("x402 authorization expired at {valid_before} (now {now})")]
+    Expired { now: u64, valid_before: u64 },
+    #[error("x402 authorization nonce was already used")]
+    NonceReused,
     #[error("x402 facilitator rejected the payment")]
     VerifyRejected,
     #[error("x402 facilitator verification failed")]
@@ -308,6 +326,8 @@ pub struct X402PaymentAdapter {
     rail: X402RailConfig,
     bearer_token: Option<String>,
     http: ureq::Agent,
+    clock: Arc<dyn Clock>,
+    replay: Arc<dyn ExecutionNonceStore>,
 }
 
 impl fmt::Debug for X402PaymentAdapter {
@@ -326,10 +346,15 @@ impl fmt::Debug for X402PaymentAdapter {
 
 impl X402PaymentAdapter {
     /// Refuses a facilitator URL that is not `https` (or `http` on loopback),
-    /// or that carries credentials, a query or a fragment.
+    /// or that carries credentials, a query or a fragment. `clock` is the
+    /// trusted time the validity window is checked against; `replay` holds
+    /// each accepted authorization key until its `validBefore` and must be
+    /// durable for single use to survive a restart.
     pub fn new(
         facilitator_url: impl Into<String>,
         rail: X402RailConfig,
+        clock: Arc<dyn Clock>,
+        replay: Arc<dyn ExecutionNonceStore>,
     ) -> Result<Self, PaymentError> {
         let facilitator_url = facilitator_url.into().trim_end_matches('/').to_string();
         validate_payment_endpoint(&facilitator_url, X402_VERIFY_PATH, None)?;
@@ -338,6 +363,8 @@ impl X402PaymentAdapter {
             rail,
             bearer_token: None,
             http: build_http_agent(Duration::from_secs(5)),
+            clock,
+            replay,
         })
     }
 

@@ -2,10 +2,14 @@
 //! http variants delegate to an external facilitator. No custody or broadcast
 //! variant is exposed (custody-neutral).
 
+use std::sync::Arc;
+
 use chio_kernel::payment::SimPaymentAdapter;
 use chio_kernel::{
     AcpPaymentAdapter, PaymentAdapter, X402Network, X402PaymentAdapter, X402RailConfig,
+    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
 };
+use chio_store_sqlite::SqliteExecutionNonceStore;
 
 #[derive(Debug, Clone)]
 pub enum PaymentAdapterConfig {
@@ -35,9 +39,12 @@ impl PaymentAdapterConfig {
     /// `CHIO_PAYMENT_X402_NETWORK` (CAIP-2, testnet allowlist only),
     /// `CHIO_PAYMENT_X402_ASSET` (EIP-3009 token contract),
     /// `CHIO_PAYMENT_X402_TOKEN_SYMBOL` (the charge currency on this rail),
-    /// `CHIO_PAYMENT_X402_TOKEN_DECIMALS` (ERC-20 `decimals`), and
-    /// `CHIO_PAYMENT_X402_PAY_TO` (payee address). The facilitator URL and the
-    /// rail are validated here, at load.
+    /// `CHIO_PAYMENT_X402_TOKEN_DECIMALS` (ERC-20 `decimals`),
+    /// `CHIO_PAYMENT_X402_PAY_TO` (payee address), and
+    /// `CHIO_PAYMENT_X402_REPLAY_DB` (SQLite path of the durable store that
+    /// holds each accepted EIP-3009 authorization for single use). The
+    /// facilitator URL, the rail and the replay store are validated here, at
+    /// load.
     ///
     /// Returns `Ok(None)` when `CHIO_PAYMENT_ADAPTER` is absent or set to `sim`
     /// (the caller then uses the documented default). Returns `Err` when the
@@ -70,8 +77,16 @@ impl PaymentAdapterConfig {
                     &required("CHIO_PAYMENT_X402_PAY_TO")?,
                 )
                 .map_err(|error| format!("http-x402 rail: {error}"))?;
-                let mut adapter = X402PaymentAdapter::new(base_url, rail)
-                    .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
+                let clock = crate::input::time::clock();
+                let replay = SqliteExecutionNonceStore::open_with_clock(
+                    required("CHIO_PAYMENT_X402_REPLAY_DB")?,
+                    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
+                    clock.clone(),
+                )
+                .map_err(|error| format!("CHIO_PAYMENT_X402_REPLAY_DB: {error}"))?;
+                let mut adapter =
+                    X402PaymentAdapter::new(base_url, rail, clock, Arc::new(replay))
+                        .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token);
                 }
@@ -162,7 +177,13 @@ mod tests {
         )
         .test_unwrap();
         let cfg = PaymentAdapterConfig::HttpX402 {
-            adapter: X402PaymentAdapter::new("https://facilitator.example", rail).test_unwrap(),
+            adapter: X402PaymentAdapter::new(
+                "https://facilitator.example",
+                rail,
+                crate::input::time::clock(),
+                Arc::new(chio_kernel::InMemoryExecutionNonceStore::default()),
+            )
+            .test_unwrap(),
         };
         cfg.validate().test_unwrap();
         assert_eq!(cfg.build_adapter().rail_id(), "x402");

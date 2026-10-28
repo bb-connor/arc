@@ -1579,6 +1579,8 @@ mod tests {
                 "0x2000000000000000000000000000000000000002",
             )
             .expect("valid rail"),
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(0)),
+            std::sync::Arc::new(crate::InMemoryExecutionNonceStore::default()),
         )
         .expect("valid facilitator")
         .with_bearer_token("x402-secret");
