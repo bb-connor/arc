@@ -201,6 +201,7 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          SELF_KEY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           source scripts/structural-gates.sh
           run_gate bash scripts/tests/run-structural-gates.test.sh
@@ -320,6 +321,8 @@ jobs:
           run_gate bash scripts/tests/check-accounting-arithmetic.test.sh
           run_gate python3 scripts/check-domain-separation.py
           run_gate bash scripts/tests/check-domain-separation.test.sh
+          run_gate python3 scripts/check-self-key-verify.py --base "$SELF_KEY_BASE_SHA"
+          run_gate python3 scripts/tests/check-self-key-verify.test.py
           run_gate python3 scripts/check-security-clocks.py
           run_gate python3 scripts/tests/check-security-clocks.test.py
           run_gate python3 scripts/check-escape-hatches.py

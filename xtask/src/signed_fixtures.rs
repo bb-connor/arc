@@ -1031,7 +1031,8 @@ fn check_coverage(root: &Path) -> Result<(), XtaskError> {
             signed.push(relative);
         }
     }
-    let problems = coverage_problems(&signed);
+    let mut problems = registry_problems();
+    problems.extend(coverage_problems(&signed));
     if problems.is_empty() {
         println!(
             "signed-fixtures: {} signed files each have one owner",
@@ -1044,6 +1045,34 @@ fn check_coverage(root: &Path) -> Result<(), XtaskError> {
             problems.join("; ")
         )))
     }
+}
+
+/// Closed entries must state why no generator owns them, and every embedded
+/// placeholder must sit in exactly one step-owned file with its cases and
+/// fail-closed test named.
+fn registry_problems() -> Vec<String> {
+    let mut problems = Vec::new();
+    for entry in CLOSED_SETS {
+        if entry.reason.trim().is_empty() {
+            problems.push(format!("closed `{}` has no reason", entry.pattern));
+        }
+    }
+    for entry in EMBEDDED_PLACEHOLDERS {
+        let found = owners(entry.path);
+        if found.len() != 1 || !found[0].starts_with("step ") {
+            problems.push(format!(
+                "placeholder `{}` must have one step owner: {found:?}",
+                entry.path
+            ));
+        }
+        if entry.cases.trim().is_empty() || entry.fail_closed_test.trim().is_empty() {
+            problems.push(format!(
+                "placeholder `{}` must name its cases and fail-closed test",
+                entry.path
+            ));
+        }
+    }
+    problems
 }
 
 fn in_coverage_scope(path: &str) -> bool {
@@ -1317,7 +1346,6 @@ mod tests {
     #[test]
     fn closed_entries_carry_their_kind_evidence() {
         for entry in CLOSED_SETS {
-            assert!(!entry.reason.trim().is_empty(), "{}", entry.pattern);
             let evidence: Vec<&str> = match entry.kind {
                 ClosedKind::Placeholder { fail_closed_test } => vec![fail_closed_test],
                 ClosedKind::HashPinned {
@@ -1401,13 +1429,8 @@ mod tests {
     }
 
     #[test]
-    fn embedded_placeholders_live_in_step_owned_files() {
-        for entry in EMBEDDED_PLACEHOLDERS {
-            let found = owners(entry.path);
-            assert_eq!(found.len(), 1, "{}: {found:?}", entry.path);
-            assert!(found[0].starts_with("step "), "{}: {found:?}", entry.path);
-            assert!(!entry.cases.trim().is_empty() && !entry.fail_closed_test.trim().is_empty());
-        }
+    fn closed_and_placeholder_registries_are_complete() {
+        assert_eq!(registry_problems(), Vec::<String>::new());
     }
 
     #[test]
