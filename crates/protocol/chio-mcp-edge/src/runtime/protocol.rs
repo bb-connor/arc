@@ -62,7 +62,7 @@ pub(super) use self::tasks::{
 };
 pub(super) use self::tool_results::{
     governed_denial_tool_result, kernel_response_to_tool_result, tool_error_result,
-    KernelResponseToToolResultArgs,
+    KernelResponseToToolResultArgs, GOVERNED_DENIAL_TEXT,
 };
 
 #[cfg(test)]

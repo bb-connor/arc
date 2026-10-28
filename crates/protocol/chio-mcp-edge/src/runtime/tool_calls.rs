@@ -717,12 +717,18 @@ impl ChioMcpEdge {
         error: chio_kernel::KernelError,
         related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let client_error = match &error {
+            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
+                GOVERNED_DENIAL_TEXT.to_owned()
+            }
+            other => other.to_string(),
+        };
         self.emit_log_with_related_task(
             LogLevel::Error,
             "chio.mcp.tools",
             json!({
                 "event": "tool_failed",
-                "error": error.to_string(),
+                "error": client_error,
             }),
             related_task_id,
         );

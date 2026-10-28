@@ -1,6 +1,8 @@
 use super::*;
 use crate::project_tool_result as value_to_tool_result;
 
+pub(in crate::runtime) const GOVERNED_DENIAL_TEXT: &str = "Governed transaction denied";
+
 pub(in crate::runtime) struct KernelResponseToToolResultArgs<'a> {
     pub pending_notifications: &'a mut Vec<Value>,
     pub request_id: &'a Value,
@@ -271,7 +273,7 @@ pub(in crate::runtime) fn tool_error_result(reason: &str) -> Value {
 
 pub(in crate::runtime) fn governed_denial_tool_result() -> Value {
     json!({
-        "content": [{"type": "text", "text": "Governed transaction denied"}],
+        "content": [{"type": "text", "text": GOVERNED_DENIAL_TEXT}],
         "structuredContent": {"code": "governed_transaction_denied"},
         "isError": true,
     })
