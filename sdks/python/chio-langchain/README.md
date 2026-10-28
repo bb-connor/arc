@@ -52,6 +52,29 @@ tool = toolkit.create_tool(
 - `ChioTool` -- a LangChain `BaseTool` whose invocation is evaluated through
   the sidecar for advisory audit and bound to a capability id.
 
+## Verified MCP tools
+
+`chio_langchain.mcp` builds LangChain tools from an open MCP session to a Chio
+MCP edge. Install `chio-langchain[mcp]`. Each call goes through
+`chio.mcp.VerifiedMcpSession`, so a tool returns only output covered by a
+signed receipt from the kernel key you pin.
+
+```python
+from chio_langchain.mcp import ChioMcpToolkit
+
+tools = await ChioMcpToolkit(
+    session,  # an initialized mcp.ClientSession connected to a Chio edge
+    server_id="wrapped-http-mock",
+    trusted_signers=[KERNEL_PUBLIC_KEY_HEX],
+).get_tools()
+```
+
+Tools are async only and use `response_format="content_and_artifact"`; the
+artifact carries the receipt and the committed output. A verified denial or
+tool error raises `ChioMcpToolError` with its receipt. Evidence failures raise
+`chio.mcp.McpEvidenceError` and transport failures propagate unchanged; neither
+is retried.
+
 ## Behaviour
 
 Tool calls fail closed for authorization: advisory evaluation never becomes a
