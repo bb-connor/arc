@@ -337,7 +337,7 @@ fn runtime_regeneration_context_with_options(
     let workflow_receipt_sha256 = canonical_json_sha256(&workflow_receipt)?;
     let source_record = serde_json::json!({
         "stepIndex": 0,
-        "admissionReportSha256": "a".repeat(64),
+        "admissionReceiptSha256": "a".repeat(64),
         "toolReceiptSha256": "b".repeat(64),
         "bilateralDsseSha256": "c".repeat(64),
         "workflowStepSha256": "d".repeat(64)
@@ -364,13 +364,13 @@ fn runtime_regeneration_context_with_options(
         "runId": "runtime-loopback-1",
         "accepted": true,
         "generatedAtUnixMs": 1_800_000_000_000u64,
-        "admissionReportSha256": "a".repeat(64),
+        "admissionReceiptSha256": "a".repeat(64),
         "evidencePaths": ["proof-regeneration-report.json"],
         "stepEvidence": [{
             "schema": "chio.runtime.step-evidence.v1",
             "stepIndex": 0,
             "admissionId": "admission-1",
-            "admissionReportSha256": "a".repeat(64),
+            "admissionReceiptSha256": "a".repeat(64),
             "toolReceiptId": "tool-receipt-1",
             "toolReceiptSha256": "b".repeat(64),
             "outputSha256": "e".repeat(64),
@@ -404,7 +404,7 @@ fn runtime_regeneration_context_with_options(
         "runId": "runtime-loopback-1",
         "evidenceManifestSha256": manifest_sha256,
         "workflowRunReportSha256": workflow_report_sha256,
-        "admissionReportSha256": "a".repeat(64),
+        "admissionReceiptSha256": "a".repeat(64),
         "trustBundleSha256": "f".repeat(64),
         "verificationContextSha256": "1".repeat(64),
         "sourceRecords": [source_record]
