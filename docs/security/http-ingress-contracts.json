@@ -1570,8 +1570,8 @@
       "remaining_risk": "Format-specific duplicate keys, aliases and numeric conversion are not enforced by the JSON reader. Configuration provenance and parser semantics require separate qualification."
     },
     "crates/platform/chio-control-plane/src/attestation/verification.rs": {
-      "semantics": "Cloud attestation metadata and JWKS JSON responses plus Nitro CBOR envelopes feed the provider-specific certificate, token and attestation verification chain.",
-      "remaining_risk": "CBOR and unbounded response helpers need separate original-format/size qualification. This entry does not establish a signature bypass or count them as strict JSON readers."
+      "semantics": "Nitro CBOR envelopes feed the provider-specific certificate and attestation verification chain. Cloud attestation metadata and JWKS responses are fetched under a strict HTTPS HttpEgressContract and decoded by the bounded original JSON reader.",
+      "remaining_risk": "CBOR envelopes need separate original-format/size qualification. This entry does not establish a signature bypass or count them as strict JSON readers."
     },
     "crates/platform/chio-control-plane/src/keyring_runtime.rs": {
       "semantics": "Local YAML/TOML configuration controls policy, identity, attestation or keyring composition and is subject to the existing typed validation in load_keyring_runtime_composition_with_clock.",
@@ -1588,10 +1588,6 @@
     "crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs": {
       "semantics": "Local TOML trust-control access configuration (deployment, internal listener, caller credentials and pinned cluster peers) is decoded with deny_unknown_fields at every level and validated in TrustAccessConfig::from_toml_str before any credential is admitted; removed keys and unknown scopes refuse.",
       "remaining_risk": "TOML parser semantics (duplicate keys are refused by the format; integer and string conversion) belong to the toml crate. Configuration file provenance and permissions are qualified where the file is read."
-    },
-    "crates/platform/chio-control-plane/src/trust_control/service_runtime/public_registry.rs": {
-      "semantics": "Public remote registry and certification discovery documents are decoded before their owning discovery freshness and signed artifact checks.",
-      "remaining_risk": "Direct ureq response decoding loses original JSON representation and has no local original-byte reader guarantee; network response hardening remains outstanding."
     },
     "crates/products/chio-cli/src/cli/input/config.rs": {
       "semantics": "YAML/TOML configuration or guard manifests are read by local CLI/build/load operations: yaml.",

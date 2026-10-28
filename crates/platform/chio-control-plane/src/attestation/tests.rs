@@ -190,6 +190,27 @@ fn closed_local_url() -> String {
     format!("http://{address}")
 }
 
+fn local_issuer_document<T: serde::de::DeserializeOwned>(
+    url: &str,
+) -> Result<T, verification::IssuerDocumentFailure> {
+    let contract = chio_egress_contract::HttpEgressContract::permissive_for_tests(
+        url.trim_start_matches("http://"),
+    );
+    verification::fetch_issuer_document_under(&contract, url)
+}
+
+fn serve_raw_once(response: String) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+    let address = listener.local_addr().test_unwrap();
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().test_unwrap();
+        let mut request = [0_u8; 1024];
+        let _ = stream.read(&mut request);
+        let _ = stream.write_all(response.as_bytes());
+    });
+    format!("http://{address}")
+}
+
 fn sample_enterprise_evidence(now: u64) -> RuntimeAttestationEvidence {
     RuntimeAttestationEvidence {
         schema: ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA.to_string(),
@@ -653,56 +674,45 @@ fn attestation_oidc_and_metadata_helpers_cover_parse_and_resolution_edges() {
         r#"{"issuer":"https://maa.contoso.test","jwksUri":"https://maa.contoso.test/keys"}"#,
     );
     assert_eq!(
-        fetch_azure_maa_openid_metadata(&azure_metadata_url)
+        local_issuer_document::<AzureMaaOpenIdMetadata>(&azure_metadata_url)
             .test_unwrap()
             .jwks_uri,
         "https://maa.contoso.test/keys"
     );
     let azure_jwks_url = serve_json_once(&jwks_json);
     assert_eq!(
-        fetch_azure_maa_jwks(&azure_jwks_url)
+        local_issuer_document::<AzureMaaJwks>(&azure_jwks_url)
             .test_unwrap()
             .keys
             .len(),
         1
     );
-    let azure_parse_url = serve_json_once("{bad json");
-    assert!(matches!(
-        fetch_azure_maa_openid_metadata(&azure_parse_url),
-        Err(AzureMaaVerificationError::MetadataParse { .. })
-    ));
-    let azure_fetch_url = closed_local_url();
-    assert!(matches!(
-        fetch_azure_maa_jwks(&azure_fetch_url),
-        Err(AzureMaaVerificationError::MetadataFetch { .. })
-    ));
-
     let google_metadata_url = serve_json_once(
         r#"{"issuer":"https://confidentialcomputing.googleapis.com","jwksUri":"https://confidentialcomputing.googleapis.com/keys"}"#,
     );
     assert_eq!(
-        fetch_google_confidential_vm_openid_metadata(&google_metadata_url)
+        local_issuer_document::<GoogleConfidentialVmOpenIdMetadata>(&google_metadata_url)
             .test_unwrap()
             .issuer,
         "https://confidentialcomputing.googleapis.com"
     );
     let google_jwks_url = serve_json_once(&jwks_json);
     assert_eq!(
-        fetch_google_confidential_vm_jwks(&google_jwks_url)
+        local_issuer_document::<GoogleConfidentialVmJwks>(&google_jwks_url)
             .test_unwrap()
             .keys
             .len(),
         1
     );
-    let google_parse_url = serve_json_once("{bad json");
+    let parse_url = serve_json_once("{bad json");
     assert!(matches!(
-        fetch_google_confidential_vm_jwks(&google_parse_url),
-        Err(GoogleConfidentialVmVerificationError::MetadataParse { .. })
+        local_issuer_document::<AzureMaaJwks>(&parse_url),
+        Err(verification::IssuerDocumentFailure::Parse(_))
     ));
-    let google_fetch_url = closed_local_url();
+    let closed_url = closed_local_url();
     assert!(matches!(
-        fetch_google_confidential_vm_openid_metadata(&google_fetch_url),
-        Err(GoogleConfidentialVmVerificationError::MetadataFetch { .. })
+        local_issuer_document::<GoogleConfidentialVmJwks>(&closed_url),
+        Err(verification::IssuerDocumentFailure::Fetch(_))
     ));
 }
 
@@ -1629,4 +1639,158 @@ fn jwt_original_tokens_are_bounded_unambiguous_and_keep_signed_preimage(
     };
     assert_eq!(cause.code(), "urn:chio:error:attest:signed-json-too-large");
     Ok(())
+}
+
+fn watch_for_dials() -> (u16, thread::JoinHandle<bool>) {
+    let listener = TcpListener::bind("127.0.0.1:0").test_unwrap();
+    listener.set_nonblocking(true).test_unwrap();
+    let port = listener.local_addr().test_unwrap().port();
+    let dials = thread::spawn(move || {
+        for _ in 0..200 {
+            if listener.accept().is_ok() {
+                return true;
+            }
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        false
+    });
+    (port, dials)
+}
+
+fn issuer_fetch_failure(fetcher: usize, url: &str) -> (String, String) {
+    match fetcher {
+        0 => match fetch_azure_maa_openid_metadata(url) {
+            Err(AzureMaaVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Azure metadata outcome: {:?}", other.err()),
+        },
+        1 => match fetch_azure_maa_jwks(url) {
+            Err(AzureMaaVerificationError::MetadataFetch { url, error }) => (url, error),
+            other => panic!("unexpected Azure JWKS outcome: {:?}", other.err()),
+        },
+        2 => match fetch_google_confidential_vm_openid_metadata(url) {
+            Err(GoogleConfidentialVmVerificationError::MetadataFetch { url, error }) => {
+                (url, error)
+            }
+            other => panic!("unexpected Google metadata outcome: {:?}", other.err()),
+        },
+        _ => match fetch_google_confidential_vm_jwks(url) {
+            Err(GoogleConfidentialVmVerificationError::MetadataFetch { url, error }) => {
+                (url, error)
+            }
+            other => panic!("unexpected Google JWKS outcome: {:?}", other.err()),
+        },
+    }
+}
+
+#[test]
+fn attestation_issuer_fetchers_refuse_private_and_plaintext_targets_before_dialing() {
+    for fetcher in 0..4 {
+        let (port, dials) = watch_for_dials();
+        let private = format!("https://0.0.0.0:{port}/issuer");
+        let plaintext = format!("http://127.0.0.1:{port}/issuer");
+        let private_failure = issuer_fetch_failure(fetcher, &private);
+        let plaintext_failure = issuer_fetch_failure(fetcher, &plaintext);
+        assert!(
+            !dials.join().test_unwrap(),
+            "fetcher {fetcher} dialed a refused issuer target"
+        );
+        assert_eq!(
+            private_failure,
+            (
+                private.clone(),
+                chio_egress_contract::HttpEgressError::PrivateNetworkDenied {
+                    host: "0.0.0.0".to_owned()
+                }
+                .to_string()
+            )
+        );
+        assert_eq!(
+            plaintext_failure,
+            (
+                plaintext.clone(),
+                chio_egress_contract::HttpEgressError::SchemeDenied {
+                    scheme: "http".to_owned()
+                }
+                .to_string()
+            )
+        );
+    }
+}
+
+#[test]
+fn attestation_issuer_fetchers_refuse_metadata_private_ula_and_loopback_literals() {
+    for (url, refusal) in [
+        (
+            "https://169.254.169.254/metadata/identity/oauth2/token",
+            chio_egress_contract::HttpEgressError::LinkLocalDenied {
+                host: "169.254.169.254".to_owned(),
+            },
+        ),
+        (
+            "https://10.0.0.7/.well-known/openid-configuration",
+            chio_egress_contract::HttpEgressError::PrivateNetworkDenied {
+                host: "10.0.0.7".to_owned(),
+            },
+        ),
+        (
+            "https://[fd00::1]/keys",
+            chio_egress_contract::HttpEgressError::Ipv6UlaDenied {
+                host: "fd00::1".to_owned(),
+            },
+        ),
+        (
+            "https://localhost/keys",
+            chio_egress_contract::HttpEgressError::LoopbackDenied {
+                host: "localhost".to_owned(),
+            },
+        ),
+    ] {
+        for fetcher in 0..4 {
+            assert_eq!(
+                issuer_fetch_failure(fetcher, url),
+                (url.to_owned(), refusal.to_string()),
+                "fetcher {fetcher}"
+            );
+        }
+    }
+}
+
+#[test]
+fn attestation_issuer_fetch_returns_redirects_unfollowed_and_bounds_the_body() {
+    let (port, dials) = watch_for_dials();
+    let redirect_url = serve_raw_once(format!(
+        "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{port}/keys\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    ));
+    let redirect = local_issuer_document::<AzureMaaJwks>(&redirect_url);
+    assert!(
+        !dials.join().test_unwrap(),
+        "the issuer fetch followed a redirect"
+    );
+    assert!(matches!(
+        redirect,
+        Err(verification::IssuerDocumentFailure::Fetch(error))
+            if error == "issuer returned HTTP status 302"
+    ));
+
+    let ceiling: u64 = 1024 * 1024;
+    let mut contract_url = serve_raw_once(format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        ceiling + 1,
+        " ".repeat(1024 * 1024 + 1)
+    ));
+    let mut contract = chio_egress_contract::HttpEgressContract::permissive_for_tests(
+        contract_url.trim_start_matches("http://"),
+    );
+    contract.max_response_bytes = ceiling;
+    contract_url.push_str("/keys");
+    assert!(matches!(
+        verification::fetch_issuer_document_under::<AzureMaaJwks>(&contract, &contract_url),
+        Err(verification::IssuerDocumentFailure::Fetch(error))
+            if error
+                == chio_egress_contract::HttpEgressError::ResponseTooLarge {
+                    observed: ceiling + 1,
+                    max: ceiling,
+                }
+                .to_string()
+    ));
 }
