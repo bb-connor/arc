@@ -4828,10 +4828,13 @@ in an operator-local `chio.revocation-partner-registry.v1` registry:
 - a sync fetches the signed root, verifies it against the pinned authority
   key, then fetches leaf pages after the mirror's leaf count; every page must
   echo the requested `after` and carry leaves whose `seq` values continue the
-  mirror by one each, and at most 65,536 leaves are fetched in one sync
+  mirror by one each; a partner more than 65,536 leaves ahead is refused,
+  and at most 65,536 leaves are staged and applied in one sync, so leaves a
+  final page carries past the signed root's leaf count are dropped
 - every request of one sync is bounded by the time left before the sync's
   single deadline, and the mirror commits only after the last fetch, at a
-  time read after it
+  time read after it, and only when the fetch finished before that deadline;
+  a fetch abandoned at the deadline never writes the mirror
 - the mirror accepts the signed root only when the rebuilt root, epoch and
   leaf count equal it; a root that does not verify, is dated more than 5
   seconds ahead, rolls back the accepted epoch or signing time, or signs a

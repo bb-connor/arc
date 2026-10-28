@@ -30,7 +30,9 @@ use crate::passport_revocation_feed::{
 };
 use crate::revocation_partner::{RevocationPartner, RevocationPartnerRegistry};
 
-/// Most leaves one sync replays. A partner further ahead than this is refused.
+/// Most leaves one sync stages and applies. A partner further ahead than this
+/// is refused. The final page may carry leaves past the offered root, up to one
+/// page in all; those are dropped unstaged.
 pub const MAX_PARTNER_SYNC_LEAVES: u64 = 65_536;
 
 /// Largest amount a partner's signed root may be dated after this operator's
@@ -345,8 +347,11 @@ impl PartnerRevocationMirror {
         while crate::integer::count(leaves.len()) < behind {
             let page = source.leaves_after(after)?;
             check_page(partner, &page, after)?;
-            after = page.leaves.last().map_or(after, |leaf| leaf.seq);
-            leaves.extend(page.leaves);
+            let room = usize::try_from(behind)
+                .unwrap_or(usize::MAX)
+                .saturating_sub(leaves.len());
+            leaves.extend(page.leaves.into_iter().take(room));
+            after = leaves.last().map_or(after, |leaf| leaf.seq);
         }
         Ok(StagedPartnerSync { offered, leaves })
     }

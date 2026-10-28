@@ -1,9 +1,11 @@
 //! Strict HTTPS transport for a federation partner's passport revocation feed.
 //!
 //! One sync resolves the partner's trust-control host once, pins the checked
-//! addresses, and runs the root fetch, every leaf page fetch and the mirror
-//! commit as one bounded job on the portable fetch pool. Every request is
-//! bounded by the time left before the sync's single deadline.
+//! addresses, and runs the root fetch and every leaf page fetch as one bounded
+//! job on the portable fetch pool. Every request is bounded by the time left
+//! before the sync's single deadline. The mirror commit runs on the caller's
+//! thread, and only for a job that returned before that deadline, so a job the
+//! caller abandoned never writes the mirror.
 use super::*;
 
 use chio_egress_contract::HttpEgressContract;
@@ -155,12 +157,17 @@ where
         + Send
         + 'static,
 {
-    let partner_id = partner.partner_id.clone();
-    let outcome = run_portable_fetch(pool, deadline, move |deadline| {
-        Ok(stage(&mirror, &partner, deadline)
-            .and_then(|staged| mirror.commit(&partner, staged, clock.as_ref())))
-    });
-    outcome.map_err(|error| PartnerRevocationError::Fetch(partner_id, error.to_string()))?
+    let staged = {
+        let mirror = Arc::clone(&mirror);
+        let partner = partner.clone();
+        run_portable_fetch(pool, deadline, move |deadline| {
+            Ok(stage(&mirror, &partner, deadline))
+        })
+    };
+    let staged = staged.map_err(|error| {
+        PartnerRevocationError::Fetch(partner.partner_id.clone(), error.to_string())
+    })??;
+    mirror.commit(&partner, staged, clock.as_ref())
 }
 
 fn stage_over_strict_transport(
