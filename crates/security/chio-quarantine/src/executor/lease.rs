@@ -30,11 +30,13 @@ impl<
         self.require_live_lease(work)
     }
 
-    /// Names a lost lease before any write. The scheduled CAS still checks the
+    /// Names a lost lease or a retired store before any write. The scheduled CAS still checks the
     /// exact live lease in its own transaction and stays the authoritative fence.
     pub(super) fn require_live_lease(&self, work: &ScheduledWork) -> Result<(), ExecutorError> {
         self.store.validate_lease(work).map_err(|error| {
-            if error.kind() == PortErrorKind::Conflict {
+            if error.is_retired() {
+                ExecutorError::StoreRetired
+            } else if error.kind() == PortErrorKind::Conflict {
                 ExecutorError::StaleLease
             } else {
                 ExecutorError::Store(error)

@@ -238,7 +238,7 @@ impl<
     ) -> Result<SchedulerWorkOutcome, SchedulerError> {
         self.observe_clock(&work.tenant_id, now_unix_ms)?;
         if let Err(error) = self.store.validate_lease(work) {
-            if error.kind() == PortErrorKind::Conflict {
+            if error.kind() == PortErrorKind::Conflict && !error.is_retired() {
                 return Ok(SchedulerWorkOutcome::LeaseLost {
                     action_id: work.action_id.clone(),
                 });
@@ -267,6 +267,7 @@ impl<
                 Err(error) if is_lineage_fence_lapsed(&error) => {
                     lapsed_fence = Some(error.code().clone());
                 }
+                Err(error) if error.is_retired() => return Err(SchedulerError::Store(error)),
                 Err(error) if error.kind() == PortErrorKind::Conflict => {
                     return Ok(SchedulerWorkOutcome::LeaseLost {
                         action_id: work.action_id.clone(),

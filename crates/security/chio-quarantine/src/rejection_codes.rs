@@ -48,6 +48,7 @@ impl ExecutorError {
             }
             Self::StaleLease => "urn:chio:error:kernel:response-executor-stale-lease",
             Self::Store(inner) => inner.code().as_str(),
+            Self::StoreRetired => "urn:chio:error:kernel:response-executor-store-retired",
             Self::StateMachine(inner) => inner.code(),
             Self::WorkMismatch => "urn:chio:error:kernel:response-executor-work-mismatch",
         }

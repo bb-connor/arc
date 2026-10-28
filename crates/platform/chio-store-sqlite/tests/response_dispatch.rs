@@ -38,6 +38,10 @@ mod dispatch_lease_readback;
 #[path = "response_dispatch/overlay_inventory.rs"]
 mod overlay_inventory;
 
+#[cfg(unix)]
+#[path = "response_dispatch/sealed_store_lease.rs"]
+mod sealed_store_lease;
+
 fn now_unix_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

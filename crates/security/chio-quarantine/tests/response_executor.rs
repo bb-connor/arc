@@ -5,6 +5,8 @@ mod lease_takeover;
 mod response_support;
 #[path = "response_executor/rollback_budget.rs"]
 mod rollback_budget;
+#[path = "response_executor/store_retirement.rs"]
+mod store_retirement;
 
 use chio_core_types::receipt::security::{ActiveDefenseEffectOutcome, ActiveDefenseReceiptBody};
 use chio_quarantine::{
@@ -32,6 +34,7 @@ use chio_security_types::{
 };
 use response_support::{record, TestResponseStore};
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 fn expect_err<T: std::fmt::Debug, E>(result: Result<T, E>) -> E {
@@ -369,6 +372,7 @@ struct CrashStore {
     inner: TestResponseStore,
     crash: Mutex<Option<StoreCrash>>,
     durable_work: Mutex<Option<ScheduledWork>>,
+    retired: AtomicBool,
     takeover_during_applying_lease_cas: Mutex<Option<ScheduledWork>>,
     effect_transitions: Mutex<Vec<ResponseEffectCasRequest>>,
 }
@@ -379,6 +383,7 @@ impl CrashStore {
             inner: TestResponseStore::default(),
             crash: Mutex::new(None),
             durable_work: Mutex::new(None),
+            retired: AtomicBool::new(false),
             takeover_during_applying_lease_cas: Mutex::new(None),
             effect_transitions: Mutex::new(Vec::new()),
         }
@@ -405,6 +410,10 @@ impl CrashStore {
             .durable_work
             .lock()
             .unwrap_or_else(|_| panic!("work mutex poisoned")) = Some(work);
+    }
+
+    fn retire(&self) {
+        self.retired.store(true, Ordering::Release);
     }
 
     fn arm_takeover_during_applying_lease_cas(&self, work: ScheduledWork) {
@@ -499,6 +508,9 @@ impl ResponseSchedulerStore for CrashStore {
     }
 
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
+        if self.retired.load(Ordering::Acquire) {
+            return Err(PortError::retired());
+        }
         let current = self
             .durable_work
             .lock()
