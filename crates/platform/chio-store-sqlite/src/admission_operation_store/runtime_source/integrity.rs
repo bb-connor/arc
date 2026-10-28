@@ -60,9 +60,10 @@ pub(crate) fn verify_runtime_source_projection_coverage(
 pub(crate) fn verify_runtime_source_pristine(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    if !records::verify_all_records(connection)
-        .map_err(invalid)?
-        .is_empty()
+    if records::source_table_exists(connection).map_err(invalid)?
+        && !records::verify_all_records(connection)
+            .map_err(invalid)?
+            .is_empty()
     {
         return Err(invalid(
             "runtime source qualification state is not pristine",
@@ -88,4 +89,26 @@ fn global_count(connection: &Connection) -> Result<i64, SqliteServingOwnerError>
             |row| row.get(0),
         )
         .map_err(invalid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn absent_source_table_is_only_allowed_before_provisioning(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = Connection::open_in_memory()?;
+        verify_runtime_source_pristine(&connection)?;
+        assert_eq!(
+            records::verify_all_records(&connection).err().as_deref(),
+            Some("runtime source qualification table is absent"),
+        );
+        let error = verify_runtime_source_projection_coverage(&connection).err();
+        assert!(
+            matches!(error, Some(SqliteServingOwnerError::Invalid(detail))
+            if detail == "runtime source qualification integrity: runtime source qualification table is absent")
+        );
+        Ok(())
+    }
 }
