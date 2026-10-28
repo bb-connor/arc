@@ -36,7 +36,11 @@ impl CaptureRefusalProbe {
         use chio_kernel::BudgetStore;
         let claimant = AdmissionIdentifier::try_new(
             "claimant",
-            format!("kernel:{}", kernel.public_key().to_hex()),
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(
+                &kernel.receipt_signing_public_key()?,
+            )?
+            .as_str()
+            .to_owned(),
         )?;
         for route in ["combined", "split", "generic"] {
             let now = now_ms()?;
@@ -146,7 +150,11 @@ impl CaptureRefusalProbe {
             operation.version(),
             &AdmissionIdentifier::try_new(
                 "claimant",
-                format!("kernel:{}", kernel.public_key().to_hex()),
+                chio_kernel::admission_operation::execution_nonce_coordinator_id(
+                    &kernel.receipt_signing_public_key()?,
+                )?
+                .as_str()
+                .to_owned(),
             )?,
             now,
             now + 60_000,

@@ -943,3 +943,34 @@ fn unstamped_provisioned_admission_store_is_refused() -> AnchoredTestResult {
     );
     Ok(())
 }
+
+#[test]
+fn nonce_catalog_refuses_classical_only_issuer_definitions() -> AnchoredTestResult {
+    for table in [
+        "admission_execution_nonce_issuances",
+        "admission_execution_nonce_reservations",
+    ] {
+        let fixture = fixture();
+        let connection = fixture.store.connection()?;
+        verify_admission_operation_invariants(&connection)?;
+        connection.execute_batch("PRAGMA writable_schema = ON")?;
+        let changed = connection.execute(
+            "UPDATE sqlite_schema SET sql = replace(sql,
+             'octet_length(issuer) BETWEEN 1 AND 4129',
+             'length(issuer) = 64 AND octet_length(issuer) <= 256')
+             WHERE type = 'table' AND name = ?1",
+            [table],
+        )?;
+        connection.execute_batch("PRAGMA writable_schema = OFF")?;
+        assert_eq!(changed, 1);
+        let error = verify_admission_operation_invariants(&connection)
+            .err()
+            .ok_or("retired nonce issuer catalog accepted")?;
+        assert!(
+            matches!(error, AdmissionOperationStoreError::Invariant(ref detail)
+            if detail.contains("schema differs from the canonical definition")),
+            "{error}"
+        );
+    }
+    Ok(())
+}

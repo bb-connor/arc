@@ -268,19 +268,19 @@ fn durable_nonce_lifecycle_expired_capture_rolls_back_budget_and_can_still_cance
 
 #[test]
 fn durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases() -> TestResult {
-    for (cancel, mutation) in [
-        (false, "DROP TRIGGER admission_execution_nonce_transitions_no_delete;
-                 DELETE FROM admission_execution_nonce_transitions WHERE kind = 'committed';"),
-        (false, "DROP TRIGGER admission_execution_nonce_transitions_immutable;
-                 UPDATE admission_execution_nonce_transitions SET recorded_at_unix_ms = recorded_at_unix_ms + 1 WHERE kind = 'committed';"),
-        (false, "DROP TRIGGER admission_execution_nonce_transitions_immutable;
+    for (cancel, trigger_name, mutation, expected) in [
+        (false, "admission_execution_nonce_transitions_no_delete", "DROP TRIGGER admission_execution_nonce_transitions_no_delete;
+                 DELETE FROM admission_execution_nonce_transitions WHERE kind = 'committed';", "nonce history does not authorize its operation phase"),
+        (false, "admission_execution_nonce_transitions_immutable", "DROP TRIGGER admission_execution_nonce_transitions_immutable;
+                 UPDATE admission_execution_nonce_transitions SET recorded_at_unix_ms = recorded_at_unix_ms + 1 WHERE kind = 'committed';", "nonce transition lost its exact admission commit"),
+        (false, "admission_execution_nonce_transitions_immutable", "DROP TRIGGER admission_execution_nonce_transitions_immutable;
                  PRAGMA ignore_check_constraints = ON;
                  UPDATE admission_execution_nonce_transitions SET operation_json = zeroblob(262145) WHERE kind = 'capture_pending';
-                 PRAGMA ignore_check_constraints = OFF;"),
-        (true, "DROP TRIGGER admission_execution_nonce_transitions_immutable;
+                 PRAGMA ignore_check_constraints = OFF;", "nonce transition exceeds its storage bound"),
+        (true, "admission_execution_nonce_transitions_immutable", "DROP TRIGGER admission_execution_nonce_transitions_immutable;
                 PRAGMA ignore_check_constraints = ON;
                 UPDATE admission_execution_nonce_transitions SET participant_digest = 'bad' WHERE kind = 'cancelled';
-                PRAGMA ignore_check_constraints = OFF;"),
+                PRAGMA ignore_check_constraints = OFF;", "nonce transition participant exceeds its storage bound"),
     ] {
         let mut fixture = ready()?;
         prepare(&mut fixture)?;
@@ -290,16 +290,24 @@ fn durable_nonce_lifecycle_history_rejects_missing_corrupt_and_oversized_phases(
         } else {
             capture(&mut fixture)?;
         }
-        fixture.fixture.store.connection()?.execute_batch(mutation)?;
+        let connection = fixture.fixture.store.connection()?;
+        let trigger_sql: String = connection.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+            [trigger_name],
+            |row| row.get(0),
+        )?;
+        connection.execute_batch(mutation)?;
+        connection.execute_batch(&trigger_sql)?;
+        drop(connection);
         let error = fixture.fixture.store.load_by_operation_id(fixture.operation.binding().operation_id()).expect_err("corrupt history read");
-        assert!(error.to_string().contains("nonce"), "{error}");
+        assert!(matches!(error, AdmissionOperationStoreError::Invariant(ref detail) if detail == expected), "{error}");
         let NonceFixture { fixture: Fixture { _temp, database, lock_root, authority, store, .. }, .. } = fixture;
         drop(store);
         drop(authority);
         let error = match SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, chio_test_support::clock::clock()) {
             Ok(_) => return Err("corrupt nonce history reopened".into()), Err(error) => error,
         };
-        assert!(error.to_string().contains("nonce"), "{error}");
+        assert!(matches!(error, SqliteServingOwnerError::Invalid(ref detail) if detail == &format!("admission operation invariant failed: {expected}")), "{error}");
     }
     Ok(())
 }

@@ -95,7 +95,7 @@ impl ChioKernel {
         })?
         .ok_or_else(|| recovery_required("native caller physical budget capture is absent"))?;
         if capture.operation != operation
-            || nonce.issuer() != &self.config.keypair.public_key()
+            || nonce.issuer() != &self.receipt_signing_public_key()?
             || evidence.report.report.completed_at_unix_ms > now
         {
             return Err(recovery_required(

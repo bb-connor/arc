@@ -254,7 +254,11 @@ fn nonce_command(
     let lease = store.claim_recovery(
         operation.binding().operation_id(),
         operation.version(),
-        &identifier("claimant", &format!("kernel:{}", key.public_key().to_hex())),
+        &identifier(
+            "claimant",
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(&key.public_key())?
+                .as_str(),
+        ),
         now,
         now + 60_000,
         fence,
@@ -624,3 +628,6 @@ fn durable_nonce_decoder_rejects_unbound_noncanonical_and_future_artifacts() -> 
 fn durable_nonce_contenders_in_distinct_namespaces_share_one_replay_identity() -> TestResult {
     issuance::contenders_share_one_identity()
 }
+
+#[path = "execution_nonce/issuer_encoding.rs"]
+mod issuer_encoding;

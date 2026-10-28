@@ -90,7 +90,7 @@ impl ChioKernel {
         })?
         .ok_or_else(|| invalid("caller start original nonce is absent"))?;
         if reservation.signed_nonce() != nonce
-            || reservation.issuer() != &self.config.keypair.public_key()
+            || reservation.issuer() != &self.receipt_signing_public_key()?
             || operation.execution_nonce_id() != Some(reservation.nonce_id())
         {
             return Err(invalid(

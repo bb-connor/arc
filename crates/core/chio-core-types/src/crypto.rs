@@ -58,6 +58,8 @@ mod ed25519_verification;
 mod encoding;
 mod wire;
 
+pub use wire::MAX_KEY_WIRE_BYTES;
+
 /// Shared canonical JSON bytes suitable for signing and verification.
 pub type SharedCanonicalBytes = SharedCanonicalBytesInner<CanonicalBytes<CanonicalJsonWitness>>;
 

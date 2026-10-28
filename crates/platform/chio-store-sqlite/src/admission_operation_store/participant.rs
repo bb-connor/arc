@@ -190,8 +190,8 @@ impl SqliteAdmissionOperationStore {
                     .recovery_claim
                     .as_ref()
                     .ok_or(AdmissionOperationStoreError::Fenced)?;
-                let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
-                if recovery_claim.claimant_id().as_str() != expected_claimant
+                let expected_claimant = execution_nonce_coordinator_id(verified.signer_key())?;
+                if recovery_claim.claimant_id().as_str() != expected_claimant.as_str()
                     || recovery_claim.coordinator_lease_id() != &context.coordinator_lease_id
                     || recovery_claim.coordinator_lease_epoch() != context.coordinator_lease_epoch
                     || recovery_claim.store_fence() != &context.store_fence
@@ -362,13 +362,13 @@ fn verify_historical_recovery_claim<'a>(
         .recovery_claim
         .as_ref()
         .ok_or(AdmissionOperationStoreError::Fenced)?;
-    let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+    let expected_claimant = execution_nonce_coordinator_id(verified.signer_key())?;
     if binding.operation_id() != source.binding().operation_id().as_str()
         || binding.operation_state() != source.state()
         || binding.operation_version() != source.version()
         || binding.coordinator_lease_epoch() != source.coordinator_lease_epoch()
         || binding.coordinator_lease_id() != context.coordinator_lease_id.as_str()
-        || binding.recovery_claimant_id() != expected_claimant
+        || binding.recovery_claimant_id() != expected_claimant.as_str()
         || binding.recovery_expires_at_unix_ms() <= context.trusted_time_unix_ms
         || binding.store_fence() != &context.store_fence
         || recovery_claim.operation_id() != source.binding().operation_id()
