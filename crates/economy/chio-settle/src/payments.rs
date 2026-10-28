@@ -267,11 +267,14 @@ pub fn prepare_paymaster_compatibility(
 }
 
 #[cfg(test)]
+use crate as settle_api;
+#[cfg(test)]
+#[path = "../tests/support/approval.rs"]
+mod approval_support;
+
+#[cfg(test)]
 mod tests {
-    use crate as settle_api;
-    mod approval_support {
-        include!("../tests/support/approval.rs");
-    }
+    use super::approval_support;
     use super::{
         build_x402_payment_requirements, evaluate_circle_nanopayment,
         prepare_paymaster_compatibility, ApprovalBinding, CircleNanopaymentPolicy,
