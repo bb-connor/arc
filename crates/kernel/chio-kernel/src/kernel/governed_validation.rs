@@ -279,12 +279,7 @@ impl ChioKernel {
         &self,
         approval_token: &GovernedApprovalToken,
     ) -> Result<(), String> {
-        // Multi-algorithm dispatch happens inside `approval_token.verify_signature()`:
-        // the `approver` public key and the `signature` field are each algorithm-
-        // tagged (Ed25519 by default; `p256:` / `p384:` under the FIPS crypto
-        // path), so ECDSA approvals are validated through aws-lc-rs when the
-        // `chio-core-types/fips` feature is enabled without any kernel-side
-        // algorithm plumbing.
+        // The approver is pinned by membership in governed_approvers before the integrity check.
         for pk in &self.governed_approvers {
             if *pk == approval_token.approver {
                 return match approval_token.verify_integrity_embedded_key() {
