@@ -193,7 +193,7 @@ impl RemoteBudgetStore {
             != StructuredBudgetProjectionKindView::AdmissionOperation
         {
             return Err(structured_budget_error(
-                "structured remote authorization was downgraded to a legacy hold projection",
+                "structured remote authorization was downgraded to a standalone hold projection",
             ));
         }
         let usage_sequence_relation = match decision {
@@ -492,7 +492,7 @@ impl RemoteBudgetStore {
             ));
         }
         let projection_shape_invalid = match contract.kind {
-            StructuredBudgetProjectionKindView::LegacyHold => {
+            StructuredBudgetProjectionKindView::StandaloneHold => {
                 mutation.admission_binding.is_some()
                     || !mutation.invocation_quota_usages.is_empty()
                     || mutation.cumulative_approval.is_some()

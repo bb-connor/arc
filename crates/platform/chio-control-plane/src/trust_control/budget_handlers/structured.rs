@@ -57,9 +57,6 @@ fn structured_lifecycle_budget_store(
     state: &TrustServiceState,
     hold_id: &str,
 ) -> Result<(SqliteBudgetStore, Option<BudgetEventAuthority>), Response> {
-    // This only projects later transitions for an already-authorized legacy
-    // hold. Composite authorization remains disabled until a provisioned joint
-    // authority is injected through structured_budget_store.
     if state.cluster.is_some() && state.joint_authority_store.is_none() {
         return Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,

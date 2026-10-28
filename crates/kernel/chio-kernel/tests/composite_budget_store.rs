@@ -1334,7 +1334,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
             Some("hold:partial-cancel"),
             Some("event:partial-cancel:authorize"),
         )
-        .expect("authorize legacy hold"));
+        .expect("authorize standalone hold"));
     let release = BudgetReleaseHoldRequest {
         capability_id: CAPABILITY_ID.to_string(),
         grant_index: GRANT_INDEX,
@@ -1345,7 +1345,7 @@ fn partially_released_legacy_capture_cancels_remaining_exposure() {
     };
     store
         .release_budget_hold(release.clone())
-        .expect("partially release legacy hold");
+        .expect("partially release standalone hold");
     store
         .capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: CAPABILITY_ID.to_string(),

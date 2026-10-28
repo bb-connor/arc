@@ -46,7 +46,7 @@ impl BudgetStore for SqliteBudgetStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_structured_hold_from_legacy_writer(
+        Self::reject_structured_hold_from_standalone_writer(
             &transaction,
             Some(&request.hold_id),
             "invocation capture",
@@ -286,7 +286,7 @@ impl BudgetStore for SqliteBudgetStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_structured_hold_from_legacy_writer(
+        Self::reject_structured_hold_from_standalone_writer(
             &transaction,
             Some(&request.hold_id),
             "captured invocation cancellation",
@@ -566,10 +566,10 @@ impl BudgetStore for SqliteBudgetStore {
         if self.is_structured_hold(hold_id)? {
             return self.reverse_composite_hold(request);
         }
-        self.require_standalone_mutation("legacy hold reversal")?;
+        self.require_standalone_mutation("hold reversal")?;
         if request.expected_cumulative_approval_state.is_some() {
             return Err(BudgetStoreError::Invariant(
-                "legacy sqlite budget holds do not support cumulative approval state fencing"
+                "standalone sqlite budget holds do not support cumulative approval state fencing"
                     .to_string(),
             ));
         }
@@ -627,7 +627,8 @@ impl BudgetStore for SqliteBudgetStore {
         })?;
         if !self.is_structured_hold(hold_id)? {
             return Err(BudgetStoreError::Invariant(
-                "legacy sqlite budget holds do not support distinct monetary capture".to_string(),
+                "standalone sqlite budget holds do not support distinct monetary capture"
+                    .to_string(),
             ));
         }
         self.capture_composite_hold(request)
@@ -756,7 +757,11 @@ impl BudgetStore for SqliteBudgetStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_structured_hold_from_legacy_writer(&transaction, hold_id, "charge reversal")?;
+        Self::reject_structured_hold_from_standalone_writer(
+            &transaction,
+            hold_id,
+            "charge reversal",
+        )?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -970,7 +975,11 @@ impl BudgetStore for SqliteBudgetStore {
         }
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_structured_hold_from_legacy_writer(&transaction, hold_id, "charge reduction")?;
+        Self::reject_structured_hold_from_standalone_writer(
+            &transaction,
+            hold_id,
+            "charge reduction",
+        )?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -1201,7 +1210,7 @@ impl BudgetStore for SqliteBudgetStore {
 
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection)?;
-        Self::reject_structured_hold_from_legacy_writer(
+        Self::reject_structured_hold_from_standalone_writer(
             &transaction,
             hold_id,
             "charge settlement",
