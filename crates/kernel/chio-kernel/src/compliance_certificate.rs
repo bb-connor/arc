@@ -105,6 +105,10 @@ pub enum ComplianceCertificateError {
     #[error("compliance certificate signature verification failed")]
     SignatureVerificationFailed,
 
+    /// The certificate's signer is not the key the verifier trusts.
+    #[error("compliance certificate signer is not the expected signer")]
+    UntrustedSigner,
+
     /// The certificate's signature algorithm violates the configured
     /// `crypto_floor`. Threat model row `pq_signature_downgrade`.
     #[error(
@@ -164,8 +168,8 @@ pub fn issue_session_compliance_certificate(
     })
 }
 
-/// Verify a session compliance certificate against the configured
-/// `crypto_floor`.
+/// Verify a session compliance certificate signed by `expected_signer`
+/// against the configured `crypto_floor`.
 ///
 /// Performs the same dispatch table as
 /// `CapabilityToken::verify_integrity_embedded_key_with_floor`: floor rejection BEFORE
@@ -175,7 +179,9 @@ pub fn issue_session_compliance_certificate(
 ///
 /// # Errors
 ///
-/// Returns [`ComplianceCertificateError::RejectedByCryptoFloor`] when the
+/// Returns [`ComplianceCertificateError::UntrustedSigner`] when the signer
+/// is not `expected_signer`.
+/// [`ComplianceCertificateError::RejectedByCryptoFloor`] when the
 /// certificate's signature algorithm violates the configured floor.
 /// [`ComplianceCertificateError::CryptoFloorMismatch`] when the body's
 /// floor field disagrees with the verification floor.
@@ -183,8 +189,12 @@ pub fn issue_session_compliance_certificate(
 /// cryptographic check fails.
 pub fn verify_session_compliance_certificate(
     cert: &SessionComplianceCertificate,
+    expected_signer: &PublicKey,
     floor: KernelCryptoFloor,
 ) -> Result<(), ComplianceCertificateError> {
+    if &cert.signer_key != expected_signer {
+        return Err(ComplianceCertificateError::UntrustedSigner);
+    }
     // Step 1: floor enforcement over the signer key's algorithm, BEFORE the
     // cryptographic check.
     let signature_algorithm = cert.signer_key.algorithm();
@@ -211,7 +221,7 @@ pub fn verify_session_compliance_certificate(
 
     // Step 3: cryptographic verification.
     if verify_wrapped(
-        &cert.signer_key,
+        expected_signer,
         SESSION_COMPLIANCE_CERTIFICATE_SCHEMA,
         &cert.body,
         &cert.signature,

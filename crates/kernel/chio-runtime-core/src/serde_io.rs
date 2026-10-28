@@ -133,11 +133,17 @@ pub fn signed_runtime_admission_report_json(
     serde_json::to_string_pretty(report).map_err(ChioRuntimeError::Json)
 }
 
+/// Whether `report` is signed by `expected_signer`; a report from any other
+/// signer is `Ok(false)`.
 pub fn verify_signed_runtime_admission_report(
     report: &SignedRuntimeAdmissionReport,
+    expected_signer: &chio_core_types::crypto::PublicKey,
 ) -> Result<bool, ChioRuntimeError> {
+    if &report.signer_key != expected_signer {
+        return Ok(false);
+    }
     report
-        .verify_signature(&report.signer_key)
+        .verify_signature(expected_signer)
         .map_err(|error| ChioRuntimeError::Canonical(error.to_string()))
 }
 

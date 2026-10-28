@@ -302,9 +302,11 @@ pub fn signed_runtime_admission_report_json(
 
 pub fn verify_signed_runtime_admission_report(
     report: &SignedRuntimeAdmissionReport,
+    expected_signer: &chio_core_types::crypto::PublicKey,
 ) -> Result<bool, ChioRuntimeError> {
     wrap_runtime(chio_runtime_core::verify_signed_runtime_admission_report(
         report,
+        expected_signer,
     ))
 }
 
