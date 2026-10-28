@@ -921,6 +921,7 @@ fn refused_lineage_subject_stays_invalid(captured: bool) {
     let ReceiptQuerySnapshotState::Invalid { reason } = state else {
         unreachable!()
     };
+    assert_eq!(reason, REFUSED_CAPTURED_LINEAGE);
     assert!(
         matches!(service.query_receipts(&admin(100)), Err(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(actual))) if actual == reason)
     );
