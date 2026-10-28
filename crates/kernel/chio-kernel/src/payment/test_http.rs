@@ -1,4 +1,4 @@
-//! Loopback HTTP stub that answers a fixed sequence of JSON responses, one
+//! Scripted loopback HTTP server that answers a fixed sequence of JSON responses, one
 //! connection each, and hands every captured request back to the test.
 
 use std::io::{Read, Write};
@@ -50,7 +50,7 @@ pub(crate) fn spawn_json_server(
 const ACCEPT_POLL: Duration = Duration::from_millis(10);
 const ACCEPT_ATTEMPTS: u32 = 500;
 
-/// Accept the next request, or fail the stub after about five seconds so a
+/// Accept the next request, or fail the scripted server after about five seconds so a
 /// request the adapter never sends fails the test instead of hanging it.
 fn accept_bounded(listener: &TcpListener) -> TcpStream {
     listener
@@ -67,10 +67,10 @@ fn accept_bounded(listener: &TcpListener) -> TcpStream {
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 thread::sleep(ACCEPT_POLL);
             }
-            Err(error) => panic!("stub accept failed: {error}"),
+            Err(error) => panic!("scripted server accept failed: {error}"),
         }
     }
-    panic!("stub expected a request that never arrived");
+    panic!("scripted server expected a request that never arrived");
 }
 
 fn read_request(stream: &mut TcpStream) -> String {
@@ -135,14 +135,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_missing_request_fails_the_stub_instead_of_hanging() {
+    fn a_missing_request_fails_the_scripted_server_instead_of_hanging() {
         let (_url, _requests, handle) = spawn_once_json_server(200, serde_json::json!({}));
         let failure = handle
             .join()
-            .expect_err("a stub whose request never arrives must fail");
+            .expect_err("a scripted server whose request never arrives must fail");
         assert_eq!(
             failure.downcast_ref::<&str>(),
-            Some(&"stub expected a request that never arrived")
+            Some(&"scripted server expected a request that never arrived")
         );
     }
 }

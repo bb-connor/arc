@@ -39,6 +39,20 @@
 //! let _ = (evidence, authorize, disclose);
 //! ```
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
