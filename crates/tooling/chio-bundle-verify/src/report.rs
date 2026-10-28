@@ -4,12 +4,16 @@ use std::path::Path;
 
 use chio_core_types::crypto::PublicKey;
 use chio_core_types::receipt::body::ChioReceipt;
+use chio_core_types::receipt::evidence::EvidenceImportPackage;
 use chio_core_types::receipt::kinds::ReceiptKind;
 use chio_core_types::root_authority::{ReportColumn, VerifierTrust};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{BundleVerifyError, ExitClass};
-use crate::verify::{verify_package, EmbeddedHttpReceiptVerifier, VerifiedPackage};
+use crate::package::manifest_sha256;
+use crate::verify::{
+    verify_decoded_package, verify_package, EmbeddedHttpReceiptVerifier, VerifiedPackage,
+};
 
 pub const BUNDLE_VERIFY_REPORT_SCHEMA: &str = "chio.bundle-verify-report.v1";
 
@@ -118,6 +122,16 @@ impl VerificationReport {
             ExitClass::Verified
         }
     }
+
+    /// Refuses when a required column is not `verified` for some receipt.
+    pub fn require_columns(&self, trust: &VerifierTrust) -> Result<(), BundleVerifyError> {
+        match self.exit_class(trust) {
+            ExitClass::Verified => Ok(()),
+            _ => Err(BundleVerifyError::required_column(
+                "a column the trust file requires is not verified for every receipt",
+            )),
+        }
+    }
 }
 
 const OBSERVATION_ONLY: &str =
@@ -145,6 +159,23 @@ const NO_ROOT_AUTHORITY: &str = "the receipt carries no root authority";
 const NO_DISCLOSURE: &str = "the bundle carries no content openings";
 const NO_SETTLEMENT: &str = "the bundle carries no settlement evidence";
 
+/// A verified package and its column report.
+#[derive(Debug, Clone)]
+pub struct VerifiedBundle {
+    pub package: VerifiedPackage,
+    pub report: VerificationReport,
+}
+
+/// Refuses a trust file that requires a column this verifier cannot verify.
+fn refuse_unsupported_requirements(trust: &VerifierTrust) -> Result<(), BundleVerifyError> {
+    if trust.required_columns.contains(&ReportColumn::Settlement) {
+        return Err(BundleVerifyError::unsupported(
+            "this verifier cannot verify the settlement column",
+        ));
+    }
+    Ok(())
+}
+
 /// Verify a bundle directory and report one evidence class per column.
 ///
 /// Every integrity, parse and trust failure is an error. A `settlement`
@@ -153,21 +184,32 @@ pub fn verify_bundle(
     dir: &Path,
     trust: &VerifierTrust,
     embedded_http: Option<&dyn EmbeddedHttpReceiptVerifier>,
-) -> Result<VerificationReport, BundleVerifyError> {
-    if trust.required_columns.contains(&ReportColumn::Settlement) {
-        return Err(BundleVerifyError::unsupported(
-            "this verifier cannot verify the settlement column",
-        ));
-    }
-    let verified = verify_package(dir, trust, embedded_http)?;
-    Ok(report(&verified, trust))
+) -> Result<VerifiedBundle, BundleVerifyError> {
+    refuse_unsupported_requirements(trust)?;
+    let package = verify_package(dir, trust, embedded_http)?;
+    let report = column_report(&package.package, package.manifest_sha256.clone(), trust);
+    Ok(VerifiedBundle { package, report })
 }
 
-/// The report of an already verified package.
-#[must_use]
-pub fn report(verified: &VerifiedPackage, trust: &VerifierTrust) -> VerificationReport {
-    let receipts = verified
-        .package
+/// Verify a decoded package and report one evidence class per column, with
+/// the same refusals as [`verify_bundle`].
+pub fn verify_decoded_bundle(
+    package: &EvidenceImportPackage,
+    trust: &VerifierTrust,
+    embedded_http: Option<&dyn EmbeddedHttpReceiptVerifier>,
+) -> Result<VerificationReport, BundleVerifyError> {
+    refuse_unsupported_requirements(trust)?;
+    verify_decoded_package(package, trust, embedded_http)?;
+    let manifest_sha256 = manifest_sha256(&package.manifest)?;
+    Ok(column_report(package, manifest_sha256, trust))
+}
+
+fn column_report(
+    package: &EvidenceImportPackage,
+    manifest_sha256: String,
+    trust: &VerifierTrust,
+) -> VerificationReport {
+    let receipts = package
         .bundle
         .tool_receipts
         .iter()
@@ -185,8 +227,8 @@ pub fn report(verified: &VerifiedPackage, trust: &VerifierTrust) -> Verification
         .collect();
     let mut report = VerificationReport {
         schema: BUNDLE_VERIFY_REPORT_SCHEMA.to_string(),
-        envelope_signer: verified.package.envelope.signer_key.clone(),
-        manifest_sha256: verified.manifest_sha256.clone(),
+        envelope_signer: package.envelope.signer_key.clone(),
+        manifest_sha256,
         required_columns: trust.required_columns.clone(),
         receipts,
         exit_class: 0,

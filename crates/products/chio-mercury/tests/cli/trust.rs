@@ -455,7 +455,7 @@ fn mercury_and_chio_verify_agree_on_the_same_trust_file() {
     let chio_verify = |trust: &Path| {
         let trust = chio_bundle_verify::read_trust_file(trust).test_expect("read trust file");
         chio_bundle_verify::verify_bundle(&evidence.evidence_dir, &trust, None)
-            .map(|report| report.exit_class(&trust))
+            .map(|verified| verified.report.exit_class(&trust))
     };
     let mercury_verify = |trust: &Path| {
         mercury(&[

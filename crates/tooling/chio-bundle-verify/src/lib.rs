@@ -5,7 +5,10 @@
 //! the kernel-signed export envelope, every file digest, every receipt and
 //! checkpoint signature under a pinned key, the checkpoint chain, inclusion
 //! proofs, transparency claims and the export's query scope.
-//! [`verify_bundle`] adds the per-receipt column report.
+//! [`verify_bundle`] and [`verify_decoded_bundle`] add the per-receipt column
+//! report and refuse a required column this verifier cannot verify;
+//! [`VerificationReport::require_columns`] refuses a required column that is
+//! not `verified`.
 //!
 //! The crate reads no clock and opens no network or database connection.
 
@@ -19,8 +22,8 @@ pub mod verify;
 
 pub use error::{exit_class_for_urn, BundleVerifyError, BundleVerifyErrorKind, ExitClass};
 pub use report::{
-    report, verify_bundle, ColumnResult, EvidenceClass, ReceiptColumns, ReceiptReport,
-    VerificationReport, BUNDLE_VERIFY_REPORT_SCHEMA,
+    verify_bundle, verify_decoded_bundle, ColumnResult, EvidenceClass, ReceiptColumns,
+    ReceiptReport, VerificationReport, VerifiedBundle, BUNDLE_VERIFY_REPORT_SCHEMA,
 };
 pub use trust::read_trust_file;
 pub use verify::{
