@@ -66,7 +66,38 @@ impl<'a> From<SenderRequest<'a>> for PresentedSender<'a> {
 }
 
 /// An authorization code the local authorization server redeemed after
-/// checking its client, redirect URI, PKCE verifier and resource.
+/// checking its client, redirect URI, PKCE verifier, resource and sender
+/// constraint.
+///
+/// Only that redemption constructs it, and its members are read-only:
+///
+/// ```
+/// use chio_mcp_remote::root_exchange::kinds::local_as::RedeemedCode;
+/// fn present(_code: &RedeemedCode) {}
+/// ```
+///
+/// ```compile_fail
+/// use chio_mcp_remote::root_exchange::kinds::local_as::RedeemedCode;
+/// use chio_core::root_authority::Sha256Digest;
+/// let forged = RedeemedCode {
+///     code: "never-issued",
+///     code_expires_at: u64::MAX,
+///     subject: "victim",
+///     client_id: "allowed-client",
+///     resource: "https://edge.example/mcp",
+///     scopes: &[],
+///     sender_constraint: None,
+///     token_exp: u64::MAX,
+///     request_digest: Sha256Digest::from_bytes([0; 32]),
+/// };
+/// ```
+///
+/// ```compile_fail,E0616
+/// use chio_mcp_remote::root_exchange::kinds::local_as::RedeemedCode;
+/// fn retarget(code: &mut RedeemedCode) {
+///     code.subject = "victim".into();
+/// }
+/// ```
 #[derive(Clone, Copy)]
 pub struct RedeemedCode<'a> {
     pub code: &'a str,

@@ -27,6 +27,8 @@ mod enterprise_provider_freshness;
 mod enterprise_provider_session_spawn;
 #[path = "tests/fixed_error_bodies.rs"]
 mod fixed_error_bodies;
+#[path = "tests/local_as_redemption.rs"]
+mod local_as_redemption;
 #[path = "tests/local_authorization.rs"]
 mod local_authorization;
 #[path = "tests/protocol_refusal.rs"]
