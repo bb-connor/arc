@@ -1391,3 +1391,79 @@ fn local_reexchange_scope_is_the_narrowed_request() {
         RootExchangeError::RuleMatchCount { matched: 0 }
     );
 }
+
+#[tokio::test]
+async fn sender_bound_provider_tokens_refuse() {
+    let keys = AnyRecordKeys::idp();
+    for (cnf, failure) in [
+        (
+            json!({ "x5t#S256": "cert-thumbprint" }),
+            SenderConstraintFailure::Mtls,
+        ),
+        (
+            json!({ "chioSenderKey": "ab".repeat(32) }),
+            SenderConstraintFailure::DpopUnavailable,
+        ),
+        (
+            json!({ "jkt": "dpop-thumbprint" }),
+            SenderConstraintFailure::Confirmation,
+        ),
+    ] {
+        let expected = RootExchangeError::SenderConstraintUnmet(failure);
+        let bound = |claims: Value| {
+            edit(claims, |claims| {
+                claims.insert("cnf".into(), cnf.clone());
+            })
+        };
+        let error = oidc_refusal(bound(oidc_claims())).await;
+        assert_eq!(error, expected);
+        refusal_code(&error, OAuthErrorCode::InvalidGrant);
+        let entra = compact(&idp_header(), &bound(entra_claims()), idp_sign);
+        assert_eq!(
+            entra_jwt::verify(&every_kind(), &entra, NOW, &keys)
+                .await
+                .unwrap_err(),
+            expected
+        );
+        let introspector = StubIntrospector::answering(bound(introspection_response()));
+        assert_eq!(introspection_refusal(&introspector).await, expected);
+    }
+}
+
+#[test]
+fn operator_scope_of_only_resource_grants_is_not_empty() {
+    let ceiling: ChioScope = serde_json::from_value(json!({
+        "grants": [grant("search")],
+        "resource_grants": [{ "uri_pattern": "crm://records/*", "operations": ["read"] }]
+    }))
+    .unwrap();
+    let mut rule = base_rule("operator-roots", "chio_operator_key");
+    rule["ceiling_scope"] = json!(ceiling);
+    rule["ceiling_scope_hash"] = json!(digest_of(&ceiling));
+    let exchange = build(vec![rule], &[]).unwrap();
+    let resources_only = json!({
+        "resource_grants": [{ "uri_pattern": "crm://records/*", "operations": ["read"] }]
+    });
+    let evidence = operator_key::verify(
+        &operator_request(|request| request["scope"] = resources_only.clone()),
+        NOW,
+    )
+    .unwrap();
+    let prepared = exchange
+        .prepare(evidence, None, None, NOW, &entropy())
+        .unwrap();
+    assert!(prepared.body.scope.grants.is_empty());
+    assert_eq!(prepared.body.scope.resource_grants.len(), 1);
+    consistent(&exchange, &prepared);
+    let empty = operator_key::verify(
+        &operator_request(|request| request["scope"] = json!({})),
+        NOW,
+    )
+    .unwrap();
+    assert_eq!(
+        exchange
+            .prepare(empty, None, None, NOW, &entropy())
+            .unwrap_err(),
+        RootExchangeError::EmptyEffectiveScope
+    );
+}

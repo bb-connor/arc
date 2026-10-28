@@ -7745,8 +7745,10 @@
       "parse::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": [
-      "confirmation::from_value",
       "local_key::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/sender.rs": [
+      "confirmation::from_value"
     ],
     "crates/core/chio-fixed/src/q16.rs": [
       "serialize::custom_deserialize"
@@ -13099,9 +13101,9 @@
         }
       ]
     },
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": {
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/sender.rs": {
       "kind": "typed-value-conversion",
-      "contract": "Converts the cnf member of a local access token whose signature already verified against the pinned local authorization server key into the closed confirmation profile, and the pinned Ed25519 key into a JWK. Neither conversion grants authority; the sender constraint is enforced on the result.",
+      "contract": "Converts the cnf member of a token or introspection response whose signature or introspection already verified into the closed confirmation profile. The conversion grants no authority; the sender constraint is enforced on the result, and a member outside the profile refuses.",
       "readers": [
         {
           "reader": "confirmation",
@@ -13112,7 +13114,13 @@
             "serde_json::from_value"
           ],
           "checked": true
-        },
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts the pinned Ed25519 key of the local authorization server into a JWK. The conversion grants no authority.",
+      "readers": [
         {
           "reader": "local_key",
           "decoders": [

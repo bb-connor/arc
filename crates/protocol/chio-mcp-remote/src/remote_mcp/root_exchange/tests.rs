@@ -1769,3 +1769,33 @@ fn signed_claims_reach_the_claim_rules_only_through_verification() {
     assert_eq!(verified.claims()["iss"], signed_iss);
     assert_eq!(verified.header().kid.as_str(), IDP_KID);
 }
+
+#[test]
+fn client_registry_coalesces_one_client_across_redirect_uris() {
+    let registration =
+        |redirect_uri: &str, auth: crate::TokenEndpointAuth| crate::OAuthClientRegistration {
+            client_id: CLIENT_ID.to_owned(),
+            redirect_uri: redirect_uri.to_owned(),
+            token_endpoint_auth: auth,
+        };
+    let jwt = |jwk: Value| {
+        crate::TokenEndpointAuth::PrivateKeyJwt(Box::new(serde_json::from_value(jwk).unwrap()))
+    };
+    ClientRegistry::new(&[
+        registration("https://client.example/callback", jwt(client_jwk())),
+        registration("https://client.example/other", jwt(client_jwk())),
+    ])
+    .unwrap();
+    for second in [jwt(idp_jwk(IDP_KID)), crate::TokenEndpointAuth::None] {
+        assert_eq!(
+            ClientRegistry::new(&[
+                registration("https://client.example/callback", jwt(client_jwk())),
+                registration("https://client.example/other", second),
+            ])
+            .unwrap_err(),
+            RootExchangeError::ClientAssertionInvalid(
+                "client id is registered with different authentication"
+            )
+        );
+    }
+}

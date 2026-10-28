@@ -9,3 +9,4 @@ pub mod oauth_introspection;
 pub mod oidc_jwt;
 pub mod operator_key;
 pub mod operator_static_bearer;
+mod sender;

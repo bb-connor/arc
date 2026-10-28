@@ -32,12 +32,24 @@ pub struct ClientRegistry {
 }
 
 impl ClientRegistry {
-    /// Take the `private_key_jwt` clients of `registrations`. Refuses a
-    /// confidential client id registered twice and keys that cannot verify.
+    /// Take the `private_key_jwt` clients of `registrations`. A client id
+    /// appears once per redirect URI; its registrations must all carry the
+    /// same authentication, and its key must verify.
     pub fn new(registrations: &[OAuthClientRegistration]) -> Result<Self, RootExchangeError> {
-        let mut registry = BTreeMap::new();
+        let mut auth: BTreeMap<&str, &TokenEndpointAuth> = BTreeMap::new();
         for registration in registrations {
-            let TokenEndpointAuth::PrivateKeyJwt(jwk) = &registration.token_endpoint_auth else {
+            let first = *auth
+                .entry(registration.client_id.as_str())
+                .or_insert(&registration.token_endpoint_auth);
+            if first != &registration.token_endpoint_auth {
+                return Err(RootExchangeError::ClientAssertionInvalid(
+                    "client id is registered with different authentication",
+                ));
+            }
+        }
+        let mut registry = BTreeMap::new();
+        for (client_id, auth) in auth {
+            let TokenEndpointAuth::PrivateKeyJwt(jwk) = auth else {
                 continue;
             };
             let key = VerifyingKey::from_jwk(jwk).ok_or(
@@ -47,14 +59,7 @@ impl ClientRegistry {
                 kid: jwk.kid.as_str().to_owned(),
                 key,
             };
-            if registry
-                .insert(registration.client_id.clone(), registered)
-                .is_some()
-            {
-                return Err(RootExchangeError::ClientAssertionInvalid(
-                    "client id is registered twice",
-                ));
-            }
+            registry.insert(client_id.to_owned(), registered);
         }
         Ok(Self { clients: registry })
     }

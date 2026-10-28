@@ -903,7 +903,8 @@ fn bounded_scope(
     let Some(bound) = bound else {
         return Ok(rule.ceiling_scope.clone());
     };
-    if bound.grants.is_empty() {
+    if bound.grants.is_empty() && bound.resource_grants.is_empty() && bound.prompt_grants.is_empty()
+    {
         return Err(RootExchangeError::EmptyEffectiveScope);
     }
     if !bound.is_subset_of(&rule.ceiling_scope) {

@@ -12,6 +12,7 @@ use super::super::exchange::{check_record, MatchInput, RootExchange};
 use super::super::jws::{CompactJws, VerifiedJws, VerifyingKey};
 use super::super::key_lookup::IdpKeyLookup;
 use super::super::replay::{ReplayKey, ReplayNamespace};
+use super::sender;
 
 /// Reads the scope values of a bearer JWT's claims.
 pub(super) type ScopeValues = fn(&Map<String, Value>) -> Result<Vec<String>, RootExchangeError>;
@@ -32,7 +33,8 @@ pub(super) struct BearerJwsKind {
 /// The one rule the unverified claims match selects the provider record and
 /// the clock skew. The signature verifies against the record's key for
 /// `kid`; then `iss` equals the record issuer, some `aud` is in the
-/// record's audiences, and the time rules hold.
+/// record's audiences, and the time rules hold. A token carrying `cnf`
+/// refuses: no sender proof reaches this verifier.
 pub(super) async fn verify(
     exchange: &RootExchange,
     spec: &BearerJwsKind,
@@ -72,6 +74,7 @@ pub(super) async fn verify(
         return Err(RootExchangeError::AudienceMismatch);
     }
     let (iat, exp) = check_times(claims, now, rule.max_clock_skew_secs.unwrap_or(0))?;
+    sender::refuse_bound(claims)?;
     let (principal, tenant) = mapped_identity(claims, identity)?;
     let token_digest = Sha256Digest::from_hash(sha256(token.as_bytes()));
     Ok(AnchorEvidence {

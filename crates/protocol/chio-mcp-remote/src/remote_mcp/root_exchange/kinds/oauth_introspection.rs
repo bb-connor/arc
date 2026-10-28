@@ -8,7 +8,8 @@
 //! lists audiences some `aud` is among them. The principal and tenant come
 //! from the record's subject mapping over the response members. The
 //! evidence is the digest of the response bytes, and the replay key is the
-//! digest of the token bytes.
+//! digest of the token bytes. A response carrying `cnf` refuses: no sender
+//! proof reaches this verifier.
 
 use async_trait::async_trait;
 use chio_core::capability::anchor::AnchorKind;
@@ -27,6 +28,7 @@ use super::super::evidence::AnchorEvidence;
 use super::super::exchange::{check_record, MatchInput, RootExchange};
 use super::super::provider::ProviderRecord;
 use super::super::replay::{ReplayKey, ReplayNamespace};
+use super::sender;
 
 const KIND: AnchorKind = AnchorKind::OauthIntrospection;
 
@@ -200,6 +202,7 @@ pub async fn verify(
     if exp <= iat {
         return Err(RootExchangeError::ClaimInvalid("exp"));
     }
+    sender::refuse_bound(&response)?;
     let (principal, tenant) = mapped_identity(&response, identity)?;
     let token_digest = Sha256Digest::from_hash(sha256(token.as_bytes()));
     Ok(AnchorEvidence {

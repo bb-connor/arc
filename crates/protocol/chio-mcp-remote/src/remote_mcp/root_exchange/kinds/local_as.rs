@@ -29,12 +29,11 @@ use chio_core::sha256;
 use serde_json::{json, Map, Value};
 
 use super::super::claims::{required_seconds, required_string, scope_values, string};
-use super::super::error::{RootExchangeError, SenderConstraintFailure};
+use super::super::error::RootExchangeError;
 use super::super::evidence::AnchorEvidence;
 use super::super::jws::{CompactJws, VerifyingKey};
 use super::super::replay::{ReplayKey, ReplayNamespace};
-use crate::sender_constraint::{validate_sender_constraint, ConfirmationWire};
-use crate::{ChioSenderConstraintClaims, SenderConstraintError, SenderRequest};
+use crate::SenderRequest;
 
 const KIND: AnchorKind = AnchorKind::ChioLocalAs;
 
@@ -92,32 +91,6 @@ struct LocalToken {
     token_digest: Sha256Digest,
 }
 
-fn sender_failure(error: SenderConstraintError) -> RootExchangeError {
-    RootExchangeError::SenderConstraintUnmet(match error {
-        SenderConstraintError::DpopUnavailable => SenderConstraintFailure::DpopUnavailable,
-        SenderConstraintError::UnsupportedSchema => SenderConstraintFailure::Confirmation,
-        SenderConstraintError::MtlsBinding => SenderConstraintFailure::Mtls,
-        SenderConstraintError::AttestationBinding => SenderConstraintFailure::Attestation,
-    })
-}
-
-/// The token's `cnf`, read through the closed confirmation profile.
-fn confirmation(
-    claims: &Map<String, Value>,
-) -> Result<Option<ChioSenderConstraintClaims>, RootExchangeError> {
-    let Some(cnf) = claims.get("cnf") else {
-        return Ok(None);
-    };
-    let wire: ConfirmationWire = serde_json::from_value(cnf.clone()).map_err(|_| {
-        RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::Confirmation)
-    })?;
-    ChioSenderConstraintClaims::try_from(wire)
-        .map(Some)
-        .map_err(|_| {
-            RootExchangeError::SenderConstraintUnmet(SenderConstraintFailure::Confirmation)
-        })
-}
-
 fn local_key(server: &LocalAuthorizationServer<'_>) -> Result<VerifyingKey, RootExchangeError> {
     let jwk: Jwk = serde_json::from_value(json!({
         "kid": "local-as",
@@ -156,7 +129,7 @@ fn verify_token(
     if iat >= exp {
         return Err(RootExchangeError::ClaimInvalid("exp"));
     }
-    validate_sender_constraint(confirmation(claims)?.as_ref(), sender.0).map_err(sender_failure)?;
+    super::sender::check(claims, sender.0)?;
     Ok(LocalToken {
         jti: required_string(claims, "jti")?.to_owned(),
         principal: required_string(claims, "sub")?.to_owned(),
