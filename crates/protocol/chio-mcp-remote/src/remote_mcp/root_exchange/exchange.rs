@@ -8,10 +8,7 @@ use chio_core::capability::anchor::{AnchorKind, RootAnchor};
 use chio_core::capability::scope::{ChioScope, ToolGrant};
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
-use chio_core::receipt::commitment::{
-    DELEGATION_CLAIM_COMMITMENT_DOMAIN, DELEGATION_SUBJECT_COMMITMENT_DOMAIN,
-    DELEGATION_TENANT_COMMITMENT_DOMAIN,
-};
+use chio_core::receipt::commitment::{commit, ClaimName, CommitmentDomain, Salt};
 use chio_core::rng::Rng;
 use chio_core::root_authority::{
     ClaimMode, ClaimValue, DelegationAnchor, DelegationAnchorFields, DelegationContext,
@@ -19,7 +16,6 @@ use chio_core::root_authority::{
     MatchClaims, ProviderRecordKind, RecordedClaims, RootAuthorityShapeError, RootPolicyRule,
     SaltRef, SaltedCommitment, Sha256Digest, Text, Uri, CHIO_DELEGATION_CONTEXT_SCHEMA,
 };
-use chio_core::Sha256State;
 use serde_json::{Map, Value};
 
 use super::claims::{required_string, scope_values};
@@ -185,15 +181,6 @@ fn random<const N: usize>(entropy: &dyn Rng) -> Result<[u8; N], RootExchangeErro
         .fill_bytes(&mut bytes)
         .map_err(|_| RootExchangeError::EntropyUnavailable)?;
     Ok(bytes)
-}
-
-fn commitment(domain: &[u8], parts: &[&[u8]]) -> Sha256Digest {
-    let mut state = Sha256State::new();
-    state.update(domain);
-    for part in parts {
-        state.update(part);
-    }
-    Sha256Digest::from_hash(state.finalize())
 }
 
 fn salt_ref(value: &str) -> Result<SaltRef, RootExchangeError> {
@@ -386,9 +373,12 @@ fn record_claims(
                 let canonical = canonical_json_bytes(&value)
                     .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
                 let reference = salt_ref(&format!("anchor.claims.{name}"))?;
-                let commit = commitment(
-                    DELEGATION_CLAIM_COMMITMENT_DOMAIN,
-                    &[name.as_bytes(), &[0], &salt, &canonical],
+                let claim_name =
+                    ClaimName::new(name).map_err(|_| RootExchangeError::ClaimInvalid(name))?;
+                let commit = commit(
+                    CommitmentDomain::DelegationClaim(claim_name),
+                    &Salt::from_bytes(salt),
+                    &canonical,
                 );
                 openings.push(ContextOpening {
                     salt_ref: reference.clone(),
@@ -423,7 +413,7 @@ fn record_claims(
 }
 
 fn salted(
-    domain: &[u8],
+    domain: CommitmentDomain<'_>,
     reference: &str,
     value: &str,
     entropy: &dyn Rng,
@@ -437,7 +427,7 @@ fn salted(
         value: Value::String(value.to_owned()),
     });
     Ok(SaltedCommitment {
-        commit: commitment(domain, &[&salt, value.as_bytes()]),
+        commit: commit(domain, &Salt::from_bytes(salt), value.as_bytes()),
         salt_ref: reference,
     })
 }
@@ -724,14 +714,14 @@ impl RootExchange {
             None => Keypair::from_seed(&random::<32>(entropy)?).public_key(),
         };
         let subject_commitment = salted(
-            DELEGATION_SUBJECT_COMMITMENT_DOMAIN,
+            CommitmentDomain::DelegationSubject,
             "anchor.sub",
             &evidence.principal,
             entropy,
             &mut openings,
         )?;
         let tenant_commitment = salted(
-            DELEGATION_TENANT_COMMITMENT_DOMAIN,
+            CommitmentDomain::DelegationTenant,
             "anchor.tenant",
             &evidence.tenant,
             entropy,
