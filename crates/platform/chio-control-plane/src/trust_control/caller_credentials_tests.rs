@@ -1345,6 +1345,44 @@ fn peer_future_dated_replay_after_restart_refuses() {
 }
 
 #[test]
+fn peer_replay_after_restart_with_clock_moved_back_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    let target = status_target();
+    let before_restart = nonce_cache();
+    let older = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT - 10, None);
+    let latest = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    for (headers, now) in [(&older, ISSUED_AT - 10), (&latest, ISSUED_AT)] {
+        access
+            .peers
+            .verify(
+                headers,
+                &target,
+                now,
+                Scope::ClusterReplicate,
+                &before_restart,
+            )
+            .test_unwrap();
+    }
+    let restarted = PeerNonceCache::new(Some(ISSUED_AT - 20), 1);
+    for headers in [&latest, &older] {
+        assert_eq!(
+            access
+                .peers
+                .verify(
+                    headers,
+                    &target,
+                    ISSUED_AT - 3,
+                    Scope::ClusterReplicate,
+                    &restarted,
+                )
+                .test_unwrap_err(),
+            PeerAuthError::Stale
+        );
+    }
+}
+
+#[test]
 fn peer_replay_after_clock_step_back_refuses() {
     let keypair = Keypair::generate();
     let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
