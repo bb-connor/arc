@@ -18,7 +18,8 @@ const LEDGER_CAPACITY: usize = 65_536;
 /// Deterministic no-broadcast payment adapter.
 ///
 /// The latest settlement status is remembered per reference so recovery can
-/// answer the settlement-state query. The ledger keeps the most recent
+/// answer the settlement-state query; a capture retry leaves a recorded
+/// refund in place. The ledger keeps the most recent
 /// `LEDGER_CAPACITY` references. A reference that was evicted, or that a
 /// restarted adapter never saw, reports `NoAuthorization`, which is accurate
 /// because the adapter moved no funds. Terminal calls verify the identifier
@@ -36,9 +37,16 @@ struct Ledger {
 }
 
 impl Ledger {
-    fn record(&mut self, reference: &str, status: RailSettlementStatus, overwrite: bool) {
+    /// Record `status` for `reference`. An existing status is replaced only
+    /// when `replaces` admits it.
+    fn record(
+        &mut self,
+        reference: &str,
+        status: RailSettlementStatus,
+        replaces: fn(RailSettlementStatus) -> bool,
+    ) {
         if let Some(entry) = self.statuses.get_mut(reference) {
-            if overwrite {
+            if replaces(*entry) {
                 *entry = status;
             }
             return;
@@ -89,13 +97,14 @@ impl SimPaymentAdapter {
         reference: &str,
         authorization_id: &str,
         status: RailSettlementStatus,
+        replaces: fn(RailSettlementStatus) -> bool,
     ) -> Result<(), PaymentError> {
         if authorization_id != Self::authorization_id(reference) {
             return Err(PaymentError::RailError(
                 "sim authorization does not match the recorded identifier".into(),
             ));
         }
-        self.ledger()?.record(reference, status, true);
+        self.ledger()?.record(reference, status, replaces);
         Ok(())
     }
 
@@ -120,7 +129,7 @@ impl PaymentAdapter for SimPaymentAdapter {
     ) -> Result<PaymentAuthorization, PaymentError> {
         let authorization_id = Self::authorization_id(&request.reference);
         self.ledger()?
-            .record(&request.reference, RailSettlementStatus::Settled, false);
+            .record(&request.reference, RailSettlementStatus::Settled, |_| false);
         Ok(PaymentAuthorization {
             authorization_id,
             state: PaymentAuthorizationState::PrepaidFinal,
@@ -140,7 +149,12 @@ impl PaymentAdapter for SimPaymentAdapter {
         _currency: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        self.record_status(reference, authorization_id, RailSettlementStatus::Settled)?;
+        self.record_status(
+            reference,
+            authorization_id,
+            RailSettlementStatus::Settled,
+            |current| current != RailSettlementStatus::Refunded,
+        )?;
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Settled,
@@ -153,7 +167,12 @@ impl PaymentAdapter for SimPaymentAdapter {
         authorization_id: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        self.record_status(reference, authorization_id, RailSettlementStatus::Released)?;
+        self.record_status(
+            reference,
+            authorization_id,
+            RailSettlementStatus::Released,
+            |_| true,
+        )?;
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Released,
@@ -168,7 +187,12 @@ impl PaymentAdapter for SimPaymentAdapter {
         _currency: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        self.record_status(reference, transaction_id, RailSettlementStatus::Refunded)?;
+        self.record_status(
+            reference,
+            transaction_id,
+            RailSettlementStatus::Refunded,
+            |_| true,
+        )?;
         Ok(PaymentResult {
             transaction_id: transaction_id.to_string(),
             settlement_status: RailSettlementStatus::Refunded,
@@ -361,6 +385,23 @@ mod tests {
             }
             other => panic!("expected settled state, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn capture_retry_after_refund_keeps_refunded_status() {
+        let adapter = SimPaymentAdapter::new();
+        let id = adapter
+            .authorize(&request("req-1", 100))
+            .unwrap()
+            .authorization_id;
+        let captured = adapter.capture(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(captured.settlement_status, RailSettlementStatus::Settled);
+        adapter.refund(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(status(&adapter, "req-1"), RailSettlementStatus::Refunded);
+
+        let replayed = adapter.capture(&id, 100, "USD", "req-1").unwrap();
+        assert_eq!(replayed, captured);
+        assert_eq!(status(&adapter, "req-1"), RailSettlementStatus::Refunded);
     }
 
     #[test]
