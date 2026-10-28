@@ -1963,6 +1963,10 @@ reconciliation reference. The order context presented at release MUST carry
 every accepted order context field unchanged except `id`, `issued_at`,
 `current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`.
 
+The offer token issuer MUST be the order merchant: lock refuses an offer
+unless `merchant_subject` is `did:chio:` followed by the offer token issuer
+public key hex.
+
 The acceptance binds `order_id`, `quote_sha256` (which covers the quote amount
 and currency), `buyer_subject`, the offer token id and canonical digest, and
 `accepted_at`. Lock refuses, in order, an unsupported acceptance schema, an

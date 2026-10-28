@@ -23,6 +23,14 @@ fn keypair(seed: u8) -> Keypair {
     Keypair::from_seed(&[seed; 32])
 }
 
+fn merchant() -> Keypair {
+    keypair(1)
+}
+
+fn merchant_subject() -> String {
+    format!("did:chio:{}", merchant().public_key().to_hex())
+}
+
 fn usd(units: u64) -> MonetaryAmount {
     MonetaryAmount {
         units,
@@ -69,7 +77,7 @@ fn order_context(current_state: &str) -> CommerceOrderContext {
         "order_id": "order-commerce-001",
         "buyer_subject": "buyer:alice",
         "agent_subject": "agent:alice",
-        "merchant_subject": "merchant:coffee",
+        "merchant_subject": merchant_subject(),
         "intent_ref": "intent-1",
         "provider_admission_ref": "admission-1",
         "provider_passport_ref": "passport-1",
@@ -171,7 +179,7 @@ struct AcceptFixture {
 
 impl AcceptFixture {
     fn new() -> Self {
-        let issuer = keypair(1);
+        let issuer = merchant();
         let buyer = keypair(2);
         let reservation_authority = keypair(9);
         let acceptor = buyer.public_key();
@@ -247,7 +255,7 @@ fn accept_locks_quote_into_fixed_custody_and_pins_digests() {
             amount_minor: 4200,
         }]
     );
-    assert_eq!(acceptance.ledger.beneficiary_account, "merchant:coffee");
+    assert_eq!(acceptance.ledger.beneficiary_account, merchant_subject());
     assert_eq!(
         acceptance.escrow_digest,
         acceptance.ledger.digest().test_expect("ledger digest")
@@ -341,6 +349,38 @@ fn accept_denies_self_issued_offer() {
     assert_eq!(
         fixture.denial(),
         escrow(CommerceEscrowError::OfferSelfIssued)
+    );
+}
+
+#[test]
+fn accept_denies_offer_issued_by_key_other_than_merchant() {
+    let mut fixture = AcceptFixture::new();
+    fixture.issuer = keypair(5);
+    fixture.reissue_token(vec![grant(Some(usd(4200)))]);
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::OfferIssuerNotMerchant)
+    );
+}
+
+#[test]
+fn accept_denies_offer_for_merchant_subject_without_key() {
+    let mut fixture = AcceptFixture::new();
+    fixture.context.merchant_subject = "merchant:coffee".to_string();
+    pin_quote(&mut fixture.context);
+    fixture.resign_reservation(reservation_body(
+        &fixture.context,
+        &fixture.token,
+        usd(4200),
+    ));
+    fixture.resign_acceptance(acceptance_body(
+        &fixture.context,
+        &fixture.token,
+        ACCEPTED_AT,
+    ));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::OfferIssuerNotMerchant)
     );
 }
 
@@ -655,7 +695,7 @@ fn accept_denies_invalid_settlement_dispatch() {
 #[test]
 fn accept_denies_buyer_paying_itself() {
     let mut fixture = AcceptFixture::new();
-    fixture.context.merchant_subject = fixture.context.buyer_subject.clone();
+    fixture.context.buyer_subject = fixture.context.merchant_subject.clone();
     pin_quote(&mut fixture.context);
     fixture.resign_reservation(reservation_body(
         &fixture.context,
@@ -907,7 +947,7 @@ fn execution_body() -> CapitalExecutionInstructionArtifact {
         action: CapitalExecutionInstructionAction::ReleaseReserve,
         owner_role: CapitalExecutionRole::OperatorTreasury,
         counterparty_role: CapitalExecutionRole::AgentCounterparty,
-        counterparty_id: "merchant:coffee".to_string(),
+        counterparty_id: merchant_subject(),
         amount: Some(usd(4200)),
         authority_chain,
         execution_window: CapitalExecutionWindow {
@@ -1007,7 +1047,7 @@ fn release_drains_custody_to_merchant_against_authenticated_execution() {
         CommerceEscrowLeg {
             kind: CommerceEscrowLegKind::Release,
             from_account: COMMERCE_ESCROW_CUSTODY_ACCOUNT.to_string(),
-            to_account: "merchant:coffee".to_string(),
+            to_account: merchant_subject(),
             amount_minor: 4200,
         }
     );

@@ -255,6 +255,7 @@ fn expected_commerce_escrow(error: &chio_commerce_order::CommerceEscrowError) ->
         E::AcceptStateNotAllowed(_)
         | E::OfferOutsideValidityWindow
         | E::OfferSelfIssued
+        | E::OfferIssuerNotMerchant
         | E::AcceptorNotSubject
         | E::AcceptanceUnbound(_)
         | E::OfferLiabilityInvalid(_)
@@ -334,6 +335,7 @@ fn every_commerce_variant_has_its_exit_class() {
         E::Escrow(chio_commerce_order::CommerceEscrowError::Canonicalization(text())),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSchemaUnsupported(text())),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSignatureInvalid),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::OfferIssuerNotMerchant),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceUnbound("buyer_subject")),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceDigestMismatch),
         E::Escrow(chio_commerce_order::CommerceEscrowError::SettlementSignatureInvalid),

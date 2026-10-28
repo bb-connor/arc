@@ -398,10 +398,10 @@ pub struct CommerceEscrowRelease {
 ///
 /// Denies unless the quote digest recomputes, the order state allows
 /// settlement-packet assembly, the offer token is authentic, valid at
-/// `accepted_at`, issued by a counterparty other than its subject, and accepted
-/// by its subject, the reservation is signed by a pinned authority for this
-/// order and offer, and the offer liability equals the signed quote and is
-/// fully reserved in the quote currency.
+/// `accepted_at`, issued by the order merchant key to a different subject,
+/// and accepted by its subject, the reservation is signed by a pinned
+/// authority for this order and offer, and the offer liability equals the
+/// signed quote and is fully reserved in the quote currency.
 pub fn accept(
     request: CommerceEscrowAcceptRequest<'_>,
 ) -> Result<AcceptedEscrow, CommerceOrderError> {
@@ -417,7 +417,7 @@ pub fn accept(
             CommerceEscrowError::AcceptStateNotAllowed(context.current_state.clone()).into(),
         );
     }
-    authenticate_offer(request.token_offer)?;
+    authenticate_offer(request.token_offer, context)?;
     authenticate_acceptance(request.acceptance, context, request.token_offer)?;
     let liability = token_offer_liability(request.token_offer)?;
     let reserved = verify_reservation(
@@ -608,12 +608,24 @@ fn required_escrow_status(
     }
 }
 
-fn authenticate_offer(token: &CapabilityToken) -> Result<(), CommerceEscrowError> {
+/// The offer must be signed by the merchant key the order names as
+/// `merchant_subject` in `did:chio:<public key hex>` form.
+fn authenticate_offer(
+    token: &CapabilityToken,
+    context: &CommerceOrderContext,
+) -> Result<(), CommerceEscrowError> {
     if !matches!(token.verify_signature(), Ok(true)) {
         return Err(CommerceEscrowError::OfferSignatureInvalid);
     }
     if token.issuer == token.subject {
         return Err(CommerceEscrowError::OfferSelfIssued);
+    }
+    let merchant_key_hex = context
+        .merchant_subject
+        .strip_prefix("did:chio:")
+        .ok_or(CommerceEscrowError::OfferIssuerNotMerchant)?;
+    if merchant_key_hex != token.issuer.to_hex() {
+        return Err(CommerceEscrowError::OfferIssuerNotMerchant);
     }
     Ok(())
 }
