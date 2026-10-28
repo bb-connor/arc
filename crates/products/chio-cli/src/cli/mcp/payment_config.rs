@@ -41,8 +41,9 @@ impl PaymentAdapterConfig {
     /// `CHIO_PAYMENT_X402_TOKEN_SYMBOL` (the charge currency on this rail),
     /// `CHIO_PAYMENT_X402_TOKEN_DECIMALS` (ERC-20 `decimals`),
     /// `CHIO_PAYMENT_X402_PAY_TO` (payee address), and
-    /// `CHIO_PAYMENT_X402_REPLAY_DB` (SQLite path of the durable store that
-    /// holds each accepted EIP-3009 authorization for single use). The
+    /// `CHIO_PAYMENT_X402_REPLAY_DB` (SQLite file of the durable store that
+    /// holds each accepted EIP-3009 authorization for single use; empty,
+    /// in-memory and temporary database paths are refused). The
     /// facilitator URL, the rail and the replay store are validated here, at
     /// load.
     ///
@@ -154,7 +155,22 @@ pub enum X402ReplayStorePathError {
 /// The configured replay store path, refused unless SQLite would open it as a
 /// durable file.
 pub fn durable_replay_db_path(path: &str) -> Result<&str, X402ReplayStorePathError> {
+    if path.trim().is_empty() {
+        return Err(X402ReplayStorePathError::Empty);
+    }
+    if chio_store_sqlite::is_in_memory_sqlite_path(path) || names_a_temporary_database(path) {
+        return Err(X402ReplayStorePathError::NonDurable);
+    }
     Ok(path)
+}
+
+/// SQLite opens a private temporary database for an empty URI filename.
+fn names_a_temporary_database(path: &str) -> bool {
+    path.strip_prefix("file:").is_some_and(|uri| {
+        uri.split(['?', '#'])
+            .next()
+            .is_none_or(|name| name.is_empty())
+    })
 }
 
 #[cfg(test)]
