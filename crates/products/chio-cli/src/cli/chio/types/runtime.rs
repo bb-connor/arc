@@ -3,61 +3,6 @@ use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub(crate) enum ChioRuntimeCommands {
-    /// Evaluate a runtime admission request against verifier-owned local state.
-    Admit {
-        /// Stable request binding JSON.
-        #[arg(long, value_name = "PATH")]
-        request: PathBuf,
-
-        /// Runtime admission profile JSON.
-        #[arg(long = "admission-profile", value_name = "PATH")]
-        admission_profile: PathBuf,
-
-        /// Runtime admission bundle JSON to pin into local admission state.
-        #[arg(long = "admission-bundle", value_name = "PATH")]
-        admission_bundle: PathBuf,
-
-        /// Signed strict runtime trust input JSON.
-        #[arg(long = "runtime-trust-input", value_name = "PATH")]
-        runtime_trust_input: Option<PathBuf>,
-
-        /// Caller-supplied trusted verifier keys JSON.
-        #[arg(long = "trusted-verifiers", value_name = "PATH")]
-        trusted_verifiers: Option<PathBuf>,
-
-        /// Signed pheromone query report to record as observe-only advice.
-        #[arg(long = "pheromone-query-report", value_name = "PATH")]
-        pheromone_query_report: Option<PathBuf>,
-
-        /// Signed verifier-owned runtime pheromone policy JSON.
-        #[arg(long = "runtime-pheromone-policy", value_name = "PATH")]
-        runtime_pheromone_policy: Option<PathBuf>,
-
-        /// Signed verifier-owned runtime peer weights JSON.
-        #[arg(long = "runtime-peer-weights", value_name = "PATH")]
-        runtime_peer_weights: Option<PathBuf>,
-
-        /// Treaty or governance action class id used for runtime policy matching.
-        #[arg(long = "action-class-id", value_name = "ACTION_CLASS_ID")]
-        action_class_id: Option<String>,
-
-        /// Durable trust-floor state path. Uses --store when omitted.
-        #[arg(long = "trust-floor-state", value_name = "PATH")]
-        trust_floor_state: Option<PathBuf>,
-
-        /// Durable local admission store JSON.
-        #[arg(long, value_name = "PATH")]
-        store: PathBuf,
-
-        /// Admission evaluation time in Unix milliseconds.
-        #[arg(long)]
-        now_unix_ms: u64,
-
-        /// Output path for runtime admission report JSON.
-        #[arg(long, value_name = "PATH")]
-        report: PathBuf,
-    },
-
     /// Sign a strict runtime trust input from verifier-owned local material.
     SignTrustInput {
         /// Runtime trust input body JSON.
@@ -85,7 +30,7 @@ pub(crate) enum ChioRuntimeCommands {
         command: ChioRuntimePeerWeightsCommands,
     },
 
-    /// Evaluate runtime pheromone policy without mutating admission state.
+    /// Sign runtime pheromone query reports.
     Pheromone {
         #[command(subcommand)]
         command: ChioRuntimePheromoneCommands,
@@ -495,44 +440,5 @@ pub(crate) enum ChioRuntimePheromoneCommands {
         /// Output path for signed pheromone query report JSON.
         #[arg(long, value_name = "PATH")]
         out: PathBuf,
-    },
-
-    /// Evaluate a signed runtime pheromone policy over a query report.
-    Evaluate {
-        /// Runtime admission bundle JSON for request binding.
-        #[arg(long = "admission-bundle", value_name = "PATH")]
-        admission_bundle: PathBuf,
-
-        /// Signed strict runtime trust input JSON.
-        #[arg(long = "runtime-trust-input", value_name = "PATH")]
-        runtime_trust_input: PathBuf,
-
-        /// Caller-supplied trusted verifier keys JSON.
-        #[arg(long = "trusted-verifiers", value_name = "PATH")]
-        trusted_verifiers: PathBuf,
-
-        /// Signed pheromone query report JSON.
-        #[arg(long = "pheromone-query-report", value_name = "PATH")]
-        pheromone_query_report: PathBuf,
-
-        /// Signed verifier-owned runtime pheromone policy JSON.
-        #[arg(long = "runtime-pheromone-policy", value_name = "PATH")]
-        runtime_pheromone_policy: PathBuf,
-
-        /// Signed verifier-owned runtime peer weights JSON.
-        #[arg(long = "runtime-peer-weights", value_name = "PATH")]
-        runtime_peer_weights: PathBuf,
-
-        /// Treaty or governance action class id used for runtime policy matching.
-        #[arg(long = "action-class-id", value_name = "ACTION_CLASS_ID")]
-        action_class_id: Option<String>,
-
-        /// Evaluation time in Unix milliseconds.
-        #[arg(long)]
-        now_unix_ms: u64,
-
-        /// Output path for policy decision JSON.
-        #[arg(long, value_name = "PATH")]
-        report: PathBuf,
     },
 }

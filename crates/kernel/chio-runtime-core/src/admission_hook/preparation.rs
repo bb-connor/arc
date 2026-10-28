@@ -11,7 +11,6 @@ pub(super) enum HookAdmissionPreparation<'a, S> {
 /// It cannot outlive or be committed through a different configured hook.
 pub(super) struct PreparedHookAdmission<'a, S> {
     pub(super) hook: &'a ChioRuntimeAdmissionHook<S>,
-    pub(super) admission_id: String,
     pub(super) core: PreparedRuntimeAdmission,
     pub(super) treaty_continuation_id_to_consume: Option<String>,
     pub(super) swarm_continuation_id_to_consume: Option<String>,
@@ -252,7 +251,6 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
         Ok(HookAdmissionPreparation::Prepared(Box::new(
             PreparedHookAdmission {
                 hook: self,
-                admission_id: admission_ref.admission_id,
                 core,
                 treaty_continuation_id_to_consume,
                 swarm_continuation_id_to_consume,
