@@ -162,10 +162,7 @@ def bind_names(text: str, ureq_roots: set[str], hyper_roots: set[str]):
     """
     uses = [(match.start(), list(expand_use_tree(match.group(2), []))) for match in USE_STATEMENT.finditer(text)]
     externs = [(match.group(1), match.group(2)) for match in EXTERN_CRATE.finditer(text)]
-    type_aliases = [
-        (match.group(1), [s.strip() for s in re.sub(r"<.*", "", match.group(2), flags=re.S).split("::") if s.strip()])
-        for match in TYPE_ALIAS.finditer(text)
-    ]
+    type_aliases = [(match.group(1), match.group(2)) for match in TYPE_ALIAS.finditer(text)]
     constructors: set[str] = set()
     findings: set[tuple[int, str]] = set()
     while True:
@@ -196,10 +193,8 @@ def bind_names(text: str, ureq_roots: set[str], hyper_roots: set[str]):
                         hyper_roots.add(bound)
                 elif crate in constructors and len(path) == 1:
                     constructors.add(bound)
-        for name, path in type_aliases:
-            if path and path[0] in ureq_roots and any(segment in UREQ_CONSTRUCTORS for segment in path[1:]):
-                constructors.add(name)
-            elif len(path) == 1 and path[0] in constructors:
+        for name, target in type_aliases:
+            if names_agent_type(target, ureq_roots, constructors):
                 constructors.add(name)
         if size == (len(ureq_roots), len(hyper_roots), len(constructors)):
             return constructors, findings
@@ -240,7 +235,8 @@ def qualified_self_types(text: str):
 
 
 def names_agent_type(self_type: str, ureq_roots: set[str], constructors: set[str]) -> bool:
-    """True when a qualified path's self type names a ureq agent type or an alias of one."""
+    """True when a type (a qualified path's self type or an alias target) names a
+    ureq agent type or an alias of one."""
     self_type = self_type.strip()
     while self_type.startswith("(") and self_type.endswith(")"):
         self_type = self_type[1:-1].strip()
