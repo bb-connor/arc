@@ -345,7 +345,7 @@ impl AcceptedEscrow {
 
 /// Inputs to [`release`].
 pub struct CommerceEscrowReleaseRequest<'a> {
-    /// Consumed: one acceptance backs one release.
+    /// The immutable accepted snapshot this release consumes.
     pub acceptance: AcceptedEscrow,
     /// The same order advanced to a settlement-reconciliation predecessor
     /// state. Its order, party, quote, settlement, and escrow fields must equal
