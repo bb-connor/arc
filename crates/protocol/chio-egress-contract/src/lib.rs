@@ -657,6 +657,18 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
     address.is_unspecified()
         || address.is_multicast()
         || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+        || embeds_ipv4_destination(&segments)
+}
+
+/// NAT64 (64:ff9b::/96, 64:ff9b:1::/48), IPv4-compatible (::/96), 6to4
+/// (2002::/16) and Teredo (2001::/32) addresses deliver to an IPv4 host the
+/// address classes above do not see, so they are refused without decoding.
+fn embeds_ipv4_destination(segments: &[u16; 8]) -> bool {
+    let nat64 = segments[0] == 0x0064
+        && segments[1] == 0xff9b
+        && (segments[2] == 0x0001 || segments[2..6] == [0, 0, 0, 0]);
+    let ipv4_compatible = segments[..6] == [0, 0, 0, 0, 0, 0];
+    nat64 || ipv4_compatible || segments[0] == 0x2002 || (segments[0] == 0x2001 && segments[1] == 0)
 }
 
 /// Optional reqwest transport that dispatches only through a
