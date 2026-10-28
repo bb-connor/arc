@@ -17,33 +17,17 @@ mod trust_floor_defaults;
 mod trust_floor_races;
 
 #[derive(Default)]
-struct StoreWithoutTreatyContinuationSupport {
+struct ReadWriteOnlyStore {
     inner: InMemoryRuntimeAdmissionStore,
     floor_callbacks: std::sync::atomic::AtomicUsize,
 }
 
-impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
+impl RuntimeAdmissionStore for ReadWriteOnlyStore {
     fn bundle(
         &self,
         admission_id: &str,
     ) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
         self.inner.bundle(admission_id)
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner.consume_destructive_lease(lease_id, admission_id)
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.inner.release_destructive_lease(lease_id, admission_id)
     }
 
     fn runtime_trust_floor(
@@ -67,18 +51,22 @@ impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
 }
 
 #[test]
-fn store_without_treaty_continuation_support_fails_closed() {
-    let store = StoreWithoutTreatyContinuationSupport::default();
-
-    match store.consume_treaty_continuation("continue-unsupported", "admission-1") {
-        Ok(()) => panic!("default treaty continuation consume must fail closed"),
-        Err(error) => assert_rejected_code(error, "chio_treaty_continuation_store_unsupported"),
+fn unqualified_store_refuses_operation_owned_source() -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::admission_operation::{AdmissionIdentifier, RuntimeSourceQualificationV1};
+    let source = RuntimeSourceQualificationV1::new(
+        AdmissionIdentifier::try_new("source_id", "source")?,
+        AdmissionIdentifier::try_new("runtime_id", "runtime")?,
+        AdmissionIdentifier::try_new("destination_id", "destination")?,
+        1,
+        2,
+        1,
+    )?;
+    let store = ReadWriteOnlyStore::default();
+    match store.verify_operation_owned_runtime_source(&source) {
+        Ok(()) => panic!("unqualified backend accepted a source descriptor"),
+        Err(error) => assert_rejected_code(error, "operation_owned_runtime_source_unsupported"),
     }
-
-    match store.release_treaty_continuation("continue-unsupported", "admission-1") {
-        Ok(()) => panic!("default treaty continuation release must fail closed"),
-        Err(error) => assert_rejected_code(error, "chio_treaty_continuation_store_unsupported"),
-    }
+    Ok(())
 }
 
 fn assert_rejected_code(error: ChioRuntimeError, expected: &'static str) {
@@ -108,7 +96,7 @@ fn in_memory_runtime_admission_store_insert_bundle_is_idempotent(
 }
 
 #[test]
-fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
+fn sqlite_runtime_orchestration_store_persists_run_and_step_status(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("runtime-orchestration.sqlite3");
@@ -131,15 +119,9 @@ fn sqlite_runtime_orchestration_store_persists_replay_fence_and_status(
                 lease_id: Some("lease-live-1".to_string()),
             },
         )?;
-        store.consume_destructive_lease("lease-live-1", "adm-live-1")?;
     }
 
     let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
-    let replay = reopened.consume_destructive_lease("lease-live-1", "adm-live-1");
-    match replay {
-        Ok(()) => panic!("expected destructive lease replay rejection"),
-        Err(error) => assert_eq!(error.code(), "destructive_lease_replay"),
-    }
     let profile = RuntimeOrchestrationProfile {
         schema: CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA.to_string(),
         profile_id: "profile-runtime-orchestration".to_string(),
