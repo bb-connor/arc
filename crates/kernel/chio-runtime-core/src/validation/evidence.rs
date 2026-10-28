@@ -10,8 +10,7 @@ use crate::types::{
     RuntimeWorkflowRunReport,
 };
 use crate::validation::common::{
-    ensure_sha256_hash, is_sha256_hex, validate_acceptance_failure_code, validate_non_empty,
-    validate_state_label,
+    ensure_sha256_hash, validate_acceptance_failure_code, validate_non_empty, validate_state_label,
 };
 
 pub fn validate_runtime_evidence_sink_health_report(
