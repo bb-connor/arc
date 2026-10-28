@@ -358,7 +358,7 @@ pub(crate) fn cmd_passport_challenge_respond(
     let challenge: PassportPresentationChallenge =
         match (challenge_path, challenge_url) {
             (Some(path), None) => crate::input::json(&crate::input::read(path)?)?,
-            (None, Some(url)) => fetch_json_url(url)?,
+            (None, Some(url)) => fetch_json_url(EndpointSource::Operator, url)?,
             (Some(_), Some(_)) => {
                 return Err(CliError::policy_error(
                     "challenge response accepts either --challenge or --challenge-url, not both"
@@ -410,6 +410,7 @@ pub(crate) fn cmd_passport_challenge_submit(
     let presentation: PassportPresentationResponse =
         crate::input::json(&crate::input::read(input)?)?;
     let verification: chio_credentials::PassportPresentationVerification = post_json_url(
+        EndpointSource::Operator,
         submit_url,
         &VerifyPassportChallengeRequest {
             presentation,
@@ -662,9 +663,10 @@ pub(crate) fn cmd_passport_oid4vp_respond(
         ));
     }
 
-    let request_jwt = fetch_text_url(&resolved_request_url)?;
+    let request_jwt = fetch_text_url(EndpointSource::Operator, &resolved_request_url)?;
     let metadata_url = oid4vp_verifier_metadata_url(&resolved_request_url)?;
-    let metadata: Oid4vpVerifierMetadata = fetch_json_url(&metadata_url)?;
+    let metadata: Oid4vpVerifierMetadata =
+        fetch_json_url(EndpointSource::Operator, &metadata_url)?;
     metadata
         .validate()
         .map_err(|error| CliError::policy_error(error.to_string()))?;
@@ -673,7 +675,10 @@ pub(crate) fn cmd_passport_oid4vp_respond(
             "OID4VP request URL is outside the verifier metadata request_uri_prefix".to_string(),
         ));
     }
-    let jwks: PortableJwkSet = fetch_json_url(&metadata.jwks_uri)?;
+    let jwks: PortableJwkSet = fetch_json_url(
+        verifier_chosen_source(&resolved_request_url, &metadata.jwks_uri),
+        &metadata.jwks_uri,
+    )?;
     let verifier_public_keys = verifier_public_keys_from_jwks(&jwks)?;
     let request: Oid4vpRequestObject = verify_signed_oid4vp_request_object_with_any_key(
         &request_jwt,
@@ -707,12 +712,21 @@ pub(crate) fn cmd_passport_oid4vp_respond(
         fs::write(path, response_jwt.as_bytes())?;
     }
 
-    let submit_target = submit
-        .then_some(request.response_uri.as_str())
-        .or(submit_url);
+    let submit_target = if submit {
+        Some((
+            verifier_chosen_source(&resolved_request_url, &request.response_uri),
+            request.response_uri.as_str(),
+        ))
+    } else {
+        submit_url.map(|url| (EndpointSource::Operator, url))
+    };
     let verification = submit_target
-        .map(|url| {
-            post_form_url::<Oid4vpPresentationVerification>(url, &[("response", &response_jwt)])
+        .map(|(source, url)| {
+            post_form_url::<Oid4vpPresentationVerification>(
+                source,
+                url,
+                &[("response", &response_jwt)],
+            )
         })
         .transpose()?;
 
@@ -766,8 +780,11 @@ pub(crate) fn cmd_passport_oid4vp_submit(
     json_output: bool,
 ) -> Result<(), CliError> {
     let response_jwt = load_text_file(input)?;
-    let verification: Oid4vpPresentationVerification =
-        post_form_url(submit_url, &[("response", response_jwt.as_str())])?;
+    let verification: Oid4vpPresentationVerification = post_form_url(
+        EndpointSource::Operator,
+        submit_url,
+        &[("response", response_jwt.as_str())],
+    )?;
     if json_output {
         println!("{}", serde_json::to_string_pretty(&verification)?);
     } else {
@@ -797,7 +814,7 @@ pub(crate) fn cmd_passport_oid4vp_metadata(
         "{}/v1/public/passport/oid4vp/requests/example",
         verifier_url.trim_end_matches('/')
     ))?;
-    let metadata: Oid4vpVerifierMetadata = fetch_json_url(&url)?;
+    let metadata: Oid4vpVerifierMetadata = fetch_json_url(EndpointSource::Operator, &url)?;
     metadata
         .validate()
         .map_err(|error| CliError::policy_error(error.to_string()))?;
@@ -1057,9 +1074,9 @@ mod verifier_chosen_url_tests {
         OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI, OID4VP_OPENID4VP_SCHEME,
         OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_TYPE_VP_TOKEN,
     };
-    use std::io::{Read, Write};
+    use chio_egress_contract::HttpEgressError;
+    use std::io::{ErrorKind, Read, Write};
     use std::net::{TcpListener, TcpStream};
-    use std::sync::mpsc;
 
     fn read_request_head(stream: &mut TcpStream) {
         let mut head = Vec::new();
@@ -1080,15 +1097,8 @@ mod verifier_chosen_url_tests {
     #[test]
     fn a_verifier_chosen_jwks_uri_on_another_loopback_authority_is_not_dialed() {
         let jwks = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        jwks.set_nonblocking(true).unwrap();
         let jwks_uri = format!("http://{}/jwks", jwks.local_addr().unwrap());
-        let (dialed, dial_seen) = mpsc::channel();
-        std::thread::spawn(move || {
-            if let Ok((mut stream, _)) = jwks.accept() {
-                let _ = dialed.send(());
-                read_request_head(&mut stream);
-                let _ = stream.write_all(&reply(r#"{"keys":[]}"#));
-            }
-        });
 
         let verifier = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let origin = format!("http://{}", verifier.local_addr().unwrap());
@@ -1135,10 +1145,26 @@ mod verifier_chosen_url_tests {
             json_output: true,
         });
         server.join().unwrap();
-        assert!(result.is_err());
-        assert!(
-            dial_seen.try_recv().is_err(),
+        assert_eq!(
+            jwks.accept().map(|_| ()).unwrap_err().kind(),
+            ErrorKind::WouldBlock,
             "the holder dialed a verifier-chosen jwks_uri on another loopback authority"
+        );
+        let error = result.unwrap_err();
+        let mut source = std::error::Error::source(&error);
+        let mut refusal = None;
+        while let Some(cause) = source {
+            if let Some(egress) = cause.downcast_ref::<HttpEgressError>() {
+                refusal = Some(egress.clone());
+                break;
+            }
+            source = cause.source();
+        }
+        assert_eq!(
+            refusal,
+            Some(HttpEgressError::SchemeDenied {
+                scheme: "http".to_string()
+            })
         );
     }
 }

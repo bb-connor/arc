@@ -1,4 +1,4 @@
-use super::{HttpEgressContract, HttpEgressError};
+use super::{EndpointSource, HttpEgressContract, HttpEgressError};
 use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -432,6 +432,7 @@ fn ipv6_neighbours_of_the_embedding_prefixes_stay_global() {
 #[test]
 fn single_endpoint_admits_only_its_own_scheme_and_authority() {
     let contract = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
         "passport-document",
         "https://Verifier.Example./v1/request",
         4096,
@@ -469,6 +470,7 @@ fn single_endpoint_admits_only_its_own_scheme_and_authority() {
     );
 
     let with_port = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
         "passport-document",
         "https://verifier.example:8443/",
         1,
@@ -487,12 +489,22 @@ fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
         "http://localhost:9/document",
         "http://[::1]:9/document",
     ] {
-        let contract = HttpEgressContract::single_endpoint("passport-document", url, 1).expect(url);
+        let contract = HttpEgressContract::single_endpoint(
+            EndpointSource::Operator,
+            "passport-document",
+            url,
+            1,
+        )
+        .expect(url);
         assert!(!contract.deny_loopback, "{url}");
     }
-    let contract =
-        HttpEgressContract::single_endpoint("passport-document", "http://127.0.0.1:9/", 1)
-            .expect("loopback");
+    let contract = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "passport-document",
+        "http://127.0.0.1:9/",
+        1,
+    )
+    .expect("loopback");
     assert_eq!(
         contract
             .enforce_url("http://127.0.0.1:10/", 0)
@@ -507,7 +519,12 @@ fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
         ("ftp://127.0.0.1/", "ftp"),
     ] {
         assert_eq!(
-            HttpEgressContract::single_endpoint("passport-document", url, 1),
+            HttpEgressContract::single_endpoint(
+                EndpointSource::Operator,
+                "passport-document",
+                url,
+                1
+            ),
             Err(HttpEgressError::SchemeDenied {
                 scheme: scheme.to_string()
             }),
@@ -549,7 +566,12 @@ fn single_endpoint_refuses_non_public_literals_and_userinfo() {
         ),
     ] {
         assert_eq!(
-            HttpEgressContract::single_endpoint("passport-document", url, 1),
+            HttpEgressContract::single_endpoint(
+                EndpointSource::Operator,
+                "passport-document",
+                url,
+                1
+            ),
             Err(refusal),
             "{url}"
         );
@@ -558,9 +580,13 @@ fn single_endpoint_refuses_non_public_literals_and_userinfo() {
 
 #[test]
 fn a_localhost_name_admits_only_loopback_answers() {
-    let contract =
-        HttpEgressContract::single_endpoint("passport-document", "http://localhost:9/", 1)
-            .expect("loopback name");
+    let contract = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "passport-document",
+        "http://localhost:9/",
+        1,
+    )
+    .expect("loopback name");
     for address in [
         IpAddr::V4(Ipv4Addr::LOCALHOST),
         IpAddr::V6(Ipv6Addr::LOCALHOST),
@@ -576,12 +602,71 @@ fn a_localhost_name_admits_only_loopback_answers() {
         IpAddr::V6("2606:2800:220:1::1".parse().unwrap()),
     ] {
         for host in ["localhost", "localhost.localdomain", "LocalHost."] {
-            assert!(
-                contract.enforce_resolved_ip(host, address).is_err(),
+            assert_eq!(
+                contract.enforce_resolved_ip(host, address),
+                Err(HttpEgressError::LoopbackNameResolvedOffHost {
+                    host: format!("{host} resolved to {address}")
+                        .replace("::ffff:93.184.216.34", "93.184.216.34"),
+                }),
                 "{host} resolved to {address} was admitted"
             );
         }
     }
+}
+
+#[test]
+fn a_remote_endpoint_never_gets_plaintext_or_loopback() {
+    for (url, refusal) in [
+        (
+            "http://127.0.0.1:9/document",
+            HttpEgressError::SchemeDenied {
+                scheme: "http".to_string(),
+            },
+        ),
+        (
+            "http://localhost:9/document",
+            HttpEgressError::SchemeDenied {
+                scheme: "http".to_string(),
+            },
+        ),
+        (
+            "https://127.0.0.1:9/document",
+            HttpEgressError::LoopbackDenied {
+                host: "127.0.0.1".to_string(),
+            },
+        ),
+        (
+            "https://localhost:9/document",
+            HttpEgressError::LoopbackDenied {
+                host: "localhost".to_string(),
+            },
+        ),
+        (
+            "https://[::1]:9/document",
+            HttpEgressError::LoopbackDenied {
+                host: "::1".to_string(),
+            },
+        ),
+    ] {
+        assert_eq!(
+            HttpEgressContract::single_endpoint(
+                EndpointSource::Remote,
+                "passport-document",
+                url,
+                1
+            ),
+            Err(refusal),
+            "{url}"
+        );
+    }
+    let contract = HttpEgressContract::single_endpoint(
+        EndpointSource::Remote,
+        "passport-document",
+        "https://verifier.example/jwks",
+        1,
+    )
+    .expect("public https");
+    assert!(contract.deny_loopback);
 }
 
 #[cfg(all(test, feature = "reqwest-egress"))]

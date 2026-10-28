@@ -89,6 +89,19 @@ pub enum HttpEgressError {
     RedirectLimitExceeded { observed: u8, max: u8 },
     #[error("response size {observed} exceeds maximum {max}")]
     ResponseTooLarge { observed: u64, max: u64 },
+    #[error("loopback name resolved off host: {host}")]
+    LoopbackNameResolvedOffHost { host: String },
+}
+
+/// Who chose a [`HttpEgressContract::single_endpoint`] URL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EndpointSource {
+    /// The operator named the URL, for example on the command line. A
+    /// loopback URL may use plaintext `http`.
+    Operator,
+    /// A remote party chose the URL. Only `https` to a non-loopback host is
+    /// admitted.
+    Remote,
 }
 
 impl HttpEgressContract {
@@ -207,7 +220,7 @@ impl HttpEgressContract {
     }
 
     fn enforce_loopback_hostname(&self, normalized: &str) -> Result<(), HttpEgressError> {
-        if self.deny_loopback && matches!(normalized, "localhost" | "localhost.localdomain") {
+        if self.deny_loopback && is_loopback_name(normalized) {
             return Err(HttpEgressError::LoopbackDenied {
                 host: normalized.to_string(),
             });
@@ -227,7 +240,18 @@ impl HttpEgressContract {
     }
 
     /// Enforce address-class denials after a domain has resolved to an IP.
+    /// A loopback name such as `localhost` must resolve only to loopback.
     pub fn enforce_resolved_ip(&self, host: &str, address: IpAddr) -> Result<(), HttpEgressError> {
+        if let IpAddr::V6(v6) = address {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return self.enforce_resolved_ip(host, IpAddr::V4(mapped));
+            }
+        }
+        if is_loopback_name(&normalize_domain_name(host)) && !address.is_loopback() {
+            return Err(HttpEgressError::LoopbackNameResolvedOffHost {
+                host: format!("{host} resolved to {address}"),
+            });
+        }
         match address {
             IpAddr::V4(address) => {
                 self.enforce_ip_address_class(
@@ -236,9 +260,6 @@ impl HttpEgressContract {
                 )?;
             }
             IpAddr::V6(address) => {
-                if let Some(mapped) = address.to_ipv4_mapped() {
-                    return self.enforce_resolved_ip(host, IpAddr::V4(mapped));
-                }
                 self.enforce_ip_address_class(
                     format!("{host} resolved to {address}"),
                     classify_ipv6_address(&address),
@@ -568,6 +589,10 @@ fn normalize_domain_name(host: &str) -> String {
     host.trim_end_matches('.').to_ascii_lowercase()
 }
 
+fn is_loopback_name(normalized: &str) -> bool {
+    matches!(normalized, "localhost" | "localhost.localdomain")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IpAddressClass {
     Global,
@@ -708,27 +733,27 @@ pub use reqwest_helper::{
 
 impl HttpEgressContract {
     /// Contract for the single endpoint `url` names: that URL's scheme and
-    /// authority only, `https` or plaintext `http` to a loopback host, no
-    /// redirects, and `max_response_bytes`. Loopback is admitted only when
-    /// `url` names a loopback host; link-local, unique-local, private and
+    /// authority only, no redirects, and `max_response_bytes`. An
+    /// [`EndpointSource::Operator`] URL may be `https`, or plaintext `http`
+    /// to a loopback host; an [`EndpointSource::Remote`] URL must be `https`
+    /// to a non-loopback host. Link-local, unique-local, private and
     /// special-use addresses are refused. `url` itself is enforced before the
     /// contract is returned, and resolved addresses are enforced at connect.
     pub fn single_endpoint(
+        source: EndpointSource,
         tenant_egress_namespace: &str,
         url: &str,
         max_response_bytes: u64,
     ) -> Result<Self, HttpEgressError> {
         let parsed =
             Url::parse(url).map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
-        let loopback = match parsed.host() {
-            Some(Host::Domain(domain)) => matches!(
-                normalize_domain_name(domain).as_str(),
-                "localhost" | "localhost.localdomain"
-            ),
+        let loopback_host = match parsed.host() {
+            Some(Host::Domain(domain)) => is_loopback_name(&normalize_domain_name(domain)),
             Some(Host::Ipv4(address)) => address.is_loopback(),
             Some(Host::Ipv6(address)) => address.is_loopback(),
             None => return Err(HttpEgressError::MissingAuthority),
         };
+        let loopback = source == EndpointSource::Operator && loopback_host;
         let scheme = parsed.scheme();
         if scheme != "https" && !(scheme == "http" && loopback) {
             return Err(HttpEgressError::SchemeDenied {

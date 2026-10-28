@@ -1,8 +1,8 @@
 //! Bounded remote documents; HTTP error bodies never become CLI diagnostics.
 use crate::{input, CliError};
 use chio_egress_contract::{
-    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, HttpEgressContract,
-    HttpEgressError,
+    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, EndpointSource,
+    HttpEgressContract, HttpEgressError,
 };
 use serde::de::DeserializeOwned;
 use std::time::Duration;
@@ -29,14 +29,34 @@ fn transport_failure(source: impl std::error::Error + Send + Sync + 'static) -> 
     )
 }
 
+/// A URL the verifier chose counts as operator-supplied only when it keeps
+/// the scheme and authority of the URL the operator named.
+pub(super) fn verifier_chosen_source(operator_url: &str, url: &str) -> EndpointSource {
+    let origin = |url: &str| {
+        url::Url::parse(url).ok().map(|parsed| {
+            (
+                parsed.scheme().to_owned(),
+                parsed.host_str().map(str::to_owned),
+                parsed.port_or_known_default(),
+            )
+        })
+    };
+    match (origin(operator_url), origin(url)) {
+        (Some(operator), Some(chosen)) if operator == chosen => EndpointSource::Operator,
+        _ => EndpointSource::Remote,
+    }
+}
+
 /// Each document URL gets a contract for its own authority: `https`, or
-/// plaintext `http` to a loopback host, no redirects, and the document size
-/// ceiling.
+/// plaintext `http` to a loopback host the operator named, no redirects, and
+/// the document size ceiling.
 fn request(
+    source: EndpointSource,
     url: &str,
     method: fn(&BlockingContractAgent, &str) -> Result<BlockingContractRequest, HttpEgressError>,
 ) -> Result<BlockingContractRequest, CliError> {
     let contract = HttpEgressContract::single_endpoint(
+        source,
         "passport-document",
         url,
         input::MAX_DOCUMENT_BYTES as u64,
@@ -57,25 +77,29 @@ fn document_bytes(
     Ok(response.body().to_vec())
 }
 
-pub(super) fn fetch_json_url<T: DeserializeOwned>(url: &str) -> Result<T, CliError> {
-    let bytes = document_bytes(request(url, BlockingContractAgent::get)?.call())?;
+pub(super) fn fetch_json_url<T: DeserializeOwned>(
+    source: EndpointSource,
+    url: &str,
+) -> Result<T, CliError> {
+    let bytes = document_bytes(request(source, url, BlockingContractAgent::get)?.call())?;
     Ok(input::json(&bytes)?)
 }
 
-pub(super) fn fetch_text_url(url: &str) -> Result<String, CliError> {
-    let bytes = document_bytes(request(url, BlockingContractAgent::get)?.call())?;
+pub(super) fn fetch_text_url(source: EndpointSource, url: &str) -> Result<String, CliError> {
+    let bytes = document_bytes(request(source, url, BlockingContractAgent::get)?.call())?;
     String::from_utf8(bytes).map_err(|source| {
         CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
     })
 }
 
 pub(super) fn post_json_url<B: serde::Serialize, T: DeserializeOwned>(
+    source: EndpointSource,
     url: &str,
     body: &B,
 ) -> Result<T, CliError> {
     let body = serde_json::to_vec(body)?;
     let bytes = document_bytes(
-        request(url, BlockingContractAgent::post)?
+        request(source, url, BlockingContractAgent::post)?
             .header("Content-Type", "application/json")
             .send_bytes(&body),
     )?;
@@ -83,12 +107,13 @@ pub(super) fn post_json_url<B: serde::Serialize, T: DeserializeOwned>(
 }
 
 pub(super) fn post_form_url<T: DeserializeOwned>(
+    source: EndpointSource,
     url: &str,
     fields: &[(&str, &str)],
 ) -> Result<T, CliError> {
     let body = serde_urlencoded::to_string(fields).map_err(transport_failure)?;
     let bytes = document_bytes(
-        request(url, BlockingContractAgent::post)?
+        request(source, url, BlockingContractAgent::post)?
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send_bytes(body.as_bytes()),
     )?;
@@ -134,7 +159,7 @@ mod tests {
             let _ = stream.write_all(reply.as_bytes());
         });
 
-        let outcome = fetch_json_url::<serde_json::Value>(&url);
+        let outcome = fetch_json_url::<serde_json::Value>(EndpointSource::Operator, &url);
         first_server.join().unwrap();
         let _ = TcpStream::connect(second_address)
             .and_then(|mut probe| probe.write_all(b"GET /probe HTTP/1.1\r\n\r\n"));
@@ -180,12 +205,12 @@ mod tests {
     #[test]
     fn remote_document_limits_and_original_duplicate_rejection() {
         let (url, server) = serve_once(reply("200 OK", br#"{"rule":1,"rule":2}"#));
-        assert!(fetch_json_url::<serde_json::Value>(&url).is_err());
+        assert!(fetch_json_url::<serde_json::Value>(EndpointSource::Operator, &url).is_err());
         server.join().unwrap();
 
         let large = vec![b'x'; input::MAX_DOCUMENT_BYTES + 1];
         let (url, server) = serve_once(reply("200 OK", &large));
-        let error = fetch_text_url(&url).unwrap_err();
+        let error = fetch_text_url(EndpointSource::Operator, &url).unwrap_err();
         assert_eq!(
             egress_refusal(&error),
             Some(HttpEgressError::ResponseTooLarge {
@@ -196,7 +221,7 @@ mod tests {
         server.join().unwrap();
 
         let (url, server) = serve_once(reply("403 Forbidden", b"private-marker"));
-        let error = fetch_text_url(&url).unwrap_err();
+        let error = fetch_text_url(EndpointSource::Operator, &url).unwrap_err();
         assert!(std::error::Error::source(&error).is_some());
         assert!(!format!("{error:?} {error}").contains("private-marker"));
         server.join().unwrap();
@@ -224,8 +249,33 @@ mod tests {
                 },
             ),
         ] {
-            let error = fetch_text_url(url).unwrap_err();
+            let error = fetch_text_url(EndpointSource::Operator, url).unwrap_err();
             assert_eq!(egress_refusal(&error), Some(refusal), "{url}");
         }
+    }
+
+    #[test]
+    fn a_verifier_chosen_url_is_operator_supplied_only_on_the_operator_origin() {
+        let operator = "http://127.0.0.1:8080/v1/public/passport/oid4vp/requests/r1";
+        for (url, source) in [
+            (
+                "http://127.0.0.1:8080/v1/public/passport/oid4vp/direct-post",
+                EndpointSource::Operator,
+            ),
+            ("http://127.0.0.1:8081/jwks", EndpointSource::Remote),
+            ("http://localhost:8080/jwks", EndpointSource::Remote),
+            ("https://127.0.0.1:8080/jwks", EndpointSource::Remote),
+            ("http://127.0.0.1.attacker.example:8080/jwks", EndpointSource::Remote),
+            ("not a url", EndpointSource::Remote),
+        ] {
+            assert_eq!(verifier_chosen_source(operator, url), source, "{url}");
+        }
+        assert_eq!(
+            verifier_chosen_source(
+                "https://verifier.example/requests/r1",
+                "https://verifier.example:443/jwks"
+            ),
+            EndpointSource::Operator
+        );
     }
 }
