@@ -398,6 +398,13 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("raw decode", findings[0])
 
+    def test_macro_trait_capture_does_not_hide_concrete_decode(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! m { ($Name:ty) => { fn decode(d: D) { $Name::deserialize(d); ChioReceipt::deserialize(d); } }; } m!(u32);",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
     def test_macro_template_unknown_concrete_target_is_an_error(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "macro_rules! m { () => { fn bad(s: &str) { serde_json::from_str::<missing::Envelope>(s); } }; } m!();",
