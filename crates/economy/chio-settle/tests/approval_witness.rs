@@ -297,6 +297,32 @@ fn dispatch_identity_comparison_does_not_trim_the_live_identity() {
 }
 
 #[test]
+fn x402_refuses_missing_capability_identity_without_consuming() {
+    let mut f = Fixture::new();
+    f.binding.capability_id = f.dispatch.dispatch_id.clone();
+    f.dispatch.capital_instruction.body.query.capability_id = None;
+    assert!(
+        matches!(f.x402(f.witness()), Err(SettlementError::InvalidBinding(reason))
+        if reason == "x402 capability identity is missing")
+    );
+    f.dispatch.capital_instruction.body.query.capability_id = Some(f.binding.capability_id.clone());
+    f.x402(f.witness()).test_unwrap();
+}
+
+#[test]
+fn circle_refuses_missing_capability_identity_without_consuming() {
+    let mut f = Fixture::new();
+    f.binding.capability_id = f.dispatch.dispatch_id.clone();
+    f.dispatch.capital_instruction.body.query.capability_id = None;
+    assert!(
+        matches!(f.circle(f.witness()), Err(SettlementError::InvalidBinding(reason))
+        if reason == "circle capability identity is missing")
+    );
+    f.dispatch.capital_instruction.body.query.capability_id = Some(f.binding.capability_id.clone());
+    f.circle(f.witness()).test_unwrap();
+}
+
+#[test]
 fn circle_requires_the_exact_signed_capability_identity() {
     let mut f = Fixture::new();
     let witness = f.witness();
