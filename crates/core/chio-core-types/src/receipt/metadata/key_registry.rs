@@ -166,7 +166,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         CommittedSafe,
         Some(super::RECEIPT_SESSION_ANCHOR_SCHEMA),
-        "The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The anchor id embeds the random session id, so the commitment confirms no guessed auth context. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier.",
+        "The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, so it is never written; the anchor id embeds the random session id, so the commitment confirms no guessed auth context. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier.",
     ),
     spec(
         "receipt_context",
