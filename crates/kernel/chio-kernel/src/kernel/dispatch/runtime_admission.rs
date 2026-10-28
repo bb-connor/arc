@@ -146,6 +146,23 @@ impl ChioKernel {
                     refusal.hook_release_metadata = hook_release_metadata;
                     return refusal;
                 }
+                if let Some(field) =
+                    crate::kernel::hook_kernel_owned_runtime_field(decision.metadata.as_ref())
+                {
+                    let mut refusal = RuntimeAdmissionDecision::deny(
+                        crate::kernel::HOOK_KERNEL_OWNED_RUNTIME_FIELD_REFUSAL,
+                        Some(serde_json::json!({
+                            "runtime_admission": {
+                                "hook": hook.name(),
+                                "accepted": false,
+                                "failure_code": "runtime_admission_hook_metadata_kernel_owned_field",
+                                "field": field
+                            }
+                        })),
+                    );
+                    refusal.hook_release_metadata = decision.metadata;
+                    return refusal;
+                }
                 if decision.allowed {
                     match decision.verified_treaty_material.take() {
                         Some(material) => {
@@ -166,18 +183,9 @@ impl ChioKernel {
                             }
                         }
                         None if request.federated_origin_kernel_id.is_some() => {
-                            let mut metadata = decision.metadata;
-                            if let Some(runtime) = metadata
-                                .as_mut()
-                                .and_then(serde_json::Value::as_object_mut)
-                                .and_then(|metadata| metadata.get_mut("chio_runtime"))
-                                .and_then(serde_json::Value::as_object_mut)
-                            {
-                                runtime.remove("federation_treaty_dsse");
-                            }
                             return RuntimeAdmissionDecision::deny(
                                 "verified federation treaty material missing from allowed runtime admission",
-                                metadata,
+                                decision.metadata,
                             );
                         }
                         None => {}

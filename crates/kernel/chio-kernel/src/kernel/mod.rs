@@ -183,6 +183,46 @@ fn hook_metadata_names_forbidden_key(metadata: Option<&serde_json::Value>) -> bo
         .is_some_and(|object| object.keys().any(|key| !is_hook_metadata_key(key)))
 }
 
+/// Refusal reason for runtime-admission hook metadata whose `chio_runtime`
+/// block names a field only the kernel writes.
+const HOOK_KERNEL_OWNED_RUNTIME_FIELD_REFUSAL: &str =
+    "runtime admission hook metadata names a kernel-owned chio_runtime field";
+
+/// `chio_runtime` fields only the kernel writes: reservation retention,
+/// identity disposition, cleanup and post-effect faults, payment credential
+/// disposition and verified treaty evidence. A hook decision naming one is
+/// refused, so a signed receipt never carries a hook-asserted kernel record.
+const KERNEL_OWNED_RUNTIME_FIELDS: [&str; 17] = [
+    "retained_destructive_lease_id",
+    "retained_treaty_continuation_id",
+    "retained_swarm_continuation_id",
+    "reservations_retained_fail_closed",
+    "reservation_retained",
+    "identity_disposition",
+    "retryable_after_resume",
+    "pre_dispatch_cleanup_failed",
+    "pre_dispatch_cleanup_faults",
+    "pre_dispatch_cleanup_reason",
+    "post_effect_fault",
+    "evaluation_started_at",
+    "payment_credential_disposition",
+    "dispatch_credential_disposition",
+    "dispatch_credential_retention_outcome_unknown",
+    "pre_dispatch_payment_unwind",
+    "federation_treaty_dsse",
+];
+
+/// The first kernel-owned field, in list order, that hook `chio_runtime`
+/// metadata names.
+fn hook_kernel_owned_runtime_field(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let runtime = metadata
+        .and_then(|metadata| metadata.get(RUNTIME_ADMISSION_METADATA_KEY))
+        .and_then(serde_json::Value::as_object)?;
+    KERNEL_OWNED_RUNTIME_FIELDS
+        .into_iter()
+        .find(|field| runtime.contains_key(*field))
+}
+
 /// The first reserved key, in registry order, that caller metadata names.
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
