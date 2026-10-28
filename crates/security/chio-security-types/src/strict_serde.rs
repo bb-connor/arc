@@ -1,7 +1,7 @@
 //! Decoders that refuse input their derived serde form would discard.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -96,6 +96,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
 /// cannot keep the last of two duplicates.
 pub fn lossless<'de, D, T>(
     deserializer: D,
+    type_name: &'static str,
     decode: impl FnOnce(Value) -> Result<T, serde_json::Error>,
     encode: impl FnOnce(&T) -> Result<Value, serde_json::Error>,
 ) -> Result<T, D::Error>
@@ -103,7 +104,15 @@ where
     D: Deserializer<'de>,
 {
     let StrictValue(value) = StrictValue::deserialize(deserializer)?;
-    let typed = decode(value.clone()).map_err(D::Error::custom)?;
+    let typed = decode(value.clone()).map_err(|error| {
+        if error.to_string() == "data did not match any variant of untagged enum LosslessTarget" {
+            D::Error::custom(format!(
+                "data did not match any variant of untagged enum {type_name}"
+            ))
+        } else {
+            D::Error::custom(error)
+        }
+    })?;
     if encode(&typed).map_err(D::Error::custom)? != value {
         return Err(D::Error::custom(DROPPED_INPUT));
     }
@@ -149,6 +158,7 @@ macro_rules! lossless_serde {
                 ) -> ::core::result::Result<Self, D::Error> {
                     $crate::strict_serde::lossless(
                         deserializer,
+                        stringify!($name),
                         |value| LosslessRaw::deserialize(value),
                         |typed| {
                             $crate::strict_serde::__private::Serialize::serialize(
