@@ -318,6 +318,40 @@ measure_workflows() {
                     err "fuzz-budget: ${wf} run ${run_id} lists no jobs (conclusion: ${conclusion:-none})"
                     exit 2
                 fi
+                # Runner time needs the accounting fields of every job. A job
+                # assigned to a runner must carry its start (and, once
+                # completed, its completion) time. A job never assigned to a
+                # runner consumes nothing, which is only consistent with it
+                # never running: cancelled, skipped or failed before
+                # assignment, or still waiting for a runner.
+                if ! violation="$(jq -rs --arg run_status "${run_status}" '
+                    def text_or_null: type == "string" or type == "null";
+                    [[.[].jobs[]] | unique_by(.id)[]
+                     | if ((.status | type) != "string"
+                           or ((has("runner_name") and (.runner_name | text_or_null)) | not)
+                           or ((has("started_at") and (.started_at | text_or_null)) | not)
+                           or ((has("completed_at") and (.completed_at | text_or_null)) | not)
+                           or ((has("conclusion") and (.conclusion | text_or_null)) | not))
+                       then "job \(.id) lacks accounting fields"
+                       elif $run_status == "completed" and .status != "completed"
+                       then "completed run lists unfinished job \(.id)"
+                       elif (.runner_name // "") != "" then
+                         if .started_at == null then "assigned job \(.id) has no start time"
+                         elif .status == "completed" and .completed_at == null
+                         then "completed job \(.id) has no completion time"
+                         else empty end
+                       elif .status == "completed"
+                            and ([.conclusion] | inside(["cancelled", "skipped", "failure"]) | not)
+                       then "unassigned job \(.id) concluded \(.conclusion)"
+                       else empty end
+                    ] | first // "ok"' "${jobs}" 2>/dev/null)" || [[ -z "${violation}" ]]; then
+                    err "fuzz-budget: malformed jobs listing for ${wf} run ${run_id}"
+                    exit 2
+                fi
+                if [[ "${violation}" != "ok" ]]; then
+                    err "fuzz-budget: ${wf} run ${run_id}: ${violation}"
+                    exit 2
+                fi
                 if ! run_seconds="$(jq -s --argjson now "${now_epoch}" \
                     '[[.[].jobs[]] | unique_by(.id)[]
                       | select((.runner_name // "") != "" and .started_at != null)

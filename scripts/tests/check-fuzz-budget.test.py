@@ -76,6 +76,8 @@ def run(
 
 def job(start: int, end: int | None, runner: str | None) -> dict:
     return {
+        "status": "in_progress" if end is None else "completed",
+        "conclusion": None if end is None else ("success" if runner else "cancelled"),
         "started_at": iso(start),
         "completed_at": None if end is None else iso(end),
         "runner_name": runner,
@@ -389,6 +391,40 @@ def invalid_job_listings_fail_closed() -> None:
         assert ledger.read_text() == before, ledger.read_text()
 
 
+def jobs_without_accounting_fields_fail_closed() -> None:
+    start = NOW - 86400
+    complete = job(start, start + 600, "runner")
+    for broken, needle in [
+        ({"id": 1}, "job 1 lacks accounting fields"),
+        ({"id": 1, "runner_name": "assigned-runner"}, "job 1 lacks accounting fields"),
+        (dict(complete, id=1, started_at=None), "assigned job 1 has no start time"),
+        (dict(complete, id=1, completed_at=None), "completed job 1 has no completion time"),
+        (dict(complete, id=1, started_at=1700000000), "job 1 lacks accounting fields"),
+        (dict(complete, id=1, runner_name=7), "job 1 lacks accounting fields"),
+        (dict(complete, id=1, status="in_progress", completed_at=None), "completed run lists unfinished job 1"),
+        (dict(complete, id=1, runner_name=None, conclusion="success"), "unassigned job 1 concluded success"),
+    ]:
+        case = Case()
+        case.listing([run(50, start, start + 700)])
+        case.raw_jobs(50, {"total_count": 1, "jobs": [broken]})
+        expect(case.check(), 2, needle, "fuzz.yml run 50")
+        case.listing([run(51, start, start + 700)], workflow="mutants.yml")
+        case.raw_jobs(51, {"total_count": 1, "jobs": [broken]})
+        case.quiet("mutation")
+        expect(case.check("mutation"), 0, needle, "envelope=mutation usage is unverified")
+
+
+def never_started_jobs_count_zero() -> None:
+    start = NOW - 86400
+    case = Case()
+    case.listing([run(52, start, start + 86400, conclusion="cancelled")])
+    queued_then_cancelled = dict(job(start, start + 86400, None), id=1)
+    skipped = dict(job(start, start, ""), id=2, conclusion="skipped")
+    ran = dict(job(start, start + 600, "runner"), id=3)
+    case.raw_jobs(52, {"total_count": 3, "jobs": [queued_then_cancelled, skipped, ran]})
+    expect(case.check(), 0, "runs=1 queried=1 executed=10 min")
+
+
 def paginated_jobs_sum_across_pages() -> None:
     start = NOW - 86400
     case = Case()
@@ -523,6 +559,8 @@ CASES = [
     missing_workflow_fails_closed,
     invalid_job_listings_fail_closed,
     paginated_jobs_sum_across_pages,
+    jobs_without_accounting_fields_fail_closed,
+    never_started_jobs_count_zero,
     cancelled_run_without_jobs_counts_zero,
     invalid_mutation_listing_is_not_cached,
     ledger_skips_completed_runs,
