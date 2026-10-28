@@ -4,8 +4,8 @@ use chio_security_types::{ports::*, response_simulation::*, *};
 use serde_json::json;
 
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-fn id(value: &str) -> RecordId {
-    RecordId::new(value).unwrap_or_else(|e| panic!("identifier: {e}"))
+fn id(value: &str) -> TestResult<RecordId> {
+    Ok(RecordId::new(value)?)
 }
 fn digest(value: u8) -> Digest32 {
     Digest32::new([value; 32])
@@ -18,7 +18,7 @@ pub fn fixture(
     let action_id = ActionId::new("simulation-action")?;
     let session_id = SessionId::new("session")?;
     let lineage_id = LineageId::new("root")?;
-    let affected_ids = RecordIdSet::new(vec![id("root")])?;
+    let affected_ids = RecordIdSet::new(vec![id("root")?])?;
     let affected_set_hash = response_affected_set_hash(&tenant_id, &affected_ids)?;
     let target = containment_session_target(&tenant_id, &session_id)?;
     let overlay = OverlaySnapshot {
@@ -183,7 +183,7 @@ pub fn fixture(
                     request: BlastRadiusRequest {
                         tenant_id: tenant_id.clone(),
                         action_id: action_id.clone(),
-                        seed_ids: BoundedVec::new(vec![id("root")])?,
+                        seed_ids: BoundedVec::new(vec![id("root")?])?,
                         query_bounds: bounds,
                     },
                     approved_result: scope.clone(),
@@ -258,24 +258,24 @@ pub fn dry_run_plan(
     build_response_plan(ResponsePlanInput {
         execution: ResponseExecutionBinding::new(ResponseExecutionMode::DryRun),
         action_id,
-        trigger_finding_id: id("finding"),
+        trigger_finding_id: id("finding")?,
         trigger_finding_hash: digest(1),
         trigger_finding_receipt_id: OpaqueReceiptRef::new("finding-receipt")?,
         tenant_id: tenant_id.clone(),
-        policy_version: id("policy"),
+        policy_version: id("policy")?,
         policy_hash: digest(2),
         affected_ids: affected_ids.as_slice().to_vec(),
         effects,
         ttl_ms: 2000,
         created_at_unix_ms: 1000,
         operator_capability: OperatorCapabilityBinding {
-            capability_id: id("capability"),
+            capability_id: id("capability")?,
             capability_digest: digest(3),
             expires_at_unix_ms: 5000,
-            executor_subject: id("executor"),
+            executor_subject: id("executor")?,
         },
         approval_requirement: ResponseApprovalRequirement::Automatic,
-        submitter: id("submitter"),
+        submitter: id("submitter")?,
         reason_hash: digest(4),
     })
     .map_err(Into::into)

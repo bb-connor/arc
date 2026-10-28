@@ -32,7 +32,7 @@ use chio_security_types::{
     ResponseEffectProgress, ResponseEffectSpec, ResponseMutationRecord, ResponsePlanInput,
     ResponseState, ResponseTarget, ResponseTransitionCause,
 };
-use response_support::{record, TestResponseStore};
+use response_support::TestResponseStore;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -46,6 +46,10 @@ fn expect_err<T: std::fmt::Debug, E>(result: Result<T, E>) -> E {
 
 fn digest(value: u8) -> Digest32 {
     Digest32::new([value; 32])
+}
+
+fn record(value: &str) -> RecordId {
+    RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
 }
 
 fn contribution(value: u8) -> (CanonicalBody, Digest32) {

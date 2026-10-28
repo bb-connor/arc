@@ -24,7 +24,7 @@ use chio_security_types::{
     ResponseShapeError, ResponseState, ResponseTarget,
 };
 use proptest::prelude::*;
-use response_support::{record, TestResponseStore};
+use response_support::TestResponseStore;
 use std::sync::Arc;
 
 fn expect_err<T: std::fmt::Debug, E>(result: Result<T, E>) -> E {
@@ -74,6 +74,11 @@ const LEGAL_STATE_EDGES: [(ResponseState, ResponseState); 20] = [
 
 fn digest(value: u8) -> Digest32 {
     Digest32::new([value; 32])
+}
+
+fn record(value: &str) -> chio_security_types::ports::RecordId {
+    chio_security_types::ports::RecordId::new(value)
+        .unwrap_or_else(|error| panic!("record id: {error}"))
 }
 
 fn error(value: &str) -> ErrorCode {

@@ -4,16 +4,8 @@ use crate::*;
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::{ports::*, *};
 use std::sync::Arc;
-#[allow(
-    clippy::panic,
-    reason = "The integration-test fixtures shared with this driver reject malformed fixture identifiers."
-)]
 #[path = "../tests/response_support/simulation.rs"]
 mod simulation_fixture;
-#[allow(
-    clippy::panic,
-    reason = "The integration-test fixtures shared with this driver reject malformed fixture identifiers."
-)]
 #[path = "../tests/response_support/mod.rs"]
 mod support;
 
