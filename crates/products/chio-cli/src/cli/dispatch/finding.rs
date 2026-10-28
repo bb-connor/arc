@@ -1170,6 +1170,11 @@ const AUTHORIZATION_HEADER: &str = "Authorization";
 
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "finding/redirect_probe.rs"]
+mod redirect_probe;
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 #[path = "finding/unit_tests.rs"]
 mod unit_tests;
 
