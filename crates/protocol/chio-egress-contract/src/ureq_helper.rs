@@ -4,7 +4,18 @@ use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract, Req
 use std::error::Error;
 use std::io::{self, Read};
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
 use std::time::Duration;
+
+/// Name lookup for one host and port. Every address it returns still passes
+/// the contract address checks before a socket opens.
+pub type ContractLookup = Arc<dyn Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync>;
+
+/// The system resolver as a [`ContractLookup`].
+#[must_use]
+pub fn system_lookup() -> ContractLookup {
+    Arc::new(|host: &str, port: u16| (host, port).to_socket_addrs().map(Iterator::collect))
+}
 
 /// Blocking HTTP agent whose only constructor is [`BlockingContractAgent::new`].
 /// It never follows redirects, ignores proxy environment variables, checks
@@ -27,6 +38,16 @@ impl BlockingContractAgent {
         timeout: Duration,
         deadline: Duration,
     ) -> Result<Self, HttpEgressError> {
+        Self::with_lookup(contract, timeout, deadline, system_lookup())
+    }
+
+    /// As [`Self::new`], resolving names through `lookup`.
+    pub fn with_lookup(
+        contract: &HttpEgressContract,
+        timeout: Duration,
+        deadline: Duration,
+        lookup: ContractLookup,
+    ) -> Result<Self, HttpEgressError> {
         let prepared = contract.prepare()?;
         prepared.validate_dispatchable_with_pinned_dns()?;
         let agent = ureq::AgentBuilder::new()
@@ -38,6 +59,7 @@ impl BlockingContractAgent {
             .try_proxy_from_env(false)
             .resolver(ContractResolver {
                 prepared: prepared.clone(),
+                lookup,
             })
             .build();
         Ok(Self { agent, prepared })
@@ -163,31 +185,33 @@ fn contract_refusal(error: &(dyn Error + 'static)) -> Option<HttpEgressError> {
 
 struct ContractResolver {
     prepared: PreparedHttpEgressContract,
+    lookup: ContractLookup,
 }
 
 impl ureq::Resolver for ContractResolver {
     fn resolve(&self, netloc: &str) -> io::Result<Vec<SocketAddr>> {
-        resolve_with_contract(&self.prepared, netloc)
+        resolve_with_contract(&self.prepared, &self.lookup, netloc)
             .map_err(|refusal| io::Error::new(io::ErrorKind::PermissionDenied, refusal))
     }
 }
 
 fn resolve_with_contract(
     prepared: &PreparedHttpEgressContract,
+    lookup: &ContractLookup,
     netloc: &str,
 ) -> Result<Vec<SocketAddr>, HttpEgressError> {
-    let (host, _port) = netloc
+    let (host, port) = netloc
         .rsplit_once(':')
         .ok_or(HttpEgressError::MissingAuthority)?;
     let host = host.trim_start_matches('[').trim_end_matches(']');
+    let port = port
+        .parse::<u16>()
+        .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
     prepared.enforce_resolver_hostname(host)?;
-    let addresses = netloc
-        .to_socket_addrs()
-        .map_err(|error| HttpEgressError::DnsResolutionFailed {
-            host: host.to_string(),
-            details: error.to_string(),
-        })?
-        .collect::<Vec<_>>();
+    let addresses = lookup(host, port).map_err(|error| HttpEgressError::DnsResolutionFailed {
+        host: host.to_string(),
+        details: error.to_string(),
+    })?;
     enforce_resolved_addresses(prepared, host, addresses)
 }
 

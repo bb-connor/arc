@@ -1,7 +1,9 @@
 use super::*;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::time::Instant;
 
 fn serve_once(response: &'static str) -> (String, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -167,5 +169,131 @@ fn deadline_bounds_a_response_that_drips_inside_the_phase_timeout() {
         matches!(outcome, Err(HttpEgressError::Transport(_))),
         "a 4 second drip must exceed the 1 second deadline: {outcome:?}"
     );
+    handle.join().expect("server");
+}
+
+fn lookup_after(delay: Duration, answer: SocketAddr) -> ContractLookup {
+    Arc::new(move |_host: &str, _port: u16| {
+        thread::sleep(delay);
+        Ok(vec![answer])
+    })
+}
+
+#[test]
+fn slow_resolution_spends_the_request_deadline() {
+    let (authority, handle) =
+        serve_once("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    let server: SocketAddr = authority.parse().expect("server");
+    let target = format!("slow.example:{}", server.port());
+    let agent = BlockingContractAgent::with_lookup(
+        &HttpEgressContract::permissive_for_tests(&target),
+        Duration::from_secs(5),
+        Duration::from_secs(1),
+        lookup_after(Duration::from_secs(3), server),
+    )
+    .expect("agent");
+    let started = Instant::now();
+    let outcome = agent
+        .get(&format!("http://{target}/"))
+        .expect("allowed")
+        .call();
+    let elapsed = started.elapsed();
+    assert_eq!(
+        outcome,
+        Err(HttpEgressError::DnsResolutionFailed {
+            host: "slow.example".to_string(),
+            details: "resolution did not finish within the request deadline".to_string(),
+        })
+    );
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "a 3 second lookup must end at the 1 second deadline, took {elapsed:?}"
+    );
+    drop(handle);
+}
+
+#[test]
+fn http_phase_gets_only_the_budget_left_after_resolution() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let server = listener.local_addr().expect("address");
+    let handle = thread::spawn(move || {
+        let accepted = listener.accept();
+        thread::sleep(Duration::from_secs(3));
+        drop(accepted);
+    });
+    let target = format!("silent.example:{}", server.port());
+    let agent = BlockingContractAgent::with_lookup(
+        &HttpEgressContract::permissive_for_tests(&target),
+        Duration::from_secs(5),
+        Duration::from_secs(1),
+        lookup_after(Duration::from_millis(600), server),
+    )
+    .expect("agent");
+    let started = Instant::now();
+    let outcome = agent
+        .get(&format!("http://{target}/"))
+        .expect("allowed")
+        .call();
+    let elapsed = started.elapsed();
+    assert!(
+        matches!(outcome, Err(HttpEgressError::Transport(_))),
+        "a silent server must fail the request: {outcome:?}"
+    );
+    assert!(
+        elapsed < Duration::from_millis(1_500),
+        "resolution and the HTTP phase share the 1 second deadline, took {elapsed:?}"
+    );
+    handle.join().expect("server");
+}
+
+#[test]
+fn the_first_checked_answer_is_the_only_address_dialed() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let server = listener.local_addr().expect("address");
+    let handle = thread::spawn(move || {
+        for _ in 0..2 {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut request = Vec::new();
+            let mut byte = [0_u8; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                if stream.read(&mut byte).expect("read") == 0 {
+                    break;
+                }
+                request.push(byte[0]);
+            }
+            stream
+                .write_all(
+                    b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .expect("write");
+        }
+    });
+    let target = format!("rebind.example:{}", server.port());
+    let lookups = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&lookups);
+    let rebinding: ContractLookup = Arc::new(move |_host: &str, port: u16| {
+        if observed.fetch_add(1, Ordering::SeqCst) == 0 {
+            Ok(vec![server])
+        } else {
+            Ok(vec![SocketAddr::from(([10, 0, 0, 1], port))])
+        }
+    });
+    let agent = BlockingContractAgent::with_lookup(
+        &HttpEgressContract::permissive_for_tests(&target),
+        Duration::from_secs(2),
+        Duration::from_secs(10),
+        rebinding,
+    )
+    .expect("agent");
+    for _ in 0..2 {
+        let response = agent
+            .clone()
+            .get(&format!("http://{target}/"))
+            .expect("allowed")
+            .call()
+            .expect("response");
+        assert_eq!(response.status(), 204);
+    }
+    assert_eq!(lookups.load(Ordering::SeqCst), 1);
     handle.join().expect("server");
 }
