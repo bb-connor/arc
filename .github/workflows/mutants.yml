@@ -173,7 +173,7 @@ jobs:
 
       - name: Restore fuzz budget ledger
         if: steps.select.outputs.selected == 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ runner.temp }}/fuzz-budget-ledger.json
           key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
@@ -184,7 +184,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
           GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
           set -euo pipefail
@@ -196,6 +195,13 @@ jobs:
             echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
             exit 2
           fi
+
+      - name: Save fuzz budget ledger
+        if: always() && steps.select.outputs.selected == 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
       - name: Capture PR diff for --in-diff scoping
         id: diff
@@ -389,7 +395,7 @@ jobs:
 
       - name: Restore fuzz budget ledger
         if: steps.forced.outputs.skip == 'false'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ runner.temp }}/fuzz-budget-ledger.json
           key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
@@ -400,7 +406,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
           # Mutation lanes are reported, not capped.
           GH_FUZZ_BUDGET_SCOPE: mutation
         run: |
@@ -411,6 +416,13 @@ jobs:
             echo "scripts/check-fuzz-budget.sh missing or non-executable" >&2
             exit 2
           fi
+
+      - name: Save fuzz budget ledger
+        if: always() && steps.forced.outputs.skip == 'false'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
       - name: Run cargo-mutants full-workspace sweep
         id: mutate

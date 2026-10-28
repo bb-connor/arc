@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Restore fuzz budget ledger
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ runner.temp }}/fuzz-budget-ledger.json
           key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
@@ -52,8 +52,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: fail
           GH_FUZZ_BUDGET_SCOPE: cflite
         run: |
           set -euo pipefail
@@ -61,6 +59,13 @@ jobs:
           # runs older than 30 days, so the rotation resumes once usage is
           # back under the cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+      - name: Save fuzz budget ledger
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
   rotate:
     name: rotate
