@@ -343,9 +343,47 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("raw decode", findings[0])
 
+    def test_test_only_brace_macro_preserves_following_production(self):
+        for invocation in ["std::thread_local! { static X: u32 = 0; }", "probe! { nested! { x } };", "probe!(a < 3);", "probe![a < 3];"]:
+            with self.subTest(invocation=invocation):
+                findings = self.findings({
+                    "crates/demo/src/lib.rs": "#[cfg(test)] " + invocation + " fn bad(s: &str) { serde_json::from_str::<ChioReceipt>(s); }",
+                })
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn("raw decode", findings[0])
+
+    def test_test_only_comparison_preserves_production_decode(self):
+        for statement in ["assert!(a < 3);", "let x = a < 3;", "let x = a > 3;"]:
+            with self.subTest(statement=statement):
+                findings = self.findings({
+                    "crates/demo/src/lib.rs": "fn bad(s: &str, a: u32) { #[cfg(test)] " + statement + " serde_json::from_str::<ChioReceipt>(s); }",
+                })
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn("raw decode", findings[0])
+
+    def test_macro_template_concrete_decode_is_scanned(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! m { () => { fn bad(s: &str) { serde_json::from_str::<ChioReceipt>(s); } }; } m!();",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
+    def test_macro_template_capture_does_not_hide_concrete_target(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! m { ($name:ident) => { fn bad(s: &str) { serde_json::from_str::<($name, ChioReceipt)>(s); } }; } m!(u32);",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
+    def test_macro_template_unknown_concrete_target_is_an_error(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! m { () => { fn bad(s: &str) { serde_json::from_str::<missing::Envelope>(s); } }; } m!();",
+        })
+        self.assertTrue(any("unresolved type path missing::Envelope" in finding for finding in findings), findings)
+
     def test_macro_decoder_template_is_not_a_concrete_raw_decode(self):
         findings = self.findings({
-            "crates/demo/src/lib.rs": "macro_rules! make { ($name:ident) => { struct $name(u32); const _: () = { fn deserialize(d: D) { PrivateMirror::deserialize(d); } }; }; } make!(Plain);",
+            "crates/demo/src/lib.rs": "macro_rules! make { ($name:ident) => { struct $name(u32); const _: () = { type PrivateMirror = $name; fn deserialize(d: D) { PrivateMirror::deserialize(d); } }; }; } make!(Plain);",
         })
         self.assertEqual(findings, [])
 
