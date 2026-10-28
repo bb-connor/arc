@@ -1486,6 +1486,20 @@ fn ensure_source_runtime_regeneration_records_bind_workflow_steps(
         .ok_or_else(|| "proof-room.runtime-regeneration.workflow-steps-missing".to_string())?;
 
     for source_record in source_records {
+        if source_record.as_object().is_some_and(|record| {
+            record.keys().any(|key| {
+                !matches!(
+                    key.as_str(),
+                    "stepIndex"
+                        | "toolReceiptSha256"
+                        | "bilateralDsseSha256"
+                        | "workflowStepSha256"
+                )
+            })
+        }) {
+            return Err("proof-room.runtime-regeneration.source-record-unknown-field".into());
+        }
+
         let step_index = source_record
             .get("stepIndex")
             .and_then(serde_json::Value::as_u64)
