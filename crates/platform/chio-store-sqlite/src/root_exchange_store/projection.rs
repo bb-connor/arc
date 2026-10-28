@@ -122,10 +122,12 @@ impl RootRow {
             && context.exchange.request_digest == self.request_digest
             && context.anchor.provider_identity_digest == self.provider_identity_digest
             && context.anchor.key_snapshot_digest == self.key_snapshot_digest
-            && context
-                .anchor
-                .artifact_digest
-                .is_none_or(|digest| digest == self.artifact_digest);
+            && match context.anchor.artifact_digest {
+                Some(digest) => {
+                    context.anchor.kind.is_jws_verified() && digest == self.artifact_digest
+                }
+                None => !context.anchor.kind.is_jws_verified(),
+            };
         if !agrees {
             return Err(tampered());
         }

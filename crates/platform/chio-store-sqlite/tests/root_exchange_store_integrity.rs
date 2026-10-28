@@ -9,6 +9,8 @@ mod support;
 use chio_store_sqlite::root_exchange_store::{
     RetainedArtifact, RootExchangeIntegrityError as I, RootExchangeStoreError as E,
 };
+use chio_store_sqlite::serving_owner::SqliteServingOwnerError;
+use chio_store_sqlite::SchemaVersionError;
 use rusqlite::ffi;
 use support::{Admit, Case, Env, TestResult, NOW};
 
@@ -322,11 +324,27 @@ fn foreign_catalog_layout_refuses_open() -> TestResult {
         "CREATE TABLE root_exchange_extra (id INTEGER PRIMARY KEY);",
     ] {
         let env = minted_env()?;
-        let (fixture, reopened) = env.tamper_and_reopen(None, sql)?;
-        assert_eq!(reopened, I::SchemaMismatch, "{sql}");
+        let fixture = env.fixture;
+        drop(env.store);
+        drop(env.owner);
+        fixture.raw()?.execute_batch(sql)?;
+        let error = match fixture.open() {
+            Ok(_) => return Err(format!("open accepted {sql}").into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                error.downcast_ref::<SqliteServingOwnerError>(),
+                Some(SqliteServingOwnerError::Schema(
+                    SchemaVersionError::CatalogMismatch
+                ))
+            ),
+            "{sql}: {error}"
+        );
         let raw = fixture.raw()?;
-        let roots: i64 =
-            raw.query_row("SELECT COUNT(*) FROM root_exchange_roots", [], |row| row.get(0))?;
+        let roots: i64 = raw.query_row("SELECT COUNT(*) FROM root_exchange_roots", [], |row| {
+            row.get(0)
+        })?;
         assert_eq!(roots, 1, "{sql}");
     }
     Ok(())

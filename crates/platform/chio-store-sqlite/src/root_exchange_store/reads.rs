@@ -220,9 +220,8 @@ impl SqliteRootExchangeStore {
 
     pub fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext> {
         self.read_only(|tx| {
-            let row = read_root_row_by_context(tx, digest)?.ok_or_else(|| {
-                RootExchangeStoreError::DelegationContextMissing { digest: *digest }
-            })?;
+            let row = read_root_row_by_context(tx, digest)?
+                .ok_or(RootExchangeStoreError::DelegationContextMissing { digest: *digest })?;
             Ok(row.verify()?.context)
         })
     }

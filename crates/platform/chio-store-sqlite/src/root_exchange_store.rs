@@ -161,8 +161,6 @@ impl std::fmt::Display for RetainedArtifact {
 /// Why the store refuses to open. Every variant leaves the rows in place.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RootExchangeIntegrityError {
-    #[error("root exchange schema differs from its canonical definition")]
-    SchemaMismatch,
     #[error("anchored root {capability_id} has no global commit")]
     RootWithoutGlobalCommit { capability_id: String },
     #[error("anchored root {capability_id} differs from its authorization projection")]

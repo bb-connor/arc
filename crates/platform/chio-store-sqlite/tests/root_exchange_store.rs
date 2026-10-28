@@ -50,11 +50,11 @@ fn mint_inserts_root_replay_openings_and_retained_artifacts() -> TestResult {
 }
 
 #[test]
-fn retry_for_the_same_client_artifact_and_request_recovers_the_root() -> TestResult {
+fn bearer_retry_for_the_same_client_artifact_and_request_recovers_the_root() -> TestResult {
     let env = Env::new()?;
-    let case = Case::id_jag("cap-1")?;
+    let case = Case::static_bearer("cap-1")?;
     env.minted(&case, &Admit, NOW)?;
-    let retry = Case::id_jag("cap-2")?;
+    let retry = Case::static_bearer("cap-2")?;
     assert_eq!(
         env.minted(&retry, &Admit, NOW + 1)?,
         ("cap-1".to_string(), true)
@@ -71,8 +71,8 @@ fn retry_for_the_same_client_artifact_and_request_recovers_the_root() -> TestRes
 #[test]
 fn retry_from_another_client_refuses_replay() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    let mut retry = Case::id_jag("cap-2")?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut retry = Case::static_bearer("cap-2")?;
     retry.client_id = "other-client".into();
     assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
@@ -81,8 +81,8 @@ fn retry_from_another_client_refuses_replay() -> TestResult {
 #[test]
 fn retry_with_changed_artifact_refuses_replay() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    let mut retry = Case::id_jag("cap-2")?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut retry = Case::static_bearer("cap-2")?;
     retry.artifact = 0x99;
     assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
@@ -91,8 +91,8 @@ fn retry_with_changed_artifact_refuses_replay() -> TestResult {
 #[test]
 fn retry_with_changed_request_refuses_replay() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    let mut retry = Case::id_jag("cap-2")?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut retry = Case::static_bearer("cap-2")?;
     retry.request = 0x98;
     assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
@@ -139,9 +139,13 @@ fn checker_error_rolls_back_and_denies() -> TestResult {
 #[test]
 fn recovery_of_a_revoked_root_refuses_with_entry_id() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
     assert_eq!(
-        env.refused(&Case::id_jag("cap-2")?, &RevokedTenant(tags(1)), NOW + 1)?,
+        env.refused(
+            &Case::static_bearer("cap-2")?,
+            &RevokedTenant(tags(1)),
+            NOW + 1
+        )?,
         E::Revoked {
             entry_id: "rev-tenant-1".into()
         }
@@ -152,10 +156,10 @@ fn recovery_of_a_revoked_root_refuses_with_entry_id() -> TestResult {
 #[test]
 fn recovery_of_an_expired_root_refuses() -> TestResult {
     let env = Env::new()?;
-    let mut case = Case::id_jag("cap-1")?;
+    let mut case = Case::static_bearer("cap-1")?;
     case.expires_at = NOW + 10;
     env.minted(&case, &Admit, NOW)?;
-    let mut retry = Case::id_jag("cap-2")?;
+    let mut retry = Case::static_bearer("cap-2")?;
     retry.expires_at = NOW + 300;
     assert_eq!(
         env.refused(&retry, &Admit, NOW + 20)?,
@@ -169,8 +173,8 @@ fn recovery_of_an_expired_root_refuses() -> TestResult {
 #[test]
 fn recovery_under_another_policy_digest_refuses() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    let mut retry = Case::id_jag("cap-2")?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut retry = Case::static_bearer("cap-2")?;
     retry.policy = loaded_policy("rp_acme_rotated")?;
     assert_eq!(
         env.refused(&retry, &Admit, NOW + 1)?,
@@ -214,10 +218,7 @@ fn expired_replay_binding_rebinds_to_a_second_root_and_keeps_the_first() -> Test
     assert_eq!(env.store.presentation("cap-2")?.minted_at, NOW + 120);
     let mut retry = Case::id_jag("cap-3")?;
     retry.expires_at = NOW + 400;
-    assert_eq!(
-        env.minted(&retry, &Admit, NOW + 121)?,
-        ("cap-2".to_string(), true)
-    );
+    assert_eq!(env.refused(&retry, &Admit, NOW + 121)?, E::AssertionReplay);
     Ok(())
 }
 
@@ -520,8 +521,8 @@ fn tag_generations_referenced_by_roots_must_be_loaded() -> TestResult {
 #[test]
 fn tag_from_generation_n_still_matches_after_rotation_to_n_plus_1() -> TestResult {
     let env = Env::new()?;
-    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    let mut rotated = Case::id_jag("cap-2")?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut rotated = Case::static_bearer("cap-2")?;
     rotated.candidates = vec![tags(2), tags(1)];
     rotated.tags = tags(1);
     assert_eq!(
@@ -680,10 +681,17 @@ fn non_jws_roots_pass_the_row_check_without_context_artifact_digest() -> TestRes
             _ => Case::non_jws(kind, "cap-1")?,
         };
         env.minted(&case, &Admit, NOW)?;
-        let reopened = env.fixture.open()?.root_exchange_store();
+        let fixture = env.fixture;
+        drop(env.store);
+        drop(env.owner);
+        let owner = fixture.open()?;
+        let reopened = owner.root_exchange_store();
         let stored = reopened.presentation("cap-1")?;
         assert_eq!(stored.context.anchor.artifact_digest, None);
-        assert_eq!(stored.context.anchor.kind.as_str(), case.context()?.anchor.kind.as_str());
+        assert_eq!(
+            stored.context.anchor.kind.as_str(),
+            case.context()?.anchor.kind.as_str()
+        );
     }
     Ok(())
 }
