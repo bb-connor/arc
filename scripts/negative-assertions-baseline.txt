@@ -701,7 +701,6 @@
 1	crates/security/chio-quarantine/tests/response_dispatch.rs	dispatch_binding_requires_one_applying_transition_at_authorization_time	decode_response_record(&response_record(&mismatched_time)).is_err()
 1	crates/security/chio-quarantine/tests/response_dispatch.rs	dispatch_binding_requires_one_applying_transition_at_authorization_time	decode_response_record(&response_record(&missing_applying)).is_err()
 1	crates/security/chio-quarantine/tests/response_scheduler.rs	scheduler_fencing_renewal_preserves_token_and_only_current_lease_releases	scheduler.release_for_shutdown(&work).is_err()
-1	crates/security/chio-quarantine/tests/rules.rs	invalid_stage_graph_timing_fields_kinds_and_cardinality_reject_at_load_time	parse(document).is_err()
 1	crates/security/chio-secret-broker/src/audit.rs	comparison_decoder_rejects_noncanonical_tampered_and_oversized_inputs	SignedBrokerAuditComparison::from_canonical_bytes(&noncanonical).is_err()
 1	crates/security/chio-secret-broker/src/audit.rs	comparison_decoder_rejects_noncanonical_tampered_and_oversized_inputs	SignedBrokerAuditComparison::from_canonical_bytes(&oversized).is_err()
 1	crates/security/chio-secret-broker/src/audit.rs	comparison_decoder_rejects_noncanonical_tampered_and_oversized_inputs	SignedBrokerAuditComparison::from_canonical_bytes(&tampered_bytes).is_err()
