@@ -616,6 +616,27 @@ pub fn agent() -> ureq::Agent {
 }
 EOF
 
+http_client_case ureq_trait_generic_qualified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent(config: ureq::Config) -> ureq::Agent {
+    <ureq::Agent as From<ureq::Config>>::from(config)
+}
+EOF
+http_client_case ureq_alias_trait_generic_qualified crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+use ureq::Config as Cfg;
+
+pub fn agent(config: Cfg) -> Http {
+    <Http as From<Cfg>>::from(config)
+}
+EOF
+http_client_case ureq_agent_in_turbofish crates/chio-fake/src/lib.rs <<'EOF'
+use std::sync::Arc;
+
+pub fn share(agent: ureq::Agent) -> Arc<ureq::Agent> {
+    Arc::<ureq::Agent>::new(agent)
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
@@ -630,7 +651,8 @@ for expectation in \
     reject:ureq_type_alias reject:ureq_function_reference \
     reject:ureq_crate_qualified_alias reject:ureq_qualified_type_path \
     reject:ureq_qualified_type_alias reject:ureq_trait_qualified \
-    reject:ureq_self_qualified_alias; do
+    reject:ureq_self_qualified_alias reject:ureq_trait_generic_qualified \
+    reject:ureq_alias_trait_generic_qualified accept:ureq_agent_in_turbofish; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
