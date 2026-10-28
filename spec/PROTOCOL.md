@@ -3051,6 +3051,59 @@ that currently covers:
 Compatibility claims are grounded in checked-in conformance scenarios, live JS
 and Python peers, and the release-qualification wave corpus.
 
+The edge serves MCP revision 2025-11-25 through `initialize` and the stateless
+revision 2026-07-28 through per-request `_meta`. One edge session serves one
+revision family and refuses requests from the other.
+
+#### 8.2.1 Tool Result Execution Evidence
+
+Every `tools/call` result the edge returns carries kernel evidence in the
+result `_meta`. The edge advertises it in
+`capabilities.experimental["io.chio/execution-evidence"]` as `{"version": "1",
+"schema": "chio.mcp.execution-evidence.v1", "resultMetaField": "chioEvidence",
+"contextMethod": "chio/execution-context", "outputKinds": ["value", "stream",
+"none"]}`, in both the `initialize` result and the `server/discover` result.
+
+`_meta.chioEvidence` is an object with these members:
+
+| Member | Value |
+|--------|-------|
+| `schema` | `"chio.mcp.execution-evidence.v1"` |
+| `requestId` | `metadata.receipt_context.request_id` of the signed receipt (the caller's `_meta.chioRequestId` when supplied), or `null` |
+| `receipt` | The complete signed `ChioReceipt` for this call |
+| `outputKind` | `"value"`, `"stream"` or `"none"` |
+| `output` | For `"value"`, the exact kernel output whose RFC 8785 canonical bytes hash to `receipt.content_hash`; otherwise `null` |
+| `terminalState` | `"completed"`, `"cancelled"` or `"incomplete"`; diagnostic only |
+
+`outputKind` is `"value"` only for an allowed, completed value result. A
+streamed result is `"stream"` with `output: null`; its receipt commits to the
+stream, not to a single value. Every other result (a denial, an incomplete or
+cancelled call, a pending approval) is `"none"` with `output: null`.
+
+`_meta.chio` carries `decision` (`"allow"`, `"deny"` or `"pending_approval"`),
+the same signed `receipt`, its `receiptId` and the kernel `terminalState`.
+
+The rendered MCP `content` and `structuredContent` are projections and are not
+the signed commitment. A verifier MUST check the receipt signature against the
+operator-pinned kernel key, the tool, server and argument hash, the request ID
+it supplied, and, for `"value"`, that `receipt.content_hash` equals the SHA-256
+of the canonical `output`. A verifier MUST fail closed when the evidence is
+absent or the receipt does not verify, and MUST NOT retry an uncertain external
+effect on that basis alone.
+
+The edge overwrites any upstream `_meta.chio` or `_meta.chioEvidence`, and
+replaces a non-object upstream `_meta` with an object, before it installs the
+kernel evidence. Other upstream `_meta` members are preserved. Under 2026-07-28
+the result also carries `resultType` and
+`_meta["io.modelcontextprotocol/serverInfo"]` alongside the evidence.
+
+#### 8.2.2 List Cursors
+
+Paginated list results carry `nextCursor` as a string only while another page
+remains. An exhausted listing omits `nextCursor`; it is never JSON `null`. A
+cursor is opaque to the client. A cursor past the end of the listing is refused
+with JSON-RPC invalid params.
+
 ### 8.3 Hosted Remote Admin
 
 `chio mcp serve-http` ships operator-facing admin APIs, including:
