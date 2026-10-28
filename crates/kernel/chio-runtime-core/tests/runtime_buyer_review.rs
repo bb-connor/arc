@@ -1,3 +1,6 @@
+#[path = "runtime_buyer_review/packet_admission.rs"]
+mod packet_admission;
+
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
@@ -68,27 +71,6 @@ fn buyer_attestation_packet_preserves_verified_lineage_boundary_without_acceptin
     assert!(!denied.accepted);
     assert_eq!(
         denied.failure_code.as_deref(),
-        Some("chio_buyer_packet_hash_mismatch")
-    );
-    Ok(())
-}
-
-#[test]
-fn buyer_packet_rejects_mismatched_cross_boundary_admission_report_digest(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (mut packet, lineage, continuation, admission, bilateral) = buyer_fixture()?;
-    let baseline =
-        verify_buyer_attestation_packet(&packet, &lineage, &continuation, &admission, &bilateral)?;
-    assert_eq!(
-        baseline.failure_code.as_deref(),
-        Some("chio_buyer_packet_dsse_unresolved")
-    );
-    packet.cross_boundary_admission_report_sha256 = "0".repeat(64);
-    let refused =
-        verify_buyer_attestation_packet(&packet, &lineage, &continuation, &admission, &bilateral)?;
-    assert!(!refused.accepted);
-    assert_eq!(
-        refused.failure_code.as_deref(),
         Some("chio_buyer_packet_hash_mismatch")
     );
     Ok(())
