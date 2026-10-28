@@ -213,6 +213,8 @@ fn digests(directory: &Path, policy: SidecarPolicy) -> Result<BTreeMap<String, S
                 if current == directory && EXCLUDED_DIRECTORIES.contains(&name.as_str()) {
                     continue;
                 }
+                #[cfg(test)]
+                reader_tests::before_descend(&path)?;
                 pending.push(path);
                 continue;
             }
