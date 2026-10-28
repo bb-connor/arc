@@ -17,8 +17,45 @@ pub(super) fn load_commerce_escrow_ledger_bytes(
     order_context: &chio_commerce_order::CommerceOrderContext,
     label: &str,
 ) -> Result<Option<Vec<u8>>, CliError> {
-    let _ = (bundle_dir, budget, nodes, order_context, label);
-    Ok(None)
+    let Some(pinned) = order_context.escrow_digest.as_deref() else {
+        return Ok(None);
+    };
+    let candidates = graph_nodes_by_role(nodes, COMMERCE_ESCROW_LEDGER_ROLE);
+    if candidates.is_empty() {
+        return Err(graph_not_closed(format!(
+            "proof verify: missing {label} escrow ledger for pinned digest {pinned}",
+        )));
+    }
+    let mut selected = Vec::new();
+    for node in candidates {
+        let bytes = load_graph_bytes_artifact_bounded(
+            bundle_dir,
+            node,
+            chio_commerce_order::COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            label,
+            budget,
+        )?;
+        let ledger: chio_commerce_order::CommerceEscrowLedger = crate::input::json(&bytes)?;
+        let digest = ledger.digest().map_err(|error| {
+            artifact_schema_invalid(format!(
+                "proof verify: {label} escrow ledger {} is not canonical: {error}",
+                node.path,
+            ))
+        })?;
+        if digest == pinned {
+            selected.push(bytes);
+        }
+    }
+    let mut selected = selected.into_iter();
+    match (selected.next(), selected.next()) {
+        (Some(bytes), None) => Ok(Some(bytes)),
+        (None, _) => Err(artifact_digest_mismatch(format!(
+            "proof verify: no {label} escrow ledger matches pinned digest {pinned}",
+        ))),
+        (Some(_), Some(_)) => Err(artifact_schema_invalid(format!(
+            "proof verify: multiple {label} escrow ledgers match pinned digest {pinned}",
+        ))),
+    }
 }
 
 #[cfg(test)]
