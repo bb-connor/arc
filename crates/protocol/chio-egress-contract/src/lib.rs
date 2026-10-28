@@ -845,13 +845,16 @@ impl HttpEgressContract {
     /// [`EndpointSource::Operator`] URL may be `https`, or plaintext `http`
     /// to a loopback host; an [`EndpointSource::Remote`] URL must be `https`
     /// to a non-loopback host. Link-local, unique-local, private and
-    /// special-use addresses are refused. `url` itself is enforced before the
-    /// contract is returned, and resolved addresses are enforced at connect.
+    /// special-use addresses are refused unless an entry of `allowances`
+    /// pins the endpoint; only an operator URL takes allowances. `url` itself
+    /// is enforced before the contract is returned, and resolved addresses
+    /// are enforced at connect.
     pub fn single_endpoint(
         source: EndpointSource,
         tenant_egress_namespace: &str,
         url: &str,
         max_response_bytes: u64,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self, HttpEgressError> {
         let parsed =
             Url::parse(url).map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
@@ -868,7 +871,7 @@ impl HttpEgressContract {
                 scheme: scheme.to_owned(),
             });
         }
-        let contract = Self {
+        let mut contract = Self {
             tenant_egress_namespace: tenant_egress_namespace.to_owned(),
             allowed_schemes: BTreeSet::from([scheme.to_owned()]),
             allowed_authority_set: BTreeSet::from([normalized_url_authority(&parsed)?]),
@@ -879,7 +882,10 @@ impl HttpEgressContract {
             max_response_bytes,
             private_network_allowances: BTreeSet::new(),
         };
-        contract.enforce_url(url, 0)?;
+        if source == EndpointSource::Operator {
+            contract = contract.with_private_network_allowances(allowances);
+        }
+        contract.prepare()?.enforce_url(url, 0)?;
         Ok(contract)
     }
 

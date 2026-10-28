@@ -1,7 +1,8 @@
 //! Bounded remote documents; HTTP error bodies never become CLI diagnostics.
 use crate::{input, CliError};
 use chio_egress_contract::{
-    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, EndpointSource,
+    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, EgressAllowanceSet,
+    EndpointSource,
     HttpEgressContract, HttpEgressError,
 };
 use serde::de::DeserializeOwned;
@@ -60,6 +61,7 @@ fn request(
         "passport-document",
         url,
         input::MAX_DOCUMENT_BYTES as u64,
+        &EgressAllowanceSet::default(),
     )
     .map_err(transport_failure)?;
     let agent = BlockingContractAgent::new(&contract, DOCUMENT_PHASE_TIMEOUT, DOCUMENT_DEADLINE)

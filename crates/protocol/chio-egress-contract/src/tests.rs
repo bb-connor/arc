@@ -1,4 +1,7 @@
-use super::{EndpointSource, HttpEgressContract, HttpEgressError};
+use super::{
+    EgressAllowanceSet, EndpointSource, HttpEgressContract, HttpEgressError,
+    PrivateNetworkAllowance,
+};
 use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -454,6 +457,7 @@ fn single_endpoint_admits_only_its_own_scheme_and_authority() {
         "passport-document",
         "https://Verifier.Example./v1/request",
         4096,
+        &EgressAllowanceSet::default(),
     )
     .expect("public https endpoint");
     assert_eq!(
@@ -492,6 +496,7 @@ fn single_endpoint_admits_only_its_own_scheme_and_authority() {
         "passport-document",
         "https://verifier.example:8443/",
         1,
+        &EgressAllowanceSet::default(),
     )
     .expect("explicit port");
     assert_eq!(
@@ -512,6 +517,7 @@ fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
             "passport-document",
             url,
             1,
+            &EgressAllowanceSet::default(),
         )
         .expect(url);
         assert!(!contract.deny_loopback, "{url}");
@@ -521,6 +527,7 @@ fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
         "passport-document",
         "http://127.0.0.1:9/",
         1,
+        &EgressAllowanceSet::default(),
     )
     .expect("loopback");
     assert_eq!(
@@ -541,7 +548,8 @@ fn single_endpoint_admits_plaintext_and_loopback_only_for_a_loopback_url() {
                 EndpointSource::Operator,
                 "passport-document",
                 url,
-                1
+                1,
+                &EgressAllowanceSet::default()
             ),
             Err(HttpEgressError::SchemeDenied {
                 scheme: scheme.to_string()
@@ -588,7 +596,8 @@ fn single_endpoint_refuses_non_public_literals_and_userinfo() {
                 EndpointSource::Operator,
                 "passport-document",
                 url,
-                1
+                1,
+                &EgressAllowanceSet::default()
             ),
             Err(refusal),
             "{url}"
@@ -603,6 +612,7 @@ fn a_localhost_name_admits_only_loopback_answers() {
         "passport-document",
         "http://localhost:9/",
         1,
+        &EgressAllowanceSet::default(),
     )
     .expect("loopback name");
     for address in [
@@ -671,7 +681,8 @@ fn a_remote_endpoint_never_gets_plaintext_or_loopback() {
                 EndpointSource::Remote,
                 "passport-document",
                 url,
-                1
+                1,
+                &EgressAllowanceSet::default()
             ),
             Err(refusal),
             "{url}"
@@ -682,6 +693,7 @@ fn a_remote_endpoint_never_gets_plaintext_or_loopback() {
         "passport-document",
         "https://verifier.example/jwks",
         1,
+        &EgressAllowanceSet::default(),
     )
     .expect("public https");
     assert!(contract.deny_loopback);
@@ -1215,5 +1227,89 @@ mod reqwest_egress_tests {
             let _ = stream.write_all(b"0\r\n\r\n");
         });
         addr
+    }
+}
+
+fn private_endpoint_allowances() -> EgressAllowanceSet {
+    EgressAllowanceSet::new([
+        PrivateNetworkAllowance {
+            host: "10.0.4.7".to_string(),
+            port: 8443,
+            cidr: "10.0.4.7/32".parse().unwrap(),
+        },
+        PrivateNetworkAllowance {
+            host: "venue.vpc.internal".to_string(),
+            port: 443,
+            cidr: "10.0.4.0/24".parse().unwrap(),
+        },
+    ])
+    .unwrap()
+}
+
+#[test]
+fn single_endpoint_admits_an_allowed_private_endpoint_named_by_the_operator() {
+    let allowances = private_endpoint_allowances();
+    let literal = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "finding-venue",
+        "https://10.0.4.7:8443/v1/findings/search",
+        1,
+        &allowances,
+    )
+    .expect("allowed private literal");
+    assert_eq!(literal.private_network_allowances.len(), 1);
+    let named = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "finding-venue",
+        "https://venue.vpc.internal/v1/findings/search",
+        1,
+        &allowances,
+    )
+    .expect("allowed private name");
+    named
+        .enforce_resolved_address(
+            "venue.vpc.internal",
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 4, 9)), 443),
+        )
+        .expect("inside the allowance");
+    assert!(named
+        .enforce_resolved_address(
+            "venue.vpc.internal",
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 5, 9)), 443),
+        )
+        .is_err());
+}
+
+#[test]
+fn single_endpoint_keeps_refusing_what_no_allowance_pins() {
+    let allowances = private_endpoint_allowances();
+    for (source, url, refusal) in [
+        (
+            EndpointSource::Remote,
+            "https://10.0.4.7:8443/",
+            HttpEgressError::PrivateNetworkDenied {
+                host: "10.0.4.7".to_string(),
+            },
+        ),
+        (
+            EndpointSource::Operator,
+            "https://10.0.4.7:9443/",
+            HttpEgressError::PrivateNetworkDenied {
+                host: "10.0.4.7".to_string(),
+            },
+        ),
+        (
+            EndpointSource::Operator,
+            "http://10.0.4.7:8443/",
+            HttpEgressError::SchemeDenied {
+                scheme: "http".to_string(),
+            },
+        ),
+    ] {
+        assert_eq!(
+            HttpEgressContract::single_endpoint(source, "finding-venue", url, 1, &allowances),
+            Err(refusal),
+            "{url}"
+        );
     }
 }
