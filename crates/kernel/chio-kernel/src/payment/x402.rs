@@ -29,10 +29,9 @@ use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    build_http_agent, payment_identifier_is_valid, post_json, validate_payment_endpoint,
-    PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
-    X402SettlementRef,
+    payment_identifier_is_valid, post_json, validate_payment_endpoint, PaymentAdapter,
+    PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
+    PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus, X402SettlementRef,
 };
 use crate::execution_nonce::ExecutionNonceStore;
 use crate::KernelError;
@@ -346,7 +345,7 @@ pub struct X402PaymentAdapter {
     facilitator_url: String,
     rail: X402RailConfig,
     bearer_token: Option<String>,
-    http: ureq::Agent,
+    timeout: Duration,
     clock: Arc<dyn Clock>,
     replay: Arc<dyn ExecutionNonceStore>,
 }
@@ -367,7 +366,8 @@ impl fmt::Debug for X402PaymentAdapter {
 
 impl X402PaymentAdapter {
     /// Refuses a facilitator URL that is not `https` (or `http` on loopback),
-    /// or that carries credentials, a query or a fragment. `clock` is the
+    /// that carries credentials, a query or a fragment, or whose host is a
+    /// private, loopback, link-local or unique-local address. `clock` is the
     /// trusted time the validity window is checked against; `replay` holds
     /// each accepted authorization key until its `validBefore` and must be
     /// durable for single use to survive a restart.
@@ -383,7 +383,7 @@ impl X402PaymentAdapter {
             facilitator_url,
             rail,
             bearer_token: None,
-            http: build_http_agent(Duration::from_secs(5)),
+            timeout: super::PAYMENT_RAIL_TIMEOUT,
             clock,
             replay,
         })
@@ -397,7 +397,7 @@ impl X402PaymentAdapter {
 
     #[must_use]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.http = build_http_agent(timeout);
+        self.timeout = timeout;
         self
     }
 
@@ -510,7 +510,7 @@ impl X402PaymentAdapter {
 
     fn verify(&self, body: &X402FacilitatorRequest<'_>) -> Result<(), X402Refusal> {
         let response: X402VerifyResponse = post_json(
-            &self.http,
+            self.timeout,
             &self.facilitator_url,
             self.bearer_token.as_deref(),
             X402_VERIFY_PATH,
@@ -529,7 +529,7 @@ impl X402PaymentAdapter {
         identity: &X402AuthorizationIdentity,
     ) -> Result<X402SettledAuthorization, PaymentError> {
         let response: X402SettleResponse = post_json(
-            &self.http,
+            self.timeout,
             &self.facilitator_url,
             self.bearer_token.as_deref(),
             X402_SETTLE_PATH,

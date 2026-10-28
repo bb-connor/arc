@@ -2453,6 +2453,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "ureq",
  "url",
 ]
 
@@ -2649,6 +2650,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-egress-contract",
  "chio-federation",
  "chio-kernel",
  "chio-kernel-core",
@@ -2687,7 +2689,6 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
- "ureq",
  "url",
  "uuid",
 ]
@@ -9124,8 +9125,6 @@ dependencies = [
  "once_cell",
  "rustls",
  "rustls-pki-types",
- "serde",
- "serde_json",
  "url",
  "webpki-roots 0.26.11",
 ]

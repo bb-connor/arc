@@ -58,9 +58,9 @@ pub struct PreparedHttpEgressContract {
 /// Fail-closed reasons returned by HTTP egress contract enforcement.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum HttpEgressError {
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     #[error("urn:chio:error:transport:http-failed")]
-    Transport(#[from] reqwest_helper::RequestFailure),
+    Transport(#[from] RequestFailure),
     #[error("outbound HTTP egress requires a declared HttpEgressContract")]
     MissingContract,
     #[error("invalid HttpEgressContract: {0}")]
@@ -322,7 +322,7 @@ impl HttpEgressContract {
         Ok(false)
     }
 
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.prepare()?.enforce_resolver_hostname(host)
     }
@@ -439,7 +439,7 @@ impl PreparedHttpEgressContract {
         Ok(())
     }
 
-    #[cfg(feature = "reqwest-egress")]
+    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.validate_dispatchable_with_pinned_dns()?;
         let normalized = normalize_domain_name(host);
@@ -665,6 +665,19 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
 /// a single fail-closed entry point.
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper;
+
+#[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+mod transport_failure;
+#[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+pub use transport_failure::RequestFailure;
+
+/// Optional blocking ureq transport that dispatches only through a
+/// `BlockingContractAgent` under `HttpEgressContract` enforcement.
+#[cfg(feature = "ureq-egress")]
+pub mod ureq_helper;
+
+#[cfg(feature = "ureq-egress")]
+pub use ureq_helper::{BlockingContractAgent, BlockingContractRequest, BlockingContractResponse};
 
 #[cfg(feature = "reqwest-egress")]
 mod operator_readiness;

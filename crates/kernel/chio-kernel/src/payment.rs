@@ -1,11 +1,14 @@
+use std::collections::BTreeSet;
 use std::fmt;
-use std::io::Read;
 use std::net::IpAddr;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256};
 #[cfg(test)]
 use chio_core::{capability::scope::MonetaryAmount, receipt::economics::SettlementStatus};
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
@@ -199,7 +202,7 @@ pub struct AcpPaymentAdapter {
     refund_path: String,
     settlement_state_path: String,
     bearer_token: Option<String>,
-    http: ureq::Agent,
+    timeout: Duration,
 }
 
 impl fmt::Debug for AcpPaymentAdapter {
@@ -231,7 +234,7 @@ impl AcpPaymentAdapter {
             refund_path: "/refund".to_string(),
             settlement_state_path: "/settlement-state".to_string(),
             bearer_token: None,
-            http: build_http_agent(Duration::from_secs(5)),
+            timeout: PAYMENT_RAIL_TIMEOUT,
         }
     }
 
@@ -273,7 +276,7 @@ impl AcpPaymentAdapter {
 
     #[must_use]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.http = build_http_agent(timeout);
+        self.timeout = timeout;
         self
     }
 }
@@ -298,7 +301,7 @@ impl PaymentAdapter for AcpPaymentAdapter {
             request,
         };
         let response: AcpAuthorizeResponse = post_json(
-            &self.http,
+            self.timeout,
             &self.base_url,
             self.bearer_token.as_deref(),
             &self.authorize_path,
@@ -385,7 +388,7 @@ impl PaymentAdapter for AcpPaymentAdapter {
         binding.validate()?;
         let request_digest = acp_request_digest(&binding)?;
         let response: AcpSettlementStateResponse = get_json(
-            &self.http,
+            self.timeout,
             &self.base_url,
             self.bearer_token.as_deref(),
             &self.settlement_state_path,
@@ -424,7 +427,7 @@ impl AcpPaymentAdapter {
             binding,
         };
         let response: AcpTerminalOperationResponse = post_json(
-            &self.http,
+            self.timeout,
             &self.base_url,
             self.bearer_token.as_deref(),
             path,
@@ -443,6 +446,7 @@ const ACP_TERMINAL_OPERATION_RESPONSE_SCHEMA: &str =
 const ACP_SETTLEMENT_STATE_REQUEST_SCHEMA: &str = "chio.payment.acp-settlement-state-request.v1";
 const ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA: &str = "chio.payment.acp-settlement-state-response.v1";
 const MAX_PAYMENT_RESPONSE_BYTES: u64 = 256 * 1024;
+const PAYMENT_RAIL_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_PAYMENT_BEARER_TOKEN_BYTES: usize = 16 * 1024;
 const MAX_PAYMENT_IDENTIFIER_BYTES: usize = 512;
 
@@ -761,62 +765,73 @@ fn acp_request_digest<T: Serialize>(value: &T) -> Result<String, PaymentError> {
 }
 
 fn post_json<B: Serialize, T: DeserializeOwned>(
-    http: &ureq::Agent,
+    timeout: Duration,
     base_url: &str,
     bearer_token: Option<&str>,
     path: &str,
     body: &B,
 ) -> Result<T, PaymentError> {
-    validate_payment_endpoint(base_url, path, bearer_token)?;
-    let url = format!("{base_url}{path}");
+    let agent = payment_rail_agent(base_url, path, bearer_token, timeout)?;
     let payload = serde_json::to_value(body)
+        .and_then(|value| serde_json::to_vec(&value))
         .map_err(|error| PaymentError::RailError(format!("invalid request payload: {error}")))?;
-    let mut request = http.post(&url);
+    let mut request = agent
+        .post(&format!("{base_url}{path}"))
+        .map_err(map_rail_egress_error)?
+        .header("Content-Type", "application/json");
     if let Some(token) = bearer_token {
-        request = request.set("Authorization", &format!("Bearer {token}"));
+        request = request.header("Authorization", &format!("Bearer {token}"));
     }
-    match request.send_json(payload) {
-        Ok(response) => read_payment_json(response),
-        Err(error) => Err(map_http_payment_error(error)),
-    }
+    read_payment_json(
+        request
+            .send_bytes(&payload)
+            .map_err(map_rail_egress_error)?,
+    )
 }
 
 fn get_json<T: DeserializeOwned>(
-    http: &ureq::Agent,
+    timeout: Duration,
     base_url: &str,
     bearer_token: Option<&str>,
     path: &str,
     query: &[(&str, &str)],
 ) -> Result<T, PaymentError> {
-    validate_payment_endpoint(base_url, path, bearer_token)?;
-    let url = format!("{base_url}{path}");
-    let mut request = http.get(&url);
+    let agent = payment_rail_agent(base_url, path, bearer_token, timeout)?;
+    let mut request = agent
+        .get(&format!("{base_url}{path}"))
+        .map_err(map_rail_egress_error)?;
     for (name, value) in query {
         request = request.query(name, value);
     }
     if let Some(token) = bearer_token {
-        request = request.set("Authorization", &format!("Bearer {token}"));
+        request = request.header("Authorization", &format!("Bearer {token}"));
     }
-    match request.call() {
-        Ok(response) => read_payment_json(response),
-        Err(error) => Err(map_http_payment_error(error)),
-    }
+    read_payment_json(request.call().map_err(map_rail_egress_error)?)
 }
 
-fn read_payment_json<T: DeserializeOwned>(response: ureq::Response) -> Result<T, PaymentError> {
-    let mut reader = response
-        .into_reader()
-        .take(MAX_PAYMENT_RESPONSE_BYTES.saturating_add(1));
-    let mut body = Vec::new();
-    reader.read_to_end(&mut body).map_err(|_| {
-        PaymentError::RailError("payment rail response could not be read".to_owned())
-    })?;
-    if u64::try_from(body.len()).map_or(true, |size| size > MAX_PAYMENT_RESPONSE_BYTES) {
-        return Err(PaymentError::RailError(
-            "payment rail response is too large".to_owned(),
-        ));
+fn read_payment_json<T: DeserializeOwned>(
+    response: BlockingContractResponse,
+) -> Result<T, PaymentError> {
+    match response.status() {
+        200..=299 => {}
+        402 => return Err(PaymentError::InsufficientFunds),
+        status @ 400..=499 => {
+            return Err(PaymentError::Declined(format!(
+                "payment rail rejected request (HTTP {status})"
+            )))
+        }
+        status if status >= 500 => {
+            return Err(PaymentError::Unavailable(format!(
+                "payment rail returned an unavailable status (HTTP {status})"
+            )))
+        }
+        _ => {
+            return Err(PaymentError::RailError(
+                "payment rail response is invalid".to_owned(),
+            ))
+        }
     }
-    chio_core::canonical::UntrustedJsonText::from_wire(&body, 256 * 1024)
+    chio_core::canonical::UntrustedJsonText::from_wire(response.body(), 256 * 1024)
         .and_then(|input| input.decode_signed())
         .map_err(|_| PaymentError::RailError("payment rail response is invalid".to_owned()))
 }
@@ -826,8 +841,20 @@ fn validate_payment_endpoint(
     path: &str,
     bearer_token: Option<&str>,
 ) -> Result<(), PaymentError> {
-    let parsed = Url::parse(base_url)
-        .map_err(|_| PaymentError::RailError("payment rail URL is invalid".to_owned()))?;
+    payment_rail_contract(base_url, path, bearer_token).map(|_| ())
+}
+
+/// The contract admits only the rail's own scheme and authority, plaintext
+/// `http` only to a loopback host, no redirects, and the payment response
+/// ceiling. The rail URL itself is checked here; resolved addresses are
+/// checked when the agent connects.
+fn payment_rail_contract(
+    base_url: &str,
+    path: &str,
+    bearer_token: Option<&str>,
+) -> Result<HttpEgressContract, PaymentError> {
+    let invalid_url = || PaymentError::RailError("payment rail URL is invalid".to_owned());
+    let parsed = Url::parse(base_url).map_err(|_| invalid_url())?;
     let loopback_http = parsed.scheme() == "http"
         && parsed.host_str().is_some_and(|host| {
             host.eq_ignore_ascii_case("localhost")
@@ -846,9 +873,7 @@ fn validate_payment_endpoint(
         || path.contains(['?', '#'])
         || path.chars().any(char::is_control)
     {
-        return Err(PaymentError::RailError(
-            "payment rail URL is invalid".to_owned(),
-        ));
+        return Err(invalid_url());
     }
     if bearer_token.is_some_and(|token| {
         token.is_empty()
@@ -859,16 +884,39 @@ fn validate_payment_endpoint(
             "payment rail credential is invalid".to_owned(),
         ));
     }
-    Ok(())
+    let host = parsed
+        .host_str()
+        .ok_or_else(invalid_url)?
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    let authority = match parsed.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    };
+    let contract = HttpEgressContract {
+        tenant_egress_namespace: "payment-rail".to_owned(),
+        allowed_schemes: BTreeSet::from([parsed.scheme().to_owned()]),
+        allowed_authority_set: BTreeSet::from([authority]),
+        deny_loopback: !loopback_http,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 0,
+        max_response_bytes: MAX_PAYMENT_RESPONSE_BYTES,
+    };
+    contract
+        .enforce_url(&format!("{base_url}{path}"), 0)
+        .map_err(map_rail_egress_error)?;
+    Ok(contract)
 }
 
-fn build_http_agent(timeout: Duration) -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout_connect(timeout)
-        .timeout_read(timeout)
-        .timeout_write(timeout)
-        .redirects(0)
-        .build()
+fn payment_rail_agent(
+    base_url: &str,
+    path: &str,
+    bearer_token: Option<&str>,
+    timeout: Duration,
+) -> Result<BlockingContractAgent, PaymentError> {
+    let contract = payment_rail_contract(base_url, path, bearer_token)?;
+    BlockingContractAgent::new(&contract, timeout).map_err(map_rail_egress_error)
 }
 
 fn normalize_http_path(path: &str) -> String {
@@ -879,17 +927,29 @@ fn normalize_http_path(path: &str) -> String {
     }
 }
 
-fn map_http_payment_error(error: ureq::Error) -> PaymentError {
+fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
     match error {
-        ureq::Error::Status(402, _response) => PaymentError::InsufficientFunds,
-        ureq::Error::Status(status, _response) if (400..500).contains(&status) => {
-            PaymentError::Declined(format!("payment rail rejected request (HTTP {status})"))
-        }
-        ureq::Error::Status(status, _response) => PaymentError::Unavailable(format!(
-            "payment rail returned an unavailable status (HTTP {status})"
-        )),
-        ureq::Error::Transport(_error) => {
+        HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. } => {
             PaymentError::Unavailable("payment rail transport failed".to_owned())
+        }
+        HttpEgressError::ResponseTooLarge { .. } => {
+            PaymentError::RailError("payment rail response is too large".to_owned())
+        }
+        HttpEgressError::InvalidContract(_)
+        | HttpEgressError::InvalidUrl(_)
+        | HttpEgressError::MissingAuthority
+        | HttpEgressError::UserinfoDenied => {
+            PaymentError::RailError("payment rail URL is invalid".to_owned())
+        }
+        HttpEgressError::MissingContract
+        | HttpEgressError::SchemeDenied { .. }
+        | HttpEgressError::AuthorityDenied { .. }
+        | HttpEgressError::LoopbackDenied { .. }
+        | HttpEgressError::LinkLocalDenied { .. }
+        | HttpEgressError::Ipv6UlaDenied { .. }
+        | HttpEgressError::PrivateNetworkDenied { .. }
+        | HttpEgressError::RedirectLimitExceeded { .. } => {
+            PaymentError::RailError("payment rail egress denied".to_owned())
         }
     }
 }

@@ -20,6 +20,7 @@ url = { workspace = true }
 http = { version = "1", optional = true }
 reqwest = { workspace = true, default-features = false, features = ["form", "json", "query", "rustls"], optional = true }
 tokio = { workspace = true, features = ["net"], optional = true }
+ureq = { version = "2.10", optional = true }
 
 [features]
 default = []
@@ -27,6 +28,10 @@ default = []
 # enforcement on the initial URL, on every redirect, and on observed response
 # size. Callers that depend on this feature get `send_with_contract`.
 reqwest-egress = ["dep:http", "dep:reqwest", "dep:serde_json", "dep:tokio", "dep:chio-core"]
+# Blocking ureq helper: `BlockingContractAgent` enforces the contract on the
+# request URL, on every resolved address, and on the response size, and never
+# follows redirects.
+ureq-egress = ["dep:ureq"]
 
 [dev-dependencies]
 reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
