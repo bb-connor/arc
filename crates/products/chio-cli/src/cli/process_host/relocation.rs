@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chio_control_plane::DurableAdmissionRuntime;
 use chio_store_sqlite::{RelocationImportPhase, RelocationSeal};
@@ -198,82 +198,10 @@ fn checkpoint(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-/// SHA-256 of every regular file that travels with the directory, keyed by
-/// its slash-separated relative path.
-fn digests(directory: &Path, policy: SidecarPolicy) -> Result<BTreeMap<String, String>, CliError> {
-    let mut files = BTreeMap::new();
-    let mut pending = vec![directory.to_path_buf()];
-    while let Some(current) = pending.pop() {
-        for entry in std::fs::read_dir(&current)? {
-            let entry = entry?;
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let file_type = entry.file_type()?;
-            if file_type.is_dir() {
-                if current == directory && EXCLUDED_DIRECTORIES.contains(&name.as_str()) {
-                    continue;
-                }
-                #[cfg(test)]
-                reader_tests::before_descend(&path)?;
-                pending.push(path);
-                continue;
-            }
-            if !file_type.is_file() {
-                if file_type.is_symlink() {
-                    return Err(error(format!(
-                        "host state must not contain symlinks: {}",
-                        relative(directory, &path)?
-                    )));
-                }
-                return Err(error(format!(
-                    "host state contains a nonregular file: {}",
-                    relative(directory, &path)?
-                )));
-            }
-            if current == directory && EXCLUDED.contains(&name.as_str()) {
-                continue;
-            }
-            if let Some(database) = SQLITE_SIDECARS
-                .iter()
-                .find_map(|suffix| name.strip_suffix(suffix))
-            {
-                let known = current == directory
-                    && (database == "authority.db" || CHECKPOINTED.contains(&database));
-                let regular_database = known
-                    && directory
-                        .join(database)
-                        .symlink_metadata()
-                        .is_ok_and(|metadata| metadata.is_file());
-                let accepts_wal = matches!(policy, SidecarPolicy::Checkpointable)
-                    || (matches!(policy, SidecarPolicy::CommittedImport)
-                        && database == "authority.db");
-                if !regular_database
-                    || (!accepts_wal && name.ends_with("-wal") && entry.metadata()?.len() != 0)
-                {
-                    return Err(error(format!(
-                        "unverified SQLite sidecar: {}",
-                        relative(directory, &path)?
-                    )));
-                }
-                continue;
-            }
-            files.insert(relative(directory, &path)?, digest(&path)?);
-        }
-    }
-    Ok(files)
-}
+mod walk;
+use walk::digests;
 
-fn relative(directory: &Path, path: &Path) -> Result<String, CliError> {
-    let relative: PathBuf = path
-        .strip_prefix(directory)
-        .map_err(|_| error("relocated file escaped the state directory"))?
-        .to_path_buf();
-    relative
-        .to_str()
-        .map(|text| text.replace(std::path::MAIN_SEPARATOR, "/"))
-        .ok_or_else(|| error("relocated file name is not valid UTF-8"))
-}
-
+#[cfg(test)]
 fn digest(path: &Path) -> Result<String, CliError> {
     let file = crate::input::open_regular(path)?;
     let expected = file.metadata()?.len();

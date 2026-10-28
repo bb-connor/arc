@@ -50,20 +50,28 @@ fn relocation_digest_refuses_growth_and_truncation_after_handle_metadata() -> Te
     Ok(())
 }
 
+type BeforeDescend = Box<dyn FnOnce(&Path) -> Result<(), CliError>>;
+
 thread_local! {
-    static BEFORE_DESCEND: std::cell::RefCell<Option<Box<dyn FnOnce(&Path) -> Result<(), CliError>>>> = const { std::cell::RefCell::new(None) };
+    static BEFORE_DESCEND: std::cell::RefCell<Option<BeforeDescend>> = const { std::cell::RefCell::new(None) };
 }
 
 pub(super) fn before_descend(path: &Path) -> Result<(), CliError> {
     let callback = BEFORE_DESCEND.with(|slot| slot.borrow_mut().take());
-    if let Some(callback) = callback { callback(path)?; }
+    if let Some(callback) = callback {
+        callback(path)?;
+    }
     Ok(())
 }
 
 struct DescendHook;
 
 impl Drop for DescendHook {
-    fn drop(&mut self) { BEFORE_DESCEND.with(|slot| { slot.borrow_mut().take(); }); }
+    fn drop(&mut self) {
+        BEFORE_DESCEND.with(|slot| {
+            slot.borrow_mut().take();
+        });
+    }
 }
 
 #[test]
@@ -73,7 +81,10 @@ fn relocation_walk_accepts_nested_regular_files() -> TestResult {
     std::fs::write(root.path().join("nested/artifact"), b"abc")?;
     let files = digests(root.path(), SidecarPolicy::Sealed)?;
     assert_eq!(files.len(), 1);
-    assert_eq!(files.get("nested/artifact").map(String::as_str), Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+    assert_eq!(
+        files.get("nested/artifact").map(String::as_str),
+        Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    );
     Ok(())
 }
 
@@ -88,15 +99,140 @@ fn relocation_walk_refuses_directory_replaced_by_symlink_before_descent() -> Tes
     let outside_path = outside.path().to_path_buf();
     let moved_path = moved.path().join("original");
     let _hook = DescendHook;
-    BEFORE_DESCEND.with(|slot| *slot.borrow_mut() = Some(Box::new(move |path| {
-        std::fs::rename(path, &moved_path)?;
-        std::os::unix::fs::symlink(&outside_path, path)?;
-        Ok(())
-    })));
+    BEFORE_DESCEND.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(move |path| {
+            std::fs::rename(path, &moved_path)?;
+            std::os::unix::fs::symlink(&outside_path, path)?;
+            Ok(())
+        }))
+    });
     let result = digests(root.path(), SidecarPolicy::Sealed);
     assert!(BEFORE_DESCEND.with(|slot| slot.borrow().is_none()));
-    let Err(error) = result else { return Err("directory replacement was followed while hashing".into()); };
-    assert_eq!(error.to_string(), "process host: relocation directory is not a nonsymlink directory: nested");
+    let Err(CliError::Chio(error)) = result else {
+        return Err("directory replacement was followed or returned the wrong error type".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: relocation directory is not a nonsymlink directory: nested"
+    );
     assert_eq!(std::fs::read(outside.path().join("artifact"))?, b"outside");
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_refuses_directory_replaced_by_regular_file() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let moved = tempfile::tempdir()?;
+    std::fs::create_dir(root.path().join("nested"))?;
+    let moved_path = moved.path().join("original");
+    let _hook = DescendHook;
+    BEFORE_DESCEND.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(move |path| {
+            std::fs::rename(path, &moved_path)?;
+            std::fs::write(path, b"not a directory")?;
+            Ok(())
+        }));
+    });
+    let Err(CliError::Chio(error)) = digests(root.path(), SidecarPolicy::Sealed) else {
+        return Err("expected directory replacement refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: relocation directory is not a nonsymlink directory: nested"
+    );
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_preserves_root_exclusions_and_sidecar_policy() -> TestResult {
+    let root = tempfile::tempdir()?;
+    std::fs::create_dir(root.path().join("run-sockets"))?;
+    std::fs::create_dir(root.path().join("nested"))?;
+    for name in [
+        "host.lock",
+        "relocation.json",
+        "run-sockets/socket",
+        "nested/host.lock",
+        "authority.db",
+    ] {
+        std::fs::write(root.path().join(name), b"abc")?;
+    }
+    std::fs::write(root.path().join("authority.db-wal"), b"pending")?;
+    let checkpointable = digests(root.path(), SidecarPolicy::Checkpointable)?;
+    assert_eq!(
+        checkpointable
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["authority.db", "nested/host.lock"]
+    );
+    assert_eq!(
+        digests(root.path(), SidecarPolicy::CommittedImport)?,
+        checkpointable
+    );
+    let Err(CliError::Chio(error)) = digests(root.path(), SidecarPolicy::Sealed) else {
+        return Err("expected nonempty WAL refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: unverified SQLite sidecar: authority.db-wal"
+    );
+    std::fs::write(root.path().join("authority.db-wal"), b"")?;
+    assert_eq!(digests(root.path(), SidecarPolicy::Sealed)?, checkpointable);
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_refuses_static_symlinks() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let outside = tempfile::tempdir()?;
+    std::fs::write(outside.path().join("database"), b"outside")?;
+    std::os::unix::fs::symlink(
+        outside.path().join("database"),
+        root.path().join("authority.db"),
+    )?;
+    let result = digests(root.path(), SidecarPolicy::Sealed);
+    let Err(CliError::Chio(error)) = result else {
+        return Err("expected sidecar database symlink refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: host state must not contain symlinks: authority.db"
+    );
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_refuses_symlinks_in_root_components() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let outside = tempfile::tempdir()?;
+    std::fs::create_dir(outside.path().join("inner"))?;
+    std::fs::write(outside.path().join("inner/artifact"), b"outside")?;
+    let alias = root.path().join("alias");
+    std::os::unix::fs::symlink(outside.path(), &alias)?;
+    let Err(CliError::Chio(error)) = digests(&alias.join("inner"), SidecarPolicy::Sealed) else {
+        return Err("expected root component symlink refusal".into());
+    };
+    let label = alias
+        .strip_prefix("/")?
+        .to_str()
+        .ok_or("fixture path is not UTF-8")?;
+    assert_eq!(
+        error.message(),
+        format!("process host: relocation directory is not a nonsymlink directory: {label}")
+    );
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_refuses_parent_components() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let Err(CliError::Chio(error)) = digests(&root.path().join(".."), SidecarPolicy::Sealed) else {
+        return Err("expected parent component refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: relocation root contains a parent or platform prefix component"
+    );
     Ok(())
 }
