@@ -336,7 +336,7 @@ fn decode_evaluate_request(body: &[u8]) -> Result<EvaluateRequest, String> {
     let text = std::str::from_utf8(body)
         .map_err(|error| format!("failed to decode evaluate request: {error}"))?;
     UntrustedJsonText::new(text)
-        .decode_document()
+        .decode_signed()
         .map_err(|error| format!("failed to decode evaluate request: {error}"))
 }
 
@@ -356,7 +356,7 @@ fn hydrate_request_from_headers(
                 .map_err(|error| format!("invalid x-chio-capability header: {error}"))?;
             request.capability = Some(
                 UntrustedJsonText::new(raw_capability)
-                    .decode_document()
+                    .decode_signed()
                     .map_err(|error| format!("invalid x-chio-capability JSON: {error}"))?,
             );
         }
@@ -507,7 +507,7 @@ fn resolve_capability(request: &EvaluateRequest) -> Result<CapabilityToken, Stri
     let raw = std::env::var(CAPABILITY_TOKENS_ENV)
         .map_err(|_| format!("missing {CAPABILITY_TOKENS_ENV} and no inline capability token"))?;
     let tokens: serde_json::Map<String, serde_json::Value> = UntrustedJsonText::new(&raw)
-        .decode_document()
+        .decode_signed()
         .map_err(|error| format!("invalid {CAPABILITY_TOKENS_ENV}: {error}"))?;
     let capability = tokens
         .get(&request.capability_id)
