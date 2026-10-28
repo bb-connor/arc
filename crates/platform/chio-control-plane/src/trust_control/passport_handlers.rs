@@ -1544,6 +1544,56 @@ pub(crate) async fn handle_federated_issue(
         }
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     }
+    let mut store =
+        if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
+            match state.receipt_store() {
+                Ok(store) => Some(store),
+                Err(response) => return response,
+            }
+        } else {
+            None
+        };
+    let upstream_parent = if let Some(upstream_capability_id) =
+        payload.upstream_capability_id.as_deref()
+    {
+        let Some(store) = store.as_ref() else {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "multi-hop federated issuance requires --receipt-db so imported upstream evidence can be resolved",
+            );
+        };
+        match store.get_federated_share_for_capability(upstream_capability_id) {
+            Ok(Some((share, snapshot))) => {
+                if let Some(policy) = payload.delegation_policy.as_ref() {
+                    if share.signer_public_key != policy.body.signer_public_key.to_hex() {
+                        return plain_http_error(
+                            StatusCode::FORBIDDEN,
+                            "delegation policy signer must match the signer that shared the imported upstream evidence package",
+                        );
+                    }
+                }
+                if let Err(error) = ensure_requested_capability_within_parent_snapshot(
+                    &payload.capability,
+                    &snapshot,
+                    now,
+                ) {
+                    return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+                }
+                Some((share.share_id, snapshot))
+            }
+            Ok(None) => {
+                return plain_http_error(
+                    StatusCode::NOT_FOUND,
+                    "imported upstream capability was not found in the local federated evidence-share index",
+                );
+            }
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            }
+        }
+    } else {
+        None
+    };
     if let Err(error) = partner_door.admit(accept_unix_ms) {
         return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
@@ -1689,56 +1739,6 @@ pub(crate) async fn handle_federated_issue(
         }
         enterprise_audit = Some(audit);
     }
-    let mut store =
-        if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
-            match state.receipt_store() {
-                Ok(store) => Some(store),
-                Err(response) => return response,
-            }
-        } else {
-            None
-        };
-    let upstream_parent = if let Some(upstream_capability_id) =
-        payload.upstream_capability_id.as_deref()
-    {
-        let Some(store) = store.as_ref() else {
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "multi-hop federated issuance requires --receipt-db so imported upstream evidence can be resolved",
-            );
-        };
-        match store.get_federated_share_for_capability(upstream_capability_id) {
-            Ok(Some((share, snapshot))) => {
-                if let Some(policy) = payload.delegation_policy.as_ref() {
-                    if share.signer_public_key != policy.body.signer_public_key.to_hex() {
-                        return plain_http_error(
-                            StatusCode::FORBIDDEN,
-                            "delegation policy signer must match the signer that shared the imported upstream evidence package",
-                        );
-                    }
-                }
-                if let Err(error) = ensure_requested_capability_within_parent_snapshot(
-                    &payload.capability,
-                    &snapshot,
-                    now,
-                ) {
-                    return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
-                }
-                Some((share.share_id, snapshot))
-            }
-            Ok(None) => {
-                return plain_http_error(
-                    StatusCode::NOT_FOUND,
-                    "imported upstream capability was not found in the local federated evidence-share index",
-                );
-            }
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-            }
-        }
-    } else {
-        None
-    };
     let authority = if payload.delegation_policy.is_some() {
         load_capability_authority_with_deferred_lineage(&state)
     } else {
