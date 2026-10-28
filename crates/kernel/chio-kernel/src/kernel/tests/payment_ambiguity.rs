@@ -1725,7 +1725,7 @@ fn assert_payment_evidence_signed(
         financial["payment_authorization_evidence"],
         payment_ambiguity_evidence()
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

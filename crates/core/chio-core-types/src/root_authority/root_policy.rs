@@ -485,12 +485,17 @@ impl RootPolicy {
         if &self.policy_key != pinned_policy_key {
             return Err(RootPolicyLoadError::PolicyKeyNotPinned);
         }
-        let verified = self
-            .policy_key
-            .verify_canonical_strict(&self.signing_body(), &self.signature)
-            .map_err(|error| RootPolicyLoadError::Canonicalization(error.to_string()))?;
-        if !verified {
-            return Err(RootPolicyLoadError::InvalidSignature);
+        match crate::crypto::verify_wrapped(
+            pinned_policy_key,
+            super::CHIO_ROOT_POLICY_SCHEMA,
+            &self.signing_body(),
+            &self.signature,
+        ) {
+            Ok(()) => {}
+            Err(crate::error::Error::SignatureRejected) => {
+                return Err(RootPolicyLoadError::InvalidSignature)
+            }
+            Err(error) => return Err(RootPolicyLoadError::Canonicalization(error.to_string())),
         }
         if self.valid_from >= self.valid_until {
             return Err(RootPolicyLoadError::EmptyValidityWindow);

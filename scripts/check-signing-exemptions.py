@@ -24,6 +24,7 @@ ALLOWLIST = {
     ('crates/products/chio-cli/src/cli/dispatch/proof/export.rs', 'redact_public_bundle_signature', 'DssePae'): 1,
     ('crates/products/chio-proof-room/src/bundle_a.rs', 'verify_bundle_signature', 'DssePae'): 1,
     ('crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs', 'sign_jwt', 'JwsSigningInput'): 1,
+    ('crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs', 'verify', 'JwsSigningInput'): 1,
     ('crates/protocol/chio-mcp-remote/src/remote_mcp/session_identity.rs', 'verify_ed25519_jwt_signature', 'JwsSigningInput'): 1,
     ('crates/trust/chio-credentials/src/oid4vp.rs', 'sign_jwt_value', 'JwsSigningInput'): 1,
     ('crates/trust/chio-credentials/src/oid4vp.rs', 'verify_oid4vp_direct_post_response', 'JwsSigningInput'): 1,

@@ -1619,7 +1619,7 @@ fn continuation_token_self_signed_by_an_untrusted_key_is_refused() {
             subject: &child_kp.public_key(),
             call_chain: &call_chain,
             parent_session_anchor: parent_anchor.clone(),
-            parent_receipt_hash: &parent_receipt_hash,
+            parent_receipt_hash: Some(&parent_receipt_hash),
             server_id: "srv-echo",
             tool_name: "delegate",
             governed_intent_hash: None,

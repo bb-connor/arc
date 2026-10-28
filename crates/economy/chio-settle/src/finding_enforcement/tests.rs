@@ -21,7 +21,6 @@ use chio_open_market::penalty::{
     OpenMarketPenaltyState, SignedOpenMarketPenalty, OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA,
 };
 use chio_web3_bindings::IChioBondVault;
-use serde::Serialize;
 
 use crate::{
     EvmBondSnapshot, EvmTransactionReceipt, PreparedEvmCall, SettlementChainConfig,

@@ -117,7 +117,12 @@ fn signed_policy(edit: impl FnOnce(&mut Value)) -> RootPolicy {
 }
 
 fn resign(policy: RootPolicy, signer: &Keypair) -> RootPolicy {
-    let signature = signer.sign_canonical(&policy.signing_body()).unwrap().0;
+    let signature = signer
+        .sign_wrapped(
+            chio_core_types::root_authority::CHIO_ROOT_POLICY_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&policy.signing_body()).unwrap(),
+        )
+        .unwrap();
     let mut fields = policy.into_fields();
     fields.signature = signature;
     RootPolicy::new(fields).unwrap()
@@ -753,7 +758,12 @@ fn snapshot_signed_by(exchange_key: &PublicKey, signer: &Keypair) -> IdpKeySnaps
         "signature": "00".repeat(64)
     }))
     .unwrap();
-    let signature = signer.sign_canonical(&unsigned.signing_body()).unwrap().0;
+    let signature = signer
+        .sign_wrapped(
+            chio_core_types::root_authority::CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&unsigned.signing_body()).unwrap(),
+        )
+        .unwrap();
     let mut fields = unsigned.into_fields();
     fields.signature = signature;
     IdpKeySnapshot::new(fields).unwrap()

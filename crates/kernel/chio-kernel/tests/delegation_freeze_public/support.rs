@@ -252,7 +252,7 @@ impl Fixture {
             )?,
             None => CapabilityToken::sign(body, &self.issuer)?,
         };
-        assert!(token.verify_signature_at(parent.issued_at)?);
+        assert!(token.verify_integrity_embedded_key_at(parent.issued_at)?);
         Ok((token, child_holder))
     }
 

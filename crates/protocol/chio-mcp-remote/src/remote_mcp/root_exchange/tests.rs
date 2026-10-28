@@ -75,9 +75,11 @@ fn snapshot_digest(keys: &[Value]) -> Sha256Digest {
     }))
     .unwrap();
     let signature = exchange_keypair()
-        .sign_canonical(&unsigned.signing_body())
-        .unwrap()
-        .0;
+        .sign_wrapped(
+            chio_core::root_authority::CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body()).unwrap(),
+        )
+        .unwrap();
     let mut fields = unsigned.into_fields();
     fields.signature = signature;
     let snapshot = IdpKeySnapshot::new(fields).unwrap();
@@ -109,7 +111,10 @@ fn compact(header: &Value, claims: &Value, sign: impl Fn(&[u8]) -> Vec<u8>) -> S
 }
 
 fn idp_sign(input: &[u8]) -> Vec<u8> {
-    idp_keypair().sign(input).to_bytes().to_vec()
+    idp_keypair()
+        .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, input)
+        .to_bytes()
+        .to_vec()
 }
 
 fn client_sign(input: &[u8]) -> Vec<u8> {
@@ -236,9 +241,11 @@ fn loaded_policy(identity_digest: Sha256Digest, edit: impl FnOnce(&mut Value)) -
     edit(&mut value);
     let unsigned: RootPolicy = serde_json::from_value(value).unwrap();
     let signature = policy_keypair()
-        .sign_canonical(&unsigned.signing_body())
-        .unwrap()
-        .0;
+        .sign_wrapped(
+            chio_core::root_authority::CHIO_ROOT_POLICY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body()).unwrap(),
+        )
+        .unwrap();
     let mut fields = unsigned.into_fields();
     fields.signature = signature;
     RootPolicy::new(fields)
@@ -1002,7 +1009,7 @@ async fn forged_id_jag_signature_is_refused() {
     let harness = Harness::new();
     let forged = compact(&id_jag_header(), &id_jag_claims(), |input| {
         Keypair::from_seed(&[12; 32])
-            .sign(input)
+            .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, input)
             .to_bytes()
             .to_vec()
     });

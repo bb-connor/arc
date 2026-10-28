@@ -276,7 +276,15 @@ impl VerifyingKey {
             (KeyMaterial::P384(key), JwsAlgorithm::ES384) => P384Signature::from_slice(signature)
                 .is_ok_and(|signature| key.verify(input, &signature).is_ok()),
             (KeyMaterial::Ed25519(key), JwsAlgorithm::EdDSA) => <[u8; 64]>::try_from(signature)
-                .is_ok_and(|bytes| key.verify_strict(input, &ChioSignature::from_bytes(&bytes))),
+                .is_ok_and(|bytes| {
+                    chio_core::crypto::verify_exempt(
+                        key,
+                        chio_core::crypto::ExemptFormat::JwsSigningInput,
+                        input,
+                        &ChioSignature::from_bytes(&bytes),
+                    )
+                    .is_ok()
+                }),
             _ => false,
         }
     }

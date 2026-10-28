@@ -64,9 +64,11 @@ fn classical_only(kernel: &ChioKernel, nonce: &SignedExecutionNonce) -> SignedEx
         signature: kernel
             .config
             .keypair
-            .sign_canonical(&nonce.nonce)
-            .unwrap()
-            .0,
+            .sign_wrapped(
+                crate::execution_nonce::EXECUTION_NONCE_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&nonce.nonce).unwrap(),
+            )
+            .unwrap(),
     }
 }
 

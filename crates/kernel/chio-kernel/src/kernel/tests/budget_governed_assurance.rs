@@ -1327,8 +1327,17 @@ fn payment_authority_expiry_is_the_earliest_capability_or_approval_expiry() {
                 proposal_deadline: 1_744_000_050,
                 policy_authority: kernel.config.keypair.public_key(),
             },
-            algorithm: None,
-            signature: kernel.config.keypair.sign(b"payment-authority-expiry"),
+            signature: kernel
+                .config
+                .keypair
+                .sign_wrapped(
+                    chio_core::capability::governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+                    &chio_core::canonical::CanonicalBytes::from_serializable(
+                        &"payment-authority-expiry",
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
         },
     );
     assert_eq!(

@@ -89,14 +89,14 @@ impl ReceiptFixture {
             let mut body = receipt.body();
             body.action.parameter_hash = "00".repeat(32);
             receipt = ChioReceipt::sign(body, &self.signer).test_expect("receipt signs");
-            assert!(receipt.verify_signature().test_expect("signature verifies"));
+            assert!(receipt.verify_integrity_embedded_key().test_expect("signature verifies"));
             assert!(!receipt
                 .action
                 .verify_hash()
                 .test_expect("action hash checks"));
         } else {
             receipt.timestamp += 1;
-            assert!(!receipt.verify_signature().test_expect("signature checks"));
+            assert!(!receipt.verify_integrity_embedded_key().test_expect("signature checks"));
             assert!(receipt
                 .action
                 .verify_hash()

@@ -335,16 +335,17 @@ pub fn assess_functions_verification(
 #[cfg(test)]
 mod tests {
     use chio_core::crypto::Keypair;
-    use chio_core::hashing::Hash;
+    use chio_core::hashing::{sha256, Hash};
     use chio_core::receipt::{
         body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
-        metadata::GuardEvidence,
+        metadata::GuardEvidence, signing::ChioReceiptSigningBody,
     };
 
     use super::{
         assess_functions_verification, prepare_functions_batch_verification,
         ChainlinkFunctionsTarget, FunctionsFallbackStatus, FunctionsVerificationPolicy,
         FunctionsVerificationPurpose, FunctionsVerificationResponse,
+        CHIO_FUNCTIONS_ED25519_SOURCE,
     };
 
     use chio_test_support::prelude::*;

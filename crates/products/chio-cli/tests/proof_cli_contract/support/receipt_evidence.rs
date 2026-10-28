@@ -25,8 +25,12 @@ pub(crate) fn sign_terminal_receipt(mut receipt: serde_json::Value) -> serde_jso
         "kernel_key".to_string(),
         serde_json::Value::String(keypair.public_key().to_hex()),
     );
-    let (signature, _) = keypair
-        .sign_canonical(&receipt)
+    let signature = keypair
+        .sign_wrapped(
+            "chio.proof-room.receipt-evidence.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&receipt)
+                .test_expect("canonical signing body"),
+        )
         .test_expect("terminal receipt signs");
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
     receipt

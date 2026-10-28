@@ -244,7 +244,7 @@ fn sqlite_stop_after_capture_refuses_terminal_transaction_until_resume() -> Test
     let released = kernel.evaluate_tool_call_blocking(&retained.request)?;
     assert_eq!(released.verdict, Verdict::Allow);
     assert!(released.output.is_some());
-    assert!(released.receipt.verify_signature()?);
+    assert!(released.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         released
             .receipt

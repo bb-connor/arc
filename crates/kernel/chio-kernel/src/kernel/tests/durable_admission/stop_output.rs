@@ -57,7 +57,7 @@ fn stopped_live_return_and_retry_retain_output_until_resume() -> TestResult {
     )?;
     assert_eq!(released.verdict, Verdict::Allow);
     assert!(released.output.is_some());
-    assert!(released.receipt.verify_signature()?);
+    assert!(released.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         released
             .receipt
