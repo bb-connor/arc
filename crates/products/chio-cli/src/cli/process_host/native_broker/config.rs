@@ -253,6 +253,8 @@ pub(super) fn read_signer(
             "broker authority seed must be a private regular file owned by the host",
         ));
     }
+    #[cfg(test)]
+    reader_tests::after_open_metadata(path)?;
     let mut seed = zeroize::Zeroizing::new(String::new());
     file.take(66).read_to_string(&mut seed)?;
     if metadata.len() > 65 {
