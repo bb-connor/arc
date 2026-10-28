@@ -26,9 +26,9 @@ pub(crate) use receipt_metadata::{
 };
 pub(crate) use receipt_scopes::{
     current_post_invocation_guard_evidence, current_pre_invocation_guard_evidence,
-    scope_governed_call_chain_receipt_evidence, scope_governed_runtime_attestation_receipt_record,
-    scope_post_invocation_guard_evidence, scope_pre_invocation_guard_evidence,
-    GovernedCallChainReceiptEvidence,
+    next_fixed_runtime_episode_id, scope_governed_call_chain_receipt_evidence,
+    scope_governed_runtime_attestation_receipt_record, scope_post_invocation_guard_evidence,
+    scope_pre_invocation_guard_evidence, GovernedCallChainReceiptEvidence,
 };
 pub use receipt_scopes::{scope_receipt_ids_for_current_thread, ReceiptIdScope};
 pub use signing::{
