@@ -639,6 +639,10 @@ class TypeResolutionTests(unittest.TestCase):
         source = "fn {name}(m: Option<Value>) -> Result<(), E> {{ let r: {ty} = m\n        .ok_or(e())\n        .and_then(|value| serde_json::from_value(value).map_err(wrap))?; Ok(()) }}"
         self.assertEqual(len(self.raw_decodes(source.format(name="bad", ty="ChioReceipt"))), 1)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": source.format(name="good", ty="u64")}), [])
+        block = "fn bad(m: Option<Value>) -> Result<(), E> { let r: ChioReceipt = m.ok_or(e()).and_then(|value| { check(); serde_json::from_value(value).map_err(wrap) })?; Ok(()) }"
+        self.assertEqual(len(self.raw_decodes(block)), 1)
+        document = "fn bad(t: &str) -> Result<(), E> { let r: ChioReceipt = UntrustedJsonText::from_wire(t, 9)?\n        .decode_document()?; Ok(()) }"
+        self.assertEqual(len(self.raw_decodes(document)), 1)
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": "fn unknown(m: Option<Value>) -> Result<(), E> { let r: u64 = m.ok_or(e()).and_then(|value| serde_json::from_value(value).map(stamp))?; Ok(()) }"}), ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_value(value)"])
 
     def test_extractor_alias_chains_resolve_before_filtering(self):

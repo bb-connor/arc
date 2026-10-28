@@ -17,10 +17,14 @@ impl, or a call to a function of the same crate that is generic over a
 or `const` initializer. It is flagged when its target is strict by turbofish,
 by a `let` annotation (including a declared-then-assigned binding), by the
 item's declared type, or by the strict return type of the function that holds
-it (with `Self` read as the implementing type), either directly, through the
-tail of an `if` branch, `match` arm or block, as the scrutinee of a tail
-`match` or `if let`, or through an unannotated `let` binding that the function
-returns. A `_` placeholder in a target is completed by that context. A decode
+it (with `Self` read as the implementing type). Context applies only along
+value-preserving flows: `Ok`/`Some`/`Box::new` wrappers, `?`, `.await` and
+error- or option-adapting methods, the tail of an `if` branch, `match` arm,
+block or `and_then` closure, and an unannotated `let` binding the function
+returns. A `match` or `if let` scrutinee takes the types its arm patterns
+name, or the construct's own context when every value-carrying arm forwards
+the value unchanged; a closure that consumes the value gives its annotated
+parameter type. A `_` placeholder in a target is completed by that context. A decode
 whose target is neither named nor completed by context is refused as inferred
 unless ALLOWED_INFERRED names it with a reason. An extractor (`Json`, `Query`,
 `Form`, or an import of axum's) is flagged when its type argument is strict.
@@ -96,6 +100,8 @@ ALLOWED_INFERRED: dict[tuple[str, str, str], str] = {
         "Inferred PersistedAdmissionOperationV1 member of a ledger Value already parsed by decode_signed in from_ledger.",
     ("crates/kernel/chio-kernel/src/kernel/session_ops.rs", "parse_tool_call_operation_dpop", "serde_json::from_value(value.clone())"):
         "Inferred DpopProof from the Option return type through map and transpose; a DPoP proof holds no receipt type.",
+    ("crates/kernel/chio-kernel/src/kernel/session_ops.rs", "parse_tool_call_operation_execution_nonce", "serde_json::from_value(value.clone())"):
+        "Inferred SignedExecutionNonce through a match arm and transpose into the Option return type; a nonce holds no receipt type.",
     ("crates/kernel/chio-kernel/src/tool_outcome/release/persistence.rs", "validate_zero_charge_records", "parse_artifact_value(&checked_artifacts[0])"):
         "Inferred PersistedToolOutcomeRecordV1 from ToolOutcomeRecordV1::from_persisted; it holds no receipt type.",
     ("crates/kernel/chio-kernel/src/tool_outcome/release/persistence.rs", "validate_zero_charge_records", "parse_artifact_value(&checked_artifacts[1])"):
@@ -136,6 +142,8 @@ ALLOWED_INFERRED: dict[tuple[str, str, str], str] = {
         "Inferred serde_json::Value from handle_jsonrpc_value(message: Value).",
     ("crates/protocol/chio-acp-edge/src/jsonrpc.rs", "handle_jsonrpc", ".decode_document()"):
         "Inferred serde_json::Value from handle_jsonrpc_value(message: Value).",
+    ("crates/protocol/chio-acp-proxy/src/input.rs", "decode", "original.decode_document()"):
+        "Inferred serde_json::Value, the field of the Self newtype that as_value returns as &serde_json::Value.",
     ("crates/protocol/chio-mcp-adapter/src/framing.rs", "read_jsonrpc_frame_with_admission", ".decode_document()"):
         "Inferred serde_json::Value from the Option<(Value, T)> return type.",
     ("crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc", "complete_prompt_argument", "serde_json::from_value(completion_value.clone())"):
@@ -154,8 +162,6 @@ ALLOWED_INFERRED: dict[tuple[str, str, str], str] = {
         "Inferred Option<Sensitivity> and Option<bool> extension members of the Self literal.",
     ("crates/protocol/chio-provider-adapter-core/src/input.rs", "arguments", "json_bounded(text.as_bytes(),MAX_ARGUMENT_BYTES)"):
         "Inferred serde_json::Value from argument_object(value: Value).",
-    ("crates/sdk/chio-binding-helpers/src/signing.rs", "json_document", "text.decode_document()"):
-        "Inferred serde_json::Value from the Result<Value> return type through and_then.",
     ("crates/security/chio-active-response-authority/src/store.rs", "prepare_logical_records", "serde_json::from_slice(&payload)"):
         "Inferred LogicalRecord.payload, a serde_json::Value.",
     ("crates/tooling/chio-conformance/src/native_suite.rs", "collect_native_scenarios", "serde_json::from_str(&content)"):
@@ -774,6 +780,15 @@ def let_annotation(fn_code: str, offset: int) -> str:
     return enclosing_let(fn_code, offset)[1]
 
 
+def impl_deserialize_parameters(code: str, offset: int) -> set[str]:
+    """The generic parameters of the innermost `impl` holding `offset` that are bound by `Deserialize`."""
+    header = ""
+    for start, end, text in block_spans(code):
+        if start < offset < end and text.startswith("impl"):
+            header = text
+    return set(GENERIC_BOUND.findall(header)) & impl_parameters(code, offset)
+
+
 def call_end(code: str, offset: int) -> int:
     """The end of the call starting at `offset`, past any turbofish or qualified-path angles."""
     index = offset
@@ -834,23 +849,36 @@ def control_flow(fn_code: str) -> tuple:
     return tuple(rows)
 
 
+IDENTITY_WRAPPERS = frozenset({"Ok", "Some", "Box::new", "Arc::new", "Rc::new", "std::sync::Arc::new", "std::rc::Rc::new"})
+IDENTITY_METHODS = frozenset({
+    "map_err", "ok", "unwrap", "expect", "unwrap_or", "unwrap_or_else", "unwrap_or_default",
+    "context", "with_context", "ok_or", "ok_or_else", "inspect_err",
+})
+IDENTITY_MAPS = frozenset({"Some", "Ok", "Box::new", "Arc::new", "Rc::new"})
+VALUELESS_ARM = re.compile(r"\s*(?:Err\s*\(|None\b|_\s*$)")
+
+
 def value_prefix(prefix: str) -> bool:
-    """Whether `prefix` only wraps the expression after it in constructor calls."""
+    """Whether `prefix` only wraps the expression after it in value-preserving constructors."""
     pieces = prefix.split("(")
-    return not pieces[-1].strip() and all(re.fullmatch(r"\s*[A-Za-z_][\w:]*\s*", piece) for piece in pieces[:-1])
+    return not pieces[-1].strip() and all(re.sub(r"\s+", "", piece) in IDENTITY_WRAPPERS for piece in pieces[:-1])
 
 
-def postfix_end(code: str, index: int) -> int:
-    """The first token after the `?`, `.await`, closing wrapper parens and method calls at `index`."""
+def postfix_end(code: str, index: int, wrappers: bool = True) -> tuple[int, str]:
+    """The first token after the value-preserving `?`, `.await`, closing wrapper
+    parens and methods at `index`, and the first value-changing method call there.
+
+    A method outside IDENTITY_METHODS (or `map` with a constructor other than
+    IDENTITY_MAPS) changes the value, so the walk stops at it and returns its text."""
     while True:
         while index < len(code) and code[index].isspace():
             index += 1
-        if index < len(code) and code[index] in "?)":
+        if index < len(code) and (code[index] == "?" or wrappers and code[index] == ")"):
             index += 1
             continue
         method = re.match(r"\.\s*(\w+)\s*(?:::\s*(?=<))?", code[index:])
         if not method:
-            return index
+            return index, ""
         position = index + method.end()
         if method.group(1) == "await":
             index = position
@@ -860,77 +888,233 @@ def postfix_end(code: str, index: int) -> int:
             while position < len(code) and code[position].isspace():
                 position += 1
         if code[position:position + 1] != "(":
-            return index
-        index = _contracts.closing(code, position)
+            return index, code[index:position]
+        close = _contracts.closing(code, position)
+        argument = re.sub(r"\s+", "", code[position + 1:close - 1])
+        if method.group(1) not in IDENTITY_METHODS and not (method.group(1) == "map" and argument in IDENTITY_MAPS):
+            return index, code[index:close]
+        index = close
 
 
-def tail_value(fn_code: str, start: int, end: int, depth: int = 0) -> bool:
-    """Whether the expression in `[start, end)` is the function's value.
+def closure_parameter_type(projection: str) -> str:
+    """The annotated parameter type of a closure passed to a value-changing method."""
+    closure = re.match(r"\.\s*\w+\s*\(\s*(?:move\s+)?\|\s*(?:mut\s+)?\w+\s*:\s*([^|]+)\|", projection)
+    return closure.group(1).strip() if closure else ""
 
-    The expression is the value of a `return`, the function body's tail, or the
-    tail of a block, `if` branch or `match` arm whose construct is itself the
-    function's value."""
-    if depth > 64:
+
+def match_arms(code: str, opening: int) -> list[tuple[str, str]]:
+    """(pattern, value expression) for each arm of the match body opening at `opening`."""
+    close = brace_pairs(code).get(opening, len(code) - 1)
+    arms, index = [], opening + 1
+    while index < close:
+        arrow = index
+        depth = 0
+        while arrow < close and not (depth == 0 and code.startswith("=>", arrow)):
+            depth += code[arrow] in "([{"
+            depth -= code[arrow] in ")]}"
+            arrow += 1
+        if arrow >= close:
+            break
+        pattern = code[index:arrow].strip().lstrip(",").strip()
+        start = arrow + 2
+        while start < close and code[start].isspace():
+            start += 1
+        if code[start:start + 1] == "{":
+            end = brace_pairs(code).get(start, close) + 1
+            value = block_tail(code[start + 1:end - 1])
+            following = end
+            while following < close and code[following].isspace():
+                following += 1
+            index = following + 1 if code[following:following + 1] == "," else following
+        else:
+            end, depth = start, 0
+            while end < close and not (depth == 0 and code[end] == ","):
+                depth += code[end] in "([{"
+                depth -= code[end] in ")]}"
+                end += 1
+            value = code[start:end]
+            index = end + 1
+        arms.append((re.split(r"\bif\b", pattern)[0], value.strip()))
+    return arms
+
+
+def block_tail(body: str) -> str:
+    """The tail expression of a block body: the text after its last top-level `;`."""
+    depth, last = 0, -1
+    for index, char in enumerate(body):
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == ";" and depth == 0:
+            last = index
+    return body[last + 1:].strip()
+
+
+def pattern_types(pattern: str) -> list[str]:
+    """Types a struct or tuple-struct pattern names, with an enum variant read as its enum."""
+    found = []
+    for match in re.finditer(r"(?<![\w:])((?:\w+\s*::\s*)*[A-Z]\w*)\s*[({]", pattern):
+        path = [part.strip() for part in match.group(1).split("::")]
+        if path[-1] in {"Ok", "Err", "Some", "None"}:
+            continue
+        if len(path) > 1 and path[-2][:1].isupper():
+            path = path[:-1]
+        found.append("::".join(path))
+    return found
+
+
+def identity_arm(pattern: str, value: str) -> bool:
+    """Whether an arm binds the scrutinee's value by name and yields it unchanged."""
+    binding = re.fullmatch(r"\s*(?:(?:Ok|Some)\s*\(\s*)?(?:mut\s+)?([a-z_]\w*)\s*\)?\s*", pattern)
+    if not binding:
         return False
+    name = re.escape(binding.group(1))
+    return bool(re.fullmatch(r"(?:return\s+)?(?:(?:Ok|Some)\s*\(\s*)?" + name + r"\s*\)?", value.strip()))
+
+
+def value_type(returns) -> str:
+    """The function's value type: `()` without a return type, empty when unknown (None)."""
+    return "" if returns is None else returns or "()"
+
+
+CLOSURE_TAIL = re.compile(r"\.\s*(?:and_then|or_else)\s*\(\s*(?:move\s+)?\|[^|]*\|\s*$")
+
+
+def chain_start(code: str, index: int) -> int:
+    """Where the method chain whose `.` sits at `index` begins."""
+    position = index
+    while True:
+        cursor = position - 1
+        while cursor >= 0 and code[cursor].isspace():
+            cursor -= 1
+        while cursor >= 0 and code[cursor] == "?":
+            cursor -= 1
+        if cursor >= 0 and code[cursor] in ")]":
+            opening = {")": "(", "]": "["}[code[cursor]]
+            depth = 0
+            while cursor >= 0:
+                depth += code[cursor] in ")]"
+                depth -= code[cursor] in "(["
+                if code[cursor] == opening and depth == 0:
+                    break
+                cursor -= 1
+            cursor -= 1
+        while cursor >= 0 and (code[cursor].isalnum() or code[cursor] in "_:&*"):
+            cursor -= 1
+        start = cursor + 1
+        while cursor >= 0 and code[cursor].isspace():
+            cursor -= 1
+        if cursor >= 0 and code[cursor] == ".":
+            position = cursor
+            continue
+        return start
+
+
+def closure_flow(fn_code: str, start: int, end: int, returns, depth: int) -> str | None:
+    """The flow of a decode that is the whole body of an `and_then`/`or_else` closure,
+    whose result is then the chain's value; None when the decode is not such a body."""
+    head = CLOSURE_TAIL.search(fn_code, max(0, start - 200), start)
+    if not head or head.end() != start:
+        return None
+    paren = fn_code.index("(", head.start())
+    close = _contracts.closing(fn_code, paren)
+    following, projection = postfix_end(fn_code, end, wrappers=False)
+    if projection or following != close - 1:
+        return ""
+    return flow(fn_code, chain_start(fn_code, head.start()), close, returns, depth + 1)
+
+
+def flow(fn_code: str, start: int, end: int, returns, depth: int = 0) -> str:
+    """The type the value of the expression in `[start, end)` is checked against.
+
+    The type is named only along value-preserving flows: a `let` annotation,
+    an assignment to a declared binding, a `return` or tail of the function,
+    a value-preserving `if`/`match` arm or block tail, a scrutinee whose arms
+    name a type in their patterns or forward the value unchanged, or the
+    annotated parameter of a closure that consumes it. Anything else is empty."""
+    if depth > 64:
+        return ""
+    closure = closure_flow(fn_code, start, end, returns, depth)
+    if closure is not None:
+        return closure
     pairs = brace_pairs(fn_code)
     openings = {close: opening for opening, close in pairs.items()}
+    following, projection = postfix_end(fn_code, end)
+    if projection:
+        return closure_parameter_type(projection)
+    constructs = control_flow(fn_code)
+    for row in constructs:
+        if row[3] == following and row[0] < start:
+            head = fn_code[row[0]:row[3]]
+            lead = re.sub(r"^(?:match\b|if\s+let\b.*?=(?!=)|if\b)", "", fn_code[row[0]:start], count=1, flags=re.S)
+            if not value_prefix(lead):
+                return ""
+            if row[2] == "match":
+                arms = match_arms(fn_code, row[3])
+            elif re.match(r"if\s+let\b", head):
+                pattern = re.match(r"if\s+let\s+(.*?)=(?!=)", head, re.S)
+                arms = [(pattern.group(1) if pattern else "", block_tail(fn_code[row[3] + 1:pairs[row[3]]]))]
+            else:
+                return ""
+            named = [kind for pattern, _ in arms for kind in pattern_types(pattern)]
+            if named:
+                return "(" + ", ".join(named) + ")"
+            carrying = [(pattern, value) for pattern, value in arms if not VALUELESS_ARM.match(pattern)]
+            if carrying and all(identity_arm(pattern, value) for pattern, value in carrying):
+                return flow(fn_code, row[0], row[1], returns, depth + 1)
+            return ""
     statement_start = max(fn_code.rfind(char, 0, start) for char in ";{}") + 1
     prefix = fn_code[statement_start:start]
-    if prefix.strip().startswith("return"):
-        return True
+    returning = re.match(r"\s*return\b", prefix)
+    if returning:
+        return value_type(returns) if value_prefix(prefix[returning.end():]) else ""
+    binding = re.match(r"\s*let\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])", prefix)
+    if binding:
+        if not value_prefix(prefix[binding.end():]) or fn_code[following:following + 1] != ";":
+            return ""
+        if binding.group(2):
+            return binding.group(2).strip()
+        name = binding.group(1).strip()
+        if re.fullmatch(r"\w+", name) and binding_returned(fn_code, following, name):
+            return value_type(returns)
+        return ""
+    assignment = re.match(r"\s*(\w+)\s*=(?![=>])", prefix)
+    if assignment:
+        if not value_prefix(prefix[assignment.end():]) or fn_code[following:following + 1] != ";":
+            return ""
+        declarations = re.findall(r"\blet\s+(?:mut\s+)?" + re.escape(assignment.group(1)) + r"\s*:\s*([^=;]+?)\s*;", fn_code[:start])
+        return declarations[-1] if declarations else ""
     arm = "=>" in prefix
     if arm:
         prefix = prefix.rsplit("=>", 1)[1]
-    if not value_prefix(prefix):
-        return False
-    following = postfix_end(fn_code, end)
-    if following >= len(fn_code) or fn_code[following] not in ",}":
-        return False
-    constructs = control_flow(fn_code)
+    if not value_prefix(prefix) or following >= len(fn_code) or fn_code[following] not in ",}":
+        return ""
     if arm:
         holders = [row for row in constructs if row[2] == "match" and row[3] < start < pairs[row[3]]]
         if holders:
             row = max(holders, key=lambda row: row[3])
             if fn_code[following] == "," or following == pairs[row[3]]:
-                return tail_value(fn_code, row[0], row[1], depth + 1)
+                return flow(fn_code, row[0], row[1], returns, depth + 1)
     if fn_code[following] != "}":
-        return False
+        return ""
     opening = openings.get(following)
     if opening is None:
-        return False
+        return ""
     if following == len(fn_code.rstrip()) - 1:
-        return True
+        return value_type(returns)
     for row in constructs:
         if row[2] == "if" and opening in row[4]:
-            return tail_value(fn_code, row[0], row[1], depth + 1)
+            return flow(fn_code, row[0], row[1], returns, depth + 1)
     before = fn_code[:opening].rstrip()
     if before.endswith("=>"):
         holders = [row for row in constructs if row[2] == "match" and row[3] < opening < pairs[row[3]]]
         if holders:
             row = max(holders, key=lambda row: row[3])
-            return tail_value(fn_code, row[0], row[1], depth + 1)
-        return False
-    if not before or before[-1] in ";{}" or re.search(r"\bunsafe$", before):
-        return tail_value(fn_code, opening, following + 1, depth + 1)
-    return False
-
-
-def returned(fn_code: str, offset: int) -> bool:
-    """Whether the call at `offset` is the function's value, or the scrutinee of a
-    `match` or `if let` that is."""
-    if tail_value(fn_code, offset, call_end(fn_code, offset)):
-        return True
-    for start, end, keyword, head, _ in control_flow(fn_code):
-        if start < offset < head and (keyword == "match" or re.match(r"if\s+let\b", fn_code[start:head])):
-            if tail_value(fn_code, start, end):
-                return True
-    return False
-
-
-def let_binding(fn_code: str, offset: int) -> str:
-    """The name an unannotated `let` binds to the call at `offset`, if any."""
-    pattern, annotation = enclosing_let(fn_code, offset)
-    return pattern if not annotation and re.fullmatch(r"\w+", pattern) else ""
+            return flow(fn_code, row[0], row[1], returns, depth + 1)
+        return ""
+    if not before or before[-1] in ";{}=" or re.search(r"\bunsafe$", before):
+        return flow(fn_code, opening, following + 1, returns, depth + 1)
+    closure = closure_flow(fn_code, opening, following + 1, returns, depth)
+    return closure or ""
 
 
 def binding_returned(fn_code: str, offset: int, name: str) -> bool:
@@ -1069,16 +1253,19 @@ def placeholder_strict(explicit, mentions) -> bool:
     return explicit is not None and bool(PLACEHOLDER.search(explicit)) and mentions(PLACEHOLDER.sub("()", explicit))
 
 
-def contextual_target(fn_code: str, offset: int, returns: str) -> str:
-    annotation = let_annotation(fn_code, offset) or assigned_annotation(fn_code, offset)
-    if annotation:
-        return annotation
-    if returned(fn_code, offset):
-        return returns or "()"
-    name = let_binding(fn_code, offset)
-    if name and binding_returned(fn_code, offset, name):
-        return returns or "()"
-    return ""
+RECEIVER_DECODE = re.compile(r"(?:\s*\?|\s*\.\s*\w+\s*\([^;{}]*?\))*?\s*\.\s*decode_document\s*(?:::\s*<[^;{}]*?>\s*)?\(")
+
+
+def contextual_target(fn_code: str, offset: int, returns) -> str:
+    if fn_code.startswith(".", offset):
+        start = chain_start(fn_code, offset)
+        end = _contracts.closing(fn_code, fn_code.index("(", offset))
+        return flow(fn_code, start, end, returns)
+    end = call_end(fn_code, offset)
+    document = RECEIVER_DECODE.match(fn_code, end)
+    if document:
+        end = _contracts.closing(fn_code, document.end() - 1)
+    return flow(fn_code, offset, end, returns)
 
 
 def crate_of(rel: str) -> str:
@@ -1321,30 +1508,34 @@ def scan(root: Path) -> list[str]:
             if path[-1] in crate_helpers and alias not in crate_helpers:
                 crate_helpers[alias] = crate_helpers[path[-1]]
 
-    axum_names = {"axum", ""} | {
-        alias for imports in strict.imports.values() for alias, path in imports.items()
-        if path[0] == "axum" and (len(path) < 3 or path[-1] in AXUM_EXTRACTORS)
-    }
-
-    local_extractors = {}
+    local_extractors = set()
     for rel, code in files:
         for start, end, header in block_spans(code):
             extractor = re.match(r"impl\s*<[^{]*?>\s*(?:[\w:]*::)?FromRequest(?:Parts)?\s*<[^{]*?>\s*for\s+(\w+)\s*<", header)
             if extractor and any(True for _ in decode_sites(code[start:end], 0, helpers.get(crate_of(rel), {}), resolver(rel, start), aliases)):
-                local_extractors.setdefault(crate_of(rel), set()).add(extractor.group(1))
+                local_extractors |= resolve_path(extractor.group(1), rel, start)
+    extractor_names = {"axum", ""} | {key[-1] for key in local_extractors}
+    changed = True
+    while changed:
+        additions = {
+            alias for imports in strict.imports.values() for alias, path in imports.items()
+            if {path[0], path[-1]} & extractor_names
+        } - extractor_names
+        extractor_names |= additions
+        changed = bool(additions)
 
     def extractors(text, rel, offset, pattern):
-        """(start, opening `<`) for each extractor type applied in `text`."""
+        """(start, opening `<`) for each extractor type applied in `text`.
+
+        Every path that can reach axum or a local raw-decoding extractor through
+        an import chain is resolved, so renamed and re-exported extractors count."""
         found = {match.start(): match.end() - 1 for match in pattern.finditer(text)}
         for match in TYPE_APPLICATION.finditer(text):
             segments = [part.strip() for part in match.group(1).split("::")]
-            if segments[-1] in local_extractors.get(crate_of(rel), set()):
-                found.setdefault(match.start(), match.end() - 1)
+            if match.start() in found or not {segments[0], segments[-1]} & extractor_names:
                 continue
-            if not ({segments[0], segments[-1]} & axum_names):
-                continue
-            if match.start() not in found and any(
-                key[:2] == (":external", "axum") and key[-1] in AXUM_EXTRACTORS
+            if any(
+                key[:2] == (":external", "axum") and key[-1] in AXUM_EXTRACTORS or key in local_extractors
                 for key in resolve_path(match.group(1), rel, offset)
             ):
                 found[match.start()] = match.end() - 1
@@ -1382,7 +1573,7 @@ def scan(root: Path) -> list[str]:
                     target = re.sub(r"\bSelf\b", self_type, target)
                 if not target and placeholder_strict(explicit, lambda text: mentions_target(text, rel, row[1] + offset)):
                     target = PLACEHOLDER.sub("()", explicit)
-                if not target and parameters or set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}:
+                if not target and (parameters or impl_deserialize_parameters(code, row[1])) or set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}:
                     continue
                 record(rel, owner, call_text(fn_code, offset), kind, target, row[1] + offset)
         for item in STATIC_ITEM.finditer(code):
@@ -1451,7 +1642,7 @@ def targets_in_template(body: str, offset: int, explicit) -> str:
     site, so this returns an empty string."""
     if explicit is not None and not PLACEHOLDER.search(explicit):
         return explicit
-    annotation = let_annotation(body, offset) or assigned_annotation(body, offset)
+    annotation = contextual_target(body, offset, None)
     if explicit is not None:
         return f"({explicit}, {annotation})" if annotation else ""
     return annotation
