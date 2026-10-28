@@ -582,10 +582,7 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
         serde_json::json!(CHIO_RUNTIME_ADMISSION_STORE_SCHEMA)
     );
     assert_eq!(admission_state["bundles"].as_array().map(Vec::len), Some(1));
-    assert_eq!(
-        admission_state["consumedLeaseIds"].as_array().map(Vec::len),
-        Some(1)
-    );
+    assert!(admission_state.get("consumedLeaseIds").is_none());
     assert!(admission_state.get("trustFloors").is_none());
 
     let trust_floor_state: serde_json::Value =
