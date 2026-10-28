@@ -122,12 +122,14 @@ pub enum MintRequestRefusal {
     KeySnapshotMismatch,
     #[error("artifact digest differs from the context")]
     ArtifactMismatch,
+    #[error("context artifact digest presence differs from the anchor kind")]
+    ArtifactDigestPresence,
+    #[error("replay namespace is not admitted for the anchor kind")]
+    ReplayNamespaceKind,
     #[error("root tags span two key generations")]
     TagsSpanGenerations,
     #[error("root tags are not among the loaded generations")]
     TagsNotLoaded,
-    #[error("only an operator key root may omit the tenant tag")]
-    TenantTagRequired,
     #[error("bearer mapping retention ends before the root")]
     BearerRetentionShort,
     #[error("duplicate context opening")]
@@ -159,6 +161,8 @@ impl std::fmt::Display for RetainedArtifact {
 /// Why the store refuses to open. Every variant leaves the rows in place.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RootExchangeIntegrityError {
+    #[error("root exchange schema differs from its canonical definition")]
+    SchemaMismatch,
     #[error("anchored root {capability_id} has no global commit")]
     RootWithoutGlobalCommit { capability_id: String },
     #[error("anchored root {capability_id} differs from its authorization projection")]
@@ -176,7 +180,7 @@ pub enum RootExchangeIntegrityError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RootTags {
     pub subject: KeyedIndexValue,
-    pub tenant: Option<KeyedIndexValue>,
+    pub tenant: KeyedIndexValue,
 }
 
 impl RootTags {
@@ -237,6 +241,17 @@ pub trait MintRevocationCheck {
     ) -> std::result::Result<(), MintRevocationRefusal>;
 }
 
+/// What a mint's replay key is unique within.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MintReplayNamespace {
+    /// The anchor kind's own namespace: the presented assertion, token or
+    /// request, and for `chio_local_as` the re-exchanged subject token `jti`.
+    AnchorKind,
+    /// A `chio_local_as` authorization-code issuance, keyed by
+    /// SHA-256 of the code.
+    LocalAsIssue,
+}
+
 /// Everything one mint binds. The exchange signs `root` before the call.
 pub struct MintRequest<'a> {
     pub root: &'a CapabilityToken,
@@ -252,6 +267,7 @@ pub struct MintRequest<'a> {
     pub client_id: &'a str,
     /// SHA-256 of the presented assertion or token.
     pub artifact_digest: Sha256Digest,
+    pub replay_namespace: MintReplayNamespace,
     /// `exp + 60`, past which the replay key may bind again.
     pub replay_retain_until: u64,
     pub openings: &'a [ContextOpening],
@@ -501,3 +517,6 @@ fn invalid(detail: impl Into<String>) -> RootExchangeStoreError {
 pub(super) fn owner_invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
     SqliteServingOwnerError::Invalid(detail.into())
 }
+
+#[cfg(test)]
+mod tests;

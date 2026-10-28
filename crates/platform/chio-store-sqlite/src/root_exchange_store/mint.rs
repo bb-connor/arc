@@ -194,15 +194,8 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if !request.tag_candidates.contains(&request.tags) {
         return Err(refuse(MintRequestRefusal::TagsNotLoaded));
     }
-    if request
-        .tags
-        .tenant
-        .is_some_and(|tenant| tenant.key_id != request.tags.subject.key_id)
-    {
+    if request.tags.tenant.key_id != request.tags.subject.key_id {
         return Err(refuse(MintRequestRefusal::TagsSpanGenerations));
-    }
-    if request.tags.tenant.is_none() && anchor.kind != AnchorKind::ChioOperatorKey {
-        return Err(refuse(MintRequestRefusal::TenantTagRequired));
     }
     if let Some(mapping) = request.bearer {
         if mapping.retain_until < root.expires_at {

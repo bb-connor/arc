@@ -6,12 +6,12 @@
 mod support;
 
 use chio_store_sqlite::root_exchange_store::{
-    BearerLookup, BearerMapping, ContextOpenings, MintOutcome, MintRequestRefusal, OpeningState,
-    RetainedArtifact, RootExchangeStoreError as E,
+    BearerLookup, BearerMapping, ContextOpenings, MintOutcome, MintReplayNamespace,
+    MintRequestRefusal, OpeningState, RetainedArtifact, RootExchangeStoreError as E,
 };
 use support::{
-    digest, loaded_policy, snapshot, tags, Admit, Case, Env, Failing, RevokedTenant, TestResult,
-    NOW,
+    digest, loaded_policy, snapshot, tags, Admit, Case, Env, Failing, Kind, RevokedTenant,
+    TestResult, NOW,
 };
 
 #[test]
@@ -294,13 +294,6 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
             Box::new(|case| case.candidates = vec![tags(2)]),
         ),
         (
-            MintRequestRefusal::TenantTagRequired,
-            Box::new(|case| {
-                case.tags.tenant = None;
-                case.candidates = vec![case.tags];
-            }),
-        ),
-        (
             MintRequestRefusal::TagsSpanGenerations,
             Box::new(|case| {
                 case.tags.tenant = tags(2).tenant;
@@ -552,6 +545,145 @@ fn mint_outcomes_carry_the_checked_root() -> TestResult {
             assert_eq!(root.context, case.context()?);
         }
         MintOutcome::Recovered(_) => return Err("fresh mint reported a recovery".into()),
+    }
+    Ok(())
+}
+
+fn local_as_issue(capability_id: &str) -> TestResult<Case> {
+    let mut case = Case::non_jws(Kind::LocalAs, capability_id)?;
+    case.namespace = MintReplayNamespace::LocalAsIssue;
+    case.replay = 0x51;
+    case.request = 0x52;
+    Ok(case)
+}
+
+fn local_reexchange(capability_id: &str) -> TestResult<Case> {
+    let mut case = Case::non_jws(Kind::LocalAs, capability_id)?;
+    case.replay = 0x53;
+    case.request = 0x54;
+    Ok(case)
+}
+
+fn binding(namespace: &str, capability_id: &str) -> (String, Option<String>) {
+    (namespace.to_string(), Some(capability_id.to_string()))
+}
+
+#[test]
+fn local_as_issue_binds_its_own_replay_namespace() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&local_as_issue("cap-1")?, &Admit, NOW)?;
+    assert_eq!(
+        env.replay_bindings()?,
+        vec![binding("chio_local_as_issue", "cap-1")]
+    );
+    Ok(())
+}
+
+#[test]
+fn local_as_issue_then_first_reexchange_succeeds() -> TestResult {
+    let env = Env::new()?;
+    assert_eq!(
+        env.minted(&local_as_issue("cap-1")?, &Admit, NOW)?,
+        ("cap-1".to_string(), false)
+    );
+    assert_eq!(
+        env.minted(&local_reexchange("cap-2")?, &Admit, NOW + 1)?,
+        ("cap-2".to_string(), false)
+    );
+    assert_eq!(
+        env.replay_bindings()?,
+        vec![
+            binding("chio_local_as", "cap-2"),
+            binding("chio_local_as_issue", "cap-1"),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn local_reexchange_twice_refuses() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&local_reexchange("cap-1")?, &Admit, NOW)?;
+    assert_eq!(
+        env.refused(&local_reexchange("cap-2")?, &Admit, NOW + 1)?,
+        E::AssertionReplay
+    );
+    assert_eq!(
+        env.store.presentation("cap-2").err(),
+        Some(E::AnchoredRootMissing {
+            capability_id: "cap-2".into()
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn local_as_issue_namespace_requires_the_local_as_kind() -> TestResult {
+    for kind in [Kind::IdJag, Kind::StaticBearer, Kind::OperatorKey] {
+        let env = Env::new()?;
+        let mut case = match kind {
+            Kind::IdJag => Case::id_jag("cap-1")?,
+            Kind::StaticBearer => Case::static_bearer("cap-1")?,
+            _ => Case::non_jws(kind, "cap-1")?,
+        };
+        case.namespace = MintReplayNamespace::LocalAsIssue;
+        assert_eq!(
+            env.refused(&case, &Admit, NOW)?,
+            E::InvalidMintRequest(MintRequestRefusal::ReplayNamespaceKind)
+        );
+        assert_eq!(env.replay_bindings()?, Vec::new());
+    }
+    Ok(())
+}
+
+#[test]
+fn explicit_exchange_identical_repeat_refuses_replay() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
+    assert_eq!(
+        env.refused(&Case::id_jag("cap-2")?, &Admit, NOW + 1)?,
+        E::AssertionReplay
+    );
+    assert_eq!(
+        env.store.presentation("cap-2").err(),
+        Some(E::AnchoredRootMissing {
+            capability_id: "cap-2".into()
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn non_jws_context_carrying_artifact_digest_refuses_mint() -> TestResult {
+    for kind in [Kind::LocalAs, Kind::OperatorKey] {
+        let env = Env::new()?;
+        let mut case = Case::non_jws(kind, "cap-1")?;
+        case.edit_context = |value| {
+            value["anchor"]["artifact_digest"] = serde_json::json!(support::digest(0x13));
+        };
+        assert_eq!(digest(case.artifact), digest(0x13));
+        assert_eq!(
+            env.refused(&case, &Admit, NOW)?,
+            E::InvalidMintRequest(MintRequestRefusal::ArtifactDigestPresence)
+        );
+        assert_eq!(env.replay_bindings()?, Vec::new());
+    }
+    Ok(())
+}
+
+#[test]
+fn non_jws_roots_pass_the_row_check_without_context_artifact_digest() -> TestResult {
+    for kind in [Kind::StaticBearer, Kind::LocalAs, Kind::OperatorKey] {
+        let env = Env::new()?;
+        let case = match kind {
+            Kind::StaticBearer => Case::static_bearer("cap-1")?,
+            _ => Case::non_jws(kind, "cap-1")?,
+        };
+        env.minted(&case, &Admit, NOW)?;
+        let reopened = env.fixture.open()?.root_exchange_store();
+        let stored = reopened.presentation("cap-1")?;
+        assert_eq!(stored.context.anchor.artifact_digest, None);
+        assert_eq!(stored.context.anchor.kind.as_str(), case.context()?.anchor.kind.as_str());
     }
     Ok(())
 }
