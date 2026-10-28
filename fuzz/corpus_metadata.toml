@@ -1357,3 +1357,27 @@ target = "frost_round2_envelope"
 path = "fuzz/corpus/frost_round2_envelope/pair-19.json"
 sha256 = "a369b9c2f76f2ee9667c0d623818158adee3119713fd9010eefad5f3061fd19f"
 source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/valid-usd.json"
+sha256 = "5fbbc359521545f4fb6f4fe7dd27464a091492a68f58cf69fea1ad7f31876233"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/valid-usdc-rail.json"
+sha256 = "dd32f173f8e139059ee52dfea240761de35657443f4c6deba70827d045e4598d"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/contract-pinned.json"
+sha256 = "5bedc44f52283af937cf9d7ab8f70bfafabbab829af02066019f38f4d59005e3"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/capability-mismatch.json"
+sha256 = "bccc247bcb2e7472e0956207b4cd6aee037337c8bc26affc9722933266d1ee02"
+source = "hand_curated_coverage"

@@ -222,3 +222,6 @@ pub fn underwriting_policy_input(data: &[u8]) {
 
 mod frost_round2_envelope;
 pub use frost_round2_envelope::frost_round2_envelope;
+
+mod settlement_approval_witness;
+pub use settlement_approval_witness::settlement_approval_witness;

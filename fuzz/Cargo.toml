@@ -36,6 +36,8 @@ response_authority_protocol = ["dep:chio-control-plane"]
 response_lifecycle = ["dep:chio-quarantine"]
 
 [dependencies]
+chio-settle = { path = "../crates/economy/chio-settle" }
+chio-security-types = { path = "../crates/security/chio-security-types", features = ["std"] }
 zeroize = "1.8"
 chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }
 chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"], optional = true }
@@ -327,6 +329,13 @@ bench = false
 [[bin]]
 name = "frost_round2_envelope"
 path = "fuzz_targets/frost_round2_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "settlement_approval_witness"
+path = "fuzz_targets/settlement_approval_witness.rs"
 test = false
 doc = false
 bench = false

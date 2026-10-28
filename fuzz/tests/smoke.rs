@@ -40,6 +40,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "peers_lock_decode",
     "receipt_log_replay",
     "rollback_anchor_slots",
+    "settlement_approval_witness",
     "underwriting_policy_input",
     "wasm_guard_escape",
     "wasm_guard_smith",
@@ -360,5 +361,13 @@ fn frost_round2_envelope_smoke() {
     assert_seed_floor(
         "frost_round2_envelope",
         chio_fuzz::entries::frost_round2_envelope,
+    );
+}
+
+#[test]
+fn settlement_approval_witness_smoke() {
+    assert_seed_floor(
+        "settlement_approval_witness",
+        chio_fuzz::entries::settlement_approval_witness,
     );
 }
