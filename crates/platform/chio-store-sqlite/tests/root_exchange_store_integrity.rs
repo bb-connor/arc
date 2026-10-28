@@ -42,7 +42,7 @@ fn hex(byte: u8) -> String {
 #[test]
 fn every_projected_root_column_mutation_refuses_open() -> TestResult {
     let mutations = [
-        format!("UPDATE root_exchange_roots SET root_policy_rule_id = 'dev-static'"),
+        "UPDATE root_exchange_roots SET root_policy_rule_id = 'dev-static'".to_string(),
         format!("UPDATE root_exchange_roots SET tag_key_id = '{}'", hex(0xa2)),
         format!("UPDATE root_exchange_roots SET subject_tag = '{}'", hex(0xb2)),
         format!("UPDATE root_exchange_roots SET tenant_tag = '{}'", hex(0xc2)),
