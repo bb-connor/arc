@@ -1159,6 +1159,8 @@ fn post_bytes(
     bytes: &[u8],
 ) -> Result<serde_json::Value, CliError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let response = match ureq::post(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .set("authorization", &format!("Bearer {token}"))

@@ -4,6 +4,7 @@ use serde::de::DeserializeOwned;
 use std::time::Duration;
 
 fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI fetch of a document URL the operator named
     ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(30))
         .build()

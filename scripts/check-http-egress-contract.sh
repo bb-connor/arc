@@ -123,7 +123,8 @@ REQWEST_EXECUTE_GAP_LINE_REGEX="(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*\\.)*([A
 line_is_classified() {
     local file="$1"
     local line_no="$2"
-    awk -v line_no="$line_no" -v marker="$CLASSIFICATION_MARKER" '
+    local marker="${3:-$CLASSIFICATION_MARKER}"
+    awk -v line_no="$line_no" -v marker="$marker" '
         NR >= line_no - 4 && NR <= line_no {
             if (index($0, marker) > 0) {
                 found = 1
@@ -152,6 +153,21 @@ unclassified_reqwest_lines() {
 }
 
 failed=()
+is_test_source() {
+    local rel="$1" file="$2"
+    case "$rel" in
+        */tests.rs|*/tests/*|*-tests.rs)
+            return 0
+            ;;
+        */*_tests/*)
+            # Require a compiler-enforced file boundary. A guarded ancestor can
+            # also import this file through a production alias or be unreachable.
+            [[ "$(head -n 1 "$file")" == '#![cfg(test)]' ]] && return 0
+            ;;
+    esac
+    return 1
+}
+
 for file in "${CANDIDATE_FILES[@]}"; do
     rel="${file#./}"
 
@@ -167,19 +183,9 @@ for file in "${CANDIDATE_FILES[@]}"; do
         continue
     fi
 
-    # Skip test sources.
-    case "$rel" in
-        */tests.rs|*/tests/*|*-tests.rs)
-            continue
-            ;;
-        */*_tests/*)
-            # Require a compiler-enforced file boundary. A guarded ancestor can
-            # also import this file through a production alias or be unreachable.
-            if [[ "$(head -n 1 "$file")" == '#![cfg(test)]' ]]; then
-                continue
-            fi
-            ;;
-    esac
+    if is_test_source "$rel" "$file"; then
+        continue
+    fi
 
     # send_with_contract accepts only a ContractClient. A caller file that
     # also names a plain reqwest client or request builder type fails.
@@ -225,8 +231,81 @@ for file in "${CANDIDATE_FILES[@]}"; do
     continue
 done
 
+# ureq and hyper clients. Every ureq request starts at an agent constructor or
+# a top-level dispatch function, so each such site must be the contract helper
+# in chio-egress-contract or carry a CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ
+# classification. Kernel crates take no classification and name no ureq item:
+# their HTTP egress goes through chio_egress_contract::BlockingContractAgent.
+UREQ_MARKER="CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ:"
+HYPER_CLIENT_MARKER="CHIO_EGRESS_LINT_ALLOW_DIRECT_HYPER_CLIENT:"
+CONTRACT_OWNER="crates/protocol/chio-egress-contract/"
+UREQ_FUNCTIONS="get|post|put|delete|patch|head|request|request_url|agent|builder"
+UREQ_GAP_LINE_REGEX="ureq::(${UREQ_FUNCTIONS})\\(|ureq::(Agent|AgentBuilder)::[a-z_]+\\("
+UREQ_IMPORTED_FUNCTION_REGEX="use[[:space:]]+ureq::(\\{[^;]*\\b(${UREQ_FUNCTIONS})\\b|(${UREQ_FUNCTIONS})\\b)"
+UREQ_IMPORTED_AGENT_REGEX="use[[:space:]]+ureq::(\\{[^;]*\\b(Agent|AgentBuilder)\\b|(Agent|AgentBuilder)\\b)"
+UREQ_IMPORTED_AGENT_LINE_REGEX="(^|[^A-Za-z0-9_:])(Agent|AgentBuilder)::[a-z_]+\\("
+HYPER_CLIENT_LINE_REGEX="hyper(_util)?::client::"
+# HTTP client crates this lint does not parse. Depending on one fails until
+# the lint learns its dispatch forms.
+UNSCANNED_HTTP_CLIENT_CRATES="isahc|surf|attohttpc|minreq|curl|awc|http-req|ehttp|hyper-tls"
+
+unclassified_lines() {
+    local file="$1" pattern="$2" marker="$3"
+    while IFS= read -r match; do
+        if ! line_is_classified "$file" "${match%%:*}" "$marker"; then
+            printf '%s\n' "$match"
+        fi
+    done < <(grep -nE "$pattern" "$file" 2>/dev/null | grep -vE "^[0-9]+:[[:space:]]*//" || true)
+}
+
+while IFS= read -r file; do
+    rel="${file#./}"
+    if [[ "$rel" == "$CONTRACT_OWNER"* ]] || is_test_source "$rel" "$file"; then
+        continue
+    fi
+    if [[ "$rel" == crates/kernel/* ]]; then
+        while IFS= read -r match; do
+            failed+=("$file:$match")
+        done < <(grep -nE "\\bureq\\b" "$file" | grep -vE "^[0-9]+:[[:space:]]*//" || true)
+        continue
+    fi
+    patterns=("$UREQ_GAP_LINE_REGEX" "$UREQ_IMPORTED_FUNCTION_REGEX")
+    if grep -qE "$UREQ_IMPORTED_AGENT_REGEX" "$file"; then
+        patterns+=("$UREQ_IMPORTED_AGENT_LINE_REGEX")
+    fi
+    while IFS= read -r alias; do
+        patterns+=("\\b${alias}::(${UREQ_FUNCTIONS}|Agent|AgentBuilder)\\b")
+    done < <(sed -nE 's/.*use[[:space:]]+ureq[[:space:]]+as[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;.*/\1/p' "$file")
+    for pattern in "${patterns[@]}"; do
+        while IFS= read -r gap; do
+            failed+=("$file:$gap")
+        done < <(unclassified_lines "$file" "$pattern" "$UREQ_MARKER")
+    done
+done < <(grep -rlE "\\bureq\\b" --include='*.rs' crates/ 2>/dev/null | sort -u || true)
+
+while IFS= read -r file; do
+    rel="${file#./}"
+    if [[ "$rel" == "$CONTRACT_OWNER"* ]] || is_test_source "$rel" "$file"; then
+        continue
+    fi
+    while IFS= read -r gap; do
+        failed+=("$file:$gap")
+    done < <(unclassified_lines "$file" "$HYPER_CLIENT_LINE_REGEX" "$HYPER_CLIENT_MARKER")
+done < <(grep -rlE "$HYPER_CLIENT_LINE_REGEX" --include='*.rs' crates/ 2>/dev/null | sort -u || true)
+
+while IFS= read -r manifest_match; do
+    failed+=("$manifest_match (HTTP client crate the egress lint does not scan)")
+done < <(
+    {
+        [[ -f Cargo.toml ]] && printf '%s\n' Cargo.toml
+        find crates -name Cargo.toml -not -path '*/target/*' 2>/dev/null
+    } | sort -u | while IFS= read -r manifest; do
+        grep -nHE "^[[:space:]]*(${UNSCANNED_HTTP_CLIENT_CRATES})[[:space:]]*(=|\\.)|^\\[[^]]*dependencies\\.(${UNSCANNED_HTTP_CLIENT_CRATES})\\]|package[[:space:]]*=[[:space:]]*\"(${UNSCANNED_HTTP_CLIENT_CRATES})\"" "$manifest" || true
+    done
+)
+
 if [[ ${#failed[@]} -gt 0 ]]; then
-    echo "HttpEgressContract coverage gap: the following production crates use reqwest::Client without enforcing the typed egress contract:" >&2
+    echo "HttpEgressContract coverage gap: the following production sites build an HTTP client or dispatch a request without enforcing the typed egress contract:" >&2
     for f in "${failed[@]}"; do
         echo "  $f" >&2
     done
@@ -234,6 +313,9 @@ if [[ ${#failed[@]} -gt 0 ]]; then
     echo "Add either an explicit HttpEgressContract field on the dispatch struct" >&2
     echo "or route every call through chio_egress_contract::send_with_contract" >&2
     echo "with a ContractClient from client_builder_with_contract." >&2
+    echo "Blocking ureq callers use chio_egress_contract::BlockingContractAgent;" >&2
+    echo "a reviewed non-substrate caller states why with" >&2
+    echo "CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: or CHIO_EGRESS_LINT_ALLOW_DIRECT_HYPER_CLIENT:." >&2
     exit 1
 fi
 
