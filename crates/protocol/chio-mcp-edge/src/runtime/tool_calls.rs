@@ -502,18 +502,7 @@ impl ChioMcpEdge {
                 message: "unexpected kernel response type".to_string(),
                 data: None,
             },
-            Err(error) => {
-                self.emit_log_with_related_task(
-                    LogLevel::Error,
-                    "chio.mcp.tools",
-                    json!({
-                        "event": "tool_failed",
-                        "error": error.to_string(),
-                    }),
-                    related_task_id,
-                );
-                self.tool_call_error_outcome(session_id, error, related_task_id)
-            }
+            Err(error) => self.tool_call_error_outcome(session_id, error, related_task_id),
         }
     }
 
@@ -606,18 +595,7 @@ impl ChioMcpEdge {
                 execution_nonce: response.execution_nonce,
                 related_task_id,
             }),
-            Err(error) => {
-                self.emit_log_with_related_task(
-                    LogLevel::Error,
-                    "chio.mcp.tools",
-                    json!({
-                        "event": "tool_failed",
-                        "error": error.to_string(),
-                    }),
-                    related_task_id,
-                );
-                self.tool_call_error_outcome(session_id, error, related_task_id)
-            }
+            Err(error) => self.tool_call_error_outcome(session_id, error, related_task_id),
         };
         self.persist_accepted_url_elicitations(session_id, accepted_url_elicitations);
         outcome
@@ -739,6 +717,21 @@ impl ChioMcpEdge {
         error: chio_kernel::KernelError,
         related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let client_error = match &error {
+            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
+                GOVERNED_DENIAL_TEXT.to_owned()
+            }
+            other => other.to_string(),
+        };
+        self.emit_log_with_related_task(
+            LogLevel::Error,
+            "chio.mcp.tools",
+            json!({
+                "event": "tool_failed",
+                "error": client_error,
+            }),
+            related_task_id,
+        );
         match error {
             chio_kernel::KernelError::RequestCancelled { reason, .. } => {
                 ToolCallEdgeOutcome::Cancelled { reason }
@@ -767,6 +760,10 @@ impl ChioMcpEdge {
                     message,
                     data: Some(json!({ "elicitations": elicitations })),
                 }
+            }
+            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
+                record_receipt_write_error();
+                ToolCallEdgeOutcome::Result(governed_denial_tool_result())
             }
             other => {
                 record_receipt_write_error();
