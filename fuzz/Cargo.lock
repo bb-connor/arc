@@ -1554,6 +1554,7 @@ name = "chio-commerce-order"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credit",
  "chio-risk-comptroller",
  "chrono",
  "hex",

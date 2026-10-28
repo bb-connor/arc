@@ -1,11 +1,14 @@
 #[path = "proof/artifacts.rs"]
 mod artifacts;
+#[path = "proof/escrow_ledger.rs"]
+mod escrow_ledger;
 #[path = "proof/room.rs"]
 mod room;
 #[path = "proof/transaction_error.rs"]
 mod transaction_error;
 use super::*;
 use artifacts::*;
+use escrow_ledger::load_commerce_escrow_ledger_bytes;
 use chio_errors::_generated::error_codes::TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED;
 use std::collections::{BTreeMap, BTreeSet};
 use transaction_error::{
@@ -2082,6 +2085,13 @@ fn load_commerce_order_bundle_from_graph(
     } else {
         None
     };
+    let escrow_ledger_bytes = load_commerce_escrow_ledger_bytes(
+        bundle_dir,
+        &mut budget,
+        &graph.nodes,
+        &order_context,
+        "commerce",
+    )?;
 
     Ok(chio_commerce_order::CommerceOrderVerificationBundle {
         order_context,
@@ -2095,6 +2105,7 @@ fn load_commerce_order_bundle_from_graph(
         settlement_packet_bytes,
         mandate_protocol_payloads,
         risk_comptroller_report_bytes,
+        escrow_ledger_bytes,
         verified_trust_market_context: verified_trust_market_context.cloned(),
         trusted_event_authority_receipt_kernel_keys: trusted_event_authority_receipt_kernel_keys
             .to_vec(),

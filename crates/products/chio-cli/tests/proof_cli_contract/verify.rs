@@ -38,6 +38,30 @@ fn proof_verify_requires_commerce_claims_when_requested() {
 }
 
 #[test]
+fn proof_verify_accepts_commerce_order_with_its_pinned_escrow_ledger() {
+    let (_tempdir, bundle) = build_commerce_escrow_bundle(true);
+    let bundle = utf8_path(&bundle);
+
+    let output = chio(&["proof", "verify", bundle.as_str(), "--require", "commerce"]);
+
+    assert_success(&output);
+}
+
+#[test]
+fn proof_verify_refuses_pinned_escrow_digest_without_its_ledger_node() {
+    let (_tempdir, bundle) = build_commerce_escrow_bundle(false);
+    let bundle = utf8_path(&bundle);
+
+    let output = chio(&["proof", "verify", bundle.as_str(), "--require", "commerce"]);
+
+    assert_failure_exit_code(
+        &output,
+        "missing commerce escrow ledger for pinned digest",
+        20,
+    );
+}
+
+#[test]
 fn proof_verify_commerce_requires_dedicated_commerce_trust_roots() {
     let commerce_bundle =
         workspace_root().join("fixtures/proof-room/commerce-payments/offline-psp-valid");

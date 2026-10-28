@@ -1060,6 +1060,11 @@ files = ["crates/platform/chio-control-plane/src/trust_control/service_types/pat
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.commerce.escrow-ledger.v1"
+files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+first_seen = "d29055228e"
+
+[[schema]]
 value = "chio.commerce.event-log.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-commerce-order/src/ids.rs"]
 first_seen = "1b9620751d"
@@ -1113,6 +1118,11 @@ first_seen = "1b9620751d"
 value = "chio.commerce.reputation-snapshot.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-commerce-order/src/ids.rs"]
 first_seen = "2a36f21acf"
+
+[[schema]]
+value = "chio.commerce.reservation-receipt.v1"
+files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+first_seen = "d29055228e"
 
 [[schema]]
 value = "chio.commerce.settlement-packet.v1"

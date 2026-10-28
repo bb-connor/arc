@@ -230,8 +230,66 @@ pub(super) fn map_commerce_proof_error(error: chio_commerce_order::CommerceOrder
         | Error::ProviderTrustFailed(_)
         | Error::SettlementFailed(_)
         | Error::CoverageFailed(_) => &TRANSACTION_CLAIM_REJECTED,
+        Error::Escrow(escrow) => commerce_escrow_error_spec(escrow),
     };
     CliError::registry_error(spec, format!("proof verify: {error}"))
+}
+
+fn commerce_escrow_error_spec(
+    error: &chio_commerce_order::CommerceEscrowError,
+) -> &'static ErrorCodeSpec {
+    use chio_commerce_order::CommerceEscrowError as Error;
+
+    match error {
+        Error::LedgerSchemaUnsupported(_)
+        | Error::ReservationSchemaUnsupported(_)
+        | Error::Canonicalization(_) => &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        Error::AcceptanceDigestMismatch => &TRANSACTION_ARTIFACT_HASH_MISMATCH,
+        Error::OfferSignatureInvalid
+        | Error::ReservationSignatureInvalid
+        | Error::SettlementSignatureInvalid
+        | Error::ExecutionSignatureInvalid => &TRANSACTION_SIGNATURE_INVALID,
+        Error::AcceptStateNotAllowed(_)
+        | Error::OfferOutsideValidityWindow
+        | Error::OfferSelfIssued
+        | Error::AcceptorNotSubject
+        | Error::OfferLiabilityInvalid(_)
+        | Error::LiabilityCurrencyMismatch
+        | Error::LiabilityQuoteMismatch
+        | Error::NoTrustedReservationAuthority
+        | Error::ReservationSignerUntrusted
+        | Error::ReservationIdEmpty
+        | Error::ReservationUnbound(_)
+        | Error::ReservationCurrencyMismatch
+        | Error::ReservationUnderCollateralized
+        | Error::DispatchFieldEmpty(_)
+        | Error::DispatchStatusNotDispatched(_)
+        | Error::DispatchIssuedAtInvalid
+        | Error::SettlementSigningFailed(_)
+        | Error::LedgerZeroAmount
+        | Error::LedgerCustodyAccount(_)
+        | Error::LedgerAccountsNotDistinct
+        | Error::LedgerLegsNotCanonical
+        | Error::LedgerNotLocked
+        | Error::LedgerOrderBinding(_)
+        | Error::LedgerMissing
+        | Error::LedgerUnpinned
+        | Error::LedgerPinnedBeforeAccept(_)
+        | Error::LedgerStatusMismatch { .. }
+        | Error::AcceptedContextUnbound
+        | Error::NoTrustedSettlementAuthority
+        | Error::SettlementSignerUntrusted
+        | Error::SettlementPacketUnbound(_)
+        | Error::ReleaseContextMismatch(_)
+        | Error::ReleaseStateNotAllowed(_)
+        | Error::NoTrustedExecutionAuthority
+        | Error::ExecutionSignerUntrusted
+        | Error::ExecutionInvalid(_)
+        | Error::ExecutionActionNotRelease
+        | Error::ExecutionNotMatched
+        | Error::ExecutionUnbound(_)
+        | Error::ExecutionAfterRelease(_) => &TRANSACTION_CLAIM_REJECTED,
+    }
 }
 
 pub(super) fn map_public_settlement_proof_error(
