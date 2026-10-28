@@ -11,12 +11,6 @@ use chio_runtime_core::{
 mod evidence_artifacts_schema;
 #[path = "runtime_store/json_store_bounds.rs"]
 mod json_store_bounds;
-#[cfg(unix)]
-#[path = "runtime_store/replay_source.rs"]
-mod replay_source;
-#[cfg(not(unix))]
-#[path = "runtime_store/replay_source_unsupported.rs"]
-mod replay_source_unsupported;
 #[path = "runtime_store/trust_floor_defaults.rs"]
 mod trust_floor_defaults;
 #[path = "runtime_store/trust_floor_races.rs"]

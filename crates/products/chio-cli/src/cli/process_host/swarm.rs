@@ -243,13 +243,15 @@ pub(super) fn provision(
             &runtime_id,
             &source,
             &fence,
-            runtime.authority_clock().unix_millis().map_err(error)?.get(),
+            runtime
+                .authority_clock()
+                .unix_millis()
+                .map_err(error)?
+                .get(),
         )
         .map_err(error)?;
-    let binding = RuntimeParticipantAuthorityBindingV1::new(
-        runtime_id,
-        installed.qualification_id().clone(),
-    );
+    let binding =
+        RuntimeParticipantAuthorityBindingV1::new(runtime_id, installed.qualification_id().clone());
     let body = ProfileBody {
         schema: SCHEMA.into(),
         runtime_id: runtime.runtime_id().into(),
@@ -340,8 +342,7 @@ pub(super) fn install(
         .ok_or_else(|| error("swarm graphs require a local qualified authority"))?;
     kernel.set_federation_local_kernel_id(&signed.body.admission.local_kernel_id);
     kernel.set_runtime_admission_hook(Arc::new(
-        ChioRuntimeAdmissionHook::new(signed.body.admission, source)
-            .with_operation_owned_runtime_replay(signed.body.binding)
+        ChioRuntimeAdmissionHook::new(signed.body.admission, source, signed.body.binding)
             .with_swarm_witness_keys(vec![key.public_key()])
             .with_swarm_graph_source(Arc::new(chio_runtime::IssuedSwarmGraphs::new(
                 &authority_store,

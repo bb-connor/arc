@@ -114,7 +114,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
                 )),
             ));
         }
-        let admission_now_unix_ms = self.admission_time(context.now_unix_ms)?;
+        let admission_now_unix_ms = context.now_unix_ms;
         let mut treaty_continuation_id_to_consume = None;
         let mut swarm_continuation_id_to_consume = None;
         let mut verified_swarm_route_metadata = None;
