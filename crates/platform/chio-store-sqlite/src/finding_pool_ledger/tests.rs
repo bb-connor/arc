@@ -83,7 +83,7 @@ fn qualified_schema_indexes_pending_outbox_and_expiration_reclamation() {
         "finding_pool_receipt_outbox_pending",
         "finding_pool_receipt_outbox_delivery_sequence",
         "finding_pool_debits_expiration_reclamation",
-        "finding_pool_debits_expiration_reclamation_v2",
+        "finding_pool_debits_unclaimed_deadline",
     ] {
         let present = connection
             .query_row(
