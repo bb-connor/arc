@@ -7,8 +7,9 @@
 //! identity after a rotation, commits whole or not at all. Every operation loads the document
 //! under the lock, refuses a stored subject whose generation the key set does not hold, and
 //! commits the re-key of every identity that is not under the active generation before it
-//! reads anything. Every write keeps room below the read cap for the deactivation of each
-//! active identity, so an identity the index admits can always be deactivated.
+//! reads anything. Deactivation is the one exception: [`deactivate_enterprise_identity`]
+//! records it without the re-key, so it persists even when the re-key a rotation requires does
+//! not fit.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -418,24 +419,6 @@ impl<'k> EnterpriseIdentityIndex<'k> {
             .cloned())
     }
 
-    /// Records the identity as deactivated at `at`, once. Deactivation is keyed on the identity
-    /// id, so no rotation revives it.
-    pub fn deactivate(
-        &mut self,
-        identity_id: &EnterpriseIdentityId,
-        at: u64,
-    ) -> Result<EnterpriseIdentity, EnterpriseIdentityIndexError> {
-        let row = self
-            .identities
-            .get_mut(identity_id)
-            .ok_or(EnterpriseIdentityIndexError::UnknownIdentity)?;
-        if row.deactivated_at.is_none() {
-            row.deactivated_at = Some(at);
-            self.changed = true;
-        }
-        Ok(row.view())
-    }
-
     /// The prior subjects of one identity, in `(key_id, value)` order.
     #[must_use]
     pub fn history_of(&self, identity_id: &EnterpriseIdentityId) -> Vec<EnterpriseSubjectKey> {
@@ -476,6 +459,40 @@ pub fn with_enterprise_identity_index<R>(
     let outcome = operation(&mut index)?;
     persist_if_changed(&lock, &mut index)?;
     Ok(outcome)
+}
+
+/// Records `identity_id` as deactivated at `at`, as the single writer of the index at `path`,
+/// and returns the deactivation time in force: `at`, or the earlier one already recorded.
+/// Deactivation is keyed on the identity id, so no rotation revives it.
+///
+/// Contract: for an index this module wrote, this persists at any fill level and after any
+/// number of rotations, provided `keys` holds every generation the index stores. Every write
+/// keeps the compact encoding plus the deactivation reserve of its active identities within the
+/// read cap, and recording one deactivation adds at most the reserve it releases. This path
+/// loads and verifies the index under the lock but does not re-key it, because the history rows
+/// a re-key adds are not reserved and a rotation of a full index cannot be recorded.
+pub fn deactivate_enterprise_identity(
+    path: &Path,
+    keys: &TenantIndexKeySet,
+    identity_id: &EnterpriseIdentityId,
+    at: u64,
+) -> Result<u64, EnterpriseIdentityIndexError> {
+    let lock = signed_input::lock_registry(path).map_err(EnterpriseIdentityIndexError::Registry)?;
+    let mut index = load(lock.destination(), keys)?;
+    let row = index
+        .identities
+        .get_mut(identity_id)
+        .ok_or(EnterpriseIdentityIndexError::UnknownIdentity)?;
+    let in_force = match row.deactivated_at {
+        Some(earlier) => earlier,
+        None => {
+            row.deactivated_at = Some(at);
+            index.changed = true;
+            at
+        }
+    };
+    persist_if_changed(&lock, &mut index)?;
+    Ok(in_force)
 }
 
 fn load<'k>(

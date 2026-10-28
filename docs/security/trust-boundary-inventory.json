@@ -19559,6 +19559,8 @@
       "load#2::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/enterprise_identity_index.rs": [
+      "deactivate_enterprise_identity::shared-reader::crates/platform/chio-control-plane/src/enterprise_identity_index.rs::load",
+      "deactivate_enterprise_identity::shared-reader::crates/platform/chio-control-plane/src/enterprise_identity_index.rs::persist_if_changed",
       "load::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "persist_if_changed::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::write_reserving_registry",
       "with_enterprise_identity_index::shared-reader::crates/platform/chio-control-plane/src/enterprise_identity_index.rs::load",

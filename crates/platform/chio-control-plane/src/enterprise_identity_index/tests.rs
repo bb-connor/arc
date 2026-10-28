@@ -9,8 +9,8 @@ use chio_test_support::prelude::*;
 use serde_json::{json, Value};
 
 use super::{
-    with_enterprise_identity_index, EnterpriseIdentityId, EnterpriseIdentityIndexError,
-    ResolvedIdentity, ENTERPRISE_IDENTITY_INDEX_SCHEMA,
+    deactivate_enterprise_identity, with_enterprise_identity_index, EnterpriseIdentityId,
+    EnterpriseIdentityIndexError, ResolvedIdentity, ENTERPRISE_IDENTITY_INDEX_SCHEMA,
 };
 use crate::passport_verifier::RegistryUpdateError;
 use crate::signed_input::MAX_SIGNED_FILE_BYTES;
@@ -264,22 +264,20 @@ fn scim_deactivate_after_rotation_holds() {
     let before = set(1, &[]);
     let rng = SequenceRng::new();
     let alice = insert(&path, &before, &rng, "alice").identity;
-    let deactivated = with_enterprise_identity_index(&path, &before, |index| {
-        index.deactivate(&alice.identity_id, DEACTIVATED_AT)
-    })
-    .test_unwrap();
-    assert_eq!(deactivated.deactivated_at, Some(DEACTIVATED_AT));
+    let deactivated =
+        deactivate_enterprise_identity(&path, &before, &alice.identity_id, DEACTIVATED_AT)
+            .test_unwrap();
+    assert_eq!(deactivated, DEACTIVATED_AT);
 
     let after = set(2, &[1]);
     let recreated = insert(&path, &after, &rng, "alice");
     assert!(!recreated.inserted);
     assert_eq!(recreated.identity.identity_id, alice.identity_id);
     assert_eq!(recreated.identity.deactivated_at, Some(DEACTIVATED_AT));
-    let later = with_enterprise_identity_index(&path, &after, |index| {
-        index.deactivate(&alice.identity_id, DEACTIVATED_AT + 60)
-    })
-    .test_unwrap();
-    assert_eq!(later.deactivated_at, Some(DEACTIVATED_AT));
+    let later =
+        deactivate_enterprise_identity(&path, &after, &alice.identity_id, DEACTIVATED_AT + 60)
+            .test_unwrap();
+    assert_eq!(later, DEACTIVATED_AT);
 }
 
 #[test]
@@ -566,11 +564,10 @@ fn an_identity_admitted_at_capacity_can_always_be_deactivated() {
         assert!(is_persist_refusal(&crowded), "{crowded:?}");
         assert_eq!(std::fs::read(&path).test_unwrap(), admitted_bytes);
 
-        let deactivated = with_enterprise_identity_index(&path, &keys, |index| {
-            index.deactivate(&admitted.identity.identity_id, at)
-        })
-        .test_unwrap();
-        assert_eq!(deactivated.deactivated_at, Some(at));
+        let deactivated =
+            deactivate_enterprise_identity(&path, &keys, &admitted.identity.identity_id, at)
+                .test_unwrap();
+        assert_eq!(deactivated, at);
         assert!(
             std::fs::metadata(&path).test_unwrap().len()
                 <= u64::try_from(MAX_SIGNED_FILE_BYTES).test_unwrap()
@@ -621,4 +618,79 @@ fn a_fifo_at_the_index_path_is_refused_without_blocking() {
         .test_unwrap()
         .file_type()
         .is_fifo());
+}
+
+fn stored_deactivation(path: &Path, identity_id: &EnterpriseIdentityId) -> Value {
+    stored(path)["identities"]
+        .as_array()
+        .test_unwrap()
+        .iter()
+        .find(|row| row["identityId"] == identity_id.as_str())
+        .test_unwrap()["deactivatedAt"]
+        .clone()
+}
+
+#[test]
+fn deactivation_persists_after_a_rotation_the_full_index_cannot_record() {
+    let dir = chio_test_support::private_tempdir().test_unwrap();
+    let path = index_path(&dir);
+    let rng = SequenceRng::new();
+    let principal = "p".repeat(FULL_PRINCIPAL_BYTES - DEACTIVATION_RESERVE_BYTES);
+    let admitted = insert_in(&path, &set(1, &[]), &rng, &principal)
+        .test_unwrap()
+        .identity;
+
+    let rotated = set(2, &[1]);
+    let rekey = with_enterprise_identity_index(&path, &rotated, |index| Ok(index.len()));
+    assert!(is_persist_refusal(&rekey), "{rekey:?}");
+
+    let in_force =
+        deactivate_enterprise_identity(&path, &rotated, &admitted.identity_id, DEACTIVATED_AT);
+    assert_eq!(in_force.test_unwrap(), DEACTIVATED_AT);
+    assert_eq!(
+        stored_deactivation(&path, &admitted.identity_id),
+        json!(DEACTIVATED_AT)
+    );
+    assert!(
+        std::fs::metadata(&path).test_unwrap().len()
+            <= u64::try_from(MAX_SIGNED_FILE_BYTES).test_unwrap()
+    );
+}
+
+#[test]
+fn deactivation_persists_across_repeated_rotations_at_capacity() {
+    let dir = chio_test_support::private_tempdir().test_unwrap();
+    let path = index_path(&dir);
+    let rng = SequenceRng::new();
+    let first = set(1, &[]);
+    let bob = insert_in(&path, &first, &rng, "bob").test_unwrap().identity;
+    let principal = "p".repeat(FULL_PRINCIPAL_BYTES - 400);
+    let alice = insert_in(&path, &first, &rng, &principal)
+        .test_unwrap()
+        .identity;
+
+    let second = set(2, &[1]);
+    let rekey = with_enterprise_identity_index(&path, &second, |index| Ok(index.len()));
+    assert!(is_persist_refusal(&rekey), "{rekey:?}");
+    let alice_at =
+        deactivate_enterprise_identity(&path, &second, &alice.identity_id, DEACTIVATED_AT);
+    assert_eq!(alice_at.test_unwrap(), DEACTIVATED_AT);
+
+    let third = set(3, &[1, 2]);
+    let rekey = with_enterprise_identity_index(&path, &third, |index| Ok(index.len()));
+    assert!(is_persist_refusal(&rekey), "{rekey:?}");
+    let bob_at = deactivate_enterprise_identity(&path, &third, &bob.identity_id, u64::MAX);
+    assert_eq!(bob_at.test_unwrap(), u64::MAX);
+    let again =
+        deactivate_enterprise_identity(&path, &third, &alice.identity_id, DEACTIVATED_AT + 60);
+    assert_eq!(again.test_unwrap(), DEACTIVATED_AT);
+
+    assert_eq!(
+        stored_deactivation(&path, &alice.identity_id),
+        json!(DEACTIVATED_AT)
+    );
+    assert_eq!(
+        stored_deactivation(&path, &bob.identity_id),
+        json!(u64::MAX)
+    );
 }
