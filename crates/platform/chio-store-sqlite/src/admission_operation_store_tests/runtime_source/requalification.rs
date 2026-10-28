@@ -282,3 +282,37 @@ fn corrupted_supersession_columns_refuse_before_unbounded_reads() -> Result<(), 
     }
     Ok(())
 }
+
+#[test]
+fn missing_supersession_cannot_reactivate_source_authority() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    let prior = install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+    replace(
+        &fixture,
+        &prior,
+        &Source::new(&fixture, Behavior::Normal),
+        &fixture.fence,
+    )?;
+    let connection = fixture.store.connection()?;
+    let runtime = identifier("runtime", RUNTIME_ID);
+    assert_eq!(
+        crate::admission_operation_store::runtime_source::require_active_source(
+            &connection,
+            &runtime
+        ),
+        Err(AdmissionOperationStoreError::Invariant(
+            "runtime source qualification has been superseded".into(),
+        )),
+    );
+    connection.execute_batch(
+        "DROP TRIGGER runtime_source_supersessions_no_delete;
+         DELETE FROM runtime_source_supersessions;",
+    )?;
+    assert_eq!(
+        crate::admission_operation_store::runtime_source::require_active_source(&connection, &runtime),
+        Err(AdmissionOperationStoreError::Invariant(
+            "invalid sqlite authority store: runtime source qualification integrity: runtime sources and global references have different counts".into(),
+        )),
+    );
+    Ok(())
+}
