@@ -7,6 +7,13 @@
 //! `{ x402Version, paymentPayload, paymentRequirements }` before the tool runs,
 //! so every authorization is a final prepayment.
 //!
+//! Before contacting the facilitator the adapter checks the EIP-3009 validity
+//! window against its injected trusted clock and refuses an authorization key
+//! (network, asset, payer, nonce) its durable replay store already holds. The
+//! key is reserved after `/verify` and before `/settle`, the first call that
+//! can broadcast, so a verification refusal leaves the nonce unspent and a
+//! settlement of any outcome consumes it permanently.
+//!
 //! The adapter holds no keys and never broadcasts. It has no rail status
 //! query: `settlement_state` answers `Unavailable`, so a settlement whose
 //! acknowledgement was lost ends in `ReconcileFailed` and a dead letter for the
@@ -14,9 +21,11 @@
 //! carries the broadcast transaction so the operator can reconcile on chain.
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256};
+use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -25,6 +34,8 @@ use super::{
     PaymentError, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
     X402SettlementRef,
 };
+use crate::execution_nonce::ExecutionNonceStore;
+use crate::KernelError;
 
 /// x402 protocol version this adapter speaks.
 pub const X402_VERSION: u8 = 2;
@@ -37,6 +48,13 @@ const X402_AUTHORIZATION_ID_PREFIX: &str = "x402";
 /// Non-terminal settle `errorReason`: broadcast, confirmation not established.
 const X402_SETTLEMENT_PENDING: &str = "settlement_pending";
 const MAX_X402_SIGNATURE_HEX_BYTES: usize = 4096;
+/// Retention horizon, in Unix seconds, of a spent authorization key. The token
+/// contract consumes an EIP-3009 nonce permanently, whatever `validBefore` the
+/// payer signed, so the local marker outlives every authorization that can
+/// carry it and is never pruned; a full store refuses new nonces instead. The
+/// value stays representable in Unix milliseconds and leaves headroom for a
+/// store's retention grace.
+const X402_NONCE_RETAINED_UNTIL: i64 = i64::MAX / 1_000;
 
 /// CAIP-2 networks the x402 rail may settle on. On-chain value stays
 /// rehearsal-only: Base Sepolia.
@@ -71,6 +89,16 @@ pub enum X402Refusal {
     OutlivesAuthority,
     #[error("x402 authority expiry is unknown")]
     AuthorityExpiryMissing,
+    /// EIP-3009 accepts an authorization only once `now > validAfter`.
+    #[error("x402 authorization is not valid until after {valid_after} (now {now})")]
+    NotYetValid { now: u64, valid_after: u64 },
+    /// EIP-3009 refuses an authorization once `now >= validBefore`.
+    #[error("x402 authorization expired at {valid_before} (now {now})")]
+    Expired { now: u64, valid_before: u64 },
+    #[error("x402 authorization nonce was already used")]
+    NonceReused,
+    #[error("x402 replay store has no capacity for another nonce")]
+    ReplayCapacityExhausted,
     #[error("x402 facilitator rejected the payment")]
     VerifyRejected,
     #[error("x402 facilitator verification failed")]
@@ -213,6 +241,17 @@ struct X402AuthorizationIdentity {
     valid_before: u64,
 }
 
+impl X402AuthorizationIdentity {
+    /// Single-use key of the EIP-3009 authorization: the token contract
+    /// tracks `(authorizer, nonce)`, scoped here by network and asset.
+    fn replay_key(&self) -> String {
+        format!(
+            "{X402_AUTHORIZATION_ID_PREFIX}/{}/{}/{}/{}",
+            self.network, self.asset, self.from, self.nonce
+        )
+    }
+}
+
 impl fmt::Display for X402AuthorizationIdentity {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -308,6 +347,8 @@ pub struct X402PaymentAdapter {
     rail: X402RailConfig,
     bearer_token: Option<String>,
     http: ureq::Agent,
+    clock: Arc<dyn Clock>,
+    replay: Arc<dyn ExecutionNonceStore>,
 }
 
 impl fmt::Debug for X402PaymentAdapter {
@@ -326,10 +367,15 @@ impl fmt::Debug for X402PaymentAdapter {
 
 impl X402PaymentAdapter {
     /// Refuses a facilitator URL that is not `https` (or `http` on loopback),
-    /// or that carries credentials, a query or a fragment.
+    /// or that carries credentials, a query or a fragment. `clock` is the
+    /// trusted time the validity window is checked against; `replay` holds
+    /// each accepted authorization key until its `validBefore` and must be
+    /// durable for single use to survive a restart.
     pub fn new(
         facilitator_url: impl Into<String>,
         rail: X402RailConfig,
+        clock: Arc<dyn Clock>,
+        replay: Arc<dyn ExecutionNonceStore>,
     ) -> Result<Self, PaymentError> {
         let facilitator_url = facilitator_url.into().trim_end_matches('/').to_string();
         validate_payment_endpoint(&facilitator_url, X402_VERIFY_PATH, None)?;
@@ -338,6 +384,8 @@ impl X402PaymentAdapter {
             rail,
             bearer_token: None,
             http: build_http_agent(Duration::from_secs(5)),
+            clock,
+            replay,
         })
     }
 
@@ -357,7 +405,8 @@ impl X402PaymentAdapter {
         &self,
         request: &PaymentAuthorizeRequest,
         context: &X402PaymentContext,
-    ) -> Result<X402AuthorizationIdentity, X402Refusal> {
+        now: u64,
+    ) -> Result<(X402AuthorizationIdentity, u64), X402Refusal> {
         if !request.reference_is_durable {
             return Err(X402Refusal::DurableReferenceRequired);
         }
@@ -411,13 +460,52 @@ impl X402PaymentAdapter {
         if valid_before > authority_expires_at {
             return Err(X402Refusal::OutlivesAuthority);
         }
-        Ok(X402AuthorizationIdentity {
+        check_window(now, valid_after, valid_before)?;
+        let identity = X402AuthorizationIdentity {
             network: self.rail.network.as_str().to_owned(),
             asset: self.rail.asset.clone(),
             from,
             nonce,
             valid_before,
-        })
+        };
+        Ok((identity, valid_after))
+    }
+
+    fn now_unix_secs(&self) -> Result<u64, PaymentError> {
+        self.clock
+            .unix_millis()
+            .map(|now| now.as_secs())
+            .map_err(|_| PaymentError::Unavailable("x402 trusted clock is unavailable".to_owned()))
+    }
+
+    fn ensure_unspent(&self, identity: &X402AuthorizationIdentity) -> Result<(), PaymentError> {
+        match self.replay.is_consumed(&identity.replay_key()) {
+            Ok(false) => Ok(()),
+            Ok(true) => Err(X402Refusal::NonceReused.into()),
+            Err(_) => Err(replay_store_unavailable()),
+        }
+    }
+
+    /// Consumes the authorization key. Called after `/verify` with a fresh
+    /// clock reading, because the verification round trip may cross the
+    /// authorization's expiry.
+    fn spend(
+        &self,
+        identity: &X402AuthorizationIdentity,
+        valid_after: u64,
+    ) -> Result<(), PaymentError> {
+        check_window(self.now_unix_secs()?, valid_after, identity.valid_before)?;
+        match self
+            .replay
+            .reserve_until(&identity.replay_key(), X402_NONCE_RETAINED_UNTIL)
+        {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(X402Refusal::NonceReused.into()),
+            Err(KernelError::ExecutionNonceCapacity) => {
+                Err(X402Refusal::ReplayCapacityExhausted.into())
+            }
+            Err(_) => Err(replay_store_unavailable()),
+        }
     }
 
     fn verify(&self, body: &X402FacilitatorRequest<'_>) -> Result<(), X402Refusal> {
@@ -529,13 +617,16 @@ impl PaymentAdapter for X402PaymentAdapter {
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError> {
         let context = request.x402.as_ref().ok_or(X402Refusal::PaymentMissing)?;
-        let identity = self.check_payment(request, context)?;
+        let (identity, valid_after) =
+            self.check_payment(request, context, self.now_unix_secs()?)?;
+        self.ensure_unspent(&identity)?;
         let body = X402FacilitatorRequest {
             x402_version: X402_VERSION,
             payment_payload: &context.payment_payload,
             payment_requirements: &context.payment_requirements,
         };
         self.verify(&body)?;
+        self.spend(&identity, valid_after)?;
         let settled = self.settle(&body, &identity)?;
         let authorization_id = settled.to_string();
         if !payment_identifier_is_valid(&authorization_id) {
@@ -648,6 +739,22 @@ struct X402SettleResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     transaction: Option<String>,
     network: String,
+}
+
+/// EIP-3009 `transferWithAuthorization` requires `now > validAfter` and
+/// `now < validBefore`, in Unix seconds.
+fn check_window(now: u64, valid_after: u64, valid_before: u64) -> Result<(), X402Refusal> {
+    if now <= valid_after {
+        return Err(X402Refusal::NotYetValid { now, valid_after });
+    }
+    if now >= valid_before {
+        return Err(X402Refusal::Expired { now, valid_before });
+    }
+    Ok(())
+}
+
+fn replay_store_unavailable() -> PaymentError {
+    PaymentError::Unavailable("x402 replay store is unavailable".to_owned())
 }
 
 fn canonical_digest<T: Serialize>(value: &T) -> Result<String, PaymentError> {
