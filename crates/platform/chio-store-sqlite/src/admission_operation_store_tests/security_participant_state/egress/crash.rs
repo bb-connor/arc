@@ -119,12 +119,14 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
             } = fixture;
             drop(store);
             drop(authority);
+            let child_temp_root = tempfile::tempdir()?;
             let output = std::process::Command::new(std::env::current_exe()?)
                 .args(["--exact", "admission_operation_store::tests::security_participant_state::egress::crash::child_process_crash", "--nocapture"])
                 .env("CHIO_SECURITY_NATIVE_CRASH_STAGE", stage.to_string())
                 .env("CHIO_NATIVE_EGRESS_CRASH_DIRECTORY", _temp.path())
                 .env("CHIO_NATIVE_EGRESS_CRASH_EXPIRY", pending.plan.expires_at_unix_ms.to_string())
                 .env("CHIO_NATIVE_EGRESS_CRASH_PHASE", if commit_phase { "commit" } else { "acquire" })
+                .env("TMPDIR", child_temp_root.path())
                 .current_dir(_temp.path()).output()?;
             assert_eq!(
                 output.status.signal(),
@@ -132,6 +134,13 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
                 "commit {commit_phase}, stage {stage}: {} {}",
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
+            );
+            let abandoned: Vec<_> = std::fs::read_dir(child_temp_root.path())?
+                .map(|entry| entry.map(|entry| entry.file_name()))
+                .collect::<Result<_, _>>()?;
+            assert!(
+                abandoned.is_empty(),
+                "commit {commit_phase}, stage {stage}: aborted child left {abandoned:?} in its temp root"
             );
             let authority = crate::test_authority::open_serving(&database, &lock_root)?;
             let fixture = Fixture {
