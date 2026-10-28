@@ -130,22 +130,6 @@ impl ChioKernel {
                     refusal.hook_release_metadata = decision.metadata;
                     return refusal;
                 }
-                if crate::kernel::hook_metadata_names_forbidden_key(decision.metadata.as_ref()) {
-                    let hook_release_metadata = decision.metadata.clone();
-                    if let Some(metadata) = decision
-                        .metadata
-                        .as_mut()
-                        .and_then(serde_json::Value::as_object_mut)
-                    {
-                        metadata.retain(|name, _| crate::kernel::is_hook_metadata_key(name));
-                    }
-                    let mut refusal = RuntimeAdmissionDecision::deny(
-                        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
-                        decision.metadata,
-                    );
-                    refusal.hook_release_metadata = hook_release_metadata;
-                    return refusal;
-                }
                 if let Some(field) =
                     crate::kernel::hook_kernel_owned_runtime_field(decision.metadata.as_ref())
                 {
@@ -161,6 +145,22 @@ impl ChioKernel {
                         })),
                     );
                     refusal.hook_release_metadata = decision.metadata;
+                    return refusal;
+                }
+                if crate::kernel::hook_metadata_names_forbidden_key(decision.metadata.as_ref()) {
+                    let hook_release_metadata = decision.metadata.clone();
+                    if let Some(metadata) = decision
+                        .metadata
+                        .as_mut()
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        metadata.retain(|name, _| crate::kernel::is_hook_metadata_key(name));
+                    }
+                    let mut refusal = RuntimeAdmissionDecision::deny(
+                        crate::kernel::HOOK_METADATA_KEY_REFUSAL,
+                        decision.metadata,
+                    );
+                    refusal.hook_release_metadata = hook_release_metadata;
                     return refusal;
                 }
                 if decision.allowed {
