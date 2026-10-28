@@ -142,10 +142,10 @@ fn per_second(count: u64, seconds: f64) -> f64 {
 
 /// Exact VM step count of mutating work on the snapshot connection, the
 /// counterpart of `count_steps_for_test` for work that needs `&mut`.
-struct StepCounter(Arc<AtomicU64>);
+pub(super) struct StepCounter(Arc<AtomicU64>);
 
 impl StepCounter {
-    fn install(db: &SnapshotDb) -> Self {
+    pub(super) fn install(db: &SnapshotDb) -> Self {
         let steps = Arc::new(AtomicU64::new(0));
         let counter = Arc::clone(&steps);
         db.connection()
@@ -161,7 +161,7 @@ impl StepCounter {
         Self(steps)
     }
 
-    fn finish(self, db: &SnapshotDb) -> u64 {
+    pub(super) fn finish(self, db: &SnapshotDb) -> u64 {
         db.connection()
             .unwrap()
             .progress_handler(0, None::<fn() -> bool>)
