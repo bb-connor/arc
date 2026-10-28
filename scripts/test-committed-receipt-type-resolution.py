@@ -361,6 +361,22 @@ class TypeResolutionTests(unittest.TestCase):
                 self.assertEqual(len(findings), 1, findings)
                 self.assertIn("raw decode", findings[0])
 
+    def test_test_only_generic_item_preserves_production_decode(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "#[cfg(test)] fn helper<T: Trait<Vec<(u32, u32)>>>() { noop::<T>(); } fn bad(s: &str) { serde_json::from_str::<ChioReceipt>(s); }",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("::bad: raw decode", findings[0])
+
+    def test_test_only_block_expression_preserves_production_decode(self):
+        for tail in ["serde_json::from_str::<ChioReceipt>(s); }", "} fn other(s: &str) { serde_json::from_str::<ChioReceipt>(s); }"]:
+            with self.subTest(tail=tail):
+                findings = self.findings({
+                    "crates/demo/src/lib.rs": "fn bad(s: &str, a: u32) { #[cfg(test)] if a < 3 { noop(); } " + tail,
+                })
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn("raw decode", findings[0])
+
     def test_macro_template_concrete_decode_is_scanned(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "macro_rules! m { () => { fn bad(s: &str) { serde_json::from_str::<ChioReceipt>(s); } }; } m!();",
