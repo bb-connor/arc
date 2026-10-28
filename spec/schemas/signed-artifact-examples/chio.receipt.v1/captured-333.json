@@ -1,0 +1,38 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1",
+    "content_hash": "ch-1",
+    "decision": {
+      "guard": "kernel",
+      "reason": "payment authorization outcome is ambiguous",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "guard_name": "G",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "78a0d2431fee45fd3d79558e50a890ea94ccef6557572e0a208691edc0977d8e",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-test",
+      "financial": {
+        "payment_authorization_ambiguous": null
+      }
+    },
+    "policy_hash": "ph-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 100,
+    "tool_name": "tool-1",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-1",
+    "trust_level": "mediated"
+  },
+  "id": "44a1d8bffb0372fde78c8c137aed46e9b75ef8fdfa9cfa225e5f2d17602d090b"
+}

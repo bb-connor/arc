@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/capital-book.schema.json",
+  "title": "Chio credit capital book signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "events",
+    "generatedAt",
+    "query",
+    "schema",
+    "sources",
+    "subjectKey",
+    "summary",
+    "supportBoundary"
+  ],
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amount",
+          "counterpartyId",
+          "counterpartyRole",
+          "description",
+          "eventId",
+          "evidenceRefs",
+          "facilityId",
+          "kind",
+          "occurredAt",
+          "ownerRole",
+          "sourceId"
+        ],
+        "properties": {
+          "amount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "counterpartyId": {
+            "type": "string"
+          },
+          "counterpartyRole": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "locator",
+                "observedAt",
+                "referenceId"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "locator": {
+                  "type": "string"
+                },
+                "observedAt": {
+                  "type": "integer"
+                },
+                "referenceId": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "facilityId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "integer"
+          },
+          "ownerRole": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agentSubject",
+        "bondLimit",
+        "facilityLimit",
+        "lossEventLimit",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "bondLimit": {
+          "type": "integer"
+        },
+        "facilityLimit": {
+          "type": "integer"
+        },
+        "lossEventLimit": {
+          "type": "integer"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.credit.capital-book.v1"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capitalSource",
+          "counterpartyId",
+          "counterpartyRole",
+          "currency",
+          "description",
+          "facilityId",
+          "kind",
+          "ownerRole",
+          "sourceId"
+        ],
+        "properties": {
+          "bondId": {
+            "type": "string"
+          },
+          "capitalSource": {
+            "type": "string"
+          },
+          "committedAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "counterpartyId": {
+            "type": "string"
+          },
+          "counterpartyRole": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "disbursedAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "drawnAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "facilityId": {
+            "type": "string"
+          },
+          "heldAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "impairedAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "jurisdiction": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "ownerRole": {
+            "type": "string"
+          },
+          "releasedAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "repaidAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "sourceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "subjectKey": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currencies",
+        "fundingSources",
+        "ledgerEvents",
+        "matchingBonds",
+        "matchingFacilities",
+        "matchingLossEvents",
+        "matchingReceipts",
+        "mixedCurrencyBook",
+        "returnedBonds",
+        "returnedFacilities",
+        "returnedLossEvents",
+        "returnedReceipts",
+        "truncatedBonds",
+        "truncatedFacilities",
+        "truncatedLossEvents",
+        "truncatedReceipts"
+      ],
+      "properties": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fundingSources": {
+          "type": "integer"
+        },
+        "ledgerEvents": {
+          "type": "integer"
+        },
+        "matchingBonds": {
+          "type": "integer"
+        },
+        "matchingFacilities": {
+          "type": "integer"
+        },
+        "matchingLossEvents": {
+          "type": "integer"
+        },
+        "matchingReceipts": {
+          "type": "integer"
+        },
+        "mixedCurrencyBook": {
+          "type": "boolean"
+        },
+        "returnedBonds": {
+          "type": "integer"
+        },
+        "returnedFacilities": {
+          "type": "integer"
+        },
+        "returnedLossEvents": {
+          "type": "integer"
+        },
+        "returnedReceipts": {
+          "type": "integer"
+        },
+        "truncatedBonds": {
+          "type": "boolean"
+        },
+        "truncatedFacilities": {
+          "type": "boolean"
+        },
+        "truncatedLossEvents": {
+          "type": "boolean"
+        },
+        "truncatedReceipts": {
+          "type": "boolean"
+        }
+      }
+    },
+    "supportBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automaticCapitalExecutionSupported",
+        "custodyExecutionSupported",
+        "mixedCurrencyNettingSupported",
+        "sourceOfFundsAuthoritative"
+      ],
+      "properties": {
+        "automaticCapitalExecutionSupported": {
+          "type": "boolean"
+        },
+        "custodyExecutionSupported": {
+          "type": "boolean"
+        },
+        "mixedCurrencyNettingSupported": {
+          "type": "boolean"
+        },
+        "sourceOfFundsAuthoritative": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "2377c363947b41fb9cf2089a2c139e0349c323252e8461323bdb44c668adb736",
+      "parameters": {
+        "step": "parent",
+        "workflow": "chio-7.8"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-e270-7166-9b26-bf26679917b4",
+    "content_hash": "499cecaaceba2793c9637518e044f33bf1bee54fd4034e36431147326469e6cf",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "c5a7d9bc559fcd3a7763072b2b8f84e45d82ef4ef5a82bc9a93e8fd539833bbc",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "c5a7d9bc559fcd3a7763072b2b8f84e45d82ef4ef5a82bc9a93e8fd539833bbc",
+        "subject_key": "577685ba68827a312040490d3a287205a2222e397601494c5d95587644a67b3a"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-e619-7053-a515-19b4cce4c570",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "req-chio-live-parent",
+        "failure_code": null,
+        "identity_disposition": "terminal",
+        "live_receipt_capture": true
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-e618-7813-8e35-0bd72ac5ffa7",
+        "request_id": "req-chio-live-parent",
+        "request_namespace_digest": "b510667e5db1fad623b77ac052566ead5084bee8011b95d3e00ae78f174e7374"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195238,
+    "tool_name": "parent_decision",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-chio-live",
+    "trust_level": "mediated"
+  },
+  "id": "43b0893b45d4bcff302e00e5a8da25fbcacdc790ddd51f32620066618b5541c0"
+}

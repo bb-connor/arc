@@ -1,0 +1,60 @@
+{
+  "activationRef": {
+    "artifactId": "activation-1",
+    "kind": "trust_activation",
+    "operatorId": "origin-operator",
+    "schema": "chio.registry.trust-activation.v1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "https://origin-operator.chio.example/artifacts/activation-1"
+  },
+  "delegationControl": {
+    "attenuationRequired": true,
+    "delegateOperatorId": "consumer-operator",
+    "delegatorOperatorId": "origin-operator",
+    "maxHops": 2,
+    "visibilityOnlyUntilLocalActivation": true
+  },
+  "exchangeId": "fex-1",
+  "expiresAt": 1743638400,
+  "governingCharterRef": {
+    "artifactId": "charter-1",
+    "kind": "governance_charter",
+    "operatorId": "origin-operator",
+    "schema": "chio.registry.governance-charter.v1",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "uri": "https://origin-operator.chio.example/artifacts/charter-1"
+  },
+  "importControl": {
+    "allowVisibilityWithoutRuntimeTrust": true,
+    "explicitLocalActivationRequired": true,
+    "manualReviewRequired": true,
+    "prohibitAmbientRuntimeAdmission": true,
+    "rejectStaleInputs": true
+  },
+  "issuedAt": 1743552000,
+  "listingId": "listing-liability-provider-1",
+  "listingRef": {
+    "artifactId": "listing-liability-provider-1",
+    "kind": "listing",
+    "operatorId": "origin-operator",
+    "schema": "chio.registry.listing.v1",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "uri": "https://origin-operator.chio.example/artifacts/listing-liability-provider-1"
+  },
+  "note": "Shares one reviewed trust activation without widening runtime trust.",
+  "schema": "chio.federation-activation-exchange.v1",
+  "scope": {
+    "allowedActorKinds": [
+      "liability_provider"
+    ],
+    "allowedAdmissionClasses": [
+      "reviewable",
+      "bond_backed"
+    ],
+    "namespace": "registry.chio.example/liability",
+    "policyReference": "policy/federation/default",
+    "subjectOperatorId": "origin-operator"
+  },
+  "sourceOperatorId": "origin-operator",
+  "targetOperatorId": "consumer-operator"
+}

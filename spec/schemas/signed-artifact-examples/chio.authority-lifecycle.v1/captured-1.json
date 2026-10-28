@@ -1,0 +1,14 @@
+{
+  "anchorDigest": "3b9c0bd1b7a2cf1968f6cfaf010d828ab4721249310bcd0d4dcf333b2fe81ec8",
+  "change": {
+    "operation": "retire",
+    "publicKeyHex": "bc3ead81cd30ef48bafef620e2116005e208a7220edef452c2fa8b58c3cbb405"
+  },
+  "generation": 3,
+  "issuerSetDigest": "5fdd06441e2bd617755ea4fbcc507adde4b73e1569eae770ee7c5f03b29b00f2",
+  "previousCommitment": "883afbccd48b6071ebed6fb72bdd47fac9607164d93427e72b716064b6d584e7",
+  "publicKeyHex": "25a8761035d6a99a2db3a4176584e4049d8358105c74d6bb6f8f1872405b03d1",
+  "rotatedAt": 101,
+  "schema": "chio.authority-lifecycle.v1",
+  "streamId": "rollback"
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/governance-charter.schema.json",
+  "title": "Chio registry governance charter signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowedCaseKinds",
+    "authorityScope",
+    "charterId",
+    "expiresAt",
+    "governingOperatorId",
+    "issuedAt",
+    "issuedBy",
+    "schema"
+  ],
+  "properties": {
+    "allowedCaseKinds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authorityScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedActorKinds",
+        "allowedListingOperatorIds",
+        "namespace",
+        "policyReference"
+      ],
+      "properties": {
+        "allowedActorKinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedListingOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "policyReference": {
+          "type": "string"
+        }
+      }
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "escalationOperatorIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "governingOperatorName": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.registry.governance-charter.v1"
+    }
+  }
+}

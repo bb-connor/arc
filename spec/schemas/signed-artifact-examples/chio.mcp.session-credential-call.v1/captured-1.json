@@ -1,0 +1,163 @@
+{
+  "capabilityIds": [
+    "capability"
+  ],
+  "deliveryAck": {
+    "acknowledgement": "hKf4hyXUv9PwQnvxn-lg99ggrIUjY56er4AvEETdXSU",
+    "receiptId": "51014995807c0cd2f59a61db85dfe3a6231394b213cde50b00638c6600238e2c",
+    "requestHash": "81f682569b08e346cfc89a49c4eb4d8b1b99e66a0b928d12310354e18f4d9bf2",
+    "requestId": "bounded-delivery",
+    "resultHash": "519bbee80364fcd2bc33d5ee35abc0744993887733c231f2d019526cb3d826f4",
+    "schema": "chio.mcp.delivery-ack.v1"
+  },
+  "parameterHash": "7bd828be72a5ed7985b98d2d12d38499c8d3e36c27dc974e6855de2d5a245905",
+  "requestHash": "81f682569b08e346cfc89a49c4eb4d8b1b99e66a0b928d12310354e18f4d9bf2",
+  "requestId": "bounded-delivery",
+  "reservationId": "7jTKnb1jmWkpZqPWaEFyCU_dg6JXaEyw4iR2nps8Z5A",
+  "response": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+      "_meta": {
+        "chio": {
+          "decision": "allow",
+          "receipt": {
+            "action": {
+              "parameter_hash": "7bd828be72a5ed7985b98d2d12d38499c8d3e36c27dc974e6855de2d5a245905",
+              "parameters": {
+                "path": "/workspace/one"
+              }
+            },
+            "boundary_class": "prevent",
+            "capability_id": "capability",
+            "content_hash": "519bbee80364fcd2bc33d5ee35abc0744993887733c231f2d019526cb3d826f4",
+            "decision": {
+              "verdict": "allow"
+            },
+            "id": "51014995807c0cd2f59a61db85dfe3a6231394b213cde50b00638c6600238e2c",
+            "kernel_key": "65d31a8be4b731a6221a4903cb797d46d47fa23e109820889796ad34edfd55dc",
+            "metadata": {
+              "admission_operation": {
+                "projected_dispatch_state": "terminal",
+                "projected_state": "completed",
+                "request_id": "bounded-delivery",
+                "schema": "chio.admission-receipt.v1",
+                "tool_outcome_id": "outcome-1"
+              },
+              "attribution": {
+                "subject_key": "subject"
+              },
+              "chio_receipt_signing_nonce": "a49142561b0edd776d7cc2b4bf95260860ea694490f02595ebb711be1d8ff2fe",
+              "receipt_context": {
+                "request_id": "bounded-delivery"
+              }
+            },
+            "policy_hash": "policy",
+            "receipt_kind": "mediated_decision",
+            "redaction_mode": "none",
+            "signature": "f0d591e0f8c68e3aed83aefc42057b1403d86708d30d688ca047e3ed9e9290f8a556756b2fc7d2efcc38e4264f75d949e30e30ba0b56ebe0d61705de9b742107",
+            "timestamp": 1793196148,
+            "tool_name": "write_file",
+            "tool_origin": "caller_executed",
+            "tool_server": "fs",
+            "trust_level": "mediated"
+          },
+          "receiptId": "51014995807c0cd2f59a61db85dfe3a6231394b213cde50b00638c6600238e2c",
+          "terminalState": {
+            "state": "completed"
+          }
+        },
+        "chioDelivery": {
+          "acknowledgement": "hKf4hyXUv9PwQnvxn-lg99ggrIUjY56er4AvEETdXSU",
+          "receiptId": "51014995807c0cd2f59a61db85dfe3a6231394b213cde50b00638c6600238e2c",
+          "requestHash": "81f682569b08e346cfc89a49c4eb4d8b1b99e66a0b928d12310354e18f4d9bf2",
+          "requestId": "bounded-delivery",
+          "resultHash": "519bbee80364fcd2bc33d5ee35abc0744993887733c231f2d019526cb3d826f4",
+          "schema": "chio.mcp.delivery-ack.v1"
+        },
+        "chioEvidence": {
+          "output": {
+            "content": [
+              {
+                "text": "original completed result",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "numbers": [
+              0.5,
+              21,
+              1e-05,
+              18446744073709551615
+            ]
+          },
+          "outputKind": "value",
+          "receipt": {
+            "action": {
+              "parameter_hash": "7bd828be72a5ed7985b98d2d12d38499c8d3e36c27dc974e6855de2d5a245905",
+              "parameters": {
+                "path": "/workspace/one"
+              }
+            },
+            "boundary_class": "prevent",
+            "capability_id": "capability",
+            "content_hash": "519bbee80364fcd2bc33d5ee35abc0744993887733c231f2d019526cb3d826f4",
+            "decision": {
+              "verdict": "allow"
+            },
+            "id": "51014995807c0cd2f59a61db85dfe3a6231394b213cde50b00638c6600238e2c",
+            "kernel_key": "65d31a8be4b731a6221a4903cb797d46d47fa23e109820889796ad34edfd55dc",
+            "metadata": {
+              "admission_operation": {
+                "projected_dispatch_state": "terminal",
+                "projected_state": "completed",
+                "request_id": "bounded-delivery",
+                "schema": "chio.admission-receipt.v1",
+                "tool_outcome_id": "outcome-1"
+              },
+              "attribution": {
+                "subject_key": "subject"
+              },
+              "chio_receipt_signing_nonce": "a49142561b0edd776d7cc2b4bf95260860ea694490f02595ebb711be1d8ff2fe",
+              "receipt_context": {
+                "request_id": "bounded-delivery"
+              }
+            },
+            "policy_hash": "policy",
+            "receipt_kind": "mediated_decision",
+            "redaction_mode": "none",
+            "signature": "f0d591e0f8c68e3aed83aefc42057b1403d86708d30d688ca047e3ed9e9290f8a556756b2fc7d2efcc38e4264f75d949e30e30ba0b56ebe0d61705de9b742107",
+            "timestamp": 1793196148,
+            "tool_name": "write_file",
+            "tool_origin": "caller_executed",
+            "tool_server": "fs",
+            "trust_level": "mediated"
+          },
+          "requestId": "bounded-delivery",
+          "schema": "chio.mcp.execution-evidence.v1",
+          "terminalState": "completed"
+        }
+      },
+      "content": [
+        {
+          "text": "original completed result",
+          "type": "text"
+        }
+      ],
+      "isError": false,
+      "numbers": [
+        0.5,
+        21,
+        1e-05,
+        18446744073709551615
+      ]
+    }
+  },
+  "schema": "chio.mcp.session-credential-call.v1",
+  "serverId": "fs",
+  "sessionId": "retained-session",
+  "startedAt": 1793196148,
+  "state": "acknowledged",
+  "subjectKey": "subject",
+  "toolName": "write_file"
+}

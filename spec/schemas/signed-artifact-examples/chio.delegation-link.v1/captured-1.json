@@ -1,0 +1,17 @@
+{
+  "capability_id": "cap-root",
+  "cumulative_approval": {
+    "bindings": [
+      {
+        "approval_budget_epoch": 9,
+        "approval_budget_id": "budget-z",
+        "currency": "USD",
+        "root_binding_digest": "5d8aada824a465adadd88a1dc77dc1267876033f3d0ff4015c911f4629075fde"
+      }
+    ]
+  },
+  "delegatee": "3e1cd4d1ce6daa45bde032ac1981d6073b13af0e1ef52b053d9a3672c354d12e",
+  "delegator": "ea2dbd4468e2d74da2f34d394ea593a57c49c461cc1437885be76d10bd4f46d5",
+  "scope_hash": "9678d7d953070e6ebc36a48b05f2c34b8ab88c6494932442423bba2fe33a1d54",
+  "timestamp": 200
+}

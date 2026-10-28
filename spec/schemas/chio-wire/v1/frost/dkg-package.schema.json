@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/frost/dkg-package.schema.json",
+  "title": "Chio frost dkg package signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ceremonyId",
+    "keyEpoch",
+    "packageDigest",
+    "participantSetDigest",
+    "round",
+    "schema",
+    "senderParticipantId",
+    "transportKeyId"
+  ],
+  "properties": {
+    "ceremonyId": {
+      "type": "string"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "packageDigest": {
+      "type": "string"
+    },
+    "participantSetDigest": {
+      "type": "string"
+    },
+    "round": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.frost.dkg-package.v1"
+    },
+    "senderParticipantId": {
+      "type": "string"
+    },
+    "transportKeyId": {
+      "type": "string"
+    }
+  }
+}

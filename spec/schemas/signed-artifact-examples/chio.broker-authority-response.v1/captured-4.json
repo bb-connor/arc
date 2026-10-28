@@ -1,0 +1,19 @@
+{
+  "authority": "ca57eed30e4a7274ef4c648f56f58f880b20d2ca25725d9e5c13c83c08c09aeb",
+  "issuedAtUnixSeconds": 1793197542,
+  "requestDigest": "e1a5cd44275ff0ef3beb6af0be56e178dc5831ec76d1a98b0ccdb140be367cca",
+  "requestId": "0be83290b95ba4d93b3e82ed78f1beeba5e39d5887775f1e398d6bca2aaff7bf",
+  "result": {
+    "kind": "hold",
+    "response": {
+      "captured": {
+        "authorityCommitIndex": 103,
+        "budgetCommitIndex": 101,
+        "checkedRevocationSetDigest": "3200f26d8bf5e093acc0259213a68e4cd9a7a72763023c77663dae8681ddfd24",
+        "leaderEpoch": 104,
+        "revocationCommitIndex": 102
+      }
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

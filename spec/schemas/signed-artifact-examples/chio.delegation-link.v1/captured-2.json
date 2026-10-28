@@ -1,0 +1,11 @@
+{
+  "aggregate_budget": {
+    "max_invocations": 6,
+    "root_binding_digest": "0dc3e59a5a2d25a0d47af73730bcd317059fbd6b34c7a7762a4c0d95ed8ce858"
+  },
+  "capability_id": "cap-chain",
+  "delegatee": "e715e14bf390e99e33925294a508e86a4f14bd6ff76c5398c71579fd8ab32309",
+  "delegator": "1d7611f2366156ed93e7f883117c68c872eabf6e04ff1ef306d019a18ac0d75e",
+  "scope_hash": "67dd8174da205f59dcbe7c68d04c86ad30d5e8651b8bd33477492ec22322bfa0",
+  "timestamp": 200
+}

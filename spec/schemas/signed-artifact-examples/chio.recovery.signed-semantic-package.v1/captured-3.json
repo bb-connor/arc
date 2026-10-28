@@ -1,0 +1,199 @@
+{
+  "dependencies": [],
+  "domain_version": 1,
+  "operations": [
+    {
+      "channels": [
+        {
+          "channel": "input",
+          "enabled": true
+        },
+        {
+          "channel": "success",
+          "enabled": true
+        },
+        {
+          "channel": "error",
+          "enabled": true
+        },
+        {
+          "channel": "no_value",
+          "enabled": true
+        },
+        {
+          "channel": "nested",
+          "enabled": false
+        },
+        {
+          "channel": "batch",
+          "enabled": false
+        },
+        {
+          "channel": "pagination",
+          "enabled": false
+        },
+        {
+          "channel": "redirect",
+          "enabled": false
+        },
+        {
+          "channel": "stream",
+          "enabled": false
+        },
+        {
+          "channel": "file",
+          "enabled": false
+        },
+        {
+          "channel": "log",
+          "enabled": false
+        },
+        {
+          "channel": "shell",
+          "enabled": false
+        },
+        {
+          "channel": "model",
+          "enabled": false
+        }
+      ],
+      "external_influence": true,
+      "implementation": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "input_fields": [
+        "title",
+        "body"
+      ],
+      "input_schema": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "kind": "issue_write",
+      "operation": "support-remedy",
+      "output_schema": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "prerequisites": [],
+      "projection_fields": [],
+      "required_assertions": [
+        "customer-instructions-reviewed"
+      ],
+      "selectors": [
+        {
+          "field": "title",
+          "kind": "equals",
+          "value": {
+            "kind": "text",
+            "value": "package-only-title"
+          }
+        }
+      ],
+      "source_label": {
+        "compartments": [],
+        "kind": "known",
+        "owners": {}
+      },
+      "withheld_status": {
+        "audience": {
+          "compartments": [],
+          "kind": "known",
+          "owners": {}
+        }
+      }
+    }
+  ],
+  "package": "support-issue"
+}

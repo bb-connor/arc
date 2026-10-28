@@ -1,0 +1,188 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "5344f1e7d920d50379ca714c5800f972eba97cddacd84a1cdf58c637ac35bc05",
+      "parameters": {
+        "finding_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c4-3c48-7917-b2a2-72c222edf58a",
+    "content_hash": "ecf0e2fe4284f6680dc20a18f7d914065bc56904853a71c9d40c337d2375f7c7",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "ffb5e1a6169c432ea43f2ef6342fcc2ddf566c875d00443c1628a2568925128c",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "test-admission-lease",
+        "operation_id": "f4caf0f1beb3a11f5936454a678c58e293e562a3369597f97ff9f4dbaa786118",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 9,
+        "projected_state": "completed",
+        "request_binding_hash": "2b39f0f5e41a102cabd24f4963ae8adc6de5cb0ee9c7c95464a4590f2350294b",
+        "request_id": "review-publication-current-status",
+        "request_namespace_digest": "8bec6d2b27e8a6ef8e34461a69f2577dd0cc76bb1868212b34c193eec419d790",
+        "retained_dispatch_commit": {
+          "committed_version": 7,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "test-admission-lease",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt:f4caf0f1beb3a11f5936454a678c58e293e562a3369597f97ff9f4dbaa786118",
+            "operation_id": "f4caf0f1beb3a11f5936454a678c58e293e562a3369597f97ff9f4dbaa786118",
+            "transport_id": "kernel-tool-server:durable-server",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "test-admission-lease",
+            "owner_epoch": 1,
+            "store_uuid": "018f47a0-7261-7000-8000-000000000001"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "test-admission-lease",
+          "owner_epoch": 1,
+          "store_uuid": "018f47a0-7261-7000-8000-000000000001"
+        },
+        "tool_outcome_id": "c0c0c7b0c6d789b3c36721dd8d404a40b0d9d88710c345a73b6c16edbd9d3b37",
+        "tool_outcome_version": 2,
+        "trusted_time_unix_ms": 1793195261422
+      },
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "ffb5e1a6169c432ea43f2ef6342fcc2ddf566c875d00443c1628a2568925128c",
+        "subject_key": "54bfac067fc35b986c5cf3d11c6f165febda9a94298786a63d0b553d141ea8a0"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c4-3def-77c2-a2d5-d442b750f53c",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "delivery_contract": {
+        "expected_digest": "ecf0e2fe4284f6680dc20a18f7d914065bc56904853a71c9d40c337d2375f7c7",
+        "observed_digest": "ecf0e2fe4284f6680dc20a18f7d914065bc56904853a71c9d40c337d2375f7c7",
+        "result": "matched",
+        "schema": "chio.delivery-contract.v1"
+      },
+      "financial": {
+        "budget_remaining": 0,
+        "budget_total": 10,
+        "cost_breakdown": {
+          "payment": {
+            "authorization_id": "original-payment-authorization",
+            "budget_exposure_units": 10,
+            "preauthorized_units": 10,
+            "pricing_failure": null,
+            "rail": "review-payment-rail",
+            "rail_mode": "reversible_hold",
+            "recorded_units": 10,
+            "reported_cost": {
+              "currency": "USD",
+              "units": 10
+            },
+            "transaction_id": "original-payment-authorization"
+          }
+        },
+        "cost_charged": 10,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "payment_reference": "original-payment-authorization",
+        "root_budget_holder": "ffb5e1a6169c432ea43f2ef6342fcc2ddf566c875d00443c1628a2568925128c",
+        "settlement_status": "settled"
+      },
+      "finding_delivery": {
+        "accepted_bid_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "authoritative_payment_operation_id": "review-publication-payment",
+        "digest_check": "matched",
+        "finding_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "listing_id": "review-publication-listing",
+        "media_type_check": "matched",
+        "purchase_intent_id": "review-publication-purchase",
+        "reservation_id": "review-publication-reservation",
+        "schema": "chio.finding.delivery.v1",
+        "settlement_mode": "local_reversible_hold",
+        "status_proof": {
+          "feed_id": "status-feed/review-publication",
+          "key_domain_nonce": 1,
+          "map_epoch": 1,
+          "non_inclusion_checked_at": 1793195261,
+          "proof_sha256": "8771b9702aa87872c3e79e6a199b39ecb63008de0d4e1a1da005acd0cf7f543e",
+          "root_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "status_epoch_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "transform_profile": "identity",
+        "venue_admission_envelope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "finding_purchase_replay_snapshot": {
+        "purchase": {
+          "accepted_bid_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "accepted_price": {
+            "currency": "USD",
+            "units": 10
+          },
+          "authoritative_payment_operation_id": "review-publication-payment",
+          "expected_status_feed_id": "status-feed/review-publication",
+          "finding_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "listing_id": "review-publication-listing",
+          "payer_key_hex": "54bfac067fc35b986c5cf3d11c6f165febda9a94298786a63d0b553d141ea8a0",
+          "payload_media_type": "application/json",
+          "payload_sha256": "ecf0e2fe4284f6680dc20a18f7d914065bc56904853a71c9d40c337d2375f7c7",
+          "purchase_intent_id": "review-publication-purchase",
+          "reservation_id": "review-publication-reservation",
+          "status_proof": {
+            "feed_id": "status-feed/review-publication",
+            "key_domain_nonce": 1,
+            "map_epoch": 1,
+            "non_inclusion_checked_at": 1793195261,
+            "operator_authorization_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "proof_sha256": "8771b9702aa87872c3e79e6a199b39ecb63008de0d4e1a1da005acd0cf7f543e",
+            "root_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "service_bond_evidence_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "status_epoch_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "status_epoch_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "venue_admission_envelope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "schema": "chio.finding.purchase-replay-snapshot.v1"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "c867e72a6759ccb65f3abd5a0c73b1d8bde8e844c2aae3b335b833d7c29ee3aa",
+          "approved": true,
+          "approver_key": "ffb5e1a6169c432ea43f2ef6342fcc2ddf566c875d00443c1628a2568925128c",
+          "token_id": "approval-review-publication-current-status"
+        },
+        "intent_hash": "c563c06eb3e24694318013c4f864e8947f7ced0147a107c7c42583276799b6b1",
+        "intent_id": "review-publication-current-status",
+        "max_amount": {
+          "currency": "USD",
+          "units": 10
+        },
+        "purpose": "prepaid invocation",
+        "server_id": "durable-server",
+        "tool_name": "mutate"
+      },
+      "receipt_context": {
+        "request_id": "review-publication-current-status",
+        "request_namespace_digest": "8bec6d2b27e8a6ef8e34461a69f2577dd0cc76bb1868212b34c193eec419d790"
+      }
+    },
+    "policy_hash": "e747aa6d4d53ceeef88983f81038cd482ae05ba707f4efd0b2ce73f27eac9817",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195261,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "durable-server",
+    "trust_level": "mediated"
+  },
+  "id": "dd1823be1973ee71ddeebdcd0dab65e6c1d3421ebad2bbcc76c6bc055f9761ee"
+}

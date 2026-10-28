@@ -1,0 +1,74 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "ffd05598997b952f7aeb5217432164ffeb8ccfb0ad5ded8402c0fb59ec4b7b9b",
+      "parameters": {
+        "ratio": 0.5,
+        "small": 1e-05
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-test-srv-echo",
+    "content_hash": "ffd05598997b952f7aeb5217432164ffeb8ccfb0ad5ded8402c0fb59ec4b7b9b",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "256415b5c30e1c285e50babd9dc76095f37afc24ad5405eca2a3cfd338653eb1",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "256415b5c30e1c285e50babd9dc76095f37afc24ad5405eca2a3cfd338653eb1",
+        "subject_key": "daa4d843011fb1d3a6dd77f99c84523a23f8f93e105a0a92bbade6481d6d0fa6"
+      },
+      "chio_manifest_security_v1": {
+        "effective_egress": false,
+        "flow": null,
+        "manifest_digest": "2394fb7a8b59c168d2cca008436bd323e7b9844473e5f3f0e644976ab4081a55",
+        "server_id": "test-srv",
+        "tool_name": "echo"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-47f4-7790-8839-9496371f97a9",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a18243-47e8-7a20-bc0a-dfb4d669b6cc",
+        "request_id": "m-1",
+        "request_namespace_digest": "3222934e381720e5143f0cbcb2dac51a4cecf0984ce418c5a9c2aebd7ed61c8e"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "a2a",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "f7ba857e3910d99723b7ac61082378d9ef8f653767a5198710739ed01985d74b",
+        "selectedProtocols": [
+          "a2a",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "a2a"
+      }
+    },
+    "policy_hash": "policy-a2a-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186809,
+    "tool_name": "echo",
+    "tool_origin": "caller_executed",
+    "tool_server": "test-srv",
+    "trust_level": "mediated"
+  },
+  "id": "cfc9d3d685033bf5420c0d91d89eff33585c60a7001601c6fcd5439929088048"
+}

@@ -54,6 +54,12 @@ and refreshes the generated block of the chio-wire v1 README. `--check`
 writes nothing and fails when any of those files differs from what
 generation would produce. Output depends only on the tree, so a second run
 is a no-op.
+
+`UNCAPTURED_WRAPPER_IDS` is the exact, closed list of wrapper ids that no
+capture test signs yet (backlog row M1I1-CAPTURE-COVERAGE). Generation
+refuses each of them by name: none gets an example, a schema file or a
+control row, a capture of one fails the import until the id leaves the
+list, and every other wrapper id still needs an example.
 """
 
 from __future__ import annotations
@@ -79,6 +85,72 @@ DRAFT = "https://json-schema.org/draft/2020-12/schema"
 README_BEGIN = "<!-- BEGIN generated signed-artifact schemas -->"
 README_END = "<!-- END generated signed-artifact schemas -->"
 EXAMPLES = SCHEMAS / "signed-artifact-examples"
+UNCAPTURED_WRAPPER_IDS: tuple[str, ...] = (
+    "chio.agent-web.external-projection-manifest.v1",
+    "chio.agent-web.interop-verifier-report.v1",
+    "chio.anchor-inclusion-proof.v1",
+    "chio.anchor-proof-bundle.v1",
+    "chio.attest.selective-disclosure-proof.v1",
+    "chio.bbs-projection.manifest.v1",
+    "chio.commerce.event-log.v1",
+    "chio.commerce.mandate-allowance-ledger.v1",
+    "chio.commerce.order-context.v1",
+    "chio.commerce.order-passport.v1",
+    "chio.commerce.protocol-payload.v1",
+    "chio.commerce.settlement-packet.v1",
+    "chio.crypto.verification-context.v1",
+    "chio.disclosure.capsule.v1",
+    "chio.disclosure.leakage-ledger.v1",
+    "chio.disclosure.lineage-verifier-report.v1",
+    "chio.disclosure.verifier-privacy-profile.v1",
+    "chio.enterprise.control-evidence-map.v1",
+    "chio.enterprise.data-governance-report.v1",
+    "chio.enterprise.evidence-export-bundle.v1",
+    "chio.enterprise.telemetry-projection.v1",
+    "chio.fincred.credit-scorecard.v1",
+    "chio.fincred.exposure-history.v1",
+    "chio.fincred.loss-history.v1",
+    "chio.frost.authorization.v1",
+    "chio.policy.activation-receipt.v1",
+    "chio.policy.bundle.v1",
+    "chio.proof-room.bundle.v1",
+    "chio.proof-room.fixture-catalog.v1",
+    "chio.proof-room.fixture-root-catalog.v1",
+    "chio.proof-room.verifier-report.v1",
+    "chio.proof.docker-quickstart-evidence.v1",
+    "chio.proof.first-run.capability-proof.v1",
+    "chio.proof.first-run.command-log.v1",
+    "chio.proof.first-run.guard-report.v1",
+    "chio.proof.release-truth.v1",
+    "chio.public-settlement-verifier-report.v1",
+    "chio.recovery.signed-provider-finality.v1",
+    "chio.request.digest.v1",
+    "chio.response.digest.v1",
+    "chio.runtime.attack-simulation-report.v1",
+    "chio.runtime.chaos-run-report.v1",
+    "chio.runtime.execution-lease.v1",
+    "chio.runtime.revocation-freshness-proof.v1",
+    "chio.runtime.sandbox-attestation.v1",
+    "chio.runtime.terminal-receipt.v1",
+    "chio.runtime.tool-server-ack.v1",
+    "chio.runtime.trusted-time-proof.v1",
+    "chio.swarm.authority-verifier-report.v1",
+    "chio.swarm.budget-pool.v1",
+    "chio.swarm.delegation-witness-chain.v1",
+    "chio.transaction.claim-set.v1",
+    "chio.transaction.evidence-graph.v1",
+    "chio.transaction.runtime-security-report.v1",
+    "chio.transaction.verifier-policy.v1",
+    "chio.transaction.verifier-report.v1",
+    "chio.transparency.inclusion-proof.v1",
+    "chio.transparency.receipt-inclusion-proof.v1",
+    "chio.trust.key-state.v1",
+    "chio.trust.revocation-snapshot.v1",
+    "chio.web3-settlement-dispatch.v1",
+    "chio.web3-settlement-execution-receipt.v1",
+    "chio.workflow.preflight-plan.v1",
+    "chio.workflow.preflight-report.v1",
+)
 WRAPPER_IDS = Path("sdks/python/chio-py/src/chio/invariants/_generated_signed_artifact_schemas.py")
 CONTROL_KEYS = {"schema", "artifactKind", "introducedBy", "schemaFile", "title", "overrides", "envelopeSchemaFile"}
 SECRET_NAME = re.compile(r"(?:\A|_)(?:seed|secret|private|privkey|password|passphrase|mnemonic)(?:_|\Z)")
@@ -314,6 +386,10 @@ def import_captures(root: Path, capture_dir: Path) -> dict[str, bytes | None]:
         recorded = capture_dir / escape_schema_id(sid)
         if not recorded.is_dir():
             continue
+        if sid in UNCAPTURED_WRAPPER_IDS:
+            raise GenerationError(
+                f"{sid}: captured but listed in UNCAPTURED_WRAPPER_IDS; remove it from the list"
+            )
         bodies = []
         for path in sorted(recorded.glob("*.json")):
             payload = path.read_bytes()
@@ -557,7 +633,14 @@ def plan(root: Path) -> dict[str, bytes]:
     unregistered = [sid for sid in wrapper_ids if sid not in registered]
     if unregistered:
         raise GenerationError(f"wrapper ids without a registry row: {unregistered}")
-    missing = [sid for sid in wrapper_ids if not examples_for(root, sid)]
+    uncaptured = set(UNCAPTURED_WRAPPER_IDS)
+    listed = sorted(sid for sid in uncaptured if examples_for(root, sid))
+    if listed:
+        raise GenerationError(f"UNCAPTURED_WRAPPER_IDS names ids that have examples: {listed}")
+    controlled = sorted(entry["schema"] for entry in entries if entry["schema"] in uncaptured)
+    if controlled:
+        raise GenerationError(f"UNCAPTURED_WRAPPER_IDS names ids with a control row: {controlled}")
+    missing = [sid for sid in wrapper_ids if sid not in uncaptured and not examples_for(root, sid)]
     if missing:
         raise GenerationError(f"wrapper ids without an example: {missing}")
     escaped = {escape_schema_id(sid) for sid in wrapper_ids}

@@ -1,0 +1,102 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "3f4ccf86c351bb048eefcc31d2749c5a6170ed90f508b6d88df63d05b33a178e",
+      "parameters": {
+        "work": "governed"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-daa0-7f46-bc71-b633f8b31648",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "governed transaction denied: approval replay store not configured; denying as fail-closed",
+      "verdict": "deny"
+    },
+    "kernel_key": "34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592",
+        "subject_key": "890c9457a11cb0baf0b91b195081cdf9ac0c0c486f10844576870f6cec50a52e"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 100,
+          "event_id": "budget-hold:req-governed-missing-replay-store:cap-01a182c3-daa0-7f46-bc71-b633f8b31648:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "budget-hold:req-governed-missing-replay-store:cap-01a182c3-daa0-7f46-bc71-b633f8b31648:0",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "budget_commit_index": 2,
+          "committed_cost_units_after": 0,
+          "disposition": "reversed",
+          "event_id": "budget-hold:req-governed-missing-replay-store:cap-01a182c3-daa0-7f46-bc71-b633f8b31648:0:authorize:rollback:1",
+          "exposure_units": 100,
+          "realized_spend_units": 0
+        }
+      },
+      "chio_kernel": {
+        "rejection_code": "CHIO-KERNEL-GOVERNED-TRANSACTION-DENIED"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-db2d-7191-8b63-3b2fff9b7724",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "financial": {
+        "attempted_cost": 100,
+        "budget_remaining": 1000,
+        "budget_total": 1000,
+        "cost_charged": 0,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "root_budget_holder": "34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592",
+        "settlement_status": "not_applicable"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "eed72f05a87645efcdec54f49d8f5dc4993bec28bb1e20af841a774245cae441",
+          "approved": true,
+          "approver_key": "34a5fbd76e742128e9ce108b6e0f646a2d8ab84825cca6925236b2fd777e2592",
+          "token_id": "approval-req-governed-missing-replay-store"
+        },
+        "intent_hash": "1f88f7eae941895ddb8f8cc50a1386f5c2d95ec82bbba099fd7af194983f604b",
+        "intent_id": "intent-governed-missing-replay-store",
+        "max_amount": {
+          "currency": "USD",
+          "units": 100
+        },
+        "purpose": "execute governed compute",
+        "server_id": "cost-srv",
+        "tool_name": "compute"
+      },
+      "receipt_context": {
+        "request_id": "req-governed-missing-replay-store",
+        "request_namespace_digest": "96eccf5664f8bbe732863c4a3a368aba1eb775c97765409b2ccaa610e9e81240"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195236,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "01cbf3b731de1a266a0bf4f894bb8df18429310f38b7e38bb2c7d0510a3e6dfc"
+}

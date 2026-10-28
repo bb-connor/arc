@@ -1,0 +1,35 @@
+{
+  "agent_passport_jwk_thumbprint": "lWkhqaoVMPD-k3r62OPO7M8ak2U9g1rMbZFNL9STZ50",
+  "agent_passport_key_hash": "1f5fe64ec2f8c901be3aad94a41d70c12d2f3a8f43755f902e665c96f41c87e3",
+  "confidence": 0.82,
+  "decay_half_life_secs": 3600,
+  "evaporation_floor": 0.01,
+  "indicator": {
+    "indicatorDigest": "ec8cf4e0ba62aa1d2a7609e2653fc88aa1df035bbbab9b9c82781053fc27bf24",
+    "kind": "prompt_injection",
+    "workflowId": "wf-chio-refund-001"
+  },
+  "kernel_id": "did:chio:llamaworks",
+  "nonce": "pheromone-nonce-llamaworks-002",
+  "schema": "chio.pheromone-deposit.v1",
+  "severity": "high",
+  "subject_class": "support.prompt_injection",
+  "subject_class_namespace": "dev.chio.support",
+  "timestamp_unix_ms": 1766000000000,
+  "treaty_scope": [
+    "treaty:buyer-llamaworks:support-ops",
+    "treaty:buyer-dataco:support-ops"
+  ],
+  "workflow_context": {
+    "bilateral_dsse_sha256": "c2e3db14cda40df288fe59dc6106b9dfdd39778ed7078fc0eca652840c95504f",
+    "consistency_anchor": "chio:consistency:wf-chio-refund-001:0",
+    "schema": "chio.pheromone-workflow-context.v1",
+    "step_index": 0,
+    "tool_receipt_id": "14b79693334d566639bdb36299b1b1e7efa4e5695135811dbc281e0474eeabf1",
+    "workflow_id": "wf-chio-refund-001",
+    "workflow_intersection_id": "workflow-intersection:buyer-refund:001",
+    "workflow_intersection_sha256": "294d056842082dc46a6937ba76c604b280f50e1717f5c4ba943676f55e5e78ee",
+    "workflow_receipt_id": "wf-chio-refund-001",
+    "workflow_receipt_sha256": "339eaeeae6f8b15b39a126482ab3fda24bc0d4bde564846d4ed0ee22112a755a"
+  }
+}

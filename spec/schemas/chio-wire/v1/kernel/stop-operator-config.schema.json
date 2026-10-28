@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/stop-operator-config.schema.json",
+  "title": "Chio stop operator config signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority_id",
+    "config_authority_key",
+    "deployment_generation",
+    "resume_policy",
+    "rosters",
+    "schema",
+    "stop_quorum_max",
+    "time_attestation_key"
+  ],
+  "properties": {
+    "authority_id": {
+      "type": "string"
+    },
+    "config_authority_key": {
+      "type": "string"
+    },
+    "deployment_generation": {
+      "type": "integer"
+    },
+    "predecessor_digest": {
+      "type": "string"
+    },
+    "resume_policy": {
+      "type": "string"
+    },
+    "rosters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "principals",
+          "quorum_k",
+          "scope"
+        ],
+        "properties": {
+          "principals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "permissions",
+                "principal",
+                "subject_key"
+              ],
+              "properties": {
+                "permissions": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "relax",
+                    "restrict",
+                    "resume",
+                    "stop"
+                  ],
+                  "properties": {
+                    "relax": {
+                      "type": "boolean"
+                    },
+                    "restrict": {
+                      "type": "boolean"
+                    },
+                    "resume": {
+                      "type": "boolean"
+                    },
+                    "stop": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "principal": {
+                  "type": "string"
+                },
+                "subject_key": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "quorum_k": {
+            "type": "integer"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "same_principal_cooldown_ms": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.stop-operator-config.v1"
+    },
+    "stop_quorum_max": {
+      "type": "integer"
+    },
+    "time_attestation_key": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "756ecb427f204f85d45a641ed60b0d32ab003d0655d1fcafca809285c0dab5a7",
+      "parameters": {
+        "credential": "synthetic-tripwire-marker"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182e7-3950-7b9e-8e0e-a06879e4f9ec",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"chio-tripwire-pre-invocation\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "tripwire detector failed: Unavailable: store.unavailable",
+        "guard_name": "chio-tripwire-pre-invocation",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "3d44ffadf9e45de368539bf3fec6985e2132c9e8af4442790e508aa39ffea72e",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "3d44ffadf9e45de368539bf3fec6985e2132c9e8af4442790e508aa39ffea72e",
+        "subject_key": "bdbfde1b5cddcaf079e014d6ef38c100df8123fd2ad0faaaa22cede2b3ed61c8"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e7-3ae3-7470-91bc-d7e3255c7cc4",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "kernel-request-a",
+        "request_namespace_digest": "06e3e2af9120ab0dedb06f72abff036db10254064185d8d6aa28dd89641f2867"
+      }
+    },
+    "policy_hash": "policy-a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793197554,
+    "tool_name": "tool-a",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "c1e9a655a71f7b68e600ef9d723bfcdc8deb01d63970398117fb435f7622ed20"
+}

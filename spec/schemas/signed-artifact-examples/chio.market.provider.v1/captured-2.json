@@ -1,0 +1,46 @@
+{
+  "issuedAt": 1700000000,
+  "lifecycleState": "active",
+  "providerRecordId": "lpr-1",
+  "report": {
+    "displayName": "carrier-alpha display",
+    "lifecycleState": "active",
+    "policies": [
+      {
+        "claimsSupported": true,
+        "coverageClasses": [
+          "tool_execution"
+        ],
+        "jurisdiction": "us-ny",
+        "maxCoverageAmount": {
+          "currency": "USD",
+          "units": 50000
+        },
+        "quoteTtlSeconds": 3600,
+        "requiredEvidence": [
+          "credit_provider_risk_package"
+        ],
+        "supportedCurrencies": [
+          "USD"
+        ]
+      }
+    ],
+    "provenance": {
+      "changeReason": "test fixture",
+      "configuredAt": 1700000000,
+      "configuredBy": "operator@example.com",
+      "sourceRef": "liability-runbook"
+    },
+    "providerId": "carrier-alpha",
+    "providerType": "admitted_carrier",
+    "providerUrl": "https://carrier-alpha.example.com",
+    "schema": "chio.market.provider.v1",
+    "supportBoundary": {
+      "automaticTrustAdmission": false,
+      "boundCoverageSupported": true,
+      "curatedRegistryOnly": true,
+      "permissionlessFederationSupported": false
+    }
+  },
+  "schema": "chio.market.provider.v1"
+}

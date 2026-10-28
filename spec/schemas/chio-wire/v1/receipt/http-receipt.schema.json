@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/http-receipt.schema.json",
+  "title": "Chio http receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundary_class",
+    "caller_identity_hash",
+    "content_hash",
+    "id",
+    "kernel_key",
+    "method",
+    "policy_hash",
+    "receipt_kind",
+    "redaction_mode",
+    "request_id",
+    "response_status",
+    "route_pattern",
+    "timestamp",
+    "tool_origin",
+    "trust_level",
+    "verdict"
+  ],
+  "properties": {
+    "boundary_class": {
+      "type": "string"
+    },
+    "caller_identity_hash": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "content_hash": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "guard_name",
+          "verdict"
+        ],
+        "properties": {
+          "details": {
+            "type": "string"
+          },
+          "guard_name": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "id": {
+      "type": "string"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "metadata": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "chio_decision_receipt_id": {
+              "type": "string"
+            },
+            "chio_http_receipt_v1": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string"
+                }
+              }
+            },
+            "chio_http_status_scope": {
+              "type": "string"
+            },
+            "chio_kernel_receipt_id": {
+              "type": "string"
+            },
+            "chio_receipt_signing_nonce": {
+              "type": "string"
+            },
+            "completed_at": {
+              "type": "string"
+            },
+            "job_name": {
+              "type": "string"
+            },
+            "job_uid": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "route_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "candidates",
+                "decision",
+                "requestedTargetProtocol",
+                "routeSelectionId",
+                "selectedProtocols",
+                "selectedRouteId",
+                "selectedTargetProtocol",
+                "sourceProtocol"
+              ],
+              "properties": {
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "available",
+                      "routeId",
+                      "selectedProtocols",
+                      "targetProtocol"
+                    ],
+                    "properties": {
+                      "available": {
+                        "type": "boolean"
+                      },
+                      "routeId": {
+                        "type": "string"
+                      },
+                      "selectedProtocols": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "targetProtocol": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "decision": {
+                  "type": "string"
+                },
+                "requestedTargetProtocol": {
+                  "type": "string"
+                },
+                "routeSelectionId": {
+                  "type": "string"
+                },
+                "selectedProtocols": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "selectedRouteId": {
+                  "type": "string"
+                },
+                "selectedTargetProtocol": {
+                  "type": "string"
+                },
+                "sourceProtocol": {
+                  "type": "string"
+                }
+              }
+            },
+            "started_at": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observed_at",
+                  "payload",
+                  "phase",
+                  "pod_name"
+                ],
+                "properties": {
+                  "observed_at": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "pod_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "submission_kind": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "trace_id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "method": {
+      "type": "string"
+    },
+    "observation_outcome": {
+      "type": "string"
+    },
+    "policy_hash": {
+      "type": "string"
+    },
+    "receipt_kind": {
+      "type": "string"
+    },
+    "redaction_mode": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "response_status": {
+      "type": "integer"
+    },
+    "route_pattern": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "integer"
+    },
+    "tool_origin": {
+      "type": "string"
+    },
+    "trust_level": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict"
+      ],
+      "properties": {
+        "guard": {
+          "type": "string"
+        },
+        "http_status": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "verdict": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

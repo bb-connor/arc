@@ -1,0 +1,65 @@
+{
+  "absentRequestKeys": [],
+  "absentResourceKeys": [],
+  "anchorId": "anchor-1",
+  "checkpointDigest": "aeebad4a796fcc2e15dc4c6061b45ed9b373f26adfc798ca7d2d8cc58182718e",
+  "checkpointSequence": 1,
+  "heads": [
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "active",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "conformance_resource",
+        "resourceId": "resource-000",
+        "scopeId": "scope-1"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "marker": 0,
+          "resourceId": "resource-000",
+          "version": 1
+        }
+      },
+      "stateDigest": "1dc9539ab4c7fb5817121777c92c1e22354ea7e21c2f33727ccf870141e7f7ae",
+      "trustedClockHighWater": 101
+    },
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "active",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "conformance_resource",
+        "resourceId": "resource-001",
+        "scopeId": "scope-1"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "marker": 0,
+          "resourceId": "resource-001",
+          "version": 1
+        }
+      },
+      "stateDigest": "92aaac29fbbb969502c6f01ff32fafe4fa83d115c2d8ff770bbd9eb9ae9e2524",
+      "trustedClockHighWater": 101
+    }
+  ],
+  "headsRoot": "3e4c490cae31bffeb6cf7595545c225a6911f2620b3e749f4014932be0137c28",
+  "namespace": "economy-prod",
+  "observedAt": 1001,
+  "requestReplays": [],
+  "requestReplaysRoot": "9ba93a2f0a4cfdb86bc80876acad09fbffd2c5db58b6088779d643a65467676d",
+  "schema": "chio.economy.anchor-view.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1"
+}

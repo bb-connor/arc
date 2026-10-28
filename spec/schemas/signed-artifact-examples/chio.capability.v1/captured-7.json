@@ -1,0 +1,17 @@
+{
+  "attenuation_proof": {
+    "childScopeHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "normalizedSubsetProof": {
+      "normalizedChildScope": "{}",
+      "normalizedParentScope": "{}"
+    },
+    "parentScopeHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "expires_at": 1793198475,
+  "id": "cap-v2-direct",
+  "issued_at": 1793194815,
+  "issuer": "b09bbf8bc23a5cbc8f0b32d190c1387c531cdb9d071dcab72008e1d87cb4c3b1",
+  "schema": "chio.capability.v1",
+  "scope": {},
+  "subject": "b09bbf8bc23a5cbc8f0b32d190c1387c531cdb9d071dcab72008e1d87cb4c3b1"
+}

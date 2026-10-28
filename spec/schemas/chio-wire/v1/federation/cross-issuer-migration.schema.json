@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/cross-issuer-migration.schema.json",
+  "title": "Chio cross issuer migration signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attester",
+    "continuityRef",
+    "expiresAt",
+    "fromIssuer",
+    "fromSubject",
+    "issuedAt",
+    "migrationId",
+    "priorPassportIds",
+    "reason",
+    "schema",
+    "signerPublicKey",
+    "toIssuer",
+    "toSubject"
+  ],
+  "properties": {
+    "attester": {
+      "type": "string"
+    },
+    "continuityRef": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "fromIssuer": {
+      "type": "string"
+    },
+    "fromSubject": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "migrationId": {
+      "type": "string"
+    },
+    "priorPassportIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.cross-issuer-migration.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "toIssuer": {
+      "type": "string"
+    },
+    "toSubject": {
+      "type": "string"
+    }
+  }
+}

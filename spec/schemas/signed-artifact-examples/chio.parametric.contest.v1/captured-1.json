@@ -1,0 +1,16 @@
+{
+  "claimId": "8fe90f3d459a5478a0495db99578e9e703c94542ead767a58ad8710b2727d565",
+  "contestId": "6dd4508069957620d247375845d05e282fe59853b0a98080944acd58f077ade3",
+  "contestantId": "contestant-1",
+  "evidenceDigests": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "expectedClaimVersion": 1,
+  "expectedLifecycleFence": 1,
+  "expiresAt": 1743379800,
+  "issuedAt": 1743379200,
+  "parametricPolicyBodyDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "reasonCode": "predicate_evaluation",
+  "schema": "chio.parametric.contest.v1"
+}

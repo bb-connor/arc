@@ -1,0 +1,51 @@
+{
+  "bondId": "bond-claim-1",
+  "description": "fixture loss event for bond-claim-1",
+  "eventId": "loss-claim-1",
+  "eventKind": "delinquency",
+  "issuedAt": 1700000300,
+  "projectedBondLifecycleState": "impaired",
+  "report": {
+    "generatedAt": 1700000299,
+    "query": {
+      "amount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "bondId": "bond-claim-1",
+      "eventKind": "delinquency"
+    },
+    "schema": "chio.credit.loss-lifecycle-report.v1",
+    "summary": {
+      "agentSubject": "subject-claim",
+      "bondId": "bond-claim-1",
+      "capabilityId": "cap-subject-claim",
+      "currentBondLifecycleState": "active",
+      "currentDelinquentAmount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "eventAmount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "facilityId": "cfd-claim-1",
+      "outstandingDelinquentAmount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "projectedBondLifecycleState": "impaired",
+      "toolName": "bash",
+      "toolServer": "shell"
+    },
+    "supportBoundary": {
+      "appealWindowSupported": true,
+      "automaticCapitalExecutionSupported": false,
+      "bondLifecycleProjectionAuthoritative": true,
+      "externalClaimAdjudicationSupported": false,
+      "immutableLifecycleAuthoritative": true,
+      "reserveControlExecutionSupported": true
+    }
+  },
+  "schema": "chio.credit.loss-lifecycle.v1"
+}

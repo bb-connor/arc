@@ -1,0 +1,30 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "c775500ea34eded73c2a3c3bede193f0d839e6c14b36f21b6cc31472e0720a91",
+      "parameters": {
+        "probe": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1",
+    "content_hash": "shared-store-content",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-a-0"
+    },
+    "policy_hash": "shared-store-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "tenant_id": "tenant-a",
+    "timestamp": 100,
+    "tool_name": "shared-store-tool",
+    "tool_origin": "caller_executed",
+    "tool_server": "shared-store-server",
+    "trust_level": "mediated"
+  },
+  "id": "734510cc076bf7a6c1cd2de59eed3117688071809ecc73e83132bf4aa8d96d60"
+}

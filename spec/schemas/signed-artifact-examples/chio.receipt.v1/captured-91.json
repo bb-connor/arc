@@ -1,0 +1,97 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "ff5837a24ecd484aeeff6e9be098c84ffe690e75ed8ef8f7284657b2a9b7073d",
+      "parameters": {
+        "account": "7"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-reserved-facade",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "pre-execution authorization reserved; present the minted execution nonce to the tool server",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "c448140b7db1ada6ed1ab7cc71f25b525f8880ed91de7cf7823763784f333de1",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "b84da5a0ef10274fee57ea134e4a7a5212f9b510b065e9c337a6c4e7955ba170",
+        "subject_key": "b682cfaf667e328f86974ad2a8339d1aa873b79e0be50935a908804db5cd9f09"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "01a182e2-002d-7f73-9f67-d983e20d6fab",
+          "lease_epoch": 1,
+          "lease_id": "01a182e2-03e8-7df2-8c2a-59ad1f214ebc"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 3,
+          "committed_cost_units_after": 0,
+          "event_id": "admission-budget:bcea8aa28455d663cdf4ef1d9955d3d26708ff91a9e572931554ef412a93d439:0:authorize",
+          "exposure_units": 0
+        },
+        "budget_term": "01a182e2-002d-7f73-9f67-d983e20d6fab:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "admission-budget:bcea8aa28455d663cdf4ef1d9955d3d26708ff91a9e572931554ef412a93d439:0",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e2-07ed-71d0-b5bd-5342958cccf4",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "adm-reserved-facade",
+        "destructive": false,
+        "failure_code": null,
+        "governance_receipt_id": null,
+        "lease_id": null,
+        "operation_owned_replay": {
+          "bundle_sha256": "cc35167da543801ccae1135d8560b6de97bb8ad2318cc2d6dbdd08a4a8a26dc2",
+          "plan_sha256": "601ab9bd3932ce56629b69f1328b4d2c985d90e627285908d27b69ded5945f1f",
+          "reference": {
+            "claimDigest": "54cd6148c8adfdaca02c62cc25fb05359ff59b508cc0608d279e6a7153069c92",
+            "episodeId": "01a182e2-06b8-71f2-afe5-ebfcd55f66d2",
+            "operationId": "bcea8aa28455d663cdf4ef1d9955d3d26708ff91a9e572931554ef412a93d439"
+          },
+          "resources_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "swarm_evidence_sha256": null,
+          "treaty_evidence_sha256": null
+        },
+        "pheromone_advisory": null,
+        "pheromone_policy_decision": null,
+        "step_index": 1,
+        "trust_bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "verification_context_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "workflow_grant_id": "grant-reserved-facade",
+        "workflow_id": "workflow-reserved-facade"
+      },
+      "execution_nonce": {
+        "hold_disposition": "reserved",
+        "stage": "authorization",
+        "tool_dispatched": false
+      },
+      "governed_transaction": {
+        "intent_hash": "abb6ddb45c32917cd9a3f0b75a944116e4412897f0d66c2d2ee2c97e7fc30bbe",
+        "intent_id": "intent-reserved-facade",
+        "purpose": "read governed account",
+        "server_id": "vendor-ledger",
+        "tool_name": "read_account"
+      },
+      "receipt_context": {
+        "request_id": "req-reserved-facade"
+      }
+    },
+    "policy_hash": "f6ff8c698486eddb5fa8ea8c38fa2a1db3f65d76529acd54b8dd76480cf0ab87",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1800000001,
+    "tool_name": "read_account",
+    "tool_origin": "caller_executed",
+    "tool_server": "vendor-ledger",
+    "trust_level": "mediated"
+  },
+  "id": "11ba3575259d6bced96150624f9f08b2eef8a4435f9e88d49e72270952a8b307"
+}

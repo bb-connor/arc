@@ -1,0 +1,29 @@
+{
+  "boundary": {
+    "automaticTrustAdmission": false,
+    "explicitTrustActivationRequired": true,
+    "visibilityOnly": true
+  },
+  "compatibility": {
+    "sourceArtifactId": "cert-check-governance",
+    "sourceArtifactSha256": "sha256-governance",
+    "sourceSchema": "chio.certify.check.v1"
+  },
+  "expiresAt": 1751000000,
+  "listingId": "governance-authority-listing",
+  "namespace": "http://127.0.0.2:3300",
+  "namespaceOwnership": {
+    "namespace": "http://127.0.0.2:3300",
+    "ownerId": "http://127.0.0.2:3300",
+    "registeredAt": 1749998000,
+    "registryUrl": "http://127.0.0.2:3300",
+    "signerPublicKey": "c2586ccff055862e82eb1513acf7d3354e1366dfd6185587e418dea2cbc7d9c2"
+  },
+  "publishedAt": 1749999000,
+  "schema": "chio.registry.listing.v1",
+  "status": "active",
+  "subject": {
+    "actorId": "governance-tool-server",
+    "actorKind": "tool_server"
+  }
+}

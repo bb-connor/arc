@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/autonomous-pricing-input.schema.json",
+  "title": "Chio autonomous pricing input signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "available_capital_units",
+    "coverage_class",
+    "currency",
+    "evidence_refs",
+    "generated_at",
+    "input_id",
+    "latest_web3_settlement_state",
+    "note",
+    "pending_loss_units",
+    "provider_id",
+    "receipt_history_window_secs",
+    "reputation_score_bps",
+    "requested_coverage_amount",
+    "runtime_assurance_tier",
+    "schema",
+    "settled_loss_units",
+    "subject_key",
+    "support_boundary"
+  ],
+  "properties": {
+    "available_capital_units": {
+      "type": "integer"
+    },
+    "coverage_class": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "locator",
+          "observed_at",
+          "reference_id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "integer"
+          },
+          "reference_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "generated_at": {
+      "type": "integer"
+    },
+    "input_id": {
+      "type": "string"
+    },
+    "latest_web3_settlement_state": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "pending_loss_units": {
+      "type": "integer"
+    },
+    "provider_id": {
+      "type": "string"
+    },
+    "receipt_history_window_secs": {
+      "type": "integer"
+    },
+    "reputation_score_bps": {
+      "type": "integer"
+    },
+    "requested_coverage_amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "runtime_assurance_tier": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.autonomous-pricing-input.v1"
+    },
+    "settled_loss_units": {
+      "type": "integer"
+    },
+    "subject_key": {
+      "type": "string"
+    },
+    "support_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delegated_authority_required",
+        "live_bind_supported",
+        "operator_override_supported",
+        "reserve_optimization_required"
+      ],
+      "properties": {
+        "delegated_authority_required": {
+          "type": "boolean"
+        },
+        "live_bind_supported": {
+          "type": "boolean"
+        },
+        "operator_override_supported": {
+          "type": "boolean"
+        },
+        "reserve_optimization_required": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

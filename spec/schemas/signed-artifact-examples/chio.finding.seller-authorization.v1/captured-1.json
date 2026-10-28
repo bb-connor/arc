@@ -1,0 +1,20 @@
+{
+  "authorization_id": "cd595cde853c1d2c42732748e9894cf0166b99bf85df47031eb89d4cf58a2af4",
+  "expires_at": 1900000000,
+  "finding_artifact_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "finding_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "issued_at": 1700000000,
+  "issuer": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+  "listing_id": "finding-listing-01",
+  "payee": {
+    "beneficiary": {
+      "currency": "USD",
+      "destination": "rail:venue-ledger:seller-42"
+    }
+  },
+  "provider_server_id": "finding-server",
+  "provider_tool": "finding.reveal",
+  "revocation_status_ref": "revocations/seller-auth",
+  "schema": "chio.finding.seller-authorization.v1",
+  "seller": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+}

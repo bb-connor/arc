@@ -1,0 +1,22 @@
+{
+  "algorithm": "ed25519",
+  "authority_id": "authority.enterprise.test",
+  "effective_at": 2000,
+  "event_id": "event.recover.1",
+  "issued_at": 2000,
+  "key_id": "0x6c312db3f7a5c36c463005f9880f439607a0c0641a17e46377b419ac41dac8ee",
+  "log_id": "log.enterprise.test",
+  "operation": {
+    "previous_key_id": "0x6bd66dfc77930771af45dc94ec2fa7d1e78cd5af8a483fa79954b44f48f1f485",
+    "recovery_policy_binding": "0x5844c771f44fd64da71c0628099b9f115fa8ec0bfde59fa36c33d124c0e62e9d",
+    "recovery_policy_id": "recovery.enterprise.v1",
+    "type": "recover",
+    "witness_roster_binding": "0xd6d05514ac6b035018fc00113b1223882621bda2039db13f1b8466e4c7376010",
+    "witness_roster_id": "roster.enterprise.v1"
+  },
+  "previous_event_hash": "0x4eef43e6cf5793f6613286fc65f728bb0b254dab53d9ed8c0ac79f71774c339e",
+  "public_key": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+  "reason": "threshold recovery",
+  "schema": "chio.key-log.event.v1",
+  "sequence": 1
+}

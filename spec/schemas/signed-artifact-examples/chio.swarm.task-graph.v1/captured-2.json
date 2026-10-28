@@ -1,0 +1,65 @@
+{
+  "budgetPoolRef": "budget-pool-runtime",
+  "createdAtUnixMs": 1800000000000,
+  "edges": [
+    {
+      "edgeType": "delegates",
+      "fromTaskId": "task-root",
+      "toTaskId": "task-child-a"
+    },
+    {
+      "edgeType": "delegates",
+      "fromTaskId": "task-root",
+      "toTaskId": "task-child-b"
+    }
+  ],
+  "expiresAtUnixMs": 1800003600000,
+  "graphId": "swarm-graph-runtime",
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "joins": [
+    {
+      "joinId": "join-child-results",
+      "nextTaskId": "task-root",
+      "parentTaskIds": [
+        "task-child-a",
+        "task-child-b"
+      ]
+    }
+  ],
+  "maxDepth": 1,
+  "maxFanout": 2,
+  "multiHopWitnessChains": true,
+  "nodes": [
+    {
+      "depth": 0,
+      "scopeHash": "ed058b41b914d2325c23c57189f5ee6e96427baf4601e61b29c7797911426744",
+      "taskId": "task-root"
+    },
+    {
+      "budgetAllocationRef": "budget-child-a",
+      "continuationTokenRef": "continuation-child-a",
+      "depth": 1,
+      "parentTaskId": "task-root",
+      "routePlanRef": "route-child-a",
+      "scopeHash": "5b5e3fdf3c7243180df7a0826a2c487ff4bb023711d091f80b2f67c49efb13e7",
+      "taskId": "task-child-a"
+    },
+    {
+      "budgetAllocationRef": "budget-child-b",
+      "continuationTokenRef": "continuation-child-b",
+      "depth": 1,
+      "parentTaskId": "task-root",
+      "routePlanRef": "route-child-b",
+      "scopeHash": "5b5e3fdf3c7243180df7a0826a2c487ff4bb023711d091f80b2f67c49efb13e7",
+      "taskId": "task-child-b"
+    }
+  ],
+  "plannerSubject": "did:chio:planner",
+  "revocationEpochRef": "revocation-epoch-runtime",
+  "rootTransactionRef": "passport-runtime",
+  "routePlanRefs": [
+    "route-child-a",
+    "route-child-b"
+  ],
+  "schema": "chio.swarm.task-graph.v1"
+}

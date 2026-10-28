@@ -1,0 +1,16 @@
+{
+  "attemptId": null,
+  "brokerCapabilityId": null,
+  "capabilityDigest": null,
+  "diagnosticCode": "chio.broker.clock_unavailable",
+  "dispatchKnowledge": "not_started",
+  "holdId": null,
+  "invocationId": null,
+  "issuedAtUnixSeconds": 1,
+  "outcome": "denied",
+  "parentCapabilityId": null,
+  "receiptId": "broker-failure-terminal-ipc-validator",
+  "requestDigest": "abababababababababababababababababababababababababababababababab",
+  "schema": "chio.broker-execution-failure-receipt.v1",
+  "stage": "admission"
+}

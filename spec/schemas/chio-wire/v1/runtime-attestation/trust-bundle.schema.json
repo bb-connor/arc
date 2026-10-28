@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime-attestation/trust-bundle.schema.json",
+  "title": "Chio runtime attestation trust bundle signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundleId",
+    "descriptors",
+    "expiresAt",
+    "issuedAt",
+    "publisher",
+    "schema",
+    "version"
+  ],
+  "properties": {
+    "bundleId": {
+      "type": "string"
+    },
+    "descriptors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "signature",
+          "signerKey"
+        ],
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "adapter",
+              "appraisalArtifactSchema",
+              "appraisalResultSchema",
+              "attestationSchemas",
+              "descriptorId",
+              "expiresAt",
+              "issuedAt",
+              "schema",
+              "signingKeyFingerprints",
+              "verifier",
+              "verifierFamily"
+            ],
+            "properties": {
+              "adapter": {
+                "type": "string"
+              },
+              "appraisalArtifactSchema": {
+                "type": "string"
+              },
+              "appraisalResultSchema": {
+                "type": "string"
+              },
+              "attestationSchemas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "descriptorId": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "integer"
+              },
+              "issuedAt": {
+                "type": "integer"
+              },
+              "referenceValuesUri": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "signingKeyFingerprints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "verifier": {
+                "type": "string"
+              },
+              "verifierFamily": {
+                "type": "string"
+              }
+            }
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signerKey": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "referenceValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "signature",
+          "signerKey"
+        ],
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attestationSchema",
+              "descriptorId",
+              "expiresAt",
+              "issuedAt",
+              "measurements",
+              "referenceValueId",
+              "schema",
+              "sourceUri",
+              "state",
+              "verifierFamily"
+            ],
+            "properties": {
+              "attestationSchema": {
+                "type": "string"
+              },
+              "descriptorId": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "integer"
+              },
+              "issuedAt": {
+                "type": "integer"
+              },
+              "measurements": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mrEnclave"
+                ],
+                "properties": {
+                  "mrEnclave": {
+                    "type": "string"
+                  }
+                }
+              },
+              "referenceValueId": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "sourceUri": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "verifierFamily": {
+                "type": "string"
+              }
+            }
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signerKey": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.runtime-attestation.trust-bundle.v1"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

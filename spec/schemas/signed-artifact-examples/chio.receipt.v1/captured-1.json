@@ -1,0 +1,46 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "e3ae50fc5853bf143554d674e9f3df226ad12f5323d3d22a4c58bb3a8c6af1c2",
+      "parameters": {
+        "attributes": {
+          "chio.verdict": "allow"
+        },
+        "span_name": "span-1"
+      }
+    },
+    "boundary_class": "detect_only",
+    "capability_id": "otel-ingress",
+    "content_hash": "3f898ac946b7c5a2277f7c9b4bec8556a1ce6e04fb6be774aee16d323646d076",
+    "kernel_key": "ac0f20ec47b5b5bdd89f2c0959aa7001f6349657c4c191f51a55cf415d155c3d",
+    "metadata": {
+      "chio_receipt_signing_nonce": "otel-01a182d8-2930-7c31-b163-9937b32b8dd8",
+      "otel": {
+        "agent_id": null,
+        "attributes": {
+          "chio.verdict": "allow"
+        },
+        "kernel_id": null,
+        "schema": "otlp.grpc.trace.v1",
+        "source_verdict": "allow",
+        "span_name": "span-1"
+      },
+      "provenance": {
+        "otel": {
+          "span_id": "0123456789abcdef",
+          "trace_id": "0123456789abcdef0123456789abcdef"
+        }
+      }
+    },
+    "observation_outcome": "observed",
+    "policy_hash": "otel-receipt-exporter",
+    "receipt_kind": "trace_observation",
+    "redaction_mode": "summary",
+    "timestamp": 0,
+    "tool_name": "gen_ai.tool.call",
+    "tool_origin": "host_executed_provider_reported",
+    "tool_server": "otel-collector",
+    "trust_level": "verified"
+  },
+  "id": "f26bd2cdf51436ed3298337021d15c1eeedb85ce477316742c99455aedb062d3"
+}

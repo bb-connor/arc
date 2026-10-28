@@ -1,0 +1,36 @@
+{
+  "name": "Flow server",
+  "public_key": "772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef",
+  "schema": "chio.manifest.v1",
+  "server_id": "server-a",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": true,
+        "read_only": false,
+        "requires_approval": false
+      },
+      "description": "Send",
+      "flow": {
+        "declassification_purposes": [
+          "support"
+        ],
+        "egress": true,
+        "input_clearance": {
+          "compartments": [],
+          "kind": "known",
+          "owners": {}
+        }
+      },
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "send",
+      "output_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "version": "1.0.0"
+}

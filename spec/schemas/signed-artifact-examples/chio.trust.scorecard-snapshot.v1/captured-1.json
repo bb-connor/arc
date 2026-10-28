@@ -1,0 +1,52 @@
+{
+  "component_scores": [
+    {
+      "component": "native_reputation",
+      "evidence_ref": "reputation-native-alpha",
+      "score": 92,
+      "stale": false,
+      "weight": 40
+    },
+    {
+      "component": "portable_reputation",
+      "evidence_ref": "reputation-import-trust-market-valid",
+      "score": 88,
+      "stale": false,
+      "weight": 30
+    },
+    {
+      "component": "sla_history",
+      "evidence_ref": "sla-performance-history-alpha",
+      "score": 96,
+      "stale": false,
+      "weight": 30
+    }
+  ],
+  "computed_score": 92,
+  "downgrade_reasons": [],
+  "freshness_window": {
+    "valid_from": "2026-06-09T00:00:00Z",
+    "valid_until": "2026-06-11T00:00:00Z"
+  },
+  "id": "scorecard-trust-market-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "issuer_trust_roots": [
+    "did:chio:federation-root"
+  ],
+  "negative_event_refs": [],
+  "portable_reputation_import_refs": [
+    "reputation-import-trust-market-valid"
+  ],
+  "reputation_snapshot_refs": [
+    "reputation-native-alpha"
+  ],
+  "schema": "chio.trust.scorecard-snapshot.v1",
+  "scope": "global",
+  "score_ceiling": 100,
+  "score_floor": 0,
+  "sla_performance_refs": [
+    "sla-performance-history-alpha"
+  ],
+  "subject": "did:chio:provider-alpha",
+  "verifier_policy_ref": "policy-trust-market-valid"
+}

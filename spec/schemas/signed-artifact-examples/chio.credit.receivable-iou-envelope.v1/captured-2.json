@@ -1,0 +1,87 @@
+{
+  "amount": {
+    "currency": "USD",
+    "units": 500
+  },
+  "capabilityId": "factor-result-capability",
+  "creditAuthorityDigest": "c5cd1577100dc6552865780c656f07b39f0b689e3dccfadec036fba0483d4804",
+  "creditFacilityBind": {
+    "authoritySignature": {
+      "partyId": "economy.credit.facility-authority",
+      "partyKeyEpoch": 3,
+      "signature": "735a3304180d9091ebbefb4a241468baf9406daa1f3bfd8f1c60baa29f537ff41d97a2ba23d9a4ce4f0a7c97d5fbb14d2ca21efecd397f9d3723729ce0739f0d",
+      "signerKey": "2c9b9a42d57adffd50e6eb1da543de93ad97d36d976d2a2b9735e7142f3fb859"
+    },
+    "body": {
+      "actionNonce": "factor-result-credit-action",
+      "amount": {
+        "currency": "USD",
+        "units": 500
+      },
+      "authorityId": "economy.credit.facility-authority",
+      "authorityKeyEpoch": 3,
+      "authoritySetDigest": "0da5d33baf5c2531533172f118a11d44df5e81ad0c4ce73033c35c99cf1ef139",
+      "bindId": "5c8506b363f68a451c99f4811a71378643082317273258abbb218317d99ff39c",
+      "capabilityId": "factor-result-capability",
+      "creditorKeyEpoch": 7,
+      "debtorId": "did:chio:debtor",
+      "debtorKeyEpoch": 5,
+      "dueAtUnixMs": 10000,
+      "economicIntentDigest": "48fd67d871459e454774be73b39ba6564c1b208bf8c0bb4f4847bc7aaded9716",
+      "effectiveCeiling": {
+        "currency": "USD",
+        "units": 500
+      },
+      "expectedExposureFence": 1,
+      "expectedExposureVersion": 1,
+      "expiresAtUnixMs": 1500,
+      "facilityArtifactDigest": "2bb4fdaf2d085ccfa77158386bfa87ef010d65bfa9d16b6b49cb36d3d3567401",
+      "facilityId": "facility:working-capital",
+      "issuedAtUnixMs": 900,
+      "operationId": "cfaf90e2963d805cb8bf8f81566f740aa09d6660cb52605830517099624fccfe",
+      "originalCreditorId": "did:chio:seller",
+      "originalSettlementDestinationRef": "acct:seller",
+      "payeeBindingDigest": "f2ebb221d87588da58071c6d01bccfbb97d3865ada5e510034f0aba317b5b078",
+      "requestId": "factor-result-request",
+      "schema": "chio.credit.facility-bind.v1",
+      "scopeDigest": "0e94b5a07f8258f0bf1272025bcb7c39d495d72b92f0e84779bb5f2ed8488786",
+      "toolName": "priced_call",
+      "toolServer": "tools.seller.example"
+    },
+    "creditorSignature": {
+      "partyId": "did:chio:seller",
+      "partyKeyEpoch": 7,
+      "signature": "0fb75e8ab80068cd1be89b68d38ef0925beb06fae9702e1c36f4855ddf6a4814eac6083f1f63ee5c31187f5b4f66128e2fdb1ca2b153bd485f8957b57f375a04",
+      "signerKey": "c853ad0f0cd2b619aea92ceec4fd56a24d6499d584ce79257e45cfd8139b60a7"
+    },
+    "debtorSignature": {
+      "partyId": "did:chio:debtor",
+      "partyKeyEpoch": 5,
+      "signature": "753d3623c90b257017825d5bc45fc0080146a3c95ff988f73a078b7eb0ac2fed3487d361f473e3a52f56ccad47bf08f43ca04d86084cc5f59c8b99fa83f73e09",
+      "signerKey": "b5f90095318f3f044cd8e40b584253d86777be62bf07221334e5fd2199cfa7f7"
+    }
+  },
+  "currentDispositionDigest": "29c15f9c6bae49ad05d5c735f3fb83a4359ae67bdd29a0524dac76baafd16513",
+  "debtorId": "did:chio:debtor",
+  "dueAtUnixMs": 10000,
+  "facilityId": "facility:working-capital",
+  "iouId": "63d5568f9e049d17e4e4e5a30128c71157be27ff8d731dc7530370c7e69dd6ff",
+  "issuedAtUnixMs": 1000,
+  "issuerId": "economy.credit.issuer",
+  "issuerKeyEpoch": 7,
+  "obligationAtomDigest": "a2d242d1c17e05b1466a23249c1777ccae58c97d56e11df17a54339d7beb4a1c",
+  "obligationId": "73cbf564e902a3b9ba37b9e594f385c8929d5f233a3ddfad4d7027b02059ee9f",
+  "operationId": "cfaf90e2963d805cb8bf8f81566f740aa09d6660cb52605830517099624fccfe",
+  "originalCreditorId": "did:chio:seller",
+  "originalSettlementDestinationRef": "acct:seller",
+  "payeeBindingDigest": "f2ebb221d87588da58071c6d01bccfbb97d3865ada5e510034f0aba317b5b078",
+  "receiptContentHash": "607b6fad2df5c7ee344b980452bd2a8b3d5c9ce2be8faeeb545ee1fafaae77f5",
+  "receiptDigest": "f0de0e19506b1d7abf9d6634002c7869bccef217225d3d28bb752b1cd96dcf24",
+  "receiptId": "9cb6017b653ffdcb6ce4d56795360446425c4dea6195891b6e42f9fff80783f1",
+  "receiptPolicyHash": "4895fddb53a8c33c8a18e667280f2df2ddebdfa6927efb46d1f4523b6c600fbf",
+  "receiptTimestampUnixSeconds": 1,
+  "schema": "chio.credit.receivable-iou-envelope.v1",
+  "tenantId": "tenant-a",
+  "toolName": "priced_call",
+  "toolServer": "tools.seller.example"
+}

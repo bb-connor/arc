@@ -1,0 +1,29 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "1155a5ca5454aacf32ee21bb484b23e0f37e6d316bd05bae1da90b8425e56850",
+      "parameters": {
+        "q": "borrowed-preimage"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-borrowed",
+    "content_hash": "1155a5ca5454aacf32ee21bb484b23e0f37e6d316bd05bae1da90b8425e56850",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "5cc9ad99e007495cd87230c1b20f6d58c8d0ca8c70355c3c4ac5683534ab9002",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-borrowed-preimage"
+    },
+    "policy_hash": "policy-borrowed",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000010,
+    "tool_name": "report",
+    "tool_origin": "caller_executed",
+    "tool_server": "audit-server",
+    "trust_level": "mediated"
+  },
+  "id": "fbf771705e432cd4e55955a64cce5aedd2da5dcaaf8588b28f010a8a5a5df6cb"
+}

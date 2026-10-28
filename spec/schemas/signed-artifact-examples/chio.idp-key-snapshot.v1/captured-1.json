@@ -1,0 +1,24 @@
+{
+  "exchange_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "issuer": "https://idp.example",
+  "keys": [
+    {
+      "crv": "P-256",
+      "kid": "ec",
+      "kty": "EC",
+      "x": "b_A7lJJBzh2t1DUZ5pYOCoW0GmmgXDKBA6orzhWUyhY",
+      "y": "PE91OlW_AdxT9sCwx-7ni0DG_30lqW4igrmJzvccFEo"
+    },
+    {
+      "alg": "RS256",
+      "e": "AQAB",
+      "kid": "rsa",
+      "kty": "RSA",
+      "n": "gAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+      "use": "sig"
+    }
+  ],
+  "observed_at": 1792230000,
+  "schema": "chio.idp-key-snapshot.v1",
+  "source": "https://idp.example/oauth2/v1/keys"
+}

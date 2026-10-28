@@ -1,0 +1,16 @@
+{
+  "attemptId": "attempt-production-1",
+  "brokerCapabilityId": "broker-capability-production-1",
+  "capabilityDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "diagnosticCode": "chio.broker.conflict",
+  "dispatchKnowledge": "committed",
+  "holdId": "hold-production-1",
+  "invocationId": "invocation-production-1",
+  "issuedAtUnixSeconds": 101,
+  "outcome": "failed",
+  "parentCapabilityId": "parent-capability-production-1",
+  "receiptId": "broker-failure-event-production-1",
+  "requestDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "schema": "chio.broker-execution-failure-receipt.v1",
+  "stage": "dispatch"
+}

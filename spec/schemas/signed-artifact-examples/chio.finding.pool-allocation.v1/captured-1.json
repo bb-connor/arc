@@ -1,0 +1,18 @@
+{
+  "allocation_id": "d8ac52e9d14950392ab33ea2f40a2f8699d86300341274d69ce7e0b80c13a5a6",
+  "amount_units": "10",
+  "authority": "c050c5637a44fa8629fff3cccce2300cb362a63d99d95fc54145266f4332445a",
+  "currency": "USD",
+  "expires_at_unix_ms": 3,
+  "graph_id": "graph:domain",
+  "issued_at_unix_ms": 1,
+  "ledger_domain": "ledger:primary",
+  "ledger_store_binding_sha256": "abababababababababababababababababababababababababababababababab",
+  "nonce": "nonce:domain",
+  "pool_id": "pool:domain",
+  "pool_sha256": "297fd3a7136b3babfb433756f35542768c06e33aef9e87d8a16dacb96e140e9e",
+  "purchaser_id": "buyer:domain",
+  "purchaser_key": "0100000000000000000000000000000000000000000000000000000000000000",
+  "purpose": "cognition_market_finding_purchase_v1",
+  "schema": "chio.finding.pool-allocation.v1"
+}

@@ -846,3 +846,25 @@ fn payout_intent_rejects_capital_instruction_and_trust_substitution() {
         Err(ParametricClaimError::AutomaticDispatchUnsupported)
     ));
 }
+
+#[test]
+fn signed_artifact_capture_parametric_contest() {
+    let claim = claim();
+    let keypair = Keypair::from_seed(&[7; 32]);
+    let contest = required(
+        ParametricContestV1::new(
+            &claim,
+            "contestant-1".to_owned(),
+            1_743_379_200,
+            1_743_379_800,
+            ParametricContestReasonCodeV1::PredicateEvaluation,
+            vec![digest("a"), digest("b")],
+        ),
+        "contest",
+    );
+    let signed = required(SignedParametricContestV1::sign(contest, &keypair), "sign contest");
+    required(
+        VerifiedParametricContestV1::verify(signed, "contestant-1", &keypair.public_key()),
+        "verify contest",
+    );
+}

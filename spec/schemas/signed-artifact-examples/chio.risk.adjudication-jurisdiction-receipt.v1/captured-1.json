@@ -1,0 +1,33 @@
+{
+  "adjudicator_subjects": [
+    "did:chio:market-adjudicator"
+  ],
+  "appeal_authority_refs": [
+    "did:chio:appeal-authority"
+  ],
+  "covered_dispute_types": [
+    "sla_breach",
+    "guarantee_claim",
+    "collateral_slash"
+  ],
+  "effective_window": {
+    "end": "2026-06-12T00:00:00Z",
+    "start": "2026-06-10T00:00:00Z"
+  },
+  "evidence_rules_ref": "evidence-rules-market-valid",
+  "id": "jurisdiction-trust-market-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "jurisdiction_id": "jurisdiction-trust-market-valid",
+  "order_id": "order-commerce-001",
+  "policy_ref": "jurisdiction-policy-market-valid",
+  "remedy_limits": [
+    {
+      "currency": "USD",
+      "maximum_remedy": 500
+    }
+  ],
+  "schema": "chio.risk.adjudication-jurisdiction-receipt.v1",
+  "slash_authority_refs": [
+    "did:chio:slash-authority"
+  ]
+}

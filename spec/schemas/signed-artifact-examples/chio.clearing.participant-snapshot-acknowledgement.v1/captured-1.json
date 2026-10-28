@@ -1,0 +1,9 @@
+{
+  "acceptedAtUnixMs": 90,
+  "algorithmVersion": "balance_match.v1",
+  "expiresAtUnixMs": 600,
+  "keyEpoch": 1,
+  "participantId": "B",
+  "participantSnapshotDigest": "84756e8e170e5cdce1b8eccc02b6a38e8b7485dac5460c2069edb05969b81afa",
+  "schema": "chio.clearing.participant-snapshot-acknowledgement.v1"
+}

@@ -1,0 +1,35 @@
+{
+  "affected_deliveries": [],
+  "authorization": {
+    "venue_audit": {
+      "audit_epoch_envelope_sha256": "a220372d821453ef42090d472744a852ef1d4317df6bd075668f3cf0d1d30243",
+      "authorization_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "selection_digest": "52ded55cc8b5ba2f5a20e3993bede66e94e62d6d272ecfcb0738287e44af57c4"
+    }
+  },
+  "backing_envelope_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "challenge_id": "fdafe9d33284f0de32a1d23aba64a8ac2c4c6d6c615b4b8a9b6ee38468099b4d",
+  "evidence": {
+    "evidence_invalid": {
+      "challenged_checkpoint_ref": {
+        "checkpoint_ref": "checkpoint-evidence-01",
+        "checkpoint_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "challenged_evidence_receipt_refs": [
+        {
+          "receipt_id": "receipt-evidence-01",
+          "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ],
+      "purchase_record_envelope_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  },
+  "filed_at": 1750000000,
+  "finding_artifact_sha256": "fe0c0c0400ba262ac8b636aaf0279806c4437e440c74700372ee7c06edc8fa16",
+  "finding_id": "4546b5252e9b3ee87bd38c9348683715b885b0e3fd8fab7cb04f3a8d84435daa",
+  "listing_id": "listing-42",
+  "profile_envelope_sha256": "90fb45c0aeb5a849868d4a2381dff27806cfb0efa09ad91b98ac94c96b762e07",
+  "schema": "chio.finding.challenge.v1",
+  "terms_envelope_sha256": "197787157b3d26c00eecd2b1418f5f21bec4197d89e3f2370d9ce72f4837f9a0",
+  "venue_admission_envelope_sha256": "7d0420e62f2836a3b785fb05f1d6a72f6c607a9d9ac6195506c92f468a124e8b"
+}

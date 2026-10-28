@@ -1,0 +1,58 @@
+{
+  "boundary_class": "prevent",
+  "caller_identity_hash": "95eefd61ded8a7c1f5b510fcdd9c271bedd922b6b3b78c4f096a1f2920e7a307",
+  "content_hash": "f07de9fa824fb051e90299bf6266feb52772ddb3fa3dc1c8efec2216a9476e67",
+  "evidence": [
+    {
+      "details": "chain-binding requires a trust-root resolver on the HTTP authority path",
+      "guard_name": "CapabilityGuard",
+      "verdict": false
+    }
+  ],
+  "id": "8ac19df6b1f971ea3cec275f9ca39e9094185b65ae5e5d455e564f30f40aed2d",
+  "kernel_key": "b09bbf8bc23a5cbc8f0b32d190c1387c531cdb9d071dcab72008e1d87cb4c3b1",
+  "metadata": {
+    "chio_http_status_scope": "decision",
+    "chio_kernel_receipt_id": "b553b9f6f34ea6396472c3512c10476fdc6a37f6d7cacbbd764ce35eaa2273ed",
+    "route_selection": {
+      "candidates": [
+        {
+          "available": true,
+          "routeId": "native-route",
+          "selectedProtocols": [
+            "http",
+            "native"
+          ],
+          "targetProtocol": "native"
+        }
+      ],
+      "decision": "select",
+      "requestedTargetProtocol": "native",
+      "routeSelectionId": "54bc1863fc1b8a7bb06015bb219bc3004ecefccdcc7debe795c3724bfe6bef8c",
+      "selectedProtocols": [
+        "http",
+        "native"
+      ],
+      "selectedRouteId": "native-route",
+      "selectedTargetProtocol": "native",
+      "sourceProtocol": "http"
+    }
+  },
+  "method": "POST",
+  "policy_hash": "policy-hash",
+  "receipt_kind": "mediated_decision",
+  "redaction_mode": "none",
+  "request_id": "req-v2-direct",
+  "response_status": 403,
+  "route_pattern": "/pets",
+  "session_id": "session-1",
+  "timestamp": 1793194875,
+  "tool_origin": "caller_executed",
+  "trust_level": "mediated",
+  "verdict": {
+    "guard": "CapabilityGuard",
+    "http_status": 403,
+    "reason": "chain-binding requires a trust-root resolver on the HTTP authority path",
+    "verdict": "deny"
+  }
+}

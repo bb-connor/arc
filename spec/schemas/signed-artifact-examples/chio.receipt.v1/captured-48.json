@@ -1,0 +1,81 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "300da142519b7657b88c5bea359a8ae38c97159d3f804b5c6e20f13b1c607875",
+      "parameters": {
+        "child": true,
+        "seed": 38
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c7-8808-7d20-baaf-88c296c6e75c",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "post-effect finalization failed; output withheld",
+      "verdict": "cancelled"
+    },
+    "kernel_key": "5ed511aa504a7a64e4fbc0eded8754cce1cf61fb16a585d6b0493ac1887d9c7d",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "5ed511aa504a7a64e4fbc0eded8754cce1cf61fb16a585d6b0493ac1887d9c7d",
+        "subject_key": "e011497d07599443e7f384e9e323c1877cc8fdffb8f23012bdbd120fca1f22da"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:5ed511aa504a7a64e4fbc0eded8754cce1cf61fb16a585d6b0493ac1887d9c7d",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 5,
+          "event_id": "budget-hold:dst-child-flush-38:cap-01a182c7-8808-7d20-baaf-88c296c6e75c:0:authorize",
+          "exposure_units": 5
+        },
+        "budget_term": "kernel:5ed511aa504a7a64e4fbc0eded8754cce1cf61fb16a585d6b0493ac1887d9c7d:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "budget-hold:dst-child-flush-38:cap-01a182c7-8808-7d20-baaf-88c296c6e75c:0",
+        "invocation_capture": {
+          "budget_commit_index": 2,
+          "event_id": "budget-hold:dst-child-flush-38:cap-01a182c7-8808-7d20-baaf-88c296c6e75c:0:capture-invocation:1",
+          "invocation_count_after": 1
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c7-8837-7b42-8891-632def5fc234",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "dst-admission-dst-child-flush-38",
+        "evaluation_started_at": 1793195477046,
+        "failure_code": null,
+        "identity_disposition": "terminal",
+        "post_effect_fault": {
+          "code": "CHIO-KERNEL-POST-EFFECT-DROP",
+          "original_receipt_id": null,
+          "step": "drop"
+        },
+        "reservations_retained_fail_closed": true,
+        "reserved_destructive_lease_id": "dst-lease-dst-child-flush-38",
+        "retained_destructive_lease_id": "dst-lease-dst-child-flush-38"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c7-8836-7df1-a69f-f938f017378d",
+        "request_id": "dst-child-flush-38",
+        "request_namespace_digest": "99760dabb1eebc3fb2ef0835bf534de1c105f300081279cd354f6f261465be21"
+      }
+    },
+    "policy_hash": "dst-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195477,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "dst-server",
+    "trust_level": "mediated"
+  },
+  "id": "1102305fb1d4fb3f762c4e71a8195ffd4d8d2b51b571b058c01afbba97770c22"
+}

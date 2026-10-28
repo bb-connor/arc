@@ -1,0 +1,16 @@
+{
+  "bound_to": {
+    "capability_id": "cap-restart-child-a",
+    "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "request_id": "req-a-reserve",
+    "subject_id": "c332de319df440b64680436e933777fd6bcac89e3dfdbbb210fff3503344b5fc",
+    "tool_name": "compute",
+    "tool_server": "cost-srv"
+  },
+  "expires_at": 1793195378,
+  "issued_at": 1793195348,
+  "nonce_id": "01a182c5-9314-7440-bc0e-c795043c3592",
+  "reserved_hold_id": "nonce-preflight-budget-hold:req-a-reserve:cap-restart-child-a:0",
+  "reserving_request_id": "req-a-reserve",
+  "schema": "chio.execution_nonce.v1"
+}

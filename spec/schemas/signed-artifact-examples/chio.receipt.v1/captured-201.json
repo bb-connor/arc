@@ -1,0 +1,70 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "bec1bbd7330500c8f81ef2a9486453a4d949d1841a95881386e58a5dd8a50344",
+      "parameters": {
+        "substituted": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-1",
+    "content_hash": "af0da34c17b64921ff8e70fffbc89b6fa7a9445ef03cf8407b99d913231acb00",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "2c4c5292dd578cf6e2348dd92a2e245e52d293bf5e4565d61e50c5c83817b542",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 7,
+        "coordinator_lease_id": "coordinator-lease-1",
+        "operation_id": "65c012a3d83f990f112c3f589308edeb393a49a3eeda6c04bfcff3b37ee600c2",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 8,
+        "projected_state": "completed",
+        "request_binding_hash": "36bf3ec1a23f843a585ad66730cff7d79378a6a9c08becbc008d958352138c77",
+        "request_id": "request-receipt-binding",
+        "request_namespace_digest": "abc7ce88257cc324df102e65ca0689c080fa9176a3efe39cf9e2a3a3d3b258ad",
+        "retained_dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 7,
+          "coordinator_lease_id": "coordinator-lease-1",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt-1",
+            "operation_id": "65c012a3d83f990f112c3f589308edeb393a49a3eeda6c04bfcff3b37ee600c2",
+            "transport_id": "qualified-release-provider",
+            "transport_key_epoch": 7
+          },
+          "store_fence": {
+            "lease_id": "store-lease-1",
+            "owner_epoch": 9,
+            "store_uuid": "store-1"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "store-lease-1",
+          "owner_epoch": 9,
+          "store_uuid": "store-1"
+        },
+        "tool_outcome_id": "3ee0e7f9f03b2491813ba4cce48c796dfbe8bc781c4114f5dc51829ab5bab9c0",
+        "tool_outcome_version": 2,
+        "trusted_time_unix_ms": 1000
+      },
+      "chio_receipt_signing_nonce": "receipt-terminal-evidence"
+    },
+    "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1,
+    "tool_name": "tool-1",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-1",
+    "trust_level": "mediated"
+  },
+  "id": "dd5639a53da6be4853459bb40f13867ee0b0e4a5d1bb5dd557ad33fdd9950f03"
+}

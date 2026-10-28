@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/autonomous-drift-report.schema.json",
+  "title": "Chio autonomous drift report signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "comparison_report",
+    "drift_report_id",
+    "drift_signals",
+    "fail_safe_engaged",
+    "generated_at",
+    "note",
+    "optimization_ref",
+    "pricing_decision_ref",
+    "rollback_plan",
+    "schema",
+    "subject_key"
+  ],
+  "properties": {
+    "comparison_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_id",
+        "deltas",
+        "disposition",
+        "generated_at",
+        "manual_decision_ref",
+        "note",
+        "pricing_decision_ref",
+        "schema"
+      ],
+      "properties": {
+        "comparison_id": {
+          "type": "string"
+        },
+        "deltas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "automated_value",
+              "description",
+              "field",
+              "manual_value"
+            ],
+            "properties": {
+              "automated_value": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "manual_value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "generated_at": {
+          "type": "integer"
+        },
+        "manual_decision_ref": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "pricing_decision_ref": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "drift_report_id": {
+      "type": "string"
+    },
+    "drift_signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "evidence_refs",
+          "kind",
+          "metric_name",
+          "observed_value",
+          "severity",
+          "threshold_value"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "locator",
+                "observed_at",
+                "reference_id"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "locator": {
+                  "type": "string"
+                },
+                "observed_at": {
+                  "type": "integer"
+                },
+                "reference_id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metric_name": {
+            "type": "string"
+          },
+          "observed_value": {
+            "type": "integer"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "threshold_value": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "fail_safe_engaged": {
+      "type": "boolean"
+    },
+    "generated_at": {
+      "type": "integer"
+    },
+    "note": {
+      "type": "string"
+    },
+    "optimization_ref": {
+      "type": "string"
+    },
+    "pricing_decision_ref": {
+      "type": "string"
+    },
+    "rollback_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actions",
+        "issued_at",
+        "note",
+        "plan_id",
+        "requires_operator_ack",
+        "safe_state",
+        "schema",
+        "subject_key",
+        "triggers"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "requires_operator_ack": {
+          "type": "boolean"
+        },
+        "safe_state": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "subject_key": {
+          "type": "string"
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.autonomous-drift-report.v1"
+    },
+    "subject_key": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
+      "parameters": {
+        "path": "/app/src/main.rs"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c5-fd80-7d96-b1af-2fbf5f340a6e",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "MustPrepay authorization could not be settled after execution",
+      "verdict": "deny"
+    },
+    "kernel_key": "4cb27b726f804d02d991fd8612dc4daa37d733fecfb579be6fb353923a71ff2e",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "4cb27b726f804d02d991fd8612dc4daa37d733fecfb579be6fb353923a71ff2e",
+        "subject_key": "63b9db1016686e860eeace71ad7358904debdb8458844fec11153e1f4e4d70d7"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c5-fff9-7db1-93c6-dae52a19b6dc",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "financial": {
+        "authorization_id": "outcome-authorization",
+        "capture_status": "failed",
+        "payment_authorization_retained": true,
+        "payment_reference": "outcome-capture",
+        "payment_release_attempt_reference": "outcome-request",
+        "payment_release_confirmed": false,
+        "payment_release_reference": "outcome-release",
+        "release_outcome": "failed",
+        "settlement_status": "failed"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "2646006976f9c1fac51b997e4d2efc7f092371901e150ce4b1903e9bef06cfc3",
+          "approved": true,
+          "approver_key": "4cb27b726f804d02d991fd8612dc4daa37d733fecfb579be6fb353923a71ff2e",
+          "token_id": "approval-outcome-request"
+        },
+        "intent_hash": "263e3e0f33e4da46895159866da62a71587a878ff599b1ad6eb37cd47f11c4c6",
+        "intent_id": "outcome-intent",
+        "max_amount": {
+          "currency": "USD",
+          "units": 100
+        },
+        "metered_billing": {
+          "maxBilledUnits": 15,
+          "quote": {
+            "billingUnit": "1k_tokens",
+            "expiresAt": 1793195676,
+            "issuedAt": 1793195371,
+            "provider": "billing.chio",
+            "quoteId": "q-outcome-intent",
+            "quotedCost": {
+              "currency": "USD",
+              "units": 100
+            },
+            "quotedUnits": 10
+          },
+          "settlementMode": "must_prepay"
+        },
+        "purpose": "prepaid invocation",
+        "server_id": "cost-srv",
+        "tool_name": "compute"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c5-ffe7-7bc3-9627-66ffdd989c8c",
+        "request_id": "outcome-request",
+        "request_namespace_digest": "3edfbc87504593fdc00f76da46d974b2e1db4e28cefc2da0b7306899f37e38d5"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195376,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "570040d372ce45bc2d381bc54de8b83dea466a326c080fcd06316b76b6354d93"
+}

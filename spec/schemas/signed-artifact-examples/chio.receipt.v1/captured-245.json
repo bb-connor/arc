@@ -1,0 +1,51 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "33fbcf20658ed4c33343700cfea054a8a184807b89691f11f7dfde6635831d83",
+      "parameters": {
+        "uri": "https://api.github.com/repos",
+        "url": {
+          "host": "169.254.169.254"
+        }
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182be-5490-77d3-abc5-cf6f1a09ff71",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"egress-allowlist\" denied the request",
+      "verdict": "deny"
+    },
+    "kernel_key": "9c788d51c946cf888e39de73e3ee2850cccc740b065bee3660b9163cfb4a7e7e",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "9c788d51c946cf888e39de73e3ee2850cccc740b065bee3660b9163cfb4a7e7e",
+        "subject_key": "429a0e8b5db6702a06cf2b921a6772c0f216622b0e9e0572d37c6bc00332f406"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182be-5765-7f92-aad0-6a2fdde31e6b",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "req-1",
+        "request_namespace_digest": "c12110a49405a11af004673b37ffa7f10a8be1fedbbb8bdc5726f6e17464968c"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793194874,
+    "tool_name": "http_request",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "0b8bbcfe7a1c47a932f8c87394274e4b108bd4a6c60bcf1cfa961240d423a881"
+}

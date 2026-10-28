@@ -1,0 +1,24 @@
+{
+  "capabilityIds": [
+    "capability"
+  ],
+  "parameterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "requestHash": "b6e2b00c8b61cbfdc036ba3023d875a93012f0799ab831e953fc8bd7fb47addf",
+  "requestId": "retained-outcome",
+  "reservationId": "kID97czEFnSkO0IdM8JJ-NXn3rA08plcyOjBaN0F1-w",
+  "response": {
+    "error": {
+      "code": -32603,
+      "message": "retained effect outcome"
+    },
+    "id": 1,
+    "jsonrpc": "2.0"
+  },
+  "schema": "chio.mcp.session-credential-call.v1",
+  "serverId": "fs",
+  "sessionId": "retained-session",
+  "startedAt": 100,
+  "state": "fenced",
+  "subjectKey": "subject",
+  "toolName": "write_file"
+}

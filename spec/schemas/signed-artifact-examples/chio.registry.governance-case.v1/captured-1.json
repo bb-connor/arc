@@ -1,0 +1,22 @@
+{
+  "caseId": "case-225206d8688780b67cd26f41a2151f03f37239c7e581ec26c09e2dc2df50f1cd",
+  "charterId": "charter-b771ccbb4aebab61e343e01ecfecf76a557bdcb82cd970cde56e660ab47f7c6c",
+  "evidenceRefs": [
+    {
+      "kind": "listing",
+      "referenceId": "listing-artifact-1"
+    }
+  ],
+  "expiresAt": 500,
+  "governingOperatorId": "origin-a",
+  "issuedBy": "governance@chio.example",
+  "kind": "freeze",
+  "listingId": "listing-artifact-1",
+  "namespace": "https://registry.chio.example",
+  "note": "freeze",
+  "openedAt": 140,
+  "schema": "chio.registry.governance-case.v1",
+  "state": "enforced",
+  "subjectOperatorId": "origin-a",
+  "updatedAt": 140
+}

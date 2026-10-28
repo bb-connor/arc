@@ -1,0 +1,14 @@
+{
+  "expiresAtUnixMs": 3000,
+  "issuedAtUnixMs": 1000,
+  "keyId": "key-preparation",
+  "revocationAuthorityRoots": [
+    "revocation-authority"
+  ],
+  "revocationCheckpointSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "schema": "chio.runtime.verifier-trust-bundle.v1",
+  "trustBundleSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "verificationContextSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "verifierId": "verifier-preparation",
+  "version": 1
+}

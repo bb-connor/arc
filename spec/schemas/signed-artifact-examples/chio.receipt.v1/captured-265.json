@@ -1,0 +1,89 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "invalid-action-hash",
+      "parameters": {
+        "decisionType": "release",
+        "eventId": "evt-release-1",
+        "stage": "release",
+        "toolName": "release_control",
+        "workflowId": "workflow-release-control"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-proof-1",
+    "content_hash": "content-proof-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "0ba5bae0b4988b58fbe0c569bc0a58530b8b3e18a2cb84cdc656b06b1315ce9f",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-proof-1",
+      "mercury": {
+        "approvalState": {
+          "approvalTicketId": "chg-1042",
+          "approverSubjects": [
+            "approver-risk-1"
+          ],
+          "state": "approved"
+        },
+        "businessIds": {
+          "accountId": "acct-alpha",
+          "deskId": "desk-delta",
+          "inquiryId": "inquiry-2026-04-02",
+          "releaseId": "release-2026-04-02",
+          "strategyId": "strat-shadow-01",
+          "workflowId": "workflow-release-control"
+        },
+        "chronology": {
+          "causalParentEventIds": [
+            "evt-approval-1"
+          ],
+          "eventId": "evt-release-1",
+          "idempotencyKey": "idempotency-release-1",
+          "ingestedAt": 1775137626,
+          "sourceTimestamp": 1775137620,
+          "stage": "release"
+        },
+        "decisionContext": {
+          "decisionType": "release",
+          "modelId": "model-ops-reviewer",
+          "policyReference": "policy-hash-123",
+          "workflowVersion": "mercury-workflow-v1"
+        },
+        "disclosure": {
+          "audience": "compliance",
+          "policy": "internal-review-only",
+          "redactionProfile": "internal-default",
+          "reviewedExportApproved": true,
+          "verifierEquivalent": true
+        },
+        "provenance": {
+          "dependencyDigest": "deps-sha256-123",
+          "hostingMode": "supervised-shadow",
+          "modelName": "gpt-5.4",
+          "modelProvider": "openai",
+          "modelVersion": "2026-04-02",
+          "sourceRecordId": "source-release-1",
+          "sourceSystem": "shadow-release-review"
+        },
+        "schema": "chio.mercury.receipt_metadata.v1",
+        "sensitivity": {
+          "classification": "confidential",
+          "containsCustomerData": false,
+          "containsMarketData": true,
+          "retentionClass": "pilot-90d"
+        }
+      }
+    },
+    "policy_hash": "policy-proof-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1775137626,
+    "tool_name": "release_control",
+    "tool_origin": "caller_executed",
+    "tool_server": "mercury",
+    "trust_level": "mediated"
+  },
+  "id": "cd6b85d43696f03b51f4da0edfcc59dbb352a90f9fbe6cd47c8c015c3d502fb3"
+}

@@ -1,0 +1,16 @@
+{
+  "authorization_digest": "c6c6a747ac4eec9047334540185335755449f7f58f1fd3d77408ef6ec546ab83",
+  "claim_id": "1a60c259-8f7f-4b0b-88fe-7630714a058f",
+  "completed_at_unix_ms": 1793195494000,
+  "execution_started_at_unix_ms": 1793195494000,
+  "executor": {
+    "executor_id": "caller-recovery-executor",
+    "key_epoch": 1,
+    "public_key": "17d9f19eb381de1e1ad72328f3b9434e5e0c04425d0e6ec530e3449c598bf480"
+  },
+  "output": {
+    "original_caller_effect": true
+  },
+  "realized_cost": null,
+  "schema": "chio.caller-delivery-report.v1"
+}

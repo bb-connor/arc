@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/attack-simulation-report-signature.schema.json",
+  "title": "Chio runtime attack simulation report signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actualVerifierReportDigest",
+    "attackClass",
+    "chaosKnobs",
+    "expectedDenialClaim",
+    "fixturePath",
+    "issuer",
+    "runtimeReceiptRefs",
+    "scenarioId",
+    "schema",
+    "simulatorVersionDigest",
+    "status"
+  ],
+  "properties": {
+    "actualVerifierReportDigest": {
+      "type": "string"
+    },
+    "attackClass": {
+      "type": "string"
+    },
+    "chaosKnobs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expectedDenialClaim": {
+      "type": "string"
+    },
+    "fixturePath": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "runtimeReceiptRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scenarioId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.attack-simulation-report-signature.v1"
+    },
+    "simulatorVersionDigest": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

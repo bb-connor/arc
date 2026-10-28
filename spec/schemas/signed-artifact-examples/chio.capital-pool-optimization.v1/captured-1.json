@@ -1,0 +1,48 @@
+{
+  "capital_book_ref": "cb-1",
+  "currency": "USD",
+  "facility_refs": [
+    "facility-1",
+    "facility-2"
+  ],
+  "issued_at": 1743379320,
+  "max_bind_capacity_units": 250000,
+  "max_facility_utilization_bps": 7000,
+  "note": "Keeps optimization bounded and override-ready.",
+  "optimization_id": "cpo-1",
+  "pending_claim_refs": [
+    "claim-1"
+  ],
+  "pricing_decision_ref": "apd-1",
+  "recommendations": [
+    {
+      "action": "increase_reserve",
+      "amount": {
+        "currency": "USD",
+        "units": 25000
+      },
+      "rationale": "Raise reserve coverage before new autonomous binds.",
+      "source_ref": "pool:primary"
+    },
+    {
+      "action": "shift_capacity",
+      "amount": {
+        "currency": "USD",
+        "units": 15000
+      },
+      "destination_ref": "facility-1",
+      "rationale": "Move capacity toward the lower-loss facility.",
+      "source_ref": "facility-2"
+    }
+  ],
+  "schema": "chio.capital-pool-optimization.v1",
+  "subject_key": "subject-1",
+  "support_boundary": {
+    "cross_currency_optimization_supported": false,
+    "live_mutation_supported": false,
+    "operator_override_required": true,
+    "scenario_comparison_supported": true,
+    "web3_reconciliation_required": true
+  },
+  "target_reserve_ratio_bps": 3500
+}

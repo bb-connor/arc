@@ -1,0 +1,98 @@
+{
+  "appraisal": {
+    "adapter": "azure_maa",
+    "artifact": {
+      "claims": {
+        "normalizedAssertions": {
+          "attestationType": "sgx"
+        },
+        "normalizedClaims": [
+          {
+            "category": "platform",
+            "code": "attestation_type",
+            "confidence": "verified",
+            "freshness": "evidence_window",
+            "provenance": "vendor_claims",
+            "value": "sgx"
+          }
+        ],
+        "vendorClaims": {
+          "attestationType": "sgx"
+        }
+      },
+      "evidence": {
+        "evidenceSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "expiresAt": 1800000000,
+        "issuedAt": 1749000000,
+        "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+        "verifier": "https://maa.cognition-market.test"
+      },
+      "policy": {
+        "effectiveTier": "attested",
+        "reasonCodes": [
+          "evidence_verified"
+        ],
+        "reasons": [
+          {
+            "code": "evidence_verified",
+            "description": "The verifier accepted the evidence and Chio derived a portable appraisal.",
+            "disposition": "pass",
+            "group": "verification"
+          }
+        ],
+        "verdict": "accepted"
+      },
+      "schema": "chio.runtime-attestation.appraisal-artifact.v1",
+      "verifier": {
+        "adapter": "azure_maa",
+        "verifierFamily": "azure_maa"
+      }
+    },
+    "effectiveTier": "attested",
+    "evidence": {
+      "evidenceSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "expiresAt": 1800000000,
+      "issuedAt": 1749000000,
+      "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+      "verifier": "https://maa.cognition-market.test"
+    },
+    "normalizedAssertions": {
+      "attestationType": "sgx"
+    },
+    "normalizedClaims": [
+      {
+        "category": "platform",
+        "code": "attestation_type",
+        "confidence": "verified",
+        "freshness": "evidence_window",
+        "provenance": "vendor_claims",
+        "value": "sgx"
+      }
+    ],
+    "reasonCodes": [
+      "evidence_verified"
+    ],
+    "reasons": [
+      {
+        "code": "evidence_verified",
+        "description": "The verifier accepted the evidence and Chio derived a portable appraisal.",
+        "disposition": "pass",
+        "group": "verification"
+      }
+    ],
+    "schema": "chio.runtime-attestation.appraisal.v1",
+    "vendorClaims": {
+      "attestationType": "sgx"
+    },
+    "verdict": "accepted",
+    "verifierFamily": "azure_maa"
+  },
+  "generatedAt": 1750000000,
+  "policyOutcome": {
+    "accepted": true,
+    "effectiveTier": "basic",
+    "reason": "matched attestation trust rule `cognition-market-runtime`",
+    "trustPolicyConfigured": true
+  },
+  "schema": "chio.runtime-attestation.appraisal-report.v1"
+}

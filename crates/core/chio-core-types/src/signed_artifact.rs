@@ -6,12 +6,11 @@ use alloc::vec::Vec;
 
 use crate::capability::{
     aggregate_invocation::AGGREGATE_BUDGET_ROOT_SCHEMA,
-    cumulative_approval::CUMULATIVE_APPROVAL_ROOT_SCHEMA, features::CHIO_CAPABILITIES_SCHEMA,
+    cumulative_approval::CUMULATIVE_APPROVAL_ROOT_SCHEMA,
     governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA, token::CHIO_CAPABILITY_SCHEMA,
 };
 use crate::economic_continuity::{
-    CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
-    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+    CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use crate::error::{Error, Result};
@@ -24,9 +23,6 @@ use crate::session::{CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, CHIO_SESSION_ANCHOR_SCH
 pub const CHIO_ANCHOR_BATCH_V1_SCHEMA: &str = "chio.anchor_batch.v1";
 pub const CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA: &str = "chio.anchor-inclusion-proof.v1";
 pub const CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA: &str = "chio.anchor-proof-bundle.v1";
-pub const CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA: &str =
-    "chio.budget-snapshot-anchor-provenance.v1";
-pub const CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA: &str = "chio.bilateral-signature-slice.v1";
 pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
     "chio.frost.authorization-slot-checkpoint.v1";
 pub const CHIO_FROST_AUTHORIZATION_V1_SCHEMA: &str = "chio.frost.authorization.v1";
@@ -312,20 +308,6 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("aggregate_budget_root_binding", "protocol-primitives-v1")),
     ),
     (
-        CHIO_BUDGET_SNAPSHOT_ANCHOR_PROVENANCE_V1_SCHEMA,
-        Some((
-            "budget_snapshot_anchor_provenance",
-            "economic-state-continuity-v1",
-        )),
-    ),
-    (
-        CHIO_CAPABILITIES_SCHEMA,
-        Some((
-            "capability_negotiation",
-            "schema-registry/v1/capability-negotiation",
-        )),
-    ),
-    (
         CHIO_CAPABILITY_SCHEMA,
         Some(("capability_token", "schema-registry/v1/capability-token-v1")),
     ),
@@ -358,10 +340,6 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("anchor_proof_bundle", "checkpoint-transparency-v1")),
     ),
     (
-        CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA,
-        Some(("bilateral_dsse_signature_slice", "federation-dsse-slice")),
-    ),
-    (
         CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA,
         Some((
             "frost_authorization_slot_checkpoint",
@@ -385,16 +363,8 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("frost_roster", "frost-quorum-substrate-v1")),
     ),
     (
-        CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
-        Some(("economic_resource_head", "economic-state-continuity-v1")),
-    ),
-    (
         CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
         Some(("economic_state_batch", "economic-state-continuity-v1")),
-    ),
-    (
-        CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
-        Some(("economic_effect_slot", "economic-state-continuity-v1")),
     ),
     (
         CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
@@ -2081,7 +2051,10 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.trust.passport-revocation-root.v1",
-        Some(("trust_passport_revocation_root", "signing-wrapper-v1")),
+        Some((
+            "trust_passport_revocation_root",
+            "federated-passport-revocation-v1",
+        )),
     ),
     (
         "chio.underwriting.decision.v1",

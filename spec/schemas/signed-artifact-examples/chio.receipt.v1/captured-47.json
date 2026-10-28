@@ -1,0 +1,47 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "8ef9e84441bf3ba101b53321ad1a34686b5162f1a4a53fd134d6522461d9da97",
+      "parameters": {
+        "authorization_correlation_id": "auth-correlation:session-malformed-tool-call:call-malformed-tool-call",
+        "authorization_parameter_hash": "e2c578d03338b8e61d617b8b4bf1a1c38888450a9732cdf1e9d5b5de566fd300",
+        "operation": "fs_read",
+        "operation_payload": {
+          "capabilityToken": "test-token",
+          "path": "resource:test-tool-call",
+          "sessionId": "test-session",
+          "toolCallId": "test-tool-call"
+        },
+        "resource": "resource:call-malformed-tool-call",
+        "session_id": "session-malformed-tool-call",
+        "tool": "fs/read_text_file",
+        "tool_call_id": {
+          "unexpected": true
+        }
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-malformed-tool-call-non-string",
+    "content_hash": "authorization-content-hash",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "b039e159af3311073a712937970a78570bac80007df3d90f23899abc00eabd9f",
+    "metadata": {
+      "chio_receipt_signing_nonce": "dd3719aea2e7d2f0c183eccee00900fc4a5cc4307d0f473fa91e6787360077de",
+      "receipt_context": {
+        "request_id": "auth-malformed-tool-call-non-string"
+      }
+    },
+    "policy_hash": "policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "tenant_id": "tenant-malformed-tool-call",
+    "timestamp": 1793186814,
+    "tool_name": "fs/read_text_file",
+    "tool_origin": "caller_executed",
+    "tool_server": "proxy-server",
+    "trust_level": "mediated"
+  },
+  "id": "be13728731cafa556dc4b4626984c7dba0209b196740f826e0d3838df6189d6f"
+}

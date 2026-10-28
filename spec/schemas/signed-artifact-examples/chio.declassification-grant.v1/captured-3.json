@@ -1,0 +1,75 @@
+{
+  "operationId": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
+  "outcomeRecordedAtUnixMs": 1500,
+  "receiptDigest": "a151c43894ba27c083496ee5a5af8dcd152ccb433a826fdd27998312cced0fde",
+  "receiptId": "0897c913e48d1b59d9abd933041a52d2d867ca1e589eb1c9f4c6026e326134c9",
+  "reservationDigest": "adc65a22dc1ad1a82f45a9273d6b38508ed8d8f9c1e392bc103e46549888709c",
+  "reservationId": "685a2dbde5819c20b32b518de0e9e99fda9ac5f84de2ff53559c161c9661fb2f",
+  "schema": "chio.channel.terminal-outcome-commitment.v1",
+  "terminalResult": {
+    "result": {
+      "storage": "inline",
+      "value": {
+        "dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 7,
+          "coordinator_lease_id": "channel-coordinator",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "channel-attempt-kernel-outcome-adapter",
+            "operation_id": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
+            "transport_id": "channel-transport-kernel-outcome-adapter",
+            "transport_key_epoch": 9
+          },
+          "store_fence": {
+            "lease_id": "channel-owner-3",
+            "owner_epoch": 3,
+            "store_uuid": "channel-store"
+          }
+        },
+        "evaluation_id": "9c8fa05b4397d942222b93be84611365fec62ac073215af84b958a51af48c6fe",
+        "evaluation_lifecycle_digest": "52200e0bfb181bb774a0463153bc405b4bd348ce3509abeb064cf9f3e09993b8",
+        "operation_id": "7fa8ecd0f29c4e042264147bc088e7d9c4d495dc5262f1a8a2191d1fd039d67a",
+        "operation_version": 7,
+        "outcome_id": "fd1899a525e08cc17b774004a47951d86f3d2ace4a0ebbfbdb92600706dbc3ef",
+        "outcome_lifecycle_digest": "a7a9ca1bc7d10fef77a714331eb67ae2bd932df257015ad913c58c2b222d59ec",
+        "outcome_recorded_at_unix_ms": 1500,
+        "outcome_recording_fence": {
+          "lease_id": "channel-owner-4",
+          "owner_epoch": 4,
+          "store_uuid": "channel-store"
+        },
+        "outcome_version": 2,
+        "post_guard_decision_digest": "62569a19ea4881580d9c8f47858967d03ec650fe05281896707fce06514c7327",
+        "pricing_verdict_digest": "154efcc0733bed5ad275bae04c362104d73ac5006e8a6118885e7b97f7d48058",
+        "projection_coordinator_lease_epoch": 7,
+        "projection_coordinator_lease_id": "channel-projection",
+        "projection_store_fence": {
+          "lease_id": "channel-owner-5",
+          "owner_epoch": 5,
+          "store_uuid": "channel-store"
+        },
+        "raw_output_digest": "26bd7a42a582c48a127f7f9481cd82c4ddf76dae1ca9ab82b0a55eb3ba0cdc5e",
+        "request_id": "channel-request-kernel-outcome-adapter",
+        "resolved_output_digest": "af0da34c17b64921ff8e70fffbc89b6fa7a9445ef03cf8407b99d913231acb00",
+        "settlement_disposition": {
+          "amount": {
+            "currency": "USD",
+            "units": 7
+          },
+          "kind": "capture"
+        },
+        "terminal_dependency_root_digest": "0717e4a258e8da1ad57bf20a2a71c0e0752c40c9dbe2ce36e4ab7374891908d7",
+        "tool_name": "tool-outcome-test-tool",
+        "tool_server": "tool-outcome-test-server",
+        "trusted_time_unix_ms": 1600
+      }
+    },
+    "resultDigest": "30348b0f66437c28efc7da07ad8fb992b74e5963a1e9dab7146f02ddc9472abc",
+    "resultId": "fd1899a525e08cc17b774004a47951d86f3d2ace4a0ebbfbdb92600706dbc3ef"
+  },
+  "terminalizedAtUnixMs": 1600
+}

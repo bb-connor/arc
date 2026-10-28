@@ -1,0 +1,19 @@
+{
+  "auditId": "audit-exact-140",
+  "brokerInstanceId": "test-broker-instance",
+  "canonicalRequestSha256": "d13515b586a372ed1dcd17e940c911481d34b072405dcbc59e016f7c055bb539",
+  "capabilitySha256": "232fb50a8fdbbe5f9e9bc9f468297da41049a26e6fb72b95696198ed8633d7e3",
+  "credentialProvider": "generic-https",
+  "deploymentId": "test-deployment",
+  "expiresAtUnixSeconds": 80,
+  "issuedAtUnixSeconds": 19,
+  "proofSha256": "c8bb98a50aa8b8bb1a783bd001c4d09ac8dad0351898ff4fd4d595bc9996bbc3",
+  "providerAdapterId": "generic-bearer",
+  "providerAdapterVersion": 1,
+  "referenceCommitmentSha256": "62abc19322d43ef031cac724943d722f35e1b91b694fb4637cb9c0510671104e",
+  "referenceSource": "pre-broker-provider-observation",
+  "revocationAuthorityDomain": "combined-authority",
+  "runnerId": "test-enterprise-runner",
+  "schema": "chio.broker-audit-runner-authorization.v1",
+  "tenantScope": "tenant-a"
+}

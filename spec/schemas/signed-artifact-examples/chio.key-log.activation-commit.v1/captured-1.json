@@ -1,0 +1,20 @@
+{
+  "checkpoint_body_hash": "0xa82f91430fc365651175053ff079544cf8a69c75ab88ac30624a4ecc4bddf9d3",
+  "checkpoint_hash": "0x7c88cbb980ef2744a429d729def49eec8373adfbab425c7481671362e8aa9de9",
+  "checkpoint_sequence": 1,
+  "committed_at": 3100,
+  "event_id": "event.rotation.1",
+  "event_leaf_hash": "0x823a396bcbf9e222e72763d573ae41a56948109df1bc723fe19e362e0c082185",
+  "log_id": "log.enterprise.test",
+  "root_hash": "0x11c46f8188fe10e26dc904ddc31edb8cb8b867d3c3e896db7790f834af9d40e3",
+  "schema": "chio.key-log.activation-commit.v1",
+  "signing_epoch": 1,
+  "tree_size": 2,
+  "witness_set_hash": "0x0508b76fe0db1cba44bf9e3fc67dc8801de2b1459910e2d447bf8ddf13c2b9a3",
+  "witness_signatures": [
+    {
+      "signature": "2f8437a49433f44e8587d7c6c305c6a204e4780b8978c8a30a4a0efd6c0f33552f63d2e6b20efd63388b4544f734fb5f3768faf8503b0418b908525002e1ef0a",
+      "witness_id": "witness.a"
+    }
+  ]
+}

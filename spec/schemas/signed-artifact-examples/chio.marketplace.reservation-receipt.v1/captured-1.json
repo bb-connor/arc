@@ -1,0 +1,11 @@
+{
+  "agentId": "agent-alpha",
+  "askDigest": "98cb1815d947038c770f047a249e1b47b600b19e75a473dc8ea282240fa6ac52",
+  "listingId": "listing-1",
+  "receiptId": "",
+  "reservedAmount": {
+    "currency": "USD",
+    "units": 1000
+  },
+  "schema": "chio.marketplace.reservation-receipt.v1"
+}

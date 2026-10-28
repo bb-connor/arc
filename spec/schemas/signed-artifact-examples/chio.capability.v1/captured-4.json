@@ -1,0 +1,45 @@
+{
+  "delegation_chain": [
+    {
+      "attenuations": [
+        {
+          "constraint": {
+            "type": "domain_exact",
+            "value": "a.example"
+          },
+          "server_id": "srv",
+          "tool_name": "read",
+          "type": "add_constraint"
+        }
+      ],
+      "capability_id": "snapshot-parent",
+      "delegatee": "d1f36f7711e2db889230785f9a478f9ca06463cd8f872aa6b698d1ffbad0a85f",
+      "delegator": "b2a095c86eafd130ea49646c3db51e312d8acb6daee07c4b811c8c847f782887",
+      "signature": "fb3e4c0358447473e06c2b085082c4960d4d2c6a1d11ae33240b8501f6973ec52f8e12882bb087ea68cb6292cde104d4a265c01395085bca497a0fed7062ca0d",
+      "timestamp": 100
+    }
+  ],
+  "expires_at": 200,
+  "id": "snapshot-token",
+  "issued_at": 100,
+  "issuer": "b2a095c86eafd130ea49646c3db51e312d8acb6daee07c4b811c8c847f782887",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "path_prefix",
+            "value": "/workspace"
+          }
+        ],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "srv",
+        "tool_name": "read"
+      }
+    ]
+  },
+  "subject": "d1f36f7711e2db889230785f9a478f9ca06463cd8f872aa6b698d1ffbad0a85f"
+}

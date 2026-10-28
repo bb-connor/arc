@@ -1,0 +1,65 @@
+{
+  "events": [],
+  "generatedAt": 1700000140,
+  "query": {
+    "agentSubject": "subject-1",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "schema": "chio.credit.capital-book.v1",
+  "sources": [
+    {
+      "capitalSource": "operator_internal",
+      "committedAmount": {
+        "currency": "USD",
+        "units": 12000
+      },
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "currency": "USD",
+      "description": "facility commitment",
+      "disbursedAmount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "facilityId": "cfd-1",
+      "impairedAmount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "jurisdiction": "us-ny",
+      "kind": "facility_commitment",
+      "ownerRole": "operator_treasury",
+      "sourceId": "facility-source-1"
+    }
+  ],
+  "subjectKey": "subject-1",
+  "summary": {
+    "currencies": [
+      "USD"
+    ],
+    "fundingSources": 1,
+    "ledgerEvents": 0,
+    "matchingBonds": 1,
+    "matchingFacilities": 1,
+    "matchingLossEvents": 1,
+    "matchingReceipts": 2,
+    "mixedCurrencyBook": false,
+    "returnedBonds": 1,
+    "returnedFacilities": 1,
+    "returnedLossEvents": 1,
+    "returnedReceipts": 2,
+    "truncatedBonds": false,
+    "truncatedFacilities": false,
+    "truncatedLossEvents": false,
+    "truncatedReceipts": false
+  },
+  "supportBoundary": {
+    "automaticCapitalExecutionSupported": false,
+    "custodyExecutionSupported": false,
+    "mixedCurrencyNettingSupported": false,
+    "sourceOfFundsAuthoritative": true
+  }
+}

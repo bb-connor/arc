@@ -1,0 +1,56 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44e3be5eef4e6fc533410241a90fc7f90eda7a39ee1bd9a65aab6185c7450026",
+      "parameters": {
+        "record": "retained-material"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a18295-8358-720d-9cf2-cd9ad798d2cc",
+    "content_hash": "afbea3c7febb086c2abf4aa8c28fb24cee7a9e954022780204867a25259ce038",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "94b8dd557dd9a548058617140c99312d3882280ab44fcf564f7332f275ca9593",
+    "metadata": {
+      "admission_operation": "PRIVATE_PARSER_VALUE_CANARY",
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "94b8dd557dd9a548058617140c99312d3882280ab44fcf564f7332f275ca9593",
+        "subject_key": "06b6b084f2c73fa1a7087d2dfccceca383b9068c37570da33f8955af9466a7ac"
+      },
+      "chio_receipt_signing_nonce": "82fbb4b72f77c06e66346bb5d3434264ee04de2b844f922c95c71e486a421258",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "bb60d47726619972a9bbb3048d3430d6e29364f05145032181403f9f29b5ab1d",
+          "approved": true,
+          "approver_key": "94b8dd557dd9a548058617140c99312d3882280ab44fcf564f7332f275ca9593",
+          "token_id": "DURABLE_TRANSIENT_APPROVAL_CANARY-fault-replay"
+        },
+        "intent_hash": "03e32f0d55635ec03813d2bfb914803e697c52251ae1e65f4d72d04979dec183",
+        "intent_id": "intent-fault-replay",
+        "purpose": "retained credential fixture",
+        "server_id": "maintenance-server",
+        "tool_name": "mutate"
+      },
+      "receipt_context": {
+        "request_id": "fault-replay",
+        "request_namespace_digest": "19d96c0f09a88aa1572a66bdd1fa92244949231469987ded5d6de9fa98cc4917"
+      }
+    },
+    "policy_hash": "1fdff74ab29a90ab0bd928c061047b3b92753731159e911677a349682050e166",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793192199,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "maintenance-server",
+    "trust_level": "mediated"
+  },
+  "id": "0e073f888beba966a270227c17f5b0ee50ae834fcc380eb38ca43f2ce1192cba"
+}

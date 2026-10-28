@@ -1,0 +1,54 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "98362e6380a06686053115bc08a2f8bbe0c6f686f60896fadc0f2d781fb470e5",
+      "parameters": {
+        "_313a0": true,
+        "zi00_3": false
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-e9me8s9q90u",
+    "content_hash": "82d2db8731c227809b211dfa79313a9e3d32f80c1d49df7eb5d04ceffd2b2421",
+    "decision": {
+      "guard": "Z1N1TZbhGmNxMB",
+      "reason": "ty+/n6 C)3`) IqdX_m$6vx/{jZ",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "guard_name": "CeSEjicBtkIsGuard",
+        "verdict": false
+      },
+      {
+        "guard_name": "FXknChXQBzsyhcrGuard",
+        "verdict": true
+      },
+      {
+        "details": "X/Zb*8>X?",
+        "guard_name": "FRoxoVgYSavfcmGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-u22f1r694",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1718841763,
+    "tool_name": "y_g____u_",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-rvsaplprxda",
+    "trust_level": "mediated"
+  },
+  "id": "6f226bb7aaabb3732c82c7a2eb90a09338c99da913844c4fc1ab5b904a500a96"
+}

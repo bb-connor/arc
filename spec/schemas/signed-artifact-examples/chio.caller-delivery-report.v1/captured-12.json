@@ -1,0 +1,16 @@
+{
+  "authorization_digest": "a58dc60a1ac75a56a2b53462867bf294e2e9c9214c35f420f080350b8f161e36",
+  "claim_id": "51cdc31b-6abd-422f-9dfa-0a7a55b06d7b",
+  "completed_at_unix_ms": 1800000000000,
+  "execution_started_at_unix_ms": 1800000000000,
+  "executor": {
+    "executor_id": "native-denial-executor",
+    "key_epoch": 7,
+    "public_key": "ddf2e3a56ef34aa6c2b34d3101f97702a2a85a901e5eb16056a38c928c74ea72"
+  },
+  "output": {
+    "secret_raw_output": true
+  },
+  "realized_cost": null,
+  "schema": "chio.caller-delivery-report.v1"
+}

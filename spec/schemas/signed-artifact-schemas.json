@@ -111,7 +111,15 @@
       "artifactKind": "behavioral_feed",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/kernel/behavioral-feed.schema.json",
-      "title": "Chio behavioral feed signed body"
+      "title": "Chio behavioral feed signed body",
+      "overrides": {
+        "/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.budget-snapshot-anchor-commitment.v1",
@@ -209,7 +217,21 @@
       "artifactKind": "credit_exposure_ledger",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/credit/exposure-ledger.schema.json",
-      "title": "Chio credit exposure ledger signed body"
+      "title": "Chio credit exposure ledger signed body",
+      "overrides": {
+        "/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.credit.facility.v1",
@@ -237,14 +259,48 @@
       "artifactKind": "credit_provider_risk_package",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/credit/provider-risk-package.schema.json",
-      "title": "Chio credit provider risk package signed body"
+      "title": "Chio credit provider risk package signed body",
+      "overrides": {
+        "/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.credit.scorecard.v1",
       "artifactKind": "credit_scorecard",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/credit/scorecard.schema.json",
-      "title": "Chio credit scorecard signed body"
+      "title": "Chio credit scorecard signed body",
+      "overrides": {
+        "/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.cross-issuer-migration.v1",
@@ -266,13 +322,6 @@
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/federation/enterprise-migration-transition.schema.json",
       "title": "Chio enterprise migration transition signed body"
-    },
-    {
-      "schema": "chio.evidence-graph.minimal-receipt.v1",
-      "artifactKind": "evidence_graph_minimal_receipt",
-      "introducedBy": "signing-wrapper-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/evidence-graph/minimal-receipt.schema.json",
-      "title": "Chio evidence graph minimal receipt signed body"
     },
     {
       "schema": "chio.evidence_export_commitment.v1",
@@ -343,7 +392,15 @@
       "artifactKind": "federation_reputation_clearing",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/federation/federation-reputation-clearing.schema.json",
-      "title": "Chio federation reputation clearing signed body"
+      "title": "Chio federation reputation clearing signed body",
+      "overrides": {
+        "/rejectedInputIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     {
       "schema": "chio.federation.transport.iroh.peer-directory-bundle.v1",
@@ -357,7 +414,15 @@
       "artifactKind": "financial_agent_passport_presentation_response",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-response.schema.json",
-      "title": "Chio financial agent passport presentation response signed body"
+      "title": "Chio financial agent passport presentation response signed body",
+      "overrides": {
+        "/presentation/membershipProofs/*/proof/audit_path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     {
       "schema": "chio.financial.cross-issuer-entry-activation-decision.v1",
@@ -406,7 +471,15 @@
       "artifactKind": "financial_cross_issuer_lifecycle_result",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-result.schema.json",
-      "title": "Chio financial cross issuer lifecycle result signed body"
+      "title": "Chio financial cross issuer lifecycle result signed body",
+      "overrides": {
+        "/sourceIndexProof/audit_path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     {
       "schema": "chio.finding-pool.store-identity-proof.v1",
@@ -532,7 +605,15 @@
       "artifactKind": "hosted_replication_event",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/finding/hosted-replication-event.schema.json",
-      "title": "Chio finding hosted replication event signed body"
+      "title": "Chio finding hosted replication event signed body",
+      "overrides": {
+        "/payload/evidence_receipt_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     {
       "schema": "chio.finding.hosted-restore-verification.v1",
@@ -588,7 +669,15 @@
       "artifactKind": "finding_worker_attested_result",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/finding/worker-attested-result.schema.json",
-      "title": "Chio finding worker attested result signed body"
+      "title": "Chio finding worker attested result signed body",
+      "overrides": {
+        "/result/diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.finding.worker-capability.v1",
@@ -666,84 +755,552 @@
       "artifactKind": "market_auto_bind",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/auto-bind.schema.json",
-      "title": "Chio market auto bind signed body"
+      "title": "Chio market auto bind signed body",
+      "overrides": {
+        "/authority/body/capitalBook/body/events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/authority/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/authority/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/authority/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.bound-coverage.v1",
       "artifactKind": "market_bound_coverage",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/bound-coverage.schema.json",
-      "title": "Chio market bound coverage signed body"
+      "title": "Chio market bound coverage signed body",
+      "overrides": {
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-adjudication.v1",
       "artifactKind": "market_claim_adjudication",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-adjudication.schema.json",
-      "title": "Chio market claim adjudication signed body"
+      "title": "Chio market claim adjudication signed body",
+      "overrides": {
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/dispute/body/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-dispute.v1",
       "artifactKind": "market_claim_dispute",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-dispute.schema.json",
-      "title": "Chio market claim dispute signed body"
+      "title": "Chio market claim dispute signed body",
+      "overrides": {
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-package.v1",
       "artifactKind": "market_claim_package",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-package.schema.json",
-      "title": "Chio market claim package signed body"
+      "title": "Chio market claim package signed body",
+      "overrides": {
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-payout-instruction.v1",
       "artifactKind": "market_claim_payout_instruction",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-payout-instruction.schema.json",
-      "title": "Chio market claim payout instruction signed body"
+      "title": "Chio market claim payout instruction signed body",
+      "overrides": {
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-payout-receipt.v1",
       "artifactKind": "market_claim_payout_receipt",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-payout-receipt.schema.json",
-      "title": "Chio market claim payout receipt signed body"
+      "title": "Chio market claim payout receipt signed body",
+      "overrides": {
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-response.v1",
       "artifactKind": "market_claim_response",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-response.schema.json",
-      "title": "Chio market claim response signed body"
+      "title": "Chio market claim response signed body",
+      "overrides": {
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-settlement-instruction.v1",
       "artifactKind": "market_claim_settlement_instruction",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-settlement-instruction.schema.json",
-      "title": "Chio market claim settlement instruction signed body"
+      "title": "Chio market claim settlement instruction signed body",
+      "overrides": {
+        "/capitalBook/body/events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.claim-settlement-receipt.v1",
       "artifactKind": "market_claim_settlement_receipt",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/claim-settlement-receipt.schema.json",
-      "title": "Chio market claim settlement receipt signed body"
+      "title": "Chio market claim settlement receipt signed body",
+      "overrides": {
+        "/settlementInstruction/body/capitalBook/body/events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/boundCoverage/body/placement/body/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/adjudication/body/dispute/body/providerResponse/body/claim/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/settlementInstruction/body/payoutReceipt/body/payoutInstruction/body/capitalInstruction/body/authorityChain": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.placement.v1",
       "artifactKind": "market_placement",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/placement.schema.json",
-      "title": "Chio market placement signed body"
+      "title": "Chio market placement signed body",
+      "overrides": {
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteResponse/body/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.pricing-authority.v1",
       "artifactKind": "market_pricing_authority",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/pricing-authority.schema.json",
-      "title": "Chio market pricing authority signed body"
+      "title": "Chio market pricing authority signed body",
+      "overrides": {
+        "/capitalBook/body/events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.provider.v1",
@@ -757,14 +1314,66 @@
       "artifactKind": "market_quote_request",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/quote-request.schema.json",
-      "title": "Chio market quote request signed body"
+      "title": "Chio market quote request signed body",
+      "overrides": {
+        "/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.market.quote-response.v1",
       "artifactKind": "market_quote_response",
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/market/quote-response.schema.json",
-      "title": "Chio market quote response signed body"
+      "title": "Chio market quote response signed body",
+      "overrides": {
+        "/quoteRequest/body/riskPackage/body/exposure/body/decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/exposure/body/receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/recentLossHistory/entries": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
     },
     {
       "schema": "chio.marketplace.accepted-bid.v1",
@@ -906,13 +1515,6 @@
       "introducedBy": "signing-wrapper-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/process/swarm-profile.schema.json",
       "title": "Chio process swarm profile signed body"
-    },
-    {
-      "schema": "chio.proof-room.receipt-projection.v1",
-      "artifactKind": "proof_room_receipt_projection",
-      "introducedBy": "signing-wrapper-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/proof-room/receipt-projection.schema.json",
-      "title": "Chio proof room receipt projection signed body"
     },
     {
       "schema": "chio.provenance-stamp.v1",
@@ -1195,13 +1797,6 @@
       "title": "Chio trace observation signed body"
     },
     {
-      "schema": "chio.trust.passport-revocation-root.v1",
-      "artifactKind": "trust_passport_revocation_root",
-      "introducedBy": "signing-wrapper-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/trust/passport-revocation-root.schema.json",
-      "title": "Chio trust passport revocation root signed body"
-    },
-    {
       "schema": "chio.underwriting.decision.v1",
       "artifactKind": "underwriting_decision",
       "introducedBy": "signing-wrapper-v1",
@@ -1258,5 +1853,52 @@
       "title": "Chio workflow receipt signed body"
     }
   ],
-  "secretShapedMembers": {}
+  "secretShapedMembers": {
+    "chio.caller-delivery-report.v1": [
+      "/output/private_result",
+      "/output/secret_raw_output"
+    ],
+    "chio.declassification-grant.v1": [
+      "/output/private_result",
+      "/subject/lineage_seed"
+    ],
+    "chio.econsim.qualification-matrix.v1": [
+      "/cases/*/seed"
+    ],
+    "chio.finding.audit-epoch.v1": [
+      "/seed_commitment",
+      "/seed_witness",
+      "/seed_witness_signature",
+      "/seed_witnessed_at"
+    ],
+    "chio.finding.audit-report.v1": [
+      "/revealed_seed"
+    ],
+    "chio.finding.audit-seed-witness.v1": [
+      "/seed_commitment",
+      "/seed_witnessed_at"
+    ],
+    "chio.mcp.cage-launch-policy.v1": [
+      "/receipt/signer_seed_path"
+    ],
+    "chio.receipt.v1": [
+      "/body/action/parameters/fixture_secret",
+      "/body/action/parameters/private",
+      "/body/action/parameters/private_argument",
+      "/body/action/parameters/secret",
+      "/body/action/parameters/seed",
+      "/body/metadata/active_defense_body/body/lineage_seed",
+      "/body/metadata/billing_fixture/cost_breakdown/private",
+      "/body/metadata/financial/cost_breakdown/private",
+      "/body/metadata/private",
+      "/body/metadata/secret",
+      "/body/metadata/security_event_projection/body/subject/lineage_seed"
+    ],
+    "chio.runtime.chaos-run-report-signature.v1": [
+      "/deterministicSeedDigest"
+    ],
+    "chio.signed-security-event.v1": [
+      "/subject/lineage_seed"
+    ]
+  }
 }

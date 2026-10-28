@@ -1,0 +1,124 @@
+{
+  "enterprise_migration": {
+    "deployment_id": "production.test",
+    "head": {
+      "key": {
+        "control": "cage_enforcement",
+        "deployment_id": "production.test",
+        "scope_id": "cage-policy-test",
+        "scope_kind": "tool_server"
+      },
+      "transition_digest": [
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119,
+        119
+      ]
+    },
+    "state_database_path": "/operator/enterprise-migration.sqlite3",
+    "trusted_transition_signers": [
+      "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b"
+    ]
+  },
+  "limits": {
+    "launch_timeout_ms": 10000,
+    "max_artifact_bytes": 1048576,
+    "nofile_hard": 192,
+    "nofile_soft": 192
+  },
+  "operator_ceilings": {
+    "environment_variables": [],
+    "forbidden_paths": [
+      "/another-path"
+    ],
+    "native_syscall_profiles": [
+      "native_minimal_v1"
+    ],
+    "network_destinations": [],
+    "read_paths": [],
+    "write_paths": []
+  },
+  "receipt": {
+    "capability_id": "cage-launch-capability",
+    "database_path": "/operator/cage-receipts.sqlite3",
+    "signer_seed_path": "/operator/cage-receipt-seed",
+    "tenant_id": "tenant-test",
+    "trusted_signer_public_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b"
+  },
+  "registered_public_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+  "runtime": {
+    "cage_init_binding_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "cage_init_path": "/operator/chio-cage-init",
+    "execution_identity": {
+      "gid": 10001,
+      "supplementary_gids": [],
+      "uid": 10001
+    },
+    "runtime_files": [],
+    "target_argv": [
+      "/operator/mcp-server"
+    ],
+    "target_binding_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "target_path": "/operator/mcp-server",
+    "working_directory": "/operator/workdir"
+  },
+  "schema": "chio.mcp.cage-launch-policy.v1",
+  "signed_manifest": {
+    "manifest": {
+      "name": "Cage policy test",
+      "public_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+      "required_permissions": {
+        "native_syscall_profile": "native_minimal_v1"
+      },
+      "schema": "chio.manifest.v1",
+      "server_id": "cage-policy-test",
+      "tools": [
+        {
+          "annotations": {
+            "destructive": false,
+            "idempotent": true,
+            "read_only": true,
+            "requires_approval": false
+          },
+          "description": "Echo",
+          "input_schema": {
+            "type": "object"
+          },
+          "latency_hint": "fast",
+          "name": "echo"
+        }
+      ],
+      "version": "1"
+    },
+    "signature": "3e9c5a0e6db105abce5adeb4d772a5c17db3371ee1bf3bdf2b46ea28452b16bbf074eeb892289438315e1380869945deb30ee099705e9380a59b13812b7ae80e",
+    "signer_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b"
+  }
+}

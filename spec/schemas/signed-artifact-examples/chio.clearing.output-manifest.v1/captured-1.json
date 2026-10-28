@@ -1,0 +1,10 @@
+{
+  "atomTransformationCount": 2,
+  "atomTransformationRoot": "abbf1b33dcf05ccc4e53862164e9361babbbaf0170c9bdb5c786ecaf88dea53f",
+  "participantStatementCount": 3,
+  "participantStatementRoot": "4ef4e645691992aa52a11391548afc049e2701a7eaab6874b6abf052f2732ab8",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "schema": "chio.clearing.output-manifest.v1",
+  "settlementIntentCount": 1,
+  "settlementIntentRoot": "a4e5d285aad31b52b5f573886ea02ac3cacfc8d94718d272a92827fff1365cc5"
+}

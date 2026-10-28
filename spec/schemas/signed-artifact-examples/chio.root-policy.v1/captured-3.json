@@ -1,0 +1,48 @@
+{
+  "disclosure": {
+    "default": "committed"
+  },
+  "exchange_keys": [
+    "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+  ],
+  "policy_id": "rp_acme_prod",
+  "policy_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "rules": [
+    {
+      "capability_ttl_secs": 300,
+      "ceiling_scope": {
+        "grants": [
+          {
+            "operations": [
+              "invoke"
+            ],
+            "server_id": "crm",
+            "tool_name": "search"
+          }
+        ],
+        "resource_grants": [
+          {
+            "operations": [
+              "read"
+            ],
+            "uri_pattern": "crm://records/*"
+          }
+        ]
+      },
+      "ceiling_scope_hash": "sha256:7f6e4f0b6fe0ddd0b2ee8246f572b660839856793e4571f8b137a74678675c26",
+      "holder_classes": [
+        "edge_session",
+        "caller"
+      ],
+      "match": {
+        "anchor_kind": "chio_operator_key"
+      },
+      "max_clock_skew_secs": 30,
+      "recorded_claims": {},
+      "rule_id": "operator-roots"
+    }
+  ],
+  "schema": "chio.root-policy.v1",
+  "valid_from": 1792233800,
+  "valid_until": 1792334800
+}

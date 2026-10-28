@@ -1,0 +1,32 @@
+{
+  "agentId": "41c6d937e8f09be0ad00976ec2a44d791a8fed3d8f2c7d2861f72e3a9569719c",
+  "authContext": {
+    "method": {
+      "audience": "chio-mcp",
+      "federatedClaims": {
+        "tenantId": "tenant-fed"
+      },
+      "issuer": "https://issuer.example",
+      "kind": "o_auth_bearer",
+      "principal": "oidc:https://issuer.example#sub:user-Z",
+      "scopes": [
+        "mcp:invoke"
+      ],
+      "subject": "user-Z",
+      "token_fingerprint": "fp-Z"
+    },
+    "origin": "https://app.example",
+    "transport": "streamable_http"
+  },
+  "authContextHash": "23f82870df8ef3c4d303da0e9b9912af3b81cb849f8e43a0e9a76cdad527c81a",
+  "authEpoch": 1,
+  "authMethodHash": "085d9b1110c9d20fe6a9241919694525832f771452ad87444d85e8ab5f7a9c0b",
+  "id": "sess-BE_TeJ-fX9uy8jK6HvkAHg:anchor:1:23f82870df8e",
+  "issuedAt": 1793195368,
+  "kernelKey": "af1991a406e44615346d40c14162dcb4edae4af2f0afb40ef0c3143dac264798",
+  "proofBinding": {
+    "tokenFingerprint": "fp-Z"
+  },
+  "schema": "chio.session_anchor.v1",
+  "sessionId": "sess-BE_TeJ-fX9uy8jK6HvkAHg"
+}

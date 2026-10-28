@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/scorecard.schema.json",
+  "title": "Chio credit scorecard signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dimensions",
+    "filters",
+    "generatedAt",
+    "positions",
+    "probation",
+    "reputation",
+    "schema",
+    "summary",
+    "supportBoundary"
+  ],
+  "properties": {
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agentSubject",
+        "decisionLimit",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "decisionLimit": {
+          "type": "integer"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "activeQuotedPremiumUnits",
+          "currency",
+          "failedUnits",
+          "governedMaxExposureUnits",
+          "pendingUnits",
+          "provisionalLossUnits",
+          "quotedPremiumUnits",
+          "recoveredUnits",
+          "reservedUnits",
+          "settledUnits"
+        ],
+        "properties": {
+          "activeQuotedPremiumUnits": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "failedUnits": {
+            "type": "integer"
+          },
+          "governedMaxExposureUnits": {
+            "type": "integer"
+          },
+          "pendingUnits": {
+            "type": "integer"
+          },
+          "provisionalLossUnits": {
+            "type": "integer"
+          },
+          "quotedPremiumUnits": {
+            "type": "integer"
+          },
+          "recoveredUnits": {
+            "type": "integer"
+          },
+          "reservedUnits": {
+            "type": "integer"
+          },
+          "settledUnits": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "probation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probationary",
+        "receiptCount",
+        "spanDays",
+        "targetReceiptCount",
+        "targetSpanDays"
+      ],
+      "properties": {
+        "probationary": {
+          "type": "boolean"
+        },
+        "receiptCount": {
+          "type": "integer"
+        },
+        "spanDays": {
+          "type": "integer"
+        },
+        "targetReceiptCount": {
+          "type": "integer"
+        },
+        "targetSpanDays": {
+          "type": "integer"
+        }
+      }
+    },
+    "reputation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptedImportedSignalCount",
+        "effectiveScore",
+        "importedSignalCount",
+        "probationary"
+      ],
+      "properties": {
+        "acceptedImportedSignalCount": {
+          "type": "integer"
+        },
+        "effectiveScore": {
+          "type": "number"
+        },
+        "importedSignalCount": {
+          "type": "integer"
+        },
+        "probationary": {
+          "type": "boolean"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.credit.scorecard.v1"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anomalyCount",
+        "band",
+        "confidence",
+        "currencies",
+        "matchingDecisions",
+        "matchingReceipts",
+        "mixedCurrencyBook",
+        "overallScore",
+        "probationary",
+        "returnedDecisions",
+        "returnedReceipts"
+      ],
+      "properties": {
+        "anomalyCount": {
+          "type": "integer"
+        },
+        "band": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "matchingDecisions": {
+          "type": "integer"
+        },
+        "matchingReceipts": {
+          "type": "integer"
+        },
+        "mixedCurrencyBook": {
+          "type": "boolean"
+        },
+        "overallScore": {
+          "type": "number"
+        },
+        "probationary": {
+          "type": "boolean"
+        },
+        "returnedDecisions": {
+          "type": "integer"
+        },
+        "returnedReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "supportBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capitalAllocationSupported",
+        "crossCurrencyNettingSupported",
+        "facilityPolicySupported",
+        "subjectScopedOnly"
+      ],
+      "properties": {
+        "capitalAllocationSupported": {
+          "type": "boolean"
+        },
+        "crossCurrencyNettingSupported": {
+          "type": "boolean"
+        },
+        "facilityPolicySupported": {
+          "type": "boolean"
+        },
+        "subjectScopedOnly": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

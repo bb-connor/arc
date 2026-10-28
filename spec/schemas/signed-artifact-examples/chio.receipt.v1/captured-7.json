@@ -1,0 +1,29 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "06313eaa8b5c72a3a848e060a8de740851187fcdb0801fd697154d55c635ea88",
+      "parameters": {
+        "release": "candidate-1"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-export-1",
+    "content_hash": "content-export-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-export-1"
+    },
+    "policy_hash": "policy-export-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1775137626,
+    "tool_name": "publish",
+    "tool_origin": "caller_executed",
+    "tool_server": "export",
+    "trust_level": "mediated"
+  },
+  "id": "6d58fb288f8fbe69de15f00eeb8a1dbe78707a8e3dcb64e10b5c817893f9de1b"
+}

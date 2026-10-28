@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "777fb02c5f507b25ad6662ab1fbd76bb124d5293a0490d43af066e1a032cb60d",
+      "parameters": {
+        "Cookie": "ordinary=value; session=synthetic-tripwire-marker; other=value"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182e7-3950-79b2-ae65-f3ac29cca66a",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"chio-tripwire-pre-invocation\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "{\"artifact_id_hash\":[61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61],\"artifact_version_hash\":[62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62],\"event_persistence\":\"inserted\",\"kind\":\"browser_cookie\",\"receipt_persistence\":\"appended\"}",
+        "guard_name": "chio-tripwire-pre-invocation",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "97311b5cac041f852f5cd32342130c92f6549f9ff6acb837f56679c2ff60faa2",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "97311b5cac041f852f5cd32342130c92f6549f9ff6acb837f56679c2ff60faa2",
+        "subject_key": "e80eae34ee42a27443e1416dc15a76be73f8bb7caa62ee391ae1d4712d0afb95"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e7-3b66-7893-94ee-423d58360a42",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "kernel-request-a",
+        "request_namespace_digest": "2586dd32b7b543025bc3934e9f4e99fb10ba65e3cc5f333ad83c44d2070413b5"
+      }
+    },
+    "policy_hash": "policy-a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793197554,
+    "tool_name": "tool-a",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "9f96c32e6796f0a22009f1789d052bc787d946b805273f61761869b5803070cd"
+}

@@ -1,0 +1,34 @@
+{
+  "discovery_authority_ref": "did:chio:market-curator",
+  "freshness_window": {
+    "valid_from": "2026-06-09T00:00:00Z",
+    "valid_until": "2026-06-11T00:00:00Z"
+  },
+  "id": "discovery-trust-market-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "market_scope": "bounded-autonomous-commerce",
+  "order_id": "order-commerce-001",
+  "order_intent_ref": "intent-commerce-001",
+  "passport_id": "passport-trust-market-valid",
+  "provider_candidates": [
+    {
+      "availability_ref": "availability-alpha",
+      "excluded": false,
+      "jurisdiction_ref": "jurisdiction-trust-market-valid",
+      "pricing_surface_ref": "pricing-alpha",
+      "provider_passport_ref": "provider-passport-alpha",
+      "service_manifest_ref": "service-manifest-alpha",
+      "subject": "did:chio:provider-alpha"
+    },
+    {
+      "availability_ref": "availability-beta",
+      "excluded": false,
+      "jurisdiction_ref": "jurisdiction-trust-market-valid",
+      "pricing_surface_ref": "pricing-beta",
+      "provider_passport_ref": "provider-passport-beta",
+      "service_manifest_ref": "service-manifest-beta",
+      "subject": "did:chio:provider-beta"
+    }
+  ],
+  "schema": "chio.commerce.provider-discovery-snapshot.v1"
+}

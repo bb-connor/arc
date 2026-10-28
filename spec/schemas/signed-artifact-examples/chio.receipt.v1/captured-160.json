@@ -1,0 +1,73 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "2e4c25ffee23d189dfa70c99e785c9e25ca5aafefc71b1a3a1770bd8494d0b4b",
+      "parameters": {
+        "score": 0.5
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-test-srv-read_file",
+    "content_hash": "2e4c25ffee23d189dfa70c99e785c9e25ca5aafefc71b1a3a1770bd8494d0b4b",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "35eccc1348aa64b17bca355bd68a58a345c02070782faaf24a6cb88c407ef2c8",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "35eccc1348aa64b17bca355bd68a58a345c02070782faaf24a6cb88c407ef2c8",
+        "subject_key": "620dcb864ef2ff100ca04a54088d2e8b670c5b0d4fe9f6cc91c8130598cf3287"
+      },
+      "chio_manifest_security_v1": {
+        "effective_egress": false,
+        "flow": null,
+        "manifest_digest": "da0ad32e358dd26fda838d96bef78b40825051a52333f394ceecea7db4be63b4",
+        "server_id": "test-srv",
+        "tool_name": "read_file"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-4d8a-7d40-9204-250c131475f8",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a18243-4d7e-76e0-bcd2-4640c6344f36",
+        "request_id": "acp-read_file-acp-task-1",
+        "request_namespace_digest": "4febd7702f9213db08cf09696f7c70a8484a6e0d2bd541a425cf583c9f321899"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "acp",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "6babcb10fc8b3a0e68efc0fa294c97a72208ac153e851a1644534f30b0b7e64f",
+        "selectedProtocols": [
+          "acp",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "acp"
+      }
+    },
+    "policy_hash": "policy-acp-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186811,
+    "tool_name": "read_file",
+    "tool_origin": "caller_executed",
+    "tool_server": "test-srv",
+    "trust_level": "mediated"
+  },
+  "id": "54cd7c8120d1df60471f3a4c084745a3a764dc6f4e88a1872aad53fc7778ac92"
+}

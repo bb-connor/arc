@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/portable-negative-event.schema.json",
+  "title": "Chio portable negative event signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "evidenceRefs",
+    "expiresAt",
+    "issuerOperatorId",
+    "kind",
+    "observedAt",
+    "publishedAt",
+    "schema",
+    "severity",
+    "subjectKey"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "referenceId",
+          "uri"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "uri": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuerOperatorId": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "observedAt": {
+      "type": "integer"
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.portable-negative-event.v1"
+    },
+    "severity": {
+      "type": "number"
+    },
+    "subjectKey": {
+      "type": "string"
+    }
+  }
+}

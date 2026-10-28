@@ -1,0 +1,10 @@
+{
+  "createdAt": 10,
+  "expiresAt": 20,
+  "issuer": "issuer-a",
+  "partner": "partner-b",
+  "query": {},
+  "requireProofs": false,
+  "schema": "chio.federation-policy.v1",
+  "signerPublicKey": "a4b40130ecf3fd9b24ba05c2aa9d9c8c95de9d2d037a0e4531e376be14a5a63b"
+}

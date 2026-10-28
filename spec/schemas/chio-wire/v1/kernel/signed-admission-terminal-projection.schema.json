@@ -1,0 +1,890 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/signed-admission-terminal-projection.schema.json",
+  "title": "Chio signed admission terminal projection signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorization_consumption",
+    "context",
+    "manifest_json",
+    "observer",
+    "projection_json",
+    "records",
+    "schema",
+    "signer_key",
+    "source_operation",
+    "terminal_operation"
+  ],
+  "properties": {
+    "authorization_consumption": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authorizationReceiptId",
+            "consumedAtUnixMs",
+            "consumerReceiptId",
+            "parameterHash",
+            "requestId",
+            "sessionId",
+            "toolCallId"
+          ],
+          "properties": {
+            "authorizationReceiptId": {
+              "type": "string"
+            },
+            "consumedAtUnixMs": {
+              "type": "integer"
+            },
+            "consumerReceiptId": {
+              "type": "string"
+            },
+            "parameterHash": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "tenantId": {
+              "type": "string"
+            },
+            "toolCallId": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinator_lease_epoch",
+        "coordinator_lease_id",
+        "expected_operation_version",
+        "operation_id",
+        "request_id",
+        "store_fence",
+        "trusted_time_unix_ms"
+      ],
+      "properties": {
+        "coordinator_lease_epoch": {
+          "type": "integer"
+        },
+        "coordinator_lease_id": {
+          "type": "string"
+        },
+        "expected_operation_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "store_fence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lease_id",
+            "owner_epoch",
+            "store_uuid"
+          ],
+          "properties": {
+            "lease_id": {
+              "type": "string"
+            },
+            "owner_epoch": {
+              "type": "integer"
+            },
+            "store_uuid": {
+              "type": "string"
+            }
+          }
+        },
+        "trusted_time_unix_ms": {
+          "type": "integer"
+        }
+      }
+    },
+    "manifest_json": {
+      "type": "string"
+    },
+    "observer": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pending",
+            "receipt_id"
+          ],
+          "properties": {
+            "pending": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "next_visible_at_ms"
+              ],
+              "properties": {
+                "next_visible_at_ms": {
+                  "type": "integer"
+                }
+              }
+            },
+            "receipt_id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "projection_json": {
+      "type": "string"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canonical_json",
+          "kind",
+          "record_digest",
+          "record_id"
+        ],
+        "properties": {
+          "canonical_json": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "record_digest": {
+            "type": "string"
+          },
+          "record_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.signed-admission-terminal-projection.v1"
+    },
+    "signer_key": {
+      "type": "string"
+    },
+    "source_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attachments",
+        "binding",
+        "coordinator_lease_epoch",
+        "dispatch_commit",
+        "dispatch_state",
+        "last_error",
+        "schema",
+        "state",
+        "terminal_replay",
+        "version"
+      ],
+      "properties": {
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ApprovalSetHash": {
+                "type": "string"
+              },
+              "BrokerAttempt": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attempt_id",
+                  "operation_id",
+                  "transport_id",
+                  "transport_key_epoch"
+                ],
+                "properties": {
+                  "attempt_id": {
+                    "type": "string"
+                  },
+                  "operation_id": {
+                    "type": "string"
+                  },
+                  "transport_id": {
+                    "type": "string"
+                  },
+                  "transport_key_epoch": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "BudgetHoldId": {
+                "type": "string"
+              },
+              "ChannelReservationDigest": {
+                "type": "string"
+              },
+              "ChannelReservationProposalDigest": {
+                "type": "string"
+              },
+              "ExecutionNonceId": {
+                "type": "string"
+              },
+              "ExecutionNonceIssuanceDigest": {
+                "type": "string"
+              },
+              "ExecutionNoncePreflightDigest": {
+                "type": "string"
+              },
+              "PaymentParticipantId": {
+                "type": "string"
+              },
+              "SupplementalAuthorizationDigest": {
+                "type": "string"
+              },
+              "ThresholdProposalHash": {
+                "type": "string"
+              },
+              "ToolOutcomeId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authenticated_tenant_id",
+            "authorization_capability_hash",
+            "capability_id",
+            "coordinator_authority_id",
+            "effect_class",
+            "kind",
+            "operation_id",
+            "policy_hash",
+            "request_binding",
+            "request_id",
+            "request_namespace_digest"
+          ],
+          "properties": {
+            "authenticated_tenant_id": {
+              "type": "string"
+            },
+            "authorization_capability_hash": {
+              "type": "string"
+            },
+            "capability_id": {
+              "type": "string"
+            },
+            "coordinator_authority_id": {
+              "type": "string"
+            },
+            "effect_class": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "operation_id": {
+              "type": "string"
+            },
+            "policy_hash": {
+              "type": "string"
+            },
+            "request_binding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action_parameter_hash",
+                "immutable_request_hash",
+                "participant_requirements",
+                "request_binding_hash"
+              ],
+              "properties": {
+                "action_parameter_hash": {
+                  "type": "string"
+                },
+                "immutable_request_hash": {
+                  "type": "string"
+                },
+                "participant_requirements": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "approval",
+                    "authorization_consumption",
+                    "broker_attempt",
+                    "budget_capture",
+                    "execution_nonce",
+                    "obligation",
+                    "observation_attempt_zero",
+                    "outcome_eligibility",
+                    "payment"
+                  ],
+                  "properties": {
+                    "approval": {
+                      "type": "boolean"
+                    },
+                    "authorization_consumption": {
+                      "type": "boolean"
+                    },
+                    "broker_attempt": {
+                      "type": "boolean"
+                    },
+                    "budget_capture": {
+                      "type": "boolean"
+                    },
+                    "channel": {
+                      "type": "boolean"
+                    },
+                    "execution_nonce": {
+                      "type": "boolean"
+                    },
+                    "obligation": {
+                      "type": "boolean"
+                    },
+                    "observation_attempt_zero": {
+                      "type": "boolean"
+                    },
+                    "outcome_eligibility": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "type": "boolean"
+                    },
+                    "supplemental_authorization": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "request_binding_hash": {
+                  "type": "string"
+                }
+              }
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "request_namespace_digest": {
+              "type": "string"
+            }
+          }
+        },
+        "coordinator_lease_epoch": {
+          "type": "integer"
+        },
+        "dispatch_commit": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "committed_version",
+                "coordinator_lease_epoch",
+                "coordinator_lease_id",
+                "dispatch_launch",
+                "provider_attempt",
+                "store_fence"
+              ],
+              "properties": {
+                "committed_version": {
+                  "type": "integer"
+                },
+                "coordinator_lease_epoch": {
+                  "type": "integer"
+                },
+                "coordinator_lease_id": {
+                  "type": "string"
+                },
+                "dispatch_launch": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "native_launch",
+                    "worker_profile"
+                  ],
+                  "properties": {
+                    "native_launch": {
+                      "type": "null"
+                    },
+                    "worker_profile": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "provider_attempt": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "attempt_id",
+                        "operation_id",
+                        "transport_id",
+                        "transport_key_epoch"
+                      ],
+                      "properties": {
+                        "attempt_id": {
+                          "type": "string"
+                        },
+                        "operation_id": {
+                          "type": "string"
+                        },
+                        "transport_id": {
+                          "type": "string"
+                        },
+                        "transport_key_epoch": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "store_fence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lease_id",
+                    "owner_epoch",
+                    "store_uuid"
+                  ],
+                  "properties": {
+                    "lease_id": {
+                      "type": "string"
+                    },
+                    "owner_epoch": {
+                      "type": "integer"
+                    },
+                    "store_uuid": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "dispatch_state": {
+          "type": "string"
+        },
+        "last_error": {
+          "type": "null"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "terminal_replay": {
+          "type": "null"
+        },
+        "version": {
+          "type": "integer"
+        }
+      }
+    },
+    "terminal_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attachments",
+        "binding",
+        "coordinator_lease_epoch",
+        "dispatch_commit",
+        "dispatch_state",
+        "last_error",
+        "schema",
+        "state",
+        "terminal_replay",
+        "version"
+      ],
+      "properties": {
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ApprovalSetHash": {
+                "type": "string"
+              },
+              "BrokerAttempt": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attempt_id",
+                  "operation_id",
+                  "transport_id",
+                  "transport_key_epoch"
+                ],
+                "properties": {
+                  "attempt_id": {
+                    "type": "string"
+                  },
+                  "operation_id": {
+                    "type": "string"
+                  },
+                  "transport_id": {
+                    "type": "string"
+                  },
+                  "transport_key_epoch": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "BudgetHoldId": {
+                "type": "string"
+              },
+              "ChannelReservationDigest": {
+                "type": "string"
+              },
+              "ChannelReservationProposalDigest": {
+                "type": "string"
+              },
+              "ExecutionNonceId": {
+                "type": "string"
+              },
+              "ExecutionNonceIssuanceDigest": {
+                "type": "string"
+              },
+              "ExecutionNoncePreflightDigest": {
+                "type": "string"
+              },
+              "PaymentParticipantId": {
+                "type": "string"
+              },
+              "SupplementalAuthorizationDigest": {
+                "type": "string"
+              },
+              "ThresholdProposalHash": {
+                "type": "string"
+              },
+              "ToolOutcomeId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authenticated_tenant_id",
+            "authorization_capability_hash",
+            "capability_id",
+            "coordinator_authority_id",
+            "effect_class",
+            "kind",
+            "operation_id",
+            "policy_hash",
+            "request_binding",
+            "request_id",
+            "request_namespace_digest"
+          ],
+          "properties": {
+            "authenticated_tenant_id": {
+              "type": "string"
+            },
+            "authorization_capability_hash": {
+              "type": "string"
+            },
+            "capability_id": {
+              "type": "string"
+            },
+            "coordinator_authority_id": {
+              "type": "string"
+            },
+            "effect_class": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "operation_id": {
+              "type": "string"
+            },
+            "policy_hash": {
+              "type": "string"
+            },
+            "request_binding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action_parameter_hash",
+                "immutable_request_hash",
+                "participant_requirements",
+                "request_binding_hash"
+              ],
+              "properties": {
+                "action_parameter_hash": {
+                  "type": "string"
+                },
+                "immutable_request_hash": {
+                  "type": "string"
+                },
+                "participant_requirements": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "approval",
+                    "authorization_consumption",
+                    "broker_attempt",
+                    "budget_capture",
+                    "execution_nonce",
+                    "obligation",
+                    "observation_attempt_zero",
+                    "outcome_eligibility",
+                    "payment"
+                  ],
+                  "properties": {
+                    "approval": {
+                      "type": "boolean"
+                    },
+                    "authorization_consumption": {
+                      "type": "boolean"
+                    },
+                    "broker_attempt": {
+                      "type": "boolean"
+                    },
+                    "budget_capture": {
+                      "type": "boolean"
+                    },
+                    "channel": {
+                      "type": "boolean"
+                    },
+                    "execution_nonce": {
+                      "type": "boolean"
+                    },
+                    "obligation": {
+                      "type": "boolean"
+                    },
+                    "observation_attempt_zero": {
+                      "type": "boolean"
+                    },
+                    "outcome_eligibility": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "type": "boolean"
+                    },
+                    "supplemental_authorization": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "request_binding_hash": {
+                  "type": "string"
+                }
+              }
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "request_namespace_digest": {
+              "type": "string"
+            }
+          }
+        },
+        "coordinator_lease_epoch": {
+          "type": "integer"
+        },
+        "dispatch_commit": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "committed_version",
+                "coordinator_lease_epoch",
+                "coordinator_lease_id",
+                "dispatch_launch",
+                "provider_attempt",
+                "store_fence"
+              ],
+              "properties": {
+                "committed_version": {
+                  "type": "integer"
+                },
+                "coordinator_lease_epoch": {
+                  "type": "integer"
+                },
+                "coordinator_lease_id": {
+                  "type": "string"
+                },
+                "dispatch_launch": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "native_launch",
+                    "worker_profile"
+                  ],
+                  "properties": {
+                    "native_launch": {
+                      "type": "null"
+                    },
+                    "worker_profile": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "provider_attempt": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "attempt_id",
+                        "operation_id",
+                        "transport_id",
+                        "transport_key_epoch"
+                      ],
+                      "properties": {
+                        "attempt_id": {
+                          "type": "string"
+                        },
+                        "operation_id": {
+                          "type": "string"
+                        },
+                        "transport_id": {
+                          "type": "string"
+                        },
+                        "transport_key_epoch": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "store_fence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lease_id",
+                    "owner_epoch",
+                    "store_uuid"
+                  ],
+                  "properties": {
+                    "lease_id": {
+                      "type": "string"
+                    },
+                    "owner_epoch": {
+                      "type": "integer"
+                    },
+                    "store_uuid": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "dispatch_state": {
+          "type": "string"
+        },
+        "last_error": {
+          "type": "null"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "terminal_replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "economic_mutation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "projection_digest",
+                "result_digest",
+                "result_id"
+              ],
+              "properties": {
+                "projection_digest": {
+                  "type": "string"
+                },
+                "result_digest": {
+                  "type": "string"
+                },
+                "result_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "incident": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "incident_id",
+                "projection_digest"
+              ],
+              "properties": {
+                "incident_id": {
+                  "type": "string"
+                },
+                "projection_digest": {
+                  "type": "string"
+                }
+              }
+            },
+            "receipt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "projection_digest",
+                "receipt_id"
+              ],
+              "properties": {
+                "projection_digest": {
+                  "type": "string"
+                },
+                "receipt_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "version": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

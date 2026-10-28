@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-migration.schema.json",
+  "title": "Chio financial cross issuer migration signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attesterId",
+    "continuityRef",
+    "expiresAt",
+    "fromIssuer",
+    "fromSubject",
+    "issuedAt",
+    "migrationDigest",
+    "migrationId",
+    "priorSourcePassportIds",
+    "reason",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "toIssuer",
+    "toSubject"
+  ],
+  "properties": {
+    "attesterId": {
+      "type": "string"
+    },
+    "continuityRef": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "fromIssuer": {
+      "type": "string"
+    },
+    "fromSubject": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "migrationDigest": {
+      "type": "string"
+    },
+    "migrationId": {
+      "type": "string"
+    },
+    "priorSourcePassportIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer-migration.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "toIssuer": {
+      "type": "string"
+    },
+    "toSubject": {
+      "type": "string"
+    }
+  }
+}

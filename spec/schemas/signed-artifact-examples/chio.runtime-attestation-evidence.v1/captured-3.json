@@ -1,0 +1,17 @@
+{
+  "claims": {
+    "awsNitro": {
+      "digest": "sha384:nitro-measurement",
+      "moduleId": "nitro-enclave-1",
+      "pcrs": {
+        "0": "0123"
+      }
+    }
+  },
+  "evidence_sha256": "nitro-digest-1",
+  "expires_at": 200,
+  "issued_at": 100,
+  "schema": "chio.runtime-attestation.aws-nitro-attestation.v1",
+  "tier": "attested",
+  "verifier": "https://nitro.aws.example/"
+}

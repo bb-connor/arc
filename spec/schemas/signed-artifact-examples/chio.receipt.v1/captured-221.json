@@ -1,0 +1,39 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "4fa38892b2752a3c806d0718ed406a2549f23f1c51fc6c372951624a5e4d8210",
+      "parameters": {
+        "_6__j8_0": true,
+        "_t": "F`v~r",
+        "y_z_o_v": true
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-x",
+    "content_hash": "9e19667ec5ad721072ec5892b4d62723dbc005b48fd4bcacace261495cc8b3aa",
+    "decision": {
+      "reason": ">AiHC~H.Lh`@{H*[G%&'^[<5_1;",
+      "verdict": "cancelled"
+    },
+    "kernel_key": "4ed32f63bf35f0eeefcb25f28a2e1fbdc873ae2835671b0c9460f5f12e4556a8",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-o0626968z6u3qm",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1785921473,
+    "tool_name": "y__tfcn",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-lghugxosk",
+    "trust_level": "mediated"
+  },
+  "id": "818537f6eee35e66c37a5c5bd6ec75bc8f98a6dcb504d6d811f6a85d8416d040"
+}

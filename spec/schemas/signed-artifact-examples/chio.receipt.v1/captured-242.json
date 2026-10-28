@@ -1,0 +1,31 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "a21227366773e11aeea85095882c1b30e95dc1fc724fa4b072b3d48e1ede9710",
+      "parameters": {
+        "different_action": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "bundle-capability",
+    "content_hash": "bundle-content",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+    "metadata": {
+      "receipt_context": {
+        "session_id": "bundle-session"
+      }
+    },
+    "policy_hash": "bundle-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 101,
+    "tool_name": "fs/read_text_file",
+    "tool_origin": "caller_executed",
+    "tool_server": "acp-proxy",
+    "trust_level": "mediated"
+  },
+  "id": "ee21ec1e1aca5b2469f108a86aa301d782ea390808a24225ae8a08381f7e4b31"
+}

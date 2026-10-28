@@ -1,0 +1,83 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7d3096c9a50967f177bc981f12fcc3cc37f0a822fb6cf949260df9115ba35864",
+      "parameters": {
+        "document": "notes"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c5-da58-756e-b1bc-521408dc691c",
+    "content_hash": "4fc61a0eaf96ca4dcf71eccb1dfb09674a7a9293cf9482b97b1e655a415b1a64",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "31a2e2632e8b593fba9ee7ac0a33fcd2305e62ecec6cdee520abebdd9202fb41",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "test-admission-lease",
+        "operation_id": "13a330346dddb55b52b1acc7f5f8231eca48a2e274da6e37f15ba282e21dd436",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 9,
+        "projected_state": "completed",
+        "request_binding_hash": "740114ad717057b2a7134f04c00f03ece64f2c0ef424c5b4211adcd883bde7d3",
+        "request_id": "honest",
+        "request_namespace_digest": "8bec6d2b27e8a6ef8e34461a69f2577dd0cc76bb1868212b34c193eec419d790",
+        "retained_dispatch_commit": {
+          "committed_version": 7,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "test-admission-lease",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt:13a330346dddb55b52b1acc7f5f8231eca48a2e274da6e37f15ba282e21dd436",
+            "operation_id": "13a330346dddb55b52b1acc7f5f8231eca48a2e274da6e37f15ba282e21dd436",
+            "transport_id": "kernel-tool-server:proof-srv",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "test-admission-lease",
+            "owner_epoch": 1,
+            "store_uuid": "018f47a0-7261-7000-8000-000000000001"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "test-admission-lease",
+          "owner_epoch": 1,
+          "store_uuid": "018f47a0-7261-7000-8000-000000000001"
+        },
+        "tool_outcome_id": "88d64b8a5d10e866c8f99fec1208622b0aaaeff0cfa332b6a2aa4e6906f4a454",
+        "tool_outcome_version": 2,
+        "trusted_time_unix_ms": 1793195367320
+      },
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "31a2e2632e8b593fba9ee7ac0a33fcd2305e62ecec6cdee520abebdd9202fb41",
+        "subject_key": "253ebd44c2f26ba5f169cf9c55c437b51a0e3054879b68c037980d0c08998a11"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c5-db9a-73b0-80de-5c3745f09f3c",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "request_id": "honest",
+        "request_namespace_digest": "8bec6d2b27e8a6ef8e34461a69f2577dd0cc76bb1868212b34c193eec419d790"
+      }
+    },
+    "policy_hash": "bf5f4534183baa94e40bdc261de6d5347ccee7131a3b6cedd5827e70b11a25ff",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195367,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "proof-srv",
+    "trust_level": "mediated"
+  },
+  "id": "ad017808a44531bfa26f5700566dd01f5535f6416bf3658df60c230e1003eac4"
+}

@@ -1,0 +1,8 @@
+{
+  "audit_authority": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "eligible_snapshot_at": 1700000100,
+  "eligible_snapshot_digest": "0870543dc187db190421e3fbdd007be0136bf77e3c5a125c0b88af34c7ad48d6",
+  "epoch_index": 1,
+  "seed_commitment": "8c9bbd19b3109e14939583524977bedcf613f0ecefd523bf811344ca9d89fa8e",
+  "seed_witnessed_at": 1700000200
+}

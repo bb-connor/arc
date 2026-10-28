@@ -1,0 +1,11 @@
+{
+  "acceptedAtUnixMs": 511,
+  "expiresAtUnixMs": 600,
+  "keyEpoch": 1,
+  "outputManifestDigest": "bdef2c04a42711fccbeb1e1d2b18028371af42fdc9eac42e1e81bb2d5209bf44",
+  "participantId": "A",
+  "participantStatementDigest": "490e4bd365b7c45ffcef763186d46b130092e36b226e1b70c100316bc7add3d4",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "roundId": "round-1",
+  "schema": "chio.clearing.participant-acceptance.v1"
+}

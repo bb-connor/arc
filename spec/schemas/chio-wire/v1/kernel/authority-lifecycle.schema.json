@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/authority-lifecycle.schema.json",
+  "title": "Chio authority lifecycle signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorDigest",
+    "change",
+    "generation",
+    "issuerSetDigest",
+    "previousCommitment",
+    "publicKeyHex",
+    "rotatedAt",
+    "schema",
+    "streamId"
+  ],
+  "properties": {
+    "anchorDigest": {
+      "type": "string"
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "publicKeyHex": {
+          "type": "string"
+        },
+        "verifyUntil": {
+          "type": "integer"
+        }
+      }
+    },
+    "generation": {
+      "type": "integer"
+    },
+    "issuerSetDigest": {
+      "type": "string"
+    },
+    "previousCommitment": {
+      "type": "string"
+    },
+    "publicKeyHex": {
+      "type": "string"
+    },
+    "rotatedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.authority-lifecycle.v1"
+    },
+    "streamId": {
+      "type": "string"
+    }
+  }
+}

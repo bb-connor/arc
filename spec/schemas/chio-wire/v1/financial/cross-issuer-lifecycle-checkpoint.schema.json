@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint.schema.json",
+  "title": "Chio financial cross issuer lifecycle checkpoint signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointDigest",
+    "issuerDid",
+    "resolverIdentity",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "sourceIndexCount",
+    "sourceIndexRoot",
+    "storeGeneration",
+    "trustedClockHighWater"
+  ],
+  "properties": {
+    "checkpointDigest": {
+      "type": "string"
+    },
+    "issuerDid": {
+      "type": "string"
+    },
+    "predecessorCheckpointDigest": {
+      "type": "string"
+    },
+    "resolverIdentity": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer.lifecycle-checkpoint.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "sourceIndexCount": {
+      "type": "integer"
+    },
+    "sourceIndexRoot": {
+      "type": "string"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "trustedClockHighWater": {
+      "type": "integer"
+    }
+  }
+}

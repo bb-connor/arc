@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-open-admission-policy.schema.json",
+  "title": "Chio federation open admission policy signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowedAdmissionClasses",
+    "explicitLocalReviewRequired",
+    "feeScheduleRef",
+    "governingCharterRef",
+    "governingOperatorId",
+    "issuedAt",
+    "namespace",
+    "policyId",
+    "schema",
+    "visibilityOnlyWithoutActivation"
+  ],
+  "properties": {
+    "allowedAdmissionClasses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "explicitLocalReviewRequired": {
+      "type": "boolean"
+    },
+    "feeScheduleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "kind",
+        "operatorId",
+        "schema",
+        "sha256"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operatorId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "governingCharterRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "kind",
+        "operatorId",
+        "schema",
+        "sha256"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operatorId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "policyId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federation-open-admission-policy.v1"
+    },
+    "stakeRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admissionClass",
+          "governanceCaseRequired",
+          "minimumBondAmount",
+          "requiredBondClass",
+          "slashable"
+        ],
+        "properties": {
+          "admissionClass": {
+            "type": "string"
+          },
+          "governanceCaseRequired": {
+            "type": "boolean"
+          },
+          "minimumBondAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "requiredBondClass": {
+            "type": "string"
+          },
+          "slashable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "visibilityOnlyWithoutActivation": {
+      "type": "boolean"
+    }
+  }
+}

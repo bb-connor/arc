@@ -1,0 +1,23 @@
+{
+  "attempt_envelope_sha256s": [
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  ],
+  "audit_epoch_envelope_sha256": "ff53e3e959b51eadddc1b40e86bac4152686790a3bda33b57caa07c421421713",
+  "audit_report_id": "809144d0313e93c5aecaadb702e9617b897d72015615f94724fd75a71d4a5df7",
+  "missed_attempts": [
+    {
+      "finding_id": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+      "reason": "retained replay inputs expired before the attempt"
+    }
+  ],
+  "outcome_envelope_digests": [
+    "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+  ],
+  "reported_at": 1750050000,
+  "revealed_seed": "1111111111111111111111111111111111111111111111111111111111111111",
+  "schema": "chio.finding.audit-report.v1",
+  "selected_finding_ids": [
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+  ]
+}

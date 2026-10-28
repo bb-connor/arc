@@ -1,0 +1,75 @@
+{
+  "body": {
+    "authority": {
+      "assetBindingDigest": "47905618986166ecd3eb0a127e7c8fda9d210b2e5984b67826b0eb2b876760b3",
+      "authorizedAtUnixMs": 101500,
+      "boundTokenBaseUnits": "1500000",
+      "channelExpiryUnixMs": 1800000,
+      "channelId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+      "channelStateVersion": 2,
+      "closeBodyDigest": "396faaba132dd02b3ebc6ee07188323550e9def3e0c218d47de0e7f7bd2d49d5",
+      "closeDigest": "f44c9b2af76b115b7de70772be3cd55e91f1435f04abe2e77e31e0da78362619",
+      "closeSubmissionCutoffUnixMs": 1950000,
+      "disputeDeadlineUnixMs": 101500,
+      "effectiveCloseDigest": "4ef048d18704e29089c2ca360eb73dcdca9da4da9b169ac153b799ed9238b124",
+      "escrowDeadlineUnixMs": 2000000,
+      "escrowReference": {
+        "chainId": "eip155:31337",
+        "escrowContract": "0x5555555555555555555555555555555555555555",
+        "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b"
+      },
+      "escrowReservationVersion": 3,
+      "expectedRefundTokenBaseUnits": "1500000",
+      "expectedReleaseTokenBaseUnits": "0",
+      "finalCumulativeOwed": {
+        "currency": "USD",
+        "units": 0
+      },
+      "finalStateDigest": "4da6bcf63a3d350ee34c18f446e786b13e841098c0a933e4ec1790cfbe4afce1",
+      "finalStateSequence": 0,
+      "frost": {
+        "actionDigest": "7d1715d1d1005c2150289ccf1e50c970f8964dfd99042ecdfd55869a681e143a",
+        "authorizationId": "cf2d552fcd26e7fde6338a792bcd123b9e44432f372d0afa74c6465a2c450143",
+        "authorizationSlotId": "f23b598eb9062bc5843c49e53ebcefa85c24aab58d9b34bbed53ab3a8d15d6fb",
+        "signedEnvelopeDigest": "de4b64b3842c0ccb22d90180d20f2699d0b44b36d32e4e7ebe2c2166926507c5"
+      },
+      "frostIssuedAtUnixMs": 101500,
+      "frostKeyEpoch": 7,
+      "frostResourceFence": 3,
+      "frostResourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+      "frostResourceVersion": 2,
+      "frostRosterDigest": "3da0e8672628b2630a865997b556e88eb19ca9f2235e65707deb01e866f26aa0",
+      "frostScopeId": "channel-settlement",
+      "lifecycleFence": 3,
+      "openDigest": "d6bdeef426c9467a38b351d664eb87b42eec9b41acbb53f9b4431c513cbf54b5",
+      "originalOperator": "0x4444444444444444444444444444444444444444",
+      "originalOperatorKeyHash": "0xc9736463f555cdb7d2a78cfd7aa8b8c4f09d906d78f8dab9228eda30a28c2818",
+      "originalWeb3DispatchDigest": "21d362cab97daba2b2f201b1738d21dc91e9168cd36979ffafd4ad901f30b842",
+      "payeeBeneficiaryAddress": "0x3333333333333333333333333333333333333333",
+      "publisherFence": 4
+    },
+    "publicationRoot": "8bdd7f4aaec5bacb5c40885317e1615976eca67398171d5902b7f5db8ed92d6d",
+    "releaseBroadcast": {
+      "callDigest": "803ffc81f54a6b376507c8258711886245061294de076984b090f6a549c5143c",
+      "effectKind": "channel_release_broadcast",
+      "effectSlotId": "14db7aaf630c8a8f2b3b4644a48bd20e18c6315c6117b3ebebed90e545cde376",
+      "idempotencyKey": "c9e7076190f54eaf1b2101128b50b60e668bcaef9bfc374a0f7e3812d62e0635",
+      "operationId": "d7c96539bd742789d6423d7903cfbfb81410cc0fbbe94cc736abc3e0ed36e341",
+      "resourceHeadDigest": "04bd40f216a719b0a778b5af762ee4edafb8f493d4a898ac003e3e5683c2b980",
+      "scopeId": "channel-settlement"
+    },
+    "rootPublication": {
+      "callDigest": "7eb41e86f503fd39eb965040c1ff165eb5ac5ff2dd5936e6432f0d8456716171",
+      "effectKind": "channel_release_root_publication",
+      "effectSlotId": "2bd8709dbd5fde2efc7273f5f4905cfb0755fa7d0b9b792e2ab5a388bde59f70",
+      "idempotencyKey": "ed271f794321af7065e679dfba6975c48868705c8b83be09b86136018258f412",
+      "operationId": "07cea18883f5a245b06381571b9ef37e613c0ea878c80f9919f6079602157b08",
+      "resourceHeadDigest": "49232e7b023fddcede7a9ab672d02a00dabc1d2e2b3a87191edfd0b558648690",
+      "scopeId": "channel-settlement"
+    },
+    "schema": "chio.channel.release-authorization.v1"
+  },
+  "keyEpoch": 8,
+  "signerId": "channel-release-publisher",
+  "signerKey": "66cd608b928b88e50e0efeaa33faf1c43cefe07294b0b87e9fe0aba6a3cf7633"
+}

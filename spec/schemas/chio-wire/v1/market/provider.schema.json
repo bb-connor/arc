@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/market/provider.schema.json",
+  "title": "Chio market provider signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "issuedAt",
+    "lifecycleState",
+    "providerRecordId",
+    "report",
+    "schema"
+  ],
+  "properties": {
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lifecycleState": {
+      "type": "string"
+    },
+    "providerRecordId": {
+      "type": "string"
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "lifecycleState",
+        "policies",
+        "provenance",
+        "providerId",
+        "providerType",
+        "providerUrl",
+        "schema",
+        "supportBoundary"
+      ],
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "lifecycleState": {
+          "type": "string"
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "claimsSupported",
+              "coverageClasses",
+              "jurisdiction",
+              "maxCoverageAmount",
+              "quoteTtlSeconds",
+              "requiredEvidence",
+              "supportedCurrencies"
+            ],
+            "properties": {
+              "claimsSupported": {
+                "type": "boolean"
+              },
+              "coverageClasses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "jurisdiction": {
+                "type": "string"
+              },
+              "maxCoverageAmount": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "quoteTtlSeconds": {
+                "type": "integer"
+              },
+              "requiredEvidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "supportedCurrencies": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changeReason",
+            "configuredAt",
+            "configuredBy",
+            "sourceRef"
+          ],
+          "properties": {
+            "changeReason": {
+              "type": "string"
+            },
+            "configuredAt": {
+              "type": "integer"
+            },
+            "configuredBy": {
+              "type": "string"
+            },
+            "sourceRef": {
+              "type": "string"
+            }
+          }
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "providerType": {
+          "type": "string"
+        },
+        "providerUrl": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "supportBoundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "automaticTrustAdmission",
+            "boundCoverageSupported",
+            "curatedRegistryOnly",
+            "permissionlessFederationSupported"
+          ],
+          "properties": {
+            "automaticTrustAdmission": {
+              "type": "boolean"
+            },
+            "boundCoverageSupported": {
+              "type": "boolean"
+            },
+            "curatedRegistryOnly": {
+              "type": "boolean"
+            },
+            "permissionlessFederationSupported": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.market.provider.v1"
+    },
+    "supersedesProviderRecordId": {
+      "type": "string"
+    }
+  }
+}

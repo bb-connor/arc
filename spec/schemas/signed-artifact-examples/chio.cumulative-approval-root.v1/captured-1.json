@@ -1,0 +1,17 @@
+{
+  "approval_budget_epoch": 7,
+  "approval_budget_id": "budget-1",
+  "root_capability_hash": "894daa1cf3c938dcd248c9b71084df223e1524b0264941d94d7dd2fcc81f6ddc",
+  "root_capability_id": "cap-root",
+  "root_expires_at": 1000,
+  "root_grant_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+  "root_issuer": "a7165a3ad29f1c79a10a0642a93ff6b49dff34bd4363afecc961897eb2ed3304",
+  "root_scope_hash": "debb851617e2fdac8dc3f557efef08e861bab1ecbaddb6a0a991496ae1b2168c",
+  "root_subject": "d67b5e5e56047127a0b39a356bd99e73982523cff9d76b81bd5f996d61f4d72c",
+  "schema": "chio.cumulative-approval-root.v1",
+  "signer_key_epoch": 0,
+  "threshold": {
+    "currency": "USD",
+    "units": 100
+  }
+}

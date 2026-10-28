@@ -1,0 +1,18 @@
+{
+  "authority": "chio_link_runtime_v1",
+  "base": "ETH",
+  "cache_age_seconds": 45,
+  "converted_cost_units": 300,
+  "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+  "grant_currency": "USD",
+  "max_age_seconds": 3600,
+  "oracle_public_key": "d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c",
+  "original_cost_units": 1000000000000000,
+  "original_currency": "ETH",
+  "quote": "USD",
+  "rate_denominator": 100,
+  "rate_numerator": 300000,
+  "schema": "chio.oracle-conversion-evidence.v1",
+  "source": "chainlink",
+  "updated_at": 1743292740
+}

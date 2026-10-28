@@ -1,0 +1,23 @@
+{
+  "anchorDigest": "5f18be0ed4a8e3b5cf14bcfdb3eb1c096cce576baa61fd1b6b30c5dbf643c55d",
+  "chainCommitment": "5f18be0ed4a8e3b5cf14bcfdb3eb1c096cce576baa61fd1b6b30c5dbf643c55d",
+  "expiresAt": 401,
+  "issuedAt": 101,
+  "schema": "chio.authority-snapshot.v1",
+  "snapshot": {
+    "generation": 1,
+    "publicKeyHex": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+    "rotatedAt": 100,
+    "trustedKeys": [
+      {
+        "activatedAt": 100,
+        "generation": 1,
+        "lifecycle": {
+          "state": "active"
+        },
+        "publicKeyHex": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+      }
+    ]
+  },
+  "streamId": "clock-policy"
+}

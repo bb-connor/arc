@@ -1,0 +1,17 @@
+{
+  "authority": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+  "issuedAtUnixSeconds": 1793191220,
+  "requestDigest": "d376b6588d7d92910c4507ac311888c320dfa379f87ca0f7d4f5b1bb42d91e2e",
+  "requestId": "428d016a53de1854f68cbfa78d1fe493060f7757ed12218023bace515af5334d",
+  "result": {
+    "kind": "capabilities",
+    "response": {
+      "atomicMultiKeyHolds": true,
+      "combinedCaptureAndRevocation": true,
+      "profile": "authoritative_hold_event",
+      "queryById": true,
+      "sharedRevocationWriteDomain": true
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

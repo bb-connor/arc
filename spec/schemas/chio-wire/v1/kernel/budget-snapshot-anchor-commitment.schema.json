@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/budget-snapshot-anchor-commitment.schema.json",
+  "title": "Chio budget snapshot anchor commitment signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorSetDigest",
+    "chainDigest",
+    "commitSequence",
+    "committedAt",
+    "electionTerm",
+    "leaderUrl",
+    "previousChainDigest",
+    "schema",
+    "signerPublicKey"
+  ],
+  "properties": {
+    "anchorSetDigest": {
+      "type": "string"
+    },
+    "chainDigest": {
+      "type": "string"
+    },
+    "commitSequence": {
+      "type": "integer"
+    },
+    "committedAt": {
+      "type": "integer"
+    },
+    "electionTerm": {
+      "type": "integer"
+    },
+    "leaderUrl": {
+      "type": "string"
+    },
+    "previousChainDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.budget-snapshot-anchor-commitment.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    }
+  }
+}

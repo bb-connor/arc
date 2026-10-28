@@ -1,0 +1,15 @@
+{
+  "amount": {
+    "currency": "USD",
+    "units": 100
+  },
+  "contributingReservationRoot": "d620e9a9520f6e9ad4b4b1572618e25c6a28671bdfa1d661d8e1b81b7205f803",
+  "creditorParticipantId": "creditor-1",
+  "creditorSettlementDestination": "acct:creditor-1",
+  "debtorParticipantId": "debtor-1",
+  "dispatchIdempotencyKey": "3844ff528989dfc78386f4ec8853089ae31477fd00e4b3c9d9598b0219b0dd27",
+  "intentId": "intent-first",
+  "ordinal": 1,
+  "roundCoreDigest": "8966afcf174acf5d5cdadb8a07fe0d2be786c5d27dde1f9c10df34b0d767f538",
+  "schema": "chio.clearing.settlement-intent.v1"
+}

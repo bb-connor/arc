@@ -1,0 +1,41 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "fcf5ea56fb039c04417c643e3755778cc8801125cb163f47c062b528ddda4060",
+      "parameters": {
+        "chain_id": "eip155:8453",
+        "method": "release"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-web3",
+    "content_hash": "3bbb434f30b56ad676784700d5a01b35aa2fa939940c80af1f9f1d98052e11d6",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "details": "bounded",
+        "guard_name": "BudgetGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-002",
+      "financial": {
+        "currency": "USD",
+        "units": 42
+      }
+    },
+    "policy_hash": "abc123",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1744000030,
+    "tool_name": "settle",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-web3",
+    "trust_level": "mediated"
+  },
+  "id": "8f3297352fcdc0ab472bd7f01ca9632b3b4d296a37dcf6f917fdd0be00a3cc04"
+}

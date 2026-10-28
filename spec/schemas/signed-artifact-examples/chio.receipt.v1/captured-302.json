@@ -1,0 +1,138 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "8a44725210b9dcd4fefd9f0eca07b70ae45e69274a3105fb25eb426a2cf8bbf4",
+      "parameters": {
+        "prompt": "hello"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-economic",
+    "content_hash": "content-economic-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "f4f22510e250292e539e8c12f57edeabe3d7325b9c141e1b718f33cc006bf1ee",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "8bb047c4e89a7fbd181de983c4ac0059006d1526bec663e8954e19863495940f",
+        "subject_key": "ff1ed4d52bd822ae0aabecac19dd121987c1fce09d6f3fd55de1c0285ed5b140"
+      },
+      "chio_receipt_signing_nonce": "rcpt-economic-1",
+      "financial": {
+        "attempted_cost": 450,
+        "budget_remaining": 600,
+        "budget_total": 1000,
+        "cost_charged": 400,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "payment_reference": "payref-economic-1",
+        "root_budget_holder": "ff1ed4d52bd822ae0aabecac19dd121987c1fce09d6f3fd55de1c0285ed5b140",
+        "settlement_status": "pending"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approved": true,
+          "approver_key": "ff1ed4d52bd822ae0aabecac19dd121987c1fce09d6f3fd55de1c0285ed5b140",
+          "token_id": "approval-economic-1"
+        },
+        "economic_authorization": {
+          "amount_bounds": {
+            "approved_max": {
+              "currency": "USD",
+              "units": 500
+            },
+            "hold_amount": {
+              "currency": "USD",
+              "units": 450
+            },
+            "settlement_cap": {
+              "currency": "USD",
+              "units": 450
+            }
+          },
+          "budget": {
+            "attempted_cost": 450,
+            "budget_remaining": 600,
+            "budget_total": 1000,
+            "cost_charged": 400,
+            "currency": "USD",
+            "delegation_depth": 0,
+            "grant_index": 0,
+            "root_budget_holder": "ff1ed4d52bd822ae0aabecac19dd121987c1fce09d6f3fd55de1c0285ed5b140"
+          },
+          "economic_mode": "metered_hold_capture",
+          "merchant": {
+            "merchant_id": "model",
+            "order_ref": "req-economic-1"
+          },
+          "metering": {
+            "billing_unit": "tokens",
+            "max_billable_units": 110,
+            "meter_profile_hash": "meter-profile-economic-1",
+            "provider": "meterco"
+          },
+          "payee": {
+            "beneficiary_id": "model",
+            "settlement_destination_ref": "payref-economic-1"
+          },
+          "payer": {
+            "funding_source_ref": "payref-economic-1",
+            "party_id": "agent-economic"
+          },
+          "pricing_basis": {
+            "quote_expiry": 3600,
+            "quote_hash": "quote-hash-economic-1"
+          },
+          "rail": {
+            "asset": "USD",
+            "contract_or_account_ref": "payref-economic-1",
+            "facilitator": "meterco",
+            "kind": "metered_billing"
+          },
+          "settlement": {
+            "settlement_status": "pending"
+          },
+          "version": "v1"
+        },
+        "intent_hash": "intent-hash-economic-1",
+        "intent_id": "intent-economic-1",
+        "max_amount": {
+          "currency": "USD",
+          "units": 500
+        },
+        "metered_billing": {
+          "maxBilledUnits": 110,
+          "quote": {
+            "billingUnit": "tokens",
+            "expiresAt": 3600,
+            "issuedAt": 1900,
+            "provider": "meterco",
+            "quoteId": "quote-economic-1",
+            "quotedCost": {
+              "currency": "USD",
+              "units": 400
+            },
+            "quotedUnits": 100
+          },
+          "settlementMode": "hold_capture"
+        },
+        "purpose": "metered inference",
+        "server_id": "model",
+        "tool_name": "infer"
+      }
+    },
+    "policy_hash": "policy-economic-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 2000,
+    "tool_name": "infer",
+    "tool_origin": "caller_executed",
+    "tool_server": "model",
+    "trust_level": "mediated"
+  },
+  "id": "171bda487f5398d32508869b9a4d31e357126f5cbf3bca2138b5ca17e174fe08"
+}

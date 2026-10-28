@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint-pin.schema.json",
+  "title": "Chio financial cross issuer lifecycle checkpoint pin signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointDigest",
+    "generationPinDigest",
+    "issuerDid",
+    "pinDigest",
+    "resolverIdentity",
+    "resultDigest",
+    "schema",
+    "signerKeyEpoch",
+    "sourcePassportId",
+    "status",
+    "statusVersion",
+    "storeGeneration",
+    "storeId",
+    "trustedClockHighWater"
+  ],
+  "properties": {
+    "checkpointDigest": {
+      "type": "string"
+    },
+    "generationPinDigest": {
+      "type": "string"
+    },
+    "issuerDid": {
+      "type": "string"
+    },
+    "pinDigest": {
+      "type": "string"
+    },
+    "previousPinDigest": {
+      "type": "string"
+    },
+    "resolverIdentity": {
+      "type": "string"
+    },
+    "resultDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "sourcePassportId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "statusVersion": {
+      "type": "integer"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "storeId": {
+      "type": "string"
+    },
+    "trustedClockHighWater": {
+      "type": "integer"
+    }
+  }
+}

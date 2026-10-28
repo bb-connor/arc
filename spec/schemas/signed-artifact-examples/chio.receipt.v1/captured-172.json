@@ -1,0 +1,39 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "e9e7af5daaf868303da1a167e9fb4951de6927011a8bc2ea0c66e5c7a35a436f",
+      "parameters": {
+        "dry_run": true,
+        "message": "hello"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-wire-001",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "details": "allowed",
+        "guard_name": "ShellCommandGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-wire-001",
+      "surface": "wire-schema-test",
+      "version": 1
+    },
+    "policy_hash": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000100,
+    "tool_name": "echo",
+    "tool_origin": "chio_internal",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "10aa72d601007381267ea68b5a108e464eed7b9b007a51197abc96d794fd3b4c"
+}

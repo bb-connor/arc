@@ -1,0 +1,86 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d041d2d45881d016d651aa0eca74b5250773d5365e6bb3f395501a64d0903542",
+      "parameters": {
+        "location": "San Francisco"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182d8-25f0-73e1-ac78-c057652d9eb3",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "governed transaction denied: bound tool invocation is required for tool approval",
+      "verdict": "deny"
+    },
+    "kernel_key": "89d8e3bbb96aef268dea0d8f220cc37caef0dc6596c9f400eb2fecaeac03b31c",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "89d8e3bbb96aef268dea0d8f220cc37caef0dc6596c9f400eb2fecaeac03b31c",
+        "subject_key": "23aced069474c953c1fa46101589c3969e2456f988a55896d3e4a37b549c8bba"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_kernel": {
+        "rejection_code": "CHIO-KERNEL-GOVERNED-TRANSACTION-DENIED"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182d8-27db-78a3-89ae-5dfda8c409e3",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "governed_transaction": {
+        "intent_hash": "a173981853109ea4acad461a0e839ea9a4cdc2af2360890ec1cbf9c14b6325ee",
+        "intent_id": "intent-openai-approval-1",
+        "max_amount": {
+          "currency": "USD",
+          "units": 100
+        },
+        "purpose": "require human approval",
+        "server_id": "test-srv",
+        "tool_name": "get_weather"
+      },
+      "receipt_context": {
+        "request_id": "openai-call_abc123",
+        "request_namespace_digest": "86ac8d42970b411e9b5d2d195521f31a7e932c6e978ddfd27de9d62b4d315681"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "open_ai",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "governedIntentId": "intent-openai-approval-1",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "b518f69883271e26a8aad8d52857e29f1541cd3ba4f403abbbb905c978533361",
+        "selectedProtocols": [
+          "open_ai",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "open_ai"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793196566,
+    "tool_name": "get_weather",
+    "tool_origin": "caller_executed",
+    "tool_server": "test-srv",
+    "trust_level": "mediated"
+  },
+  "id": "027a560cbc4af91b011606b6d950f462f64012c47d0af9fd91c8230663f6935a"
+}

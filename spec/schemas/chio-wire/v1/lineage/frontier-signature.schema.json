@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/lineage/frontier-signature.schema.json",
+  "title": "Chio lineage frontier signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "frontier"
+  ],
+  "properties": {
+    "frontier": {
+      "type": "string"
+    }
+  }
+}

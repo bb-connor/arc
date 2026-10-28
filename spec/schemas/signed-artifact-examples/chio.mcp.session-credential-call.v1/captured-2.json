@@ -1,0 +1,17 @@
+{
+  "capabilityIds": [
+    "capability"
+  ],
+  "parameterHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "requestHash": "727dd4374532bfbf7ecd121c30a4c641f3a869995796c4c792a2da69b51e3c3c",
+  "requestId": "nonce-metadata",
+  "reservationId": "pZLJX4Q9NLGMktF5bMNn9Pn6ixVGRMQyL73LvMRro9k",
+  "response": null,
+  "schema": "chio.mcp.session-credential-call.v1",
+  "serverId": "fs",
+  "sessionId": "retained-session",
+  "startedAt": 100,
+  "state": "pending",
+  "subjectKey": "subject",
+  "toolName": "write_file"
+}

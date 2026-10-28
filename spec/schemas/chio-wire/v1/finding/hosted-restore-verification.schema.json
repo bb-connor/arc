@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-restore-verification.schema.json",
+  "title": "Chio finding hosted restore verification signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "archiveSha256",
+    "restoredResourceSha256",
+    "schema",
+    "tenantId",
+    "verifiedAt"
+  ],
+  "properties": {
+    "archiveSha256": {
+      "type": "string"
+    },
+    "restoredResourceSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-restore-verification.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "verifiedAt": {
+      "type": "integer"
+    }
+  }
+}

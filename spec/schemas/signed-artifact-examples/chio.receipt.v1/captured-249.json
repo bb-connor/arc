@@ -1,0 +1,40 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "e9a8f252ad1018786926fba56e23708da7fdc1d295f4e80033da1b302aeec32c",
+      "parameters": {
+        "_5v_9": "_13{7c&={&mB",
+        "__c_yz4": null,
+        "y_89": "iF\"\"]%E{j\\*.e"
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-o",
+    "content_hash": "11107b90c92c9925cb439df34c0c736fd068d574672ca342e289f688e3b4f9bd",
+    "decision": {
+      "guard": "ZGFg8YMS",
+      "reason": "=:N<`\"1qeO",
+      "verdict": "deny"
+    },
+    "kernel_key": "4ed32f63bf35f0eeefcb25f28a2e1fbdc873ae2835671b0c9460f5f12e4556a8",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-8087vx5l02d2",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1719967945,
+    "tool_name": "f__b_mb_m_",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-scez",
+    "trust_level": "mediated"
+  },
+  "id": "1759e96804a4fda7c43c451018133029c13bcd6cd67a77f26208faeee75f0a95"
+}

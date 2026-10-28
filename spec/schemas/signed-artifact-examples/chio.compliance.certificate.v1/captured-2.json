@@ -1,0 +1,46 @@
+{
+  "all_signatures_valid": true,
+  "anomalies": [],
+  "budget_compliant": false,
+  "chain_continuous": true,
+  "checks": {
+    "allowed_mediated_receipt_limit": "not_evaluated",
+    "required_guards": "not_evaluated",
+    "tenant": "not_evaluated",
+    "tool_targets": "not_evaluated"
+  },
+  "compliance_profile_digest": "74070e60b004706e24db44af04e0df87e9c52fbe551362e14a963d2dc148fcb0",
+  "coverage": {
+    "archived_through_entry_seq": 3,
+    "checkpoint": {
+      "body": {
+        "batch_end_seq": 4,
+        "batch_start_seq": 4,
+        "chain_root": "0x79e918b8f92b2cc75a5c8c3f951c3cbf5b2359239d536daf2c2b7119b5320d9f",
+        "checkpoint_seq": 2,
+        "issued_at": 1793202718,
+        "kernel_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+        "merkle_root": "0xe8e3707aeb4f7433c375ff41cb70666fe5116369ebf3c5444c0b52fb2b60e51b",
+        "previous_checkpoint_sha256": "5b2b3028ebb45cb22275b97f48cd6af813a36b6c4bf85ca9ae702d1f9a2b6239",
+        "schema": "chio.checkpoint_statement.v1",
+        "tree_size": 1
+      },
+      "signature": "3d887ffc03bd02cda485db69a9fc476a0d90e678b7a01d4f25bf87eeea61d596cff1c2807eb4aa7a8ad6675e019bd836aa34e324c8fc091acb24a7f04004e80d"
+    },
+    "kind": "retained_snapshot_reference",
+    "session_id": "target_%",
+    "snapshot_end_entry_seq": 4,
+    "tenant_id": null
+  },
+  "first_receipt_at": 1,
+  "guards_compliant": false,
+  "invocation_count": 0,
+  "issued_at": 1793202718,
+  "kernel_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "last_receipt_at": 4,
+  "receipt_count": 3,
+  "receipt_set_digest": "7eddb655c99e4e66e9ec838f2348ad109fcb1b83476c3dc30144851dd0b580a8",
+  "schema": "chio.compliance.certificate.v1",
+  "scope_compliant": false,
+  "session_id": "target_%"
+}

@@ -1,0 +1,97 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "aaa82cbe90edc928ec1dbb07b816d063e05b6ed91c18003defb7ac8796861c2e",
+      "parameters": {
+        "decisionType": "release",
+        "eventId": "evt-release-1",
+        "stage": "release",
+        "toolName": "release_control",
+        "workflowId": "workflow-release-control"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-proof-1",
+    "content_hash": "content-proof-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "2fd1648c6bd8c32ba9acdec4a23834c2b6facdc169a133b3f7dbbd1b62125e61",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-proof-1",
+      "mercury": {
+        "approvalState": {
+          "approvalTicketId": "chg-1042",
+          "approverSubjects": [
+            "approver-risk-1"
+          ],
+          "state": "approved"
+        },
+        "bundleRefs": [
+          {
+            "artifactCount": 2,
+            "bundleId": "bundle-release-2026-04-02",
+            "manifestSha256": "wrong-manifest-hash",
+            "retentionClass": "pilot-90d"
+          }
+        ],
+        "businessIds": {
+          "accountId": "acct-alpha",
+          "deskId": "desk-delta",
+          "inquiryId": "inquiry-2026-04-02",
+          "releaseId": "release-2026-04-02",
+          "strategyId": "strat-shadow-01",
+          "workflowId": "workflow-release-control"
+        },
+        "chronology": {
+          "causalParentEventIds": [
+            "evt-approval-1"
+          ],
+          "eventId": "evt-release-1",
+          "idempotencyKey": "idempotency-release-1",
+          "ingestedAt": 1775137626,
+          "sourceTimestamp": 1775137620,
+          "stage": "release"
+        },
+        "decisionContext": {
+          "decisionType": "release",
+          "modelId": "model-ops-reviewer",
+          "policyReference": "policy-hash-123",
+          "workflowVersion": "mercury-workflow-v1"
+        },
+        "disclosure": {
+          "audience": "compliance",
+          "policy": "internal-review-only",
+          "redactionProfile": "internal-default",
+          "reviewedExportApproved": true,
+          "verifierEquivalent": true
+        },
+        "provenance": {
+          "dependencyDigest": "deps-sha256-123",
+          "hostingMode": "supervised-shadow",
+          "modelName": "gpt-5.4",
+          "modelProvider": "openai",
+          "modelVersion": "2026-04-02",
+          "sourceRecordId": "source-release-1",
+          "sourceSystem": "shadow-release-review"
+        },
+        "schema": "chio.mercury.receipt_metadata.v1",
+        "sensitivity": {
+          "classification": "confidential",
+          "containsCustomerData": false,
+          "containsMarketData": true,
+          "retentionClass": "pilot-90d"
+        }
+      }
+    },
+    "policy_hash": "policy-proof-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1775137626,
+    "tool_name": "release_control",
+    "tool_origin": "caller_executed",
+    "tool_server": "mercury",
+    "trust_level": "mediated"
+  },
+  "id": "d09687a9125490527af6c1734a4714a0361a8e9748015761d788aee8a0cb060d"
+}

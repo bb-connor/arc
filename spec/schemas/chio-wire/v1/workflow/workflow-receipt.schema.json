@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/workflow/workflow-receipt.schema.json",
+  "title": "Chio workflow receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "capability_id",
+    "completed_at",
+    "duration_ms",
+    "id",
+    "kernel_key",
+    "outcome",
+    "schema",
+    "skill_id",
+    "skill_version",
+    "started_at",
+    "steps"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "integer"
+    },
+    "duration_ms": {
+      "type": "integer"
+    },
+    "id": {
+      "type": "string"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "elapsed_secs": {
+          "type": "integer"
+        },
+        "limit_secs": {
+          "type": "integer"
+        },
+        "limit_units": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "spent_units": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "step_index": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.workflow-receipt.v1"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "skill_id": {
+      "type": "string"
+    },
+    "skill_version": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "integer"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "allowed",
+          "duration_ms",
+          "outcome",
+          "server_id",
+          "step_index",
+          "tool_name"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "bilateral_dsse_sha256": {
+            "type": "string"
+          },
+          "consistency_anchor": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "governance_receipt_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "output_hash": {
+            "type": "string"
+          },
+          "parent_receipt_sha256": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "step_index": {
+            "type": "integer"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "tool_receipt_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "total_cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

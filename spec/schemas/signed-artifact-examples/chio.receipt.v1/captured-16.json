@@ -1,0 +1,51 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "a9ec417e5f284d351e9cd1a8d1c7e3b089d5404ca92d3e31f5ae354fdf2831fa",
+      "parameters": {
+        "attempt_id": "attempt-reject",
+        "stage": "rejection",
+        "state": "rejected"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-1",
+    "content_hash": "f3cb448b77a6e975639a76761c4427a026218db3e2ea7d38ae3f221efeeaaf18",
+    "decision": {
+      "guard": "chio-cage",
+      "reason": "native cage launch did not reach full enforcement",
+      "verdict": "deny"
+    },
+    "kernel_key": "ed6a47a39da869b5446155e40b2d93f1e3f0167be26732bae7a3ef9d8e3a3fd3",
+    "metadata": {
+      "cage_receipt": {
+        "attempt_id": "attempt-reject",
+        "enforcement_record": {
+          "exit": null,
+          "failure": {
+            "code": "invalid_plan",
+            "stage": "admission"
+          },
+          "fully_enforced": null,
+          "schema": "chio.cage.enforcement-record.v1",
+          "state": "rejected"
+        },
+        "recorded_at_unix_ms": 9000,
+        "schema": "chio.cage.receipt-body.v1",
+        "stage": "rejection",
+        "started_at_unix_ms": 8000
+      },
+      "schema": "chio.cage.receipt-metadata.v1"
+    },
+    "policy_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "summary",
+    "tenant_id": "tenant-1",
+    "timestamp": 9,
+    "tool_name": "launch",
+    "tool_origin": "chio_internal",
+    "tool_server": "native-server",
+    "trust_level": "mediated"
+  },
+  "id": "0ea948ed169f0b7a6e381fe9a98ed02332f9e948e253d4888e95a5fb74db7748"
+}

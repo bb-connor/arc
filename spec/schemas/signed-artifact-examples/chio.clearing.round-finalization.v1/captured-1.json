@@ -1,0 +1,15 @@
+{
+  "clearingAuthorityId": "clearing-authority",
+  "clearingAuthorityKeyEpoch": 13,
+  "finalizedAtUnixMs": 550,
+  "governanceScopeId": "clearing-governance",
+  "outputManifestDigest": "bdef2c04a42711fccbeb1e1d2b18028371af42fdc9eac42e1e81bb2d5209bf44",
+  "participantAcceptanceCount": 3,
+  "participantAcceptanceRoot": "d4414a6c464a70bae57e893d17e99635533a90b175382bf7ea9dd7c7eadfa524",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "roundId": "round-1",
+  "schema": "chio.clearing.round-finalization.v1",
+  "sourceLifecycleFence": 3,
+  "sourceLifecycleHeadDigest": "523e62f1bb3083be3744aa9166b496c89297cc3bf0ecc4e501abe32293b3f074",
+  "sourceLifecycleVersion": 3
+}

@@ -1,0 +1,56 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "ac42b48b384f2ae61c408593ad0b4252302cb25cee41be11a7cc50573c62d16b",
+      "parameters": {
+        "batch": 1,
+        "fixture_secret": "active-defense-fixture-secret-must-not-enter-receipts"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a1827c-f248-7738-9c34-721bcd25112e",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"chio-tripwire-pre-invocation\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "{\"artifact_id_hash\":[155,66,253,206,13,83,172,238,174,72,61,105,169,57,81,192,186,232,254,185,129,29,181,137,19,239,232,12,76,56,22,106],\"artifact_version_hash\":[245,70,99,189,247,216,123,136,208,164,74,186,103,104,94,59,136,194,102,176,161,42,80,246,99,178,235,230,4,183,222,106],\"event_persistence\":\"inserted\",\"kind\":\"honey_tool\",\"receipt_persistence\":\"appended\"}",
+        "guard_name": "chio-tripwire-pre-invocation",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "677a74d964e4a84ffa5025a8b5537b5c4a37ad6d146e854783ac734684a207c4",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "677a74d964e4a84ffa5025a8b5537b5c4a37ad6d146e854783ac734684a207c4",
+        "subject_key": "2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a1827c-f3fd-7b70-a464-46bd4103670d",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "request-active-defense",
+        "request_namespace_digest": "30e9ec1ca1703b90f98fa5086705668f57a88eba7c81c818f597d35428ddcc3f"
+      }
+    },
+    "policy_hash": "active-defense-kernel-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793190589,
+    "tool_name": "export_records",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-active-defense",
+    "trust_level": "mediated"
+  },
+  "id": "d764ffee7b86add7067ba856a6b4747326dfff73378e2cff053a169b9cc89c6b"
+}

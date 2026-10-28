@@ -1,0 +1,20 @@
+{
+  "agent_passport_jwk_thumbprint": "UDDReOZl1ipXAfp9wYsm13sDBMK5og--QWdBjzuf6o4",
+  "agent_passport_key_hash": "34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e",
+  "confidence": 0.8,
+  "decay_half_life_secs": 3600,
+  "evaporation_floor": 0.01,
+  "indicator": {
+    "digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "kernel_id": "did:chio:llamaworks",
+  "nonce": "nonce-001",
+  "schema": "chio.pheromone-deposit.v1",
+  "severity": "high",
+  "subject_class": "support.prompt_injection",
+  "subject_class_namespace": "dev.chio.support",
+  "timestamp_unix_ms": 1700000000000,
+  "treaty_scope": [
+    "treaty:buyer-llamaworks:support-ops"
+  ]
+}

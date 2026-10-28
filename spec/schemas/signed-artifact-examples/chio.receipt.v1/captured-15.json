@@ -1,0 +1,45 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
+      "parameters": {
+        "path": "/app/src/main.rs"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c6-2c60-7daf-b97e-e2c760cfe9b5",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "recording hook denies before budget",
+      "verdict": "deny"
+    },
+    "kernel_key": "746446a94d4b07a49cae653f9475c38670d6b3a4f16590428910dbaf8a2cb96d",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "746446a94d4b07a49cae653f9475c38670d6b3a4f16590428910dbaf8a2cb96d",
+        "subject_key": "25354130dc4f2ea77583f10c63c6dba2ff7b3cbd02ed82ff40514b04c0db10c8"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c6-2dd9-7e63-b83b-8db0528bff2f",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "host_note": "caller-visible",
+      "receipt_context": {
+        "request_id": "reserved-metadata",
+        "request_namespace_digest": "28a748be56354b2fd94b3615620dfea14f84882cec489807d262aa4ee99651d1"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195388,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "metadata-server",
+    "trust_level": "mediated"
+  },
+  "id": "0a6ccfcd107179d6c82e1f80ade0e3cf29dbcbb4d590dcc480a38314f3a56602"
+}

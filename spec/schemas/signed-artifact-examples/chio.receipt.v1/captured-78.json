@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "5913bce1e931e62d2f03b10a3a19a943b88d4c8de95368db0b7996f851ea7ed4",
+      "parameters": {
+        "d7u_cm1_": "*<\"Znfx(-'Yq",
+        "ghu44": null,
+        "r9u15g25g": -233515205
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-h5252js",
+    "content_hash": "4a94208cd3742d1eabf3bb4ca37e81d62aa8ffc0a5d611fb9cfaa1664e036958",
+    "decision": {
+      "reason": "IV",
+      "verdict": "cancelled"
+    },
+    "evidence": [
+      {
+        "details": "Py",
+        "guard_name": "RGhLmFnaRGuard",
+        "verdict": true
+      },
+      {
+        "details": "L$:0!BJd'%?./Y2e\\%",
+        "guard_name": "KlFUNOLCKhGuard",
+        "verdict": true
+      },
+      {
+        "guard_name": "CSsYJGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-s6h3973",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1797299059,
+    "tool_name": "ud_aut__v",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-eg",
+    "trust_level": "mediated"
+  },
+  "id": "ff61a57f526deb82c6e71c1eb2f4e77d6b816b06557d68be5ed52c5995e12bd7"
+}

@@ -1,0 +1,72 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "43cac6b440f0f99c7ba34a182a55a410b1cb9c617bf366258eabb6ae2ee89822",
+      "parameters": {
+        "message": "refused"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "semantic-refusal-capability",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "operation refused",
+      "verdict": "deny"
+    },
+    "kernel_key": "7d5e23108cb7c524715006d71270edef6bc80f8e940811598980c9b258c81b76",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "semantic-coordinator-lease",
+        "operation_id": "71042be02a708c9a4d42a107968cdb350dfa72cfa25c2654248c5ea55ba7a10c",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 7,
+        "projected_state": "outcome_unknown_after_dispatch",
+        "request_binding_hash": "de576080e14c3ee9e2272d10a2181e8060b5546e218a8556cd08bb470b630ed5",
+        "request_id": "semantic-refusal-request",
+        "request_namespace_digest": "3076f9ad4d3824db50c4d4256015b6d607dc5f44f037f674326f174beed15ef3",
+        "retained_dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "semantic-coordinator-lease",
+          "provider_attempt": {
+            "attempt_id": "semantic-attempt",
+            "operation_id": "71042be02a708c9a4d42a107968cdb350dfa72cfa25c2654248c5ea55ba7a10c",
+            "transport_id": "kernel-tool-server:semantic-server",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "semantic-store-lease",
+            "owner_epoch": 1,
+            "store_uuid": "semantic-store"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "semantic-store-lease",
+          "owner_epoch": 1,
+          "store_uuid": "semantic-store"
+        },
+        "tool_outcome_id": null,
+        "tool_outcome_version": null,
+        "trusted_time_unix_ms": 1700000000000
+      },
+      "chio_receipt_signing_nonce": "4022601516a573e3222f57ab369c68ad4dd9e2fd0dbc4f5ed3d87a117b86b1c3",
+      "receipt_context": {
+        "request_id": "semantic-refusal-request",
+        "request_namespace_digest": "3076f9ad4d3824db50c4d4256015b6d607dc5f44f037f674326f174beed15ef3"
+      }
+    },
+    "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000000,
+    "tool_name": "semantic-tool",
+    "tool_origin": "caller_executed",
+    "tool_server": "semantic-server",
+    "trust_level": "mediated"
+  },
+  "id": "1a11f8d161697868202cde5b516174a66717553f91a7319d243bafcd37a23199"
+}

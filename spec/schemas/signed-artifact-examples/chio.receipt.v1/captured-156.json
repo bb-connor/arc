@@ -1,0 +1,91 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7bd266d4bd399e548a4d7328cad7bd046a5644b1312bcb2e2316549f6cb5e937",
+      "parameters": {
+        "actor": "research-agent-alpha",
+        "guardDecision": "deny",
+        "policyReference": "chio.wall.research_execution_barrier.v1",
+        "requestId": "chio-wall-request-2026-10-28-01",
+        "requestedDomain": "execution",
+        "sourceDomain": "research",
+        "toolName": "execution_oms.submit_order",
+        "workflowId": "workflow-information-domain-barrier"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-chio-wall-1",
+    "content_hash": "ca56ea2589f66f8d7a2c3db16168a1dc113379c2c3b92e120be7b386222e49ce",
+    "decision": {
+      "guard": "mcp-tool",
+      "reason": "tool `execution_oms.submit_order` is outside the allowlist for the `research` domain and is denied fail-closed before `research` access can cross into `execution`",
+      "verdict": "deny"
+    },
+    "kernel_key": "552b3b638873682a0b6c29ba826756996337b89778b6e6748642aed2bfdd6ccd",
+    "metadata": {
+      "authorizationContext": {
+        "actorLabel": "research-agent-alpha",
+        "buyerMotion": "control_room_barrier_review",
+        "controlSurface": "tool_access_domain_boundary",
+        "policyReference": "chio.wall.research_execution_barrier.v1",
+        "requestId": "chio-wall-request-2026-10-28-01",
+        "requestedDomain": "execution",
+        "schema": "chio.wall.authorization_context.v1",
+        "sourceDomain": "research",
+        "toolName": "execution_oms.submit_order",
+        "workflowId": "workflow-information-domain-barrier"
+      },
+      "chio_receipt_signing_nonce": "rcpt-chio-wall-control-path-1",
+      "deniedAccessRecord": {
+        "escalationOwner": "barrier-control-room",
+        "note": "Chio-Wall records one denied cross-domain tool-access event and routes follow-up through the barrier control-room owner.",
+        "requestId": "chio-wall-request-2026-10-28-01",
+        "requestedDomain": "execution",
+        "schema": "chio.wall.denied_access_record.v1",
+        "sourceDomain": "research",
+        "supportOwner": "chio-wall-ops",
+        "toolName": "execution_oms.submit_order",
+        "workflowId": "workflow-information-domain-barrier"
+      },
+      "guardOutcome": {
+        "allowedTools": [
+          "research_news.read",
+          "research_model.run",
+          "research_review.export"
+        ],
+        "decision": "deny",
+        "evaluatedTool": "execution_oms.submit_order",
+        "failClosed": true,
+        "guardName": "mcp-tool",
+        "matchedPolicy": "chio.wall.research_execution_barrier.v1",
+        "pipelineName": "guard-pipeline",
+        "reason": "tool `execution_oms.submit_order` is outside the allowlist for the `research` domain and is denied fail-closed before `research` access can cross into `execution`",
+        "requestId": "chio-wall-request-2026-10-28-01",
+        "schema": "chio.wall.guard_outcome.v1",
+        "workflowId": "workflow-information-domain-barrier"
+      },
+      "policySnapshot": {
+        "allowedTools": [
+          "research_news.read",
+          "research_model.run",
+          "research_review.export"
+        ],
+        "failClosed": true,
+        "note": "The initial Chio-Wall lane reuses Chio tool-guard mechanics through one fail-closed allowlist for the research domain.",
+        "policyId": "chio.wall.research_execution_barrier.v1",
+        "schema": "chio.wall.policy_snapshot.v1",
+        "sourceDomain": "research"
+      },
+      "schema": "chio.wall.receipt_metadata.v1"
+    },
+    "policy_hash": "cb013752f6647113b61510407c1ee6ba2c2f59273bc5b548838dc88081b15291",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1712104800,
+    "tool_name": "execution_oms.submit_order",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-wall",
+    "trust_level": "mediated"
+  },
+  "id": "55b4e526d74424ca8612f45e13c8ccc6344559c3d9264dac7ad4cc986986c725"
+}

@@ -1,0 +1,25 @@
+{
+  "admission": {
+    "expiresAtUnixMs": 1743379260000,
+    "issuedAtUnixMs": 1743379200000,
+    "localKernelId": "kernel:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "profileId": "process-capture",
+    "schema": "chio.runtime.admission-profile.v1",
+    "verifierId": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+  },
+  "binding": {
+    "expectation_id": "expectation-1",
+    "runtime_authority_id": "runtime-1"
+  },
+  "record_sha256": "70ce871f8a3d3fb449bc3c3ace6547cef02dfc74ffe48d912532a724bfdbe5b9",
+  "routes": {
+    "alice": {
+      "bridge": "chio-ipc",
+      "manifest_sha256": "05b3abf2579a5eb66403cd78be557fd860633a1fe2103c7642030defe32c657f",
+      "protocol_target": "send_jobs",
+      "selected_route": "chio-ipc/send_jobs"
+    }
+  },
+  "runtime_id": "runtime-1",
+  "schema": "chio.process.swarm-profile.v1"
+}

@@ -1,0 +1,14 @@
+{
+  "bound_to": {
+    "capability_id": "cap-123",
+    "parameter_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "request_id": "request-abc",
+    "subject_id": "subject-abc",
+    "tool_name": "read_file",
+    "tool_server": "fs"
+  },
+  "expires_at": 1000030,
+  "issued_at": 1000000,
+  "nonce_id": "01a182c3-b74d-78d3-a106-fa3afe96e40a",
+  "schema": "chio.execution_nonce.v1"
+}

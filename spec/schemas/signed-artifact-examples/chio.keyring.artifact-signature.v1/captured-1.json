@@ -1,0 +1,7 @@
+{
+  "artifact_hash": "0xfd0178926538ec67a4c26905529bdfb9d0189a419667e6779e922ade6156eb44",
+  "artifact_signature": "7161462d2ae53ff49257cb5e4128e413613ee0921ad0f69d197312d1ba2475112cd751b5c37665a0675f6a7607d9b5b0b5f4ed5bb9187056fe624fbead913101",
+  "key_id": "0x9f59cbb5a9eb13058b89a5515616ebc4bb82c45adffc36c53a3c61f409640dcd",
+  "schema": "chio.keyring.artifact-signature.v1",
+  "signing_epoch": 7
+}

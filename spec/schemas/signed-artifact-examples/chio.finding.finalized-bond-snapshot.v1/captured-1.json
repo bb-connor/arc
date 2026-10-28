@@ -1,0 +1,25 @@
+{
+  "allocation_id": "9de1fce0b7a07a080f8ccbf37514930142bf0897c4537ce94868aa01861e2be1",
+  "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "block_number": 21000000,
+  "chain_id": "chio-devnet",
+  "currency": "USD",
+  "finality_policy": "confirmations>=64",
+  "held_amount": 0,
+  "identity_registry_record": "registry/operators/venue-42",
+  "locked_amount": 5000,
+  "observed_at": 1750086401,
+  "observed_finality": {
+    "confirmations": {
+      "depth": 96
+    }
+  },
+  "operator_key_epoch": 1,
+  "operator_key_hash": "0x0791868d8f29ea735f26a17a9aea038cd4255baac26eac5a74e58a07ed2f1975",
+  "schema": "chio.finding.finalized-bond-snapshot.v1",
+  "seller": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+  "slashed_amount": 0,
+  "snapshot_id": "cd921e26cc70669ea2cc7f24dd428944af9c7860af8ad185381208efe30c7a39",
+  "vault_contract": "vault:finding-collateral",
+  "vault_id": "vault-01"
+}

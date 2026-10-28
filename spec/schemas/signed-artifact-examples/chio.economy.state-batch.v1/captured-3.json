@@ -1,0 +1,355 @@
+{
+  "anchorId": "parametric-anchor",
+  "batchId": "36c21cd49e54037d0a07aebbc04b9436747f382c8baf1d312f1f7d873e87f6a7",
+  "checkpointSequence": 8,
+  "effectSlots": [],
+  "expectedHeadsRoot": "39a26ac86595ac5463e822b20a5ea0de431545522b6a2dd68cb5aae49193e591",
+  "issuedAt": 1700011000,
+  "namespace": "parametric-market",
+  "nextHeadsRoot": "8b982bb7cf669fb703484ee5efa55cec122b44b8a7c069792736e76a2170fbfd",
+  "previousCheckpointDigest": "7171717171717171717171717171717171717171717171717171717171717171",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "parametric-anchor-key",
+  "transitions": [
+    {
+      "nextHead": {
+        "anchorId": "parametric-anchor",
+        "headVersion": 1,
+        "lifecycleFence": 1,
+        "lifecycleState": "ready",
+        "namespace": "parametric-market",
+        "resourceKey": {
+          "resourceFamily": "parametric_claim",
+          "resourceId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+          "scopeId": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011"
+        },
+        "resourceVersion": 1,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "claim": {
+              "beneficiaryId": "subject-1",
+              "coverageAuthorityId": "carrier-alpha",
+              "fundingFacilityId": "cfd-1",
+              "identity": {
+                "claimId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+                "key": {
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "evidenceRangeDigest": "24bc7aec2232449f72d9a60e6163694cc4d60412e02b59e727c45dc5aaf16b5f",
+                  "parametricPolicyBodyDigest": "a8de918c211724512ce25220628738187852a9ff56c53d0844e35abf62bbbe57",
+                  "subjectKey": "subject-1",
+                  "triggerPredicateBodyDigest": "e6524dc1fd11af2baa80e907307ab95c087b814bd25bb98730ccf58c28e0d87c",
+                  "windowEnd": 1700011000,
+                  "windowStart": 1700010000
+                },
+                "triggerInstanceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c"
+              },
+              "lifecycleFence": 1,
+              "openedAt": 1700011000,
+              "payerId": "operator-treasury-1",
+              "payoutAmount": {
+                "currency": "USD",
+                "units": 1000
+              },
+              "payoutMode": {
+                "kind": "automatic"
+              },
+              "payoutRail": {
+                "destinationAccountDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "kind": "web3",
+                "railId": "web3-primary"
+              },
+              "schema": "chio.parametric.claim-record.v1",
+              "state": "ready",
+              "triggerMagnitude": {
+                "kind": "basis_points",
+                "value": 5000
+              },
+              "version": 1
+            },
+            "schema": "chio.parametric.claim-opening-state.v1",
+            "trigger": {
+              "evidenceManifest": {
+                "ranges": [
+                  {
+                    "anchorEpoch": 1,
+                    "checkpointAt": 1700011010,
+                    "checkpointId": "checkpoint-1-7",
+                    "checkpointRoot": "a5d5f95325cf51e76a6c838594a33a6bed23e91b41dc51cd4605ff390081308f",
+                    "expectedCount": 2,
+                    "indexNamespace": "subject-time-sequence-v1",
+                    "queryIndexRoot": "c46bcf2aad8bc843b2156d1d227c4624936d9957f3697baa9128122d0a3a11cf",
+                    "rangeProofDigest": "91cce1c0a1dbe3aa31361ca37c4d4455f06a88d99c4a5c001344c855a1ccbba3",
+                    "selectedMemberRoot": "7a39d263cd531084f0bb3faea82f8118af4fd6760c87b4d0b0a32d1c78d0a0cd",
+                    "sequenceRange": {
+                      "first": 10,
+                      "last": 11
+                    },
+                    "signerKeyEpoch": 7,
+                    "sourceId": "kernel-receipts",
+                    "sourceKind": "receipt_store",
+                    "sourcePrefixCutoff": 12,
+                    "subjectKey": "subject-1",
+                    "window": {
+                      "endAt": 1700011000,
+                      "startAt": 1700010000
+                    }
+                  }
+                ]
+              },
+              "identity": {
+                "claimId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+                "key": {
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "evidenceRangeDigest": "24bc7aec2232449f72d9a60e6163694cc4d60412e02b59e727c45dc5aaf16b5f",
+                  "parametricPolicyBodyDigest": "a8de918c211724512ce25220628738187852a9ff56c53d0844e35abf62bbbe57",
+                  "subjectKey": "subject-1",
+                  "triggerPredicateBodyDigest": "e6524dc1fd11af2baa80e907307ab95c087b814bd25bb98730ccf58c28e0d87c",
+                  "windowEnd": 1700011000,
+                  "windowStart": 1700010000
+                },
+                "triggerInstanceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c"
+              },
+              "magnitude": {
+                "kind": "basis_points",
+                "value": 5000
+              },
+              "schema": "chio.parametric.fired-trigger-record.v1",
+              "signedPolicy": {
+                "body": {
+                  "beneficiaryId": "subject-1",
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "boundCoverageEnvelopeDigest": "3f877975e70bd2d5e9948925db59b62ead9598f2e00d67d52a4da1efefa9d9d6",
+                  "coverageAmount": {
+                    "currency": "USD",
+                    "units": 10000
+                  },
+                  "coverageAuthorityId": "carrier-alpha",
+                  "effectiveFrom": 1700010000,
+                  "effectiveUntil": 1700020000,
+                  "evaluatorAuthority": {
+                    "authorityId": "evaluator-1",
+                    "keyEpoch": 3,
+                    "keyId": "evaluator-key-1"
+                  },
+                  "fundingFacilityId": "cfd-1",
+                  "issuedAt": 1700000172,
+                  "maxCheckpointLagSeconds": 120,
+                  "payerId": "operator-treasury-1",
+                  "payoutMode": {
+                    "kind": "automatic"
+                  },
+                  "payoutRail": {
+                    "destinationAccountDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                    "kind": "web3",
+                    "railId": "web3-primary"
+                  },
+                  "payoutSchedule": {
+                    "amount": {
+                      "currency": "USD",
+                      "units": 1000
+                    },
+                    "kind": "fixed"
+                  },
+                  "preActionAuthorityDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                  "predicate": {
+                    "kind": "guard_denial_rate",
+                    "minEvents": 2,
+                    "thresholdBps": 5000
+                  },
+                  "schema": "chio.parametric.policy.v1",
+                  "subjectKey": "subject-1",
+                  "windowAnchor": 1700010000,
+                  "windowSeconds": 1000
+                },
+                "signature": "272615cdaa11b78823f9e3dd65ef3e2a6bba824b787e27b9dc5b58d0f200f01912f5aebafe97ab77b04189bb397ca08f2cd7603ab5d575e9620d3abaec850b0b",
+                "signerKey": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+              }
+            },
+            "trustedOpenedAt": 1700011000
+          }
+        },
+        "stateDigest": "5458e6719c9f53ea8ba22544d40bc2c0213dcfa668cb4f57ecb48c834fa9ff90",
+        "trustedClockHighWater": 1700011000
+      },
+      "resourceKey": {
+        "resourceFamily": "parametric_claim",
+        "resourceId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+        "scopeId": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011"
+      },
+      "transitionProofDigest": "f202bc7300934dc2ebccfeefc192d4d5f2c78d455771a309b4c7f24af005f00f"
+    },
+    {
+      "nextHead": {
+        "anchorId": "parametric-anchor",
+        "headVersion": 1,
+        "lifecycleFence": 1,
+        "lifecycleState": "fired",
+        "namespace": "parametric-market",
+        "resourceKey": {
+          "resourceFamily": "parametric_trigger",
+          "resourceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c",
+          "scopeId": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011"
+        },
+        "resourceVersion": 1,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "claim": {
+              "beneficiaryId": "subject-1",
+              "coverageAuthorityId": "carrier-alpha",
+              "fundingFacilityId": "cfd-1",
+              "identity": {
+                "claimId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+                "key": {
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "evidenceRangeDigest": "24bc7aec2232449f72d9a60e6163694cc4d60412e02b59e727c45dc5aaf16b5f",
+                  "parametricPolicyBodyDigest": "a8de918c211724512ce25220628738187852a9ff56c53d0844e35abf62bbbe57",
+                  "subjectKey": "subject-1",
+                  "triggerPredicateBodyDigest": "e6524dc1fd11af2baa80e907307ab95c087b814bd25bb98730ccf58c28e0d87c",
+                  "windowEnd": 1700011000,
+                  "windowStart": 1700010000
+                },
+                "triggerInstanceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c"
+              },
+              "lifecycleFence": 1,
+              "openedAt": 1700011000,
+              "payerId": "operator-treasury-1",
+              "payoutAmount": {
+                "currency": "USD",
+                "units": 1000
+              },
+              "payoutMode": {
+                "kind": "automatic"
+              },
+              "payoutRail": {
+                "destinationAccountDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "kind": "web3",
+                "railId": "web3-primary"
+              },
+              "schema": "chio.parametric.claim-record.v1",
+              "state": "ready",
+              "triggerMagnitude": {
+                "kind": "basis_points",
+                "value": 5000
+              },
+              "version": 1
+            },
+            "schema": "chio.parametric.claim-opening-state.v1",
+            "trigger": {
+              "evidenceManifest": {
+                "ranges": [
+                  {
+                    "anchorEpoch": 1,
+                    "checkpointAt": 1700011010,
+                    "checkpointId": "checkpoint-1-7",
+                    "checkpointRoot": "a5d5f95325cf51e76a6c838594a33a6bed23e91b41dc51cd4605ff390081308f",
+                    "expectedCount": 2,
+                    "indexNamespace": "subject-time-sequence-v1",
+                    "queryIndexRoot": "c46bcf2aad8bc843b2156d1d227c4624936d9957f3697baa9128122d0a3a11cf",
+                    "rangeProofDigest": "91cce1c0a1dbe3aa31361ca37c4d4455f06a88d99c4a5c001344c855a1ccbba3",
+                    "selectedMemberRoot": "7a39d263cd531084f0bb3faea82f8118af4fd6760c87b4d0b0a32d1c78d0a0cd",
+                    "sequenceRange": {
+                      "first": 10,
+                      "last": 11
+                    },
+                    "signerKeyEpoch": 7,
+                    "sourceId": "kernel-receipts",
+                    "sourceKind": "receipt_store",
+                    "sourcePrefixCutoff": 12,
+                    "subjectKey": "subject-1",
+                    "window": {
+                      "endAt": 1700011000,
+                      "startAt": 1700010000
+                    }
+                  }
+                ]
+              },
+              "identity": {
+                "claimId": "2976947ff7b1454598f2b970ac35d1ee2f14466123d948461c4e2962578a57d4",
+                "key": {
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "evidenceRangeDigest": "24bc7aec2232449f72d9a60e6163694cc4d60412e02b59e727c45dc5aaf16b5f",
+                  "parametricPolicyBodyDigest": "a8de918c211724512ce25220628738187852a9ff56c53d0844e35abf62bbbe57",
+                  "subjectKey": "subject-1",
+                  "triggerPredicateBodyDigest": "e6524dc1fd11af2baa80e907307ab95c087b814bd25bb98730ccf58c28e0d87c",
+                  "windowEnd": 1700011000,
+                  "windowStart": 1700010000
+                },
+                "triggerInstanceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c"
+              },
+              "magnitude": {
+                "kind": "basis_points",
+                "value": 5000
+              },
+              "schema": "chio.parametric.fired-trigger-record.v1",
+              "signedPolicy": {
+                "body": {
+                  "beneficiaryId": "subject-1",
+                  "boundCoverageBodyDigest": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011",
+                  "boundCoverageEnvelopeDigest": "3f877975e70bd2d5e9948925db59b62ead9598f2e00d67d52a4da1efefa9d9d6",
+                  "coverageAmount": {
+                    "currency": "USD",
+                    "units": 10000
+                  },
+                  "coverageAuthorityId": "carrier-alpha",
+                  "effectiveFrom": 1700010000,
+                  "effectiveUntil": 1700020000,
+                  "evaluatorAuthority": {
+                    "authorityId": "evaluator-1",
+                    "keyEpoch": 3,
+                    "keyId": "evaluator-key-1"
+                  },
+                  "fundingFacilityId": "cfd-1",
+                  "issuedAt": 1700000172,
+                  "maxCheckpointLagSeconds": 120,
+                  "payerId": "operator-treasury-1",
+                  "payoutMode": {
+                    "kind": "automatic"
+                  },
+                  "payoutRail": {
+                    "destinationAccountDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                    "kind": "web3",
+                    "railId": "web3-primary"
+                  },
+                  "payoutSchedule": {
+                    "amount": {
+                      "currency": "USD",
+                      "units": 1000
+                    },
+                    "kind": "fixed"
+                  },
+                  "preActionAuthorityDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                  "predicate": {
+                    "kind": "guard_denial_rate",
+                    "minEvents": 2,
+                    "thresholdBps": 5000
+                  },
+                  "schema": "chio.parametric.policy.v1",
+                  "subjectKey": "subject-1",
+                  "windowAnchor": 1700010000,
+                  "windowSeconds": 1000
+                },
+                "signature": "272615cdaa11b78823f9e3dd65ef3e2a6bba824b787e27b9dc5b58d0f200f01912f5aebafe97ab77b04189bb397ca08f2cd7603ab5d575e9620d3abaec850b0b",
+                "signerKey": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+              }
+            },
+            "trustedOpenedAt": 1700011000
+          }
+        },
+        "stateDigest": "5458e6719c9f53ea8ba22544d40bc2c0213dcfa668cb4f57ecb48c834fa9ff90",
+        "trustedClockHighWater": 1700011000
+      },
+      "resourceKey": {
+        "resourceFamily": "parametric_trigger",
+        "resourceId": "852844387bcdaa91d93a4fd50624f3403fc5ee8c0eff34b1d39b60bfb9e4da4c",
+        "scopeId": "5164a8ce2b784efc2c5579f333a7bc9be66227b184cf1db2f57041190375e011"
+      },
+      "transitionProofDigest": "f202bc7300934dc2ebccfeefc192d4d5f2c78d455771a309b4c7f24af005f00f"
+    }
+  ]
+}

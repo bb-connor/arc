@@ -1,0 +1,36 @@
+{
+  "checkpoint_hash": "0x7e8dd20f6068ca518f2a9feb833088aa067b2e31f1dcabd3575815b798a7fd6b",
+  "checkpoint_sequence": 1,
+  "event_envelope_hash": "0x0cf78637d35aa2af3ededfad4d48261f68d786848f16bd259d1049968a46e8a1",
+  "event_id": "event.recover.1",
+  "event_sequence": 1,
+  "event_signers": [
+    {
+      "key_id": "0x6c312db3f7a5c36c463005f9880f439607a0c0641a17e46377b419ac41dac8ee",
+      "role": "new_key"
+    },
+    {
+      "authorizer_id": "recovery.a",
+      "role": "recovery"
+    },
+    {
+      "authorizer_id": "recovery.b",
+      "role": "recovery"
+    }
+  ],
+  "issued_at": 5000,
+  "log_id": "log.enterprise.test",
+  "operator_key_id": "0x0876ceb7c71bb4452e25f91174611f68792cc6704490ddccf580ad07d0beaae6",
+  "outcome": "pending_committed",
+  "receipt_id": "key-receipt:c8993bf151de67a9008def9452160e2c8647d0d4b098af75c100fd69bf2e81f0",
+  "root_hash": "0x759e13b530c7f82d30149b06648365fbe508fac154fc786a4d5efbc3340cb5c0",
+  "schema": "chio.key-log.enterprise-receipt.v1",
+  "source_receipt_ids": [
+    "key-receipt:a4fe7b81a7f70ca7903e31c332dde3b96db64b85b8ec08a3976b156beb0898f4"
+  ],
+  "stage": "pending",
+  "transaction_id": "key-tx:7003ba490c00c5ebcec62d5895e58f52dec478041cc4fe74cd0088b3f5d6b33a",
+  "tree_size": 2,
+  "witness_roster_id": "roster.enterprise.v1",
+  "witness_signatures": []
+}

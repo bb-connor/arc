@@ -1,0 +1,25 @@
+{
+  "event_id": "01JSQ1E7HRD0B4HGWH3E9Q8D3G",
+  "invocation": {
+    "q": "select 1"
+  },
+  "provenance": {
+    "otel": {
+      "span_id": "0000000000000000",
+      "trace_id": "00000000000000000000000000000000"
+    }
+  },
+  "redaction_pass_id": "redactors@1.5.0+default",
+  "request_blob_sha256": "e1ab92e69071544a8b8a809c8bb967f251012ce28402f1f13fba37bfadf1018e",
+  "response_blob_sha256": "efbab4498dc5f946995152a282cb1411419f209ce81d18c8964bc0de3925891b",
+  "schema_version": "1",
+  "tee_id": "tee-runner-test",
+  "ts": "2025-04-25T17:55:31.000Z",
+  "upstream": {
+    "api_version": "unknown",
+    "operation": "send_email",
+    "system": "mcp"
+  },
+  "verdict": "allow",
+  "would_have_blocked": false
+}

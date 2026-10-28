@@ -1,0 +1,24 @@
+{
+  "attenuations": [
+    {
+      "max_invocations": 1,
+      "server_id": "conformance",
+      "tool_name": "echo",
+      "type": "reduce_budget"
+    },
+    {
+      "constraint": {
+        "type": "max_length",
+        "value": 32
+      },
+      "server_id": "conformance",
+      "tool_name": "echo",
+      "type": "add_constraint"
+    }
+  ],
+  "capability_id": "cap-parent-001",
+  "delegatee": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+  "delegator": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+  "scope_hash": "aed84789c5aa815c87ae457afb7a3bd2f96738fd7013be9f8888724b5531d649",
+  "timestamp": 1700000100
+}

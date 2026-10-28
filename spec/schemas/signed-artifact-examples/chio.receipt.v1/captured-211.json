@@ -1,0 +1,67 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "bd05509464d966271b43f93a9d2411c31754da946f306925c5d6a4317b155999",
+      "parameters": {
+        "stage": "child"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-daa0-7c95-96fd-2da891765cdd",
+    "content_hash": "3eec996de9f203427a79cdce99926f4977fc3ec6069da9737e4d799a27ff824d",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "e16a3169a0215994369e646a0649dfab550f94cf1838e3119687d4f2a40b2fa6",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "e16a3169a0215994369e646a0649dfab550f94cf1838e3119687d4f2a40b2fa6",
+        "subject_key": "64f7bedc04170ba7043520a8ba5edac53f270b092583174baf5de52ccbc884e4"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-daf8-7b63-852c-356e009782c6",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "governed_transaction": {
+        "call_chain": {
+          "chainId": "chain-live-continuation",
+          "continuationTokenId": "continuation-token-1",
+          "delegatorSubject": "delegator-subject",
+          "evidenceClass": "observed",
+          "evidenceSources": [
+            "session_parent_request_lineage"
+          ],
+          "originSubject": "origin-subject",
+          "parentRequestId": "req-parent-live-continuation",
+          "sessionAnchorId": "sess-VciCFD9nyyBglT2TFZaf2g:anchor:0:e9c280e641d0"
+        },
+        "intent_hash": "61a1ee8d5ce608169c15612bbe9c881d38674414582c5cf4af24bcb7bb9dc78c",
+        "intent_id": "intent-live-continuation",
+        "purpose": "continue a live parent with a continuation token",
+        "server_id": "srv-echo",
+        "tool_name": "delegate"
+      },
+      "governed_transaction_diagnostics": {
+        "lineageReferences": {
+          "sessionAnchorId": "sess-VciCFD9nyyBglT2TFZaf2g:anchor:0:e9c280e641d0"
+        }
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-daeb-76e0-8906-0c187d409e4a",
+        "request_id": "req-child-live-continuation",
+        "request_namespace_digest": "14e4a2fe3c5de1c9036e8360d4f05735bd0eaa8eb60ba302f1c1b69d21782fb0"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195236,
+    "tool_name": "delegate",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-echo",
+    "trust_level": "mediated"
+  },
+  "id": "9aed7dc3a4b0c1be44d3c67d79e0d7432fec99db75544eb267db945f7512b9c1"
+}

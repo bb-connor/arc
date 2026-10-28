@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/status-intent-submission.schema.json",
+  "title": "Chio finding status intent submission signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "feed_id",
+    "finding_id",
+    "inclusion_deadline",
+    "intent_id",
+    "issued_at",
+    "key_domain_nonce",
+    "operator_id",
+    "operator_key_epoch",
+    "schema",
+    "source",
+    "source_authority_id",
+    "source_receipt",
+    "source_receipt_sha256"
+  ],
+  "properties": {
+    "feed_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "inclusion_deadline": {
+      "type": "integer"
+    },
+    "intent_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "key_domain_nonce": {
+      "type": "integer"
+    },
+    "operator_id": {
+      "type": "string"
+    },
+    "operator_key_epoch": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.status-intent-submission.v1"
+    },
+    "source": {
+      "type": "string"
+    },
+    "source_authority_id": {
+      "type": "string"
+    },
+    "source_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "signature",
+        "signerKey"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "feed_id",
+            "finding_id",
+            "issued_at",
+            "key_domain_nonce",
+            "schema",
+            "source_authority_id"
+          ],
+          "properties": {
+            "feed_id": {
+              "type": "string"
+            },
+            "finding_id": {
+              "type": "string"
+            },
+            "issued_at": {
+              "type": "integer"
+            },
+            "key_domain_nonce": {
+              "type": "integer"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "source_authority_id": {
+              "type": "string"
+            }
+          }
+        },
+        "signature": {
+          "type": "string"
+        },
+        "signerKey": {
+          "type": "string"
+        }
+      }
+    },
+    "source_receipt_sha256": {
+      "type": "string"
+    }
+  }
+}

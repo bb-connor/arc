@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/active-response-policy-authority-request.schema.json",
+  "title": "Chio active response policy authority request signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "client",
+    "deploymentDigest",
+    "issuedAtUnixSeconds",
+    "operation",
+    "requestId",
+    "schema",
+    "storeDigest"
+  ],
+  "properties": {
+    "client": {
+      "type": "string"
+    },
+    "deploymentDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "issuedAtUnixSeconds": {
+      "type": "integer"
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string"
+        }
+      }
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.active-response-policy-authority-request.v1"
+    },
+    "storeDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

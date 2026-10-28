@@ -1,0 +1,38 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "279adc4990323ff76f004279b5d70a2687f535fd0d8e6c81547bf28b053e1642",
+      "parameters": {
+        "agent_web_envelope_id": "c9b191514aaf01a6f7eb75449b89f6989b5a53bebd432e8b01d59daaee7a6e06",
+        "agent_web_passport_scope_sha256": "b7473ed65225ffc6ab337cec7b785709e682de90848e292c65a29b8a4f89da38",
+        "agent_web_receipt_ref": "receipt-agent-web-vc-allow",
+        "content_hash": "672198b402f566fa56621584d81d9525ae470162be40936a5ddb158c73dc3fa3",
+        "projection_manifest_sha256": "eae7f174cf17022ac0d65e939cba599a37f085c04468e9f02bee040f4201061b",
+        "source_protocol": "vc",
+        "source_protocol_version": "vc-data-model-2.0",
+        "transaction_passport_id": "passport-agent-web-valid",
+        "transaction_passport_issuer": "did:chio:66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-agent-web-fixture",
+    "content_hash": "672198b402f566fa56621584d81d9525ae470162be40936a5ddb158c73dc3fa3",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "204040e364c10f2bec9c1fe500a1cd4c247c89d650a01ed7e82caba867877c21",
+    "metadata": {
+      "agent_web_receipt_ref": "receipt-agent-web-vc-allow",
+      "chio_receipt_signing_nonce": "receipt-agent-web-vc-allow"
+    },
+    "policy_hash": "96dd86e1e38637ccaaefb44b2959754cdf839b17cc3f94d62f7ce3be5bd58191",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "summary",
+    "timestamp": 1770508800,
+    "tool_name": "project-external-evidence",
+    "tool_origin": "caller_executed",
+    "tool_server": "agent-web-sidecar",
+    "trust_level": "mediated"
+  },
+  "id": "fd3b87132413e156f0d0b7d14526e5393b24041ba63128aceb0d91458fd4f31a"
+}

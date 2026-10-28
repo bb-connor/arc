@@ -1,0 +1,39 @@
+{
+  "description": "MCP server adapted to Chio protocol",
+  "name": "Wrapped HTTP Mock",
+  "public_key": "274ec2dc6967da722832d739accc3768f629cf7c268cde7d6a062ad92d574555",
+  "required_permissions": {
+    "native_syscall_profile": "native_standard_v1"
+  },
+  "schema": "chio.manifest.v1",
+  "server_id": "wrapped-http-mock",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Echo JSON\n\nReturn structured JSON",
+      "input_schema": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "echo_json",
+      "output_schema": {
+        "properties": {
+          "echo": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ],
+  "version": "0.1.0"
+}

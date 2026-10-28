@@ -1,0 +1,74 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "ba36296be6f02201910806f0ede19e4f6c9a30ea5933163cad9a1f3229301baf",
+      "parameters": {
+        "caller_identity_hash": "95eefd61ded8a7c1f5b510fcdd9c271bedd922b6b3b78c4f096a1f2920e7a307",
+        "capability": {
+          "invalid_reason": "presented capability cap-revoked has been revoked"
+        },
+        "content_hash": "ed9399bb713e10a8639f234f4bac6951e1017d3e2c674cca75e451de07fe2809",
+        "method": "POST",
+        "path": "/pets",
+        "policy": "deny_by_default",
+        "route_pattern": "/pets"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182be-5c60-796e-bba1-2e21e77e16ef",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "durable admission failed: no qualified admission operation store is configured",
+      "verdict": "deny"
+    },
+    "kernel_key": "b5ac949e573bf5e0462606e47c55e9a45d230eb9a2d6663385f04790caabe73a",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "b5ac949e573bf5e0462606e47c55e9a45d230eb9a2d6663385f04790caabe73a",
+        "subject_key": "56d979eb7ef4cdb2c30b68247cc3f34e190bdccebdb63ff3b2cb5aa19c973d97"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182be-5d68-7652-9fb0-605d896b761c",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "req-revoked",
+        "request_namespace_digest": "274e9c066fef799437390f3540594042943db5d193307259f8af6676b91e852b"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "http",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "a8753cbfba0da4dbe248fb446440a611b3f0b78e442ea8fff4300f15e4a55e04",
+        "selectedProtocols": [
+          "http",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "http"
+      }
+    },
+    "policy_hash": "policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793194876,
+    "tool_name": "authorize_http_request",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio_http_authority",
+    "trust_level": "mediated"
+  },
+  "id": "c54ab17b39050a97ac67f5329f19b10fe3346c74999a568db3f992b499c61244"
+}

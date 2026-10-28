@@ -1,0 +1,11 @@
+{
+  "capability_id": "cap-tool-read-demo",
+  "guard_decision_id": "guard-decision",
+  "kernel_key": "a6d2455ea3a5771aba9fcb037924114c92f9f325049f6b4269e739d9048bb869",
+  "policy_digest": "3f3f80ff3e9d7a19d2bc89309fa450bdc12cfad21ed81b65591490a015f1215f",
+  "receipt_id": "receipt-minimal-allow",
+  "request_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "response_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema": "chio.proof-room.receipt-evidence.v1",
+  "terminal_status": "allowed_executed"
+}

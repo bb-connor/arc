@@ -1,0 +1,91 @@
+{
+  "activatedAt": 83,
+  "activationId": "a077aa0ceeaf52ffcf62633b4824a0d797b62a8e5cb4d7dc6047e15804d978b4",
+  "activationNotBefore": 83,
+  "admissionDigest": "05ebba7713f079002b0eeaed2f58afe9e052667afa7b8a6a9ff032b97291f92c",
+  "admissionId": "7889b15b4c077275a544d817b6508611f6c27dbc3615ef0612c2fa33ebe056dc",
+  "approvalSetDigest": "f302f34eab77d592f19d4b6a4bd97d26afd925263ce8e3c43e602b5528b9e398",
+  "approvals": [
+    {
+      "body": {
+        "admissionDigest": "05ebba7713f079002b0eeaed2f58afe9e052667afa7b8a6a9ff032b97291f92c",
+        "admissionId": "7889b15b4c077275a544d817b6508611f6c27dbc3615ef0612c2fa33ebe056dc",
+        "approvalExpiresAt": 124,
+        "approvalId": "c4b5b15c3874bc43a0d37b4a4e298847ffd2a0fdbd889366ad35f2d5f44c67fc",
+        "approvedAt": 74,
+        "proposalDigest": "cc83f05fa96c4f03dbaa0b4604a25efcef315c13771c922aa6dd1a1ab6f5ee9c",
+        "proposalId": "6f45b83e8564e96c38dc880d17b5ccb337be8b3de42baa918100e45760614bc6",
+        "schema": "chio.fiscal.approval.v1",
+        "signerKeyId": "34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e"
+      },
+      "signature": "545008a2c7ee4978ecf158aafc15011799b98462bd86c112683ec53bca6c615d82978914b3edd154c5f87480b14b7ff34beace62d040eb75a1e3c40c6b0d590e",
+      "signerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+    },
+    {
+      "body": {
+        "admissionDigest": "05ebba7713f079002b0eeaed2f58afe9e052667afa7b8a6a9ff032b97291f92c",
+        "admissionId": "7889b15b4c077275a544d817b6508611f6c27dbc3615ef0612c2fa33ebe056dc",
+        "approvalExpiresAt": 124,
+        "approvalId": "184c9441ba099c50cc870a56a36227d3f2995bba6d2a435b5e299d72b9e25748",
+        "approvedAt": 74,
+        "proposalDigest": "cc83f05fa96c4f03dbaa0b4604a25efcef315c13771c922aa6dd1a1ab6f5ee9c",
+        "proposalId": "6f45b83e8564e96c38dc880d17b5ccb337be8b3de42baa918100e45760614bc6",
+        "schema": "chio.fiscal.approval.v1",
+        "signerKeyId": "6a3803d5f059902a1c6dafbc9ba4729212f7caac08634cc3ae76b27529f03827"
+      },
+      "signature": "4d057df79432270ceb279f54583d74b00cf957927bdfdd09cbe35f7cc8d6f934961512c4231375f45d23df9a97c3e2f5649a60a5a50700c0fc7558e89fd06807",
+      "signerKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    }
+  ],
+  "charterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
+  "charterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
+  "issuedBy": "34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e",
+  "proposalDigest": "cc83f05fa96c4f03dbaa0b4604a25efcef315c13771c922aa6dd1a1ab6f5ee9c",
+  "proposalId": "6f45b83e8564e96c38dc880d17b5ccb337be8b3de42baa918100e45760614bc6",
+  "schema": "chio.fiscal.activation.v1",
+  "target": {
+    "kind": "charter_rotation",
+    "predecessorCharterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
+    "successorCharterDigest": "585b27ff61bed60045d653a3016267f59828a7f74740aa3143688a27599fdc47",
+    "successorSchedules": [
+      {
+        "body": {
+          "charterDigest": "585b27ff61bed60045d653a3016267f59828a7f74740aa3143688a27599fdc47",
+          "charterId": "e9d1ccc23ca1494350f3a027124039927ff1d7d6b9631d067552cc65e0dffcaa",
+          "domain": "tier_limits",
+          "issuedAt": 70,
+          "issuedBy": "operator.example",
+          "params": {
+            "ceilings": [
+              {
+                "currency": "USD",
+                "units": 100
+              },
+              {
+                "currency": "USD",
+                "units": 200
+              },
+              {
+                "currency": "USD",
+                "units": 300
+              },
+              {
+                "currency": "USD",
+                "units": 400
+              }
+            ],
+            "kind": "tier_limits"
+          },
+          "scheduleId": "261e8b353a23870689b7012164afec8242bdb93bd51303678cd884fd60df8469",
+          "schema": "chio.fiscal.schedule.v1",
+          "sequence": 2,
+          "supersedesScheduleId": "2063081889a93c429de4aed8930ef3b6e786f5970a4ab2a4a717ba4b25c3feb2",
+          "validFrom": 70,
+          "validUntil": 900
+        },
+        "signature": "340066c7b24d681ed028fdb59c186fe705396128fefb216c1ec3f1a424a6297f16627413b1056382cd6cca7c33e0f2d06545c7b74ebd25f1344444e80005fc0b",
+        "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
+      }
+    ]
+  }
+}

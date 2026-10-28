@@ -1,0 +1,33 @@
+{
+  "certificationRefs": [
+    "cert-1"
+  ],
+  "credentialBindings": [
+    {
+      "credentialId": "0404040404040404040404040404040404040404040404040404040404040404",
+      "envelopeDigest": "0505050505050505050505050505050505050505050505050505050505050505",
+      "family": "premium_history"
+    }
+  ],
+  "decidedAt": 1710000100,
+  "decision": "activate",
+  "decisionDigest": "6aeb5076d1ca96ad3cc16c77686e8606051f45107050bc6d68bbd16998986c30",
+  "entryId": "entry-1",
+  "issuer": "did:chio:70df9e2279adbec6d12bf2921184c9222eb24ed852005bf640139f52e59cd9ae",
+  "lifecycleEvidenceDigest": "0606060606060606060606060606060606060606060606060606060606060606",
+  "lifecyclePinDigest": "0707070707070707070707070707070707070707070707070707070707070707",
+  "migrationEnvelopeDigests": [
+    "22d8c92a989ad41d8ba4fa8d047815d632c5f164f326973be80b92aa89632e52"
+  ],
+  "packId": "pack-1",
+  "presentationDigest": "0303030303030303030303030303030303030303030303030303030303030303",
+  "profileFamily": "financial",
+  "reason": "locally admitted",
+  "schema": "chio.financial.cross-issuer-entry-activation-decision.v1",
+  "signerKeyEpoch": 4,
+  "signerKeyId": "verifier-key",
+  "sourceKind": "imported",
+  "sourceManifestDigest": "0202020202020202020202020202020202020202020202020202020202020202",
+  "sourcePassportId": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifierId": "verifier-a"
+}

@@ -235,4 +235,31 @@ mod tests {
         body.last_sequence = 3;
         assert!(body.validate(&tenant).is_err());
     }
+
+    #[test]
+    fn signed_artifact_capture_sqlite_import_batch() {
+        let tenant = HostedTenantId::new("tenant:import")
+            .unwrap_or_else(|error| panic!("test tenant failed: {error}"));
+        let source = Keypair::from_seed(&[33_u8; 32]);
+        let body = HostedSqliteImportBatchBody {
+            schema: HOSTED_SQLITE_IMPORT_BATCH_SCHEMA.to_owned(),
+            tenant_id: tenant.as_str().to_owned(),
+            authority_epoch: 1,
+            first_sequence: 1,
+            last_sequence: 2,
+            source_projection_sha256: "a".repeat(64),
+            entries: vec![
+                signed_domain_entry(&tenant, 1, &source),
+                signed_domain_entry(&tenant, 2, &source),
+            ],
+            exported_at: 1_700_000_001,
+        };
+        assert!(body.validate(&tenant).is_ok());
+        let signed = SignedExportEnvelope::sign(body, &source)
+            .unwrap_or_else(|error| panic!("import batch signing failed: {error}"));
+        assert!(matches!(
+            signed.verify_signature(&source.public_key()),
+            Ok(true)
+        ));
+    }
 }

@@ -1,0 +1,17 @@
+{
+  "action": "factor.assignment_bind",
+  "actionNonce": "stale-nonce",
+  "agreementId": "agreement-stale",
+  "authorityId": "assignment-authority",
+  "authorityKeyEpoch": 5,
+  "buyerId": "did:chio:factor",
+  "buyerSettlementDestinationRef": "acct:factor",
+  "effectiveAtUnixMs": 1050,
+  "expiresAtUnixMs": 1100,
+  "issuedAtUnixMs": 1000,
+  "normalizedRequestDigest": "816123800c93763b2d16084c134458c54d3bbc0897d681ee7e7d2e6fd5ffc06b",
+  "obligationAtomDigest": "20c38ecce28d1552f4eb9e009823ad5c41dc1c0c035ed361423bb44155480f3b",
+  "operationId": "dbc3179faf26ed93fc32b3558c980381e83ee4b7e3aaa7592b07d5f706a3ba86",
+  "schema": "chio.factor.assignment-bind-authorization.v1",
+  "sellerId": "did:chio:seller"
+}

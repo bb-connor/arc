@@ -1,0 +1,94 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-cb00-7587-a37e-dd909db42a07",
+    "content_hash": "1aad36b0fb02621b951649811957ba7ad67d4838c2932d02088f7d6e8db74313",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "eb2ef48ac1c772742d9a248bc4f7038e847edf99ca7b28ba10da2d2ab360ea9e",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "eb2ef48ac1c772742d9a248bc4f7038e847edf99ca7b28ba10da2d2ab360ea9e",
+        "subject_key": "edf9d844e37e31c0b5ba2b8d89350871e68c75606da0e48f9f15548cd423c9f2"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:eb2ef48ac1c772742d9a248bc4f7038e847edf99ca7b28ba10da2d2ab360ea9e",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 100,
+          "event_id": "budget-hold:req-prepaid:cap-01a182c3-cb00-7587-a37e-dd909db42a07:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:eb2ef48ac1c772742d9a248bc4f7038e847edf99ca7b28ba10da2d2ab360ea9e:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "budget-hold:req-prepaid:cap-01a182c3-cb00-7587-a37e-dd909db42a07:0",
+        "invocation_capture": {
+          "budget_commit_index": 2,
+          "event_id": "budget-hold:req-prepaid:cap-01a182c3-cb00-7587-a37e-dd909db42a07:0:capture-invocation:1",
+          "invocation_count_after": 1
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "budget_commit_index": 3,
+          "committed_cost_units_after": 100,
+          "disposition": "reconciled",
+          "event_id": "budget-hold:req-prepaid:cap-01a182c3-cb00-7587-a37e-dd909db42a07:0:reconcile",
+          "exposure_units": 100,
+          "realized_spend_units": 100
+        }
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-cb71-7ba2-b2e4-da0e1523328a",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "financial": {
+        "budget_remaining": 900,
+        "budget_total": 1000,
+        "cost_breakdown": {
+          "payment": {
+            "adapter_metadata": {
+              "adapter": "x402"
+            },
+            "authorization_id": "x402_txn_paid",
+            "preauthorized_units": 100,
+            "recorded_units": 100
+          }
+        },
+        "cost_charged": 100,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "payment_reference": "x402_txn_paid",
+        "root_budget_holder": "eb2ef48ac1c772742d9a248bc4f7038e847edf99ca7b28ba10da2d2ab360ea9e",
+        "settlement_status": "settled"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-cb6f-7a03-83a5-cbde775900f1",
+        "request_id": "req-prepaid",
+        "request_namespace_digest": "b37f39dceeffcb31aa2078fb4242d103ce232c179a62f07230ca77d90d762a64"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195232,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "eb07952a13ece0fd1d382f288cda4b43adc0c8b71942bc49a14b1de80568dd57"
+}

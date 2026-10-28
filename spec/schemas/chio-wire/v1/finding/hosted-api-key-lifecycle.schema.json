@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-api-key-lifecycle.schema.json",
+  "title": "Chio finding hosted api key lifecycle signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "keyId",
+    "occurredAt",
+    "operation",
+    "schema",
+    "tenantId"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "occurredAt": {
+      "type": "integer"
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "activeFrom": {
+          "type": "integer"
+        },
+        "allowedActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expiresAt": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "principalId": {
+          "type": "string"
+        },
+        "rotatedFromKeyId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.finding.hosted-api-key-lifecycle.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

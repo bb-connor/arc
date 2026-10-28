@@ -1,0 +1,15 @@
+{
+  "action": "released",
+  "createdAt": 1793209493,
+  "holdId": "legal-hold-a",
+  "previousHoldEventSha256": "d40396e442c4513e3ebb3ed470f64b97aa5269a81aa234a8a531b4bb63336284",
+  "schema": "chio.finding.hosted-legal-hold.v1",
+  "target": {
+    "resourceFamily": "finding",
+    "resourceId": "60b49af83cd6724007c7480071e9201d3b6775d287e83935a25f4847aef3e679",
+    "resourceKind": "aggregate",
+    "resourceRevision": 1,
+    "resourceSha256": "0c19550c28b90382c59401ac6a6bd05108bd7df73f64ce6369d88c03dc42f3c0"
+  },
+  "tenantId": "integration-a-1793209486471803644"
+}

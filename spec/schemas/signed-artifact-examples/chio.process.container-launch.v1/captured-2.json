@@ -1,0 +1,12 @@
+{
+  "attempt": 1,
+  "container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "engine_identity": "test-engine",
+  "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "inspected_config_digest": "ded36351f939f37b7c4b45b9f55a49dd68a97735e7f45877f7f7c4b7bdcef4b7",
+  "process_id": "root",
+  "profile_digest": "ded36351f939f37b7c4b45b9f55a49dd68a97735e7f45877f7f7c4b7bdcef4b7",
+  "schema": "chio.process.container-launch.v1",
+  "started_at": "2026-01-01T00:00:00Z",
+  "state": "fully_enforced"
+}

@@ -1,0 +1,16 @@
+{
+  "algorithmVersion": "balance_match.v1",
+  "clearingAuthorityId": "clearing-authority",
+  "clearingAuthorityKeyEpoch": 13,
+  "currency": "USD",
+  "disputeWindowEndsAtUnixMs": 500,
+  "epoch": 3,
+  "generatedAtUnixMs": 100,
+  "governanceScopeId": "clearing-governance",
+  "inputCount": 2,
+  "inputManifestDigest": "66fe4ef8dd0e664aa4c3c828743a1252428877a39744b7647ef7dde2244ebade",
+  "participantSnapshotDigest": "84756e8e170e5cdce1b8eccc02b6a38e8b7485dac5460c2069edb05969b81afa",
+  "reservationRoot": "5568169d269d465c3e802cb5a83b1e644a5d541578bb312d94c538b352aa2a80",
+  "roundId": "round-1",
+  "schema": "chio.clearing.netting-round-core.v1"
+}

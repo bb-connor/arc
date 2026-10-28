@@ -1,0 +1,39 @@
+{
+  "aggregate_invocation_budget": {
+    "max_invocations": 1,
+    "scope": "capability"
+  },
+  "expires_at": 18446744073709551615,
+  "id": "cap-scoped",
+  "issued_at": 0,
+  "issuer": "b8464e0b958d94818d9ed9f31a7a3d12eaaed4038f24edf5bdef2e6479a5184b",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "custom",
+            "value": [
+              "session_id",
+              "sess-1"
+            ]
+          },
+          {
+            "type": "custom",
+            "value": [
+              "target_component_type",
+              "chat"
+            ]
+          }
+        ],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "ag-ui",
+        "tool_name": "submit"
+      }
+    ]
+  },
+  "subject": "fdd5cfb5dd82ecb618914b854a6841382cd65b09547fbd322c7abd379f7347b6"
+}

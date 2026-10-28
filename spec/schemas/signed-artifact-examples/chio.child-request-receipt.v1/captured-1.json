@@ -1,0 +1,14 @@
+{
+  "id": "",
+  "kernel_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "operation_kind": "create_message",
+  "outcome_hash": "child-outcome",
+  "parent_request_id": "parent",
+  "policy_hash": "policy",
+  "request_id": "child",
+  "session_id": "target",
+  "terminal_state": {
+    "state": "completed"
+  },
+  "timestamp": 100
+}

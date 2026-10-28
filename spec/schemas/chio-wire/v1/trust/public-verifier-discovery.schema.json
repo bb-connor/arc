@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/public-verifier-discovery.schema.json",
+  "title": "Chio public verifier discovery signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "discoveryId",
+    "expiresAt",
+    "importGuardrails",
+    "jwksUri",
+    "metadataSha256",
+    "metadataUrl",
+    "publishedAt",
+    "requestUriPrefix",
+    "schema",
+    "signerPublicKey",
+    "verifier",
+    "version"
+  ],
+  "properties": {
+    "discoveryId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "importGuardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "informationalOnly",
+        "requiresExplicitPolicyImport",
+        "requiresManualReview"
+      ],
+      "properties": {
+        "informationalOnly": {
+          "type": "boolean"
+        },
+        "requiresExplicitPolicyImport": {
+          "type": "boolean"
+        },
+        "requiresManualReview": {
+          "type": "boolean"
+        }
+      }
+    },
+    "jwksUri": {
+      "type": "string"
+    },
+    "metadataSha256": {
+      "type": "string"
+    },
+    "metadataUrl": {
+      "type": "string"
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "requestUriPrefix": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.public-verifier-discovery.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

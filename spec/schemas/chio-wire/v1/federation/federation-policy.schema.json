@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-policy.schema.json",
+  "title": "Chio federation policy signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "createdAt",
+    "expiresAt",
+    "issuer",
+    "partner",
+    "query",
+    "requireProofs",
+    "schema",
+    "signerPublicKey"
+  ],
+  "properties": {
+    "createdAt": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "partner": {
+      "type": "string"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "requireProofs": {
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "chio.federation-policy.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    }
+  }
+}

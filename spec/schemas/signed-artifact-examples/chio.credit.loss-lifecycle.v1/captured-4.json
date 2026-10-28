@@ -1,0 +1,51 @@
+{
+  "bondId": "bond-1",
+  "description": "test loss marker",
+  "eventId": "loss-t1",
+  "eventKind": "delinquency",
+  "issuedAt": 11,
+  "projectedBondLifecycleState": "active",
+  "report": {
+    "generatedAt": 11,
+    "query": {
+      "amount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "bondId": "bond-1",
+      "eventKind": "delinquency"
+    },
+    "schema": "chio.credit.loss-lifecycle-report.v1",
+    "summary": {
+      "agentSubject": "subject-1",
+      "bondId": "bond-1",
+      "currentBondLifecycleState": "active",
+      "currentDelinquentAmount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "eventAmount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "outstandingDelinquentAmount": {
+        "currency": "USD",
+        "units": 1000
+      },
+      "projectedBondLifecycleState": "active",
+      "releaseableReserveAmount": {
+        "currency": "USD",
+        "units": 2000
+      }
+    },
+    "supportBoundary": {
+      "appealWindowSupported": true,
+      "automaticCapitalExecutionSupported": false,
+      "bondLifecycleProjectionAuthoritative": true,
+      "externalClaimAdjudicationSupported": false,
+      "immutableLifecycleAuthoritative": true,
+      "reserveControlExecutionSupported": true
+    }
+  },
+  "schema": "chio.credit.loss-lifecycle.v1"
+}

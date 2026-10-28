@@ -1,0 +1,7 @@
+{
+  "checkpointSeq": 1042,
+  "checkpointStatementSha256": "d148fbd8099d2b5a35286c60063e732fe7e3415987cbdfa171cbf460cae7f8bb",
+  "observedAt": 1750090503,
+  "publishedAt": 1743292800,
+  "schema": "chio.finding.anchor-checkpoint-publication.v1"
+}

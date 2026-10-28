@@ -1,0 +1,25 @@
+{
+  "buyer_subject": "did:chio:buyer-acme",
+  "collateral_position_ref": "collateral-trust-market-valid",
+  "effective_window": {
+    "end": "2026-06-11T00:00:00Z",
+    "start": "2026-06-10T00:00:00Z"
+  },
+  "exclusions_ref": "sla-exclusions-market-valid",
+  "guarantee_decision_ref": "guarantee-trust-market-valid",
+  "id": "sla-commitment-trust-market-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "measurement_policy_ref": "measurement-policy-market-valid",
+  "metric_definitions": [
+    {
+      "metric": "completion_time_minutes",
+      "target": 30,
+      "unit": "minutes"
+    }
+  ],
+  "order_id": "order-commerce-001",
+  "provider_subject": "did:chio:provider-alpha",
+  "remedy_policy_ref": "remedy-policy-market-valid",
+  "schema": "chio.commerce.sla-commitment.v1",
+  "service_scope": "bounded-shopping-task"
+}

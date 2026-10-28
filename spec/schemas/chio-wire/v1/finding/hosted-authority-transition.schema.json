@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-authority-transition.schema.json",
+  "title": "Chio finding hosted authority transition signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "configurationRevision",
+    "createdAt",
+    "fromAuthority",
+    "fromEpoch",
+    "operation",
+    "rollbackWindowEndsAt",
+    "schema",
+    "sourceCheckpointSha256",
+    "targetCheckpointSha256",
+    "tenantId",
+    "throughSequence",
+    "toAuthority",
+    "toEpoch"
+  ],
+  "properties": {
+    "configurationRevision": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "fromAuthority": {
+      "type": "string"
+    },
+    "fromEpoch": {
+      "type": "integer"
+    },
+    "operation": {
+      "type": "string"
+    },
+    "rollbackWindowEndsAt": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "schema": {
+      "const": "chio.finding.hosted-authority-transition.v1"
+    },
+    "sourceCheckpointSha256": {
+      "type": "string"
+    },
+    "targetCheckpointSha256": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "throughSequence": {
+      "type": "integer"
+    },
+    "toAuthority": {
+      "type": "string"
+    },
+    "toEpoch": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "budgetAllocationId": "budget-child-a",
+  "childTaskId": "task-child-a",
+  "expiresAtUnixMs": 1800000061000,
+  "graphId": "swarm-graph-proof-valid",
+  "graphSha256": "b2ee3e57ce6095bf7fc9c4edc3049680350bfde7ee4e7f34fe89d6431c51fcaf",
+  "issuedAtUnixMs": 1800000000000,
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "mode": "single_use",
+  "nonce": "nonce-task-child-a",
+  "parentReceiptIds": [
+    "receipt-root"
+  ],
+  "parentTaskId": "task-root",
+  "revocationEpochRef": "revocation-epoch-swarm-valid",
+  "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+  "routePlanReceiptId": "route-child-a",
+  "schema": "chio.swarm.continuation-token.v1",
+  "sessionAnchorRef": "other-session",
+  "tokenId": "continuation-child-a",
+  "witnessChainRef": "witness-child-a",
+  "witnessChainSha256": "009f0e70f0d9d367cea86437c634d8d9ea5ffe492b6f8228cbe64c59fd28e797"
+}

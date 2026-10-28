@@ -1,0 +1,132 @@
+{
+  "cases": [
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "collusion-bid-ring",
+      "scenarioId": "collusion-bid-ring-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    },
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "credit-exhaustion",
+      "scenarioId": "credit-exhaustion-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    },
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "fee-structuring",
+      "scenarioId": "fee-structuring-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    },
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "oracle-divergence",
+      "scenarioId": "oracle-divergence-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    },
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "settlement-dos",
+      "scenarioId": "settlement-dos-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    },
+    {
+      "assertionScope": "the named production validator rejected the corpus",
+      "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedDisposition": "fail-closed",
+      "explicitLimits": [
+        "internal qualification only"
+      ],
+      "observedDisposition": "fail-closed",
+      "outcome": "held",
+      "requirementIds": [
+        "AE-TEST"
+      ],
+      "scenarioClass": "sybil-pricing-ring",
+      "scenarioId": "sybil-pricing-ring-seed-7",
+      "schema": "chio.econsim.scenario-result.v1",
+      "seed": 7,
+      "targetStatus": "bound"
+    }
+  ],
+  "harnessProvenance": {
+    "cargoLockDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "cargoVersion": "cargo test",
+    "command": [
+      "chio-econsim-runner"
+    ],
+    "corpusManifestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "enabledFeatures": [],
+    "executableDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "gitCommit": "abc",
+    "qualificationScope": "internal qualification only",
+    "runnerKeyId": "runner-test",
+    "rustcVersion": "rustc test",
+    "scenarioManifestDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "sourceTreeDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceTreeState": "clean",
+    "targetTriple": "test-target"
+  },
+  "profileId": "econsim-v1",
+  "schema": "chio.econsim.qualification-matrix.v1"
+}

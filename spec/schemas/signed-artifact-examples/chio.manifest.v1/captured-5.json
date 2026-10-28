@@ -1,0 +1,40 @@
+{
+  "description": "Bindings manifest verification sample",
+  "name": "Bindings Demo",
+  "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+  "schema": "chio.manifest.v1",
+  "server_id": "srv-bindings-demo",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Reads a file from the workspace",
+      "input_schema": {
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "latency_hint": "fast",
+      "name": "file_read",
+      "output_schema": {
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ],
+  "version": "1.0.0"
+}

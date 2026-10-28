@@ -1,0 +1,49 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
+      "parameters": {
+        "path": "/app/src/main.rs"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c6-20a8-7c25-80e0-f64c494c384e",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "runtime admission hook metadata must be a JSON object",
+      "verdict": "deny"
+    },
+    "kernel_key": "4f59f75363188d565ea233482119f21bcd9e71f6f78d5ca0fdc95882804ba577",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "4f59f75363188d565ea233482119f21bcd9e71f6f78d5ca0fdc95882804ba577",
+        "subject_key": "92d747d9b21c083da83c207c47df20430fb0399ea1955c7496f1aab0da30d7b0"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c6-2329-7d51-b244-dc065d0f12e8",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "reserved-metadata",
+        "request_namespace_digest": "97fbf27fbf9e87f966dec820a8927abcaa2291de869623ee17711c6be86c5b1f"
+      },
+      "runtime_admission": {
+        "accepted": false,
+        "failure_code": "runtime_admission_hook_metadata_not_object",
+        "hook": "non-object-metadata-hook"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195385,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "metadata-server",
+    "trust_level": "mediated"
+  },
+  "id": "24e4442cc7e481eb2b56316ac0dcb0a004910fd69295b58d3e8f9e4acadf5cd7"
+}

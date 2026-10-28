@@ -1,0 +1,37 @@
+{
+  "discovery_snapshot_ref": "discovery-trust-market-valid",
+  "id": "selection-trust-market-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "order_id": "order-commerce-001",
+  "override_receipt_ref": "",
+  "passport_id": "passport-trust-market-valid",
+  "price_quote_ref": "price-quote-alpha",
+  "ranking_policy_ref": "ranking-policy-market-valid",
+  "ranking_results": [
+    {
+      "provider_subject": "did:chio:provider-alpha",
+      "rank": 1,
+      "total_score": 92
+    }
+  ],
+  "rejected_candidate_summaries": [
+    {
+      "provider_subject": "did:chio:provider-beta",
+      "reason_codes": [
+        "lower_local_score"
+      ],
+      "redacted_fields": [
+        "customer_history"
+      ]
+    }
+  ],
+  "risk_report_ref": "risk-comptroller-market-valid",
+  "schema": "chio.commerce.provider-selection-report.v1",
+  "scorecard_ref": "scorecard-trust-market-valid",
+  "selected_provider_subject": "did:chio:provider-alpha",
+  "selection_reason_codes": [
+    "highest_local_score",
+    "sla_available"
+  ],
+  "sla_commitment_ref": "sla-commitment-trust-market-valid"
+}

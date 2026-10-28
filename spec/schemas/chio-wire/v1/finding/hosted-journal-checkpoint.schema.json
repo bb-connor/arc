@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-journal-checkpoint.schema.json",
+  "title": "Chio finding hosted journal checkpoint signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aggregateHeadsSha256",
+    "configurationRevision",
+    "createdAt",
+    "migrationVersion",
+    "previousCheckpointSha256",
+    "schema",
+    "tenantId",
+    "terminalJobsSha256"
+  ],
+  "properties": {
+    "aggregateHeadsSha256": {
+      "type": "string"
+    },
+    "configurationRevision": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "migrationVersion": {
+      "type": "integer"
+    },
+    "previousCheckpointSha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "schema": {
+      "const": "chio.finding.hosted-journal-checkpoint.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "terminalJobsSha256": {
+      "type": "string"
+    }
+  }
+}

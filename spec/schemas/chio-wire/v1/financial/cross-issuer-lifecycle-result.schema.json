@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-result.schema.json",
+  "title": "Chio financial cross issuer lifecycle result signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effectiveAt",
+    "issuerDid",
+    "resolverIdentity",
+    "resultDigest",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "sourceIndexLeaf",
+    "sourceIndexProof",
+    "sourceManifestDigest",
+    "sourcePassportId",
+    "status",
+    "statusVersion",
+    "storeGeneration",
+    "trustedClockHighWater"
+  ],
+  "properties": {
+    "effectiveAt": {
+      "type": "integer"
+    },
+    "issuerDid": {
+      "type": "string"
+    },
+    "resolverIdentity": {
+      "type": "string"
+    },
+    "resultDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer.lifecycle-result.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "sourceIndexLeaf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resultDigest",
+        "sourcePassportId"
+      ],
+      "properties": {
+        "resultDigest": {
+          "type": "string"
+        },
+        "sourcePassportId": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceIndexProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audit_path",
+        "leaf_index",
+        "tree_size"
+      ],
+      "properties": {
+        "audit_path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "leaf_index": {
+          "type": "integer"
+        },
+        "tree_size": {
+          "type": "integer"
+        }
+      }
+    },
+    "sourceManifestDigest": {
+      "type": "string"
+    },
+    "sourcePassportId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "statusVersion": {
+      "type": "integer"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "trustedClockHighWater": {
+      "type": "integer"
+    }
+  }
+}

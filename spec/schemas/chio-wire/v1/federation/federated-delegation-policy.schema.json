@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federated-delegation-policy.schema.json",
+  "title": "Chio federated delegation policy signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "createdAt",
+    "expiresAt",
+    "issuer",
+    "partner",
+    "schema",
+    "scope",
+    "signerPublicKey",
+    "ttlSeconds",
+    "verifier"
+  ],
+  "properties": {
+    "createdAt": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "parentCapabilityId": {
+      "type": "string"
+    },
+    "partner": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federated-delegation-policy.v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "ttlSeconds": {
+      "type": "integer"
+    },
+    "verifier": {
+      "type": "string"
+    }
+  }
+}

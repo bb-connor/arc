@@ -1,0 +1,66 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c6-3fe8-7741-9845-ac8731aaf7c9",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "budget invocation capture could not be confirmed",
+      "verdict": "deny"
+    },
+    "kernel_key": "9d962645fad5554170dcd34d06413b01257acbb24180fb2f2f59d3628c04a958",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "9d962645fad5554170dcd34d06413b01257acbb24180fb2f2f59d3628c04a958",
+        "subject_key": "9be302790322519c5fad78d0e3ec4b243c9b2b9b9b232f3ef86b5e3390e365ab"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:9d962645fad5554170dcd34d06413b01257acbb24180fb2f2f59d3628c04a958",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 100,
+          "event_id": "budget-hold:req-capture-lost-ack-top:cap-01a182c6-3fe8-7741-9845-ac8731aaf7c9:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:9d962645fad5554170dcd34d06413b01257acbb24180fb2f2f59d3628c04a958:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "budget-hold:req-capture-lost-ack-top:cap-01a182c6-3fe8-7741-9845-ac8731aaf7c9:0",
+        "invocation_capture": {
+          "admission_retained": true,
+          "event_id": "budget-hold:req-capture-lost-ack-top:cap-01a182c6-3fe8-7741-9845-ac8731aaf7c9:0:capture-invocation:1",
+          "invocation_capture_ambiguous": true
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c6-4281-77e3-ba13-cbadbade9c6d",
+      "chio_runtime": {
+        "identity_disposition": "retained"
+      },
+      "receipt_context": {
+        "request_id": "req-capture-lost-ack-top",
+        "request_namespace_digest": "ae08edc037b14420824ec6a2cce44ff46b3e6ebc9fea7c2129cf98cb6b590e80"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195393,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "4ddd48f7948db4ba50d2d6d6a95ad805180dcaadea44c179ed32c7e8766d62ab"
+}

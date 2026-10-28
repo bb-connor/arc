@@ -1,0 +1,36 @@
+{
+  "agentId": "b3f306713c81631734953267e65807bb25ce79b7ac6722857d0b082d59401bb0",
+  "authContext": {
+    "method": {
+      "audience": "chio-mcp",
+      "enterpriseIdentity": {
+        "federationMethod": "jwt",
+        "principal": "oidc:https://issuer.example#sub:tenant-b",
+        "providerId": "review-tenant-provider",
+        "providerKind": "oidc_jwks",
+        "subjectKey": "tenant-b-subject",
+        "tenantId": "caller-tenant-b"
+      },
+      "issuer": "https://issuer.example",
+      "kind": "o_auth_bearer",
+      "principal": "oidc:https://issuer.example#sub:tenant-b",
+      "scopes": [
+        "mcp:invoke"
+      ],
+      "subject": "tenant-b",
+      "token_fingerprint": "review-tenant-b"
+    },
+    "transport": "streamable_http"
+  },
+  "authContextHash": "9f7d432d7f222fef84469ed6a034056a49e63ecb00636a23e3f03471d51b9610",
+  "authEpoch": 1,
+  "authMethodHash": "a76fed7aec60b40a0441af57cfbf161d20b0274b7d24d49f6d57690287dc3a2e",
+  "id": "sess-2XyyhwGrYwo023AnRaxG7Q:anchor:1:9f7d432d7f22",
+  "issuedAt": 1793195532,
+  "kernelKey": "94069157a07ac746c990aaae70f390c48ec13e0130995521460646a84d95c8b5",
+  "proofBinding": {
+    "tokenFingerprint": "review-tenant-b"
+  },
+  "schema": "chio.session_anchor.v1",
+  "sessionId": "sess-2XyyhwGrYwo023AnRaxG7Q"
+}

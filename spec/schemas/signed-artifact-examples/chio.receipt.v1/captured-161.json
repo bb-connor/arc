@@ -1,0 +1,70 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d00aa7d5cdf0d81f62b40c523a5c4478dc57b8981679c8d117c61694faf5a55f",
+      "parameters": {
+        "call": 2
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a3185c-5000-78f9-b675-ada40700e550",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "execution nonce preflight requires retry with presented nonce",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "d2fa0a0b3309bf880f0d40d57d3d9a4b33fe8bdfd1aae7eda2e4d20413d90522",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "d2fa0a0b3309bf880f0d40d57d3d9a4b33fe8bdfd1aae7eda2e4d20413d90522",
+        "subject_key": "537ade9da22dd3f08826a332be2abe60ab87a30766541cbfa654326cdf2f5946"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "01a1828b-8a95-75e0-914a-e2e7cd58aabc",
+          "lease_epoch": 1,
+          "lease_id": "01a1828b-8e23-7f92-a7f0-65ea0cd34c1d"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 5,
+          "committed_cost_units_after": 0,
+          "event_id": "nonce-preflight-authorize:fffc11e5e9b0a9ddc2512e135e75a014d970f27677d81472c1bcf75db0b2f57f:0",
+          "exposure_units": 0
+        },
+        "budget_term": "01a1828b-8a95-75e0-914a-e2e7cd58aabc:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "nonce-preflight-hold:fffc11e5e9b0a9ddc2512e135e75a014d970f27677d81472c1bcf75db0b2f57f:0",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "budget_commit_index": 6,
+          "committed_cost_units_after": 0,
+          "disposition": "reversed",
+          "event_id": "nonce-preflight-authorize:fffc11e5e9b0a9ddc2512e135e75a014d970f27677d81472c1bcf75db0b2f57f:0:rollback:5",
+          "exposure_units": 0,
+          "realized_spend_units": 0
+        }
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a1828b-bf97-7923-840e-655057ededa4",
+      "execution_nonce": {
+        "stage": "preflight",
+        "tool_dispatched": false
+      },
+      "receipt_context": {
+        "request_id": "participant-history-cadence-02"
+      }
+    },
+    "policy_hash": "70c4c675068974856912e3d89769fc9e80e388bc50c9db92f25b12739dc4c236",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1800000000,
+    "tool_name": "send",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "f2d6dc5cc280e7cf27cd1f626c36253f51f1acfe76c26666a10feaa7d4d6d274"
+}

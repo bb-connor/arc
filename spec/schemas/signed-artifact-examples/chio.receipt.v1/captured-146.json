@@ -1,0 +1,43 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "0fa7bd0f89782a366cf67bb0b561086ca441a453c24bcda0af0077c7917d3b65",
+      "parameters": {
+        "city": "Boston"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182d1-1940-792c-8710-b99177441c11",
+    "content_hash": "1a4106c46bf7087dc53cae703cc5b9102172370ea6e5eb7c762847643c9e2aef",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "eff47ab5b9ce6e755d733f28f0e8ee96733642cf0683b880f1e8019c03342d13",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "eff47ab5b9ce6e755d733f28f0e8ee96733642cf0683b880f1e8019c03342d13",
+        "subject_key": "335a83f65b2c4a18c303d55cbb8f20e326ae4eee5c956e0fdac0951da38dd876"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182d1-19c7-7dc0-82f6-f56e7cdfebed",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182d1-19c6-78c1-898f-72186fd98678",
+        "request_id": "mcp-edge-req-64ae65f761e24096b5d23c594a43d10f",
+        "request_namespace_digest": "1c014b9cf60d096e63e59e761e12ae0ffd681d768a1c5aee0b7bb40bd0e854d1"
+      }
+    },
+    "policy_hash": "edge-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793196104,
+    "tool_name": "echo_json",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "1603d840ad42b1263320052b0ef4ba26fc514323b41027552fb5bbd8a83dde7c"
+}

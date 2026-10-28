@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-replication-check.schema.json",
+  "title": "Chio finding hosted replication check signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityEpoch",
+    "checkedAt",
+    "lagSeconds",
+    "projectionDifferenceCount",
+    "schema",
+    "securityCounterCount",
+    "sourceAuthority",
+    "sourceProjectionSha256",
+    "targetProjectionSha256",
+    "tenantId",
+    "throughSequence"
+  ],
+  "properties": {
+    "authorityEpoch": {
+      "type": "integer"
+    },
+    "checkedAt": {
+      "type": "integer"
+    },
+    "lagSeconds": {
+      "type": "integer"
+    },
+    "projectionDifferenceCount": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-replication-check.v1"
+    },
+    "securityCounterCount": {
+      "type": "integer"
+    },
+    "sourceAuthority": {
+      "type": "string"
+    },
+    "sourceProjectionSha256": {
+      "type": "string"
+    },
+    "targetProjectionSha256": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "throughSequence": {
+      "type": "integer"
+    }
+  }
+}

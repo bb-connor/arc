@@ -1,0 +1,15 @@
+{
+  "authorityKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "delegationDepthLimit": 4,
+  "event": {
+    "capability_id": "cap-1",
+    "epoch": 2,
+    "kind": "revoke"
+  },
+  "runtimeEventCount": 2,
+  "schema": "chio.trace-observation.v1",
+  "sequence": 2,
+  "sourceSequence": 2,
+  "traceId": "trace-b",
+  "traceLength": 2
+}

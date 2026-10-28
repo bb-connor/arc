@@ -1,0 +1,17 @@
+{
+  "id": "child-1",
+  "kernel_key": "5d2447bd03377d3187a30d85189f5e4b291121e0775d3ac9d5b150b2e3ec4dac",
+  "metadata": {
+    "source": "cluster-test"
+  },
+  "operation_kind": "create_message",
+  "outcome_hash": "outcome-hash",
+  "parent_request_id": "parent-alpha",
+  "policy_hash": "policy-hash",
+  "request_id": "child-alpha",
+  "session_id": "sess-alpha",
+  "terminal_state": {
+    "state": "completed"
+  },
+  "timestamp": 13
+}

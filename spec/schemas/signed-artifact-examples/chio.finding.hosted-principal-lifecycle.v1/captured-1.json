@@ -1,0 +1,11 @@
+{
+  "capabilityPublicKeyHex": "c6822637c7d310ec57627be00ba259d253749f4aaf644470cffbe53a35f73242",
+  "createdAt": 1793209487,
+  "operation": "key_rotation",
+  "overlapExpiresAt": 1793209587,
+  "previousEventSha256": "844f569c9b78d092157cd4486e9408621a59c554a827a2be4f77b385223846c4",
+  "principalId": "buyer-a",
+  "role": "buyer",
+  "schema": "chio.finding.hosted-principal-lifecycle.v1",
+  "tenantId": "integration-a-1793209486471803644"
+}

@@ -1,0 +1,763 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d14e6bce3d9d23699461accef0a05590e338f87624fba1c21bd81555c52c6ad6",
+      "parameters": {
+        "bootstrap": {
+          "action": {
+            "parameter_hash": "ca5b0bce59ba726d56b92ef338914cbf65189af3a1ce2b9bb8843903928020dc",
+            "parameters": {
+              "capabilities": {
+                "alice": {
+                  "aggregate_invocation_budget": {
+                    "max_invocations": 2,
+                    "root_binding": {
+                      "body": {
+                        "max_invocations": 2,
+                        "root_capability_hash": "52372f3791edd0ca5a6915cd9d03beadc146bceb00228f0f83d67769a169e10c",
+                        "root_capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                        "root_expires_at": 1793206968,
+                        "root_issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                        "root_scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                        "root_subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                        "schema": "chio.aggregate-budget-root.v1"
+                      },
+                      "signature": "04fd71dddf0c20b5a6de57c83760005ae2f249474c09ceaefdbf3672b29380bcbb33f40f40849706144b8e1929a735f19afcb16e7345f9d7c32c4086cf313e01"
+                    },
+                    "scope": "delegation_family"
+                  },
+                  "attenuation_proof": {
+                    "childScopeHash": "e02d84ae385a725175e82a5fe689fabd278c84b4a722a7e3c77b4a3204ff48ae",
+                    "normalizedSubsetProof": {
+                      "aggregateBudget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "normalizedChildScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"send_jobs\"}]}",
+                      "normalizedParentScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"*\"}]}",
+                      "subsetRelations": [
+                        {
+                          "childIndex": 0,
+                          "grantKind": "tool",
+                          "parentIndex": 0,
+                          "subset": true
+                        }
+                      ]
+                    },
+                    "parentScopeHash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c"
+                  },
+                  "budget_share_bps": 2500,
+                  "delegation_chain": [
+                    {
+                      "aggregate_budget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                      "delegatee": "f1db3b55d446ac300b770672484b6dc21645dde32368297b269d44c1818b964e",
+                      "delegator": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                      "scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                      "signature": "0005c51bde03bb861d5dcc23b8d36116e6c0e3a22f3632177850a8b99b7d39f78bc53eb08a8fdacb9785381b8dfc24117316160447f27e97103f517366ed550a",
+                      "timestamp": 1793203368
+                    }
+                  ],
+                  "expires_at": 1793206968,
+                  "id": "3846b1f6-57d9-409f-aaab-e7fff8a89436",
+                  "issued_at": 1793203368,
+                  "issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "operations": [
+                          "invoke",
+                          "delegate"
+                        ],
+                        "server_id": "chio-ipc",
+                        "tool_name": "send_jobs"
+                      }
+                    ]
+                  },
+                  "signature": "17281fd07143cb5b85078dc25744e7b3b7625cfa5300be17d733e6ea113c7a73ede1bc8fc326f042ba81982e8191de670ae8620c4b2db0ced10518a184608907",
+                  "subject": "f1db3b55d446ac300b770672484b6dc21645dde32368297b269d44c1818b964e"
+                },
+                "bob": {
+                  "aggregate_invocation_budget": {
+                    "max_invocations": 2,
+                    "root_binding": {
+                      "body": {
+                        "max_invocations": 2,
+                        "root_capability_hash": "52372f3791edd0ca5a6915cd9d03beadc146bceb00228f0f83d67769a169e10c",
+                        "root_capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                        "root_expires_at": 1793206968,
+                        "root_issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                        "root_scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                        "root_subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                        "schema": "chio.aggregate-budget-root.v1"
+                      },
+                      "signature": "04fd71dddf0c20b5a6de57c83760005ae2f249474c09ceaefdbf3672b29380bcbb33f40f40849706144b8e1929a735f19afcb16e7345f9d7c32c4086cf313e01"
+                    },
+                    "scope": "delegation_family"
+                  },
+                  "attenuation_proof": {
+                    "childScopeHash": "e02d84ae385a725175e82a5fe689fabd278c84b4a722a7e3c77b4a3204ff48ae",
+                    "normalizedSubsetProof": {
+                      "aggregateBudget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "normalizedChildScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"send_jobs\"}]}",
+                      "normalizedParentScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"*\"}]}",
+                      "subsetRelations": [
+                        {
+                          "childIndex": 0,
+                          "grantKind": "tool",
+                          "parentIndex": 0,
+                          "subset": true
+                        }
+                      ]
+                    },
+                    "parentScopeHash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c"
+                  },
+                  "budget_share_bps": 2500,
+                  "delegation_chain": [
+                    {
+                      "aggregate_budget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                      "delegatee": "93e95c41920c126520e9064dbaebed413e68f1254df096ff31e97da3afa654d4",
+                      "delegator": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                      "scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                      "signature": "0637a680db0b918206917ac792f1325a60d472a6e18606de7907056c37cec078c31a2b2a3cace8a2721452f8a06547773224c6a5fa4f2f2dc4f0defd905bf70e",
+                      "timestamp": 1793203368
+                    }
+                  ],
+                  "expires_at": 1793206968,
+                  "id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+                  "issued_at": 1793203368,
+                  "issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "operations": [
+                          "invoke",
+                          "delegate"
+                        ],
+                        "server_id": "chio-ipc",
+                        "tool_name": "send_jobs"
+                      }
+                    ]
+                  },
+                  "signature": "3b698a1398587a5290bfb84d30578832f7dec699c771ad7d7be43223b7a5aa874b72a8e1ffb2d099d0b6699ea617135573684f38f12465a037fb2451e815c105",
+                  "subject": "93e95c41920c126520e9064dbaebed413e68f1254df096ff31e97da3afa654d4"
+                },
+                "carol": {
+                  "aggregate_invocation_budget": {
+                    "max_invocations": 2,
+                    "root_binding": {
+                      "body": {
+                        "max_invocations": 2,
+                        "root_capability_hash": "52372f3791edd0ca5a6915cd9d03beadc146bceb00228f0f83d67769a169e10c",
+                        "root_capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                        "root_expires_at": 1793206968,
+                        "root_issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                        "root_scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                        "root_subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                        "schema": "chio.aggregate-budget-root.v1"
+                      },
+                      "signature": "04fd71dddf0c20b5a6de57c83760005ae2f249474c09ceaefdbf3672b29380bcbb33f40f40849706144b8e1929a735f19afcb16e7345f9d7c32c4086cf313e01"
+                    },
+                    "scope": "delegation_family"
+                  },
+                  "attenuation_proof": {
+                    "childScopeHash": "e02d84ae385a725175e82a5fe689fabd278c84b4a722a7e3c77b4a3204ff48ae",
+                    "normalizedSubsetProof": {
+                      "aggregateBudget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "normalizedChildScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"send_jobs\"}]}",
+                      "normalizedParentScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"*\"}]}",
+                      "subsetRelations": [
+                        {
+                          "childIndex": 0,
+                          "grantKind": "tool",
+                          "parentIndex": 0,
+                          "subset": true
+                        }
+                      ]
+                    },
+                    "parentScopeHash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c"
+                  },
+                  "budget_share_bps": 2500,
+                  "delegation_chain": [
+                    {
+                      "aggregate_budget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                      "delegatee": "4bb8e672b845a4f9b67152e72a757e86ad705e056a1caf87c977684c9575f17f",
+                      "delegator": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                      "scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                      "signature": "016190bced806324fc73d74d264e0eb4a84c4952d8c88ee6d80707215aa15475917a08ba7d533a783faa7585eaea0037a6d3c9f3ea76229fabb5ba97b9f9fa0e",
+                      "timestamp": 1793203368
+                    }
+                  ],
+                  "expires_at": 1793206968,
+                  "id": "8b4310e4-6ce1-47b7-b5fd-ada94bb42f29",
+                  "issued_at": 1793203368,
+                  "issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "operations": [
+                          "invoke",
+                          "delegate"
+                        ],
+                        "server_id": "chio-ipc",
+                        "tool_name": "send_jobs"
+                      }
+                    ]
+                  },
+                  "signature": "35118f8749da6fd24fa757169783c03f348036b080f7ab03e9e87e67b9c0ea4ff2971d53248b88485b1ae7f4670733972745599a4cf216691ba246691c00ce0c",
+                  "subject": "4bb8e672b845a4f9b67152e72a757e86ad705e056a1caf87c977684c9575f17f"
+                },
+                "dave": {
+                  "aggregate_invocation_budget": {
+                    "max_invocations": 2,
+                    "root_binding": {
+                      "body": {
+                        "max_invocations": 2,
+                        "root_capability_hash": "52372f3791edd0ca5a6915cd9d03beadc146bceb00228f0f83d67769a169e10c",
+                        "root_capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                        "root_expires_at": 1793206968,
+                        "root_issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                        "root_scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                        "root_subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                        "schema": "chio.aggregate-budget-root.v1"
+                      },
+                      "signature": "04fd71dddf0c20b5a6de57c83760005ae2f249474c09ceaefdbf3672b29380bcbb33f40f40849706144b8e1929a735f19afcb16e7345f9d7c32c4086cf313e01"
+                    },
+                    "scope": "delegation_family"
+                  },
+                  "attenuation_proof": {
+                    "childScopeHash": "e02d84ae385a725175e82a5fe689fabd278c84b4a722a7e3c77b4a3204ff48ae",
+                    "normalizedSubsetProof": {
+                      "aggregateBudget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "normalizedChildScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"send_jobs\"}]}",
+                      "normalizedParentScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"chio-ipc\",\"tool_name\":\"*\"}]}",
+                      "subsetRelations": [
+                        {
+                          "childIndex": 0,
+                          "grantKind": "tool",
+                          "parentIndex": 0,
+                          "subset": true
+                        }
+                      ]
+                    },
+                    "parentScopeHash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c"
+                  },
+                  "budget_share_bps": 2500,
+                  "delegation_chain": [
+                    {
+                      "aggregate_budget": {
+                        "max_invocations": 2,
+                        "root_binding_digest": "671a6c86320b9930ce3fd5fce8bcd6481d763bef0e9b9ca98dae59d14e8cb017"
+                      },
+                      "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                      "delegatee": "df05d776e2a9b6d3d78d5b8b8adca9e18f57cc6822baf32501b572b0a0c5146f",
+                      "delegator": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                      "scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                      "signature": "15602550d843e413d8814aefab1d63a1aaec5e8a675f9f62af4ac5a1b82f1d7af552e2fdfcbf367cc94125d29ce3f396fd87dec3f1101b7b9d69ffb4b7a9eb03",
+                      "timestamp": 1793203368
+                    }
+                  ],
+                  "expires_at": 1793206968,
+                  "id": "95f438c2-88ec-46d3-94f4-888d1b2d53cf",
+                  "issued_at": 1793203368,
+                  "issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "operations": [
+                          "invoke",
+                          "delegate"
+                        ],
+                        "server_id": "chio-ipc",
+                        "tool_name": "send_jobs"
+                      }
+                    ]
+                  },
+                  "signature": "1f169e36acbcd27df931c35cfa62c20bc0857790a248965912e620b82d8c6a3d21a5bff258787826ad9606ad4ae95d0d7a044c9c0e6d8a05992d3ae010082704",
+                  "subject": "df05d776e2a9b6d3d78d5b8b8adca9e18f57cc6822baf32501b572b0a0c5146f"
+                },
+                "root": {
+                  "aggregate_invocation_budget": {
+                    "max_invocations": 2,
+                    "root_binding": {
+                      "body": {
+                        "max_invocations": 2,
+                        "root_capability_hash": "52372f3791edd0ca5a6915cd9d03beadc146bceb00228f0f83d67769a169e10c",
+                        "root_capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                        "root_expires_at": 1793206968,
+                        "root_issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                        "root_scope_hash": "970f6dac4705bfe631e99e9e228736b796593bfe2207f24d108dc6debcbdde4c",
+                        "root_subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e",
+                        "schema": "chio.aggregate-budget-root.v1"
+                      },
+                      "signature": "04fd71dddf0c20b5a6de57c83760005ae2f249474c09ceaefdbf3672b29380bcbb33f40f40849706144b8e1929a735f19afcb16e7345f9d7c32c4086cf313e01"
+                    },
+                    "scope": "delegation_family"
+                  },
+                  "expires_at": 1793206968,
+                  "id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+                  "issued_at": 1793203368,
+                  "issuer": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+                  "schema": "chio.capability.v1",
+                  "scope": {
+                    "grants": [
+                      {
+                        "operations": [
+                          "invoke",
+                          "delegate"
+                        ],
+                        "server_id": "chio-ipc",
+                        "tool_name": "*"
+                      }
+                    ]
+                  },
+                  "signature": "470db0c50cf670eac049fb83a4ba667c73230daac9fdbc55eedeb1892425a68a9354fdbf744caf7b43ba06a839d39068dd597202a16fad8433fab7aa9d733305",
+                  "subject": "b967ed61dc1d62f0b544b37cd9b814a4608f79c60d4146299d31db1c9f38636e"
+                }
+              },
+              "record_sha256": "ef0d3e995637f162f71b37771e766cfd458de9fae74f4dab6a0356726a7e1507",
+              "runtime_id": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+            }
+          },
+          "boundary_class": "detect_only",
+          "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+          "content_hash": "ca5b0bce59ba726d56b92ef338914cbf65189af3a1ce2b9bb8843903928020dc",
+          "id": "ac690268b77ac50ab7a7686d1a65a203ccbf37a4c596a1b0c3c5e588207b2929",
+          "kernel_key": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+          "observation_outcome": "observed",
+          "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+          "receipt_kind": "trace_observation",
+          "redaction_mode": "none",
+          "signature": "d2196653d3e10fb1612230ec1fbd2919dad613acaa918fd5bbbf453dd8ef9d24a2b58e1b871db4e6b9d34797f3af998f777972ce7f11fe02f1f72a8296ea240a",
+          "timestamp": 1793203368,
+          "tool_name": "provision_swarm",
+          "tool_origin": "chio_internal",
+          "tool_server": "chio-process-host",
+          "trust_level": "verified"
+        },
+        "context": {
+          "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+          "process_id": "bob",
+          "runtime_id": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+        },
+        "nonce": {
+          "operation": {
+            "attachments": [
+              {
+                "BrokerAttempt": {
+                  "attempt_id": "attempt:a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                  "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                  "transport_id": "kernel-tool-server:chio-ipc",
+                  "transport_key_epoch": 6
+                }
+              },
+              {
+                "ExecutionNonceIssuanceDigest": "3c34ce053468f5969919c2525fba417baf45c6c1d0f5c1727a90a9fdabe970a4"
+              },
+              {
+                "ExecutionNoncePreflightDigest": "788e39e1d3f522e7b1390f33b100a68dc43192fd17f92f294175b0babcc894a4"
+              },
+              {
+                "RuntimeParticipantLedgerDigest": "7b95951c6d1a527e8bb78d834bdce0da96f18f872f364ccac0416a8cf4b9dc62"
+              }
+            ],
+            "binding": {
+              "authenticated_tenant_id": "local-system",
+              "authorization_capability_hash": "e1783a9799746cbd7dd34757eaf0214bf76580178db42ece4c0fd1bacf2beaee",
+              "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+              "coordinator_authority_id": "01a1833f-ec01-7e02-b9db-c04d89cb5561",
+              "effect_class": "side_effecting",
+              "kind": "tool_dispatch",
+              "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+              "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+              "request_binding": {
+                "action_parameter_hash": "2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6",
+                "immutable_request_hash": "38a0b1a5856534411944a9e76769d6e7412a02725d6de5d2f211b59e544c90be",
+                "participant_requirements": {
+                  "approval": false,
+                  "authorization_consumption": false,
+                  "broker_attempt": true,
+                  "budget_capture": true,
+                  "execution_nonce": true,
+                  "obligation": false,
+                  "observation_attempt_zero": false,
+                  "outcome_eligibility": false,
+                  "payment": false
+                },
+                "request_binding_hash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f"
+              },
+              "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+              "request_namespace_digest": "0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12"
+            },
+            "coordinator_lease_epoch": 6,
+            "dispatch_commit": null,
+            "dispatch_state": "terminal",
+            "last_error": null,
+            "schema": "chio.admission-operation.v1",
+            "state": "compensated_before_dispatch",
+            "terminal_replay": {
+              "receipt": {
+                "projection_digest": "033ddbf97397a7e888662c40534afed7ab3390e7be2124d8262d6f62be41d527",
+                "receipt_id": "f58cba01bc2a3af6ca6c9bb664d496191fa37e5feda44fe21dc8d9c751f0feef"
+              }
+            },
+            "version": 6
+          },
+          "reserved_at_unix_ms": null,
+          "signed_nonce": {
+            "nonce": {
+              "bound_to": {
+                "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+                "parameter_hash": "2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6",
+                "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+                "subject_id": "93e95c41920c126520e9064dbaebed413e68f1254df096ff31e97da3afa654d4",
+                "tool_name": "send_jobs",
+                "tool_server": "chio-ipc"
+              },
+              "expires_at": 1793203409,
+              "issued_at": 1793203379,
+              "nonce_id": "01a18340-1cd7-7ef0-93e9-b420beff3ec3",
+              "schema": "chio.operation_execution_nonce.v1"
+            },
+            "signature": "6cd2a7b686d1e6f6b6ff372e94fd2630882e36edebcb9ae18a5685ca55d35ac439545287ad60dab90a0e0c8a6dbe3f6f1855cda6d1c94bd89c4ea9b4d71f5c04"
+          },
+          "verified_at_unix_ms": 1793203379000
+        },
+        "observed_at_unix_ms": 1793203411746,
+        "operation": {
+          "binding": {
+            "authenticated_tenant_id": "local-system",
+            "authorization_capability_hash": "e1783a9799746cbd7dd34757eaf0214bf76580178db42ece4c0fd1bacf2beaee",
+            "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+            "coordinator_authority_id": "01a1833f-ec01-7e02-b9db-c04d89cb5561",
+            "effect_class": "side_effecting",
+            "kind": "tool_dispatch",
+            "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+            "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+            "request_binding": {
+              "action_parameter_hash": "2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6",
+              "immutable_request_hash": "38a0b1a5856534411944a9e76769d6e7412a02725d6de5d2f211b59e544c90be",
+              "participant_requirements": {
+                "approval": false,
+                "authorization_consumption": false,
+                "broker_attempt": true,
+                "budget_capture": true,
+                "execution_nonce": true,
+                "obligation": false,
+                "observation_attempt_zero": false,
+                "outcome_eligibility": false,
+                "payment": false
+              },
+              "request_binding_hash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f"
+            },
+            "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+            "request_namespace_digest": "0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12"
+          },
+          "dispatch_commit": null,
+          "dispatch_state": "terminal",
+          "execution_nonce_issuance_digest": null,
+          "history": [
+            {
+              "claim": {
+                "intent": {
+                  "episodeId": "01a18340-150b-70e0-b838-5323fdfedee2",
+                  "expectationId": "6683f669b19d1c42dd1aa28a5ad4e1d2d25d9b67825f9adb8c700f26b450b509",
+                  "grantIndex": 0,
+                  "phase": "nonce_preflight",
+                  "planDigest": "f068dab1a93135d6efbbda8ba819ad97b1652c48b7fef50fd2613ee10267b379",
+                  "requestBindingHash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f",
+                  "resources": [
+                    {
+                      "artifactDigest": "01606ce2d375398450450cc112f0f61d3db8e6501aec890167372ae423ec0066",
+                      "kind": "swarm_continuation",
+                      "resourceId": "continue-bob"
+                    }
+                  ],
+                  "runtimeAuthorityId": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+                },
+                "ledgerDigest": "7b95951c6d1a527e8bb78d834bdce0da96f18f872f364ccac0416a8cf4b9dc62",
+                "operationId": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                "recordedAtUnixMs": 1793203377778,
+                "schema": "chio.runtime-participant-claim.v1"
+              },
+              "history": {
+                "disposition": "released_before_dispatch",
+                "intent": {
+                  "episodeId": "01a18340-150b-70e0-b838-5323fdfedee2",
+                  "expectationId": "6683f669b19d1c42dd1aa28a5ad4e1d2d25d9b67825f9adb8c700f26b450b509",
+                  "grantIndex": 0,
+                  "phase": "nonce_preflight",
+                  "planDigest": "f068dab1a93135d6efbbda8ba819ad97b1652c48b7fef50fd2613ee10267b379",
+                  "requestBindingHash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f",
+                  "resources": [
+                    {
+                      "artifactDigest": "01606ce2d375398450450cc112f0f61d3db8e6501aec890167372ae423ec0066",
+                      "kind": "swarm_continuation",
+                      "resourceId": "continue-bob"
+                    }
+                  ],
+                  "runtimeAuthorityId": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+                },
+                "reference": {
+                  "claimDigest": "e0fc321d3d6c9f902e47b6c8a70e0c7e14725e4f818791e7ced71cfd98707669",
+                  "episodeId": "01a18340-150b-70e0-b838-5323fdfedee2",
+                  "operationId": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad"
+                }
+              },
+              "operation": {
+                "attachments": [
+                  {
+                    "RuntimeParticipantLedgerDigest": "7b95951c6d1a527e8bb78d834bdce0da96f18f872f364ccac0416a8cf4b9dc62"
+                  }
+                ],
+                "binding": {
+                  "authenticated_tenant_id": "local-system",
+                  "authorization_capability_hash": "e1783a9799746cbd7dd34757eaf0214bf76580178db42ece4c0fd1bacf2beaee",
+                  "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+                  "coordinator_authority_id": "01a1833f-ec01-7e02-b9db-c04d89cb5561",
+                  "effect_class": "side_effecting",
+                  "kind": "tool_dispatch",
+                  "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                  "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+                  "request_binding": {
+                    "action_parameter_hash": "2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6",
+                    "immutable_request_hash": "38a0b1a5856534411944a9e76769d6e7412a02725d6de5d2f211b59e544c90be",
+                    "participant_requirements": {
+                      "approval": false,
+                      "authorization_consumption": false,
+                      "broker_attempt": true,
+                      "budget_capture": true,
+                      "execution_nonce": true,
+                      "obligation": false,
+                      "observation_attempt_zero": false,
+                      "outcome_eligibility": false,
+                      "payment": false
+                    },
+                    "request_binding_hash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f"
+                  },
+                  "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+                  "request_namespace_digest": "0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12"
+                },
+                "coordinator_lease_epoch": 6,
+                "dispatch_commit": null,
+                "dispatch_state": "not_committed",
+                "last_error": null,
+                "schema": "chio.admission-operation.v1",
+                "state": "prepared",
+                "terminal_replay": null,
+                "version": 2
+              }
+            },
+            {
+              "claim": {
+                "intent": {
+                  "episodeId": "01a18340-21de-7983-91fe-85b8af1f7299",
+                  "expectationId": "6683f669b19d1c42dd1aa28a5ad4e1d2d25d9b67825f9adb8c700f26b450b509",
+                  "grantIndex": 0,
+                  "phase": "dispatch",
+                  "planDigest": "077c2b7063cdca39af6f8c004a7072e20e27c35058912fbb65f4315df320dd20",
+                  "requestBindingHash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f",
+                  "resources": [
+                    {
+                      "artifactDigest": "01606ce2d375398450450cc112f0f61d3db8e6501aec890167372ae423ec0066",
+                      "kind": "swarm_continuation",
+                      "resourceId": "continue-bob"
+                    }
+                  ],
+                  "runtimeAuthorityId": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+                },
+                "ledgerDigest": "7b95951c6d1a527e8bb78d834bdce0da96f18f872f364ccac0416a8cf4b9dc62",
+                "operationId": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                "recordedAtUnixMs": 1793203381013,
+                "schema": "chio.runtime-participant-claim.v1"
+              },
+              "history": {
+                "disposition": "released_before_dispatch",
+                "intent": {
+                  "episodeId": "01a18340-21de-7983-91fe-85b8af1f7299",
+                  "expectationId": "6683f669b19d1c42dd1aa28a5ad4e1d2d25d9b67825f9adb8c700f26b450b509",
+                  "grantIndex": 0,
+                  "phase": "dispatch",
+                  "planDigest": "077c2b7063cdca39af6f8c004a7072e20e27c35058912fbb65f4315df320dd20",
+                  "requestBindingHash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f",
+                  "resources": [
+                    {
+                      "artifactDigest": "01606ce2d375398450450cc112f0f61d3db8e6501aec890167372ae423ec0066",
+                      "kind": "swarm_continuation",
+                      "resourceId": "continue-bob"
+                    }
+                  ],
+                  "runtimeAuthorityId": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44"
+                },
+                "reference": {
+                  "claimDigest": "0f814352a2f679b3f1ebb692dd70a77989cd05a083a55e26b984bf2169a617fa",
+                  "episodeId": "01a18340-21de-7983-91fe-85b8af1f7299",
+                  "operationId": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad"
+                }
+              },
+              "operation": {
+                "attachments": [
+                  {
+                    "BrokerAttempt": {
+                      "attempt_id": "attempt:a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                      "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                      "transport_id": "kernel-tool-server:chio-ipc",
+                      "transport_key_epoch": 6
+                    }
+                  },
+                  {
+                    "ExecutionNonceIssuanceDigest": "3c34ce053468f5969919c2525fba417baf45c6c1d0f5c1727a90a9fdabe970a4"
+                  },
+                  {
+                    "ExecutionNoncePreflightDigest": "788e39e1d3f522e7b1390f33b100a68dc43192fd17f92f294175b0babcc894a4"
+                  },
+                  {
+                    "RuntimeParticipantLedgerDigest": "7b95951c6d1a527e8bb78d834bdce0da96f18f872f364ccac0416a8cf4b9dc62"
+                  }
+                ],
+                "binding": {
+                  "authenticated_tenant_id": "local-system",
+                  "authorization_capability_hash": "e1783a9799746cbd7dd34757eaf0214bf76580178db42ece4c0fd1bacf2beaee",
+                  "capability_id": "10735bf6-0c25-456e-b36a-cde4684e21be",
+                  "coordinator_authority_id": "01a1833f-ec01-7e02-b9db-c04d89cb5561",
+                  "effect_class": "side_effecting",
+                  "kind": "tool_dispatch",
+                  "operation_id": "a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad",
+                  "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+                  "request_binding": {
+                    "action_parameter_hash": "2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6",
+                    "immutable_request_hash": "38a0b1a5856534411944a9e76769d6e7412a02725d6de5d2f211b59e544c90be",
+                    "participant_requirements": {
+                      "approval": false,
+                      "authorization_consumption": false,
+                      "broker_attempt": true,
+                      "budget_capture": true,
+                      "execution_nonce": true,
+                      "obligation": false,
+                      "observation_attempt_zero": false,
+                      "outcome_eligibility": false,
+                      "payment": false
+                    },
+                    "request_binding_hash": "88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f"
+                  },
+                  "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+                  "request_namespace_digest": "0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12"
+                },
+                "coordinator_lease_epoch": 6,
+                "dispatch_commit": null,
+                "dispatch_state": "not_committed",
+                "last_error": null,
+                "schema": "chio.admission-operation.v1",
+                "state": "broker_attempt_registered",
+                "terminal_replay": null,
+                "version": 5
+              }
+            }
+          ],
+          "state": "compensated_before_dispatch",
+          "terminal_replay": {
+            "receipt": {
+              "projection_digest": "033ddbf97397a7e888662c40534afed7ab3390e7be2124d8262d6f62be41d527",
+              "receipt_id": "f58cba01bc2a3af6ca6c9bb664d496191fa37e5feda44fe21dc8d9c751f0feef"
+            }
+          },
+          "version": 6
+        },
+        "receipt_log": {
+          "checkpoint": {
+            "body": {
+              "batch_end_seq": 7,
+              "batch_start_seq": 1,
+              "chain_root": "0xd52aa7bece22e5aa09b40530e4a478788fe27395783e1e132a40e9ba4778d86e",
+              "checkpoint_seq": 1,
+              "issued_at": 1793203404,
+              "kernel_key": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+              "merkle_root": "0x7c556e5b93e8f34e55ab6bbb6e33d56b07000a825ec2261bb074400768691831",
+              "schema": "chio.checkpoint_statement.v1",
+              "tree_size": 7
+            },
+            "signature": "87853d784085c3939dfeab5883cf7194362e6b07b05179fa7998d02c10a66ac9b4623e30f8d7ee9dbfe11659212ba2ab5028b01caca3fd5a1fa3add46d232e07"
+          },
+          "inclusion": {
+            "checkpoint_seq": 1,
+            "leaf_index": 4,
+            "merkle_root": "0x7c556e5b93e8f34e55ab6bbb6e33d56b07000a825ec2261bb074400768691831",
+            "proof": {
+              "audit_path": [
+                "0x730f9be7954e6913520ec9259ca3e4632089735edf031440b550aa844bb22eb3",
+                "0x3a2dc3c12728b32b8ac58280af99aec81f96a1805fd25a0cae194077c73f93ab",
+                "0x429cdd25d39e857688e4d9083c534d51c9d7eda9c0fc7041a357c9526a5cbe58"
+              ],
+              "leaf_index": 4,
+              "tree_size": 7
+            },
+            "receipt_seq": 5
+          }
+        },
+        "request": {
+          "arguments": {
+            "message_key": "bob",
+            "payload": {
+              "from": "bob"
+            }
+          },
+          "known_outcome_only": false,
+          "operation_key": "publish",
+          "server_id": "chio-ipc",
+          "tool_name": "send_jobs"
+        },
+        "response": {
+          "execution_nonce_json": "{\"nonce\":{\"schema\":\"chio.operation_execution_nonce.v1\",\"nonce_id\":\"01a18340-1cd7-7ef0-93e9-b420beff3ec3\",\"issued_at\":1793203379,\"expires_at\":1793203409,\"bound_to\":{\"subject_id\":\"93e95c41920c126520e9064dbaebed413e68f1254df096ff31e97da3afa654d4\",\"request_id\":\"process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e\",\"capability_id\":\"10735bf6-0c25-456e-b36a-cde4684e21be\",\"tool_server\":\"chio-ipc\",\"tool_name\":\"send_jobs\",\"parameter_hash\":\"2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6\"}},\"signature\":\"6cd2a7b686d1e6f6b6ff372e94fd2630882e36edebcb9ae18a5685ca55d35ac439545287ad60dab90a0e0c8a6dbe3f6f1855cda6d1c94bd89c4ea9b4d71f5c04\"}",
+          "output": null,
+          "reason": "invocation budget exhausted for capability 10735bf6-0c25-456e-b36a-cde4684e21be",
+          "receipt_json": "{\"action\":{\"parameter_hash\":\"2961ce899168f9c060e8651c248ed86294765fae058acb4e8db110a9a5f435b6\",\"parameters\":{\"message_key\":\"bob\",\"payload\":{\"from\":\"bob\"}}},\"boundary_class\":\"prevent\",\"capability_id\":\"10735bf6-0c25-456e-b36a-cde4684e21be\",\"content_hash\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\",\"decision\":{\"guard\":\"kernel\",\"reason\":\"invocation budget exhausted for capability 10735bf6-0c25-456e-b36a-cde4684e21be\",\"verdict\":\"deny\"},\"id\":\"f58cba01bc2a3af6ca6c9bb664d496191fa37e5feda44fe21dc8d9c751f0feef\",\"kernel_key\":\"b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c\",\"metadata\":{\"admission_operation\":{\"compensation_status\":\"compensated_before_dispatch\",\"coordinator_lease_epoch\":6,\"coordinator_lease_id\":\"01a18340-12af-7d91-8fd4-5f2ef04b11a0\",\"operation_id\":\"a2214c5fe1d4ae0383332816062b4a138b4056740d16ef94d877898e9fb4f7ad\",\"projected_dispatch_state\":\"terminal\",\"projected_operation_version\":6,\"projected_state\":\"compensated_before_dispatch\",\"request_binding_hash\":\"88c6e134422a6ed927a6c51cc22b35593659e8ab1ea3144184ce97e07742422f\",\"request_id\":\"process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e\",\"request_namespace_digest\":\"0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12\",\"retained_dispatch_commit\":null,\"schema\":\"chio.admission-receipt.v1\",\"store_fence\":{\"lease_id\":\"01a18340-12af-7d91-8fd4-5f2ef04b11a0\",\"owner_epoch\":6,\"store_uuid\":\"01a1833f-ec01-7e02-b9db-c04d89cb5561\"},\"tool_outcome_id\":null,\"tool_outcome_version\":null,\"trusted_time_unix_ms\":1793203381937},\"attribution\":{\"delegation_depth\":1,\"issuer_key\":\"b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c\",\"subject_key\":\"93e95c41920c126520e9064dbaebed413e68f1254df096ff31e97da3afa654d4\"},\"budget_authority\":{\"authority_profile\":\"authoritative_hold_event\",\"guarantee_level\":\"single_node_atomic\",\"metering_profile\":\"max_cost_preauthorize_then_reconcile_actual\"},\"chio_kernel\":{\"rejection_code\":\"CHIO-KERNEL-BUDGET-EXHAUSTED\"},\"chio_process\":{\"attempt\":1,\"operation_key\":\"publish\",\"process_id\":\"bob\",\"request_sha256\":\"cc8de977f410b9b5d8ab05b98328eb3ba3d14f1240b60a2122c7a6729fe5d8e1\",\"runtime_id\":\"31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44\"},\"chio_receipt_signing_nonce\":\"rcpt-01a18340-2772-73a2-aa5f-648fd3a2b610\",\"chio_runtime\":{\"identity_disposition\":\"terminal\"},\"governed_transaction\":{\"intent_hash\":\"4da28251d52f89d6722cef2764e1d29211bcd138882a82e6c8db43c989383b08\",\"intent_id\":\"intent-graph-0-bob\",\"purpose\":\"Execute the initialized process task\",\"server_id\":\"chio-ipc\",\"tool_name\":\"send_jobs\"},\"receipt_context\":{\"request_id\":\"process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e\",\"request_namespace_digest\":\"0aed13e435827d0ee6c8e5c08a5c02049eff77f43b98cae49d7a20a3da44fc12\"},\"route\":{\"bridge\":\"chio\",\"protocolTarget\":\"chio://sha256/8ae17346c2425ea0e82378fcf9aa8aca6eb25805a2a447430b7233e9340f1db4\",\"selectedRoute\":\"chio:chio-ipc\"}},\"policy_hash\":\"c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"signature\":\"84bd7a1fcafca51c31e8f644a1b793dcfb305cc90796f6f91d3ae7c22e2909308d7fb54a43051eba3432487921b759d019422aabe572cc23bf8c4545bf74d005\",\"timestamp\":1793203381,\"tool_name\":\"send_jobs\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"chio-ipc\",\"trust_level\":\"mediated\"}",
+          "request_id": "process:9f686ba1bb7a7d16930396b028d50127e52f8c1192eb1472fb9a0ec9b0d6c28e",
+          "terminal_state": {
+            "state": "completed"
+          },
+          "verdict": "deny"
+        },
+        "runtime_id": "31b6b6ce-3d00-4fb1-97c8-e2e0b41fff44",
+        "schema": "chio.process.call-observation.v1"
+      }
+    },
+    "boundary_class": "detect_only",
+    "capability_id": "cap-01a1833f-f040-7cab-b2a0-2e4d1e3af57b",
+    "content_hash": "d14e6bce3d9d23699461accef0a05590e338f87624fba1c21bd81555c52c6ad6",
+    "kernel_key": "b2742689d179ed1a53bcb921741aaaa72f2f6c5e449b6f94371d5d3e03dfbf8c",
+    "observation_outcome": "observed",
+    "policy_hash": "c3e48636b91df9ad8c2c88991b346ce56dfd77f6d444755c3561e0f7a2c53e5f",
+    "receipt_kind": "trace_observation",
+    "redaction_mode": "none",
+    "timestamp": 1793203411,
+    "tool_name": "attest_retained_call",
+    "tool_origin": "chio_internal",
+    "tool_server": "chio-process-host",
+    "trust_level": "verified"
+  },
+  "id": "4a886bbea57177db598cbc39aa728a6e487119afe7a0ed5be0f4275930d1d0f2"
+}

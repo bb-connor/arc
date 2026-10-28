@@ -1,0 +1,6 @@
+{
+  "authorized_at": 1700000250,
+  "epoch_precommitment_sha256": "fdb081a4285dc7ea21676659b40929a2512b84219a8166bba0feb25fb874a504",
+  "expires_at": 1900000000,
+  "schema": "chio.finding.audit-round-authorization.v1"
+}

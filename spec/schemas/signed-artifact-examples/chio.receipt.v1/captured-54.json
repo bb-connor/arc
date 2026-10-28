@@ -1,0 +1,129 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "114e6a9cea601cd120a19d9d772a2f1699071ec02e875f84f297a474988f03af",
+      "parameters": {
+        "binding": {
+          "authenticated_tenant_id": "local-system",
+          "authorization_capability_hash": "47ac6094a4e30a4e0cf3d7e5a0a0b2c6c98907d0363597d1e0cd3e75ba9805c2",
+          "capability_id": "semantic-refusal-capability",
+          "coordinator_authority_id": "semantic-authority",
+          "effect_class": "side_effecting",
+          "kind": "tool_dispatch",
+          "operation_id": "870626eee95a4a4287ef56b9db1d50d220ddf3421c49a0d116ac1a1c7dfe253a",
+          "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "request_binding": {
+            "action_parameter_hash": "43cac6b440f0f99c7ba34a182a55a410b1cb9c617bf366258eabb6ae2ee89822",
+            "immutable_request_hash": "0aacf15d85341a94b7d06af2efd48d0a39f089377fb3d58afccbecf6f56d30b2",
+            "participant_requirements": {
+              "approval": false,
+              "authorization_consumption": false,
+              "broker_attempt": true,
+              "budget_capture": true,
+              "execution_nonce": false,
+              "obligation": false,
+              "observation_attempt_zero": false,
+              "outcome_eligibility": false,
+              "payment": false
+            },
+            "request_binding_hash": "de576080e14c3ee9e2272d10a2181e8060b5546e218a8556cd08bb470b630ed5"
+          },
+          "request_id": "semantic-refusal-request",
+          "request_namespace_digest": "3076f9ad4d3824db50c4d4256015b6d607dc5f44f037f674326f174beed15ef3"
+        },
+        "dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "semantic-coordinator-lease",
+          "provider_attempt": {
+            "attempt_id": "semantic-attempt",
+            "operation_id": "870626eee95a4a4287ef56b9db1d50d220ddf3421c49a0d116ac1a1c7dfe253a",
+            "transport_id": "kernel-tool-server:semantic-server",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "semantic-store-lease",
+            "owner_epoch": 1,
+            "store_uuid": "semantic-store"
+          }
+        },
+        "dispatch_state": "terminal",
+        "history": [],
+        "state": "outcome_unknown_after_dispatch",
+        "terminal_replay": {
+          "receipt": {
+            "projection_digest": "c33bd450bee9be19017ad2e8f16c93c0c249e0022cb4e42f199c1c5b2bf66e08",
+            "receipt_id": "2a3e02d4aa61644a0e8051aa573a782033d08d46c929f5f2f1e861268596527f"
+          }
+        },
+        "version": 7
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "semantic-refusal-capability",
+    "content_hash": "114e6a9cea601cd120a19d9d772a2f1699071ec02e875f84f297a474988f03af",
+    "decision": {
+      "guard": "kernel",
+      "reason": "operation refused",
+      "verdict": "deny"
+    },
+    "kernel_key": "265efc4709d353f98286506abed522e549f05a92894cdcf3653e3251d1e84447",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "semantic-coordinator-lease",
+        "operation_id": "870626eee95a4a4287ef56b9db1d50d220ddf3421c49a0d116ac1a1c7dfe253a",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 7,
+        "projected_state": "outcome_unknown_after_dispatch",
+        "request_binding_hash": "de576080e14c3ee9e2272d10a2181e8060b5546e218a8556cd08bb470b630ed5",
+        "request_id": "semantic-refusal-request",
+        "request_namespace_digest": "3076f9ad4d3824db50c4d4256015b6d607dc5f44f037f674326f174beed15ef3",
+        "retained_dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "semantic-coordinator-lease",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "semantic-attempt",
+            "operation_id": "870626eee95a4a4287ef56b9db1d50d220ddf3421c49a0d116ac1a1c7dfe253a",
+            "transport_id": "kernel-tool-server:semantic-server",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "semantic-store-lease",
+            "owner_epoch": 1,
+            "store_uuid": "semantic-store"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "semantic-store-lease",
+          "owner_epoch": 1,
+          "store_uuid": "semantic-store"
+        },
+        "tool_outcome_id": null,
+        "tool_outcome_version": null,
+        "trusted_time_unix_ms": 1700000000000
+      },
+      "chio_receipt_signing_nonce": "2a3e02d4aa61644a0e8051aa573a782033d08d46c929f5f2f1e861268596527f",
+      "receipt_context": {
+        "request_id": "semantic-refusal-request",
+        "request_namespace_digest": "3076f9ad4d3824db50c4d4256015b6d607dc5f44f037f674326f174beed15ef3"
+      }
+    },
+    "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000000,
+    "tool_name": "semantic-tool",
+    "tool_origin": "caller_executed",
+    "tool_server": "semantic-server",
+    "trust_level": "mediated"
+  },
+  "id": "e4cad7b622eb87cf3b55ea768147ce5136d6b55fac6ebd4239db94d9eeff9da9"
+}

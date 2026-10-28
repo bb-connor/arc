@@ -1,0 +1,39 @@
+{
+  "aggregateId": "mismatched-penalty",
+  "artifactSignerKey": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+  "authorityEpoch": 1,
+  "committedAt": 1700000001,
+  "eventId": "mismatched-penalty-event",
+  "eventKind": "penalty_assessed",
+  "expectedEventSha256": null,
+  "expectedRevision": 0,
+  "payload": {
+    "bond_ref": "integration-bond",
+    "descriptor": {
+      "context_sha256": "c686e0ee1053f4e5db867e3e9a67ac57e8df284284df13669d47fdd51fff3826",
+      "outcome_class": "positive_result",
+      "topic": "integration:c686e0ee1053f4e5db867e3e9a67ac57e8df284284df13669d47fdd51fff3826"
+    },
+    "evidence_checkpoint_ref": "integration-checkpoint",
+    "evidence_class": "asserted",
+    "evidence_cost": {
+      "currency": "USD",
+      "units": 1
+    },
+    "evidence_receipt_ids": [],
+    "expires_at": 1900000000,
+    "finding_id": "1d0718644a8beaa372c089357ba060278c06076aa801b869c8848eb5300c98ab",
+    "guarantee_class": "asserted",
+    "issued_at": 1700000000,
+    "issuer": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+    "payload_media_type": "application/json",
+    "payload_sha256": "c686e0ee1053f4e5db867e3e9a67ac57e8df284284df13669d47fdd51fff3826",
+    "schema": "chio.finding.v1",
+    "signature": "fb2d9cabd27b0b301ed0649c533093887417fb1898ff7280a0921aca7c8d1181d863155ddb5655b6cbb08ba3a820816283104c7a53de28eddb3198006262f10d",
+    "status_feed_ref": "integration-status"
+  },
+  "schema": "chio.finding.hosted-replication-event.v1",
+  "sequence": 3,
+  "sourceAuthority": "sqlite",
+  "tenantId": "integration-a-1793209486471803644"
+}

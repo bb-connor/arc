@@ -1,0 +1,9 @@
+{
+  "checkpoint_sequence": 1,
+  "issued_at": 5000,
+  "log_id": "log.snapshot",
+  "previous_checkpoint_hash": "0x36bcbc80cac506e897abf3205e4d23e975ab275090fa5ca3035a2263b680740b",
+  "root_hash": "0x34d93a1d09cd5539b78c2ccb66c3fabafae417d3603bbf4b81973e7a1c85b45b",
+  "schema": "chio.key-log.checkpoint.v1",
+  "tree_size": 2
+}

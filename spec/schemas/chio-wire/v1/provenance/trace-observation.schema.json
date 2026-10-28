@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/provenance/trace-observation.schema.json",
+  "title": "Chio trace observation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityKey",
+    "delegationDepthLimit",
+    "event",
+    "runtimeEventCount",
+    "schema",
+    "sequence",
+    "sourceSequence",
+    "traceId",
+    "traceLength"
+  ],
+  "properties": {
+    "authorityKey": {
+      "type": "string"
+    },
+    "delegationDepthLimit": {
+      "type": "integer"
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "admission_sequence": {
+          "type": "integer"
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "delegation_depth": {
+          "type": "integer"
+        },
+        "epoch": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "boundary_class",
+            "capability_id",
+            "content_hash",
+            "decision",
+            "id",
+            "kernel_key",
+            "metadata",
+            "policy_hash",
+            "receipt_kind",
+            "redaction_mode",
+            "signature",
+            "timestamp",
+            "tool_name",
+            "tool_origin",
+            "tool_server",
+            "trust_level"
+          ],
+          "properties": {
+            "action": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parameter_hash",
+                "parameters"
+              ],
+              "properties": {
+                "parameter_hash": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "nonce"
+                  ],
+                  "properties": {
+                    "nonce": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            },
+            "boundary_class": {
+              "type": "string"
+            },
+            "capability_id": {
+              "type": "string"
+            },
+            "content_hash": {
+              "type": "string"
+            },
+            "decision": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "verdict"
+              ],
+              "properties": {
+                "guard": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "type": "string"
+                }
+              }
+            },
+            "id": {
+              "type": "string"
+            },
+            "kernel_key": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "chio_receipt_signing_nonce",
+                "receipt_context"
+              ],
+              "properties": {
+                "attribution": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "delegation_depth",
+                    "issuer_key",
+                    "subject_key"
+                  ],
+                  "properties": {
+                    "delegation_depth": {
+                      "type": "integer"
+                    },
+                    "grant_index": {
+                      "type": "integer"
+                    },
+                    "issuer_key": {
+                      "type": "string"
+                    },
+                    "subject_key": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "chio_receipt_signing_nonce": {
+                  "type": "string"
+                },
+                "chio_runtime": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "identity_disposition"
+                  ],
+                  "properties": {
+                    "identity_disposition": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "receipt_context": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "request_id"
+                  ],
+                  "properties": {
+                    "evaluation_id": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "request_namespace_digest": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "policy_hash": {
+              "type": "string"
+            },
+            "receipt_kind": {
+              "type": "string"
+            },
+            "redaction_mode": {
+              "type": "string"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "integer"
+            },
+            "tool_name": {
+              "type": "string"
+            },
+            "tool_origin": {
+              "type": "string"
+            },
+            "tool_server": {
+              "type": "string"
+            },
+            "trust_level": {
+              "type": "string"
+            }
+          }
+        },
+        "receipt_time": {
+          "type": "integer"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "revocation_admitted": {
+          "type": "boolean"
+        },
+        "revocation_source_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "revocation_subject_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seen_epoch": {
+          "type": "integer"
+        }
+      }
+    },
+    "runtimeEventCount": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.trace-observation.v1"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "sourceSequence": {
+      "type": "integer"
+    },
+    "traceId": {
+      "type": "string"
+    },
+    "traceLength": {
+      "type": "integer"
+    }
+  }
+}

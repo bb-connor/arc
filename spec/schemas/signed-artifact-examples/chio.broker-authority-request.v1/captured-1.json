@@ -1,0 +1,14 @@
+{
+  "broker": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+  "issuedAtUnixSeconds": 20,
+  "operation": {
+    "kind": "check_broker_revocation",
+    "request": {
+      "brokerCapabilityId": "broker-capability",
+      "nowUnixSeconds": 20,
+      "revocationId": "broker-revocation"
+    }
+  },
+  "requestId": "4758fbfce0b6df877001400990707b0bb7c62d1160839488db2223e4eae917c6",
+  "schema": "chio.broker-authority-request.v1"
+}

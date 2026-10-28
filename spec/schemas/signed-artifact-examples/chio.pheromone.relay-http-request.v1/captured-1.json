@@ -1,0 +1,10 @@
+{
+  "bodySha256": "dbfdf6206fcc98461cdde4e649a2afc88a986904575613eb68579171d0d189da",
+  "method": "POST",
+  "nonce": "relay-nonce-001",
+  "path": "/v1/chio/pheromone/batches",
+  "recipientKernelId": "did:chio:buyer-kernel",
+  "schema": "chio.pheromone.relay-http-request.v1",
+  "senderKernelId": "did:chio:llamaworks",
+  "sentAtUnixMs": 1766000000500
+}

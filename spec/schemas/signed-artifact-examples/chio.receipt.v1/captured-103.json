@@ -1,0 +1,58 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "c866d702a30c1b516a02d0dd20253c7b45107e67ea620e8f54028767016a2cff",
+      "parameters": {
+        "limits": {
+          "max": 18446744073709551615,
+          "min": -9223372036854775808,
+          "zero": 0
+        },
+        "nested": [
+          {
+            "flags": [
+              true,
+              false,
+              null
+            ],
+            "path": "/workspace/a"
+          },
+          [
+            1,
+            [
+              2,
+              [
+                3
+              ]
+            ]
+          ]
+        ],
+        "ratio": 0.25,
+        "unicode": "café  "
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-subset-001-read-exact",
+    "content_hash": "a7a37f3a15091433f2cc3f0bbf07ee29d7a9812f1527d1c8053f173d0723fc3b",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-full-width",
+      "sequence": 18446744073709551615,
+      "window": {
+        "offset": -9223372036854775808
+      }
+    },
+    "policy_hash": "policy-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 18446744073709551615,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "eval-fixture",
+    "trust_level": "mediated"
+  },
+  "id": "4c56494573cdad0a0383047052a2cd2750770f7133cc1d8c99af3d43ba83635f"
+}

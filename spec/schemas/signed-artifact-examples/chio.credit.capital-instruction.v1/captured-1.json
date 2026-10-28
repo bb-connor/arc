@@ -1,0 +1,42 @@
+{
+  "action": "transfer_funds",
+  "amount": {
+    "currency": "USD",
+    "units": 5000
+  },
+  "authorityChain": [],
+  "counterpartyId": "subject-1",
+  "counterpartyRole": "agent_counterparty",
+  "description": "fixture transfer",
+  "executionWindow": {
+    "notAfter": 1800000000,
+    "notBefore": 1700010850
+  },
+  "instructionId": "cei-fixture-t1",
+  "intendedState": "pending_execution",
+  "issuedAt": 1700010850,
+  "ownerRole": "facility_provider",
+  "query": {
+    "agentSubject": "subject-1",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "rail": {
+    "custodyProviderId": "custody-fixture-1",
+    "kind": "api",
+    "railId": "rail-fixture-1"
+  },
+  "reconciledState": "not_observed",
+  "schema": "chio.credit.capital-instruction.v1",
+  "sourceId": "src-fixture-1",
+  "sourceKind": "facility_commitment",
+  "subjectKey": "subject-1",
+  "supportBoundary": {
+    "automaticDispatchSupported": false,
+    "capitalBookAuthoritative": true,
+    "custodyNeutralInstructionSupported": true,
+    "externalExecutionAuthoritative": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "authorizing_capability_digest": "38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe",
+  "eligible_set_digest": "38cf85ae73fb81f49434120e8c54f6e9bb7ae0483dec1927448949804d5cddda",
+  "governed_intent_hash": "282bcbc3f0a34a8a4ac6f00c276fcf66cf3757a3332e83d92208e5079af46922",
+  "policy_authority": "08df3a7e6c533e5bda2c274e87cdbebb5edf8d064f6835534983318935f0e506",
+  "policy_hash": "a0c898b1cb88de5ba0bd3781430dc5c0c7826b715e003badcc23db42106a447a",
+  "proposal_created_at": 100,
+  "proposal_deadline": 200,
+  "proposal_id": "stale",
+  "request_id": "request-1",
+  "schema": "chio.threshold-approval-proposal.v1",
+  "subject": "9abcc42195fa918199759ae3ff6bdf011bcf3bae0f6eda22177e6402db241890",
+  "threshold": 2
+}

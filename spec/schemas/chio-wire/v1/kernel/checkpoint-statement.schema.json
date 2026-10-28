@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/checkpoint-statement.schema.json",
+  "title": "Chio checkpoint statement signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "batch_end_seq",
+    "batch_start_seq",
+    "issued_at",
+    "kernel_key",
+    "merkle_root",
+    "schema",
+    "tree_size"
+  ],
+  "properties": {
+    "batch_end_seq": {
+      "type": "integer"
+    },
+    "batch_start_seq": {
+      "type": "integer"
+    },
+    "chain_root": {
+      "type": "string"
+    },
+    "checkpoint_seq": {
+      "type": "integer"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "merkle_root": {
+      "type": "string"
+    },
+    "previous_checkpoint_sha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "schema": {
+      "const": "chio.checkpoint_statement.v1"
+    },
+    "smuggled": {
+      "type": "string"
+    },
+    "tree_size": {
+      "type": "integer"
+    }
+  }
+}

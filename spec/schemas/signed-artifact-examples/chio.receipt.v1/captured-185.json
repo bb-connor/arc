@@ -1,0 +1,33 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "2e79cb1c0e9360adb260a8c8f354fc7a270509c0fd14f6eb065be51821c3f0d7",
+      "parameters": {
+        "stage": "parent"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-parent-continuation",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "6abd330899c22597c500ab062ba20d2b7a0fa6bcc944f0733cd981d3acb6a042",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rc-parent-continuation",
+      "lineageReferences": {
+        "sessionAnchorHash": "5b2d76167a0e672e1994ed0591344b4b504ca1737700b5d62405084e84995bac",
+        "sessionAnchorId": "sess-FsN4xptHhyybDzAKwhLs3Q:anchor:1:5b2d76167a0e"
+      }
+    },
+    "policy_hash": "policy-parent-continuation",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195234,
+    "tool_name": "delegate",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-echo",
+    "trust_level": "mediated"
+  },
+  "id": "ab4f24a16854ea7ad71753c56c4d640becb5e91cc274ecb35aba15ebf9da211c"
+}

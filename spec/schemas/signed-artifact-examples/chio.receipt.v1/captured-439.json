@@ -1,0 +1,87 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "e61f536a71c601c0df2353166ca0f7a5bd8674e74260273d4f074641571c0787",
+      "parameters": {
+        "method": "POST",
+        "request_id": "job-receipt-submission:job-uid-1",
+        "route": "/v1/receipts"
+      }
+    },
+    "boundary_class": "advisory_only",
+    "capability_id": "cap-1",
+    "content_hash": "50c61296e68fd9fde7658dc2e31cbedcb8c1854746e165a1d181ad4aa031ae18",
+    "kernel_key": "d09bb7db84d79d5d266fa42b1b0c76b11a20e6ac4296456bebca239cdf406916",
+    "metadata": {
+      "chio_http_receipt_v1": {
+        "boundary_class": "advisory_only",
+        "caller_identity_hash": "5a45e80d1ab1a73e8c2644f3f6c6e53974d0a986c2fc86692372d3f130248c9c",
+        "capability_id": "cap-1",
+        "content_hash": "1f483ace4fe87486269f6416c8e161587221c97a1b2cf4ee7eaeac324e079b2f",
+        "id": "96041bae79cb8cc1f75047ac5457778bfdd4b65a33b24f84ca1e87f241a3b1b3",
+        "kernel_key": "d09bb7db84d79d5d266fa42b1b0c76b11a20e6ac4296456bebca239cdf406916",
+        "metadata": {
+          "chio_http_status_scope": "final",
+          "completed_at": "2026-04-17T10:05:00Z",
+          "job_name": "demo",
+          "job_uid": "job-uid-1",
+          "namespace": "default",
+          "outcome": "succeeded",
+          "started_at": "2026-04-17T10:00:00Z",
+          "steps": [
+            {
+              "observed_at": "2026-04-17T10:05:00Z",
+              "payload": "{\"ok\":true}",
+              "phase": "Succeeded",
+              "pod_name": "demo-pod"
+            }
+          ],
+          "submission_kind": "job_receipt"
+        },
+        "method": "POST",
+        "observation_outcome": "observed",
+        "policy_hash": "599cad3e5864b62f81cf924b66a0eb974a8f359f0227754ecbf6bfbbf615e846",
+        "receipt_kind": "advisory_evaluation",
+        "redaction_mode": "none",
+        "request_id": "job-receipt-submission:job-uid-1",
+        "response_status": 200,
+        "route_pattern": "/v1/receipts",
+        "signature": "77b4cab67d1d7b76c78c1452cc01a7d6e132d448cb896438f04a3b8641becc5f4fc9b0f48cd908a5dab3925086e5a779f51dbe69413cf2c6d50879e01ac75c03",
+        "timestamp": 1793187161,
+        "tool_origin": "host_executed_unmediated",
+        "trust_level": "advisory",
+        "verdict": {
+          "reason": "operator observation does not authorize execution",
+          "verdict": "incomplete"
+        }
+      },
+      "chio_http_status_scope": "final",
+      "chio_receipt_signing_nonce": "96041bae79cb8cc1f75047ac5457778bfdd4b65a33b24f84ca1e87f241a3b1b3",
+      "completed_at": "2026-04-17T10:05:00Z",
+      "job_name": "demo",
+      "job_uid": "job-uid-1",
+      "namespace": "default",
+      "outcome": "succeeded",
+      "started_at": "2026-04-17T10:00:00Z",
+      "steps": [
+        {
+          "observed_at": "2026-04-17T10:05:00Z",
+          "payload": "{\"ok\":true}",
+          "phase": "Succeeded",
+          "pod_name": "demo-pod"
+        }
+      ],
+      "submission_kind": "job_receipt"
+    },
+    "observation_outcome": "observed",
+    "policy_hash": "599cad3e5864b62f81cf924b66a0eb974a8f359f0227754ecbf6bfbbf615e846",
+    "receipt_kind": "advisory_evaluation",
+    "redaction_mode": "none",
+    "timestamp": 1793187161,
+    "tool_name": "POST /v1/receipts",
+    "tool_origin": "host_executed_unmediated",
+    "tool_server": "http",
+    "trust_level": "advisory"
+  },
+  "id": "2843e12afce20374562cf85d61dfe4ea77ba19595c9074ce7cdf764a6965f6de"
+}

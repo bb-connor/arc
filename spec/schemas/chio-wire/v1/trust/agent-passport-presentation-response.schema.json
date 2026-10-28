@@ -1,0 +1,696 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/agent-passport-presentation-response.schema.json",
+  "title": "Chio agent passport presentation response signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "challenge",
+    "passport",
+    "schema"
+  ],
+  "properties": {
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expiresAt",
+        "issuedAt",
+        "nonce",
+        "schema",
+        "verifier"
+      ],
+      "properties": {
+        "challengeId": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "issuedAt": {
+          "type": "string"
+        },
+        "issuerAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxCredentials": {
+          "type": "integer"
+        },
+        "nonce": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requireActiveLifecycle",
+            "requireCheckpointCoverage",
+            "requireEnterpriseIdentityProvenance",
+            "requireReceiptLogUrls"
+          ],
+          "properties": {
+            "issuerAllowlist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "minCompositeScore": {
+              "type": "number"
+            },
+            "minReceiptCount": {
+              "type": "integer"
+            },
+            "minReliability": {
+              "type": "number"
+            },
+            "requireActiveLifecycle": {
+              "type": "boolean"
+            },
+            "requireCheckpointCoverage": {
+              "type": "boolean"
+            },
+            "requireEnterpriseIdentityProvenance": {
+              "type": "boolean"
+            },
+            "requireReceiptLogUrls": {
+              "type": "boolean"
+            }
+          }
+        },
+        "policyRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policyId"
+          ],
+          "properties": {
+            "policyId": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "verifier": {
+          "type": "string"
+        }
+      }
+    },
+    "passport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentials",
+        "issuedAt",
+        "merkleRoots",
+        "schema",
+        "subject",
+        "validUntil"
+      ],
+      "properties": {
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "@context",
+              "credentialSubject",
+              "evidence",
+              "expirationDate",
+              "issuanceDate",
+              "issuer",
+              "proof",
+              "type"
+            ],
+            "properties": {
+              "@context": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "credentialSubject": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "metrics"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "boundary_pressure",
+                      "composite_score",
+                      "computed_at",
+                      "delegation_hygiene",
+                      "effective_weight_sum",
+                      "history_depth",
+                      "incident_correlation",
+                      "least_privilege",
+                      "reliability",
+                      "resource_stewardship",
+                      "specialization",
+                      "subject_key"
+                    ],
+                    "properties": {
+                      "boundary_pressure": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "deny_ratio",
+                          "policies_observed",
+                          "receipts_observed"
+                        ],
+                        "properties": {
+                          "deny_ratio": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "policies_observed": {
+                            "type": "integer"
+                          },
+                          "receipts_observed": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "composite_score": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "state"
+                        ],
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "computed_at": {
+                        "type": "integer"
+                      },
+                      "delegation_hygiene": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "budget_reduction_rate",
+                          "delegations_observed",
+                          "scope_reduction_rate",
+                          "score",
+                          "ttl_reduction_rate"
+                        ],
+                        "properties": {
+                          "budget_reduction_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "delegations_observed": {
+                            "type": "integer"
+                          },
+                          "scope_reduction_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "ttl_reduction_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "effective_weight_sum": {
+                        "type": "number"
+                      },
+                      "history_depth": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "active_days",
+                          "activity_ratio",
+                          "first_seen",
+                          "last_seen",
+                          "receipt_count",
+                          "score",
+                          "span_days"
+                        ],
+                        "properties": {
+                          "active_days": {
+                            "type": "integer"
+                          },
+                          "activity_ratio": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "first_seen": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "last_seen": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "receipt_count": {
+                            "type": "integer"
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "span_days": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "incident_correlation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "incidents_observed",
+                          "score"
+                        ],
+                        "properties": {
+                          "incidents_observed": {
+                            "type": "null"
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "least_privilege": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "capabilities_observed",
+                          "score"
+                        ],
+                        "properties": {
+                          "capabilities_observed": {
+                            "type": "integer"
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "reliability": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "cancellation_rate",
+                          "completion_rate",
+                          "incompletion_rate",
+                          "receipts_observed",
+                          "score"
+                        ],
+                        "properties": {
+                          "cancellation_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "completion_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "incompletion_rate": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "receipts_observed": {
+                            "type": "integer"
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "resource_stewardship": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "average_utilization",
+                          "capped_grants_observed",
+                          "fit_score"
+                        ],
+                        "properties": {
+                          "average_utilization": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          },
+                          "capped_grants_observed": {
+                            "type": "integer"
+                          },
+                          "fit_score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "specialization": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "distinct_tools",
+                          "score"
+                        ],
+                        "properties": {
+                          "distinct_tools": {
+                            "type": "integer"
+                          },
+                          "score": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "state"
+                            ],
+                            "properties": {
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "subject_key": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "evidence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "checkpointRoots",
+                  "lineageRecords",
+                  "query",
+                  "receiptCount",
+                  "receiptIds",
+                  "uncheckpointedReceipts"
+                ],
+                "properties": {
+                  "checkpointRoots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "lineageRecords": {
+                    "type": "integer"
+                  },
+                  "query": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "until"
+                    ],
+                    "properties": {
+                      "since": {
+                        "type": "integer"
+                      },
+                      "until": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "receiptCount": {
+                    "type": "integer"
+                  },
+                  "receiptIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "receiptLogUrls": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "uncheckpointedReceipts": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "expirationDate": {
+                "type": "string"
+              },
+              "issuanceDate": {
+                "type": "string"
+              },
+              "issuer": {
+                "type": "string"
+              },
+              "proof": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "created",
+                  "proofPurpose",
+                  "proofValue",
+                  "type",
+                  "verificationMethod"
+                ],
+                "properties": {
+                  "created": {
+                    "type": "string"
+                  },
+                  "proofPurpose": {
+                    "type": "string"
+                  },
+                  "proofValue": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "verificationMethod": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "issuedAt": {
+          "type": "string"
+        },
+        "merkleRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "validUntil": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.agent-passport-presentation-response.v1"
+    }
+  }
+}

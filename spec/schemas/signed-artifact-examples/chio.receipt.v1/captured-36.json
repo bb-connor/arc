@@ -1,0 +1,154 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "13f513fe32a8991557ebf28941b75597641e94717c08569b7723d998c7428423",
+      "parameters": {
+        "safe": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a3185c-5000-7578-bb0b-452eb196051d",
+    "content_hash": "e5c564e390f21674b3acfd22c08a9821662cd7247285d36cbe7f75c22d2b1448",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "07b79a0f3768014ffb95efab37498b0aba2b562212a832da5dda2ca743ec300b",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "01a18285-4746-72e1-a993-f6644faf805f",
+        "operation_id": "7e93eedbcc6b229ae97f2b800c5a03123348e5e02dc3f827373fa7ab0299461d",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 13,
+        "projected_state": "completed",
+        "request_binding_hash": "be2a07c19408cdeb88c341c65b13b2697b73a867113f4fbb0e22929c1eae588b",
+        "request_id": "request-a",
+        "request_namespace_digest": "0773b35ace6b3b247dd5a9dddc7e35ba4ec93fcb0d4aaea72f60bbb02a0b5dad",
+        "retained_dispatch_commit": {
+          "committed_version": 11,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "01a18285-4746-72e1-a993-f6644faf805f",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt:7e93eedbcc6b229ae97f2b800c5a03123348e5e02dc3f827373fa7ab0299461d",
+            "operation_id": "7e93eedbcc6b229ae97f2b800c5a03123348e5e02dc3f827373fa7ab0299461d",
+            "transport_id": "native-caller-report:v1:server-a",
+            "transport_key_epoch": 41
+          },
+          "store_fence": {
+            "lease_id": "01a18285-4746-72e1-a993-f6644faf805f",
+            "owner_epoch": 1,
+            "store_uuid": "01a18285-4381-7b81-845d-0389f70dd49a"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "01a18285-4746-72e1-a993-f6644faf805f",
+          "owner_epoch": 1,
+          "store_uuid": "01a18285-4381-7b81-845d-0389f70dd49a"
+        },
+        "tool_outcome_id": "b932b7be2ebf766e2c3b546b9557c4ae9a92d270874126b527f4cc18f74b4db8",
+        "tool_outcome_version": 2,
+        "trusted_time_unix_ms": 1800000000000
+      },
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "07b79a0f3768014ffb95efab37498b0aba2b562212a832da5dda2ca743ec300b",
+        "subject_key": "2842e5361571ddfdbe14b374903fd434087aa09c673cb83755a13e8eddc49a2b"
+      },
+      "caller_delivery": {
+        "authorization_digest": "9b4039f0a66d099770b7fb70f8765cd12217dd9aa067f80adba3b0e73c4a7173",
+        "claim_id": "3e3db4f6-801e-443d-94ea-0d656d64ff1f",
+        "completed_at_unix_ms": 1800000000000,
+        "execution_started_at_unix_ms": 1800000000000,
+        "executor": {
+          "executor_id": "native-caller-executor",
+          "key_epoch": 41,
+          "public_key": "6e985c5104bcd62c694dcae44fc12a82ec7eaab9de9efc844cfbcfaebb305952"
+        },
+        "report_digest": "308a2aaf45b4e40ba24587da93ec61f825a766dc1602291fced2bf3dc8a55713",
+        "schema": "chio.authenticated-caller-observation.v1"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18285-d036-7130-ab67-d218df677a4d",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "native-runtime-admission",
+        "destructive": true,
+        "failure_code": null,
+        "governance_receipt_id": "native-runtime-governance",
+        "identity_disposition": "terminal",
+        "lease_id": "native-runtime-lease",
+        "operation_owned_replay": {
+          "bundle_sha256": "12ccfeae2ce06d2af0363f1e1603347014f61426cd7e1023c7ac3c140bd53a9c",
+          "plan_sha256": "1b2bfc5027571df7301f05868cc5a5ac8b913460a68e5f57ea41e1b7ffe3de27",
+          "reference": {
+            "claimDigest": "1b3f5f1409ebd28f9a8ef8624e43cc43cba51d77d493b5342c946b672c7b9333",
+            "episodeId": "01a18285-576d-7232-876c-55116408138b",
+            "operationId": "7e93eedbcc6b229ae97f2b800c5a03123348e5e02dc3f827373fa7ab0299461d"
+          },
+          "resources_sha256": "76153403a6288562656f6be22436e4edb08a5a6624ab0e1d71b5f5d9b713a09e",
+          "swarm_evidence_sha256": null,
+          "treaty_evidence_sha256": null
+        },
+        "pheromone_advisory": {
+          "accepted": true,
+          "distinctOriginPairs": 1,
+          "evaluatedAtUnixMs": 1800000000000,
+          "observeOnly": true,
+          "reputationEpoch": 1,
+          "sourceReportSha256": "b7ede5089651142d9429938370bf5c4bee93cf46f6fcb19935f820899ea0978e",
+          "subjectClass": "native-execution",
+          "subjectClassNamespace": "chio.runtime",
+          "totalStrength": 0.1
+        },
+        "pheromone_policy_decision": {
+          "decision": "allow",
+          "enforced": true,
+          "peerWeightsSha256": "0ee40c666c347763b1aa838cff050bcc61e188554d8f987c13442fbe53dba8c1",
+          "policyId": "native-runtime-policy",
+          "policySha256": "ce2cf08c93f6d72d71c18bde3dbded89e3638a53058d99b6baf37f2920d26b5a",
+          "queryReportSha256": "b7ede5089651142d9429938370bf5c4bee93cf46f6fcb19935f820899ea0978e",
+          "reasonCode": "runtime_pheromone_policy_allow",
+          "reputationEpoch": 1,
+          "schema": "chio.runtime.pheromone-policy-decision.v1"
+        },
+        "step_index": 1,
+        "trust_bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "verification_context_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "workflow_grant_id": "native-workflow-grant",
+        "workflow_id": "native-workflow"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "747661ee4f6eb12c793e9e571946b1ea637960f9d2e95e39f6362fd55c258007",
+          "approved": true,
+          "approver_key": "b4740ba4e0f7e0576f11e8149dbbb2529c212213db679831fb5d1b221e84552d",
+          "token_id": "approval-request-a"
+        },
+        "intent_hash": "cd81e7cf11cf6d89e482801726c1d9c7bf82482ddafed222de8fb7d4d6fb3d7e",
+        "intent_id": "request-a",
+        "purpose": "native combined security invocation",
+        "server_id": "server-a",
+        "tool_name": "send"
+      },
+      "receipt_context": {
+        "request_id": "request-a",
+        "request_namespace_digest": "0773b35ace6b3b247dd5a9dddc7e35ba4ec93fcb0d4aaea72f60bbb02a0b5dad"
+      }
+    },
+    "policy_hash": "70c4c675068974856912e3d89769fc9e80e388bc50c9db92f25b12739dc4c236",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1800000000,
+    "tool_name": "send",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "202000c893cb874826139b64722a722cadc0fb3fc1a60008d83311d92aff698f"
+}

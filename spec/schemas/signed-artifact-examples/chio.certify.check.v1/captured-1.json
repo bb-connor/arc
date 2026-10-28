@@ -1,0 +1,40 @@
+{
+  "checkedAt": 1710000000,
+  "criteria": [],
+  "criteriaProfile": "conformance-all-pass-v1",
+  "evidence": {
+    "evidenceProfile": "conformance-report-bundle-v1",
+    "generatedReportBytes": 1,
+    "generatedReportMediaType": "text/markdown",
+    "generatedReportSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "normalizedResultsSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "normalizedScenariosSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "provenanceMode": "artifact-signer-key",
+    "resultsDir": "results",
+    "scenariosDir": "scenarios"
+  },
+  "findings": [
+    {
+      "kind": "note",
+      "message": "capacity fixture "
+    }
+  ],
+  "schema": "chio.certify.check.v1",
+  "summary": {
+    "evaluatedPeerCount": 1,
+    "failCount": 0,
+    "missingScenariosCount": 0,
+    "passCount": 1,
+    "resultCount": 1,
+    "scenarioCount": 1,
+    "skippedCount": 0,
+    "unknownResultsCount": 0,
+    "unsupportedCount": 0,
+    "xfailCount": 0
+  },
+  "target": {
+    "toolServerId": "tool-server-fresh",
+    "toolServerName": "Capacity Fixture"
+  },
+  "verdict": "pass"
+}

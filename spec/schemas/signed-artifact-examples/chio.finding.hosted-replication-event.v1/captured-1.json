@@ -1,0 +1,17 @@
+{
+  "aggregateId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "artifactSignerKey": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+  "authorityEpoch": 1,
+  "committedAt": 1700000000,
+  "eventId": "import-1",
+  "eventKind": "finding_published",
+  "expectedEventSha256": null,
+  "expectedRevision": 0,
+  "payload": {
+    "invalid": true
+  },
+  "schema": "chio.finding.hosted-replication-event.v1",
+  "sequence": 1,
+  "sourceAuthority": "sqlite",
+  "tenantId": "tenant:import"
+}

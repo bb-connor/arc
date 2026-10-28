@@ -1,0 +1,33 @@
+{
+  "allowedDomains": [
+    "chio.frost.settle-commitment.v1"
+  ],
+  "authorityScope": "treaty",
+  "ceremonyTranscriptDigest": "6161616161616161616161616161616161616161616161616161616161616161",
+  "groupPublicKey": "dceffbfe328e15fee7801994906ff16c67c86f9c68b5d2236aded530dfc8fe37",
+  "keyEpoch": 1,
+  "keyOrigin": "distributed_dkg",
+  "participantCount": 3,
+  "participants": [
+    {
+      "participantId": "operator-1",
+      "verificationShare": "745079c41870b262cb842a96a41978771e2a973ac98d9c5cf61ef161d0c57a11"
+    },
+    {
+      "participantId": "operator-2",
+      "verificationShare": "057cfaa88b7ec4e7bf1b6c2c3bf0d6dc7bfec42b9f754958cb403cd726dee2b5"
+    },
+    {
+      "participantId": "operator-3",
+      "verificationShare": "deb45a4b6a4d36cf511630c1d6bbb3c6c0d32d0dab0a037d18e50261e7ebfdc2"
+    }
+  ],
+  "rosterAuthorityKeyId": "roster-authority.v1",
+  "rosterId": "d13050d514b214dc502500d9dca54a84843d31e06d6c3142736300cb619f872f",
+  "schema": "chio.frost.roster.v1",
+  "scopeId": "settlement.atlantic.v1",
+  "suiteId": "FROST-ED25519-SHA512-v1",
+  "threshold": 2,
+  "validFrom": 100,
+  "validUntil": 500
+}

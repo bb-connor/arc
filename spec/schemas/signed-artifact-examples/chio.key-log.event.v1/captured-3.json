@@ -1,0 +1,15 @@
+{
+  "algorithm": "ed25519",
+  "authority_id": "authority.snapshot",
+  "effective_at": 1000,
+  "event_id": "event.genesis",
+  "issued_at": 1000,
+  "key_id": "0xf6d98d6a0f4dc443c179b7f2a7989b7bf7c84badc69c39b7e564c1f893f6d8ce",
+  "log_id": "log.snapshot",
+  "operation": {
+    "type": "genesis"
+  },
+  "public_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+  "schema": "chio.key-log.event.v1",
+  "sequence": 0
+}

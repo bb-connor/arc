@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-canary-observation.schema.json",
+  "title": "Chio finding hosted canary observation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifactSha256",
+    "configurationRevision",
+    "durableIntegrityFailures",
+    "errorCount",
+    "observedSecs",
+    "oldestQueueAgeSecs",
+    "p99LatencyMillis",
+    "paymentAmbiguities",
+    "readyReplicas",
+    "requestCount",
+    "schema",
+    "signatureFailures",
+    "tenantIsolationViolations",
+    "windowEndedAtUnixSecs",
+    "windowStartedAtUnixSecs",
+    "workerIsolationFailures"
+  ],
+  "properties": {
+    "artifactSha256": {
+      "type": "string"
+    },
+    "configurationRevision": {
+      "type": "string"
+    },
+    "durableIntegrityFailures": {
+      "type": "integer"
+    },
+    "errorCount": {
+      "type": "integer"
+    },
+    "observedSecs": {
+      "type": "integer"
+    },
+    "oldestQueueAgeSecs": {
+      "type": "integer"
+    },
+    "p99LatencyMillis": {
+      "type": "integer"
+    },
+    "paymentAmbiguities": {
+      "type": "integer"
+    },
+    "readyReplicas": {
+      "type": "integer"
+    },
+    "requestCount": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-canary-observation.v1"
+    },
+    "signatureFailures": {
+      "type": "integer"
+    },
+    "tenantIsolationViolations": {
+      "type": "integer"
+    },
+    "windowEndedAtUnixSecs": {
+      "type": "integer"
+    },
+    "windowStartedAtUnixSecs": {
+      "type": "integer"
+    },
+    "workerIsolationFailures": {
+      "type": "integer"
+    }
+  }
+}

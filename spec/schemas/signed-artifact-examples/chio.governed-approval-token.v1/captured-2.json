@@ -1,0 +1,10 @@
+{
+  "approver": "b9b54c89520ba3dff56380defe8d4f5b816f4aa7bb8c850034f1af507ee2feff",
+  "decision": "approved",
+  "expires_at": 20,
+  "governed_intent_hash": "h",
+  "id": "expired",
+  "issued_at": 10,
+  "request_id": "a",
+  "subject": "720be197c0928b99650cd7f83cc8bd2ce2bddfc60ca1d2e0bac3fc4453dbb1c1"
+}

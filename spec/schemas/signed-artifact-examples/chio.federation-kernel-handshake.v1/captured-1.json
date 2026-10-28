@@ -1,0 +1,14 @@
+{
+  "capabilities": {
+    "features": {
+      "aggregate_invocation_budget": true
+    },
+    "schema": "chio.capabilities.v1"
+  },
+  "conformanceTier": "bronze",
+  "localKernelId": "kernel.org-b",
+  "nonce": "nonce-aggregate-enabled",
+  "remoteKernelId": "kernel.org-a",
+  "schema": "chio.federation-kernel-handshake.v1",
+  "timestamp": 1800000000
+}

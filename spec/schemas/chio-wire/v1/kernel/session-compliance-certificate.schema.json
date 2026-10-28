@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/session-compliance-certificate.schema.json",
+  "title": "Chio session compliance certificate signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "all_signatures_valid",
+    "crypto_floor",
+    "issued_at",
+    "policy_hash",
+    "receipt_count",
+    "session_id"
+  ],
+  "properties": {
+    "all_signatures_valid": {
+      "type": "boolean"
+    },
+    "crypto_floor": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "policy_hash": {
+      "type": "string"
+    },
+    "receipt_count": {
+      "type": "integer"
+    },
+    "session_id": {
+      "type": "string"
+    }
+  }
+}

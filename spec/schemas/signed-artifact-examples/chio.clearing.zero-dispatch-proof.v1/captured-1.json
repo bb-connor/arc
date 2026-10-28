@@ -1,0 +1,30 @@
+{
+  "admissionCommitDigest": "45ead671260e63ced2ef0aff1e1b107a23a81858ef401f35aae825bbed2ebfb8",
+  "admissionCommitSequence": 12,
+  "admissionStoreId": "admission-store-primary",
+  "authorityId": "admission-authority",
+  "authorityKeyEpoch": 9,
+  "dispatchStatusCount": 1,
+  "dispatchStatusRoot": "d93c628d3e0d847d84d015df59a3d380367244b1dd64c79eda112e4887b488b7",
+  "dispatchStatuses": [
+    {
+      "dispatchIdempotencyKey": "3c28c4105f00eb57665b21cdaac3368560087be3b7061fd43b5c1dd6a9929364",
+      "disposition": {
+        "kind": "absent"
+      },
+      "intentDigest": "01bab620d8a60f46d2049fff7de9a6354becdd041154c7f2b81383f5126ab385",
+      "intentId": "6a88138e9492e55be14188b5a38b17d18f8dc6aad616ab6183b5adc0ee0cca01"
+    }
+  ],
+  "expiresAtUnixMs": 560,
+  "issuedAtUnixMs": 520,
+  "outputManifestDigest": "bdef2c04a42711fccbeb1e1d2b18028371af42fdc9eac42e1e81bb2d5209bf44",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "roundId": "round-1",
+  "schema": "chio.clearing.zero-dispatch-proof.v1",
+  "settlementIntentCount": 1,
+  "settlementIntentRoot": "a4e5d285aad31b52b5f573886ea02ac3cacfc8d94718d272a92827fff1365cc5",
+  "sourceLifecycleFence": 2,
+  "sourceLifecycleHeadDigest": "9dbb1778be50ce91b8e2fb84cc0d8094f9b0cb54fb63afedcee71f54826fa645",
+  "sourceLifecycleVersion": 2
+}

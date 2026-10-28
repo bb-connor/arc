@@ -1,0 +1,43 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
+      "parameters": {
+        "path": "/app/src/main.rs"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-001",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "ForbiddenPathGuard",
+        "verdict": true
+      },
+      {
+        "details": "no secrets detected",
+        "guard_name": "SecretLeakGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "799ba360e3433a1b07ed48b97cbc39eb16dfd074656ae9ca7143b88922a2dee0",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-001",
+      "sandbox": {
+        "enforced": true
+      }
+    },
+    "policy_hash": "abc123def456",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000000,
+    "tool_name": "file_read",
+    "tool_origin": "chio_internal",
+    "tool_server": "srv-files",
+    "trust_level": "mediated"
+  },
+  "id": "e0f824d92812f8287c546c54c6515dc004974a618992fc520fb4125c0f03324e"
+}

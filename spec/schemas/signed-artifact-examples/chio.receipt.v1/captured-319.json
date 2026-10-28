@@ -1,0 +1,88 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "b483dbf6a11d0ede727f06ced6cba3d06abd0424691ef1caf6294c75ebf59462",
+      "parameters": {
+        "path": "/app/src/main.rs"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c5-ede0-7fe3-ae16-784ab2638856",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard dispatch revalidation failed: guard denied the request: payment unwind test denied before dispatch; pre-dispatch cleanup could not be confirmed: budget store error: budget state invariant violated: injected budget reversal failure",
+      "verdict": "deny"
+    },
+    "kernel_key": "299727657347d0623f4ac59c7e04b46d4e33c3c4e3f4882a442069a1281f5f0c",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "299727657347d0623f4ac59c7e04b46d4e33c3c4e3f4882a442069a1281f5f0c",
+        "subject_key": "5e0ca5c664cb99c00f65648cc13a7660e4f01e8dffc89f0b33c4499f3b9a4b58"
+      },
+      "budget_authority": {
+        "admission_may_be_retained": true,
+        "admission_release_unconfirmed": true,
+        "authority": {
+          "authority_id": "kernel:299727657347d0623f4ac59c7e04b46d4e33c3c4e3f4882a442069a1281f5f0c",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 100,
+          "event_id": "budget-hold:hosted-release-budget-reversal-error:cap-01a182c5-ede0-7fe3-ae16-784ab2638856:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:299727657347d0623f4ac59c7e04b46d4e33c3c4e3f4882a442069a1281f5f0c:1",
+        "cleanup_attempt_event_id": "budget-hold:hosted-release-budget-reversal-error:cap-01a182c5-ede0-7fe3-ae16-784ab2638856:0:authorize:rollback:1",
+        "cleanup_attempt_event_id_available": true,
+        "cleanup_capability_id": "cap-01a182c5-ede0-7fe3-ae16-784ab2638856",
+        "cleanup_custody": "fresh",
+        "cleanup_grant_index": 0,
+        "cleanup_hold_id": "budget-hold:hosted-release-budget-reversal-error:cap-01a182c5-ede0-7fe3-ae16-784ab2638856:0",
+        "cleanup_mutation_kind": "charge",
+        "cleanup_retains_prior_hold": false,
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "budget-hold:hosted-release-budget-reversal-error:cap-01a182c5-ede0-7fe3-ae16-784ab2638856:0",
+        "invocation_capture": {
+          "admission_retained": true,
+          "budget_commit_index": 2,
+          "event_id": "budget-hold:hosted-release-budget-reversal-error:cap-01a182c5-ede0-7fe3-ae16-784ab2638856:0:capture-invocation:1",
+          "invocation_count_after": 1
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "pre_dispatch_cleanup_unconfirmed": true
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c5-eff5-7531-bab3-85ed2e9dfcb0",
+      "chio_runtime": {
+        "dispatch_credential_disposition": "retained_after_authorization",
+        "dispatch_credential_retention_outcome_unknown": false,
+        "identity_disposition": "terminal",
+        "payment_credential_disposition": "retained_after_authorization",
+        "pre_dispatch_payment_unwind": {
+          "authorization_id": "payment-ambiguity-auth",
+          "credential_disposition": "retained_after_authorization",
+          "settlement_status": "released",
+          "transaction_id": "payment-ambiguity-auth"
+        }
+      },
+      "receipt_context": {
+        "request_id": "hosted-release-budget-reversal-error",
+        "request_namespace_digest": "cd794b431f0d15b739a33eb80d5c7d48761504bb6d54617a90e2049693d0d932"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195372,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "payment-ambiguity-server",
+    "trust_level": "mediated"
+  },
+  "id": "194ccfe04428d5a4518feeacb15a503380924590eb11a41232c5ab91ec0f19b2"
+}

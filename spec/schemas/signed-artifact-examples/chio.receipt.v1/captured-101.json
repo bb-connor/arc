@@ -1,0 +1,39 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "4dc20ac36da3bd4b21764ab17428eeca2ac0b45ee8f364723c4732c59a879c7e",
+      "parameters": {
+        "count": 9007199254740993,
+        "ratio": 100
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-raw",
+    "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "ForbiddenPathGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-raw",
+      "surface": {
+        "lane": "a"
+      }
+    },
+    "policy_hash": "deadbeefdeadbeef",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000000,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "9828977b5244858ebfd73fc562dde9908f71588ec1163c4951a6d25e18c47d86"
+}

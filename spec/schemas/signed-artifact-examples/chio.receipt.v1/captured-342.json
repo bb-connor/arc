@@ -1,0 +1,30 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "02a1fb39b57cfa4087ccf60dbe1395221ae98a7f833e7491b12ec6ef8acd4c19",
+      "parameters": {
+        "body": "ping",
+        "to": "alice@example.com"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-evt-allow",
+    "content_hash": "02a1fb39b57cfa4087ccf60dbe1395221ae98a7f833e7491b12ec6ef8acd4c19",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-evt-allow"
+    },
+    "policy_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1745603731,
+    "tool_name": "send_email",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-1",
+    "trust_level": "mediated"
+  },
+  "id": "924ff2799ffb9a7e49e3d5b195f2bd8a27636fd09f7c9c3948938c839244ccde"
+}

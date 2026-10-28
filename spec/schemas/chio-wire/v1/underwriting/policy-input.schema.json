@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/underwriting/policy-input.schema.json",
+  "title": "Chio underwriting policy input signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "filters",
+    "generatedAt",
+    "receipts",
+    "reputation",
+    "runtimeAssurance",
+    "schema",
+    "taxonomy"
+  ],
+  "properties": {
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agentSubject",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "receipts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionableMeteredReceipts",
+        "actionableSettlementReceipts",
+        "allowCount",
+        "approvalReceipts",
+        "approvedReceipts",
+        "callChainReceipts",
+        "cancelledCount",
+        "denyCount",
+        "failedSettlementReceipts",
+        "governedReceipts",
+        "incompleteCount",
+        "matchingReceipts",
+        "meteredReceipts",
+        "pendingSettlementReceipts",
+        "receiptRefs",
+        "returnedReceipts",
+        "runtimeAssuranceReceipts",
+        "sharedEvidenceProofRequiredCount",
+        "sharedEvidenceReferenceCount"
+      ],
+      "properties": {
+        "actionableMeteredReceipts": {
+          "type": "integer"
+        },
+        "actionableSettlementReceipts": {
+          "type": "integer"
+        },
+        "allowCount": {
+          "type": "integer"
+        },
+        "approvalReceipts": {
+          "type": "integer"
+        },
+        "approvedReceipts": {
+          "type": "integer"
+        },
+        "callChainReceipts": {
+          "type": "integer"
+        },
+        "cancelledCount": {
+          "type": "integer"
+        },
+        "denyCount": {
+          "type": "integer"
+        },
+        "failedSettlementReceipts": {
+          "type": "integer"
+        },
+        "governedReceipts": {
+          "type": "integer"
+        },
+        "incompleteCount": {
+          "type": "integer"
+        },
+        "matchingReceipts": {
+          "type": "integer"
+        },
+        "meteredReceipts": {
+          "type": "integer"
+        },
+        "pendingSettlementReceipts": {
+          "type": "integer"
+        },
+        "receiptRefs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "locator",
+              "observedAt",
+              "referenceId"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "locator": {
+                "type": "string"
+              },
+              "observedAt": {
+                "type": "integer"
+              },
+              "referenceId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "returnedReceipts": {
+          "type": "integer"
+        },
+        "runtimeAssuranceReceipts": {
+          "type": "integer"
+        },
+        "sharedEvidenceProofRequiredCount": {
+          "type": "integer"
+        },
+        "sharedEvidenceReferenceCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "reputation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptedImportedSignalCount",
+        "effectiveScore",
+        "importedSignalCount",
+        "probationary",
+        "resolvedTier",
+        "subjectKey"
+      ],
+      "properties": {
+        "acceptedImportedSignalCount": {
+          "type": "integer"
+        },
+        "effectiveScore": {
+          "type": "number"
+        },
+        "importedSignalCount": {
+          "type": "integer"
+        },
+        "probationary": {
+          "type": "boolean"
+        },
+        "resolvedTier": {
+          "type": "string"
+        },
+        "subjectKey": {
+          "type": "string"
+        }
+      }
+    },
+    "runtimeAssurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "governedReceipts",
+        "highestTier",
+        "latestEvidenceSha256",
+        "latestSchema",
+        "latestVerifier",
+        "latestVerifierFamily",
+        "observedVerifierFamilies",
+        "runtimeAssuranceReceipts"
+      ],
+      "properties": {
+        "governedReceipts": {
+          "type": "integer"
+        },
+        "highestTier": {
+          "type": "string"
+        },
+        "latestEvidenceSha256": {
+          "type": "string"
+        },
+        "latestSchema": {
+          "type": "string"
+        },
+        "latestVerifier": {
+          "type": "string"
+        },
+        "latestVerifierFamily": {
+          "type": "string"
+        },
+        "observedVerifierFamilies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtimeAssuranceReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.underwriting.policy-input.v1"
+    },
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supportedClasses",
+        "supportedReasons",
+        "version"
+      ],
+      "properties": {
+        "supportedClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supportedReasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

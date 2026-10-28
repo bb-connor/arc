@@ -1,0 +1,14 @@
+{
+  "agent_id": "agent-1",
+  "allowed": false,
+  "capability_id": "cap-2",
+  "classification": "navigate",
+  "denial_reason": "blocked",
+  "event_id": "evt-2",
+  "event_type": "navigation",
+  "id": "rcpt-2",
+  "kernel_key": "fc28e224a53ea1fcf0adffe9159dcfd7f977a9437dc5433e333fd691555a49b5",
+  "payload_hash": "def456",
+  "timestamp": 1700000000,
+  "transport": "web_socket"
+}

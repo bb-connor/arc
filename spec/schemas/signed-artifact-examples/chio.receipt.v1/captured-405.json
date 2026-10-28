@@ -1,0 +1,51 @@
+{
+  "bbs_signature": {
+    "algorithm": "bbs",
+    "ciphersuite": "BBS_BLS12381G1_XMD:SHA-256_SSWU_RO_",
+    "issuer_fingerprint": "70113a55c73186df1b5812a3c421f1ee8061acfda7fb4009f5a5432102ddaca3",
+    "issuer_public_key_hex": "ac96b29b82fd2aafa60ec4a4cf720073e1e8fe232f24cb0125b3e89397176e66c170794a6cec5b6440b00fdf88d5851b0d08d0a729499b56940e76cc1ae33e838602a52a3667f24ca9c0aeb1baeaccd972cc46eeb2d1f3755c6ed950c998c7d5",
+    "message_count": 14,
+    "projection_version": "chio.bbs-projection.receipt.v1",
+    "schema": "chio.receipt.bbs_signature.v1",
+    "signature_hex": "8056b03d49cdc7beee67e4d701d3d9345414cfb13ba451ab593ad543f5a524ac22cc9ac5892dcee2f28ae2b26db0698a2123600b735eccb192e98c5c17ccd08291802a83d66d12201f18ff62afd49cd2"
+  },
+  "body": {
+    "action": {
+      "parameter_hash": "3f31b68cde492ccb216e04bb62d975141dbed7b3c4f96a73d21398eaa88fb5cc",
+      "parameters": {
+        "caseRef": "refund-250",
+        "tool": "read_refund_case",
+        "workflowId": "wf-chio-refund-001"
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:chio-loopback",
+        "actor_kind": "agent"
+      }
+    ],
+    "bbs_projection_version": "chio.bbs-projection.receipt.v1",
+    "boundary_class": "prevent",
+    "capability_id": "lease-vendor-a-read",
+    "content_hash": "d4a0dc2e587e4acc3278024b42796fb9978466207933c82ceb0a626c3a1b314a",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-vendor-a",
+      "vendor_id": "vendor-a",
+      "workflow_id": "wf-chio-refund-001"
+    },
+    "policy_hash": "e6a0766a54bd1dcd5dc624072cbd32195e5da0b5418589d66f731eb8b9688b09",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "tenant_id": "buyer-tenant",
+    "timestamp": 1766000000,
+    "tool_name": "read_refund_case",
+    "tool_origin": "caller_executed",
+    "tool_server": "vendor-a.files",
+    "trust_level": "mediated"
+  },
+  "id": "9623fc002af61adb11ceae67fbb68d39dd0c29466669caa6a55987338673addd"
+}

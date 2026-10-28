@@ -1,0 +1,15 @@
+{
+  "chain_scope": [
+    "eip155:8453"
+  ],
+  "chio_identity": "did:chio:operator-1",
+  "chio_public_key": "a773550bdeabd6780091ee49d3be42aba867c5e68aab73f99020c57523d0bc05",
+  "expires_at": 1775200000,
+  "issued_at": 1775100000,
+  "nonce": "bind-001",
+  "purpose": [
+    "anchor"
+  ],
+  "schema": "chio.key-binding-certificate.v1",
+  "settlement_address": "0x1000000000000000000000000000000000000002"
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/voluntary-retraction-receipt.schema.json",
+  "title": "Chio finding voluntary retraction receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "feed_id",
+    "finding_id",
+    "issued_at",
+    "key_domain_nonce",
+    "schema",
+    "source_authority_id"
+  ],
+  "properties": {
+    "feed_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "key_domain_nonce": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.voluntary-retraction-receipt.v1"
+    },
+    "source_authority_id": {
+      "type": "string"
+    }
+  }
+}

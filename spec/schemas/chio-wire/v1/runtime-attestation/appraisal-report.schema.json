@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime-attestation/appraisal-report.schema.json",
+  "title": "Chio runtime attestation appraisal report signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appraisal",
+    "generatedAt",
+    "policyOutcome",
+    "schema"
+  ],
+  "properties": {
+    "appraisal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "artifact",
+        "effectiveTier",
+        "evidence",
+        "normalizedAssertions",
+        "normalizedClaims",
+        "reasonCodes",
+        "reasons",
+        "schema",
+        "vendorClaims",
+        "verdict",
+        "verifierFamily"
+      ],
+      "properties": {
+        "adapter": {
+          "type": "string"
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "claims",
+            "evidence",
+            "policy",
+            "schema",
+            "verifier"
+          ],
+          "properties": {
+            "claims": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "normalizedAssertions",
+                "normalizedClaims",
+                "vendorClaims"
+              ],
+              "properties": {
+                "normalizedAssertions": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "attestationType"
+                  ],
+                  "properties": {
+                    "attestationType": {
+                      "type": "string"
+                    },
+                    "runtimeIdentity": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "normalizedClaims": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "category",
+                      "code",
+                      "confidence",
+                      "freshness",
+                      "provenance",
+                      "value"
+                    ],
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "string"
+                      },
+                      "freshness": {
+                        "type": "string"
+                      },
+                      "provenance": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "vendorClaims": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "attestationType"
+                  ],
+                  "properties": {
+                    "attestationType": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "evidence": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidenceSha256",
+                "expiresAt",
+                "issuedAt",
+                "schema",
+                "verifier"
+              ],
+              "properties": {
+                "evidenceSha256": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "integer"
+                },
+                "issuedAt": {
+                  "type": "integer"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "verifier": {
+                  "type": "string"
+                }
+              }
+            },
+            "policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "effectiveTier",
+                "reasonCodes",
+                "reasons",
+                "verdict"
+              ],
+              "properties": {
+                "effectiveTier": {
+                  "type": "string"
+                },
+                "reasonCodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "code",
+                      "description",
+                      "disposition",
+                      "group"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "disposition": {
+                        "type": "string"
+                      },
+                      "group": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "verdict": {
+                  "type": "string"
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            },
+            "verifier": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "adapter",
+                "verifierFamily"
+              ],
+              "properties": {
+                "adapter": {
+                  "type": "string"
+                },
+                "verifierFamily": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "effectiveTier": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evidenceSha256",
+            "expiresAt",
+            "issuedAt",
+            "schema",
+            "verifier"
+          ],
+          "properties": {
+            "evidenceSha256": {
+              "type": "string"
+            },
+            "expiresAt": {
+              "type": "integer"
+            },
+            "issuedAt": {
+              "type": "integer"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "verifier": {
+              "type": "string"
+            }
+          }
+        },
+        "normalizedAssertions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attestationType"
+          ],
+          "properties": {
+            "attestationType": {
+              "type": "string"
+            },
+            "runtimeIdentity": {
+              "type": "string"
+            }
+          }
+        },
+        "normalizedClaims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "category",
+              "code",
+              "confidence",
+              "freshness",
+              "provenance",
+              "value"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "string"
+              },
+              "freshness": {
+                "type": "string"
+              },
+              "provenance": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "description",
+              "disposition",
+              "group"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "vendorClaims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attestationType"
+          ],
+          "properties": {
+            "attestationType": {
+              "type": "string"
+            }
+          }
+        },
+        "verdict": {
+          "type": "string"
+        },
+        "verifierFamily": {
+          "type": "string"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "policyOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "effectiveTier",
+        "reason",
+        "trustPolicyConfigured"
+      ],
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "effectiveTier": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "trustPolicyConfigured": {
+          "type": "boolean"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.runtime-attestation.appraisal-report.v1"
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime-attestation/evidence.schema.json",
+  "title": "Chio runtime attestation evidence signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claims",
+    "evidence_sha256",
+    "expires_at",
+    "issued_at",
+    "schema",
+    "tier",
+    "verifier"
+  ],
+  "properties": {
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "awsNitro": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "digest",
+            "moduleId",
+            "pcrs"
+          ],
+          "properties": {
+            "digest": {
+              "type": "string"
+            },
+            "moduleId": {
+              "type": "string"
+            },
+            "pcrs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "0"
+              ],
+              "properties": {
+                "0": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "azureMaa": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attestationType"
+          ],
+          "properties": {
+            "attestationType": {
+              "type": "string"
+            }
+          }
+        },
+        "enterpriseVerifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attestationType"
+          ],
+          "properties": {
+            "attestationType": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "hardwareModel": {
+              "type": "string"
+            },
+            "pcrs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "0"
+              ],
+              "properties": {
+                "0": {
+                  "type": "string"
+                }
+              }
+            },
+            "secureBoot": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "evidence_sha256": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "runtime_identity": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "workload_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credentialKind",
+        "path",
+        "scheme",
+        "trustDomain",
+        "uri"
+      ],
+      "properties": {
+        "credentialKind": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "trustDomain": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

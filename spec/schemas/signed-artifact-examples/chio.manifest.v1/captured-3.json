@@ -1,0 +1,26 @@
+{
+  "description": "Streaming test",
+  "name": "Streaming Server",
+  "public_key": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+  "schema": "chio.manifest.v1",
+  "server_id": "streaming-srv",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Stream search results",
+      "input_schema": {
+        "type": "object",
+        "x-chio-cancellation": true,
+        "x-chio-partial-output": true,
+        "x-chio-streaming": true
+      },
+      "name": "search_stream"
+    }
+  ],
+  "version": "1.0.0"
+}

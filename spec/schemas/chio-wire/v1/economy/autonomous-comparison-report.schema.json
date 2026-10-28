@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/autonomous-comparison-report.schema.json",
+  "title": "Chio autonomous comparison report signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "comparison_id",
+    "deltas",
+    "disposition",
+    "generated_at",
+    "manual_decision_ref",
+    "note",
+    "pricing_decision_ref",
+    "schema"
+  ],
+  "properties": {
+    "comparison_id": {
+      "type": "string"
+    },
+    "deltas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "automated_value",
+          "description",
+          "field",
+          "manual_value"
+        ],
+        "properties": {
+          "automated_value": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "manual_value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "disposition": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "integer"
+    },
+    "manual_decision_ref": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "pricing_decision_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.autonomous-comparison-report.v1"
+    }
+  }
+}

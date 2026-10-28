@@ -1,0 +1,32 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "bd2f7f69f3b59f053a5fab80767d2d212f211801ef63a17d009f8ebadd18b57e",
+      "parameters": {
+        "args": [
+          "x",
+          1
+        ]
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability",
+    "content_hash": "ed7002b439e9ac845f22357d822bac1444730fbdb6016d3ec9432297b9ec9f73",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+    "metadata": {
+      "chio_receipt_signing_nonce": "temporal-golden"
+    },
+    "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000000,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "server",
+    "trust_level": "mediated"
+  },
+  "id": "d77bdcee9002c83a9b9196c25d16ba62a9014e099d7006e81c06c0575c6babb6"
+}

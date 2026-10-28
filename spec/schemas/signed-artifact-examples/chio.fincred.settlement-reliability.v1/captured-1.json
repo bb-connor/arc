@@ -1,0 +1,39 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://chio.world/credentials/v1"
+  ],
+  "credentialId": "bc8350467950ca2f2bb58599b43308369a1bdb3645ab096ba9e9d5fc7f86ae8b",
+  "credentialSubject": {
+    "claims": {
+      "id": "did:chio:197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+      "obligationCount": 1,
+      "onTimeCount": 1,
+      "onTimeRatioBps": 10000
+    },
+    "family": "settlement_reliability"
+  },
+  "evidence": {
+    "sourceCompletenessAttestations": [],
+    "sourceDisclosure": {
+      "artifacts": [],
+      "kind": "bundled"
+    },
+    "window": {
+      "endsAt": 200,
+      "startsAt": 100
+    }
+  },
+  "expirationDate": "1970-01-01T00:05:00Z",
+  "family": "settlement_reliability",
+  "issuanceDate": "1970-01-01T00:03:20Z",
+  "issuer": "did:chio:fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+  "issuerKeyEpoch": 1,
+  "presentationEvidenceClass": "asserted",
+  "schema": "chio.fincred.settlement-reliability.v1",
+  "sourceEvidenceClass": "observed",
+  "type": [
+    "VerifiableCredential",
+    "ChioSettlementReliabilityCredential"
+  ]
+}

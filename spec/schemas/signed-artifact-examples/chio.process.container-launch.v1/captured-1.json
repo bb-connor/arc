@@ -1,0 +1,12 @@
+{
+  "attempt": 1,
+  "container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "engine_identity": "test-engine",
+  "failed_at_unix_ms": 1793202752269,
+  "failure_class": "start_failed",
+  "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "process_id": "root",
+  "profile_digest": "2806e2649f05af56c7da149695c174611602858aa7d5932c89278e924d0d02b9",
+  "schema": "chio.process.container-launch.v1",
+  "state": "bootstrap_failed"
+}

@@ -1,0 +1,46 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "a03c8657a575356de5937110fc9038dafa42d659089628586aa8f8d73924cd16",
+      "parameters": {
+        "limit": 5
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182d8-25f0-787a-a983-0749ad7a7a8d",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "openapi runtime admission denied",
+      "verdict": "deny"
+    },
+    "kernel_key": "14e433438d9d5c8d83c0cd30728e7ba1a73225f0587aa9b546c73d18aa5579e6",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "14e433438d9d5c8d83c0cd30728e7ba1a73225f0587aa9b546c73d18aa5579e6",
+        "subject_key": "3044e656551cfcd3ef6371d342113f8c30654fd56fec412d2bc52479c3b0d201"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182d8-290e-7f71-ad76-65ded3181dde",
+      "chio_runtime": {
+        "accepted": false,
+        "failure_code": "openapi_runtime_admission_denied",
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "req-openapi-runtime-denied",
+        "request_namespace_digest": "9707bf3cb590af81909ba588ad5b2a64a3ec353427b925d0f3c69139cf1585fd"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793196566,
+    "tool_name": "listPets",
+    "tool_origin": "caller_executed",
+    "tool_server": "petstore-bridge",
+    "trust_level": "mediated"
+  },
+  "id": "2c5848f5fe7e0d86694d79cf72c3ad4015762920e39ebf2e167b6ba45f35fbdb"
+}

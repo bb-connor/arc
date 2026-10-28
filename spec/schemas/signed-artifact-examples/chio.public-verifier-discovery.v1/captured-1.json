@@ -1,0 +1,18 @@
+{
+  "discoveryId": "verifier-discovery:https://trust.example.com",
+  "expiresAt": 1793192510,
+  "importGuardrails": {
+    "informationalOnly": true,
+    "requiresExplicitPolicyImport": true,
+    "requiresManualReview": true
+  },
+  "jwksUri": "https://trust.example.com/.well-known/jwks.json",
+  "metadataSha256": "9ab71194d1d103420a753f8a9b44d8ccffd33c466306792584c7b4b455012fe0",
+  "metadataUrl": "https://trust.example.com/.well-known/chio-oid4vp-verifier",
+  "publishedAt": 1793192210,
+  "requestUriPrefix": "https://trust.example.com/v1/public/passport/oid4vp/requests/",
+  "schema": "chio.public-verifier-discovery.v1",
+  "signerPublicKey": "bf4255a4b36411e14447de0844d5e42bb77f8cfc67636da37517c7e5fd64aedd",
+  "verifier": "https://trust.example.com",
+  "version": 1
+}

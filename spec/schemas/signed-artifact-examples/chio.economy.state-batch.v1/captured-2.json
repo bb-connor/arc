@@ -1,0 +1,192 @@
+{
+  "anchorId": "channel-anchor",
+  "batchId": "659ae6c8d93dc5406991b6fe0c949953182acc23bc539bcd8484813b899c023c",
+  "checkpointSequence": 5,
+  "effectSlots": [],
+  "expectedHeadsRoot": "7fa04fae53f55a777feeec4fd70f65f9012aab0ad32f30daa6e853d184ad897b",
+  "issuedAt": 1600,
+  "namespace": "channel-namespace",
+  "nextHeadsRoot": "c3bc34b7ff304cd37a84e1012ce02ea711c4a51a9600f7d42afad77f81a20bab",
+  "operationId": "fc6f810613be100c4becdebf27d1e7bcf4a6af71953d4b4488c295143170bd1e",
+  "previousCheckpointDigest": "b96c76cf66c496c95e59e90ebf3a7f188c72ad770bb131366b0e2e1ba08c4a82",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "channel-anchor-key",
+  "transitions": [
+    {
+      "expectedHeadDigest": "bb5bec446aa8792433f243e4ae1437d2ca53e7567219c70d0f197e69a3a45559",
+      "nextHead": {
+        "anchorId": "channel-anchor",
+        "headVersion": 3,
+        "lifecycleFence": 4,
+        "lifecycleState": "open",
+        "namespace": "channel-namespace",
+        "predecessorDigest": "bb5bec446aa8792433f243e4ae1437d2ca53e7567219c70d0f197e69a3a45559",
+        "resourceKey": {
+          "resourceFamily": "channel_escrow_reservation",
+          "resourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+          "scopeId": "channel-settlement"
+        },
+        "resourceVersion": 4,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "channelId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+            "escrowReference": {
+              "chainId": "eip155:31337",
+              "escrowContract": "0x5555555555555555555555555555555555555555",
+              "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b"
+            },
+            "lifecycleFence": 4,
+            "openDigest": "d6bdeef426c9467a38b351d664eb87b42eec9b41acbb53f9b4431c513cbf54b5",
+            "schema": "chio.channel.escrow-reservation.v1",
+            "status": "open",
+            "version": 4
+          }
+        },
+        "stateDigest": "1566b9085b0c60f4e92c05c4fcc67f708b2d5f2c1b65aac446ac2f01e516c29a",
+        "trustedClockHighWater": 1600
+      },
+      "resourceKey": {
+        "resourceFamily": "channel_escrow_reservation",
+        "resourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+        "scopeId": "channel-settlement"
+      },
+      "transitionProofDigest": "d28280024bd224547443f8f86472d7af17bb10dd15f8eb4930082b9d6acb46fa"
+    },
+    {
+      "expectedHeadDigest": "1f6b6449df53fb6d6f53cd843dc11a076879583e2d8de0cc2718350110ef5505",
+      "nextHead": {
+        "anchorId": "channel-anchor",
+        "effectIdempotencyKey": "e1c8b62db5eac59a3d5007edfa7e6a545aca03a0052140cfaf2f5de92f276591",
+        "headVersion": 3,
+        "lifecycleFence": 4,
+        "lifecycleState": "open",
+        "namespace": "channel-namespace",
+        "operationId": "fc6f810613be100c4becdebf27d1e7bcf4a6af71953d4b4488c295143170bd1e",
+        "predecessorDigest": "1f6b6449df53fb6d6f53cd843dc11a076879583e2d8de0cc2718350110ef5505",
+        "resourceKey": {
+          "resourceFamily": "channel_lifecycle",
+          "resourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+          "scopeId": "channel-settlement"
+        },
+        "resourceVersion": 3,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "channelId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+            "latestSequence": 1,
+            "latestStateDigest": "cae774544af310a0ae15bfb29511c212c3bc3662427498d5de6d80abee1c29a0",
+            "lifecycleFence": 4,
+            "liveReservationId": "5ecbd5acbe9e5fdb75c03cc8aeeb8e947b96fe081668a9485c56749255090b84",
+            "operationId": "fc6f810613be100c4becdebf27d1e7bcf4a6af71953d4b4488c295143170bd1e",
+            "schema": "chio.channel.lifecycle.v1",
+            "stateVersion": 3,
+            "status": "open"
+          }
+        },
+        "stateDigest": "f1b79534987890c4a8f3eb90a7c38abb7069f776cb7afdee8cdaf38386a94398",
+        "trustedClockHighWater": 1600
+      },
+      "resourceKey": {
+        "resourceFamily": "channel_lifecycle",
+        "resourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+        "scopeId": "channel-settlement"
+      },
+      "transitionProofDigest": "cb327025229b1565908dfc7f6f510e90f6ab53d59eee0ea94c224ca4c2686742"
+    },
+    {
+      "expectedHeadDigest": "2c9b29ad2bd8e1d6b9da90afae88b8f414d9bf26fdf21f72933d285f12e0f6d1",
+      "nextHead": {
+        "anchorId": "channel-anchor",
+        "effectIdempotencyKey": "2f5e6fc6c1a7edd9f0f3b8695899104b191e20aa3f774266d7279caeee152094",
+        "headVersion": 3,
+        "lifecycleFence": 3,
+        "lifecycleState": "completed",
+        "namespace": "channel-namespace",
+        "operationId": "fc6f810613be100c4becdebf27d1e7bcf4a6af71953d4b4488c295143170bd1e",
+        "predecessorDigest": "2c9b29ad2bd8e1d6b9da90afae88b8f414d9bf26fdf21f72933d285f12e0f6d1",
+        "resourceKey": {
+          "resourceFamily": "effect_slot",
+          "resourceId": "e6ce6706ef7fe2a8cf0fa02a88bbfecff556631b22724fac907e68278a9906ea",
+          "scopeId": "channel-settlement"
+        },
+        "resourceVersion": 3,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "actionDigest": "817185655591f52211d2a06ea186babcd5658b935516a175f9e4147e2c429187",
+            "admissionHandoff": {
+              "lifecycleFence": 5,
+              "operationVersion": 4,
+              "state": "dispatch_committed",
+              "storeFence": {
+                "lease_id": "terminal-lease",
+                "owner_epoch": 1,
+                "store_uuid": "terminal-store"
+              }
+            },
+            "anchorId": "channel-anchor",
+            "effectKind": "channel_service_dispatch",
+            "idempotencyKey": "2f5e6fc6c1a7edd9f0f3b8695899104b191e20aa3f774266d7279caeee152094",
+            "namespace": "channel-namespace",
+            "operationId": "fc6f810613be100c4becdebf27d1e7bcf4a6af71953d4b4488c295143170bd1e",
+            "parametersDigest": "16ff6fd7b4b6f246ac4f78e960bee71a16e60b0ebc209f865a9fc4c3adcef0c5",
+            "request": {
+              "requestBindingDigest": "f8409f7ac49e204bf103f1cfb66651c6d16b250c09d33dd3fcc11283a2ca9fc3",
+              "requestId": "terminal-request",
+              "requestNamespaceDigest": "36c32b2325e218dac425ae4fb5482927fda01016bcf05700674c1b5597d13b4b"
+            },
+            "resourceHeadDigest": "1f6b6449df53fb6d6f53cd843dc11a076879583e2d8de0cc2718350110ef5505",
+            "resourceKey": {
+              "resourceFamily": "channel_lifecycle",
+              "resourceId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+              "scopeId": "channel-settlement"
+            },
+            "schema": "chio.economy.effect-slot.v1",
+            "slotId": "e6ce6706ef7fe2a8cf0fa02a88bbfecff556631b22724fac907e68278a9906ea",
+            "state": "completed",
+            "target": {
+              "qualificationDigest": "e5285a059be0097a077410fb9f6bb7d36d00b1bbc858ef745bae419c0ad488d8",
+              "targetId": "terminal-target",
+              "targetKeyEpoch": 1
+            },
+            "terminal": {
+              "outcome": "completed",
+              "result": {
+                "storage": "inline",
+                "value": {
+                  "outcomeId": "2e432e610d03539ac92cc568422e3615621b648c632e01e39123352a1fbbc3db"
+                }
+              },
+              "result_digest": "b77a1455be3680c3dedfa56297d650e7a05497d62294b5b76c2955aeac9eed1f",
+              "result_id": "terminal-outcome"
+            }
+          }
+        },
+        "stateDigest": "fdcd6d53929bfcc7e3a0eaef3fb34caa0a1241e97b6ec767aa211a6f766e974c",
+        "terminalResult": {
+          "result": {
+            "storage": "inline",
+            "value": {
+              "outcomeId": "2e432e610d03539ac92cc568422e3615621b648c632e01e39123352a1fbbc3db"
+            }
+          },
+          "resultDigest": "b77a1455be3680c3dedfa56297d650e7a05497d62294b5b76c2955aeac9eed1f",
+          "resultId": "terminal-outcome"
+        },
+        "trustedClockHighWater": 1600
+      },
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "e6ce6706ef7fe2a8cf0fa02a88bbfecff556631b22724fac907e68278a9906ea",
+        "scopeId": "channel-settlement"
+      },
+      "transitionProofDigest": "4dd75191596cd43f71d86ba32998572e4c68a59e178627ba9cc94b232823b130"
+    }
+  ]
+}

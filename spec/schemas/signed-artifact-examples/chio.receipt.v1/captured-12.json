@@ -1,0 +1,78 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "1f696d4c4a966cd76725a1d7bfc0908b1b2f3344aa515e31ea4df42a4c119a96",
+      "parameters": {
+        "token": "ordinary-argument-canary-91f2"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182f2-2248-7c2f-b157-6279a2da13f6",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"SecretLeakGuard::ordinary-reason-canary-d001::ordinary-guard-canary-2384\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "ordinary-reason-canary-d001",
+        "guard_name": "SecretLeakGuard::ordinary-guard-canary-2384",
+        "verdict": false
+      },
+      {
+        "details": "ordinary-evidence-canary-3141",
+        "guard_name": "ordinary-guard-canary-2384",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+    "metadata": {
+      "actor_subject": "ordinary-metadata-canary-5926",
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+        "subject_key": "ed6a47a39da869b5446155e40b2d93f1e3f0167be26732bae7a3ef9d8e3a3fd3"
+      },
+      "billing_fixture": {
+        "attempted_cost": 7,
+        "budget_remaining": 20,
+        "budget_total": 20,
+        "cost_breakdown": {
+          "private": "ordinary-metadata-canary-5926"
+        },
+        "cost_charged": 0,
+        "currency": "ordinary-currency-canary-2795",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "payment_reference": "ordinary-payment-canary-6264",
+        "root_budget_holder": "ordinary-holder-canary-3383",
+        "settlement_status": "not_applicable"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "checkpoint_id": "ordinary-metadata-canary-5926",
+      "chio_receipt_signing_nonce": "rcpt-01a182f2-237d-72e0-a00c-466b26b98025",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "canary-denial",
+        "request_namespace_digest": "1d276d80d881cd96e297f7bdcbb5fa518a1ab735aa5294d6cfb7451631170ff3"
+      },
+      "redaction_status": "ordinary-metadata-canary-5926"
+    },
+    "policy_hash": "785fc05c36c7dafa424fb898f004969e4a8f3c31af1cca9eabfb2d6a5818610f",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793198269,
+    "tool_name": "ordinary-tool-canary-5358",
+    "tool_origin": "caller_executed",
+    "tool_server": "ordinary-server-canary-9793",
+    "trust_level": "mediated"
+  },
+  "id": "36d75270be223b0c95cfa4985e835d387c947afbff2624838de9b5c09a33bfab"
+}

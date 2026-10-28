@@ -1,0 +1,59 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "80ba4014be2cfaca10a782543685e2b64c61378e8d4c37bc79ed9ecf11b40a36",
+      "parameters": {
+        "allocation_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "allocation_id": "allocation:test",
+        "amount_units": "25",
+        "currency": "USD",
+        "durable_admission_operation_id": "operation:test",
+        "kind": "claim",
+        "occurred_at_unix_ms": "12345",
+        "purchase_id": "purchase:test",
+        "remaining_after_units": "75",
+        "reserved_after_units": "25",
+        "schema": "chio.finding.pool-mutation.v1",
+        "spent_after_units": "0",
+        "state": "reserved",
+        "tenant_id": "tenant-A"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content_hash": "80ba4014be2cfaca10a782543685e2b64c61378e8d4c37bc79ed9ecf11b40a36",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "ed6a47a39da869b5446155e40b2d93f1e3f0167be26732bae7a3ef9d8e3a3fd3",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-b847-7b32-86c2-0934967da6bf",
+      "finding_pool_mutation": {
+        "allocation_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "allocation_id": "allocation:test",
+        "amount_units": "25",
+        "currency": "USD",
+        "durable_admission_operation_id": "operation:test",
+        "kind": "claim",
+        "occurred_at_unix_ms": "12345",
+        "purchase_id": "purchase:test",
+        "remaining_after_units": "75",
+        "reserved_after_units": "25",
+        "schema": "chio.finding.pool-mutation.v1",
+        "spent_after_units": "0",
+        "state": "reserved",
+        "tenant_id": "tenant-A"
+      }
+    },
+    "policy_hash": "finding-pool-terminal-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "tenant_id": "tenant-A",
+    "timestamp": 12,
+    "tool_name": "finding_pool_mutation",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-kernel",
+    "trust_level": "mediated"
+  },
+  "id": "4ac21ff36eb4a7d6dd05173ece9d5346343caede8277b9cd2bbb54c3944647e9"
+}

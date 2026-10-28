@@ -1,0 +1,76 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "9e7b72ede817f6a100e93131f50f1e19f5efd7bdd760799f577dfa3ff0b1dcdd",
+      "parameters": {
+        "invoice": "inv-cost"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a18248-5d58-7012-b238-b30de45b153d",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "0f142a00bcc438962c2983c3136d8ba5a14705d2514431966e67c2c5a0e93d25",
+    "metadata": {
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:0f142a00bcc438962c2983c3136d8ba5a14705d2514431966e67c2c5a0e93d25",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "committed_cost_units_after": 100,
+          "event_id": "nonce-preflight-budget-hold:cost-report:cap-01a18248-5d58-7012-b238-b30de45b153d:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:0f142a00bcc438962c2983c3136d8ba5a14705d2514431966e67c2c5a0e93d25:1",
+        "cleanup_custody": "replayed",
+        "execution_nonce_id": "01a18248-5f2f-7d02-88be-3870663311d0",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "nonce-preflight-budget-hold:cost-report:cap-01a18248-5d58-7012-b238-b30de45b153d:0",
+        "mediated_spend": {
+          "profile": "chio.mediated_spend.v1"
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "budget_commit_index": 3,
+          "committed_cost_units_after": 30,
+          "disposition": "reconciled",
+          "event_id": "nonce-preflight-budget-hold:cost-report:cap-01a18248-5d58-7012-b238-b30de45b153d:0:reconcile",
+          "exposure_units": 100,
+          "realized_spend_units": 30
+        }
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18248-5f4e-71f1-9ae7-c42e174a12fb",
+      "financial": {
+        "budget_remaining": 270,
+        "budget_total": 300,
+        "cost_breakdown": {
+          "cache_ratio": 0.5,
+          "input_rate": 1e-05
+        },
+        "cost_charged": 30,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "root_budget_holder": "0f142a00bcc438962c2983c3136d8ba5a14705d2514431966e67c2c5a0e93d25",
+        "settlement_status": "settled"
+      },
+      "receipt_context": {
+        "request_id": "cost-report"
+      }
+    },
+    "policy_hash": "6aa721d46ef159815f29068ed4e770f15bb2799502236161a176bd5f6d69e133",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793187143,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "e85cd65e4620f0c0ae6779edd700a28d6ed230f126cb2b1ae0f90357be348534"
+}

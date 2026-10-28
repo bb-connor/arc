@@ -1,0 +1,27 @@
+{
+  "agreedDiscountBps": 0,
+  "agreedPrice": {
+    "currency": "USD",
+    "units": 500
+  },
+  "agreementId": "agreement-1",
+  "assignmentAuthorityDigest": "9a2f050e526c0be5b7b6da78144a0deb761c28ed1d2d924922e79430f59eb04e",
+  "buyerId": "did:chio:factor",
+  "buyerSettlementDestinationRef": "acct:factor",
+  "claimDigest": "62e7e4ca0867c1cd8d9e93f1092dfd05c171271b090698c1434ebc22c92b2e66",
+  "claimId": "9150485bafd143500b3b7495e31136c226fd707be6f510114cb327a67094efb7",
+  "dueAtUnixMs": 10000,
+  "effectiveAtUnixMs": 1050,
+  "expectedDispositionLifecycleFence": 1,
+  "expectedDispositionVersion": 1,
+  "expectedSettlementLifecycleFence": 1,
+  "expectedSettlementLifecycleVersion": 1,
+  "normalizedRequestDigest": "cb8dc67d5589448e630f0fbc5a17cde93956e34bc392051c04498136339e39fe",
+  "obligationAtomDigest": "20c38ecce28d1552f4eb9e009823ad5c41dc1c0c035ed361423bb44155480f3b",
+  "obligationId": "b844cab488732d9bb9486d73dd0ff1632826b6bb406dfa3a9f00a44b87020fe7",
+  "offerDigest": "b0bc749a32498f77d1a8e7089071765650685549710bbba531c2e8e7dc34b748",
+  "offerId": "b4fd3ce8bd8175a1a3f7dfec55ca20a09bf93cc265771d049c45f2b0c124e8b2",
+  "operationId": "706a7a2fb09fcb61d789bff2364ea7ac923e81ce045c097bf1ba7780e9c9d823",
+  "schema": "chio.factor.assignment-agreement.v1",
+  "sellerId": "did:chio:seller"
+}

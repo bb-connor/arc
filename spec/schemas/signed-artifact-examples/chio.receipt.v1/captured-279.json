@@ -1,0 +1,54 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "cce189662ff102f33a1cb5a8f1b79e7545734a95aa3bd197819210b4d9cd5ee9",
+      "parameters": {
+        "allocation_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "allocation_id": "allocation:test",
+        "amount_units": "25",
+        "currency": "USD",
+        "kind": "reserve",
+        "occurred_at_unix_ms": "1",
+        "purchase_id": "purchase:first",
+        "remaining_after_units": "75",
+        "reserved_after_units": "25",
+        "schema": "chio.finding.pool-mutation.v1",
+        "spent_after_units": "0",
+        "state": "reserved"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content_hash": "cce189662ff102f33a1cb5a8f1b79e7545734a95aa3bd197819210b4d9cd5ee9",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "ed6a47a39da869b5446155e40b2d93f1e3f0167be26732bae7a3ef9d8e3a3fd3",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-b861-7bf1-9d87-a70ecd42347f",
+      "finding_pool_mutation": {
+        "allocation_envelope_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "allocation_id": "allocation:test",
+        "amount_units": "25",
+        "currency": "USD",
+        "kind": "reserve",
+        "occurred_at_unix_ms": "1",
+        "purchase_id": "purchase:first",
+        "remaining_after_units": "75",
+        "reserved_after_units": "25",
+        "schema": "chio.finding.pool-mutation.v1",
+        "spent_after_units": "0",
+        "state": "reserved"
+      }
+    },
+    "policy_hash": "finding-pool-terminal-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 0,
+    "tool_name": "finding_pool_mutation",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-kernel",
+    "trust_level": "mediated"
+  },
+  "id": "c8f8b5f75bcc940d177740caa67bc9d60a4a5a71ca444b058798310d6f33bb92"
+}

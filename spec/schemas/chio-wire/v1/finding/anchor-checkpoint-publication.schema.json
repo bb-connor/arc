@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/anchor-checkpoint-publication.schema.json",
+  "title": "Chio finding anchor checkpoint publication signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointSeq",
+    "checkpointStatementSha256",
+    "observedAt",
+    "publishedAt",
+    "schema"
+  ],
+  "properties": {
+    "checkpointSeq": {
+      "type": "integer"
+    },
+    "checkpointStatementSha256": {
+      "type": "string"
+    },
+    "observedAt": {
+      "type": "integer"
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.anchor-checkpoint-publication.v1"
+    }
+  }
+}

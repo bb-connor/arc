@@ -1,0 +1,14 @@
+{
+  "anchorId": "anchor-a",
+  "checkpointDigest": "b1c07495893bc82ea1200a1cee8691b273e45058b08cf07b07db3b8bba41f08b",
+  "issuerDid": "did:chio:db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d",
+  "pinDigest": "2d65368122bb87c1c277b98ae759cbd09d517f46d9337ed276872dc5142f35a8",
+  "previousPinDigest": "b90b0895bf15962b713cdaf5310f770cc07597d9ddfbd117c5046847735d1cce",
+  "resolverIdentity": "resolver-a",
+  "schema": "chio.financial.cross-issuer.lifecycle-generation-pin.v1",
+  "signerKeyEpoch": 4,
+  "sourceIndexCount": 1,
+  "sourceIndexRoot": "ea5fab8a2527ace745e58a4d4cdc54b0bcc5352143eef8183598ef3f52374c83",
+  "storeGeneration": 2,
+  "trustedClockHighWater": 1710000100
+}

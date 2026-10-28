@@ -1,0 +1,42 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "2cca484be3774955bb2f2713afb84f480fb730de0342ec9eb2c3cd216917b736",
+      "parameters": {
+        "_9_3pk7q_": "Pn)Ud",
+        "__7h9x_": false,
+        "b": true,
+        "b0_": null,
+        "mkoom_j_o": "A:%`"
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-oecqg2fnn",
+    "content_hash": "318e5593595ec000803424f6f7b32e953f6050a1051ae102f3d29ee00565a743",
+    "decision": {
+      "guard": "RW3wxMm7qYsr",
+      "reason": "=[Ki.p&zk%?*>*(<*EZ",
+      "verdict": "deny"
+    },
+    "kernel_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-w9u5g9369",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1715235980,
+    "tool_name": "pco_clm_",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-iik",
+    "trust_level": "mediated"
+  },
+  "id": "7fe5903e9e5e1c5d93e518b6cf8b896c8b0961e698f4765d8f84d252538da156"
+}

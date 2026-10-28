@@ -1,0 +1,45 @@
+{
+  "authorization": "buyer_submission",
+  "backing_allocation_id": "9de1fce0b7a07a080f8ccbf37514930142bf0897c4537ce94868aa01861e2be1",
+  "challenge_envelope_sha256": "9609f258f1cd875a094e3230884adad0f73f1aefa45c1a2c12a379db61ffe359",
+  "evaluated_at": 1750000004,
+  "evaluator_authority_id": "challenge-evaluator",
+  "evaluator_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "evaluator_key_epoch": 1,
+  "evaluator_revocation_status_ref": "revocations/finding-market",
+  "evaluator_valid_from": 1,
+  "evaluator_valid_until": 9007199254740991,
+  "evidence_bundle_digest": "be956053a0c3ade15bd99d09a818cb61fa9de84e3d686d74702b1d684afe0427",
+  "evidence_kind": "replay_contradiction",
+  "facet": {
+    "replay_contradiction": {
+      "observation_digests": [
+        "9f73b2d4054c7f1fa5fadb09cf13e0f0e749a26913749144ec373914c7ce0309",
+        "a73ea12f87e76b854502db56dd3725660e2944ab46fc36bf189b9ea801ca4e78"
+      ],
+      "predicate": "baseline_fails_candidate_passes_v1",
+      "predicate_result": "confirmed_contradiction",
+      "recipe_sha256": "e7b93d3650f11225edea66ae333f1f79e475fa6fe3dcf1894ffa4fe722ec04cd",
+      "replay_run_id": "replay-run-01"
+    }
+  },
+  "finding_id": "4546b5252e9b3ee87bd38c9348683715b885b0e3fd8fab7cb04f3a8d84435daa",
+  "listing_id": "listing-42",
+  "outcome_id": "598ddbf43ac5a6b56312ac2d67f23c42e42fed2509f5fd1b012d031ab19f5cd6",
+  "penalty_calculation": {
+    "base_finding_stake_units": 300,
+    "computed_exposure_units": 400,
+    "listing_required_amount_units": 5000,
+    "live_allocated_collateral_units": 5000,
+    "open_per_sale_encumbrance_units": 100,
+    "penalty_amount": {
+      "currency": "USD",
+      "units": 400
+    }
+  },
+  "reason": "replay_contradiction_confirmed",
+  "schema": "chio.finding.challenge-outcome.v1",
+  "trigger_digest": "2ca30702f63aec268ff0485c24283b582c46827ff4a45a38a938bdab73ba917b",
+  "verdict": "upheld",
+  "verifier_profile_envelope_sha256": "90fb45c0aeb5a849868d4a2381dff27806cfb0efa09ad91b98ac94c96b762e07"
+}

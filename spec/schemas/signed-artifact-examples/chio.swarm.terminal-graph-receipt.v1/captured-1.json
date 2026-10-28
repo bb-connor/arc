@@ -1,0 +1,37 @@
+{
+  "budgetPoolId": "budget-pool-runtime",
+  "budgetRollups": [
+    {
+      "activeUnits": 2000,
+      "consumedUnits": 0,
+      "dimensionId": "usd_minor",
+      "releasedUnits": 0,
+      "reservedUnits": 0,
+      "reversedUnits": 0,
+      "totalUnits": 2000
+    }
+  ],
+  "chainId": "swarm-chain-swarm-graph-runtime",
+  "completedAtUnixMs": 1800000000500,
+  "completedTaskIds": [
+    "task-root",
+    "task-child-a",
+    "task-child-b"
+  ],
+  "graphId": "swarm-graph-runtime",
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "joinReceiptIds": [
+    "join-child-results"
+  ],
+  "receiptId": "terminal-swarm-runtime",
+  "resultDigest": "cd81227938a623d33e100a0198a8e844b9545075e6583d48a6b059a68d4cff39",
+  "revocationEpochRef": "revocation-epoch-runtime",
+  "routePlanReceiptIds": [
+    "route-child-a",
+    "route-child-b"
+  ],
+  "schema": "chio.swarm.terminal-graph-receipt.v1",
+  "terminalTaskIds": [
+    "task-root"
+  ]
+}

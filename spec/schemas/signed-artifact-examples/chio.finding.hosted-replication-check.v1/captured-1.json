@@ -1,0 +1,13 @@
+{
+  "authorityEpoch": 1,
+  "checkedAt": 1793209487,
+  "lagSeconds": 0,
+  "projectionDifferenceCount": 0,
+  "schema": "chio.finding.hosted-replication-check.v1",
+  "securityCounterCount": 0,
+  "sourceAuthority": "sqlite",
+  "sourceProjectionSha256": "149fa1c2fca7b7b805760a30933a1061943166c87ee7131ed55b6264b00be95b",
+  "targetProjectionSha256": "149fa1c2fca7b7b805760a30933a1061943166c87ee7131ed55b6264b00be95b",
+  "tenantId": "integration-a-1793209486471803644",
+  "throughSequence": 3
+}

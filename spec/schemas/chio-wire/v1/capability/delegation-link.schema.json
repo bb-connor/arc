@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/delegation-link.schema.json",
+  "title": "Chio delegation link signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "aggregate_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_invocations",
+        "root_binding_digest"
+      ],
+      "properties": {
+        "max_invocations": {
+          "type": "integer"
+        },
+        "root_binding_digest": {
+          "type": "string"
+        }
+      }
+    },
+    "attenuations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "server_id",
+          "tool_name",
+          "type"
+        ],
+        "properties": {
+          "constraint": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "value"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "value": {
+                "type": [
+                  "integer",
+                  "string"
+                ]
+              }
+            }
+          },
+          "max_invocations": {
+            "type": "integer"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "cumulative_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bindings"
+      ],
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "approval_budget_epoch",
+              "approval_budget_id",
+              "currency",
+              "root_binding_digest"
+            ],
+            "properties": {
+              "approval_budget_epoch": {
+                "type": "integer"
+              },
+              "approval_budget_id": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "root_binding_digest": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "delegatee": {
+      "type": "string"
+    },
+    "delegator": {
+      "type": "string"
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    },
+    "scope_hash": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "integer"
+    }
+  }
+}

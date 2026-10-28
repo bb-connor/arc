@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/trusted-time-proof-signature.schema.json",
+  "title": "Chio runtime trusted time proof signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ackId",
+    "issuer",
+    "leaseId",
+    "maxClockSkewMs",
+    "observedAt",
+    "proofId",
+    "schema",
+    "timeSourceId"
+  ],
+  "properties": {
+    "ackId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "leaseId": {
+      "type": "string"
+    },
+    "maxClockSkewMs": {
+      "type": "integer"
+    },
+    "observedAt": {
+      "type": "string"
+    },
+    "proofId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.trusted-time-proof-signature.v1"
+    },
+    "timeSourceId": {
+      "type": "string"
+    }
+  }
+}

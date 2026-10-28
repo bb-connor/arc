@@ -1,0 +1,29 @@
+{
+  "all_signatures_valid": true,
+  "anomalies": [
+    "missing guard"
+  ],
+  "budget_compliant": true,
+  "chain_continuous": true,
+  "checks": {
+    "allowed_mediated_receipt_limit": "passed",
+    "required_guards": "passed",
+    "tenant": "not_evaluated",
+    "tool_targets": "passed"
+  },
+  "compliance_profile_digest": "54e5a57419f1989359197a2acee550d0996abcf36212bfde0bfc468588bed247",
+  "coverage": {
+    "kind": "supplied_receipt_set"
+  },
+  "first_receipt_at": 1793186812,
+  "guards_compliant": true,
+  "invocation_count": 2,
+  "issued_at": 1793186814,
+  "kernel_key": "7b0685923323a2b821341c476027973c431a5948325be69bf8d8d115382346cc",
+  "last_receipt_at": 1793186813,
+  "receipt_count": 2,
+  "receipt_set_digest": "3194a791b81e5ac9dde607dd8b0314d75d3aacaab0fc52877cd1b8ac8c41be6b",
+  "schema": "chio.compliance.certificate.v1",
+  "scope_compliant": true,
+  "session_id": "session-good"
+}

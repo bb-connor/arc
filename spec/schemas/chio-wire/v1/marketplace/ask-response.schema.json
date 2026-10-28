@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/marketplace/ask-response.schema.json",
+  "title": "Chio marketplace ask response signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentId",
+    "bidDigest",
+    "expiresAt",
+    "issuedAt",
+    "listingId",
+    "quotedPrice",
+    "schema",
+    "tokenOffer"
+  ],
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "bidDigest": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "quotedPrice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.marketplace.ask-response.v1"
+    },
+    "tokenOffer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expires_at",
+        "id",
+        "issued_at",
+        "issuer",
+        "schema",
+        "scope",
+        "signature",
+        "subject"
+      ],
+      "properties": {
+        "expires_at": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "grants"
+          ],
+          "properties": {
+            "grants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "max_cost_per_invocation",
+                  "max_invocations",
+                  "max_total_cost",
+                  "operations",
+                  "server_id",
+                  "tool_name"
+                ],
+                "properties": {
+                  "constraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "value"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "finding_id",
+                                "listing_id",
+                                "settlement"
+                              ],
+                              "properties": {
+                                "finding_id": {
+                                  "type": "string"
+                                },
+                                "listing_id": {
+                                  "type": "string"
+                                },
+                                "settlement": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "mode"
+                                  ],
+                                  "properties": {
+                                    "mode": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "dpop_required": {
+                    "type": "boolean"
+                  },
+                  "max_cost_per_invocation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "currency",
+                      "units"
+                    ],
+                    "properties": {
+                      "currency": {
+                        "type": "string"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "max_invocations": {
+                    "type": "integer"
+                  },
+                  "max_total_cost": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "currency",
+                      "units"
+                    ],
+                    "properties": {
+                      "currency": {
+                        "type": "string"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "server_id": {
+                    "type": "string"
+                  },
+                  "tool_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "prompt_grants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operations",
+                  "prompt_name"
+                ],
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "prompt_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "resource_grants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operations",
+                  "uri_pattern"
+                ],
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "uri_pattern": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "signature": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

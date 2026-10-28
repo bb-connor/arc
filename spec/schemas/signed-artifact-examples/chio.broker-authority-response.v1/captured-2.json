@@ -1,0 +1,29 @@
+{
+  "authority": "ca57eed30e4a7274ef4c648f56f58f880b20d2ca25725d9e5c13c83c08c09aeb",
+  "issuedAtUnixSeconds": 1793197542,
+  "requestDigest": "b1950f71a6a4986d2aa5674250fe02b797cf39935d02353e23511471ca126584",
+  "requestId": "59f8330735f11443919dd4f01a3c8275f56657e412790e9ebc3235715108d283",
+  "result": {
+    "kind": "prepared",
+    "response": {
+      "admissionOperationId": "kernel-operation-process-boundary",
+      "authorityMetadataDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "preparedDispatchId": "broker-prepared-dispatch-88e718c50323177a0c0990e0f6fac9129f74e5c20b970e557bcb22bb7b892508",
+      "quotas": [
+        {
+          "keyId": "broker-quota-process-boundary",
+          "maximumExecutions": 1
+        },
+        {
+          "keyId": "parent-quota-process-boundary",
+          "maximumExecutions": 4
+        }
+      ],
+      "revocationAuthorityDomain": "authority-domain-process-boundary",
+      "sourceReceiptIds": [
+        "source-receipt-process-boundary"
+      ]
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

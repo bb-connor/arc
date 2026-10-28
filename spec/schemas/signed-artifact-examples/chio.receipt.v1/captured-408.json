@@ -1,0 +1,51 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "14c12c05ac8397e68e594f6526599614c735bad46b5c59d6a5ad18903b86d7b2",
+      "parameters": {
+        "file": "/home/user/project/src/main.rs",
+        "path": [
+          "/etc/shadow"
+        ]
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182be-5490-7086-a66c-d2df70ed77d8",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"forbidden-path\" denied the request",
+      "verdict": "deny"
+    },
+    "kernel_key": "ee87d3b0ecca7d0d58ac0720cc4305bf7938f47933f7bdfcbb33574c14cc8e38",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "ee87d3b0ecca7d0d58ac0720cc4305bf7938f47933f7bdfcbb33574c14cc8e38",
+        "subject_key": "b04e09477fbaa08870895824b7b7b9b7910659c55c510ed4f1eecf114144333f"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182be-57dd-7ab0-9927-ef5c57bab570",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "req-1",
+        "request_namespace_digest": "adb73ed54420862cf1f83a4aeb9412586ace1647eab4894bb2df75280895a959"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793194874,
+    "tool_name": "filesystem",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "88f99c2e7ff557d058d3433f649104b26f8e35c74b977245a48ccb7ddd8a7bcc"
+}

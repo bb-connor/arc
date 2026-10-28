@@ -1,0 +1,20 @@
+{
+  "operationId": "187f0349dd12b6dc73d76d86f421cd454facccc36ef9a2ba6956b37abbb31102",
+  "outcomeRecordedAtUnixMs": 1700,
+  "receiptDigest": "3ca20fc0c8a1a624613945e37e2af171eb6170d0aa08d696f51f4fdbcc7c5b8a",
+  "receiptId": "schema-terminal-receipt",
+  "reservationDigest": "49da0e88b7b97c2439f91aec9ca53b937cb66a7a34e0ebaa8aa5829b14f44ee6",
+  "reservationId": "9efa077f044e7a779c655f8d8e8760cacd16ce2347b6aa10e45b18fb5325fdd6",
+  "schema": "chio.channel.terminal-outcome-commitment.v1",
+  "terminalResult": {
+    "result": {
+      "storage": "inline",
+      "value": {
+        "outcomeId": "c5a440bdd4b71acfe9960a2021d6a9e8a12923ff7892c716a0f29f603e9785ca"
+      }
+    },
+    "resultDigest": "ad57fbca5c6d45a0a8022e224cd6383850f52ac8ddaccc62cabf44a611e95bdf",
+    "resultId": "schema-terminal-outcome"
+  },
+  "terminalizedAtUnixMs": 1750
+}

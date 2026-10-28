@@ -1,0 +1,101 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "1c4be1842ac4922180f91ba03b592af3772f80fd2dd84b278ee77f4156ad66c0",
+      "parameters": {
+        "invoice_id": "inv-bond-1"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-d2d0-7ae2-811b-e646078721ee",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "governed transaction denied: runtime attestation evidence rejected by local verification boundary: runtime attestation evidence is not authenticated by a pinned authority",
+      "verdict": "deny"
+    },
+    "kernel_key": "e033b84ba5364d646e7726231ae7c8029c2c1a02c951c2d64e0f394384d4e3ff",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "e033b84ba5364d646e7726231ae7c8029c2c1a02c951c2d64e0f394384d4e3ff",
+        "subject_key": "9b0c390db1615612b44a644da3873da70c30f2d9e6a03164e2ff9e955c6a3a70"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_kernel": {
+        "rejection_code": "CHIO-KERNEL-GOVERNED-TRANSACTION-DENIED"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-d350-7063-abda-53011fea0938",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "financial": {
+        "attempted_cost": 100,
+        "budget_remaining": 1000,
+        "budget_total": 1000,
+        "cost_charged": 0,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "root_budget_holder": "e033b84ba5364d646e7726231ae7c8029c2c1a02c951c2d64e0f394384d4e3ff",
+        "settlement_status": "not_applicable"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "d2fc1cf704d1756c2cc57870d245ccdd23f426c4b07aeb5cbdcda09d921893c3",
+          "approved": true,
+          "approver_key": "e033b84ba5364d646e7726231ae7c8029c2c1a02c951c2d64e0f394384d4e3ff",
+          "token_id": "approval-req-governed-autonomy-missing-bond"
+        },
+        "autonomy": {
+          "tier": "delegated"
+        },
+        "call_chain": {
+          "chainId": "chain-bond-1",
+          "delegatorSubject": "subject-delegator",
+          "evidenceClass": "asserted",
+          "originSubject": "subject-origin",
+          "parentReceiptId": "rc-upstream-1",
+          "parentRequestId": "req-parent-1"
+        },
+        "intent_hash": "5877cc66f8f25c21213075035c82e80f23a10a191344fbc8381a1694f8687007",
+        "intent_id": "intent-governed-autonomy-missing-bond",
+        "max_amount": {
+          "currency": "USD",
+          "units": 100
+        },
+        "purpose": "execute delegated bonded payout",
+        "server_id": "cost-srv",
+        "tool_name": "compute"
+      },
+      "governed_transaction_diagnostics": {
+        "assertedCallChain": {
+          "chainId": "chain-bond-1",
+          "delegatorSubject": "subject-delegator",
+          "evidenceClass": "asserted",
+          "originSubject": "subject-origin",
+          "parentReceiptId": "rc-upstream-1",
+          "parentRequestId": "req-parent-1"
+        }
+      },
+      "receipt_context": {
+        "request_id": "req-governed-autonomy-missing-bond",
+        "request_namespace_digest": "0aa6ad7c0741ff9bbd63e89d2beb1e455a7b6cd6f381587433467130020ffa09"
+      }
+    },
+    "policy_hash": "monetary-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195234,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "79cfe6163e69735bdd76a40eb34b5e6aaa6ecad5665e2ac8f1651430b3efdba1"
+}

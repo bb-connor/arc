@@ -1,0 +1,2340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/market/claim-dispute.schema.json",
+  "title": "Chio market claim dispute signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "disputeId",
+    "issuedAt",
+    "openedBy",
+    "providerResponse",
+    "reason",
+    "schema"
+  ],
+  "properties": {
+    "disputeId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "note": {
+      "type": "string"
+    },
+    "openedBy": {
+      "type": "string"
+    },
+    "providerResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "signature",
+        "signerKey"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "claim",
+            "claimResponseId",
+            "disposition",
+            "issuedAt",
+            "providerResponseRef",
+            "schema"
+          ],
+          "properties": {
+            "claim": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "body",
+                "signature",
+                "signerKey"
+              ],
+              "properties": {
+                "body": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "bond",
+                    "boundCoverage",
+                    "claimAmount",
+                    "claimEventAt",
+                    "claimId",
+                    "claimant",
+                    "exposure",
+                    "issuedAt",
+                    "lossEvent",
+                    "narrative",
+                    "receiptIds",
+                    "schema"
+                  ],
+                  "properties": {
+                    "bond": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "body",
+                        "signature",
+                        "signerKey"
+                      ],
+                      "properties": {
+                        "body": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "bondId",
+                            "expiresAt",
+                            "issuedAt",
+                            "lifecycleState",
+                            "report",
+                            "schema"
+                          ],
+                          "properties": {
+                            "bondId": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "integer"
+                            },
+                            "issuedAt": {
+                              "type": "integer"
+                            },
+                            "lifecycleState": {
+                              "type": "string"
+                            },
+                            "report": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "disposition",
+                                "exposure",
+                                "filters",
+                                "generatedAt",
+                                "prerequisites",
+                                "schema",
+                                "scorecard",
+                                "supportBoundary"
+                              ],
+                              "properties": {
+                                "disposition": {
+                                  "type": "string"
+                                },
+                                "exposure": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "actionableReceipts",
+                                    "activeDecisions",
+                                    "currencies",
+                                    "failedSettlementReceipts",
+                                    "matchingDecisions",
+                                    "matchingReceipts",
+                                    "mixedCurrencyBook",
+                                    "pendingSettlementReceipts",
+                                    "returnedDecisions",
+                                    "returnedReceipts",
+                                    "supersededDecisions",
+                                    "truncatedDecisions",
+                                    "truncatedReceipts"
+                                  ],
+                                  "properties": {
+                                    "actionableReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "activeDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "currencies": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "failedSettlementReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "matchingDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "matchingReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "mixedCurrencyBook": {
+                                      "type": "boolean"
+                                    },
+                                    "pendingSettlementReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "returnedDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "returnedReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "supersededDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "truncatedDecisions": {
+                                      "type": "boolean"
+                                    },
+                                    "truncatedReceipts": {
+                                      "type": "boolean"
+                                    }
+                                  }
+                                },
+                                "filters": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "agentSubject",
+                                    "decisionLimit",
+                                    "receiptLimit"
+                                  ],
+                                  "properties": {
+                                    "agentSubject": {
+                                      "type": "string"
+                                    },
+                                    "capabilityId": {
+                                      "type": "string"
+                                    },
+                                    "decisionLimit": {
+                                      "type": "integer"
+                                    },
+                                    "receiptLimit": {
+                                      "type": "integer"
+                                    },
+                                    "toolName": {
+                                      "type": "string"
+                                    },
+                                    "toolServer": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "generatedAt": {
+                                  "type": "integer"
+                                },
+                                "latestFacilityId": {
+                                  "type": "string"
+                                },
+                                "prerequisites": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "activeFacilityMet",
+                                    "activeFacilityRequired",
+                                    "certificationMet",
+                                    "certificationRequired",
+                                    "currencyCoherent",
+                                    "runtimeAssuranceMet"
+                                  ],
+                                  "properties": {
+                                    "activeFacilityMet": {
+                                      "type": "boolean"
+                                    },
+                                    "activeFacilityRequired": {
+                                      "type": "boolean"
+                                    },
+                                    "certificationMet": {
+                                      "type": "boolean"
+                                    },
+                                    "certificationRequired": {
+                                      "type": "boolean"
+                                    },
+                                    "currencyCoherent": {
+                                      "type": "boolean"
+                                    },
+                                    "runtimeAssuranceMet": {
+                                      "type": "boolean"
+                                    }
+                                  }
+                                },
+                                "schema": {
+                                  "type": "string"
+                                },
+                                "scorecard": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "anomalyCount",
+                                    "band",
+                                    "confidence",
+                                    "currencies",
+                                    "matchingDecisions",
+                                    "matchingReceipts",
+                                    "mixedCurrencyBook",
+                                    "overallScore",
+                                    "probationary",
+                                    "returnedDecisions",
+                                    "returnedReceipts"
+                                  ],
+                                  "properties": {
+                                    "anomalyCount": {
+                                      "type": "integer"
+                                    },
+                                    "band": {
+                                      "type": "string"
+                                    },
+                                    "confidence": {
+                                      "type": "string"
+                                    },
+                                    "currencies": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "matchingDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "matchingReceipts": {
+                                      "type": "integer"
+                                    },
+                                    "mixedCurrencyBook": {
+                                      "type": "boolean"
+                                    },
+                                    "overallScore": {
+                                      "type": "number"
+                                    },
+                                    "probationary": {
+                                      "type": "boolean"
+                                    },
+                                    "returnedDecisions": {
+                                      "type": "integer"
+                                    },
+                                    "returnedReceipts": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                },
+                                "supportBoundary": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "autonomyGatingSupported",
+                                    "externalEscrowExecutionSupported",
+                                    "reserveAccountingAuthoritative"
+                                  ],
+                                  "properties": {
+                                    "autonomyGatingSupported": {
+                                      "type": "boolean"
+                                    },
+                                    "externalEscrowExecutionSupported": {
+                                      "type": "boolean"
+                                    },
+                                    "reserveAccountingAuthoritative": {
+                                      "type": "boolean"
+                                    }
+                                  }
+                                },
+                                "terms": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "capitalSource",
+                                    "collateralAmount",
+                                    "coverageRatioBps",
+                                    "creditLimit",
+                                    "facilityId",
+                                    "outstandingExposureAmount",
+                                    "reserveRatioBps",
+                                    "reserveRequirementAmount"
+                                  ],
+                                  "properties": {
+                                    "capitalSource": {
+                                      "type": "string"
+                                    },
+                                    "collateralAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "coverageRatioBps": {
+                                      "type": "integer"
+                                    },
+                                    "creditLimit": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "facilityId": {
+                                      "type": "string"
+                                    },
+                                    "outstandingExposureAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "reserveRatioBps": {
+                                      "type": "integer"
+                                    },
+                                    "reserveRequirementAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "schema": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "signerKey": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "boundCoverage": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "body",
+                        "signature",
+                        "signerKey"
+                      ],
+                      "properties": {
+                        "body": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "boundAt",
+                            "boundCoverageId",
+                            "coverageAmount",
+                            "effectiveFrom",
+                            "effectiveUntil",
+                            "issuedAt",
+                            "placement",
+                            "policyNumber",
+                            "premiumAmount",
+                            "schema"
+                          ],
+                          "properties": {
+                            "boundAt": {
+                              "type": "integer"
+                            },
+                            "boundCoverageId": {
+                              "type": "string"
+                            },
+                            "carrierReference": {
+                              "type": "string"
+                            },
+                            "coverageAmount": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "currency",
+                                "units"
+                              ],
+                              "properties": {
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "units": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "effectiveFrom": {
+                              "type": "integer"
+                            },
+                            "effectiveUntil": {
+                              "type": "integer"
+                            },
+                            "issuedAt": {
+                              "type": "integer"
+                            },
+                            "placement": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "body",
+                                "signature",
+                                "signerKey"
+                              ],
+                              "properties": {
+                                "body": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "effectiveFrom",
+                                    "effectiveUntil",
+                                    "issuedAt",
+                                    "placementId",
+                                    "quoteResponse",
+                                    "schema",
+                                    "selectedCoverageAmount",
+                                    "selectedPremiumAmount"
+                                  ],
+                                  "properties": {
+                                    "effectiveFrom": {
+                                      "type": "integer"
+                                    },
+                                    "effectiveUntil": {
+                                      "type": "integer"
+                                    },
+                                    "issuedAt": {
+                                      "type": "integer"
+                                    },
+                                    "notes": {
+                                      "type": "string"
+                                    },
+                                    "placementId": {
+                                      "type": "string"
+                                    },
+                                    "placementRef": {
+                                      "type": "string"
+                                    },
+                                    "quoteResponse": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "body",
+                                        "signature",
+                                        "signerKey"
+                                      ],
+                                      "properties": {
+                                        "body": {
+                                          "type": "object",
+                                          "additionalProperties": false,
+                                          "required": [
+                                            "disposition",
+                                            "issuedAt",
+                                            "providerQuoteRef",
+                                            "quoteRequest",
+                                            "quoteResponseId",
+                                            "quotedTerms",
+                                            "schema"
+                                          ],
+                                          "properties": {
+                                            "disposition": {
+                                              "type": "string"
+                                            },
+                                            "issuedAt": {
+                                              "type": "integer"
+                                            },
+                                            "providerQuoteRef": {
+                                              "type": "string"
+                                            },
+                                            "quoteRequest": {
+                                              "type": "object",
+                                              "additionalProperties": false,
+                                              "required": [
+                                                "body",
+                                                "signature",
+                                                "signerKey"
+                                              ],
+                                              "properties": {
+                                                "body": {
+                                                  "type": "object",
+                                                  "additionalProperties": false,
+                                                  "required": [
+                                                    "issuedAt",
+                                                    "providerPolicy",
+                                                    "quoteRequestId",
+                                                    "requestedCoverageAmount",
+                                                    "requestedEffectiveFrom",
+                                                    "requestedEffectiveUntil",
+                                                    "riskPackage",
+                                                    "schema"
+                                                  ],
+                                                  "properties": {
+                                                    "issuedAt": {
+                                                      "type": "integer"
+                                                    },
+                                                    "notes": {
+                                                      "type": "string"
+                                                    },
+                                                    "providerPolicy": {
+                                                      "type": "object",
+                                                      "additionalProperties": false,
+                                                      "required": [
+                                                        "boundCoverageSupported",
+                                                        "claimsSupported",
+                                                        "coverageClass",
+                                                        "currency",
+                                                        "displayName",
+                                                        "jurisdiction",
+                                                        "maxCoverageAmount",
+                                                        "providerId",
+                                                        "providerRecordId",
+                                                        "quoteTtlSeconds",
+                                                        "requiredEvidence"
+                                                      ],
+                                                      "properties": {
+                                                        "boundCoverageSupported": {
+                                                          "type": "boolean"
+                                                        },
+                                                        "claimsSupported": {
+                                                          "type": "boolean"
+                                                        },
+                                                        "coverageClass": {
+                                                          "type": "string"
+                                                        },
+                                                        "currency": {
+                                                          "type": "string"
+                                                        },
+                                                        "displayName": {
+                                                          "type": "string"
+                                                        },
+                                                        "jurisdiction": {
+                                                          "type": "string"
+                                                        },
+                                                        "maxCoverageAmount": {
+                                                          "type": "object",
+                                                          "additionalProperties": false,
+                                                          "required": [
+                                                            "currency",
+                                                            "units"
+                                                          ],
+                                                          "properties": {
+                                                            "currency": {
+                                                              "type": "string"
+                                                            },
+                                                            "units": {
+                                                              "type": "integer"
+                                                            }
+                                                          }
+                                                        },
+                                                        "providerId": {
+                                                          "type": "string"
+                                                        },
+                                                        "providerRecordId": {
+                                                          "type": "string"
+                                                        },
+                                                        "quoteTtlSeconds": {
+                                                          "type": "integer"
+                                                        },
+                                                        "requiredEvidence": {
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "quoteRequestId": {
+                                                      "type": "string"
+                                                    },
+                                                    "requestedCoverageAmount": {
+                                                      "type": "object",
+                                                      "additionalProperties": false,
+                                                      "required": [
+                                                        "currency",
+                                                        "units"
+                                                      ],
+                                                      "properties": {
+                                                        "currency": {
+                                                          "type": "string"
+                                                        },
+                                                        "units": {
+                                                          "type": "integer"
+                                                        }
+                                                      }
+                                                    },
+                                                    "requestedEffectiveFrom": {
+                                                      "type": "integer"
+                                                    },
+                                                    "requestedEffectiveUntil": {
+                                                      "type": "integer"
+                                                    },
+                                                    "riskPackage": {
+                                                      "type": "object",
+                                                      "additionalProperties": false,
+                                                      "required": [
+                                                        "body",
+                                                        "signature",
+                                                        "signerKey"
+                                                      ],
+                                                      "properties": {
+                                                        "body": {
+                                                          "type": "object",
+                                                          "additionalProperties": false,
+                                                          "required": [
+                                                            "certification",
+                                                            "exposure",
+                                                            "facilityReport",
+                                                            "filters",
+                                                            "generatedAt",
+                                                            "recentLossHistory",
+                                                            "schema",
+                                                            "scorecard",
+                                                            "subjectKey",
+                                                            "supportBoundary"
+                                                          ],
+                                                          "properties": {
+                                                            "certification": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "required"
+                                                              ],
+                                                              "properties": {
+                                                                "required": {
+                                                                  "type": "boolean"
+                                                                }
+                                                              }
+                                                            },
+                                                            "exposure": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "body",
+                                                                "signature",
+                                                                "signerKey"
+                                                              ],
+                                                              "properties": {
+                                                                "body": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "decisions",
+                                                                    "filters",
+                                                                    "generatedAt",
+                                                                    "positions",
+                                                                    "receipts",
+                                                                    "schema",
+                                                                    "summary",
+                                                                    "supportBoundary"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "decisions": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "object"
+                                                                      }
+                                                                    },
+                                                                    "filters": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "agentSubject",
+                                                                        "decisionLimit",
+                                                                        "receiptLimit"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "agentSubject": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "decisionLimit": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "receiptLimit": {
+                                                                          "type": "integer"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "generatedAt": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "positions": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "object",
+                                                                        "additionalProperties": false,
+                                                                        "required": [
+                                                                          "activeQuotedPremiumUnits",
+                                                                          "currency",
+                                                                          "failedUnits",
+                                                                          "governedMaxExposureUnits",
+                                                                          "pendingUnits",
+                                                                          "provisionalLossUnits",
+                                                                          "quotedPremiumUnits",
+                                                                          "recoveredUnits",
+                                                                          "reservedUnits",
+                                                                          "settledUnits"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "activeQuotedPremiumUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "currency": {
+                                                                            "type": "string"
+                                                                          },
+                                                                          "failedUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "governedMaxExposureUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "pendingUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "provisionalLossUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "quotedPremiumUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "recoveredUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "reservedUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "settledUnits": {
+                                                                            "type": "integer"
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "receipts": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "object"
+                                                                      }
+                                                                    },
+                                                                    "schema": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "summary": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "actionableReceipts",
+                                                                        "activeDecisions",
+                                                                        "currencies",
+                                                                        "failedSettlementReceipts",
+                                                                        "matchingDecisions",
+                                                                        "matchingReceipts",
+                                                                        "mixedCurrencyBook",
+                                                                        "pendingSettlementReceipts",
+                                                                        "returnedDecisions",
+                                                                        "returnedReceipts",
+                                                                        "supersededDecisions",
+                                                                        "truncatedDecisions",
+                                                                        "truncatedReceipts"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "actionableReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "activeDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "currencies": {
+                                                                          "type": "array",
+                                                                          "items": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        },
+                                                                        "failedSettlementReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "matchingDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "matchingReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "mixedCurrencyBook": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "pendingSettlementReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "returnedDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "returnedReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "supersededDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "truncatedDecisions": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "truncatedReceipts": {
+                                                                          "type": "boolean"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "supportBoundary": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "claimAdjudicationSupported",
+                                                                        "crossCurrencyNettingSupported",
+                                                                        "governedReceiptsAuthoritative",
+                                                                        "recoveryLifecycleSupported",
+                                                                        "settlementReconciliationAuthoritative",
+                                                                        "underwritingDecisionsAuthoritative"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "claimAdjudicationSupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "crossCurrencyNettingSupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "governedReceiptsAuthoritative": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "recoveryLifecycleSupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "settlementReconciliationAuthoritative": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "underwritingDecisionsAuthoritative": {
+                                                                          "type": "boolean"
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "signature": {
+                                                                  "type": "string"
+                                                                },
+                                                                "signerKey": {
+                                                                  "type": "string"
+                                                                }
+                                                              }
+                                                            },
+                                                            "facilityReport": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "disposition",
+                                                                "filters",
+                                                                "generatedAt",
+                                                                "prerequisites",
+                                                                "schema",
+                                                                "scorecard",
+                                                                "supportBoundary"
+                                                              ],
+                                                              "properties": {
+                                                                "disposition": {
+                                                                  "type": "string"
+                                                                },
+                                                                "filters": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "agentSubject",
+                                                                    "decisionLimit",
+                                                                    "receiptLimit"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "agentSubject": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "decisionLimit": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "receiptLimit": {
+                                                                      "type": "integer"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "generatedAt": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "prerequisites": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "certificationMet",
+                                                                    "certificationRequired",
+                                                                    "manualReviewRequired",
+                                                                    "minimumRuntimeAssuranceTier",
+                                                                    "runtimeAssuranceMet"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "certificationMet": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "certificationRequired": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "manualReviewRequired": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "minimumRuntimeAssuranceTier": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "runtimeAssuranceMet": {
+                                                                      "type": "boolean"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "schema": {
+                                                                  "type": "string"
+                                                                },
+                                                                "scorecard": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "anomalyCount",
+                                                                    "band",
+                                                                    "confidence",
+                                                                    "currencies",
+                                                                    "matchingDecisions",
+                                                                    "matchingReceipts",
+                                                                    "mixedCurrencyBook",
+                                                                    "overallScore",
+                                                                    "probationary",
+                                                                    "returnedDecisions",
+                                                                    "returnedReceipts"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "anomalyCount": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "band": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "confidence": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "currencies": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    },
+                                                                    "matchingDecisions": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "matchingReceipts": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "mixedCurrencyBook": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "overallScore": {
+                                                                      "type": "number"
+                                                                    },
+                                                                    "probationary": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "returnedDecisions": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "returnedReceipts": {
+                                                                      "type": "integer"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "supportBoundary": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "bondExecutionSupported",
+                                                                    "crossCurrencyAllocationSupported",
+                                                                    "providerNeutralPolicy"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "bondExecutionSupported": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "crossCurrencyAllocationSupported": {
+                                                                      "type": "boolean"
+                                                                    },
+                                                                    "providerNeutralPolicy": {
+                                                                      "type": "boolean"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "terms": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "capitalSource",
+                                                                    "concentrationCapBps",
+                                                                    "creditLimit",
+                                                                    "reserveRatioBps",
+                                                                    "ttlSeconds",
+                                                                    "utilizationCeilingBps"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "capitalSource": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "concentrationCapBps": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "creditLimit": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "currency",
+                                                                        "units"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "currency": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "units": {
+                                                                          "type": "integer"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "reserveRatioBps": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "ttlSeconds": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "utilizationCeilingBps": {
+                                                                      "type": "integer"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            },
+                                                            "filters": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "agentSubject",
+                                                                "decisionLimit",
+                                                                "receiptLimit",
+                                                                "recentLossLimit"
+                                                              ],
+                                                              "properties": {
+                                                                "agentSubject": {
+                                                                  "type": "string"
+                                                                },
+                                                                "decisionLimit": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "receiptLimit": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "recentLossLimit": {
+                                                                  "type": "integer"
+                                                                }
+                                                              }
+                                                            },
+                                                            "generatedAt": {
+                                                              "type": "integer"
+                                                            },
+                                                            "latestFacility": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "creditLimit",
+                                                                "disposition",
+                                                                "expiresAt",
+                                                                "facilityId",
+                                                                "issuedAt",
+                                                                "lifecycleState",
+                                                                "signerKey"
+                                                              ],
+                                                              "properties": {
+                                                                "creditLimit": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "currency",
+                                                                    "units"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "currency": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "units": {
+                                                                      "type": "integer"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "disposition": {
+                                                                  "type": "string"
+                                                                },
+                                                                "expiresAt": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "facilityId": {
+                                                                  "type": "string"
+                                                                },
+                                                                "issuedAt": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "lifecycleState": {
+                                                                  "type": "string"
+                                                                },
+                                                                "signerKey": {
+                                                                  "type": "string"
+                                                                }
+                                                              }
+                                                            },
+                                                            "recentLossHistory": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "entries",
+                                                                "summary"
+                                                              ],
+                                                              "properties": {
+                                                                "entries": {
+                                                                  "type": "array",
+                                                                  "items": {
+                                                                    "type": "object"
+                                                                  }
+                                                                },
+                                                                "summary": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "failedSettlementEvents",
+                                                                    "matchingLossEvents",
+                                                                    "provisionalLossEvents",
+                                                                    "recoveredEvents",
+                                                                    "returnedLossEvents"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "failedSettlementEvents": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "matchingLossEvents": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "provisionalLossEvents": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "recoveredEvents": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "returnedLossEvents": {
+                                                                      "type": "integer"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            },
+                                                            "runtimeAssurance": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "governedReceipts",
+                                                                "highestTier",
+                                                                "latestEvidenceSha256",
+                                                                "latestSchema",
+                                                                "latestVerifier",
+                                                                "latestVerifierFamily",
+                                                                "observedVerifierFamilies",
+                                                                "runtimeAssuranceReceipts",
+                                                                "stale"
+                                                              ],
+                                                              "properties": {
+                                                                "governedReceipts": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "highestTier": {
+                                                                  "type": "string"
+                                                                },
+                                                                "latestEvidenceSha256": {
+                                                                  "type": "string"
+                                                                },
+                                                                "latestSchema": {
+                                                                  "type": "string"
+                                                                },
+                                                                "latestVerifier": {
+                                                                  "type": "string"
+                                                                },
+                                                                "latestVerifierFamily": {
+                                                                  "type": "string"
+                                                                },
+                                                                "observedVerifierFamilies": {
+                                                                  "type": "array",
+                                                                  "items": {
+                                                                    "type": "string"
+                                                                  }
+                                                                },
+                                                                "runtimeAssuranceReceipts": {
+                                                                  "type": "integer"
+                                                                },
+                                                                "stale": {
+                                                                  "type": "boolean"
+                                                                }
+                                                              }
+                                                            },
+                                                            "schema": {
+                                                              "type": "string"
+                                                            },
+                                                            "scorecard": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "body",
+                                                                "signature",
+                                                                "signerKey"
+                                                              ],
+                                                              "properties": {
+                                                                "body": {
+                                                                  "type": "object",
+                                                                  "additionalProperties": false,
+                                                                  "required": [
+                                                                    "dimensions",
+                                                                    "filters",
+                                                                    "generatedAt",
+                                                                    "positions",
+                                                                    "probation",
+                                                                    "reputation",
+                                                                    "schema",
+                                                                    "summary",
+                                                                    "supportBoundary"
+                                                                  ],
+                                                                  "properties": {
+                                                                    "dimensions": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "object"
+                                                                      }
+                                                                    },
+                                                                    "filters": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "agentSubject",
+                                                                        "decisionLimit",
+                                                                        "receiptLimit"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "agentSubject": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "decisionLimit": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "receiptLimit": {
+                                                                          "type": "integer"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "generatedAt": {
+                                                                      "type": "integer"
+                                                                    },
+                                                                    "positions": {
+                                                                      "type": "array",
+                                                                      "items": {
+                                                                        "type": "object",
+                                                                        "additionalProperties": false,
+                                                                        "required": [
+                                                                          "activeQuotedPremiumUnits",
+                                                                          "currency",
+                                                                          "failedUnits",
+                                                                          "governedMaxExposureUnits",
+                                                                          "pendingUnits",
+                                                                          "provisionalLossUnits",
+                                                                          "quotedPremiumUnits",
+                                                                          "recoveredUnits",
+                                                                          "reservedUnits",
+                                                                          "settledUnits"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "activeQuotedPremiumUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "currency": {
+                                                                            "type": "string"
+                                                                          },
+                                                                          "failedUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "governedMaxExposureUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "pendingUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "provisionalLossUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "quotedPremiumUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "recoveredUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "reservedUnits": {
+                                                                            "type": "integer"
+                                                                          },
+                                                                          "settledUnits": {
+                                                                            "type": "integer"
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "probation": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "probationary",
+                                                                        "receiptCount",
+                                                                        "spanDays",
+                                                                        "targetReceiptCount",
+                                                                        "targetSpanDays"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "probationary": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "receiptCount": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "spanDays": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "targetReceiptCount": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "targetSpanDays": {
+                                                                          "type": "integer"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "reputation": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "acceptedImportedSignalCount",
+                                                                        "effectiveScore",
+                                                                        "importedSignalCount",
+                                                                        "probationary"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "acceptedImportedSignalCount": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "effectiveScore": {
+                                                                          "type": "number"
+                                                                        },
+                                                                        "importedSignalCount": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "probationary": {
+                                                                          "type": "boolean"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "schema": {
+                                                                      "type": "string"
+                                                                    },
+                                                                    "summary": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "anomalyCount",
+                                                                        "band",
+                                                                        "confidence",
+                                                                        "currencies",
+                                                                        "matchingDecisions",
+                                                                        "matchingReceipts",
+                                                                        "mixedCurrencyBook",
+                                                                        "overallScore",
+                                                                        "probationary",
+                                                                        "returnedDecisions",
+                                                                        "returnedReceipts"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "anomalyCount": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "band": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "confidence": {
+                                                                          "type": "string"
+                                                                        },
+                                                                        "currencies": {
+                                                                          "type": "array",
+                                                                          "items": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        },
+                                                                        "matchingDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "matchingReceipts": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "mixedCurrencyBook": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "overallScore": {
+                                                                          "type": "number"
+                                                                        },
+                                                                        "probationary": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "returnedDecisions": {
+                                                                          "type": "integer"
+                                                                        },
+                                                                        "returnedReceipts": {
+                                                                          "type": "integer"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "supportBoundary": {
+                                                                      "type": "object",
+                                                                      "additionalProperties": false,
+                                                                      "required": [
+                                                                        "capitalAllocationSupported",
+                                                                        "crossCurrencyNettingSupported",
+                                                                        "facilityPolicySupported",
+                                                                        "subjectScopedOnly"
+                                                                      ],
+                                                                      "properties": {
+                                                                        "capitalAllocationSupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "crossCurrencyNettingSupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "facilityPolicySupported": {
+                                                                          "type": "boolean"
+                                                                        },
+                                                                        "subjectScopedOnly": {
+                                                                          "type": "boolean"
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "signature": {
+                                                                  "type": "string"
+                                                                },
+                                                                "signerKey": {
+                                                                  "type": "string"
+                                                                }
+                                                              }
+                                                            },
+                                                            "subjectKey": {
+                                                              "type": "string"
+                                                            },
+                                                            "supportBoundary": {
+                                                              "type": "object",
+                                                              "additionalProperties": false,
+                                                              "required": [
+                                                                "autonomousPricingSupported",
+                                                                "complianceScoreReferenceSupported",
+                                                                "externalCapitalReviewSupported",
+                                                                "facilityPolicyAuthoritative",
+                                                                "liabilityMarketSupported",
+                                                                "signedExposureAuthoritative",
+                                                                "signedScorecardAuthoritative"
+                                                              ],
+                                                              "properties": {
+                                                                "autonomousPricingSupported": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "complianceScoreReferenceSupported": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "externalCapitalReviewSupported": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "facilityPolicyAuthoritative": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "liabilityMarketSupported": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "signedExposureAuthoritative": {
+                                                                  "type": "boolean"
+                                                                },
+                                                                "signedScorecardAuthoritative": {
+                                                                  "type": "boolean"
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "signature": {
+                                                          "type": "string"
+                                                        },
+                                                        "signerKey": {
+                                                          "type": "string"
+                                                        }
+                                                      }
+                                                    },
+                                                    "schema": {
+                                                      "type": "string"
+                                                    }
+                                                  }
+                                                },
+                                                "signature": {
+                                                  "type": "string"
+                                                },
+                                                "signerKey": {
+                                                  "type": "string"
+                                                }
+                                              }
+                                            },
+                                            "quoteResponseId": {
+                                              "type": "string"
+                                            },
+                                            "quotedTerms": {
+                                              "type": "object",
+                                              "additionalProperties": false,
+                                              "required": [
+                                                "expiresAt",
+                                                "quotedCoverageAmount",
+                                                "quotedPremiumAmount"
+                                              ],
+                                              "properties": {
+                                                "expiresAt": {
+                                                  "type": "integer"
+                                                },
+                                                "quotedCoverageAmount": {
+                                                  "type": "object",
+                                                  "additionalProperties": false,
+                                                  "required": [
+                                                    "currency",
+                                                    "units"
+                                                  ],
+                                                  "properties": {
+                                                    "currency": {
+                                                      "type": "string"
+                                                    },
+                                                    "units": {
+                                                      "type": "integer"
+                                                    }
+                                                  }
+                                                },
+                                                "quotedDeductibleAmount": {
+                                                  "type": "object",
+                                                  "additionalProperties": false,
+                                                  "required": [
+                                                    "currency",
+                                                    "units"
+                                                  ],
+                                                  "properties": {
+                                                    "currency": {
+                                                      "type": "string"
+                                                    },
+                                                    "units": {
+                                                      "type": "integer"
+                                                    }
+                                                  }
+                                                },
+                                                "quotedPremiumAmount": {
+                                                  "type": "object",
+                                                  "additionalProperties": false,
+                                                  "required": [
+                                                    "currency",
+                                                    "units"
+                                                  ],
+                                                  "properties": {
+                                                    "currency": {
+                                                      "type": "string"
+                                                    },
+                                                    "units": {
+                                                      "type": "integer"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "schema": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "signature": {
+                                          "type": "string"
+                                        },
+                                        "signerKey": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "schema": {
+                                      "type": "string"
+                                    },
+                                    "selectedCoverageAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "selectedPremiumAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "signature": {
+                                  "type": "string"
+                                },
+                                "signerKey": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "policyNumber": {
+                              "type": "string"
+                            },
+                            "premiumAmount": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "currency",
+                                "units"
+                              ],
+                              "properties": {
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "units": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "schema": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "signerKey": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "claimAmount": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "currency",
+                        "units"
+                      ],
+                      "properties": {
+                        "currency": {
+                          "type": "string"
+                        },
+                        "units": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "claimEventAt": {
+                      "type": "integer"
+                    },
+                    "claimId": {
+                      "type": "string"
+                    },
+                    "claimRef": {
+                      "type": "string"
+                    },
+                    "claimant": {
+                      "type": "string"
+                    },
+                    "exposure": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "body",
+                        "signature",
+                        "signerKey"
+                      ],
+                      "properties": {
+                        "body": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "decisions",
+                            "filters",
+                            "generatedAt",
+                            "positions",
+                            "receipts",
+                            "schema",
+                            "summary",
+                            "supportBoundary"
+                          ],
+                          "properties": {
+                            "decisions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "filters": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "agentSubject",
+                                "decisionLimit",
+                                "receiptLimit"
+                              ],
+                              "properties": {
+                                "agentSubject": {
+                                  "type": "string"
+                                },
+                                "decisionLimit": {
+                                  "type": "integer"
+                                },
+                                "receiptLimit": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "generatedAt": {
+                              "type": "integer"
+                            },
+                            "positions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "activeQuotedPremiumUnits",
+                                  "currency",
+                                  "failedUnits",
+                                  "governedMaxExposureUnits",
+                                  "pendingUnits",
+                                  "provisionalLossUnits",
+                                  "quotedPremiumUnits",
+                                  "recoveredUnits",
+                                  "reservedUnits",
+                                  "settledUnits"
+                                ],
+                                "properties": {
+                                  "activeQuotedPremiumUnits": {
+                                    "type": "integer"
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  },
+                                  "failedUnits": {
+                                    "type": "integer"
+                                  },
+                                  "governedMaxExposureUnits": {
+                                    "type": "integer"
+                                  },
+                                  "pendingUnits": {
+                                    "type": "integer"
+                                  },
+                                  "provisionalLossUnits": {
+                                    "type": "integer"
+                                  },
+                                  "quotedPremiumUnits": {
+                                    "type": "integer"
+                                  },
+                                  "recoveredUnits": {
+                                    "type": "integer"
+                                  },
+                                  "reservedUnits": {
+                                    "type": "integer"
+                                  },
+                                  "settledUnits": {
+                                    "type": "integer"
+                                  }
+                                }
+                              }
+                            },
+                            "receipts": {
+                              "type": "array",
+                              "items": {
+                                "type": "object"
+                              }
+                            },
+                            "schema": {
+                              "type": "string"
+                            },
+                            "summary": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "actionableReceipts",
+                                "activeDecisions",
+                                "currencies",
+                                "failedSettlementReceipts",
+                                "matchingDecisions",
+                                "matchingReceipts",
+                                "mixedCurrencyBook",
+                                "pendingSettlementReceipts",
+                                "returnedDecisions",
+                                "returnedReceipts",
+                                "supersededDecisions",
+                                "truncatedDecisions",
+                                "truncatedReceipts"
+                              ],
+                              "properties": {
+                                "actionableReceipts": {
+                                  "type": "integer"
+                                },
+                                "activeDecisions": {
+                                  "type": "integer"
+                                },
+                                "currencies": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "failedSettlementReceipts": {
+                                  "type": "integer"
+                                },
+                                "matchingDecisions": {
+                                  "type": "integer"
+                                },
+                                "matchingReceipts": {
+                                  "type": "integer"
+                                },
+                                "mixedCurrencyBook": {
+                                  "type": "boolean"
+                                },
+                                "pendingSettlementReceipts": {
+                                  "type": "integer"
+                                },
+                                "returnedDecisions": {
+                                  "type": "integer"
+                                },
+                                "returnedReceipts": {
+                                  "type": "integer"
+                                },
+                                "supersededDecisions": {
+                                  "type": "integer"
+                                },
+                                "truncatedDecisions": {
+                                  "type": "boolean"
+                                },
+                                "truncatedReceipts": {
+                                  "type": "boolean"
+                                }
+                              }
+                            },
+                            "supportBoundary": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "claimAdjudicationSupported",
+                                "crossCurrencyNettingSupported",
+                                "governedReceiptsAuthoritative",
+                                "recoveryLifecycleSupported",
+                                "settlementReconciliationAuthoritative",
+                                "underwritingDecisionsAuthoritative"
+                              ],
+                              "properties": {
+                                "claimAdjudicationSupported": {
+                                  "type": "boolean"
+                                },
+                                "crossCurrencyNettingSupported": {
+                                  "type": "boolean"
+                                },
+                                "governedReceiptsAuthoritative": {
+                                  "type": "boolean"
+                                },
+                                "recoveryLifecycleSupported": {
+                                  "type": "boolean"
+                                },
+                                "settlementReconciliationAuthoritative": {
+                                  "type": "boolean"
+                                },
+                                "underwritingDecisionsAuthoritative": {
+                                  "type": "boolean"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "signerKey": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "issuedAt": {
+                      "type": "integer"
+                    },
+                    "lossEvent": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "body",
+                        "signature",
+                        "signerKey"
+                      ],
+                      "properties": {
+                        "body": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "bondId",
+                            "description",
+                            "eventId",
+                            "eventKind",
+                            "issuedAt",
+                            "projectedBondLifecycleState",
+                            "report",
+                            "schema"
+                          ],
+                          "properties": {
+                            "bondId": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "eventId": {
+                              "type": "string"
+                            },
+                            "eventKind": {
+                              "type": "string"
+                            },
+                            "issuedAt": {
+                              "type": "integer"
+                            },
+                            "projectedBondLifecycleState": {
+                              "type": "string"
+                            },
+                            "report": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "generatedAt",
+                                "query",
+                                "schema",
+                                "summary",
+                                "supportBoundary"
+                              ],
+                              "properties": {
+                                "generatedAt": {
+                                  "type": "integer"
+                                },
+                                "query": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "amount",
+                                    "bondId",
+                                    "eventKind"
+                                  ],
+                                  "properties": {
+                                    "amount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "bondId": {
+                                      "type": "string"
+                                    },
+                                    "eventKind": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "schema": {
+                                  "type": "string"
+                                },
+                                "summary": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "agentSubject",
+                                    "bondId",
+                                    "currentBondLifecycleState",
+                                    "currentDelinquentAmount",
+                                    "eventAmount",
+                                    "outstandingDelinquentAmount",
+                                    "projectedBondLifecycleState"
+                                  ],
+                                  "properties": {
+                                    "agentSubject": {
+                                      "type": "string"
+                                    },
+                                    "bondId": {
+                                      "type": "string"
+                                    },
+                                    "capabilityId": {
+                                      "type": "string"
+                                    },
+                                    "currentBondLifecycleState": {
+                                      "type": "string"
+                                    },
+                                    "currentDelinquentAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "eventAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "facilityId": {
+                                      "type": "string"
+                                    },
+                                    "outstandingDelinquentAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "projectedBondLifecycleState": {
+                                      "type": "string"
+                                    },
+                                    "releaseableReserveAmount": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "toolName": {
+                                      "type": "string"
+                                    },
+                                    "toolServer": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "supportBoundary": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "appealWindowSupported",
+                                    "automaticCapitalExecutionSupported",
+                                    "bondLifecycleProjectionAuthoritative",
+                                    "externalClaimAdjudicationSupported",
+                                    "immutableLifecycleAuthoritative",
+                                    "reserveControlExecutionSupported"
+                                  ],
+                                  "properties": {
+                                    "appealWindowSupported": {
+                                      "type": "boolean"
+                                    },
+                                    "automaticCapitalExecutionSupported": {
+                                      "type": "boolean"
+                                    },
+                                    "bondLifecycleProjectionAuthoritative": {
+                                      "type": "boolean"
+                                    },
+                                    "externalClaimAdjudicationSupported": {
+                                      "type": "boolean"
+                                    },
+                                    "immutableLifecycleAuthoritative": {
+                                      "type": "boolean"
+                                    },
+                                    "reserveControlExecutionSupported": {
+                                      "type": "boolean"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "schema": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "signerKey": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "narrative": {
+                      "type": "string"
+                    },
+                    "receiptIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "schema": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "signature": {
+                  "type": "string"
+                },
+                "signerKey": {
+                  "type": "string"
+                }
+              }
+            },
+            "claimResponseId": {
+              "type": "string"
+            },
+            "coveredAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "denialReason": {
+              "type": "string"
+            },
+            "disposition": {
+              "type": "string"
+            },
+            "issuedAt": {
+              "type": "integer"
+            },
+            "providerResponseRef": {
+              "type": "string"
+            },
+            "responseNote": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "signature": {
+          "type": "string"
+        },
+        "signerKey": {
+          "type": "string"
+        }
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.market.claim-dispute.v1"
+    }
+  }
+}

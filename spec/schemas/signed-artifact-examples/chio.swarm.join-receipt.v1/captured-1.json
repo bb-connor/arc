@@ -1,0 +1,26 @@
+{
+  "actualParentReceiptIds": [
+    "receipt-child-a"
+  ],
+  "chainId": "swarm-chain-proof-valid",
+  "dagOrdinal": 2,
+  "expectedParentReceiptIds": [
+    "receipt-child-a",
+    "receipt-child-b"
+  ],
+  "graphId": "swarm-graph-proof-valid",
+  "hlcUnixMs": 1800000000500,
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "joinId": "join-child-results",
+  "joinPredicate": "quorum:2",
+  "nextTaskId": "task-root",
+  "parentSetHash": "9078add114532e77093d94127b73ceadd2a5e2d48dadc0bb25d2f3314db48d4f",
+  "parentTaskReceipts": [
+    {
+      "receiptId": "receipt-child-a",
+      "taskId": "task-child-a"
+    }
+  ],
+  "resultDigest": "cd81227938a623d33e100a0198a8e844b9545075e6583d48a6b059a68d4cff39",
+  "schema": "chio.swarm.join-receipt.v1"
+}

@@ -1,0 +1,65 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "0d7481b47b21cc935931946c7aa816d3f0cd64bf8b0106432a396909cdd1c54d",
+      "parameters": {
+        "enforcement_envelope_sha256": "88da8e33c942e233499470af90c0ba04a40c45cbd4f7edcd3d7dc5c4bbf8922b",
+        "enforcement_id": "8aa66d3d7f6068955e0b77520e020b3aa4b4582c66cc506466c78a659c818a34",
+        "liability_key": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "penalty_envelope_sha256": "42affd96bd33835423e3115bccfc13687e0ecbedca170e9e213cf2c9cb37b269",
+        "root_intent_id": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+        "schema": "chio.finding.enforcement-anchor.v1",
+        "seller_impair_intent_id": "5d239a69ad5ad574db310865a290c8da149a5a17d98d416f2bd535bc41301d09"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-web3-1",
+    "content_hash": "5e74c65ed50fb26585825e1bca068b65bff562e9d781605efa46c1fb4fbffae1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "metadata": {
+      "chio_receipt_signing_nonce": "9efc43ad289d55120be289a3b2509f68094afb618cddbaa7419797a08dda7504",
+      "financial": {
+        "budget_remaining": 850,
+        "budget_total": 1000,
+        "cost_charged": 150,
+        "currency": "USD",
+        "delegation_depth": 1,
+        "grant_index": 0,
+        "oracle_evidence": {
+          "authority": "chio_link_runtime_v1",
+          "base": "ETH",
+          "cache_age_seconds": 45,
+          "converted_cost_units": 300,
+          "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+          "grant_currency": "USD",
+          "max_age_seconds": 3600,
+          "oracle_public_key": "d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c",
+          "original_cost_units": 1000000000000000,
+          "original_currency": "ETH",
+          "quote": "USD",
+          "rate_denominator": 100,
+          "rate_numerator": 300000,
+          "schema": "chio.oracle-conversion-evidence.v1",
+          "signature": "8a7b0cc235e29ef48c84219ba098bea8c1a7c572939f77c54b034819246e1decb5d0fa31349811c09890e3f9a52381b3e214a5ffe7224c4971ddc6442bc2df0d",
+          "source": "chainlink",
+          "updated_at": 1743292740
+        },
+        "payment_reference": "escrow-1",
+        "root_budget_holder": "subject-1",
+        "settlement_status": "pending"
+      }
+    },
+    "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1743292800,
+    "tool_name": "finding.enforcement-root",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-control-plane",
+    "trust_level": "mediated"
+  },
+  "id": "b3c1be37da3ca504a23062185fef41ba52fd5e2dd15af18cdf874770955d6b19"
+}

@@ -1,0 +1,38 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-orphan",
+    "content_hash": "content-cost-3",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "136293de3beb9a9ffa1f7737c5698aa9a3c0919957510fc9a71c2ac7228fe618",
+    "metadata": {
+      "attribution": null,
+      "chio_receipt_signing_nonce": "cost-3",
+      "financial": {
+        "budget_remaining": 900,
+        "budget_total": 1000,
+        "cost_charged": 50,
+        "currency": "USD",
+        "delegation_depth": 2,
+        "grant_index": 0,
+        "root_budget_holder": "orphan-root",
+        "settlement_status": "settled"
+      }
+    },
+    "policy_hash": "policy-cost",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1202,
+    "tool_name": "bash",
+    "tool_origin": "caller_executed",
+    "tool_server": "shell",
+    "trust_level": "mediated"
+  },
+  "id": "ceba362cbd86cee2906b54bde5cf057d6de2da51b40d7c85485b4ea3156a1010"
+}

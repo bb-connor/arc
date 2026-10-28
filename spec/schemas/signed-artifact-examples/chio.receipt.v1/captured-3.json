@@ -1,0 +1,30 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "17aa5c176ee932cd2363824debd85f9f3ed102f5d3fe91e218b6c0b9d61fdf25",
+      "parameters": {
+        "receipt_id": "signed-tool-1",
+        "tool": "execute"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-1",
+    "content_hash": "content-hash-signed-tool-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "c813f864414fa31add276a7373caaa18038417366f5332f1b2a37e7ada2317a6",
+    "metadata": {
+      "chio_receipt_signing_nonce": "signed-tool-1"
+    },
+    "policy_hash": "policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186814,
+    "tool_name": "execute",
+    "tool_origin": "caller_executed",
+    "tool_server": "acp-proxy",
+    "trust_level": "mediated"
+  },
+  "id": "de8e32e23837aec8b06b7bc552ba3f57e3745005ea1dd24320021bb6f743e3d3"
+}

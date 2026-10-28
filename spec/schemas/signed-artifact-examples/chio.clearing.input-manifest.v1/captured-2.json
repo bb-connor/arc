@@ -1,0 +1,25 @@
+{
+  "authorityId": "obligation-authority",
+  "endCheckpointDigest": "461386f1e36e080365504cc3941ce061e4b3a063b21bbaf1c6c0a0baa8edf42c",
+  "entries": [
+    {
+      "atomDigest": "62615150fdc9d4de7c98ddb2fd75e78531e5873dc0d29d242f083844b446f222",
+      "dispositionDigest": "f3a3807344502061c8e9296d97d193f23846b3bb7f850d84372a3e7839c85296",
+      "dispositionVersion": 2,
+      "lifecycleFence": 2,
+      "obligationId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+      "roundId": "round-1",
+      "sourceSequence": 1
+    }
+  ],
+  "epoch": 3,
+  "expiresAtUnixMs": 200,
+  "hasMore": false,
+  "issuedAtUnixMs": 80,
+  "keyEpoch": 11,
+  "rangeEndSequence": 1,
+  "rangeStartSequence": 1,
+  "schema": "chio.clearing.input-manifest.v1",
+  "sourceId": "obligations-primary",
+  "startCheckpointDigest": "442b537bc8b097d5e551b65c2edf086430d2e339c23385e24ed808413f938f7f"
+}

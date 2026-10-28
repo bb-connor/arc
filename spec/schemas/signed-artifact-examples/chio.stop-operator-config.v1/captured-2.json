@@ -1,0 +1,50 @@
+{
+  "authority_id": "store-uuid-1",
+  "config_authority_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "deployment_generation": 1,
+  "predecessor_digest": "88fa6b1ee02f4783a546b70ca3ac2e1af6f8c51b6d7a1e3fed4a627cbed19220",
+  "resume_policy": "operator_pair",
+  "rosters": [
+    {
+      "principals": [
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
+          },
+          "principal": "1b21e6bb0b6181a806712191a032dc338cfc7bf285deae467333eb2a85bbafd5",
+          "subject_key": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+        },
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
+          },
+          "principal": "89a648c33a23a1801dd56bf272942a258b554912954817ecdbea3222a6150ee5",
+          "subject_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+        },
+        {
+          "permissions": {
+            "relax": true,
+            "restrict": true,
+            "resume": true,
+            "stop": true
+          },
+          "principal": "dfa643853ac77d36d5d04ac8aa4ecfa71df9ff166890d38bc79061b89a354d2e",
+          "subject_key": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+        }
+      ],
+      "quorum_k": 2,
+      "scope": {
+        "kind": "kernel"
+      }
+    }
+  ],
+  "schema": "chio.stop-operator-config.v1",
+  "stop_quorum_max": 8,
+  "time_attestation_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+}

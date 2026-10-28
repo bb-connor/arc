@@ -1,0 +1,54 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "96aab2212ddfc617aaafd175e41a487317aa28f5ca87d278ef59105e3566b982",
+      "parameters": {
+        "seed": 9
+      }
+    },
+    "boundary_class": "detect_only",
+    "capability_id": "cap-01a182c7-8808-7be3-a8d1-f574d664077a",
+    "content_hash": "92a180c6387227791f9fd38d36451490e145eee40a25bde692f94b194ff0f702",
+    "kernel_key": "15f2724cdd423081e38b305140a63288780b38a7df5524905dd62f50170ec6e8",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "15f2724cdd423081e38b305140a63288780b38a7df5524905dd62f50170ec6e8",
+        "subject_key": "a876399ece7bba080f8004ed62dd4a76963678e919c44dbf34ee3c196446bcbf"
+      },
+      "chio_receipt_signing_nonce": "rcpt-cleanup-observation-01a182c7-8971-74e2-b3f8-19a076d252b2",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "dst-admission-dst-request-9",
+        "failure_code": null,
+        "pre_dispatch_cleanup_failed": true,
+        "pre_dispatch_cleanup_faults": [
+          {
+            "hold_ids": [
+              "dst-lease-dst-request-9"
+            ],
+            "reason": "internal error: DST injected runtime admission release failure",
+            "step": "runtime_admission_release"
+          }
+        ],
+        "pre_dispatch_cleanup_reason": "tool evaluation future dropped before dispatch with cleanup fault",
+        "reserved_destructive_lease_id": "dst-lease-dst-request-9"
+      },
+      "receipt_context": {
+        "request_id": "dst-request-9",
+        "request_namespace_digest": "bbaec32a1342cfcbc7ab1883a5f54ca684776e1e4331fb82bd46c7c701d66887"
+      }
+    },
+    "observation_outcome": "observed",
+    "policy_hash": "dst-policy",
+    "receipt_kind": "trace_observation",
+    "redaction_mode": "none",
+    "timestamp": 1793195477,
+    "tool_name": "mutate",
+    "tool_origin": "chio_internal",
+    "tool_server": "dst-server",
+    "trust_level": "verified"
+  },
+  "id": "28472d84ea450592f0e02943709952d0bf0f6b90e36ef79af326cca6ae262f26"
+}

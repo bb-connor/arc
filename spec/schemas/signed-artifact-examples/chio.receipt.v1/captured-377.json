@@ -1,0 +1,34 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1",
+    "content_hash": "ch-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "G",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "8e722107288cb058447754ae3bdd0a6ada596f8fa8940527d5e67ca36cab2901",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-test",
+      "financial": "invalid"
+    },
+    "policy_hash": "ph-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 100,
+    "tool_name": "tool-1",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-1",
+    "trust_level": "mediated"
+  },
+  "id": "73525bc3f41832ed39e3b08fbe866bb9c3c8d0dcc8f14e92e1af1dc02f72cf49"
+}

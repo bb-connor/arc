@@ -1,0 +1,48 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d087c109acf293498f24c6cb3e1b2449599a2efdbb413e39cc66f368d5be33d8",
+      "parameters": {
+        "owner": "λ"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "operator-cap",
+    "content_hash": "d148a2f83fc1e0e81fe04f3873ac73c0e7d02d5f8ab7c8596691446d5a74ef56",
+    "decision": {
+      "guard": "kernel",
+      "reason": "cumulative approval required",
+      "verdict": "deny"
+    },
+    "kernel_key": "3f8c53f8f9534d3bfafe6171bd059d9147a43358be05e381dfb136f7a70e2f3b",
+    "metadata": {
+      "chio_process": {
+        "attempt": 1,
+        "operation_key": "assign-one",
+        "process_id": "operator",
+        "recovery_policy": "known_outcome_only",
+        "runtime_id": "runtime-one"
+      },
+      "chio_receipt_signing_nonce": "response-test",
+      "execution_nonce": {
+        "stage": "preflight",
+        "tool_dispatched": false
+      },
+      "receipt_context": {
+        "request_id": "process:8a5eed742501049fa387848aceb4161477ffeb7d6e89bf8aded7f4414e3fe88f"
+      },
+      "threshold_approval": {
+        "state": "approval_required"
+      }
+    },
+    "policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000000,
+    "tool_name": "assign",
+    "tool_origin": "caller_executed",
+    "tool_server": "resource",
+    "trust_level": "mediated"
+  },
+  "id": "994b91ddea2e3b08050b2596d369e704ad112a3fe7c314d08dd4098114fbf173"
+}

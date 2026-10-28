@@ -1,0 +1,16 @@
+{
+  "authorization_digest": "73d03ca80b7925365aada431cb0eccb16553072951ee0d73d55a6c7d3143fc30",
+  "claim_id": "aae93279-7d94-457d-b797-250ac86631d8",
+  "completed_at_unix_ms": 1793187126846,
+  "execution_started_at_unix_ms": 1793187126846,
+  "executor": {
+    "executor_id": "api-approval-executor",
+    "key_epoch": 1,
+    "public_key": "9ab0b2d5668c0c6b4e4c44fbff93a3799874c2bd4a4f85947a7137bbd2fe24af"
+  },
+  "output": {
+    "approved": "A"
+  },
+  "realized_cost": null,
+  "schema": "chio.caller-delivery-report.v1"
+}

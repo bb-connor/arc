@@ -1,0 +1,117 @@
+{
+  "events": [
+    {
+      "amount": {
+        "currency": "USD",
+        "units": 4000
+      },
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "description": "commit",
+      "eventId": "commit:cfd-1",
+      "evidenceRefs": [
+        {
+          "kind": "credit_facility",
+          "locator": "credit-facility:cfd-1",
+          "observedAt": 10,
+          "referenceId": "cfd-1"
+        }
+      ],
+      "facilityId": "cfd-1",
+      "kind": "commit",
+      "occurredAt": 10,
+      "ownerRole": "operator_treasury",
+      "sourceId": "capital-source:facility:cfd-1"
+    }
+  ],
+  "generatedAt": 10,
+  "query": {
+    "agentSubject": "subject-1",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "schema": "chio.credit.capital-book.v1",
+  "sources": [
+    {
+      "bondId": "cbd-1",
+      "capitalSource": "operator_internal",
+      "committedAmount": {
+        "currency": "USD",
+        "units": 4000
+      },
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "currency": "USD",
+      "description": "facility source",
+      "disbursedAmount": {
+        "currency": "USD",
+        "units": 2000
+      },
+      "drawnAmount": {
+        "currency": "USD",
+        "units": 500
+      },
+      "facilityId": "cfd-1",
+      "kind": "facility_commitment",
+      "ownerRole": "operator_treasury",
+      "sourceId": "capital-source:facility:cfd-1"
+    },
+    {
+      "bondId": "cbd-1",
+      "capitalSource": "operator_internal",
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "currency": "USD",
+      "description": "bond source",
+      "facilityId": "cfd-1",
+      "heldAmount": {
+        "currency": "USD",
+        "units": 400
+      },
+      "impairedAmount": {
+        "currency": "USD",
+        "units": 300
+      },
+      "kind": "reserve_book",
+      "ownerRole": "operator_treasury",
+      "releasedAmount": {
+        "currency": "USD",
+        "units": 50
+      },
+      "repaidAmount": {
+        "currency": "USD",
+        "units": 200
+      },
+      "sourceId": "capital-source:bond:cbd-1"
+    }
+  ],
+  "subjectKey": "subject-1",
+  "summary": {
+    "currencies": [
+      "USD"
+    ],
+    "fundingSources": 2,
+    "ledgerEvents": 3,
+    "matchingBonds": 1,
+    "matchingFacilities": 1,
+    "matchingLossEvents": 1,
+    "matchingReceipts": 1,
+    "mixedCurrencyBook": false,
+    "returnedBonds": 1,
+    "returnedFacilities": 1,
+    "returnedLossEvents": 1,
+    "returnedReceipts": 1,
+    "truncatedBonds": false,
+    "truncatedFacilities": false,
+    "truncatedLossEvents": false,
+    "truncatedReceipts": false
+  },
+  "supportBoundary": {
+    "automaticCapitalExecutionSupported": false,
+    "custodyExecutionSupported": false,
+    "mixedCurrencyNettingSupported": false,
+    "sourceOfFundsAuthoritative": true
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "eventId": "portable-negative-event-d7baccd8dd83e7a1fb173a57a028654907d58aa6b6424eb6b64827c3a173cf93",
+  "evidenceRefs": [
+    {
+      "kind": "external",
+      "referenceId": "case-1",
+      "uri": "https://issuer.example/cases/1"
+    }
+  ],
+  "expiresAt": 1700000600,
+  "issuerOperatorId": "https://issuer.example",
+  "kind": "policy_violation",
+  "observedAt": 1700000090,
+  "publishedAt": 1700000100,
+  "schema": "chio.portable-negative-event.v1",
+  "severity": 0.4,
+  "subjectKey": "f0e79eab73e19f316386ec08c6078ce08d77f110137b3c3c85671e0918e1ddfb"
+}

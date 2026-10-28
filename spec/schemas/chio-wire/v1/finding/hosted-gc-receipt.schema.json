@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-gc-receipt.schema.json",
+  "title": "Chio finding hosted gc receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "archiveSha256",
+    "completedAt",
+    "schema",
+    "target",
+    "tenantId"
+  ],
+  "properties": {
+    "archiveSha256": {
+      "type": "string"
+    },
+    "completedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-gc-receipt.v1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceFamily",
+        "resourceId",
+        "resourceKind",
+        "resourceRevision",
+        "resourceSha256"
+      ],
+      "properties": {
+        "resourceFamily": {
+          "type": "string"
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "resourceKind": {
+          "type": "string"
+        },
+        "resourceRevision": {
+          "type": "integer"
+        },
+        "resourceSha256": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

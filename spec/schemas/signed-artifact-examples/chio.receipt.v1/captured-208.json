@@ -1,0 +1,38 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "0b2a7d89dcc02b2c5a432ca04a5795d18e86214e10fb60f642bd4d8a1a48fcb9",
+      "parameters": {
+        "authority_receipt_ref": "receipt-quote-commerce-001",
+        "event_id": "event-commerce-001-quote",
+        "order_id": "order-commerce-001",
+        "transition": "bind_quote"
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:single-call-authority",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-receipt-quote-commerce-001",
+    "content_hash": "2bbf55c7a81c7ff217cfd8c1e593f91d2f79397127c2ed7a4896676878ac3287",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "metadata": {
+      "chio_receipt_signing_nonce": "receipt-quote-commerce-001"
+    },
+    "policy_hash": "78365dbf2a73c84d6f98dd3e382615b29933c90e53231752cc5a8294f7a30e8f",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1781072000,
+    "tool_name": "bind_quote",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-commerce-order-authority",
+    "trust_level": "mediated"
+  },
+  "id": "1413206d4bdbcfab417b3a3b86ddcaec85ab121b9faa88b7b116dbf93c23e201"
+}

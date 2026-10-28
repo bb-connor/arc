@@ -1,0 +1,24 @@
+{
+  "authorityKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+  "bodySha256": "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+  "brokerCapabilityId": "broker-capability",
+  "callerHeadersSha256": "265e7b877c8e1768b9488972380d00a9601aac5e72d0e060cc1c3b951f3a1a13",
+  "callerOptionsSha256": "1c764db68f8e10c13e513a4c12f397b677f9eb623024c4ad1ee26aa9068d83e8",
+  "capabilityExpiresAtUnixSeconds": 100,
+  "credential": {
+    "credentialId": "credential-a",
+    "provider": "generic-https",
+    "version": 1
+  },
+  "destination": {
+    "exactPathAndQuery": "/v1?x=1",
+    "explicitPort": 443,
+    "method": "POST",
+    "normalizedHost": "example.com",
+    "scheme": "https"
+  },
+  "issuedAtUnixSeconds": 20,
+  "nonce": "nonce-abcdefghijkl",
+  "parentCapabilityId": "parent-capability",
+  "schema": "chio.broker-request-proof.v1"
+}

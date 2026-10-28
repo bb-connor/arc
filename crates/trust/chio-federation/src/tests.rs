@@ -1371,3 +1371,22 @@ fn qualification_matrix_rejects_case_level_misconfigurations() {
         Err(FederationContractError::MissingField(_))
     ));
 }
+
+fn sign_and_verify<T>(body: T) -> Result<(), Box<dyn std::error::Error>>
+where
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
+{
+    let keypair = chio_core_types::crypto::Keypair::from_seed(&[7; 32]);
+    let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(body, &keypair)?;
+    assert!(signed.verify_signature(&keypair.public_key())?);
+    Ok(())
+}
+
+#[test]
+fn signed_artifact_capture_federation_artifacts() -> Result<(), Box<dyn std::error::Error>> {
+    sign_and_verify(sample_activation_exchange())?;
+    sign_and_verify(sample_quorum_report())?;
+    sign_and_verify(sample_reputation_clearing())?;
+    sign_and_verify(sample_qualification_matrix())?;
+    Ok(())
+}

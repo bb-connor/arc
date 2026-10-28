@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-principal-lifecycle.schema.json",
+  "title": "Chio finding hosted principal lifecycle signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityPublicKeyHex",
+    "createdAt",
+    "operation",
+    "overlapExpiresAt",
+    "previousEventSha256",
+    "principalId",
+    "role",
+    "schema",
+    "tenantId"
+  ],
+  "properties": {
+    "capabilityPublicKeyHex": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "operation": {
+      "type": "string"
+    },
+    "overlapExpiresAt": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "previousEventSha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "principalId": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-principal-lifecycle.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

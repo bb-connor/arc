@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/chaos-run-report-signature.schema.json",
+  "title": "Chio runtime chaos run report signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actualVerifierReportDigest",
+    "caseId",
+    "deterministicSeedDigest",
+    "expectedResult",
+    "failureInjected",
+    "issuer",
+    "runnerVersionDigest",
+    "runtimeReceiptRefs",
+    "schema",
+    "status"
+  ],
+  "properties": {
+    "actualVerifierReportDigest": {
+      "type": "string"
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "deterministicSeedDigest": {
+      "type": "string"
+    },
+    "expectedResult": {
+      "type": "string"
+    },
+    "failureInjected": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "runnerVersionDigest": {
+      "type": "string"
+    },
+    "runtimeReceiptRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.runtime.chaos-run-report-signature.v1"
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

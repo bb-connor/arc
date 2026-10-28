@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/audit-seed-witness.schema.json",
+  "title": "Chio finding audit seed witness signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audit_authority",
+    "eligible_snapshot_at",
+    "eligible_snapshot_digest",
+    "epoch_index",
+    "seed_commitment",
+    "seed_witnessed_at"
+  ],
+  "properties": {
+    "audit_authority": {
+      "type": "string"
+    },
+    "eligible_snapshot_at": {
+      "type": "integer"
+    },
+    "eligible_snapshot_digest": {
+      "type": "string"
+    },
+    "epoch_index": {
+      "type": "integer"
+    },
+    "seed_commitment": {
+      "type": "string"
+    },
+    "seed_witnessed_at": {
+      "type": "integer"
+    }
+  }
+}

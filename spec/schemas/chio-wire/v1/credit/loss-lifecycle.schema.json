@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/loss-lifecycle.schema.json",
+  "title": "Chio credit loss lifecycle signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bondId",
+    "eventId",
+    "eventKind",
+    "issuedAt",
+    "projectedBondLifecycleState",
+    "report",
+    "schema"
+  ],
+  "properties": {
+    "bondId": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "eventId": {
+      "type": "string"
+    },
+    "eventKind": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "projectedBondLifecycleState": {
+      "type": "string"
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatedAt",
+        "query",
+        "schema",
+        "summary",
+        "supportBoundary"
+      ],
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "description"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "generatedAt": {
+          "type": "integer"
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bondId",
+            "eventKind"
+          ],
+          "properties": {
+            "amount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "bondId": {
+              "type": "string"
+            },
+            "eventKind": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentSubject",
+            "bondId",
+            "currentBondLifecycleState",
+            "eventAmount",
+            "projectedBondLifecycleState"
+          ],
+          "properties": {
+            "agentSubject": {
+              "type": "string"
+            },
+            "bondId": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "currentBondLifecycleState": {
+              "type": "string"
+            },
+            "currentDelinquentAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "currentRecoveredAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "currentReleasedReserveAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "eventAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "facilityId": {
+              "type": "string"
+            },
+            "outstandingDelinquentAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "projectedBondLifecycleState": {
+              "type": "string"
+            },
+            "releaseableReserveAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "toolName": {
+              "type": "string"
+            },
+            "toolServer": {
+              "type": "string"
+            }
+          }
+        },
+        "supportBoundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "appealWindowSupported",
+            "automaticCapitalExecutionSupported",
+            "bondLifecycleProjectionAuthoritative",
+            "externalClaimAdjudicationSupported",
+            "immutableLifecycleAuthoritative",
+            "reserveControlExecutionSupported"
+          ],
+          "properties": {
+            "appealWindowSupported": {
+              "type": "boolean"
+            },
+            "automaticCapitalExecutionSupported": {
+              "type": "boolean"
+            },
+            "bondLifecycleProjectionAuthoritative": {
+              "type": "boolean"
+            },
+            "externalClaimAdjudicationSupported": {
+              "type": "boolean"
+            },
+            "immutableLifecycleAuthoritative": {
+              "type": "boolean"
+            },
+            "reserveControlExecutionSupported": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.credit.loss-lifecycle.v1"
+    }
+  }
+}

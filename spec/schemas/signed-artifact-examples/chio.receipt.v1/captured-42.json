@@ -1,0 +1,40 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "3f4347e6a5590b5e10d2bb0eba7ea603ccd3bc5878f1fa2bbb68da5c0e9b7f26",
+      "parameters": {
+        "i": 9
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-9",
+    "content_hash": "ch-9",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "G",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "58bd1c8118884ff92e2a06e5fb8b744c57a3b6a5399cee38a1db0de5bededa51",
+    "metadata": {
+      "chio_receipt_signing_nonce": "9acf59eaab20feeaf726a9c26890674f70b54aeebaafedccd330f56374a3298f",
+      "financial": {
+        "cost_charged": 109,
+        "currency": "USD",
+        "settlement_status": "settled"
+      }
+    },
+    "policy_hash": "policy-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1009,
+    "tool_name": "tool",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "db302566ffad4802004aecfa0f697fee361faf8eb3d268e061ab358a9e6a4b85"
+}

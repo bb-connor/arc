@@ -1,0 +1,17 @@
+{
+  "name": "Old Shape Server",
+  "public_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+  "schema": "chio.manifest.v1",
+  "server_id": "server.old-shape",
+  "tools": [
+    {
+      "description": "read fixture",
+      "has_side_effects": false,
+      "input_schema": {
+        "type": "object"
+      },
+      "name": "read"
+    }
+  ],
+  "version": "1.0.0"
+}

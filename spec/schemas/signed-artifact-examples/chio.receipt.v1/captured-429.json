@@ -1,0 +1,35 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+      "parameters": {
+        "ok": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-2",
+    "content_hash": "hash",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "b8b2e0508c9a5ab9f6cc069a8b02313b10b13eb7d4f82d3266312aea92a4af8d",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "issuer",
+        "subject_key": "agent-1"
+      },
+      "chio_receipt_signing_nonce": "r3"
+    },
+    "policy_hash": "policy-b",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710086400,
+    "tool_name": "get",
+    "tool_origin": "caller_executed",
+    "tool_server": "http",
+    "trust_level": "mediated"
+  },
+  "id": "b61b55c2af9c97059f67ecdc760b96a38a601ab501a0ac91aa3db3e0221efc87"
+}

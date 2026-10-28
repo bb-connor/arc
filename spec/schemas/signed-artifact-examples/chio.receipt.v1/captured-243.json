@@ -1,0 +1,31 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "thin-capability",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "retained unknown outcome",
+      "verdict": "deny"
+    },
+    "kernel_key": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+    "metadata": {
+      "admission_operation": {
+        "retained_state": "outcome_unknown_after_dispatch"
+      }
+    },
+    "policy_hash": "71509b5b57a4ef36d8a40af7d01b4d204509ec0fd2f4a6fe7033bc6da90f630f",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000000,
+    "tool_name": "read",
+    "tool_origin": "caller_executed",
+    "tool_server": "tools",
+    "trust_level": "mediated"
+  },
+  "id": "7fddb11a90c4e29c22ed434ca8e8deffbf6ec3f511493276bbdd66bb3eb45dca"
+}

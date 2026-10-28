@@ -1,0 +1,22 @@
+{
+  "authorityDigest": "a675382a6699079751add3d6895c4a9388605cb8fae7a345f6203b9530531cdb",
+  "dispositionAuthorityId": "obligation-authority",
+  "dispositionAuthorityKeyEpoch": 11,
+  "finalizationDigest": "057ee75792a8b91172e51543097f074ca04f5d356430e75fe0ddbf588545c608",
+  "intentProgressRoot": "76f35736eafeec1cc7cdcd431ea005d8375f9756e1b4860564a430d029e33ece",
+  "nextLifecycleFence": 7,
+  "nextLifecycleVersion": 7,
+  "outputManifestDigest": "bdef2c04a42711fccbeb1e1d2b18028371af42fdc9eac42e1e81bb2d5209bf44",
+  "reservationCount": 2,
+  "reservationHeadRoot": "fa9372dcc385e198fc555190ab98a6f6f2ec5970d01a1bcc8ce69d7c17d53dd9",
+  "reservationRoot": "0e94a45f540c2421301cd68d86324bb00ff285220fe1cd2ec4a8b49598a2f163",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "roundId": "round-1",
+  "satisfiedAtUnixMs": 563,
+  "schema": "chio.clearing.round-satisfaction.v1",
+  "settlementIntentCount": 1,
+  "settlementIntentRoot": "a4e5d285aad31b52b5f573886ea02ac3cacfc8d94718d272a92827fff1365cc5",
+  "sourceLifecycleFence": 6,
+  "sourceLifecycleHeadDigest": "7528c7914d96d80cf5788157d36c9f33e705b7f498a8e96f5f1acfce34df0b2a",
+  "sourceLifecycleVersion": 6
+}

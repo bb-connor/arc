@@ -1,0 +1,44 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "8460af364945b71b9f4a9504d72a9f0e1bb46b3f07c4d9c0900487bbf5ec82ba",
+      "parameters": {
+        "findingId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-a",
+    "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "5e212c0980e4b39fc09721134aa02109374edfd260c0d3d03cb501c8d65457a9",
+    "metadata": {
+      "chio_receipt_signing_nonce": "pending",
+      "finding_delivery": {
+        "accepted_bid_envelope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "authoritative_payment_operation_id": "payment-a",
+        "digest_check": "matched",
+        "finding_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "listing_id": "listing-a",
+        "media_type_check": "matched",
+        "purchase_intent_id": "purchase-intent-a",
+        "reservation_id": "reservation-a",
+        "schema": "chio.finding.delivery.v1",
+        "settlement_mode": "local_reversible_hold",
+        "transform_profile": "identity",
+        "venue_admission_envelope_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    "policy_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "tenant_id": "tenant:test",
+    "timestamp": 1700000000,
+    "tool_name": "read_finding",
+    "tool_origin": "caller_executed",
+    "tool_server": "finding-market",
+    "trust_level": "mediated"
+  },
+  "id": "6ebaada96863a05edd881b8f8315573e5cc0411c8cfee8c57c92fda949e9e865"
+}

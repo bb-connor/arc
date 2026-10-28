@@ -1,0 +1,26 @@
+{
+  "allowedAdmissionClasses": [
+    "public_untrusted"
+  ],
+  "explicitLocalReviewRequired": true,
+  "feeScheduleRef": {
+    "artifactId": "fees",
+    "kind": "open_market_fee_schedule",
+    "operatorId": "operator",
+    "schema": "chio.example.v1",
+    "sha256": "abababababababababababababababababababababababababababababababab"
+  },
+  "governingCharterRef": {
+    "artifactId": "charter",
+    "kind": "governance_charter",
+    "operatorId": "operator",
+    "schema": "chio.example.v1",
+    "sha256": "abababababababababababababababababababababababababababababababab"
+  },
+  "governingOperatorId": "operator",
+  "issuedAt": 1793192206,
+  "namespace": "chio://federation/reputation",
+  "policyId": "reputation-trust",
+  "schema": "chio.federation-open-admission-policy.v1",
+  "visibilityOnlyWithoutActivation": true
+}

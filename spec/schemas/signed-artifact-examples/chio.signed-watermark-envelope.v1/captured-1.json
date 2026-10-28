@@ -1,0 +1,13 @@
+{
+  "application_id": "application-a",
+  "encoding": "base64_url_canonical_json",
+  "expires_at_unix_ms": 5000,
+  "issued_at_unix_ms": 1000,
+  "key_id": "watermark-key-1",
+  "marker_ref": "wmref_f6201552db252464e0f4f01ba8cfcf00ef17fc47c4054abe",
+  "sequence": 2,
+  "session_id": "session-a",
+  "source_receipt_id": "receipt-a",
+  "tenant_id": "tenant-a",
+  "tool_id": "tool-a"
+}

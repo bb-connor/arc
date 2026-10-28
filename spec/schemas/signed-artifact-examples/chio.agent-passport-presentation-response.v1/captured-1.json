@@ -1,0 +1,141 @@
+{
+  "challenge": {
+    "challengeId": "43c96581ee48f60266b06c0051dfbd69faeec7a45b6614aed7a4f974406687bd",
+    "expiresAt": "2026-10-28T13:02:33Z",
+    "issuedAt": "2026-10-28T12:52:33Z",
+    "nonce": "cf4e37b8358e13d2ac48de3dd17fb881db62a40d7bb38177f1ca8ac0a880c1b6",
+    "policyRef": {
+      "policyId": "admission"
+    },
+    "schema": "chio.agent-passport-presentation-challenge.v1",
+    "verifier": "https://verifier.example.test"
+  },
+  "passport": {
+    "credentials": [
+      {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://chio.world/credentials/v1"
+        ],
+        "credentialSubject": {
+          "id": "did:chio:e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+          "metrics": {
+            "boundary_pressure": {
+              "deny_ratio": {
+                "state": "unknown"
+              },
+              "policies_observed": 0,
+              "receipts_observed": 0
+            },
+            "composite_score": {
+              "state": "unknown"
+            },
+            "computed_at": 1793191953,
+            "delegation_hygiene": {
+              "budget_reduction_rate": {
+                "state": "unknown"
+              },
+              "delegations_observed": 0,
+              "scope_reduction_rate": {
+                "state": "unknown"
+              },
+              "score": {
+                "state": "unknown"
+              },
+              "ttl_reduction_rate": {
+                "state": "unknown"
+              }
+            },
+            "effective_weight_sum": 0,
+            "history_depth": {
+              "active_days": 0,
+              "activity_ratio": {
+                "state": "unknown"
+              },
+              "first_seen": null,
+              "last_seen": null,
+              "receipt_count": 0,
+              "score": {
+                "state": "unknown"
+              },
+              "span_days": 0
+            },
+            "incident_correlation": {
+              "incidents_observed": null,
+              "score": {
+                "state": "unknown"
+              }
+            },
+            "least_privilege": {
+              "capabilities_observed": 0,
+              "score": {
+                "state": "unknown"
+              }
+            },
+            "reliability": {
+              "cancellation_rate": {
+                "state": "unknown"
+              },
+              "completion_rate": {
+                "state": "unknown"
+              },
+              "incompletion_rate": {
+                "state": "unknown"
+              },
+              "receipts_observed": 0,
+              "score": {
+                "state": "unknown"
+              }
+            },
+            "resource_stewardship": {
+              "average_utilization": {
+                "state": "unknown"
+              },
+              "capped_grants_observed": 0,
+              "fit_score": {
+                "state": "unknown"
+              }
+            },
+            "specialization": {
+              "distinct_tools": 0,
+              "score": {
+                "state": "unknown"
+              }
+            },
+            "subject_key": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351"
+          }
+        },
+        "evidence": {
+          "checkpointRoots": [],
+          "lineageRecords": 0,
+          "query": {
+            "until": 1793191953
+          },
+          "receiptCount": 0,
+          "receiptIds": [],
+          "uncheckpointedReceipts": 0
+        },
+        "expirationDate": "2026-10-28T14:52:33Z",
+        "issuanceDate": "2026-10-28T12:51:33Z",
+        "issuer": "did:chio:d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+        "proof": {
+          "created": "2026-10-28T12:51:33Z",
+          "proofPurpose": "assertionMethod",
+          "proofValue": "39f87586bd511bd239aed6bcdd27e1dec4ea4bc1e4a20972ace64ee28ba4ef43d107d391564953a3145d2ee7b689b5684708640c6048bd350788d1a2f303ac08",
+          "type": "Ed25519Signature2020",
+          "verificationMethod": "did:chio:d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869#key-1"
+        },
+        "type": [
+          "VerifiableCredential",
+          "ChioReputationAttestation"
+        ]
+      }
+    ],
+    "issuedAt": "2026-10-28T12:51:33Z",
+    "merkleRoots": [],
+    "schema": "chio.agent-passport.v1",
+    "subject": "did:chio:e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+    "validUntil": "2026-10-28T14:52:33Z"
+  },
+  "schema": "chio.agent-passport-presentation-response.v1"
+}

@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/market-fee-schedule.schema.json",
+  "title": "Chio registry market fee schedule signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bondRequirements",
+    "disputeFee",
+    "feeScheduleId",
+    "governingOperatorId",
+    "issuedAt",
+    "issuedBy",
+    "marketParticipationFee",
+    "namespace",
+    "publicationFee",
+    "schema",
+    "scope"
+  ],
+  "properties": {
+    "bondRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bondClass",
+          "collateralReferenceKind",
+          "requiredAmount",
+          "slashable"
+        ],
+        "properties": {
+          "bondClass": {
+            "type": "string"
+          },
+          "collateralReferenceKind": {
+            "type": "string"
+          },
+          "requiredAmount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "slashable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "disputeFee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "feeScheduleId": {
+      "type": "string"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "governingOperatorName": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "marketParticipationFee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "publicationFee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.registry.market-fee-schedule.v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace"
+      ],
+      "properties": {
+        "allowedActorKinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedAdmissionClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedListingOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "policyReference": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "child-rcpt-01a182c6-37e3-7fc1-8a6f-d8fca252790e",
+  "kernel_key": "046e53ae7b8e909e24b2348c31d134383e2e1bdba2b21fd24a4126d47d2a6256",
+  "metadata": {
+    "message": "request nested-tool-child-cancel-sample-c7a3dfbc-b87f-45a0-9b6c-e7013514af80 was cancelled: client cancelled nested request",
+    "message_sha256": "79ecc6e99eefc27850b30c2d1b628a49e46e719985e4af8c592ad055311e9865",
+    "message_truncated": false,
+    "outcome": "error"
+  },
+  "operation_kind": "create_message",
+  "outcome_hash": "f50a07ff3ec5d1ef8651f5cc827fdccaddb9a39f689294876ba13743219a0006",
+  "parent_request_id": "nested-tool-child-cancel",
+  "policy_hash": "test-policy-hash",
+  "request_id": "nested-tool-child-cancel-sample-c7a3dfbc-b87f-45a0-9b6c-e7013514af80",
+  "session_id": "sess-ufju-PtD-ThZ2UPQEJdTJw",
+  "terminal_state": {
+    "reason": "client cancelled nested request",
+    "state": "cancelled"
+  },
+  "timestamp": 1793195390
+}

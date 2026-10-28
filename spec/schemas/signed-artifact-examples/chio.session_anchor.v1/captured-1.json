@@ -1,0 +1,45 @@
+{
+  "agentId": "ae432c3e1c0789e5f1fe1cefec36263a26d25bbb65776bc671dd1022b3f8ca3f",
+  "authContext": {
+    "method": {
+      "audience": "chio-mcp",
+      "enterpriseIdentity": {
+        "attributeSources": {
+          "clientId": "client_id",
+          "principal": "sub"
+        },
+        "clientId": "client-abc",
+        "federationMethod": "jwt",
+        "principal": "oidc:https://issuer.example#sub:user-123",
+        "providerId": "https://issuer.example",
+        "providerKind": "oidc_jwks",
+        "sourceSubject": "user-123",
+        "subjectKey": "85a1eadf5a82d28b04592e60f3df2186dd855eb802c85f367dc6b96ebf19beef"
+      },
+      "federatedClaims": {
+        "clientId": "client-abc"
+      },
+      "issuer": "https://issuer.example",
+      "kind": "o_auth_bearer",
+      "principal": "oidc:https://issuer.example#sub:user-123",
+      "scopes": [
+        "mcp:invoke",
+        "tools.read"
+      ],
+      "subject": "user-123",
+      "token_fingerprint": "fc495c9db907f57cddb93c7d7558dff17252a10d4ce36bb99fae99ef98394ecb"
+    },
+    "transport": "streamable_http"
+  },
+  "authContextHash": "68733fd5cf08ed9d042c5ca318aa66891c549a24e00783c8079cc398f2edc3d3",
+  "authEpoch": 1,
+  "authMethodHash": "337954a0d8aaa3409fa96832d83894dd41d12be84fb7b05d9012293a5908779d",
+  "id": "sess-restore-dbe0a109e45418c0:anchor:1:68733fd5cf08",
+  "issuedAt": 1793196111,
+  "kernelKey": "55c56d4216760aacb930d0ef6624a8a6aeb33db7196b8f7fb97acc111b83f559",
+  "proofBinding": {
+    "tokenFingerprint": "fc495c9db907f57cddb93c7d7558dff17252a10d4ce36bb99fae99ef98394ecb"
+  },
+  "schema": "chio.session_anchor.v1",
+  "sessionId": "sess-restore-dbe0a109e45418c0"
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/public-issuer-discovery.schema.json",
+  "title": "Chio public issuer discovery signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "credentialConfigurationIds",
+    "discoveryId",
+    "expiresAt",
+    "importGuardrails",
+    "issuer",
+    "jwksUri",
+    "metadataSha256",
+    "metadataUrl",
+    "publishedAt",
+    "schema",
+    "signerPublicKey",
+    "version"
+  ],
+  "properties": {
+    "credentialConfigurationIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "discoveryId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "importGuardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "informationalOnly",
+        "requiresExplicitPolicyImport",
+        "requiresManualReview"
+      ],
+      "properties": {
+        "informationalOnly": {
+          "type": "boolean"
+        },
+        "requiresExplicitPolicyImport": {
+          "type": "boolean"
+        },
+        "requiresManualReview": {
+          "type": "boolean"
+        }
+      }
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "jwksUri": {
+      "type": "string"
+    },
+    "metadataSha256": {
+      "type": "string"
+    },
+    "metadataUrl": {
+      "type": "string"
+    },
+    "passportStatusDistribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cacheTtlSecs",
+        "resolveUrls"
+      ],
+      "properties": {
+        "cacheTtlSecs": {
+          "type": "integer"
+        },
+        "resolveUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.public-issuer-discovery.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

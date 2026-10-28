@@ -1,0 +1,111 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "aa8362d7be0334878bef410fce1c003e34b687e8780abff7891b817bc03b3ffd",
+      "parameters": {
+        "record": "ledger-7",
+        "value": "settled"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c4-3c48-7f51-a820-a916aa65d004",
+    "content_hash": "6b24b56ba9d4dacb4b6ef4ddb33a7eb2228be87e1aae525fc17c962b9231c1c1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "5348fbfe20971e98ce053697506c0dcc20914e81e4a35c43e056135158599d48",
+    "metadata": {
+      "admission_operation": {
+        "compensation_status": "not_compensated",
+        "coordinator_lease_epoch": 1,
+        "coordinator_lease_id": "test-admission-lease",
+        "operation_id": "574eb58584fc22bb1125feaab6848a20a140c2411bba5ae78fb0586e8eccdc9f",
+        "projected_dispatch_state": "terminal",
+        "projected_operation_version": 8,
+        "projected_state": "completed",
+        "request_binding_hash": "264832e03f337dc191fd1da7f86375e1abbfd594a8bb94d4d6696ce3603d73dc",
+        "request_id": "review-payment-overreported",
+        "request_namespace_digest": "079e7f933d9197687a2cffdc3a38492358ecd74c69a73f6772556ebb126f78c8",
+        "retained_dispatch_commit": {
+          "committed_version": 6,
+          "coordinator_lease_epoch": 1,
+          "coordinator_lease_id": "test-admission-lease",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt:574eb58584fc22bb1125feaab6848a20a140c2411bba5ae78fb0586e8eccdc9f",
+            "operation_id": "574eb58584fc22bb1125feaab6848a20a140c2411bba5ae78fb0586e8eccdc9f",
+            "transport_id": "kernel-tool-server:durable-server",
+            "transport_key_epoch": 1
+          },
+          "store_fence": {
+            "lease_id": "test-admission-lease",
+            "owner_epoch": 1,
+            "store_uuid": "test-admission-authority"
+          }
+        },
+        "schema": "chio.admission-receipt.v1",
+        "store_fence": {
+          "lease_id": "test-admission-lease",
+          "owner_epoch": 1,
+          "store_uuid": "test-admission-authority"
+        },
+        "tool_outcome_id": "920dbda2925bb832912599ba4aeda4b4d2633558f21c5b6b1bd451d1e908cf94",
+        "tool_outcome_version": 2,
+        "trusted_time_unix_ms": 1793195261596
+      },
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "5348fbfe20971e98ce053697506c0dcc20914e81e4a35c43e056135158599d48",
+        "subject_key": "511341b67457adc702d14f7f838014b07845a2f83377894440f3c04e832f8e40"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c4-3e9d-7321-b998-ecd02ab6478a",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "financial": {
+        "budget_remaining": 90,
+        "budget_total": 100,
+        "cost_breakdown": {
+          "payment": {
+            "authorization_id": "original-payment-authorization",
+            "budget_exposure_units": 10,
+            "preauthorized_units": 10,
+            "pricing_failure": "authorization_exceeded",
+            "rail": "review-payment-rail",
+            "rail_mode": "reversible_hold",
+            "recorded_units": 10,
+            "reported_cost": {
+              "currency": "USD",
+              "units": 25
+            },
+            "transaction_id": "original-payment-authorization"
+          }
+        },
+        "cost_charged": 10,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "payment_reference": "original-payment-authorization",
+        "root_budget_holder": "5348fbfe20971e98ce053697506c0dcc20914e81e4a35c43e056135158599d48",
+        "settlement_status": "failed"
+      },
+      "receipt_context": {
+        "request_id": "review-payment-overreported",
+        "request_namespace_digest": "079e7f933d9197687a2cffdc3a38492358ecd74c69a73f6772556ebb126f78c8"
+      }
+    },
+    "policy_hash": "56e3fa7969f48b66e2bdf7f72459fb1b1ab14dcadf5751c97222050fab23e40f",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195261,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "durable-server",
+    "trust_level": "mediated"
+  },
+  "id": "f469e9d37a327522e48d02cd899e3fd4b205cc1b8ff00f6559a87e48537f357f"
+}

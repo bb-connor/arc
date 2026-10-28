@@ -1,0 +1,45 @@
+{
+  "checkpointIds": [
+    "ck-1",
+    "ck-2"
+  ],
+  "inclusions": [
+    {
+      "checkpointId": "ck-1",
+      "leafHash": "0x53907ac9bee89aa1ff0c619a4c2489f62d30f38bb7fe0b98a3da57356b77c443",
+      "proof": {
+        "audit_path": [
+          "0x94f86725da8e6b567ecc091635480069d867539d889baa54b0766d52fd81abc3"
+        ],
+        "leaf_index": 0,
+        "tree_size": 2
+      }
+    },
+    {
+      "checkpointId": "ck-2",
+      "leafHash": "0x94f86725da8e6b567ecc091635480069d867539d889baa54b0766d52fd81abc3",
+      "proof": {
+        "audit_path": [
+          "0x53907ac9bee89aa1ff0c619a4c2489f62d30f38bb7fe0b98a3da57356b77c443"
+        ],
+        "leaf_index": 1,
+        "tree_size": 2
+      }
+    }
+  ],
+  "issuedAt": 1700000000,
+  "schema": "chio.anchor_batch.v1",
+  "signerKey": "7bfa94026b1da87072e3f1c353fccd3ba32ca9d951ed7e229db401bb927d6200",
+  "treeRoot": "0x5f26e6ce872a020390d33043f3aae127d8bd11cd871fcb6eb3445514c4e82bfb",
+  "witness": {
+    "kind": "rekor",
+    "observedAt": 1700000000,
+    "root": "0x5f26e6ce872a020390d33043f3aae127d8bd11cd871fcb6eb3445514c4e82bfb",
+    "witnessId": "rekor:uuid-some"
+  },
+  "witnessState": {
+    "error": "rekor 503",
+    "kind": "stale",
+    "last_verified": 1700000000
+  }
+}

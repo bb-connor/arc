@@ -1,0 +1,64 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "34d8d68bb4ecf887de4a1023f28368228543bb1790989e801d894ba98e88a567",
+      "parameters": {
+        "confidence": 0.5,
+        "invoice": "inv-strict"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a18248-5d58-7d4d-ad13-70d37e9b50f5",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "pre-execution authorization reserved; present the minted execution nonce to the tool server",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "5908d09e09dcd91113ae2b16f9244ac683a862bbf2c5f23d3c001b2496f0b5f2",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "5908d09e09dcd91113ae2b16f9244ac683a862bbf2c5f23d3c001b2496f0b5f2",
+        "subject_key": "ef3528ede07ad46914343571b45747159811fc7527a129b2f544fdb96fafb2e0"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "kernel:5908d09e09dcd91113ae2b16f9244ac683a862bbf2c5f23d3c001b2496f0b5f2",
+          "lease_epoch": 1,
+          "lease_id": "single-node"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 100,
+          "event_id": "nonce-preflight-budget-hold:strict-decimal:cap-01a18248-5d58-7d4d-ad13-70d37e9b50f5:0:authorize",
+          "exposure_units": 100
+        },
+        "budget_term": "kernel:5908d09e09dcd91113ae2b16f9244ac683a862bbf2c5f23d3c001b2496f0b5f2:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "nonce-preflight-budget-hold:strict-decimal:cap-01a18248-5d58-7d4d-ad13-70d37e9b50f5:0",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18248-5fdc-7291-878a-b7bb59815ae6",
+      "execution_nonce": {
+        "hold_disposition": "reserved",
+        "stage": "authorization",
+        "tool_dispatched": false
+      },
+      "receipt_context": {
+        "request_id": "strict-decimal"
+      }
+    },
+    "policy_hash": "6aa721d46ef159815f29068ed4e770f15bb2799502236161a176bd5f6d69e133",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793187143,
+    "tool_name": "compute",
+    "tool_origin": "caller_executed",
+    "tool_server": "cost-srv",
+    "trust_level": "mediated"
+  },
+  "id": "b98b896b8dc441296958bee9a9a4d4db5cf7f01000082af1eed8ab1894e07adf"
+}

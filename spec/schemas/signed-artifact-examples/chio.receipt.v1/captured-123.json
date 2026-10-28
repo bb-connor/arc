@@ -1,0 +1,71 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "66857e3b81656caeeb461a39f7251bd45e29d1102d76287fc03550596c730635",
+      "parameters": {
+        "options": {
+          "limit": 10
+        },
+        "path": "/workspace/approved.txt"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-c330-7b05-9d07-8fd12306970d",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "governed transaction denied: bound tool invocation is required for tool approval",
+      "verdict": "deny"
+    },
+    "kernel_key": "f6df5edbbbb7c898e801c1c4f82f8540fe414257bc00023248d38ba8a4d75c4b",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "f6df5edbbbb7c898e801c1c4f82f8540fe414257bc00023248d38ba8a4d75c4b",
+        "subject_key": "6e8288fdd750ec24571322afb6b1793fda366b4d43454cb495d9125074dc3128"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_kernel": {
+        "rejection_code": "CHIO-KERNEL-GOVERNED-TRANSACTION-DENIED"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-c50d-7fd1-a3eb-b14db473c2be",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "governed_transaction": {
+        "approval": {
+          "approval_artifact_digest": "8098b90a7038bdf041bf7065f3fd36527992a43a0c0fae825522ba9e32e8059a",
+          "approved": true,
+          "approver_key": "f6df5edbbbb7c898e801c1c4f82f8540fe414257bc00023248d38ba8a4d75c4b",
+          "token_id": "approval-bound-request-1"
+        },
+        "intent_hash": "1ef4656df0faf0dfcdd4157423c3e55894f0401bd6ceb163cf0ae06137bb4fd9",
+        "intent_id": "bound-intent-1",
+        "max_amount": {
+          "currency": "USD",
+          "units": 0
+        },
+        "purpose": "read the approved file",
+        "server_id": "srv-a",
+        "tool_name": "read_file"
+      },
+      "receipt_context": {
+        "request_id": "bound-request-1",
+        "request_namespace_digest": "c880964b473400c3c677dc9edd4b6e0da6cf7d6e6f69a6aaa1c79b2117641ef6"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195230,
+    "tool_name": "read_file",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-a",
+    "trust_level": "mediated"
+  },
+  "id": "a1a17b82f21887903ba93453a9266840a96c1606696ff8a50dc4249e33ee4768"
+}

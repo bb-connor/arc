@@ -1,0 +1,99 @@
+{
+  "anchorId": "anchor-1",
+  "batchId": "44b3a77303b936a94c93d49868bde8d546c8c9f38e91d84711a1dc2497f19b1c",
+  "checkpointSequence": 2,
+  "effectSlots": [],
+  "expectedHeadsRoot": "18a2768e009d8533cf5473429ce06316c25fd4ef899bf8294d29be356dec47fd",
+  "issuedAt": 102,
+  "namespace": "economy-prod",
+  "nextHeadsRoot": "f7656461336e7dc7219a38d999ddefa611bd67fb9d245f1ca2e0ba7d7c40f539",
+  "operationId": "c1629e0c951446f489781599f2e62057e996eb2f334133805e097ab895fecbab",
+  "previousCheckpointDigest": "a024398b9672844d656025705196d8b8fd3067c8edcc87c5362a7a15e90b8b35",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1",
+  "transitions": [
+    {
+      "expectedHeadDigest": "2fcb6636661d1e3c1e80d0b6531f68ff3c95b292c5749733583f6a9774fe202e",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "effectIdempotencyKey": "c94237b3626efa5d7e9b45c9ca1b496c2e54d46cd6b62d3040e7e0743d85e2eb",
+        "headVersion": 2,
+        "lifecycleFence": 8,
+        "lifecycleState": "no_effect",
+        "namespace": "economy-prod",
+        "operationId": "c1629e0c951446f489781599f2e62057e996eb2f334133805e097ab895fecbab",
+        "predecessorDigest": "2fcb6636661d1e3c1e80d0b6531f68ff3c95b292c5749733583f6a9774fe202e",
+        "resourceKey": {
+          "resourceFamily": "effect_slot",
+          "resourceId": "e7519ac5d6471f19c678548bc49d3805d96c54dd378fbd31d8a1be80c7ad2c55",
+          "scopeId": "market-1"
+        },
+        "resourceVersion": 7,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "actionDigest": "bf0a9567032309b7baa0f4bd90dc12357f538dfe9ef120e5abd45d4c9b9039d6",
+            "admissionHandoff": {
+              "lifecycleFence": 1,
+              "operationVersion": 3,
+              "state": "mutation_submitted",
+              "storeFence": {
+                "lease_id": "01a1827f-fe14-7062-b1e5-e15e3ba17e81",
+                "owner_epoch": 1,
+                "store_uuid": "01a1827f-fa90-7cd2-a9dc-1e4d959a4537"
+              }
+            },
+            "anchorId": "anchor-1",
+            "effectKind": "clearing_finalize",
+            "idempotencyKey": "c94237b3626efa5d7e9b45c9ca1b496c2e54d46cd6b62d3040e7e0743d85e2eb",
+            "namespace": "economy-prod",
+            "operationId": "c1629e0c951446f489781599f2e62057e996eb2f334133805e097ab895fecbab",
+            "parametersDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "request": {
+              "requestBindingDigest": "fc1ea1b86b40bb6675180c400e6cabfa71a36eedf52db3294b005647a44b6a08",
+              "requestId": "mutation-cancellation",
+              "requestNamespaceDigest": "2351cd8d8aac64fc8ed3e6657c3d32110ce7b319e3c070f0c419b8dee78c668d"
+            },
+            "resourceHeadDigest": "e2b3ceb3e6ee30ebd6bd20b680dd60dc310d6161dd8c9632aa810af8786e091f",
+            "resourceKey": {
+              "resourceFamily": "clearing_round",
+              "resourceId": "round-1",
+              "scopeId": "market-1"
+            },
+            "schema": "chio.economy.effect-slot.v1",
+            "slotId": "e7519ac5d6471f19c678548bc49d3805d96c54dd378fbd31d8a1be80c7ad2c55",
+            "state": "no_effect",
+            "target": {
+              "qualificationDigest": "5f4d8f2f8b002b996ccb6053776d8f4a7ad713ed6f90f0ad1f63b0d7795c7f01",
+              "targetId": "clearing-engine",
+              "targetKeyEpoch": 1
+            },
+            "terminal": {
+              "kind": "permanently_not_applied",
+              "outcome": "no_effect",
+              "proof": {
+                "storage": "inline",
+                "value": {
+                  "permanentlyNotApplied": true
+                }
+              },
+              "proof_digest": "cbc12766bde4b61294baeb67a237592f5024d890cd3abdbde81ed24ec2c2096d",
+              "proof_id": "mutation-cancellation-proof-1"
+            }
+          }
+        },
+        "stateDigest": "07aefaaaf5336fcf8877f903f9a706e98fa2514769fac14911e1ca7cbc7deb2b",
+        "trustedClockHighWater": 102
+      },
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "e7519ac5d6471f19c678548bc49d3805d96c54dd378fbd31d8a1be80c7ad2c55",
+        "scopeId": "market-1"
+      },
+      "transitionProofDigest": "bfb1f6e0629e4a8998aaf920fcc04d4bdd0b9268b6585ea01afb4539f57a8fbb"
+    }
+  ]
+}

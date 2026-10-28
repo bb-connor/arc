@@ -1,0 +1,13 @@
+{
+  "activationFence": 1,
+  "activeRosterDigest": "a31ee296ce722c88ee82d600f71cf389b4461e78b6b624381baab8f62ddb256f",
+  "activeRosterId": "f08114eb460ab90537a1c1ad68c0740f36b4efbd1e5d0ac25342913042adb1ae",
+  "anchorId": "epoch-anchor.primary",
+  "anchorKeyId": "epoch-authority.v1",
+  "checkpointSequence": 1,
+  "clockHighWater": 100,
+  "groupPublicKeyDigest": "342afcaac59f591be5f73be511178daf9c8782c6f5a750b2481fdd35be5edf3d",
+  "keyEpoch": 1,
+  "schema": "chio.frost.epoch-checkpoint.v1",
+  "scopeId": "settlement.atlantic.v1"
+}

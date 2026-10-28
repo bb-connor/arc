@@ -298,6 +298,103 @@ if lost.returncode != 1 or "wrapper ids without a registry row: ['chio.lost.v1']
     failures.append(f"wrapper id without a row: accepted\n{lost.stderr}")
 holder.cleanup()
 
+
+def check_uncaptured_list() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen_signed_artifact_schemas", SCRIPT)
+    if spec is None or spec.loader is None:
+        failures.append("uncaptured list: cannot load the generator")
+        return
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    listed = module.UNCAPTURED_WRAPPER_IDS
+    if listed != PINNED_UNCAPTURED:
+        failures.append(
+            "uncaptured list: UNCAPTURED_WRAPPER_IDS differs from the pinned list; "
+            f"added {sorted(set(listed) - set(PINNED_UNCAPTURED))}, "
+            f"removed {sorted(set(PINNED_UNCAPTURED) - set(listed))}"
+        )
+    repo = SCRIPT.resolve().parents[1]
+    examples = repo / "spec/schemas/signed-artifact-examples"
+    stray = sorted(set(listed) - set(module.load_wrapper_ids(repo)))
+    if stray:
+        failures.append(f"uncaptured list: ids outside the wrapper list: {stray}")
+    captured = sorted(sid for sid in listed if (examples / module.escape_schema_id(sid)).is_dir())
+    if captured:
+        failures.append(f"uncaptured list: ids with captured examples must leave the list: {captured}")
+
+
+PINNED_UNCAPTURED = (
+    "chio.agent-web.external-projection-manifest.v1",
+    "chio.agent-web.interop-verifier-report.v1",
+    "chio.anchor-inclusion-proof.v1",
+    "chio.anchor-proof-bundle.v1",
+    "chio.attest.selective-disclosure-proof.v1",
+    "chio.bbs-projection.manifest.v1",
+    "chio.commerce.event-log.v1",
+    "chio.commerce.mandate-allowance-ledger.v1",
+    "chio.commerce.order-context.v1",
+    "chio.commerce.order-passport.v1",
+    "chio.commerce.protocol-payload.v1",
+    "chio.commerce.settlement-packet.v1",
+    "chio.crypto.verification-context.v1",
+    "chio.disclosure.capsule.v1",
+    "chio.disclosure.leakage-ledger.v1",
+    "chio.disclosure.lineage-verifier-report.v1",
+    "chio.disclosure.verifier-privacy-profile.v1",
+    "chio.enterprise.control-evidence-map.v1",
+    "chio.enterprise.data-governance-report.v1",
+    "chio.enterprise.evidence-export-bundle.v1",
+    "chio.enterprise.telemetry-projection.v1",
+    "chio.fincred.credit-scorecard.v1",
+    "chio.fincred.exposure-history.v1",
+    "chio.fincred.loss-history.v1",
+    "chio.frost.authorization.v1",
+    "chio.policy.activation-receipt.v1",
+    "chio.policy.bundle.v1",
+    "chio.proof-room.bundle.v1",
+    "chio.proof-room.fixture-catalog.v1",
+    "chio.proof-room.fixture-root-catalog.v1",
+    "chio.proof-room.verifier-report.v1",
+    "chio.proof.docker-quickstart-evidence.v1",
+    "chio.proof.first-run.capability-proof.v1",
+    "chio.proof.first-run.command-log.v1",
+    "chio.proof.first-run.guard-report.v1",
+    "chio.proof.release-truth.v1",
+    "chio.public-settlement-verifier-report.v1",
+    "chio.recovery.signed-provider-finality.v1",
+    "chio.request.digest.v1",
+    "chio.response.digest.v1",
+    "chio.runtime.attack-simulation-report.v1",
+    "chio.runtime.chaos-run-report.v1",
+    "chio.runtime.execution-lease.v1",
+    "chio.runtime.revocation-freshness-proof.v1",
+    "chio.runtime.sandbox-attestation.v1",
+    "chio.runtime.terminal-receipt.v1",
+    "chio.runtime.tool-server-ack.v1",
+    "chio.runtime.trusted-time-proof.v1",
+    "chio.swarm.authority-verifier-report.v1",
+    "chio.swarm.budget-pool.v1",
+    "chio.swarm.delegation-witness-chain.v1",
+    "chio.transaction.claim-set.v1",
+    "chio.transaction.evidence-graph.v1",
+    "chio.transaction.runtime-security-report.v1",
+    "chio.transaction.verifier-policy.v1",
+    "chio.transaction.verifier-report.v1",
+    "chio.transparency.inclusion-proof.v1",
+    "chio.transparency.receipt-inclusion-proof.v1",
+    "chio.trust.key-state.v1",
+    "chio.trust.revocation-snapshot.v1",
+    "chio.web3-settlement-dispatch.v1",
+    "chio.web3-settlement-execution-receipt.v1",
+    "chio.workflow.preflight-plan.v1",
+    "chio.workflow.preflight-report.v1",
+)
+
+check_uncaptured_list()
+
 if failures:
     print("\n\n".join(failures), file=sys.stderr)
     sys.exit(1)

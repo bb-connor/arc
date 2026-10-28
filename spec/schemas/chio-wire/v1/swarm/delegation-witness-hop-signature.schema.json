@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/delegation-witness-hop-signature.schema.json",
+  "title": "Chio swarm delegation witness hop signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attenuationRuleId",
+    "chainId",
+    "childCapabilityDigest",
+    "childScopeHash",
+    "childTaskId",
+    "expiresAtUnixMs",
+    "graphId",
+    "issuer",
+    "parentCapabilityDigest",
+    "parentScopeHash",
+    "parentTaskId",
+    "policyDigest",
+    "schema",
+    "scopeSubsetProof"
+  ],
+  "properties": {
+    "attenuationRuleId": {
+      "type": "string"
+    },
+    "chainId": {
+      "type": "string"
+    },
+    "childCapabilityDigest": {
+      "type": "string"
+    },
+    "childScopeHash": {
+      "type": "string"
+    },
+    "childTaskId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "parentCapabilityDigest": {
+      "type": "string"
+    },
+    "parentScopeHash": {
+      "type": "string"
+    },
+    "parentTaskId": {
+      "type": "string"
+    },
+    "policyDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.swarm.delegation-witness-hop-signature.v1"
+    },
+    "scopeSubsetProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalizedChildScope",
+        "normalizedParentScope",
+        "subsetRelations"
+      ],
+      "properties": {
+        "normalizedChildScope": {
+          "type": "string"
+        },
+        "normalizedParentScope": {
+          "type": "string"
+        },
+        "subsetRelations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "childIndex",
+              "grantKind",
+              "parentIndex",
+              "subset"
+            ],
+            "properties": {
+              "childIndex": {
+                "type": "integer"
+              },
+              "grantKind": {
+                "type": "string"
+              },
+              "parentIndex": {
+                "type": "integer"
+              },
+              "subset": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "available_capital_units": 600000,
+  "coverage_class": "professional_liability",
+  "currency": "USD",
+  "evidence_refs": [
+    {
+      "kind": "underwriting_decision",
+      "locator": "underwriting:uwd-1",
+      "observed_at": 1743379100,
+      "reference_id": "uwd-1"
+    },
+    {
+      "kind": "exposure_ledger",
+      "locator": "ledger:eld-1",
+      "observed_at": 1743379100,
+      "reference_id": "eld-1"
+    },
+    {
+      "kind": "credit_scorecard",
+      "locator": "scorecard:score-1",
+      "observed_at": 1743379050,
+      "reference_id": "score-1"
+    },
+    {
+      "kind": "capital_book",
+      "locator": "capital-book:cb-1",
+      "observed_at": 1743379150,
+      "reference_id": "cb-1"
+    },
+    {
+      "kind": "credit_loss_lifecycle",
+      "locator": "loss:loss-1",
+      "observed_at": 1743378900,
+      "reference_id": "loss-1"
+    },
+    {
+      "kind": "web3_settlement_receipt",
+      "locator": "web3-settlement:receipt-web3-1",
+      "observed_at": 1743379000,
+      "reference_id": "receipt-web3-1"
+    }
+  ],
+  "generated_at": 1743379200,
+  "input_id": "api-1",
+  "latest_web3_settlement_state": "settled",
+  "note": "Feeds one bounded autonomous pricing decision over Chio truth.",
+  "pending_loss_units": 0,
+  "provider_id": "carrier-1",
+  "receipt_history_window_secs": 2592000,
+  "reputation_score_bps": 8200,
+  "requested_coverage_amount": {
+    "currency": "USD",
+    "units": 120000
+  },
+  "runtime_assurance_tier": "verified",
+  "schema": "chio.autonomous-pricing-input.v1",
+  "settled_loss_units": 2500,
+  "subject_key": "subject-1",
+  "support_boundary": {
+    "delegated_authority_required": true,
+    "live_bind_supported": true,
+    "operator_override_supported": true,
+    "reserve_optimization_required": true
+  }
+}

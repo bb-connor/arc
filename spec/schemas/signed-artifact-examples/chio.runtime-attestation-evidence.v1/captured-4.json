@@ -1,0 +1,27 @@
+{
+  "claims": {
+    "enterpriseVerifier": {
+      "attestationType": "enterprise_confidential_vm",
+      "digest": "sha384:enterprise-measurement",
+      "hardwareModel": "AMD_SEV_SNP",
+      "pcrs": {
+        "0": "8f7f1be8"
+      },
+      "secureBoot": "enabled"
+    }
+  },
+  "evidence_sha256": "sha256-enterprise-attestation",
+  "expires_at": 1793190952,
+  "issued_at": 1793190622,
+  "runtime_identity": "spiffe://chio.example/workloads/enterprise",
+  "schema": "chio.runtime-attestation.other.v1",
+  "tier": "attested",
+  "verifier": "https://attest.contoso.example",
+  "workload_identity": {
+    "credentialKind": "uri",
+    "path": "/workloads/enterprise",
+    "scheme": "spiffe",
+    "trustDomain": "chio.example",
+    "uri": "spiffe://chio.example/workloads/enterprise"
+  }
+}

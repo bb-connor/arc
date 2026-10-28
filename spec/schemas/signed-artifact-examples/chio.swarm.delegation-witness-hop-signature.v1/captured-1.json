@@ -1,0 +1,27 @@
+{
+  "attenuationRuleId": "rule-subset-tool-invocation",
+  "chainId": "witness-child-a",
+  "childCapabilityDigest": "16df94b2d62cf624f4c5d0626c14bf881b9004f16bdd35bd7f922381a94b3cfe",
+  "childScopeHash": "df72e79c2623a78c6f023080d62e5aca7aca758bb637a161729880d94383668c",
+  "childTaskId": "task-child-a",
+  "expiresAtUnixMs": 1800000061000,
+  "graphId": "swarm-graph-proof-valid",
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "parentCapabilityDigest": "20fb8e54e2ac5774c07d579949a2ff267490836c6c42498b8cb6c2cf01acd7b7",
+  "parentScopeHash": "330201f0949f325b268cbe500f727cfc04fc0959de67d292a9d45f6c4410d2db",
+  "parentTaskId": "task-root",
+  "policyDigest": "d8495bc1178cab584c79c27872d5c51b7f11d0b9a53c06028943432bdd478011",
+  "schema": "chio.swarm.delegation-witness-hop-signature.v1",
+  "scopeSubsetProof": {
+    "normalizedChildScope": "{\"grants\":[{\"max_invocations\":6,\"operations\":[\"invoke\"],\"server_id\":\"commerce\",\"tool_name\":\"reserve_budget\"}]}",
+    "normalizedParentScope": "{\"grants\":[{\"max_invocations\":6,\"operations\":[\"invoke\"],\"server_id\":\"commerce\",\"tool_name\":\"reserve_budget\"}]}",
+    "subsetRelations": [
+      {
+        "childIndex": 0,
+        "grantKind": "tool",
+        "parentIndex": 0,
+        "subset": true
+      }
+    ]
+  }
+}

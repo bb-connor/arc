@@ -1,0 +1,30 @@
+{
+  "expires_at": 1793195541,
+  "id": "cap-01a182c3-ee28-7a55-888f-3d57d7ce8312",
+  "issued_at": 1793195241,
+  "issuer": "f5c90cd1925335ae88dfeb8a0bd6ea362b84cb83ad05ea4c31ead678938389de",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "model_constraint",
+            "value": {
+              "allowed_model_ids": [
+                "claude-opus-4"
+              ],
+              "min_safety_tier": null
+            }
+          }
+        ],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "srv",
+        "tool_name": "invoke"
+      }
+    ]
+  },
+  "subject": "ff754693c5f197f72861a544886d5db05d94b56743e49f9458e6465eba583c2c"
+}

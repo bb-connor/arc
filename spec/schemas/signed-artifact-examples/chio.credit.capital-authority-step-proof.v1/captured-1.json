@@ -1,0 +1,7 @@
+{
+  "approvedAt": 9,
+  "expiresAt": 20,
+  "principalId": "ae2faf733d49c22900d2da9ac64d5cc922b41ec34aad550c89d03a2f25328015",
+  "role": "custodian",
+  "schema": "chio.credit.capital-authority-step-proof.v1"
+}

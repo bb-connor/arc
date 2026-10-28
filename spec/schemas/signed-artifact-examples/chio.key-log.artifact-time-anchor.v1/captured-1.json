@@ -1,0 +1,11 @@
+{
+  "anchor": {
+    "checkpoint_hash": "0xed6306d7ba83793f08eb1fe1f7c87945369c42fc58239c06a5331293bbcd43d8",
+    "checkpoint_sequence": 1,
+    "type": "key_log_checkpoint"
+  },
+  "anchor_id": "timestamp.router.v1",
+  "anchored_at": 3010,
+  "artifact_hash": "0x4b8b9c9ef221c8ee9e82a0a6cbbd992f32080fd3e8cad673bd2f4186fbc8fbbd",
+  "schema": "chio.key-log.artifact-time-anchor.v1"
+}

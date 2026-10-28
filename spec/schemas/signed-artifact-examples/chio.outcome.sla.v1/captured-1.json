@@ -1,0 +1,12 @@
+{
+  "effectiveAtUnixMs": 1000,
+  "expiresAtUnixMs": 300000,
+  "listingDigest": "0fc4dfc4feb3b154d20f22308900bf028642220b043804b050d3caaa49dede60",
+  "maxFailureBps": 3333,
+  "minimumSampleCount": 3,
+  "providerId": "provider-1",
+  "schema": "chio.outcome.sla.v1",
+  "slaId": "248799fd0ca795636f2637ebb8d2391b9aa11749e6739e041f95bb41bf78da1e",
+  "windowAnchorUnixMs": 500,
+  "windowSeconds": 60
+}

@@ -1,0 +1,14 @@
+{
+  "anchorEpoch": 1,
+  "checkpointAt": 1700011010,
+  "checkpointId": "checkpoint-1-7",
+  "indexNamespace": "subject-time-sequence-v1",
+  "queryIndexRoot": "c46bcf2aad8bc843b2156d1d227c4624936d9957f3697baa9128122d0a3a11cf",
+  "queryTreeSize": 4,
+  "schema": "chio.parametric.evidence-source-checkpoint.v1",
+  "signatureDomain": "wrong.domain",
+  "signerKeyEpoch": 7,
+  "sourceId": "kernel-receipts",
+  "sourceKind": "receipt_store",
+  "sourcePrefixCutoff": 12
+}

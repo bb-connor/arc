@@ -1,0 +1,19 @@
+{
+  "id": "child-raw",
+  "kernel_key": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+  "metadata": {
+    "surface": {
+      "lane": "a"
+    }
+  },
+  "operation_kind": "create_message",
+  "outcome_hash": "d5986305477fc811e4c2e5255e376a3e6dfe050e0b616562d7e415f1bf1b5f68",
+  "parent_request_id": "parent-raw",
+  "policy_hash": "aabbccddaabbccdd",
+  "request_id": "child-req-raw",
+  "session_id": "sess-raw",
+  "terminal_state": {
+    "state": "completed"
+  },
+  "timestamp": 1710000001
+}

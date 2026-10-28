@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/active-response-policy-authority-response.schema.json",
+  "title": "Chio active response policy authority response signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority",
+    "deploymentDigest",
+    "issuedAtUnixSeconds",
+    "requestDigest",
+    "requestId",
+    "result",
+    "schema",
+    "storeDigest"
+  ],
+  "properties": {
+    "authority": {
+      "type": "string"
+    },
+    "deploymentDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "issuedAtUnixSeconds": {
+      "type": "integer"
+    },
+    "requestDigest": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output",
+        "result"
+      ],
+      "properties": {
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "classification": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "deploymentDigest": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "protocol": {
+              "type": "string"
+            },
+            "storeDigest": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "result": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.active-response-policy-authority-response.v1"
+    },
+    "storeDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

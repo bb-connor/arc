@@ -1,0 +1,17 @@
+{
+  "capabilities": {
+    "features": {
+      "accepts_anchor_batch_v1": true,
+      "delegation_chain_binding": true,
+      "governed_active_response_plan": true,
+      "threshold_governed_approvals": true
+    },
+    "schema": "chio.capabilities.v1"
+  },
+  "conformanceTier": "bronze",
+  "localKernelId": "kernel.org-b",
+  "nonce": "nonce-b",
+  "remoteKernelId": "kernel.org-a",
+  "schema": "chio.federation-kernel-handshake.v1",
+  "timestamp": 1800000000
+}

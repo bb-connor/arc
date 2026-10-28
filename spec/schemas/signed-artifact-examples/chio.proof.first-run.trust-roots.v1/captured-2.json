@@ -1,0 +1,12 @@
+{
+  "id": "trust-roots-test-bundle",
+  "roots": [
+    {
+      "key_digest": "27a18c4142f414227b37507c1da6e90ee6d73565eea7686152c067e2ee262ba7",
+      "key_id": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "subject": "did:chio:test-authority"
+    }
+  ],
+  "schema": "chio.proof.first-run.trust-roots.v1",
+  "trust_domain": "did:chio:proof-room-test"
+}

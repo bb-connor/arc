@@ -1,0 +1,69 @@
+{
+  "expiresAt": 1794414359,
+  "facilityId": "cfd-phase114-negative-1793204759",
+  "issuedAt": 1793204759,
+  "lifecycleState": "active",
+  "report": {
+    "disposition": "grant",
+    "filters": {
+      "agentSubject": "subject-liability-market-auto-bind-negative-1",
+      "decisionLimit": 50,
+      "receiptLimit": 200
+    },
+    "findings": [
+      {
+        "code": "facility_granted",
+        "description": "score, runtime assurance, and bounded exposure satisfied Chio auto-allocation policy",
+        "evidenceRefs": [
+          {
+            "kind": "reputation_inspection",
+            "locator": "reputation:subject-liability-market-auto-bind-negative-1",
+            "referenceId": "subject-liability-market-auto-bind-negative-1"
+          }
+        ]
+      }
+    ],
+    "generatedAt": 1793204748,
+    "prerequisites": {
+      "certificationMet": true,
+      "certificationRequired": false,
+      "manualReviewRequired": false,
+      "minimumRuntimeAssuranceTier": "attested",
+      "runtimeAssuranceMet": true
+    },
+    "schema": "chio.credit.facility-report.v1",
+    "scorecard": {
+      "anomalyCount": 1,
+      "band": "prime",
+      "confidence": "medium",
+      "currencies": [
+        "USD"
+      ],
+      "matchingDecisions": 0,
+      "matchingReceipts": 128,
+      "mixedCurrencyBook": false,
+      "overallScore": 0.96,
+      "probationary": false,
+      "returnedDecisions": 0,
+      "returnedReceipts": 128
+    },
+    "supportBoundary": {
+      "bondExecutionSupported": false,
+      "crossCurrencyAllocationSupported": false,
+      "providerNeutralPolicy": true
+    },
+    "terms": {
+      "capitalSource": "operator_internal",
+      "concentrationCapBps": 3000,
+      "creditLimit": {
+        "currency": "USD",
+        "units": 1000000
+      },
+      "reserveRatioBps": 1500,
+      "ttlSeconds": 1209600,
+      "utilizationCeilingBps": 8000
+    }
+  },
+  "schema": "chio.credit.facility.v1",
+  "supersedesFacilityId": "cfd-a739b9b32b93172372a4839a8a8c14c37b7f0c2fd2711d0b2d49c9977d50fbdf"
+}

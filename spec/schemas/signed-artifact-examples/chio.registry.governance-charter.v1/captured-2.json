@@ -1,0 +1,22 @@
+{
+  "allowedCaseKinds": [
+    "sanction",
+    "appeal"
+  ],
+  "authorityScope": {
+    "allowedActorKinds": [
+      "tool_server"
+    ],
+    "allowedListingOperatorIds": [
+      "http://127.0.0.2:3300"
+    ],
+    "namespace": "http://127.0.0.2:3300",
+    "policyReference": "policy/open-market/governance"
+  },
+  "charterId": "charter-3bd6a1bcc40fb59ff3d5ccd22dd9da89c2cdc809c161e8b709a314f68406fbcd",
+  "expiresAt": 1750900000,
+  "governingOperatorId": "http://127.0.0.2:3300",
+  "issuedAt": 1750000002,
+  "issuedBy": "governance@chio.example",
+  "schema": "chio.registry.governance-charter.v1"
+}

@@ -1,0 +1,23 @@
+{
+  "budgetPoolRef": "budget-pool-swarm-valid",
+  "createdAtUnixMs": 1760000000000,
+  "edges": [],
+  "expiresAtUnixMs": 1800000061000,
+  "graphId": "swarm-graph-proof-valid",
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "joins": [],
+  "maxDepth": 2,
+  "maxFanout": 3,
+  "nodes": [
+    {
+      "depth": 0,
+      "scopeHash": "07bedb735c306ca7a683b841f1eda95730170dcd1af6367c4c3446c7754edf73",
+      "taskId": "task-root"
+    }
+  ],
+  "plannerSubject": "did:chio:planner",
+  "revocationEpochRef": "revocation-epoch-swarm-valid",
+  "rootTransactionRef": "passport-swarm-valid",
+  "routePlanRefs": [],
+  "schema": "chio.swarm.task-graph.v1"
+}

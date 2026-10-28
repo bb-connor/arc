@@ -1,0 +1,121 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "733add2e84921902859b2a9b0abb64ef2c34329074396d7f08c3af82e52ed7cf",
+      "parameters": [
+        [
+          [
+            [
+              [
+                [
+                  [
+                    [
+                      [
+                        [
+                          [
+                            [
+                              [
+                                [
+                                  [
+                                    [
+                                      [
+                                        [
+                                          [
+                                            [
+                                              [
+                                                [
+                                                  [
+                                                    [
+                                                      [
+                                                        [
+                                                          [
+                                                            [
+                                                              [
+                                                                [
+                                                                  [
+                                                                    [
+                                                                      [
+                                                                        [
+                                                                          null
+                                                                        ]
+                                                                      ]
+                                                                    ]
+                                                                  ]
+                                                                ]
+                                                              ]
+                                                            ]
+                                                          ]
+                                                        ]
+                                                      ]
+                                                    ]
+                                                  ]
+                                                ]
+                                              ]
+                                            ]
+                                          ]
+                                        ]
+                                      ]
+                                    ]
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182e7-3950-7223-9ac4-5d528224887e",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"chio-tripwire-pre-invocation\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "tripwire argument inspection budget exceeded",
+        "guard_name": "chio-tripwire-pre-invocation",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "5e10ba1a8be658cf06701c1c9978672a04eb6d0eff7202299eb2a87ad60759c0",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "5e10ba1a8be658cf06701c1c9978672a04eb6d0eff7202299eb2a87ad60759c0",
+        "subject_key": "32aa992506bf54801ec666bd431b97fa589aef570ae003e57f81aaed6241b1f3"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e7-3c7f-7ee3-a1f2-9f940377f5c9",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "kernel-request-a",
+        "request_namespace_digest": "4cf12abc67ddbc4839a4a5ee10650ba164e10fd57cdc94ca9a68e68d579e7939"
+      }
+    },
+    "policy_hash": "policy-a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793197554,
+    "tool_name": "tool-a",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "7f1f51b8d72d0013bb273270fe3c51e86be0f4e77e88a79315a31d2031ecc23d"
+}

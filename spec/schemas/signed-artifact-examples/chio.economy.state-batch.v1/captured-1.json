@@ -1,0 +1,85 @@
+{
+  "anchorId": "anchor-1",
+  "batchId": "32b8c7f79c3b6a90d3ba2c0b13a9569f8d8592f0e1bbd8e057041dd76b761d12",
+  "checkpointSequence": 2,
+  "effectSlots": [],
+  "expectedHeadsRoot": "3733e0ceb2a8b7f91c815dc26abb04497f52d3782818f684bb4930871c094b88",
+  "issuedAt": 26240,
+  "namespace": "economy-prod",
+  "nextHeadsRoot": "6951280fba6bd29c1669be5728d19ca26c1239a4919a8328b2f2798a9ea90fd1",
+  "previousCheckpointDigest": "aeebad4a796fcc2e15dc4c6061b45ed9b373f26adfc798ca7d2d8cc58182718e",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1",
+  "transitions": [
+    {
+      "expectedHeadDigest": "b3242e45c68548c4d3ba5abbf7c53d26e7cd8bc2cd0f8734a96b3fb4eb7663df",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "headVersion": 2,
+        "lifecycleFence": 2,
+        "lifecycleState": "active",
+        "namespace": "economy-prod",
+        "predecessorDigest": "b3242e45c68548c4d3ba5abbf7c53d26e7cd8bc2cd0f8734a96b3fb4eb7663df",
+        "resourceKey": {
+          "resourceFamily": "conformance_resource",
+          "resourceId": "resource-000",
+          "scopeId": "scope-1"
+        },
+        "resourceVersion": 2,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "marker": 25140,
+            "resourceId": "resource-000",
+            "version": 2
+          }
+        },
+        "stateDigest": "e50b5ec5a25040fb12b5f87d383479a8f7a2a7d61c5155a227bdd0d41b775d59",
+        "trustedClockHighWater": 102
+      },
+      "resourceKey": {
+        "resourceFamily": "conformance_resource",
+        "resourceId": "resource-000",
+        "scopeId": "scope-1"
+      },
+      "transitionProofDigest": "5362daeee2088f9068e15ccbc04cc654db4c106481312d9312192126731bf8b8"
+    },
+    {
+      "expectedHeadDigest": "69ce8c126bdcc25d2ac4dcb64c410b32fefd9068a0c80451a894a140239f89b1",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "headVersion": 2,
+        "lifecycleFence": 2,
+        "lifecycleState": "active",
+        "namespace": "economy-prod",
+        "predecessorDigest": "69ce8c126bdcc25d2ac4dcb64c410b32fefd9068a0c80451a894a140239f89b1",
+        "resourceKey": {
+          "resourceFamily": "conformance_resource",
+          "resourceId": "resource-001",
+          "scopeId": "scope-1"
+        },
+        "resourceVersion": 2,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "marker": 25140,
+            "resourceId": "resource-001",
+            "version": 2
+          }
+        },
+        "stateDigest": "9fa4d15cae98ff41c2639fdb9e428cb02e9f3caeb0dcdb53908673310d92ce37",
+        "trustedClockHighWater": 102
+      },
+      "resourceKey": {
+        "resourceFamily": "conformance_resource",
+        "resourceId": "resource-001",
+        "scopeId": "scope-1"
+      },
+      "transitionProofDigest": "8cee2c7bb7d36652e7e9183b62ea43bdf5bbfa59ebc3e083141b37c9e8d257f0"
+    }
+  ]
+}

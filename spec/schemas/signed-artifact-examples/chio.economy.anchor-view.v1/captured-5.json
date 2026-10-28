@@ -1,0 +1,89 @@
+{
+  "absentRequestKeys": [],
+  "absentResourceKeys": [],
+  "anchorId": "anchor-1",
+  "checkpointDigest": "78f940f81ab7f36aa133d8e8495163909f17890c99db63b02b4c554ed624b584",
+  "checkpointSequence": 2,
+  "heads": [
+    {
+      "anchorId": "anchor-1",
+      "effectIdempotencyKey": "c94237b3626efa5d7e9b45c9ca1b496c2e54d46cd6b62d3040e7e0743d85e2eb",
+      "headVersion": 2,
+      "lifecycleFence": 8,
+      "lifecycleState": "no_effect",
+      "namespace": "economy-prod",
+      "operationId": "c1629e0c951446f489781599f2e62057e996eb2f334133805e097ab895fecbab",
+      "predecessorDigest": "0aaa0fb3110e81fc94053d7d37946ce05c1e3f2d4f2b80562994bd1648cb0cba",
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "e7519ac5d6471f19c678548bc49d3805d96c54dd378fbd31d8a1be80c7ad2c55",
+        "scopeId": "market-1"
+      },
+      "resourceVersion": 7,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "actionDigest": "bf0a9567032309b7baa0f4bd90dc12357f538dfe9ef120e5abd45d4c9b9039d6",
+          "admissionHandoff": {
+            "lifecycleFence": 1,
+            "operationVersion": 3,
+            "state": "mutation_submitted",
+            "storeFence": {
+              "lease_id": "01a1827f-f401-70c0-aaee-980967443eba",
+              "owner_epoch": 1,
+              "store_uuid": "01a1827f-f06a-7af1-a548-33e7779306cc"
+            }
+          },
+          "anchorId": "anchor-1",
+          "effectKind": "clearing_finalize",
+          "idempotencyKey": "c94237b3626efa5d7e9b45c9ca1b496c2e54d46cd6b62d3040e7e0743d85e2eb",
+          "namespace": "economy-prod",
+          "operationId": "c1629e0c951446f489781599f2e62057e996eb2f334133805e097ab895fecbab",
+          "parametersDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "request": {
+            "requestBindingDigest": "fc1ea1b86b40bb6675180c400e6cabfa71a36eedf52db3294b005647a44b6a08",
+            "requestId": "mutation-cancellation",
+            "requestNamespaceDigest": "2351cd8d8aac64fc8ed3e6657c3d32110ce7b319e3c070f0c419b8dee78c668d"
+          },
+          "resourceHeadDigest": "e2b3ceb3e6ee30ebd6bd20b680dd60dc310d6161dd8c9632aa810af8786e091f",
+          "resourceKey": {
+            "resourceFamily": "clearing_round",
+            "resourceId": "round-1",
+            "scopeId": "market-1"
+          },
+          "schema": "chio.economy.effect-slot.v1",
+          "slotId": "e7519ac5d6471f19c678548bc49d3805d96c54dd378fbd31d8a1be80c7ad2c55",
+          "state": "no_effect",
+          "target": {
+            "qualificationDigest": "5f4d8f2f8b002b996ccb6053776d8f4a7ad713ed6f90f0ad1f63b0d7795c7f01",
+            "targetId": "clearing-engine",
+            "targetKeyEpoch": 1
+          },
+          "terminal": {
+            "kind": "permanently_not_applied",
+            "outcome": "no_effect",
+            "proof": {
+              "storage": "inline",
+              "value": {
+                "permanentlyNotApplied": true
+              }
+            },
+            "proof_digest": "cbc12766bde4b61294baeb67a237592f5024d890cd3abdbde81ed24ec2c2096d",
+            "proof_id": "mutation-cancellation-proof-1"
+          }
+        }
+      },
+      "stateDigest": "4ad3d69d8347929b32adee6f9ec4c8d9ab68219e178be44a2938387feca52dc6",
+      "trustedClockHighWater": 102
+    }
+  ],
+  "headsRoot": "a993d60c4ad40f946d54e3821d1ddef3de2efbc2e1bfabd820fc0115c1e6115a",
+  "namespace": "economy-prod",
+  "observedAt": 102,
+  "requestReplays": [],
+  "requestReplaysRoot": "9ba93a2f0a4cfdb86bc80876acad09fbffd2c5db58b6088779d643a65467676d",
+  "schema": "chio.economy.anchor-view.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1"
+}

@@ -1,0 +1,49 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "0456dc082c4d1eecf4e091ed713283c7f694ffbf4bcd409e6d08507916b64690",
+      "parameters": {
+        "payload": "hello"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-ee28-712d-88a2-3dbadfc07d86",
+    "content_hash": "ed0c514695d3fa5b8d7cb3dde3cc3d4c8692a6eb3f098a7d7293acde6872874c",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "267ae93a72df14ee4c6069173d8622212babd48ff24c4f31c2356168783d550c",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "267ae93a72df14ee4c6069173d8622212babd48ff24c4f31c2356168783d550c",
+        "subject_key": "80189cbbf937237bf526b778382008949dac99496f775b4dfe2876eec390ea8b"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-f124-7bf2-a003-7782f3f4f86a",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "model_metadata": {
+        "model_id": "claude-opus-4",
+        "provenance_class": "asserted",
+        "provider": "anthropic",
+        "safety_tier": "high"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-f123-7d52-aae0-18ff9b2fec50",
+        "request_id": "req-model-allow",
+        "request_namespace_digest": "bfec4bd2a965a8da7ec4737635562f01e0dd7ebcf31640dc1cda52993f7f1ca9"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195241,
+    "tool_name": "invoke",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv",
+    "trust_level": "mediated"
+  },
+  "id": "571a89edbad9c144c71ed2bd45c2db145412c8259a4f24e236e22303cea13368"
+}

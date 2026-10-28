@@ -1,0 +1,44 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7eb08dfb597cc926696c6c2ab3543529e243329474cf4a18b2546a49fa1e84f0",
+      "parameters": {
+        "message": "Begin longer research task",
+        "return_immediately": true
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-a2a-follow-up",
+    "content_hash": "11c74545c24fb094a76165ead8a4c8ac19ebaa731ad97fe799f325a460ccbb9d",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "9cad4b83cf7fea2c55bd44583c15a173414fd220db2be8bafc563d7cb499a020",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "8145a13ea27ccac83c2ad835ca24c91d0dbf387be763042993ff6687c5b91701",
+        "subject_key": "a6dededa5641f7795ead74a2e295985c048ea38dd94441b9ba5c24a3ca1ca550"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-41a6-7122-b1ab-2ecd8afb9fdf",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a18243-4195-75c1-ace3-cd1c7e5f254c",
+        "request_id": "req-a2a-start",
+        "request_namespace_digest": "434eeec65a8d29bd57d98a2a603c80d22ec6df4f2dbde47ff9ee6d6cbb241aad"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186808,
+    "tool_name": "research",
+    "tool_origin": "caller_executed",
+    "tool_server": "a2a-127-0-0-1-e433d4dc1460",
+    "trust_level": "mediated"
+  },
+  "id": "48e2f02db638f5df88a97301107a5de6b92f2a00d7f943ec2b27a333d0760cec"
+}

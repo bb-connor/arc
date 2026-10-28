@@ -1,0 +1,45 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "81cd9b0d84ddb8eb2941d19d89a09d5c5d7076b692af5054319cda8783180d7c",
+      "parameters": {
+        "__6_1": null,
+        "__6_4_u": null,
+        "d_km7": true
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-hm5fotn",
+    "content_hash": "bfd740749d09b1cc889529c5275bb9b81654267ff623ad985e7032269d5544e2",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "details": "4Pk?B/d?c$&",
+        "guard_name": "MHRgfXkxXdrGuard",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-3n6yo1qnxa2rjc3w",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1875465404,
+    "tool_name": "y_",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-rzjrvhby",
+    "trust_level": "mediated"
+  },
+  "id": "ddd00cadbe5b03032534357e483fc5fdf8bc329b041265070d8ce626e5caf07d"
+}

@@ -1,0 +1,125 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "11f5d48cf858d9cea746e01689a0c05e65f64214f20da884b3886ad78d4864f0",
+      "parameters": {
+        "method": "POST",
+        "request_id": "01a18248-9e90-7ca3-994e-d01f5b65ea51",
+        "route": "/pets"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "",
+    "content_hash": "54ea07e8f53d4470eaa986e377e0a038795bfb53be23a49fb766c363a4e530e2",
+    "decision": {
+      "guard": "CapabilityGuard",
+      "reason": "side-effect route requires a capability token",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "side-effect route requires a valid capability token",
+        "guard_name": "CapabilityGuard",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "806371e3f21ab60815f5a245a0b72077fa097ed9ba58e65d418f76394f09151f",
+    "metadata": {
+      "chio_decision_receipt_id": "a4de8fccc5b98c138dac9fd837f0071a4d34be5f8fac217a666ce8097e0cab72",
+      "chio_http_receipt_v1": {
+        "boundary_class": "prevent",
+        "caller_identity_hash": "5a45e80d1ab1a73e8c2644f3f6c6e53974d0a986c2fc86692372d3f130248c9c",
+        "content_hash": "9d38c1dfc6874c3e1a44a07da44281073595cbce393231c456bb577e3e034705",
+        "evidence": [
+          {
+            "details": "side-effect route requires a valid capability token",
+            "guard_name": "CapabilityGuard",
+            "verdict": false
+          }
+        ],
+        "id": "788f3de85c959126728fde65cf023062000375bfa033fd37706116698a15f52c",
+        "kernel_key": "806371e3f21ab60815f5a245a0b72077fa097ed9ba58e65d418f76394f09151f",
+        "metadata": {
+          "chio_decision_receipt_id": "a4de8fccc5b98c138dac9fd837f0071a4d34be5f8fac217a666ce8097e0cab72",
+          "chio_http_status_scope": "final",
+          "chio_kernel_receipt_id": "596a93a31140320c850ea6b3b9421ef162f69e54050b744186782fe6cc8d2f96",
+          "route_selection": {
+            "candidates": [
+              {
+                "available": true,
+                "routeId": "native-route",
+                "selectedProtocols": [
+                  "http",
+                  "native"
+                ],
+                "targetProtocol": "native"
+              }
+            ],
+            "decision": "select",
+            "requestedTargetProtocol": "native",
+            "routeSelectionId": "3c6c4b9b4c515b5153ed07df6acf18eca90c56c3e4abbb68126836008bf995d6",
+            "selectedProtocols": [
+              "http",
+              "native"
+            ],
+            "selectedRouteId": "native-route",
+            "selectedTargetProtocol": "native",
+            "sourceProtocol": "http"
+          }
+        },
+        "method": "POST",
+        "policy_hash": "test-policy",
+        "receipt_kind": "mediated_decision",
+        "redaction_mode": "none",
+        "request_id": "01a18248-9e90-7ca3-994e-d01f5b65ea51",
+        "response_status": 403,
+        "route_pattern": "/pets",
+        "signature": "d6b2c6b1cd36eeac56e9181bbf59be68a5b83186d9be29939866f98bfbe52adabce6cad747639ec9061004d596840c5f953701e5c36424773f134a3cc6cdb506",
+        "timestamp": 1793187159,
+        "tool_origin": "caller_executed",
+        "trust_level": "mediated",
+        "verdict": {
+          "guard": "CapabilityGuard",
+          "http_status": 403,
+          "reason": "side-effect route requires a capability token",
+          "verdict": "deny"
+        }
+      },
+      "chio_http_status_scope": "final",
+      "chio_kernel_receipt_id": "596a93a31140320c850ea6b3b9421ef162f69e54050b744186782fe6cc8d2f96",
+      "chio_receipt_signing_nonce": "788f3de85c959126728fde65cf023062000375bfa033fd37706116698a15f52c",
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "http",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "3c6c4b9b4c515b5153ed07df6acf18eca90c56c3e4abbb68126836008bf995d6",
+        "selectedProtocols": [
+          "http",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "http"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793187159,
+    "tool_name": "POST /pets",
+    "tool_origin": "caller_executed",
+    "tool_server": "http",
+    "trust_level": "mediated"
+  },
+  "id": "da7725dfede63518568bffe863668f2fd76da3f9b55ac6667cae6e3e98226256"
+}

@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/behavioral-feed.schema.json",
+  "title": "Chio behavioral feed signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decisions",
+    "filters",
+    "generatedAt",
+    "governedActions",
+    "meteredBilling",
+    "privacy",
+    "receipts",
+    "schema",
+    "settlements",
+    "sharedEvidence"
+  ],
+  "properties": {
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowCount",
+        "cancelledCount",
+        "denyCount",
+        "incompleteCount"
+      ],
+      "properties": {
+        "allowCount": {
+          "type": "integer"
+        },
+        "cancelledCount": {
+          "type": "integer"
+        },
+        "denyCount": {
+          "type": "integer"
+        },
+        "incompleteCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptLimit"
+      ],
+      "properties": {
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "governedActions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approvalReceipts",
+        "approvedReceipts",
+        "commerceReceipts",
+        "governedReceipts",
+        "maxAmountReceipts"
+      ],
+      "properties": {
+        "approvalReceipts": {
+          "type": "integer"
+        },
+        "approvedReceipts": {
+          "type": "integer"
+        },
+        "commerceReceipts": {
+          "type": "integer"
+        },
+        "governedReceipts": {
+          "type": "integer"
+        },
+        "maxAmountReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "meteredBilling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionableReceipts",
+        "evidenceAttachedReceipts",
+        "financialMismatchReceipts",
+        "meteredReceipts",
+        "missingEvidenceReceipts",
+        "overMaxBilledUnitsReceipts",
+        "overQuotedCostReceipts",
+        "overQuotedUnitsReceipts",
+        "reconciledReceipts"
+      ],
+      "properties": {
+        "actionableReceipts": {
+          "type": "integer"
+        },
+        "evidenceAttachedReceipts": {
+          "type": "integer"
+        },
+        "financialMismatchReceipts": {
+          "type": "integer"
+        },
+        "meteredReceipts": {
+          "type": "integer"
+        },
+        "missingEvidenceReceipts": {
+          "type": "integer"
+        },
+        "overMaxBilledUnitsReceipts": {
+          "type": "integer"
+        },
+        "overQuotedCostReceipts": {
+          "type": "integer"
+        },
+        "overQuotedUnitsReceipts": {
+          "type": "integer"
+        },
+        "reconciledReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "childReceiptScope",
+        "directEvidenceExportSupported",
+        "exportQuery",
+        "matchingReceipts",
+        "proofsComplete",
+        "returnedReceipts"
+      ],
+      "properties": {
+        "childReceiptScope": {
+          "type": "string"
+        },
+        "directEvidenceExportSupported": {
+          "type": "boolean"
+        },
+        "exportQuery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "readBoundary"
+          ],
+          "properties": {
+            "readBoundary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "matchingReceipts": {
+          "type": "integer"
+        },
+        "proofsComplete": {
+          "type": "boolean"
+        },
+        "returnedReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "schema": {
+      "const": "chio.behavioral-feed.v1"
+    },
+    "settlements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionableReceipts",
+        "failedReceipts",
+        "notApplicableReceipts",
+        "pendingReceipts",
+        "reconciledReceipts",
+        "settledReceipts"
+      ],
+      "properties": {
+        "actionableReceipts": {
+          "type": "integer"
+        },
+        "failedReceipts": {
+          "type": "integer"
+        },
+        "notApplicableReceipts": {
+          "type": "integer"
+        },
+        "pendingReceipts": {
+          "type": "integer"
+        },
+        "reconciledReceipts": {
+          "type": "integer"
+        },
+        "settledReceipts": {
+          "type": "integer"
+        }
+      }
+    },
+    "sharedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distinctRemoteSubjects",
+        "matchingLocalReceipts",
+        "matchingReferences",
+        "matchingShares",
+        "proofRequiredShares",
+        "remoteLineageRecords",
+        "remoteToolReceipts",
+        "truncated"
+      ],
+      "properties": {
+        "distinctRemoteSubjects": {
+          "type": "integer"
+        },
+        "matchingLocalReceipts": {
+          "type": "integer"
+        },
+        "matchingReferences": {
+          "type": "integer"
+        },
+        "matchingShares": {
+          "type": "integer"
+        },
+        "proofRequiredShares": {
+          "type": "integer"
+        },
+        "remoteLineageRecords": {
+          "type": "integer"
+        },
+        "remoteToolReceipts": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

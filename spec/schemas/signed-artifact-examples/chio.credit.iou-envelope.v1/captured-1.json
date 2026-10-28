@@ -1,0 +1,12 @@
+{
+  "amount_units": 140,
+  "capability_id": "cap",
+  "currency": "USD",
+  "iou_id": "iou-0e35b51077ece19e1aacb1c7e863144d",
+  "issuer_key": "f23aeafd2f10daa3a0e5fbda4b3bb6016a8d2e00a38496f6791b8e4c7b745be7",
+  "receipt_id": "8eefa029296ce0919bf69d3b49802db4462c7249fc41ab9ee7b71a5151583057",
+  "receipt_timestamp": 1778847318,
+  "schema": "chio.credit.iou-envelope.v1",
+  "tool_name": "tool",
+  "tool_server": "srv"
+}

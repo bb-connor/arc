@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "ac36de87c6078bab4dea83bf6c6a2fea70dc26431621409a68f535fe33192593",
+      "parameters": {
+        "cookie": "synthetic-tripwire-marker"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182e7-3950-7b09-a6f6-7ac2478ae00c",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "guard denied the request: guard \"chio-tripwire-pre-invocation\" denied the request",
+      "verdict": "deny"
+    },
+    "evidence": [
+      {
+        "details": "{\"artifact_id_hash\":[61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61],\"artifact_version_hash\":[62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62],\"event_persistence\":\"inserted\",\"kind\":\"browser_cookie\",\"receipt_persistence\":\"appended\"}",
+        "guard_name": "chio-tripwire-pre-invocation",
+        "verdict": false
+      }
+    ],
+    "kernel_key": "f213b617353c87cac4d426b4ac812c41134ddad744223d1c3afefbb08a2f0fca",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "issuer_key": "f213b617353c87cac4d426b4ac812c41134ddad744223d1c3afefbb08a2f0fca",
+        "subject_key": "1059823a80b20e395072c22cd9fb6227d476a7b1460e459a45041992ffea3c01"
+      },
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "guarantee_level": "single_node_atomic",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e7-3b23-7e52-8153-bbfa1b55e93c",
+      "chio_runtime": {
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "kernel-request-a",
+        "request_namespace_digest": "2a13560450edb10649450c0f0846dfc1461b694138403d1ae818795532ac1716"
+      }
+    },
+    "policy_hash": "policy-a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793197554,
+    "tool_name": "tool-a",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "2b61246a1d6cfa1d16ca35899103d865e1ea4d88aa51c7324db7abe9060f3a14"
+}

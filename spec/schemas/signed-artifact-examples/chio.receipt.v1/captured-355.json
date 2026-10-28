@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "06dac9f0cbd0c0d24d4784de763330120295383f40da3b826e27191653395bc2",
+      "parameters": {
+        "subscribe_task": {
+          "id": "task-1"
+        }
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-a2a-subscribe-incomplete",
+    "content_hash": "5afc40be4f9dc9f757125e935c4a8f14761ad29b50282a933ba85bc828ae51e5",
+    "decision": {
+      "reason": "A2A streaming response ended before a terminal or interrupted task state",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "74fa9a15930d48079619a7f7be52c49caae91dc500a81390a357340d80ca9765",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "3042ff94787cdf7454dafa833c815f922176236625af6a104a564417af47fe1c",
+        "subject_key": "83aa8f7dc40feb5bbb47fbfe0bd20b8801f9b44be51370b0beb27305b17c9c3e"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-41cc-7632-9685-185236556a0c",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a18243-41b7-75d0-bc8e-679f55258d61",
+        "request_id": "req-a2a-subscribe-incomplete",
+        "request_namespace_digest": "40467bbb2cfa352834f39ef07f82c4e4452c6d43c212d815fbe5a2da4347b6ac"
+      },
+      "stream": {
+        "chunk_hashes": [
+          "11c74545c24fb094a76165ead8a4c8ac19ebaa731ad97fe799f325a460ccbb9d",
+          "cc3ddfbe44d6eb3ef6f8f4abe887fc649d6086d159eb7c8790089c5aebdbd13a"
+        ],
+        "chunks_expected": null,
+        "chunks_received": 2,
+        "total_bytes": 312
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186808,
+    "tool_name": "research",
+    "tool_origin": "caller_executed",
+    "tool_server": "a2a-127-0-0-1-47c29a205ac0",
+    "trust_level": "mediated"
+  },
+  "id": "71773d297cad433838fd4103bd941f1f60920b8c50728e8d942a5ccef8e28133"
+}

@@ -1,0 +1,29 @@
+{
+  "agent_id": "agent-1",
+  "capability_id": "cap-1",
+  "completed_at": 1793201915,
+  "duration_ms": 2000,
+  "id": "wf-1793201915-0-agent-1",
+  "kernel_key": "25ba16ed990ad00638a57701d6e5037aeea6fa0230883397d4bc7985496087e0",
+  "outcome": {
+    "reason": "step execution failed",
+    "status": "step_failed",
+    "step_index": 0
+  },
+  "schema": "chio.workflow-receipt.v1",
+  "skill_id": "search-summarize",
+  "skill_version": "1.0.0",
+  "started_at": 1793201913,
+  "steps": [
+    {
+      "allowed": true,
+      "duration_ms": 50,
+      "outcome": "failed",
+      "output_hash": "output-hash-1",
+      "server_id": "search-srv",
+      "step_index": 0,
+      "tool_name": "search",
+      "tool_receipt_id": "tool-receipt-1"
+    }
+  ]
+}

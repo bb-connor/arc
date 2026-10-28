@@ -1,0 +1,49 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7d7fc815ed61e8f349e204822f5264c9cc8c279d48a27adfb26b3156cbc9f431",
+      "parameters": {
+        "get_task": {
+          "history_length": 1,
+          "id": "task-1"
+        }
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-a2a-follow-up-denied",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "a2a runtime admission denied",
+      "verdict": "deny"
+    },
+    "kernel_key": "74c2e5df9582fdce629fcd5ac7a96fc09a3e9d1bf9158a0119d36c5c1cce4716",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "936c270fb45e86ce453d087a0952aa463d4446b06e5f64734f612673e6d923a6",
+        "subject_key": "7d94dfa6ff54af55e370b8b277f49e720a9ec33df87153273428fe5b8ca4c84e"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-4195-75c1-ace3-cd2891c250c3",
+      "chio_runtime": {
+        "accepted": false,
+        "failure_code": "a2a_runtime_admission_denied",
+        "identity_disposition": "reusable"
+      },
+      "receipt_context": {
+        "request_id": "req-a2a-follow-up-denied-poll",
+        "request_namespace_digest": "2e2c4a97b5208d3b4750adbe111e37218ef4ef8e8d74b024448bb41930b646d3"
+      }
+    },
+    "policy_hash": "test-policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186808,
+    "tool_name": "research",
+    "tool_origin": "caller_executed",
+    "tool_server": "a2a-127-0-0-1-48ef928c92f8",
+    "trust_level": "mediated"
+  },
+  "id": "f7877e1e3c23af6f83d1f08378ce4bd3889abb6b9d0b9cc6b5d72e43c4b45f93"
+}

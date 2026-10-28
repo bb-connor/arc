@@ -1,0 +1,50 @@
+{
+  "completedAtUnixSecs": 10,
+  "firecrackerSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "guestResultSha256": "bc8110aeb97503e5cfb0674cc914f650413e3c4933dae17437d9dffc3681e396",
+  "jailerSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "jobId": "job-a",
+  "kernelSha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "requestSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "result": {
+    "classification": "succeeded",
+    "diagnostics": [],
+    "findingArtifactSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "guestEnforcement": {
+      "openFilesBoundary": "rlimit_nofile",
+      "openFilesHardLimit": 128,
+      "openFilesLimitHits": 0,
+      "openFilesLimitProbePassed": true,
+      "openFilesSoftLimit": 128,
+      "processBoundary": "cgroup_v2",
+      "processLimit": 32,
+      "processLimitHits": 0,
+      "processLimitProbePassed": true,
+      "schema": "chio.finding.worker-guest-enforcement.v1"
+    },
+    "jobId": "job-a",
+    "outputArtifacts": [
+      {
+        "name": "finding.json",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "sizeBytes": 512
+      }
+    ],
+    "requestSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "resourceUsage": {
+      "cpuTimeMillis": 500,
+      "openFilesPeak": 8,
+      "outputBytes": 512,
+      "peakMemoryBytes": 67108864,
+      "processPeak": 2,
+      "wallTimeMillis": 1000,
+      "workspaceBytes": 2048
+    },
+    "schema": "chio.finding.worker-result.v1",
+    "tenantId": "tenant-a"
+  },
+  "rootfsSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "schema": "chio.finding.worker-attested-result.v1",
+  "tenantId": "tenant-a",
+  "workerBinarySha256": "4444444444444444444444444444444444444444444444444444444444444444"
+}

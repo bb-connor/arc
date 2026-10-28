@@ -1,0 +1,15 @@
+{
+  "activationFence": 19,
+  "activeRosterDigest": "a66a37a29bd37e9f47f39932b881934937e31c6df881f2b0bce75b227040e030",
+  "activeRosterId": "0269f01d65e4ada798176f01f1b679f2308181e9a9d028348f21a491707115ab",
+  "anchorId": "epoch-anchor.primary",
+  "anchorKeyId": "epoch-anchor-key.v1",
+  "checkpointSequence": 4,
+  "clockHighWater": 200,
+  "groupPublicKeyDigest": "eaffb2d9fb00afd9ae8ddd9ec24f839e3258139ae05622be18110c71db0666fc",
+  "keyEpoch": 4,
+  "predecessorDigest": "7777777777777777777777777777777777777777777777777777777777777777",
+  "rotationAuthorizationDigest": "8888888888888888888888888888888888888888888888888888888888888888",
+  "schema": "chio.frost.epoch-checkpoint.v1",
+  "scopeId": "treaty.atlantic.v1"
+}

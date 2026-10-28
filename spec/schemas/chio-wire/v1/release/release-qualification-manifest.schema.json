@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/release/release-qualification-manifest.schema.json",
+  "title": "Chio release qualification manifest signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifacts",
+    "candidateGitCommit",
+    "candidateGitTree",
+    "cargoLockSha256",
+    "generatedAtUnixSecs",
+    "qualificationScope",
+    "schema",
+    "source",
+    "workflowRunAttempt",
+    "workflowRunId"
+  ],
+  "properties": {
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bytes",
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "candidateGitCommit": {
+      "type": "string"
+    },
+    "candidateGitTree": {
+      "type": "string"
+    },
+    "cargoLockSha256": {
+      "type": "string"
+    },
+    "generatedAtUnixSecs": {
+      "type": "integer"
+    },
+    "qualificationScope": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.release-qualification-manifest.v1"
+    },
+    "source": {
+      "type": "string"
+    },
+    "workflowRunAttempt": {
+      "type": "null"
+    },
+    "workflowRunId": {
+      "type": "null"
+    }
+  }
+}

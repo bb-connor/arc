@@ -1,0 +1,20 @@
+{
+  "authorityDigest": "d8a94f57debcadb087e46a1fa8673a757785987908683ef87fdabe4521f760ba",
+  "authorizedAtUnixMs": 525,
+  "dispositionAuthorityId": "obligation-authority",
+  "dispositionAuthorityKeyEpoch": 11,
+  "governanceScopeId": "clearing-governance",
+  "nextLifecycleFence": 3,
+  "nextLifecycleVersion": 3,
+  "outputManifestDigest": "bdef2c04a42711fccbeb1e1d2b18028371af42fdc9eac42e1e81bb2d5209bf44",
+  "reason": "operator_cancelled",
+  "reservationCount": 2,
+  "reservationRoot": "0e94a45f540c2421301cd68d86324bb00ff285220fe1cd2ec4a8b49598a2f163",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "roundId": "round-1",
+  "schema": "chio.clearing.round-abort.v1",
+  "sourceLifecycleFence": 2,
+  "sourceLifecycleHeadDigest": "9dbb1778be50ce91b8e2fb84cc0d8094f9b0cb54fb63afedcee71f54826fa645",
+  "sourceLifecycleVersion": 2,
+  "zeroDispatchProofDigest": "909990b9455a6bb71a003ab65a3384aa969d3d2d2da976e7365e6dc1c104d9fa"
+}

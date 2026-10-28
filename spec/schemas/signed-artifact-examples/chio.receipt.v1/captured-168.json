@@ -1,0 +1,44 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "83bf95ec62be2b8a95c22804894fd5abbeca0b5d19b9ac1a4e82dc36b503c64a",
+      "parameters": {
+        "_8__4g": true
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-4bt",
+    "content_hash": "dba95ee4c7b3fdb09fabee911cbc51575e37a150da100f62ac5b300d95709214",
+    "decision": {
+      "reason": "E-Z~c@:p\\",
+      "verdict": "incomplete"
+    },
+    "evidence": [
+      {
+        "details": "N=V.]RIi~R",
+        "guard_name": "YZZvJYOQPfkoTkFDoGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-9w7j6l8",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1703820867,
+    "tool_name": "c__",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-cmgx",
+    "trust_level": "mediated"
+  },
+  "id": "48def35ce40fe9648e7be9ddc121f50a7a8d4048020ee1b6e466096ca0dcea24"
+}

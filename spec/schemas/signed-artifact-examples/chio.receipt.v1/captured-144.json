@@ -1,0 +1,60 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "4b56b1702e711f4cfe292af8d45bfbf284b110ae167ddbb595ee2d713d174746",
+      "parameters": {
+        "step": 0
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-evidence-0",
+    "content_hash": "d8234409de36acf63ded0b96cc25d15e55a1c9ff2ca1bb63031f5f2872380bef",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+    "metadata": {
+      "budget_authority": {
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "committed_cost_units_after": 1,
+          "event_id": "hold-evidence-0:authorize",
+          "exposure_units": 1
+        },
+        "execution_nonce_id": "nonce-evidence-0",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "hold-evidence-0",
+        "mediated_spend": {
+          "profile": "chio.mediated_spend.v1"
+        },
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "committed_cost_units_after": 1,
+          "disposition": "reconciled",
+          "event_id": "hold-evidence-0:reconcile",
+          "exposure_units": 1,
+          "realized_spend_units": 1
+        }
+      },
+      "financial": {
+        "budget_remaining": 99,
+        "budget_total": 100,
+        "cost_charged": 1,
+        "currency": "USD",
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "root_budget_holder": "finding-producer",
+        "settlement_status": "settled"
+      }
+    },
+    "policy_hash": "policy-wedge",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1750000000,
+    "tool_name": "finding.produce",
+    "tool_origin": "caller_executed",
+    "tool_server": "finding-server",
+    "trust_level": "mediated"
+  },
+  "id": "6d4382fb86b402f0b5e959c34262d9901c605b5c16d833830f8df0a8615715bf"
+}

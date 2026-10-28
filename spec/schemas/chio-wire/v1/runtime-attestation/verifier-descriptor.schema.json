@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime-attestation/verifier-descriptor.schema.json",
+  "title": "Chio runtime attestation verifier descriptor signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adapter",
+    "appraisalArtifactSchema",
+    "appraisalResultSchema",
+    "attestationSchemas",
+    "descriptorId",
+    "expiresAt",
+    "issuedAt",
+    "schema",
+    "signingKeyFingerprints",
+    "verifier",
+    "verifierFamily"
+  ],
+  "properties": {
+    "adapter": {
+      "type": "string"
+    },
+    "appraisalArtifactSchema": {
+      "type": "string"
+    },
+    "appraisalResultSchema": {
+      "type": "string"
+    },
+    "attestationSchemas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "descriptorId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "referenceValuesUri": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime-attestation.verifier-descriptor.v1"
+    },
+    "signingKeyFingerprints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "verifierFamily": {
+      "type": "string"
+    }
+  }
+}

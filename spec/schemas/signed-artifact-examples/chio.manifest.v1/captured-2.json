@@ -1,0 +1,40 @@
+{
+  "description": "A demo tool server",
+  "name": "Hello Tool Server",
+  "public_key": "not-a-public-key",
+  "schema": "chio.manifest.v1",
+  "server_id": "srv-hello",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": true,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Returns a greeting",
+      "input_schema": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "latency_hint": "instant",
+      "name": "greet",
+      "pricing": {
+        "billing_unit": "invocation",
+        "pricing_model": "per_invocation",
+        "unit_price": {
+          "currency": "USD",
+          "units": 50
+        }
+      }
+    }
+  ],
+  "version": "0.1.0"
+}

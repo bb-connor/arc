@@ -1,0 +1,9 @@
+{
+  "executionLeaseRef": "lease-runtime-valid",
+  "incidentRef": "incident-tool-unreachable",
+  "kernelKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "policyDigest": "05a36d67956b1ce09b4a19725cee73672011a80dc014305af3ab6ccd024bcdbb",
+  "receiptId": "receipt-runtime-incident",
+  "schema": "chio.runtime.terminal-receipt-signature.v1",
+  "terminalStatus": "failed_tool_unreachable"
+}

@@ -1,0 +1,46 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "269a9a13cf88ef68681223e31395c80d53bfe81d84844b610fedf0f3576af995",
+      "parameters": {
+        "r": "J_P\"AE{VPzHR {"
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-rd50a9agym",
+    "content_hash": "460a3beeab01032ae016e2c417cc6f31b3ee1e7cdc9ec722a434afb177136d1f",
+    "decision": {
+      "verdict": "allow"
+    },
+    "evidence": [
+      {
+        "guard_name": "JFvWRKOrlzMwOGuard",
+        "verdict": true
+      },
+      {
+        "guard_name": "FyomHGuard",
+        "verdict": true
+      }
+    ],
+    "kernel_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-a71s7d7ww98318",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1834412155,
+    "tool_name": "vji_",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-yeij",
+    "trust_level": "mediated"
+  },
+  "id": "b5a6a8f37c82c1cadd92dbf25730cb8d3f16139758a2946c06b3f42ea30cd01f"
+}

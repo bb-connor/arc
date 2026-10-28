@@ -1,0 +1,16 @@
+{
+  "acceptedAt": 130,
+  "agentId": "agent-alpha",
+  "askDigest": "093fc98f980bda1bee2a0541b24f4aa0c384a2659489e05b11761dd042afceb9",
+  "bidDigest": "fee8fc90de2a14002dba3422f62a9a55139cffd0aad667974ac586e7165bf4c0",
+  "bidReceiptId": "receipt-42",
+  "listingId": "listing-1",
+  "quotedPrice": {
+    "currency": "USD",
+    "units": 100
+  },
+  "schema": "chio.marketplace.accepted-bid.v1",
+  "tokenExpiresAt": 420,
+  "tokenId": "token-1",
+  "tokenSubject": "6772829a852979afca12c31cf644a5f9a5fc41ec8ff3702040c9278779b415e6"
+}

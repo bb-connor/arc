@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-sqlite-import-batch.schema.json",
+  "title": "Chio finding hosted sqlite import batch signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityEpoch",
+    "entries",
+    "exportedAt",
+    "firstSequence",
+    "lastSequence",
+    "schema",
+    "sourceProjectionSha256",
+    "tenantId"
+  ],
+  "properties": {
+    "authorityEpoch": {
+      "type": "integer"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entry_kind",
+          "event"
+        ],
+        "properties": {
+          "entry_kind": {
+            "type": "string"
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signature",
+              "signerKey"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "aggregateId",
+                  "artifactSignerKey",
+                  "authorityEpoch",
+                  "committedAt",
+                  "eventId",
+                  "eventKind",
+                  "expectedEventSha256",
+                  "expectedRevision",
+                  "payload",
+                  "schema",
+                  "sequence",
+                  "sourceAuthority",
+                  "tenantId"
+                ],
+                "properties": {
+                  "aggregateId": {
+                    "type": "string"
+                  },
+                  "artifactSignerKey": {
+                    "type": "string"
+                  },
+                  "authorityEpoch": {
+                    "type": "integer"
+                  },
+                  "committedAt": {
+                    "type": "integer"
+                  },
+                  "eventId": {
+                    "type": "string"
+                  },
+                  "eventKind": {
+                    "type": "string"
+                  },
+                  "expectedEventSha256": {
+                    "type": "null"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "invalid"
+                    ],
+                    "properties": {
+                      "invalid": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "schema": {
+                    "type": "string"
+                  },
+                  "sequence": {
+                    "type": "integer"
+                  },
+                  "sourceAuthority": {
+                    "type": "string"
+                  },
+                  "tenantId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "signature": {
+                "type": "string"
+              },
+              "signerKey": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "exportedAt": {
+      "type": "integer"
+    },
+    "firstSequence": {
+      "type": "integer"
+    },
+    "lastSequence": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-sqlite-import-batch.v1"
+    },
+    "sourceProjectionSha256": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "28c9513e72fc65bf5fb124c45e043d36bb2c87612220e550446ee37cf6fe933a",
+      "parameters": {
+        "key": "k1",
+        "store": "conversation",
+        "value": "hello"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-ee28-7abd-89c9-d1348b15fbe6",
+    "content_hash": "b0a92853616c0c52c97fd7843b8aed79acacfd252a700a2e04e1bd38f6b76388",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "c86911c6f2e31f9ca71acd1e3b6c6228f1e71bab123ceb6f45705481796f2edc",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "c86911c6f2e31f9ca71acd1e3b6c6228f1e71bab123ceb6f45705481796f2edc",
+        "subject_key": "3e1ab448b0471a207321b430c7e797a0f33fc95ce825b40abb3e9c73ecd210a6"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-f1be-78b1-81ab-b02637d1b7aa",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-f1bc-73f2-8cb7-dd10fc2d5038",
+        "request_id": "req-mem-allow",
+        "request_namespace_digest": "92376d1883c7c553121ce584931464ffa3edeaa4f8643b65477039683e00982a"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195241,
+    "tool_name": "memory_write",
+    "tool_origin": "caller_executed",
+    "tool_server": "mem",
+    "trust_level": "mediated"
+  },
+  "id": "d626bc6d96104050b3a10f4464d8337655eeeaf5dce76c5623f4ef503a19dd51"
+}

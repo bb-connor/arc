@@ -1,0 +1,49 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d087c109acf293498f24c6cb3e1b2449599a2efdbb413e39cc66f368d5be33d8",
+      "parameters": {
+        "owner": "λ"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "operator-cap",
+    "content_hash": "181271ee0fe720b3e9060ead442d638becf2ec17dced6600b0a077dd57155281",
+    "decision": {
+      "reason": "stream truncated",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "3f8c53f8f9534d3bfafe6171bd059d9147a43358be05e381dfb136f7a70e2f3b",
+    "metadata": {
+      "chio_process": {
+        "attempt": 1,
+        "operation_key": "assign-one",
+        "process_id": "operator",
+        "recovery_policy": "known_outcome_only",
+        "runtime_id": "runtime-one"
+      },
+      "chio_receipt_signing_nonce": "response-test",
+      "receipt_context": {
+        "request_id": "process:8a5eed742501049fa387848aceb4161477ffeb7d6e89bf8aded7f4414e3fe88f"
+      },
+      "stream": {
+        "chunk_hashes": [
+          "750c627e6e7a6545b85a2482815051c10f38181be474aaa58fd4c5319713a9f8",
+          "ee9378a06b3b059db2ecb796dd4e7363f9996a198d21bd031be91ed2327ac68b"
+        ],
+        "chunks_expected": 3,
+        "chunks_received": 2,
+        "total_bytes": 53
+      }
+    },
+    "policy_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1710000000,
+    "tool_name": "assign",
+    "tool_origin": "caller_executed",
+    "tool_server": "resource",
+    "trust_level": "mediated"
+  },
+  "id": "bd90fedcaf7ad3896132e354fef14ece8fe198767ca0961295125197b6810567"
+}

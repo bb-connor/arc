@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/listing.schema.json",
+  "title": "Chio registry listing signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundary",
+    "compatibility",
+    "expiresAt",
+    "listingId",
+    "namespace",
+    "namespaceOwnership",
+    "publishedAt",
+    "schema",
+    "status",
+    "subject"
+  ],
+  "properties": {
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automaticTrustAdmission",
+        "explicitTrustActivationRequired",
+        "visibilityOnly"
+      ],
+      "properties": {
+        "automaticTrustAdmission": {
+          "type": "boolean"
+        },
+        "explicitTrustActivationRequired": {
+          "type": "boolean"
+        },
+        "visibilityOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceArtifactId",
+        "sourceArtifactSha256",
+        "sourceSchema"
+      ],
+      "properties": {
+        "sourceArtifactId": {
+          "type": "string"
+        },
+        "sourceArtifactSha256": {
+          "type": "string"
+        },
+        "sourceSchema": {
+          "type": "string"
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "namespaceOwnership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "ownerId",
+        "registeredAt",
+        "registryUrl",
+        "signerPublicKey"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "registeredAt": {
+          "type": "integer"
+        },
+        "registryUrl": {
+          "type": "string"
+        },
+        "signerPublicKey": {
+          "type": "string"
+        }
+      }
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.registry.listing.v1"
+    },
+    "status": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actorId",
+        "actorKind"
+      ],
+      "properties": {
+        "actorId": {
+          "type": "string"
+        },
+        "actorKind": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "homepageUrl": {
+          "type": "string"
+        },
+        "metadataUrl": {
+          "type": "string"
+        },
+        "resolutionUrl": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

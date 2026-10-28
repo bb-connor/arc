@@ -1,0 +1,19 @@
+{
+  "anchorId": "delivery-anchor-1",
+  "anchorKeyEpoch": 8,
+  "deliveryId": "delivery-1",
+  "eligibilityDigest": "8d2e3b34566f44d35b57399dcfed9f83daf6eb3405ad2edca57a7f9ceb107035",
+  "idempotencyKey": "delivery-idempotency-1",
+  "outputDigest": "f8e47492019d9c323180e4e193315b4ab6b96a74ae7761db3ffcf126108abd6d",
+  "providerAcceptanceDigest": "43d810149c113c91cb4a46f74f63b69c42f64b1640a647f91c6d2f5af0000a4c",
+  "receiverBindingDigest": "c8146bdb1e9de877751182f91b38b622ea6f6fa86077d2409d40c13b18e321ca",
+  "receiverId": "receiver-1",
+  "receiverKeyEpoch": 9,
+  "receiverNamespace": "receiver-production",
+  "receiverQueueId": "receiver-queue-1",
+  "requestId": "req-outcome-1",
+  "schema": "chio.outcome.delivery-checkpoint.v1",
+  "sequence": 1,
+  "state": "pending",
+  "trustedClockHighWaterUnixMs": 1100
+}

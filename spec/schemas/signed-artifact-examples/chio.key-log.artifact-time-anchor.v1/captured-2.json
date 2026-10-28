@@ -1,0 +1,10 @@
+{
+  "anchor": {
+    "commitment": "0xfc23708146be569056224a80e08ea546b3b26006649866d9f4e6461187b52bde",
+    "type": "external"
+  },
+  "anchor_id": "timestamp.service.v1",
+  "anchored_at": 999,
+  "artifact_hash": "0xc7c5c1d70c5dec4416ab6158afd0b223ef40c29b1dc1f97ed9428b94d4cadb1c",
+  "schema": "chio.key-log.artifact-time-anchor.v1"
+}

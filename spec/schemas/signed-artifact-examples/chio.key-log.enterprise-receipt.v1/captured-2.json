@@ -1,0 +1,39 @@
+{
+  "activation_commit_hash": "0xf915793ac0b2256167534a1e3f8047477c6bca2a0770f6d5d810598a8c425bce",
+  "checkpoint_hash": "0xa60f2bc75933f5e913d364d74ca3ccbc52cbd93547a325f58486a6dc628a1a33",
+  "checkpoint_sequence": 1,
+  "event_envelope_hash": "0x85f0507e62456a2c3601c9f0cab0c6bafe833e87aad44bab1b357d937ede02be",
+  "event_id": "event.rotation",
+  "event_sequence": 1,
+  "event_signers": [
+    {
+      "key_id": "0xf6d98d6a0f4dc443c179b7f2a7989b7bf7c84badc69c39b7e564c1f893f6d8ce",
+      "role": "old_key"
+    },
+    {
+      "key_id": "0x6c312db3f7a5c36c463005f9880f439607a0c0641a17e46377b419ac41dac8ee",
+      "role": "new_key"
+    }
+  ],
+  "issued_at": 2000,
+  "log_id": "log.retained-host",
+  "operator_key_id": "0x6bd66dfc77930771af45dc94ec2fa7d1e78cd5af8a483fa79954b44f48f1f485",
+  "outcome": "activated",
+  "receipt_id": "key-receipt:99c8dbccbfd8ce44993bf4ee4c1ebfc6674272d99e3ccb34334b75785291d93a",
+  "root_hash": "0x05dcf2aab103221fd62384c3ed5b607096e29b5cfaac10cea4389a034ff2ba52",
+  "schema": "chio.key-log.enterprise-receipt.v1",
+  "signing_epoch": 1,
+  "source_receipt_ids": [
+    "key-receipt:e67a40f43367ba246bc7288224fa5f58c79627dca0a563b6833268a014e71b75"
+  ],
+  "stage": "active",
+  "transaction_id": "key-tx:331649838f595fc15ede44502a4b1519a3756213f664880cb8711e35827be3b9",
+  "tree_size": 2,
+  "witness_roster_id": "roster.retained-host",
+  "witness_signatures": [
+    {
+      "signature": "49528cdfb7a8c38369f8d26750c3ed2b4f61d9984ae69bed2a3b1f4d31c1f64cd524132eababe16dfabbdfb91928457b4bb505fb92d07640a9af98fa933fb805",
+      "witness_id": "witness.retained-host"
+    }
+  ]
+}

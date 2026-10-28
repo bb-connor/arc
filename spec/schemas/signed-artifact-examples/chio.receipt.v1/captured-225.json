@@ -1,0 +1,29 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "d95808527f6e74a7a4cc2d3dfc056424bea5dce3940f31f158d06ad5098fbdd8",
+      "parameters": {
+        "msg": "hi"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1",
+    "content_hash": "61b3cc6d877f8b45b242885ef711cef4323f7a24248994ca6c0d29e7ec9cc1d7",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-1"
+    },
+    "policy_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000000,
+    "tool_name": "echo",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-a",
+    "trust_level": "mediated"
+  },
+  "id": "b0c32c4dd258b478a21233c4db2d6fe1e60ec18c31588f71d01f396b1cceb034"
+}

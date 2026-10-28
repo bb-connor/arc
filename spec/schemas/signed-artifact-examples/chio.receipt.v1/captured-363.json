@@ -1,0 +1,33 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "4e580346f80b6c014492bfddf148920cc8fdb515d2848942d9899a525c621108",
+      "parameters": {
+        "collection": "purchased-findings",
+        "content": {
+          "payload": "verified"
+        },
+        "id": "f-1"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "memory-capability-fixture",
+    "content_hash": "95b65af50668b1801eb047690f007ba3eb29c068686c0468515884cd35fe02c1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "2012cb90ca60e8e5d8daf66e2272d2233e0486d557e8c66141ed8920177d7eb7",
+    "metadata": {
+      "chio_receipt_signing_nonce": "child-fixture"
+    },
+    "policy_hash": "47bdde9c282cdc1831adddd1099cc43c957c58dcc3b8c6b02d4a1331c98b33b8",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1750000001,
+    "tool_name": "memory_write",
+    "tool_origin": "caller_executed",
+    "tool_server": "memory",
+    "trust_level": "mediated"
+  },
+  "id": "f51c0cd31efbfc5f3efd93a325dd009fba1043570ad5077feaba6e1d8ab22e27"
+}

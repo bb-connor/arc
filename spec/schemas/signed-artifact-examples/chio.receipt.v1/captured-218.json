@@ -1,0 +1,48 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7e9430c1a62e1bf920068a52dd3e91fe3be0ff07986b3a26e2ef908063dc0f1b",
+      "parameters": {
+        "record": "vendor-ledger-7",
+        "value": "closed"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c3-e270-7778-b672-200baa9d986f",
+    "content_hash": "fc8c1cba3bccb9a391a32f94a4bcfc0d714855100157a46388d1ad56f1e71edf",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "eb3259d5ededa2115df7297559f3ca50985768c08fbdd6dde95e7b758947e2e5",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "eb3259d5ededa2115df7297559f3ca50985768c08fbdd6dde95e7b758947e2e5",
+        "subject_key": "8910e6750e5707318a927601eb14c83b509e4ded46a915cc8147d2159f8aa7cf"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-e522-7bf0-983e-4845ee2d0015",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "adm-allowed",
+        "failure_code": null,
+        "identity_disposition": "terminal",
+        "observe_only": true
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182c3-e521-7712-b8b2-77e40560c927",
+        "request_id": "req-chio-runtime-allow",
+        "request_namespace_digest": "f659fa7d6bb083212ac4871a619fd8e8ebee47b5e7bec7cf41946db3be7d80a9"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195238,
+    "tool_name": "destructive_update",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-chio-runtime",
+    "trust_level": "mediated"
+  },
+  "id": "c1e9b7be1cdad29ef6a3c65368cca3a972f40ef12dd5541d5b948908a11398c3"
+}

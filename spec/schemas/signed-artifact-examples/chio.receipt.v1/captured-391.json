@@ -1,0 +1,62 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44745faaac4f3c1540a8c2974578aea85c08bb89ee2caf3afd1a24f9724f280f",
+      "parameters": {
+        "input": 1
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability-a",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "fault",
+      "verdict": "cancelled"
+    },
+    "kernel_key": "9940d822f709889edc483b9608019d0873cd0e55e5c13cf59171ac71be783c98",
+    "metadata": {
+      "attribution": {
+        "grant_index": 2
+      },
+      "budget_authority": {
+        "terminal": {
+          "budget_commit_index": null,
+          "budget_commit_index_decimal": "18446744073709551615",
+          "budget_commit_index_omitted": true,
+          "disposition": "captured",
+          "event_id": null,
+          "event_id_omitted": true,
+          "event_id_sha256": "db33c4ce9e8a72562c8f24aa67b7abbabdb848426e8ddfff4ee08f6ae04d1b17",
+          "realized_spend_units": null,
+          "realized_spend_units_decimal": "18446744073709551615",
+          "realized_spend_units_omitted": true
+        }
+      },
+      "chio_receipt_signing_nonce": "prepared-fault",
+      "financial": {
+        "cost_charged": null,
+        "cost_charged_decimal": "18446744073709551615",
+        "cost_charged_omitted": true,
+        "payment_authorization_retained": false,
+        "payment_reference": null,
+        "payment_reference_omitted": true,
+        "payment_reference_sha256": "db33c4ce9e8a72562c8f24aa67b7abbabdb848426e8ddfff4ee08f6ae04d1b17",
+        "settlement_status": "settled"
+      },
+      "receipt_context": {
+        "evaluation_id": "evaluation-a",
+        "request_id": "request-a",
+        "request_namespace_digest": "namespace-a"
+      }
+    },
+    "policy_hash": "policy-a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1700000000,
+    "tool_name": "tool-a",
+    "tool_origin": "caller_executed",
+    "tool_server": "server-a",
+    "trust_level": "mediated"
+  },
+  "id": "7150c0d3dc4af8ce1fa42670601c48e009efda60c8c643de066ee839f5513bab"
+}

@@ -1,0 +1,85 @@
+{
+  "evaluation_time": 1750000030,
+  "facets": [
+    {
+      "facet": "artifact_integrity",
+      "outcome": "verified",
+      "reason": "structure, content address, and issuer signature verified"
+    },
+    {
+      "facet": "receipt_authenticity",
+      "outcome": "verified",
+      "reason": "production evidence receipts verified strictly"
+    },
+    {
+      "facet": "checkpoint_membership",
+      "outcome": "verified",
+      "reason": "every production receipt is a member of a pinned, signature-valid checkpoint"
+    },
+    {
+      "facet": "kernel_and_revocation_trust",
+      "outcome": "unavailable",
+      "reason": "revocation freshness evidence not supplied"
+    },
+    {
+      "facet": "issuer_lineage",
+      "outcome": "unavailable",
+      "reason": "signed capability snapshot evidence not supplied"
+    },
+    {
+      "facet": "recipe_binding",
+      "outcome": "verified",
+      "reason": "recipe preimage is canonical, digest-bound, and profile-supported"
+    },
+    {
+      "facet": "intent_binding",
+      "outcome": "unavailable",
+      "reason": "intent commitment ordering evidence not supplied"
+    },
+    {
+      "facet": "metered_exposure_backing",
+      "outcome": "verified",
+      "reason": "kernel-accounted floor established: 2 units"
+    },
+    {
+      "facet": "settled_spend_backing",
+      "outcome": "verified",
+      "reason": "kernel-accounted floor established: 2 units"
+    },
+    {
+      "facet": "runtime_assurance_backing",
+      "outcome": "unavailable",
+      "reason": "finding claims no runtime assurance tier"
+    },
+    {
+      "facet": "bond_backing",
+      "outcome": "failed",
+      "reason": "collateral store snapshot is not fresh for this evaluation"
+    },
+    {
+      "facet": "status_liveness",
+      "outcome": "verified",
+      "reason": "fresh governance-authorized status non-inclusion proof verified"
+    },
+    {
+      "facet": "guarantee_consistency",
+      "outcome": "failed",
+      "reason": "at least one evaluated facet failed"
+    }
+  ],
+  "finding_artifact_sha256": "3860e13fcf9051896ba30f19c362f9ae51b0733c33c125a60e39b0dc095a15c8",
+  "finding_id": "a5c8a5154fb925cb65f0ca7d6a40d5cc8ad313197a9f4f9d463d09c6b30a8ef6",
+  "replay_recipe_input_sha256": "d745cb38bbeeb0331c297981c65d4edef87240ad51f20ec0ddbeda2286014304",
+  "report_id": "aaca400d9b4a20b8cd432dcacb6d328dea10a1cef291a9acd1db5cbb013ba55b",
+  "resolved_evidence_bundle_sha256": "4bbc8222929a27759c34069ccd5260790bbdb678cfc5ed03b368b2403650e108",
+  "resolver_policy_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "schema": "chio.finding.verifier-report.v1",
+  "status_proof_input_sha256": "31599b4ea60f1c2dc955c2fa61d3b685dbfc4e4ed14d1e6d4a57f33784aaa730",
+  "trust_root_snapshot_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "trusted_time_input_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "verifier_authority": "d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c",
+  "verifier_implementation_id": "chio-finding-verifier/0.1",
+  "verifier_key_epoch": 1,
+  "verifier_profile_envelope_sha256": "d47c27a083c866ef4ee3642cd971493e7c85cf07606ab6b949c314536cb3d4d9",
+  "verifier_profile_id": "aa5714542ad477e014a5cde08554d868b282ff3dd37b7c8969f3930bfd5b846a"
+}

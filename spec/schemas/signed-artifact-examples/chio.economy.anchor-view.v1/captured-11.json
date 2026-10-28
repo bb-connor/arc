@@ -1,0 +1,83 @@
+{
+  "absentRequestKeys": [],
+  "absentResourceKeys": [],
+  "anchorId": "anchor-1",
+  "checkpointDigest": "3d65c79d4ed676f0ab1b70c5ef7ffde96263a58c06b1a07f53b3dbda0da366ee",
+  "checkpointSequence": 2,
+  "heads": [
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "open",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "channel_escrow_reservation",
+        "resourceId": "channel-1",
+        "scopeId": "channel-scope"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "resourceFamily": "channel_escrow_reservation"
+        }
+      },
+      "stateDigest": "050206c87b44e942875ddb9f09b87ef34925ed15ab52373e77c526fbc72a7dfe",
+      "trustedClockHighWater": 100
+    },
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "open",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "channel_lifecycle",
+        "resourceId": "channel-1",
+        "scopeId": "channel-scope"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "resourceFamily": "channel_lifecycle"
+        }
+      },
+      "stateDigest": "0b12c0f3b0f01bcb7dee4a90b65cd10b86a3165a99007bd7bcfba7e21e2e2086",
+      "trustedClockHighWater": 100
+    },
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "open",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "channel-1",
+        "scopeId": "channel-scope"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "resourceFamily": "effect_slot"
+        }
+      },
+      "stateDigest": "77c2b0f5a155de3c71d950f06ece11b848c11f0ae9cd0632ae1cd2699efe7446",
+      "trustedClockHighWater": 100
+    }
+  ],
+  "headsRoot": "83e5bd565640f9366096e0727cc9bcdbd94223ef12148908bc621cbbacec210f",
+  "namespace": "economy-prod",
+  "observedAt": 102,
+  "requestReplays": [],
+  "requestReplaysRoot": "9ba93a2f0a4cfdb86bc80876acad09fbffd2c5db58b6088779d643a65467676d",
+  "schema": "chio.economy.anchor-view.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1"
+}

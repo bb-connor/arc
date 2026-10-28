@@ -1,0 +1,18 @@
+{
+  "artifacts": [
+    {
+      "bytes": 7,
+      "path": "gate.log",
+      "sha256": "2700165975f68815c97d605c56eca8e90d497ade1264b6282401d13fee99ac27"
+    }
+  ],
+  "candidateGitCommit": "2a8f5ce531b2fc76b0eaa4cc6508307dec98745d",
+  "candidateGitTree": "3d00b60251fb163776a5da3543021f0fa9e151f1",
+  "cargoLockSha256": "083791b01c1a67ae66aca99070c9ee48082d04307473d494376e6de7cf9a654a",
+  "generatedAtUnixSecs": 1793197045,
+  "qualificationScope": "self-signed internal release qualification; not external assurance or underwriting evidence",
+  "schema": "chio.release-qualification-manifest.v1",
+  "source": "local",
+  "workflowRunAttempt": null,
+  "workflowRunId": null
+}

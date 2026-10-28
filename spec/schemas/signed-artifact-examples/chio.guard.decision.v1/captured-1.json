@@ -1,0 +1,10 @@
+{
+  "capability_id": "cap-tool-read-demo",
+  "decision": "allow",
+  "guard_key": "6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+  "id": "guard-decision",
+  "policy_sha256": "3f3f80ff3e9d7a19d2bc89309fa450bdc12cfad21ed81b65591490a015f1215f",
+  "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "response_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema": "chio.guard.decision.v1"
+}

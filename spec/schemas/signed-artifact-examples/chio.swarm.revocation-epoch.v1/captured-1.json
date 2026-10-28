@@ -1,0 +1,12 @@
+{
+  "epochId": "revocation-epoch-swarm-valid",
+  "issuedAtUnixMs": 1800000000000,
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "revokedSubjects": [
+    "did:chio:unrelated-subject"
+  ],
+  "revokedTaskIds": [],
+  "rootHash": "1288381bfc5c6daa7128400cfdbe1e8a7e132c886bd4b854e78b609c576b7d0e",
+  "schema": "chio.swarm.revocation-epoch.v1",
+  "validUntilUnixMs": 1800000061000
+}

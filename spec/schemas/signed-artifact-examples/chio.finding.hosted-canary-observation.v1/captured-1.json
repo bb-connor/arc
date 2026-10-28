@@ -1,0 +1,18 @@
+{
+  "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "configurationRevision": "revision-1",
+  "durableIntegrityFailures": 0,
+  "errorCount": 1,
+  "observedSecs": 300,
+  "oldestQueueAgeSecs": 5,
+  "p99LatencyMillis": 500,
+  "paymentAmbiguities": 0,
+  "readyReplicas": 2,
+  "requestCount": 1000,
+  "schema": "chio.finding.hosted-canary-observation.v1",
+  "signatureFailures": 0,
+  "tenantIsolationViolations": 0,
+  "windowEndedAtUnixSecs": 1700000000,
+  "windowStartedAtUnixSecs": 1699999700,
+  "workerIsolationFailures": 0
+}

@@ -1,0 +1,32 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1",
+    "content_hash": "content-1",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "70df9e2279adbec6d12bf2921184c9222eb24ed852005bf640139f52e59cd9ae",
+    "metadata": {
+      "chio_receipt_signing_nonce": "d8174687f08747823e827fd771454c0bd61ae663ac440cb366521425572da8d0",
+      "escaped": "a \\\" quoted number 0.123456789012345678901",
+      "large_float": 1e+30,
+      "negative_zero": 0,
+      "tiny_float": 5e-324,
+      "whole_float": 1
+    },
+    "policy_hash": "policy-1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1,
+    "tool_name": "bash",
+    "tool_origin": "caller_executed",
+    "tool_server": "shell",
+    "trust_level": "mediated"
+  },
+  "id": "d01d0a57f104e341a841f68ed7b6db24e63d2e74b492e844b41de775fc64059c"
+}

@@ -1,0 +1,11 @@
+{
+  "chainId": "chain-1",
+  "delegatorSubject": "delegator-subject",
+  "expiresAt": 2000,
+  "issuedAt": 1000,
+  "originSubject": "origin-subject",
+  "parentReceiptId": "rc-parent-1",
+  "parentRequestId": "req-parent-1",
+  "signer": "98fdf038a97cc02eda9da66c1a3af90c70fc7ef3529cba59c76bd1e10d0f0874",
+  "subject": "9b19e6f1192ea1148ac2c2c8c305b672b6b850de26d1d749e298167ce692f384"
+}

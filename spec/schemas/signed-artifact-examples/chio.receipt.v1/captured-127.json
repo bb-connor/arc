@@ -1,0 +1,58 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-01a182c6-43d0-76d6-acb8-20aa499e26c1",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel",
+      "reason": "execution nonce verification failed: execution nonce binding mismatch on field request_id; pre-dispatch cleanup could not be confirmed: budget store error: failed to prepare budget store directory: reverse acknowledgement lost",
+      "verdict": "deny"
+    },
+    "kernel_key": "6ec3364d22565942ad37648b489fa0ac17b8ecd62f1edcb0f67a3fdfeb276992",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "6ec3364d22565942ad37648b489fa0ac17b8ecd62f1edcb0f67a3fdfeb276992",
+        "subject_key": "579b237e43d4a1f563c682b329a61604f4cf8d6d4584fd4794391ebb2b2b136b"
+      },
+      "budget_authority": {
+        "admission_may_be_retained": true,
+        "admission_release_unconfirmed": true,
+        "cleanup_attempt_event_id": null,
+        "cleanup_attempt_event_id_available": false,
+        "cleanup_capability_id": "cap-01a182c6-43d0-76d6-acb8-20aa499e26c1",
+        "cleanup_custody": null,
+        "cleanup_grant_index": 0,
+        "cleanup_hold_id": null,
+        "cleanup_mutation_kind": "invocation",
+        "cleanup_retains_prior_hold": false,
+        "pre_dispatch_cleanup_unconfirmed": true
+      },
+      "chio_kernel": {
+        "rejection_code": "urn:chio:error:kernel:execution-nonce-binding"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182c6-460c-73f2-9a37-0e5af3d4244f",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "request_id": "req-nonmonetary-cleanup-top",
+        "request_namespace_digest": "aeaaddc9d5a8f125d6cacc173611d738a76b363064ac0b32db6412c4a220a5d3"
+      }
+    },
+    "policy_hash": "test-policy-hash",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195394,
+    "tool_name": "read_file",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-a",
+    "trust_level": "mediated"
+  },
+  "id": "4b8f044966b6ce29bf0dec2f95761bad9e2a95d607cd559936035a4c65b4a367"
+}

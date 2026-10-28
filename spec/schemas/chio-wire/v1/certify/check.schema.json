@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/certify/check.schema.json",
+  "title": "Chio certify check signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkedAt",
+    "criteria",
+    "criteriaProfile",
+    "evidence",
+    "findings",
+    "schema",
+    "summary",
+    "target",
+    "verdict"
+  ],
+  "properties": {
+    "checkedAt": {
+      "type": "integer"
+    },
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "id",
+          "status"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "criteriaProfile": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceProfile",
+        "generatedReportBytes",
+        "generatedReportMediaType",
+        "generatedReportSha256",
+        "normalizedResultsSha256",
+        "normalizedScenariosSha256",
+        "provenanceMode",
+        "resultsDir",
+        "scenariosDir"
+      ],
+      "properties": {
+        "evidenceProfile": {
+          "type": "string"
+        },
+        "generatedReportBytes": {
+          "type": "integer"
+        },
+        "generatedReportMediaType": {
+          "type": "string"
+        },
+        "generatedReportSha256": {
+          "type": "string"
+        },
+        "normalizedResultsSha256": {
+          "type": "string"
+        },
+        "normalizedScenariosSha256": {
+          "type": "string"
+        },
+        "provenanceMode": {
+          "type": "string"
+        },
+        "resultsDir": {
+          "type": "string"
+        },
+        "scenariosDir": {
+          "type": "string"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "message"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.certify.check.v1"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluatedPeerCount",
+        "failCount",
+        "missingScenariosCount",
+        "passCount",
+        "resultCount",
+        "scenarioCount",
+        "skippedCount",
+        "unknownResultsCount",
+        "unsupportedCount",
+        "xfailCount"
+      ],
+      "properties": {
+        "evaluatedPeerCount": {
+          "type": "integer"
+        },
+        "failCount": {
+          "type": "integer"
+        },
+        "missingScenariosCount": {
+          "type": "integer"
+        },
+        "passCount": {
+          "type": "integer"
+        },
+        "resultCount": {
+          "type": "integer"
+        },
+        "scenarioCount": {
+          "type": "integer"
+        },
+        "skippedCount": {
+          "type": "integer"
+        },
+        "unknownResultsCount": {
+          "type": "integer"
+        },
+        "unsupportedCount": {
+          "type": "integer"
+        },
+        "xfailCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toolServerId"
+      ],
+      "properties": {
+        "toolServerId": {
+          "type": "string"
+        },
+        "toolServerName": {
+          "type": "string"
+        }
+      }
+    },
+    "verdict": {
+      "type": "string"
+    }
+  }
+}

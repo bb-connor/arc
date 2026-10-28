@@ -1,0 +1,96 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "5e3c4f61f160d4620fbfb9b52be44bd25b77f72fe748a19218fb9c3edc2e4ffb",
+      "parameters": {
+        "authorization_correlation_id": "auth-correlation-session-2",
+        "authorization_parameter_hash": "test-authorization-parameter-hash",
+        "command": "cargo",
+        "operation": "terminal",
+        "operation_payload": {
+          "args": [
+            "test"
+          ],
+          "command": "cargo",
+          "sessionId": "session-2",
+          "toolCallId": "call-terminal-checker"
+        },
+        "resource": "cargo",
+        "session_id": "session-2",
+        "tool_call_id": "call-terminal-checker"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-terminal/create-1793186784",
+    "content_hash": "eedd8d7cb40245b058949be8bb9ad635d9fa31340e06fbe1c190329f6a12b407",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "7161594c7ed30001ce5d16023d3aaab58824dbfbd1c4c2a2a21e11488ea8decf",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "7161594c7ed30001ce5d16023d3aaab58824dbfbd1c4c2a2a21e11488ea8decf",
+        "subject_key": "d2dd6c67fa37bfc4a54ee37cd2ae13680cadd637d518e6f0ea301cfccde028a6"
+      },
+      "chio_manifest_security_v1": {
+        "effective_egress": false,
+        "flow": null,
+        "manifest_digest": "521b46bf59e9b78bdc86420be989984ed49b7685e45261cdd361044d6ed86bd5",
+        "server_id": "proxy-server",
+        "tool_name": "terminal/create"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a18243-5a10-70f1-a3db-03c556aa8e0b",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a18243-5a04-7283-ba7e-98f6c3b1dc98",
+        "request_id": "acp-live-guard-2ed41c17d9cc9f12ca3ae63627903157f112051f9137ef04b6acc065d5cac64c",
+        "request_namespace_digest": "05c9d7f9d69e59b128867975a024a02b71d012d2141a409b7ffbffef160d48b1"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "acp",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "958ad333833c8ac7a0527734c20db9b6f1de965beaf5eca6edda8f28d0746382",
+        "selectedProtocols": [
+          "acp",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "acp"
+      },
+      "source_receipt_context": {
+        "authorization_correlation_id": "auth-correlation-session-2",
+        "authorization_parameter_hash": "test-authorization-parameter-hash",
+        "operation": "terminal",
+        "request_id": "acp-live-guard-2ed41c17d9cc9f12ca3ae63627903157f112051f9137ef04b6acc065d5cac64c",
+        "resource": "cargo",
+        "session_id": "session-2",
+        "tool_call_id": "call-terminal-checker"
+      }
+    },
+    "policy_hash": "policy-acp-proxy-test",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793186814,
+    "tool_name": "terminal/create",
+    "tool_origin": "caller_executed",
+    "tool_server": "proxy-server",
+    "trust_level": "mediated"
+  },
+  "id": "3a3f81840319bfbd4e892cc56c838949d1ede3533365ec4d022a2d690d0704e2"
+}

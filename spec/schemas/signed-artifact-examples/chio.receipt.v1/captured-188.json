@@ -1,0 +1,29 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "parameters": {}
+    },
+    "boundary_class": "advisory_only",
+    "capability_id": "cap-durable-revoked",
+    "content_hash": "17971c545671bf18f4436cef32ad6608488df4973e71203fa0c8984903d64568",
+    "kernel_key": "b9c44259502c6b9fb3377d673c34c877d23f04fe61b87521a6198ba2611e5e55",
+    "metadata": {
+      "advisory_check_outcome": "capability_revoked",
+      "chio_receipt_signing_nonce": "01a18248-a327-7962-a0c5-a9fd73935408",
+      "evaluation_kind": "sidecar_tool_call_advisory",
+      "execution_nonce": "not_minted",
+      "limitation": "advisory evaluation is explicitly non-authoritative; kernel-mediated tool-call authorization is available at /v1/evaluate. This receipt records cap-revocation and parameter-hash checks only and must not be treated as kernel-mediated authorization."
+    },
+    "observation_outcome": "dropped",
+    "policy_hash": "8e448e2424b2c062da320311aa5b52a8b22119df5f1b6465ee7cfc7245997e58",
+    "receipt_kind": "advisory_evaluation",
+    "redaction_mode": "none",
+    "timestamp": 1793187160,
+    "tool_name": "read",
+    "tool_origin": "host_executed_unmediated",
+    "tool_server": "fs",
+    "trust_level": "advisory"
+  },
+  "id": "4cb50f9e69aede98f584b5058040d825215ec6590cd127452081b16b4715498a"
+}

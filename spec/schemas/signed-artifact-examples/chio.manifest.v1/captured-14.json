@@ -1,0 +1,24 @@
+{
+  "description": "Approval test",
+  "name": "Approval Server",
+  "public_key": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+  "schema": "chio.manifest.v1",
+  "server_id": "approval-srv",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": false,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Read secret",
+      "input_schema": {
+        "type": "object",
+        "x-chio-approval-required": true
+      },
+      "name": "read_secret"
+    }
+  ],
+  "version": "1.0.0"
+}

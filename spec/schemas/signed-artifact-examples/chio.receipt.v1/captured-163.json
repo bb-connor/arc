@@ -1,0 +1,34 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "aac280fc229f6651f8302a835801a4c457c3fbe3e6b93496f03c037c381054aa",
+      "parameters": {
+        "evidence_id": "active_defense_evidence_7f2915a6041cdbc5da6f9ceefd8444c9a1e1d795fbea6dfb57e54ef4915344d8",
+        "kind": "correlated_finding",
+        "transition_id": "transition-finding-native-001"
+      }
+    },
+    "boundary_class": "detect_only",
+    "capability_id": "chio.active-defense.system",
+    "content_hash": "2eb1bffb3667bf07273346cdc0046bb2380bc9b1bcc06e2dab6e776729422b7a",
+    "kernel_key": "c050c5637a44fa8629fff3cccce2300cb362a63d99d95fc54145266f4332445a",
+    "metadata": {
+      "active_defense_body": {
+        "malformed": true
+      },
+      "active_defense_evidence_id": "active_defense_evidence_7f2915a6041cdbc5da6f9ceefd8444c9a1e1d795fbea6dfb57e54ef4915344d8",
+      "occurred_at_unix_ms": 1700000000123
+    },
+    "observation_outcome": "observed",
+    "policy_hash": "0101010101010101010101010101010101010101010101010101010101010101",
+    "receipt_kind": "trace_observation",
+    "redaction_mode": "redacted",
+    "tenant_id": "tenant-native",
+    "timestamp": 1700000000,
+    "tool_name": "correlated_finding",
+    "tool_origin": "chio_internal",
+    "tool_server": "chio.kernel",
+    "trust_level": "verified"
+  },
+  "id": "de43837426bf832db412ffd2e4303647f5074d57cdbaefb0ea7cafed1c7b71e8"
+}

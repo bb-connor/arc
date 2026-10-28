@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/witness-statement.schema.json",
+  "title": "Chio key log witness statement signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpoint_hash",
+    "schema"
+  ],
+  "properties": {
+    "checkpoint_hash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.key-log.witness-statement.v1"
+    }
+  }
+}

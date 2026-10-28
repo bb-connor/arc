@@ -77,9 +77,7 @@ fn web3_settlement_registry_accepts_v1_and_refuses_v2() {
 #[test]
 fn economic_continuity_schemas_are_registered() {
     for (schema, artifact_kind) in [
-        ("chio.economy.resource-head.v1", "economic_resource_head"),
         ("chio.economy.state-batch.v1", "economic_state_batch"),
-        ("chio.economy.effect-slot.v1", "economic_effect_slot"),
         ("chio.economy.anchor-view.v1", "economic_state_anchor_view"),
         (
             "chio.economy.effect-dispatch-commit.v1",

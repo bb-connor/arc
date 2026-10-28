@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/signed-watermark-envelope.schema.json",
+  "title": "Chio signed watermark envelope signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application_id",
+    "encoding",
+    "expires_at_unix_ms",
+    "issued_at_unix_ms",
+    "key_id",
+    "marker_ref",
+    "sequence",
+    "session_id",
+    "source_receipt_id",
+    "tenant_id",
+    "tool_id"
+  ],
+  "properties": {
+    "application_id": {
+      "type": "string"
+    },
+    "encoding": {
+      "type": "string"
+    },
+    "expires_at_unix_ms": {
+      "type": "integer"
+    },
+    "issued_at_unix_ms": {
+      "type": "integer"
+    },
+    "key_id": {
+      "type": "string"
+    },
+    "marker_ref": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "source_receipt_id": {
+      "type": "string"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "tool_id": {
+      "type": "string"
+    }
+  }
+}

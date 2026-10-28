@@ -1,0 +1,16 @@
+{
+  "authorityId": "kernel-1",
+  "authorityKeyEpoch": 6,
+  "eligibilityDigest": "8d2e3b34566f44d35b57399dcfed9f83daf6eb3405ad2edca57a7f9ceb107035",
+  "expiresAtUnixMs": 1800,
+  "finalOutputDigest": "f8e47492019d9c323180e4e193315b4ab6b96a74ae7761db3ffcf126108abd6d",
+  "issuedAtUnixMs": 1300,
+  "postGuardEvidenceDigest": "43955ec21bb59d6c169de3faffc0d59bca8ca41a942936ab86f7a3275e68d00b",
+  "postGuardPolicyDigest": "19861b1dc91993f6a76dfb11e9bcadea5736d3f94a05d91d9be885115ce35afd",
+  "provenanceClass": "provider",
+  "provenanceId": "b1c6da11a6987c5924e252eee68fd65ffc32bc073df23f1a8485d30257c1e938",
+  "providerAcceptanceDigest": "43d810149c113c91cb4a46f74f63b69c42f64b1640a647f91c6d2f5af0000a4c",
+  "providerOutputDigest": "f8e47492019d9c323180e4e193315b4ab6b96a74ae7761db3ffcf126108abd6d",
+  "requestId": "req-outcome-1",
+  "schema": "chio.outcome.output-provenance.v1"
+}

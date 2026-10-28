@@ -1,0 +1,116 @@
+{
+  "appraisal": {
+    "adapter": "azure_maa",
+    "artifact": {
+      "claims": {
+        "normalizedAssertions": {
+          "attestationType": "sgx",
+          "runtimeIdentity": "spiffe://chio/runtime/caller"
+        },
+        "normalizedClaims": [
+          {
+            "category": "platform",
+            "code": "attestation_type",
+            "confidence": "derived",
+            "freshness": "evidence_window",
+            "provenance": "vendor_claims",
+            "value": "sgx"
+          },
+          {
+            "category": "identity",
+            "code": "runtime_identity",
+            "confidence": "derived",
+            "freshness": "evidence_window",
+            "provenance": "evidence_envelope",
+            "value": "spiffe://chio/runtime/caller"
+          }
+        ],
+        "vendorClaims": {
+          "attestationType": "sgx"
+        }
+      },
+      "evidence": {
+        "evidenceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expiresAt": 1793192250,
+        "issuedAt": 1793191945,
+        "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+        "verifier": "https://maa.contoso.test"
+      },
+      "policy": {
+        "effectiveTier": "none",
+        "reasonCodes": [
+          "policy_rejected"
+        ],
+        "reasons": [
+          {
+            "code": "policy_rejected",
+            "description": "Local Chio policy rejected the appraisal outcome or prevented trust widening.",
+            "disposition": "deny",
+            "group": "policy"
+          }
+        ],
+        "verdict": "rejected"
+      },
+      "schema": "chio.runtime-attestation.appraisal-artifact.v1",
+      "verifier": {
+        "adapter": "azure_maa",
+        "verifierFamily": "azure_maa"
+      }
+    },
+    "effectiveTier": "none",
+    "evidence": {
+      "evidenceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expiresAt": 1793192250,
+      "issuedAt": 1793191945,
+      "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+      "verifier": "https://maa.contoso.test"
+    },
+    "normalizedAssertions": {
+      "attestationType": "sgx",
+      "runtimeIdentity": "spiffe://chio/runtime/caller"
+    },
+    "normalizedClaims": [
+      {
+        "category": "platform",
+        "code": "attestation_type",
+        "confidence": "derived",
+        "freshness": "evidence_window",
+        "provenance": "vendor_claims",
+        "value": "sgx"
+      },
+      {
+        "category": "identity",
+        "code": "runtime_identity",
+        "confidence": "derived",
+        "freshness": "evidence_window",
+        "provenance": "evidence_envelope",
+        "value": "spiffe://chio/runtime/caller"
+      }
+    ],
+    "reasonCodes": [
+      "policy_rejected"
+    ],
+    "reasons": [
+      {
+        "code": "policy_rejected",
+        "description": "Local Chio policy rejected the appraisal outcome or prevented trust widening.",
+        "disposition": "deny",
+        "group": "policy"
+      }
+    ],
+    "schema": "chio.runtime-attestation.appraisal.v1",
+    "vendorClaims": {
+      "attestationType": "sgx"
+    },
+    "verdict": "rejected",
+    "verifierFamily": "azure_maa"
+  },
+  "generatedAt": 1793191950,
+  "policyOutcome": {
+    "accepted": false,
+    "effectiveTier": "none",
+    "reason": "runtime attestation evidence is not authenticated by a pinned authority",
+    "trustPolicyConfigured": true
+  },
+  "schema": "chio.runtime-attestation.appraisal-report.v1"
+}

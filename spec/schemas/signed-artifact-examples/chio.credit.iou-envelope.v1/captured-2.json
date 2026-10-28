@@ -1,0 +1,13 @@
+{
+  "amount_units": 772,
+  "capability_id": "cap",
+  "currency": "GBP",
+  "iou_id": "iou-9d2c00f96d69bfb9b986bb68019bfaaf",
+  "issuer_key": "217d01ebbee669f70ea67afbf2c31548bfc0a9600cffaeb15c386e36213d181f",
+  "receipt_id": "a2bf01050ab1dcf888075bfcf982ce518c05ce29862f867291d0561a6b8ae268",
+  "receipt_timestamp": 1763601668,
+  "schema": "chio.credit.iou-envelope.v1",
+  "tenant_id": "cvc",
+  "tool_name": "tool",
+  "tool_server": "srv"
+}

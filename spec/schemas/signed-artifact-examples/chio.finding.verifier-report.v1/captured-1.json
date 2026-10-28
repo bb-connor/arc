@@ -1,0 +1,101 @@
+{
+  "backing_allocation_id": "7878787878787878787878787878787878787878787878787878787878787878",
+  "evaluation_time": 1784880030,
+  "facets": [
+    {
+      "facet": "artifact_integrity",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "receipt_authenticity",
+      "outcome": "unavailable",
+      "reason": "evidence was not supplied"
+    },
+    {
+      "facet": "checkpoint_membership",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "kernel_and_revocation_trust",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "issuer_lineage",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "recipe_binding",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "intent_binding",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "metered_exposure_backing",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "settled_spend_backing",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "runtime_assurance_backing",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "bond_backing",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "status_liveness",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    },
+    {
+      "facet": "guarantee_consistency",
+      "outcome": "verified",
+      "reason": "independently verified for the bounded cognition-market profile"
+    }
+  ],
+  "finding_artifact_sha256": "d101f9c2e89d393303a749d016f840c8467c612a12c600f67fdd49472ce47c33",
+  "finding_delivery": {
+    "accepted_bid_envelope_sha256": "abababababababababababababababababababababababababababababababab",
+    "authoritative_payment_operation_id": "724bc9b64279a6bad720d9266d85a3a030ee7e17038d502727ab8ec63dbb1d85",
+    "digest_check": "matched",
+    "finding_id": "f99f7cc2e50d9394985fe458bd204d408b6825ad9b4e955ec8c196833daa0522",
+    "listing_id": "listing-qualified-transaction",
+    "media_type_check": "matched",
+    "purchase_intent_id": "4042de0b6c508ca5d69cb8ecf669ccc668b572b981eb275a7295d4e6b28932c6",
+    "reservation_id": "reservation-qualified-transaction",
+    "schema": "chio.finding.delivery.v1",
+    "settlement_mode": "local_reversible_hold",
+    "transform_profile": "identity",
+    "venue_admission_envelope_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+  },
+  "finding_delivery_receipt_id": "8989898989898989898989898989898989898989898989898989898989898989",
+  "finding_id": "f99f7cc2e50d9394985fe458bd204d408b6825ad9b4e955ec8c196833daa0522",
+  "replay_recipe_input_sha256": "acaa34e5f666736cdbd7eb890334885e228640e56a7ebd0a388896f37c182121",
+  "report_id": "809765fa6facb56d2159ee25d4bb94475bb4d4572858c73e7811274d4905221f",
+  "resolved_evidence_bundle_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+  "resolver_policy_sha256": "5656565656565656565656565656565656565656565656565656565656565656",
+  "schema": "chio.finding.verifier-report.v1",
+  "status_proof_input_sha256": "f59153f01ef45ad21b84424304dd3d6e6e6e036370ad526b5596da3e7658cd5e",
+  "trust_root_snapshot_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
+  "trusted_time_input_sha256": "6767676767676767676767676767676767676767676767676767676767676767",
+  "verifier_authority": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+  "verifier_implementation_id": "chio-finding-verifier/0.1-qualified",
+  "verifier_key_epoch": 1,
+  "verifier_profile_envelope_sha256": "c39ee55e9f6745e4cd067ef7acc5b226eabcfb247ac202ef6eaeba6d782a6760",
+  "verifier_profile_id": "6a8cdc2f9c475ad1fb3f77633495256171650372a5247f6dfd7eb2f1d1338d63"
+}

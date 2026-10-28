@@ -1,0 +1,33 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "be9385efd69e782c6fd3be7e3e21c2e2d0297095a0c435d3bf2772315b74db69",
+      "parameters": {
+        "input_bundle_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "parameters_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "phase": "baseline",
+        "pre_run_template_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "recipe_sha256": "33c36e926e14e30141219f74d07adb78bd6fe9e7379614b377672094cf8b84e7",
+        "replay_run_id": "replay-run-42",
+        "runner_manifest_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+        "verifier_profile_envelope_sha256": "9ba709be18827f079e708476b7c79465c9280c64391cedee1e376d26febc4dce"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-1746000000",
+    "content_hash": "3044d6088d5154bf00a4630eab681de906cb2ca3d61d222740ed3b6c20a0e587",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+    "policy_hash": "policy-finding-market",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1746000000,
+    "tool_name": "finding.replay",
+    "tool_origin": "caller_executed",
+    "tool_server": "finding-server",
+    "trust_level": "mediated"
+  },
+  "id": "2efb5fa8f98c2cd764ffbcf81e2ffe2892ded1b8bf41ba065a50187577ade0ee"
+}

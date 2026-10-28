@@ -1,0 +1,11 @@
+{
+  "generated_at": 1749999980,
+  "listing_envelope_sha256": "bcd161b8d424068db68dba7bd9152c7af292397a922663ef1774205021e8ec62",
+  "listing_id": "listing-finding-admitted-0001",
+  "max_age_secs": 300,
+  "namespace": "https://registry.seller.example",
+  "pricing_hint_envelope_sha256": "2fa1bdac0832a75368c3c9e6d5097a6616ec6538c2857521eda32df2d30360ff",
+  "registry_operator_id": "seller-operator",
+  "schema": "chio.finding.current-listing-assertion.v1",
+  "valid_until": 1900000000
+}

@@ -1,0 +1,8 @@
+{
+  "expiresAt": 1700100000,
+  "issuedAt": 1700000000,
+  "issuer": "a7a9de8843f966e9a784206bb681984b1100e4919cad1834358c4d0362cc7f63",
+  "payloadCanonicalBytes": "",
+  "schema": "chio.portable-agent-passport.v1",
+  "subject": "did:chio:agent-mobile"
+}

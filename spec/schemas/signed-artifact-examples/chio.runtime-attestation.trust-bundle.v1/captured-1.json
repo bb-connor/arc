@@ -1,0 +1,52 @@
+{
+  "bundleId": "bundle-1",
+  "descriptors": [
+    {
+      "body": {
+        "adapter": "azure_maa",
+        "appraisalArtifactSchema": "chio.runtime-attestation.appraisal-artifact.v1",
+        "appraisalResultSchema": "chio.runtime-attestation.appraisal-result.v1",
+        "attestationSchemas": [
+          "chio.runtime-attestation.azure-maa.jwt.v1"
+        ],
+        "descriptorId": "azure-prod",
+        "expiresAt": 300,
+        "issuedAt": 100,
+        "referenceValuesUri": "https://maa.contoso.test/reference-values",
+        "schema": "chio.runtime-attestation.verifier-descriptor.v1",
+        "signingKeyFingerprints": [
+          "sha256:azure-key-1"
+        ],
+        "verifier": "https://maa.contoso.test",
+        "verifierFamily": "azure_maa"
+      },
+      "signature": "1de20660361661ca243f5473b1380d6c96cb55c4d7e634a11c07a017b2ef0a04a7a7b0f2fcd2ce3dc6566fee49e3771dd2ff1cb446fd2b4a3ba1c488af84830e",
+      "signerKey": "a5c939ae5d5dd3c1aad9123df0c12966b94116a4e1fb4385d45184c780ca4c10"
+    }
+  ],
+  "expiresAt": 300,
+  "issuedAt": 100,
+  "publisher": "https://trust.contoso.test",
+  "referenceValues": [
+    {
+      "body": {
+        "attestationSchema": "chio.runtime-attestation.azure-maa.jwt.v1",
+        "descriptorId": "azure-prod",
+        "expiresAt": 300,
+        "issuedAt": 100,
+        "measurements": {
+          "mrEnclave": "abc123"
+        },
+        "referenceValueId": "azure-rv-1",
+        "schema": "chio.runtime-attestation.reference-values.v1",
+        "sourceUri": "https://maa.contoso.test/reference-values/1",
+        "state": "active",
+        "verifierFamily": "azure_maa"
+      },
+      "signature": "87703ad7f4ac98e7914a6a1059eed9f7bed1bcc786170016af064c005c60683a24404c06877295ea500ef25a4d184d8364505be583ec0e3d84e44e17863d6e06",
+      "signerKey": "a5c939ae5d5dd3c1aad9123df0c12966b94116a4e1fb4385d45184c780ca4c10"
+    }
+  ],
+  "schema": "chio.runtime-attestation.trust-bundle.v1",
+  "version": 1
+}

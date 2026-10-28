@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-legal-hold.schema.json",
+  "title": "Chio finding hosted legal hold signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "createdAt",
+    "holdId",
+    "previousHoldEventSha256",
+    "schema",
+    "target",
+    "tenantId"
+  ],
+  "properties": {
+    "action": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "holdId": {
+      "type": "string"
+    },
+    "previousHoldEventSha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "schema": {
+      "const": "chio.finding.hosted-legal-hold.v1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceFamily",
+        "resourceId",
+        "resourceKind",
+        "resourceRevision",
+        "resourceSha256"
+      ],
+      "properties": {
+        "resourceFamily": {
+          "type": "string"
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "resourceKind": {
+          "type": "string"
+        },
+        "resourceRevision": {
+          "type": "integer"
+        },
+        "resourceSha256": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

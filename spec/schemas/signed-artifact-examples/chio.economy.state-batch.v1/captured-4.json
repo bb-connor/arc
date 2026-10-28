@@ -1,0 +1,99 @@
+{
+  "anchorId": "anchor-1",
+  "batchId": "c112b138e2b7826a884646bc2f9ccada4b8b97fbcf5c0f6a6fb45dee83dc176a",
+  "checkpointSequence": 2,
+  "effectSlots": [],
+  "expectedHeadsRoot": "ab604b8e16ec8e20bbf4304d70cb4704c2bb5f3b9810277204a3b87d65985cec",
+  "issuedAt": 902,
+  "namespace": "economy-prod",
+  "nextHeadsRoot": "b32c88cc91e276cc21ece456c17113d36fd54ddc42aaaa65e9fe68f975bd0759",
+  "operationId": "04338b01bf53c79f6df9029b59b461777599a2a0363ef6e6ac7e10d266d24ae3",
+  "previousCheckpointDigest": "a024398b9672844d656025705196d8b8fd3067c8edcc87c5362a7a15e90b8b35",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1",
+  "transitions": [
+    {
+      "expectedHeadDigest": "6439235a1a8818fd9a5c861c66715702d93a0a9b568a75306b6e742412a34424",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "effectIdempotencyKey": "fe22a81df72be52ec4c875e2cacf6ad20f59c90822193051ad067e2094bb99ad",
+        "headVersion": 2,
+        "lifecycleFence": 2,
+        "lifecycleState": "no_effect",
+        "namespace": "economy-prod",
+        "operationId": "04338b01bf53c79f6df9029b59b461777599a2a0363ef6e6ac7e10d266d24ae3",
+        "predecessorDigest": "6439235a1a8818fd9a5c861c66715702d93a0a9b568a75306b6e742412a34424",
+        "resourceKey": {
+          "resourceFamily": "effect_slot",
+          "resourceId": "0b219501a5c79a83d8c36258359ced2657b4a15eaad71ded67bcaf7bbdd9c9f3",
+          "scopeId": "local-system"
+        },
+        "resourceVersion": 2,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "actionDigest": "69ebd19601fbf6923039881a9f01fe1fa4b927f0dc30b648ef1a52eeeca8622b",
+            "admissionHandoff": {
+              "lifecycleFence": 7,
+              "operationVersion": 3,
+              "state": "mutation_submitted",
+              "storeFence": {
+                "lease_id": "store-lease-1",
+                "owner_epoch": 9,
+                "store_uuid": "store-1"
+              }
+            },
+            "anchorId": "anchor-1",
+            "effectKind": "tool_dispatch",
+            "idempotencyKey": "fe22a81df72be52ec4c875e2cacf6ad20f59c90822193051ad067e2094bb99ad",
+            "namespace": "economy-prod",
+            "operationId": "04338b01bf53c79f6df9029b59b461777599a2a0363ef6e6ac7e10d266d24ae3",
+            "parametersDigest": "908a3e38ca5b410dd7b397ee93d886167771c1b8158bdd3edd26435e0b677b8f",
+            "request": {
+              "requestBindingDigest": "00097c5c3d2c983b6ed94742d7f88aff84424a3cacae1e429f76b3169e221de4",
+              "requestId": "request-mutation-cancellation",
+              "requestNamespaceDigest": "abc7ce88257cc324df102e65ca0689c080fa9176a3efe39cf9e2a3a3d3b258ad"
+            },
+            "resourceHeadDigest": "221e54bbe2cd0501e76420f3c2482cf1e313079a6fcc7df7d480faee8305a5fc",
+            "resourceKey": {
+              "resourceFamily": "tool_dispatch",
+              "resourceId": "04338b01bf53c79f6df9029b59b461777599a2a0363ef6e6ac7e10d266d24ae3",
+              "scopeId": "local-system"
+            },
+            "schema": "chio.economy.effect-slot.v1",
+            "slotId": "0b219501a5c79a83d8c36258359ced2657b4a15eaad71ded67bcaf7bbdd9c9f3",
+            "state": "no_effect",
+            "target": {
+              "qualificationDigest": "62360f1abab15f9a3650d9629d051bd03b36b65b97d31b501ce804046dc9276e",
+              "targetId": "economic-mutation-participant",
+              "targetKeyEpoch": 1
+            },
+            "terminal": {
+              "kind": "permanently_not_applied",
+              "outcome": "no_effect",
+              "proof": {
+                "storage": "inline",
+                "value": {
+                  "notAccepted": true
+                }
+              },
+              "proof_digest": "dc1794e6e53c3ecee38cd82cda277b88f2d80ea11b20e3016069816a389f194a",
+              "proof_id": "economic-cancellation-1"
+            }
+          }
+        },
+        "stateDigest": "3500bc0470c8498c8594dcc2b9023f1ce105df7b05c4da9506116c6104adff01",
+        "trustedClockHighWater": 902
+      },
+      "resourceKey": {
+        "resourceFamily": "effect_slot",
+        "resourceId": "0b219501a5c79a83d8c36258359ced2657b4a15eaad71ded67bcaf7bbdd9c9f3",
+        "scopeId": "local-system"
+      },
+      "transitionProofDigest": "bfb1f6e0629e4a8998aaf920fcc04d4bdd0b9268b6585ea01afb4539f57a8fbb"
+    }
+  ]
+}

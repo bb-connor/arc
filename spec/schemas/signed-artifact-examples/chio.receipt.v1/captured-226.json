@@ -1,0 +1,39 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "8fd701ceab399bd09faacbcd04e5f34cf436202fbeddc93db4e381fc0559c8bd",
+      "parameters": {
+        "_9os3v": false,
+        "tf57t": true,
+        "zh": null
+      }
+    },
+    "actor_chain": [
+      {
+        "actor_id": "agent:diff-test/encoder",
+        "actor_kind": "agent"
+      }
+    ],
+    "boundary_class": "prevent",
+    "capability_id": "cap-e",
+    "content_hash": "ba9bfada0fd72b8749f0b5737b768001049409f127f1dabbc8145e1f0ddb2bb7",
+    "decision": {
+      "reason": ".wrT-BB\"<\\-KN]e{",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-2jm",
+      "surface": "receipt-encoding-diff"
+    },
+    "policy_hash": "policy-diff-v1",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1829241761,
+    "tool_name": "po_y",
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-i",
+    "trust_level": "mediated"
+  },
+  "id": "891e367c2e910a07785aa829a150e9fb06ed5231c91ac4064a80faf068aff545"
+}

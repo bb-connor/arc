@@ -1085,6 +1085,17 @@ mod tests {
             .contains(&UnderwritingReasonCode::MeteredBillingMismatch));
     }
 
+    #[test]
+    fn signed_artifact_capture_underwriting_policy_input() {
+        let keypair = crate::crypto::Keypair::from_seed(&[7; 32]);
+        let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(
+            sample_underwriting_input(1_743_379_200),
+            &keypair,
+        )
+        .unwrap();
+        assert!(signed.verify_signature(&keypair.public_key()).unwrap());
+    }
+
     fn sample_underwriting_input(generated_at: u64) -> UnderwritingPolicyInput {
         UnderwritingPolicyInput {
             schema: UNDERWRITING_POLICY_INPUT_SCHEMA.to_string(),

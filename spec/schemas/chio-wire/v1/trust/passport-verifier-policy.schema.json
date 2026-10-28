@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/passport-verifier-policy.schema.json",
+  "title": "Chio passport verifier policy signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "createdAt",
+    "expiresAt",
+    "policy",
+    "policyId",
+    "schema",
+    "signerPublicKey",
+    "verifier"
+  ],
+  "properties": {
+    "createdAt": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requireActiveLifecycle",
+        "requireCheckpointCoverage",
+        "requireEnterpriseIdentityProvenance",
+        "requireReceiptLogUrls"
+      ],
+      "properties": {
+        "minCompositeScore": {
+          "type": "number"
+        },
+        "minReceiptCount": {
+          "type": "integer"
+        },
+        "requireActiveLifecycle": {
+          "type": "boolean"
+        },
+        "requireCheckpointCoverage": {
+          "type": "boolean"
+        },
+        "requireEnterpriseIdentityProvenance": {
+          "type": "boolean"
+        },
+        "requireReceiptLogUrls": {
+          "type": "boolean"
+        }
+      }
+    },
+    "policyId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.passport-verifier-policy.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    }
+  }
+}

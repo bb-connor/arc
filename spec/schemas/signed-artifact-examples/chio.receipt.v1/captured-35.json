@@ -1,0 +1,48 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "e2746c31450f77cf4ad669e236750dddb55d5866e1195b97958b8f5db9fc30b3",
+      "parameters": {
+        "operation_id": "3156c89e38bdb8e7c718eac147d8cc35e14ed6758a7ba990305d2f1de1f6569d",
+        "request_binding_hash": "888c22c63fc1117f56429247eef87d672795bb5d6ee3d0c14b9cd45796728904",
+        "terminal_state": "compensated_before_dispatch"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "compensated-operator",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "guard": "kernel.admission_compensation",
+      "reason": "compensated before dispatch",
+      "verdict": "deny"
+    },
+    "kernel_key": "9aa7cb8ab07013d987452e7f80a11be12c78ada510a56f743c85f08a716b0c25",
+    "metadata": {
+      "chio_receipt_signing_nonce": "rcpt-01a182c3-bd00-7182-9ee4-8a60ba2bc5c8",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "protocol_admission": {
+        "admission_operation": {
+          "dispatch_state": "not_started",
+          "last_error": "compensated before dispatch",
+          "operation_id": "3156c89e38bdb8e7c718eac147d8cc35e14ed6758a7ba990305d2f1de1f6569d",
+          "state": "compensated_before_dispatch",
+          "version": 2
+        }
+      },
+      "receipt_context": {
+        "request_id": "retained-2"
+      }
+    },
+    "policy_hash": "bf05809a71252651cde28fda95dd4543429e4deb390347030b5c1ad2932b08e9",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1793195228,
+    "tool_name": "admission_compensation",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio.kernel",
+    "trust_level": "mediated"
+  },
+  "id": "f6b5e9a5c4bb5d2729c3df985be73b84d38db42ae0c021c31226e4cfffa63986"
+}

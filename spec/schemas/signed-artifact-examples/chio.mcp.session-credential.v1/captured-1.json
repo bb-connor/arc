@@ -1,0 +1,18 @@
+{
+  "allowedTools": [
+    "write_file"
+  ],
+  "authModeFingerprint": "auth",
+  "capabilityIds": [
+    "capability"
+  ],
+  "endpointPath": "/mcp",
+  "expiresAt": 200,
+  "issuedAt": 100,
+  "policyFingerprint": "policy",
+  "schema": "chio.mcp.session-credential.v1",
+  "serverId": "fs",
+  "sessionId": "retained-session",
+  "subjectKey": "subject",
+  "tokenHash": "3449825b554ebfce5fb7f2c3a702338c1609115b361642fb33520a638bfe6fce"
+}

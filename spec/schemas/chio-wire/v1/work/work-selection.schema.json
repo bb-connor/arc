@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/work/work-selection.schema.json",
+  "title": "Chio work selection signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signer"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_hash",
+        "expected_revision",
+        "offer",
+        "request_id"
+      ],
+      "properties": {
+        "capability_hash": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "type": "integer"
+        },
+        "offer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature",
+            "signer"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "allocation_hash",
+                "arguments_hash",
+                "contract_hash",
+                "effect",
+                "expires_at",
+                "price_units",
+                "receiver",
+                "slot_id"
+              ],
+              "properties": {
+                "allocation_hash": {
+                  "type": "string"
+                },
+                "arguments_hash": {
+                  "type": "string"
+                },
+                "contract_hash": {
+                  "type": "string"
+                },
+                "effect": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "server",
+                    "tool"
+                  ],
+                  "properties": {
+                    "server": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "expires_at": {
+                  "type": "integer"
+                },
+                "price_units": {
+                  "type": "integer"
+                },
+                "receiver": {
+                  "type": "string"
+                },
+                "slot_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signer": {
+              "type": "string"
+            }
+          }
+        },
+        "request_id": {
+          "type": "string"
+        }
+      }
+    },
+    "signer": {
+      "type": "string"
+    }
+  }
+}

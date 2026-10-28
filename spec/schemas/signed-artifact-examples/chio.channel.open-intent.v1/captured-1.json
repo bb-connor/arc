@@ -1,0 +1,51 @@
+{
+  "body": {
+    "assetBinding": {
+      "chainId": "eip155:31337",
+      "currency": "USD",
+      "protocolMinorUnitDecimals": 2,
+      "schema": "chio.channel.asset-binding.v1",
+      "settlementPolicyDigest": "d052d33578e61b33d24db0d4e4473c6aeaded3ce012dbabf138b14d1e6f999cb",
+      "tokenAddress": "0x1111111111111111111111111111111111111111",
+      "tokenDecimals": 6,
+      "tokenSymbol": "USDC"
+    },
+    "bound": {
+      "currency": "USD",
+      "units": 150
+    },
+    "boundTokenBaseUnits": "1500000",
+    "channelExpiryUnixSecs": 1800,
+    "closeSubmissionCutoffUnixSecs": 1950,
+    "currency": "USD",
+    "disputeTierUpperBoundUnits": 1000,
+    "disputeWindowSecs": 100,
+    "escrowReference": {
+      "chainId": "eip155:31337",
+      "escrowContract": "0x5555555555555555555555555555555555555555",
+      "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b"
+    },
+    "finalityMode": "l1_finalized",
+    "fixedFinalityBroadcastMarginSecs": 50,
+    "fundingEvidenceDigest": "b23d69c23c5d216c2e19342fb846abd08714bfacc9b88eb641482b19771e9ced",
+    "openIntentId": "4280531c1580f4bf5f19c564d8c37df552135dfa2b5be04330915f8f176d144b",
+    "originalOperator": "0x4444444444444444444444444444444444444444",
+    "originalOperatorKeyHash": "0xc9736463f555cdb7d2a78cfd7aa8b8c4f09d906d78f8dab9228eda30a28c2818",
+    "originalWeb3DispatchDigest": "26ff8bed9abc6ad1c58656581bcb013b22f47bcb08b0ea8b9feeccaa440f56f8",
+    "participantSnapshotDigest": "4247731fb953c1050f279d3a676d0b6e962c965d3c1c7a92edf0e6af5040baaf",
+    "payeeBeneficiaryAddress": "0x3333333333333333333333333333333333333333",
+    "payeeId": "payee",
+    "payeeKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+    "payeeKeyEpoch": 3,
+    "payerId": "payer",
+    "payerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "payerKeyEpoch": 2,
+    "payerRefundAddress": "0x2222222222222222222222222222222222222222",
+    "requiredConfirmations": 12,
+    "schema": "chio.channel.open-intent.v1",
+    "settlementAuthorityScopeId": "channel-settlement"
+  },
+  "keyEpoch": 2,
+  "signerId": "payer",
+  "signerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+}

@@ -1,0 +1,22 @@
+{
+  "audit_authority": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "audit_epoch_id": "0960bb13d1522ce4864cb49fea8f237bb5415b13b50f14140a171316789adf2d",
+  "authorization_digest": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  "available_budget": {
+    "currency": "USD",
+    "units": 750000
+  },
+  "committed_at": 1750000000,
+  "eligible_listing_count": 128,
+  "eligible_snapshot_at": 1749999000,
+  "eligible_snapshot_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "epoch_index": 4,
+  "fee_schedule_envelope_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "published_rate_bps": 250,
+  "schema": "chio.finding.audit-epoch.v1",
+  "seed_commitment": "e16763312953095be27d1cd3ba5d078869b5909451799dbed455635aa61749a1",
+  "seed_witness": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+  "seed_witness_signature": "c32b5555bd8184d7299a4c62dfe3b508f4e4cbc0e35e71bc55ab7c75f48c6d20d506dc0428db20cb42f7917ad58e3a569fc7c32729abab4f965cb8f66da77509",
+  "seed_witnessed_at": 1749999500,
+  "selection_algorithm_id": "weighted-reservoir-v1"
+}

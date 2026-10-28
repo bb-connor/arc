@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/evidence-export-commitment.schema.json",
+  "title": "Chio evidence export commitment signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestSha256",
+    "payloadSha256",
+    "schema"
+  ],
+  "properties": {
+    "manifestSha256": {
+      "type": "string"
+    },
+    "payloadSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    }
+  }
+}

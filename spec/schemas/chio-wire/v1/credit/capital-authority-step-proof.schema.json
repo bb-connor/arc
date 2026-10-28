@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/capital-authority-step-proof.schema.json",
+  "title": "Chio credit capital authority step proof signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvedAt",
+    "expiresAt",
+    "principalId",
+    "role",
+    "schema"
+  ],
+  "properties": {
+    "approvedAt": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "principalId": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.credit.capital-authority-step-proof.v1"
+    }
+  }
+}

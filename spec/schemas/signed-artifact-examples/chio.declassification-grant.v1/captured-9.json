@@ -1,0 +1,14 @@
+{
+  "anchorDigest": "5f18be0ed4a8e3b5cf14bcfdb3eb1c096cce576baa61fd1b6b30c5dbf643c55d",
+  "change": {
+    "operation": "rotate",
+    "verifyUntil": 3702
+  },
+  "generation": 2,
+  "issuerSetDigest": "6959903f3c9e3372e41abee559166de885f07eca58506a7590744457b97f8fee",
+  "previousCommitment": "5f18be0ed4a8e3b5cf14bcfdb3eb1c096cce576baa61fd1b6b30c5dbf643c55d",
+  "publicKeyHex": "9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07",
+  "rotatedAt": 102,
+  "schema": "chio.authority-lifecycle.v1",
+  "streamId": "clock-policy"
+}

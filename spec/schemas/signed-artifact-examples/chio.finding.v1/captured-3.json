@@ -1,0 +1,25 @@
+{
+  "bond_ref": "bond:first",
+  "descriptor": {
+    "context_sha256": "a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e",
+    "outcome_class": "positive_result",
+    "topic": "canary:first"
+  },
+  "evidence_checkpoint_ref": "checkpoint:first",
+  "evidence_class": "asserted",
+  "evidence_cost": {
+    "currency": "USD",
+    "units": 0
+  },
+  "evidence_receipt_ids": [],
+  "expires_at": 2000003600,
+  "finding_id": "34a9b221ec2ff3b6901baed6205692edafa978b2b56943130c31b799b94adbe1",
+  "guarantee_class": "asserted",
+  "issued_at": 1999999999,
+  "issuer": "70df9e2279adbec6d12bf2921184c9222eb24ed852005bf640139f52e59cd9ae",
+  "payload_media_type": "application/json",
+  "payload_sha256": "1e335f596d50c91be247449b96053ae1896ce5afb8d4973fc5e4858ed5d7a684",
+  "schema": "chio.finding.v1",
+  "signature": "",
+  "status_feed_ref": "status:first"
+}

@@ -1,0 +1,23 @@
+{
+  "accepted_price": {
+    "currency": "USD",
+    "units": 4000
+  },
+  "authoritative_payment_operation_id": "recovery-payment-conflict",
+  "delivery_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+  "failed_delivery_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "finding_id": "1d0718644a8beaa372c089357ba060278c06076aa801b869c8848eb5300c98ab",
+  "payer": "0d7550754e0800a5d237eef5826035766b9b3e5a15868a940ab289958788e3b0",
+  "purchase_intent_id": "recovery-intent-conflict",
+  "realized_spend": {
+    "currency": "USD",
+    "units": 0
+  },
+  "recorded_at": 1793209487,
+  "request_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "reservation_id": "purchase-spend-release",
+  "result_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema": "chio.finding.purchase-result.v1",
+  "settlement": "released",
+  "verdict": "deny"
+}

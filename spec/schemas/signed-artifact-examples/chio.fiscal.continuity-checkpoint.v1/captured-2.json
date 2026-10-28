@@ -1,0 +1,54 @@
+{
+  "anchorId": "fiscal-anchor",
+  "anchorNamespace": "fiscal-main",
+  "checkpointId": "6fc817b98d587a253689e3986db74b68eeeffe590a74248eadc479fa7a5b7486",
+  "continuitySequence": 1,
+  "domains": [
+    {
+      "domain": "tier_limits",
+      "everActivated": false
+    },
+    {
+      "domain": "marketplace_discount_per_hundred",
+      "everActivated": false
+    },
+    {
+      "domain": "decision_premium_basis_points",
+      "everActivated": false
+    },
+    {
+      "active": {
+        "scheduleDigest": "164b170e6c8a4997f6984602935fd882a16ff97fcfdcc9b43c542279721f735e",
+        "scheduleId": "2063081889a93c429de4aed8930ef3b6e786f5970a4ab2a4a717ba4b25c3feb2",
+        "sequence": 1
+      },
+      "domain": "insurance_premium_schedule",
+      "everActivated": true,
+      "lastKnownGood": {
+        "scheduleDigest": "164b170e6c8a4997f6984602935fd882a16ff97fcfdcc9b43c542279721f735e",
+        "scheduleId": "2063081889a93c429de4aed8930ef3b6e786f5970a4ab2a4a717ba4b25c3feb2",
+        "sequence": 1
+      }
+    },
+    {
+      "domain": "open_market_fee_and_bond_schedule",
+      "everActivated": false
+    }
+  ],
+  "genesisPolicyDigest": "cae65af4fa2f86f8a31387454fce3e81923b2ebc836ee13735b533e4fe45be52",
+  "genesisPolicyId": "b567fc99500509c4f9e611958122520ee82212de4335a185bad0624e7316b41b",
+  "governingOperatorId": "operator.example",
+  "pinnedCharterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
+  "pinnedCharterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
+  "pinnedCharterSequence": 1,
+  "previousCheckpointDigest": "5f7e04c23e56141560f3073fbf3271d8f78310e9696d8264cb634916b76b0c1a",
+  "runtimeReadinessDigest": "90bbae37d5a49e80e336711b8847d5349d08ca74c53f7f774ae58521e10a3389",
+  "schema": "chio.fiscal.continuity-checkpoint.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "5c29b78f10a35a49a6231d08ee840a04bcc3a37a4f9d46df327dec56b8a9b7c9",
+  "stagedTransition": {
+    "transitionDigest": "18f84e3efd123fbaae96a642ae1abb769aee41de4c21b220918ec1d96714b542",
+    "transitionId": "085f6c9326213a60561e6c762e21514da4cfa1a42739d357f82d8e0ddf248d38"
+  },
+  "trustedClockHighWater": 70
+}

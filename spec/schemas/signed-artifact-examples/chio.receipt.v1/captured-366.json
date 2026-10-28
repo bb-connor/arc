@@ -1,0 +1,74 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "6fcb5a311f059fa24cc41929f783eb3ec2bb362d52af1423a7fdcfbee6fd0adb",
+      "parameters": {
+        "caller_identity_hash": "22981db4112c55888dcb29a9eaa46fbb69fc1020896d2a5776008fc39a3c567d",
+        "capability": {
+          "id": "capability"
+        },
+        "content_hash": "4ca265cd5c681f012e48a093f5a73fef3712e003d8fa3c59b299fb48722b765b",
+        "method": "POST",
+        "path": "/test",
+        "policy": "deny_by_default",
+        "route_pattern": "/test"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-00000001-86a0-7a75-94e1-85f94b2f5395",
+    "content_hash": "0b3443a9377c829f10dc4dbc281475c7bf89f141d56af637ad5c59b74d00b2ca",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "1e2a137c7fe2279f9d7f0644030a0e9c0b45f781dce71ae4519c0f4384031654",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "1e2a137c7fe2279f9d7f0644030a0e9c0b45f781dce71ae4519c0f4384031654",
+        "subject_key": "5d6bbec7c9170a80331f7525687e281d13a910fa9ebca004ba6f6bf1f5e10a3d"
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182be-608d-7722-b10c-54c76f7130cf",
+      "chio_runtime": {
+        "identity_disposition": "terminal"
+      },
+      "receipt_context": {
+        "evaluation_id": "01a182be-608b-74f2-ab6f-1571ab6d23cd",
+        "request_id": "original-input",
+        "request_namespace_digest": "5a50fc256053298b69b48d468d8b9d1f3a71fd7484743a004518444a36b0affb"
+      },
+      "route_selection": {
+        "candidates": [
+          {
+            "available": true,
+            "routeId": "native-route",
+            "selectedProtocols": [
+              "http",
+              "native"
+            ],
+            "targetProtocol": "native"
+          }
+        ],
+        "decision": "select",
+        "requestedTargetProtocol": "native",
+        "routeSelectionId": "46ef9653698678b149a181a97ed01603f84b25cfacd5aea1da513fb21242b914",
+        "selectedProtocols": [
+          "http",
+          "native"
+        ],
+        "selectedRouteId": "native-route",
+        "selectedTargetProtocol": "native",
+        "sourceProtocol": "http"
+      }
+    },
+    "policy_hash": "policy",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 100,
+    "tool_name": "authorize_http_request",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio_http_authority",
+    "trust_level": "mediated"
+  },
+  "id": "067a0b0793ed32f97bb773a1d7b21145fb9dbe07c1bd850c8885db839e24c89c"
+}

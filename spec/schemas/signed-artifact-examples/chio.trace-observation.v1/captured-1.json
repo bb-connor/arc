@@ -1,0 +1,66 @@
+{
+  "authorityKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "delegationDepthLimit": 4,
+  "event": {
+    "admission_sequence": 4,
+    "delegation_depth": 1,
+    "kind": "evaluate",
+    "receipt": {
+      "action": {
+        "parameter_hash": "389c0919d40c29e7276a615ce15da621da27aae0856edcbd2dfa83c5e2f056d5",
+        "parameters": {
+          "nonce": 2
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "cap-runtime-trace-child",
+      "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "decision": {
+        "guard": "kernel",
+        "reason": "delegation chain revoked at ancestor cap-01a1827c-dec0-79dc-b203-439d1350275f",
+        "verdict": "deny"
+      },
+      "id": "2a7173cfbf6d2b769f0621d002a7ac18f2576693fa1513d26668566d5cc43431",
+      "kernel_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 1,
+          "issuer_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+          "subject_key": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+        },
+        "chio_receipt_signing_nonce": "rcpt-01a1827c-e0e2-70d2-a72a-a1536e40d0d4",
+        "chio_runtime": {
+          "identity_disposition": "reusable"
+        },
+        "receipt_context": {
+          "request_id": "runtime-trace-deny",
+          "request_namespace_digest": "37131c9d952c3f926b2d209f3d1efcb4cc8e038c408ca608e3ad4320efa824b1"
+        }
+      },
+      "policy_hash": "0150fc694e0fc8af62b7f7d219f2beef53350bf69424ef205e18b2a4bc87bd5d",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "f6778a9afde22b9e2d5cb1e65a4b680e65024c0b97f72c9a4cb4cc2e042bea43443cd3c61c6f3bd6d467c0fbd52da285f2ea72e8acb2fc0576823ddf9d89bc06",
+      "timestamp": 1793190584,
+      "tool_name": "echo",
+      "tool_origin": "caller_executed",
+      "tool_server": "conformance",
+      "trust_level": "mediated"
+    },
+    "receipt_time": 3,
+    "request_id": "runtime-trace-deny",
+    "revocation_admitted": false,
+    "revocation_source_id": "cap-01a1827c-dec0-79dc-b203-439d1350275f",
+    "revocation_subject_ids": [
+      "cap-runtime-trace-child",
+      "cap-01a1827c-dec0-79dc-b203-439d1350275f"
+    ],
+    "seen_epoch": 2
+  },
+  "runtimeEventCount": 5,
+  "schema": "chio.trace-observation.v1",
+  "sequence": 3,
+  "sourceSequence": 5,
+  "traceId": "runtime:ed26948cfbc74a87377087ccb56eb0cdf1afacfa76cade1320beebf79481bad7:4b1fb1c696653a40971c0c8a387b677cf4d3b9087b2d43af921bb6f322f201f2",
+  "traceLength": 3
+}

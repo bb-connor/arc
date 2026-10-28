@@ -1,0 +1,29 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "6b4dbe2a0a309d9736ed0585ae9f235785c8e1e17669b92c05d8c846f17024cc",
+      "parameters": {
+        "chaos": "wedged-0-seed"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-chaos",
+    "content_hash": "content-wedged-0-seed",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "1f78f81f1594ac96f02cc6fcb2ffb0277d9b73a30ba9d70482f60cdabb54065a",
+    "metadata": {
+      "chio_receipt_signing_nonce": "chaos-rcpt-wedged-0-seed"
+    },
+    "policy_hash": "policy-chaos",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1,
+    "tool_name": "bash",
+    "tool_origin": "caller_executed",
+    "tool_server": "shell",
+    "trust_level": "mediated"
+  },
+  "id": "6ffcddc97c8cd3b26b7f777d933c9300bf5435c4433e9c3e0636ce0d5f4193ce"
+}

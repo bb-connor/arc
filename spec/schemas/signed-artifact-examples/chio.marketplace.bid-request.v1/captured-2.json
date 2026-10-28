@@ -1,0 +1,18 @@
+{
+  "agentId": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "issuedAt": 1749999991,
+  "listingId": "listing-42",
+  "maxPricePerCall": {
+    "currency": "USD",
+    "units": 100
+  },
+  "payoutDestination": "0x000000000000000000000000000000000000002a",
+  "requestedScope": {
+    "capabilityScopePrefix": "finding://",
+    "maxInvocations": 1,
+    "serverId": "finding-provider",
+    "toolName": "finding.reveal"
+  },
+  "schema": "chio.marketplace.bid-request.v1",
+  "windowSeconds": 300
+}

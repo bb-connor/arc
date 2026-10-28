@@ -959,4 +959,27 @@ wasm_sha256: deadbeef
         assert!(m.signer_public_key.is_none());
         assert!(!m.allow_unsigned, "allow_unsigned should default to false");
     }
+
+    #[test]
+    fn signed_artifact_capture_wasm_module() {
+        let keypair = chio_core::crypto::Keypair::from_seed(&[7; 32]);
+        let module_hash = hex::encode(Sha256::digest(SIGN_TEST_WASM));
+        let signer_public_key = keypair.public_key().to_hex();
+        let statement = chio_core::canonical::CanonicalBytes::from_value(&serde_json::json!({
+            "module_hash": module_hash,
+            "module_name": "g",
+            "signer_public_key": signer_public_key,
+            "version": "0.1.0",
+        }))
+        .unwrap();
+        let signature = keypair.sign_wrapped(WASM_MODULE_SCHEMA, &statement).unwrap();
+        let signed = SignedWasmModule {
+            module_hash,
+            module_name: "g".to_string(),
+            version: "0.1.0".to_string(),
+            signer_public_key: signer_public_key.clone(),
+            signature: signature.to_hex(),
+        };
+        verify_signed_module(SIGN_TEST_WASM, &signed, &signer_public_key).unwrap();
+    }
 }

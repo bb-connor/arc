@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/child-request-receipt.schema.json",
+  "title": "Chio child request receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kernel_key",
+    "operation_kind",
+    "outcome_hash",
+    "parent_request_id",
+    "policy_hash",
+    "request_id",
+    "session_id",
+    "terminal_state",
+    "timestamp"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "message_sha256": {
+          "type": "string"
+        },
+        "message_truncated": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lane"
+          ],
+          "properties": {
+            "lane": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "operation_kind": {
+      "type": "string"
+    },
+    "outcome_hash": {
+      "type": "string"
+    },
+    "parent_request_id": {
+      "type": "string"
+    },
+    "policy_hash": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "terminal_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "integer"
+    }
+  }
+}

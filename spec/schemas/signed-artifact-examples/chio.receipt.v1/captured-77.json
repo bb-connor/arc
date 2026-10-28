@@ -1,0 +1,55 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "9fc8d99bd1fb8156635f41897ef3f752d4036c15b50545e9f0325653bab0c9e2",
+      "parameters": {
+        "method": "GET",
+        "request_id": "http-export-1",
+        "route": "/pets/{petId}"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "",
+    "content_hash": "4aadf19e46952b917df6f673d703ba67831d6b0b66b8bf16f1823f31a2a9834e",
+    "decision": {
+      "verdict": "allow"
+    },
+    "kernel_key": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+    "metadata": {
+      "chio_http_receipt_v1": {
+        "boundary_class": "prevent",
+        "caller_identity_hash": "61de55ba3388aec4fdf6ecfc6eef846fb0f1b13e28cc8381270c27ffa313aee5",
+        "content_hash": "1f58b9145b24d108d7ac38887338b3ea3229833b9c1e418250343f907bfd1047",
+        "id": "760170ea0477e2caf248d478c84e8f62aaca7345f8785868e9da213f6ed5ec48",
+        "kernel_key": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+        "metadata": null,
+        "method": "GET",
+        "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+        "receipt_kind": "mediated_decision",
+        "redaction_mode": "none",
+        "request_id": "http-export-1",
+        "response_status": 200,
+        "route_pattern": "/pets/{petId}",
+        "session_id": "http-session-1",
+        "signature": "f24e5b339a513a6d036bbd31be4e9c2454a4052e088bbb5a8569780183eff4b13086621d47acc2ccdc8fbb5749ca46ebb35c8095008307de1981c6de5bd11803",
+        "timestamp": 1775137626,
+        "tool_origin": "caller_executed",
+        "trust_level": "mediated",
+        "verdict": {
+          "verdict": "allow"
+        }
+      },
+      "chio_receipt_signing_nonce": "760170ea0477e2caf248d478c84e8f62aaca7345f8785868e9da213f6ed5ec48",
+      "original_metadata": null
+    },
+    "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1775137626,
+    "tool_name": "GET /pets/{petId}",
+    "tool_origin": "caller_executed",
+    "tool_server": "http",
+    "trust_level": "mediated"
+  },
+  "id": "5770d88eee7a2112bf01f121406e48977dbd662f84d831dbefd50898894bf7a1"
+}

@@ -1,0 +1,62 @@
+{
+  "after": 0,
+  "agentId": "agent-1",
+  "before": 2000,
+  "generatedAt": 42,
+  "matchingReceipts": 2,
+  "receipts": [
+    {
+      "action": {
+        "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "parameters": {}
+      },
+      "boundary_class": "prevent",
+      "capability_id": "cap-test",
+      "content_hash": "ch",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "c94272bc21b8903d6d0a1326b1a887457f996cd3f5550d5c843bac81cdd09760",
+      "kernel_key": "b0b7b263465a1d4577d281d2ed464507a0060f2784b14b19f2882d311db88a59",
+      "metadata": {
+        "chio_receipt_signing_nonce": "r-1"
+      },
+      "policy_hash": "ph",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "7fe21e31b45ee40e7678056de33fdcdb32e0a03a33b266cecca75920c2263b03fc930334117189cefd916f6c5281856685c3d37b41c1fc7d41414fd587ae160c",
+      "timestamp": 1000,
+      "tool_name": "t",
+      "tool_origin": "caller_executed",
+      "tool_server": "srv",
+      "trust_level": "mediated"
+    },
+    {
+      "action": {
+        "parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "parameters": {}
+      },
+      "boundary_class": "prevent",
+      "capability_id": "cap-test",
+      "content_hash": "ch",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "770dcd2337ff654b3ffb3850e24f5a1e6c52fb40fbd92cf42b6590e830c0f4d5",
+      "kernel_key": "b0b7b263465a1d4577d281d2ed464507a0060f2784b14b19f2882d311db88a59",
+      "metadata": {
+        "chio_receipt_signing_nonce": "r-2"
+      },
+      "policy_hash": "ph",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "270e7754d6ab026914f3c9cfe645b33444c33d319e3214b20b3f49653a322c7059c3fd332c9792cee96e7fe6277f23ec07999963d9823c8ff727854036d88e0f",
+      "timestamp": 1001,
+      "tool_name": "t",
+      "tool_origin": "caller_executed",
+      "tool_server": "srv",
+      "trust_level": "mediated"
+    }
+  ],
+  "schema": "chio.regulatory.receipt-export.v1"
+}

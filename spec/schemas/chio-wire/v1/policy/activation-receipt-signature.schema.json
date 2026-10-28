@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/policy/activation-receipt-signature.schema.json",
+  "title": "Chio policy activation receipt signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activatedAt",
+    "activationEpoch",
+    "activationMode",
+    "issuer",
+    "migrationRule",
+    "narrowingOrWidening",
+    "policyDigest",
+    "previousPolicyDigest",
+    "schema"
+  ],
+  "properties": {
+    "activatedAt": {
+      "type": "string"
+    },
+    "activationEpoch": {
+      "type": "string"
+    },
+    "activationMode": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "migrationRule": {
+      "type": "string"
+    },
+    "narrowingOrWidening": {
+      "type": "string"
+    },
+    "policyDigest": {
+      "type": "string"
+    },
+    "previousPolicyDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.policy.activation-receipt-signature.v1"
+    }
+  }
+}

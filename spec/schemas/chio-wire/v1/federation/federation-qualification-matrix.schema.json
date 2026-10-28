@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-qualification-matrix.schema.json",
+  "title": "Chio federation qualification matrix signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "cases",
+    "exchangeRef",
+    "profileId",
+    "quorumReportRef",
+    "reputationClearingRef",
+    "schema"
+  ],
+  "properties": {
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedOutcome",
+          "id",
+          "name",
+          "notes",
+          "observedOutcome",
+          "requirementIds",
+          "scenario"
+        ],
+        "properties": {
+          "expectedOutcome": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "observedOutcome": {
+            "type": "string"
+          },
+          "requirementIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scenario": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "exchangeRef": {
+      "type": "string"
+    },
+    "profileId": {
+      "type": "string"
+    },
+    "quorumReportRef": {
+      "type": "string"
+    },
+    "reputationClearingRef": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federation-qualification-matrix.v1"
+    }
+  }
+}

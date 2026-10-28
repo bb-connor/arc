@@ -1,0 +1,33 @@
+{
+  "broker": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+  "issuedAtUnixSeconds": 1793197535,
+  "operation": {
+    "kind": "control",
+    "request": {
+      "authorization": [
+        1
+      ],
+      "operation": "status",
+      "payload": [
+        123,
+        34,
+        115,
+        116,
+        97,
+        116,
+        117,
+        115,
+        34,
+        58,
+        116,
+        114,
+        117,
+        101,
+        125
+      ],
+      "tenantScope": "tenant-production"
+    }
+  },
+  "requestId": "544531b4990ecfa42c5c62eca6b7a86c02d6470655b61dfb1db25ca98851265f",
+  "schema": "chio.broker-authority-request.v1"
+}

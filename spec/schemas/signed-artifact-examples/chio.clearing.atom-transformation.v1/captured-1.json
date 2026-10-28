@@ -1,0 +1,15 @@
+{
+  "amount": {
+    "currency": "USD",
+    "units": 100
+  },
+  "atomDigest": "62615150fdc9d4de7c98ddb2fd75e78531e5873dc0d29d242f083844b446f222",
+  "creditorIdentity": "B",
+  "creditorParticipantId": "B",
+  "debtorIdentity": "A",
+  "debtorParticipantId": "A",
+  "obligationId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "schema": "chio.clearing.atom-transformation.v1",
+  "sourceSequence": 1
+}

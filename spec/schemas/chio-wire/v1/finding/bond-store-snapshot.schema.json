@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/bond-store-snapshot.schema.json",
+  "title": "Chio finding bond store snapshot signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_at",
+    "allocation_id",
+    "backing_envelope_sha256",
+    "bond_ref",
+    "finding_id",
+    "live",
+    "observed_at",
+    "schema"
+  ],
+  "properties": {
+    "accepted_at": {
+      "type": "integer"
+    },
+    "allocation_id": {
+      "type": "string"
+    },
+    "backing_envelope_sha256": {
+      "type": "string"
+    },
+    "bond_ref": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "live": {
+      "type": "boolean"
+    },
+    "observed_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.bond-store-snapshot.v1"
+    }
+  }
+}

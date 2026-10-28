@@ -1,0 +1,11 @@
+{
+  "artifactSchema": "chio.fincred.exposure-receipt-member.v1",
+  "canonicalArtifact": "{}",
+  "queryKey": {
+    "artifactId": "receipt-1",
+    "occurredAt": 150,
+    "sourceFamily": "exposure_history",
+    "subject": "did:chio:subject"
+  },
+  "schema": "chio.fincred.source-member.v9"
+}
