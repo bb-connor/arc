@@ -1480,6 +1480,11 @@ files = ["crates/tooling/chio-conformance/src/econsim.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.enterprise-identity-index.v1"
+files = ["crates/platform/chio-control-plane/src/enterprise_identity_index.rs"]
+first_seen = "16e1c87bbd"
+
+[[schema]]
 value = "chio.enterprise-migration-transition.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
