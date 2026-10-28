@@ -2758,8 +2758,11 @@ fn catch_up_verified_head_to(
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         match head.latest_checkpoint.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, &checkpoint)
-                    .map_err(checkpoint_error_to_receipt_store)?;
+                chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+                    predecessor,
+                    &checkpoint,
+                )
+                .map_err(checkpoint_error_to_receipt_store)?;
             }
             None => validate_checkpoint_base(&checkpoint)?,
         }

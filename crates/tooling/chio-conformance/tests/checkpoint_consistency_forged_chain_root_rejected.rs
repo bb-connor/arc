@@ -38,9 +38,21 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
         checkpoint_chain_leaf_hash(&second.body).unwrap(),
     ];
 
-    let honest = build_checkpoint_consistency_proof(&first, &second, &chain, std::slice::from_ref(&first.body.kernel_key)).unwrap();
+    let honest = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &chain,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .unwrap();
     assert!(
-        verify_checkpoint_consistency_proof(&first, &second, &honest, std::slice::from_ref(&first.body.kernel_key)).unwrap(),
+        verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &honest,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .unwrap(),
         "the honest chain extension must verify"
     );
 
@@ -61,7 +73,13 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
     forged.to_chain_root = fabricated_root;
 
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &rewritten, &forged, std::slice::from_ref(&first.body.kernel_key)).unwrap(),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &rewritten,
+            &forged,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .unwrap(),
         "a chain root with no append-only relation to the predecessor must be rejected"
     );
 }

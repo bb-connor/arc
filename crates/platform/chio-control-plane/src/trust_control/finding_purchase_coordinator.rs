@@ -42,8 +42,8 @@ use chio_kernel::admission_operation::{
     AdmissionTerminalReplay, ADMISSION_RECEIPT_METADATA_KEY,
 };
 use chio_kernel::checkpoint::{
-    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint,
-    KernelCheckpoint, ReceiptInclusionProof,
+    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint, KernelCheckpoint,
+    ReceiptInclusionProof,
 };
 use chio_kernel::tool_outcome::{ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeStore};
 use chio_open_market::bidding::{

@@ -12,7 +12,8 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::{
-    broker_receipt_vectors, cage_vectors, eval_receipt_regen, fixtures, freeze_vectors, hash_pinned, recovery_authority_vectors, vector_seeds, workspace_root, XtaskError,
+    broker_receipt_vectors, cage_vectors, eval_receipt_regen, fixtures, freeze_vectors,
+    hash_pinned, recovery_authority_vectors, vector_seeds, workspace_root, XtaskError,
 };
 
 /// Passes after which a regeneration that has not converged is refused.
@@ -740,7 +741,13 @@ pub(crate) const STEPS: &[Step] = &[
             ],
             &[("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS", "1")],
         ),
-        check: cargo(&["test", "-p", "chio-web3", "--lib", "tests::reference_artifacts"]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-web3",
+            "--lib",
+            "tests::reference_artifacts",
+        ]),
         owns: &[
             "docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
             "docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json",

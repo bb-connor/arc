@@ -55,7 +55,12 @@ fn classical_certificate_round_trip_under_allow_classical() {
             .unwrap();
     assert_eq!(cert.signer_key.algorithm(), SigningAlgorithm::Ed25519);
     assert_eq!(cert.signature.algorithm(), SigningAlgorithm::Ed25519);
-    verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::AllowClassical).unwrap();
+    verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::AllowClassical,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -66,7 +71,12 @@ fn hybrid_certificate_round_trip_under_allow_hybrid() {
         .unwrap();
     assert_eq!(cert.signer_key.algorithm(), SigningAlgorithm::Hybrid);
     assert_eq!(cert.signature.algorithm(), SigningAlgorithm::Hybrid);
-    verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::AllowHybrid).unwrap();
+    verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::AllowHybrid,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -75,7 +85,12 @@ fn hybrid_certificate_round_trip_under_pq_required() {
     let body = body_with_floor(KernelCryptoFloor::PqRequired);
     let cert = issue_session_compliance_certificate(body, KernelCryptoFloor::PqRequired, &backend)
         .unwrap();
-    verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::PqRequired).unwrap();
+    verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::PqRequired,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -104,8 +119,12 @@ fn classical_certificate_under_pq_required_rejects_at_verification() {
     let cert =
         issue_session_compliance_certificate(body, KernelCryptoFloor::AllowClassical, &backend)
             .unwrap();
-    let err = verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::PqRequired)
-        .expect_err("classical cert under pq_required must reject");
+    let err = verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::PqRequired,
+    )
+    .expect_err("classical cert under pq_required must reject");
     match err {
         ComplianceCertificateError::RejectedByCryptoFloor { floor, actual } => {
             assert_eq!(floor, "pq_required");
@@ -121,8 +140,12 @@ fn hybrid_certificate_under_allow_classical_rejects_at_verification() {
     let body = body_with_floor(KernelCryptoFloor::AllowHybrid);
     let cert = issue_session_compliance_certificate(body, KernelCryptoFloor::AllowHybrid, &backend)
         .unwrap();
-    let err = verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::AllowClassical)
-        .expect_err("hybrid cert under allow_classical must reject");
+    let err = verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::AllowClassical,
+    )
+    .expect_err("hybrid cert under allow_classical must reject");
     assert!(matches!(
         err,
         ComplianceCertificateError::RejectedByCryptoFloor {
@@ -140,8 +163,12 @@ fn tampered_body_rejects_signature_verification() {
         issue_session_compliance_certificate(body, KernelCryptoFloor::AllowClassical, &backend)
             .unwrap();
     cert.body.receipt_count = 99_999_999;
-    let err = verify_session_compliance_certificate(&cert, &backend.public_key().unwrap(), KernelCryptoFloor::AllowClassical)
-        .expect_err("tampered body must reject");
+    let err = verify_session_compliance_certificate(
+        &cert,
+        &backend.public_key().unwrap(),
+        KernelCryptoFloor::AllowClassical,
+    )
+    .expect_err("tampered body must reject");
     assert!(matches!(
         err,
         ComplianceCertificateError::SignatureVerificationFailed

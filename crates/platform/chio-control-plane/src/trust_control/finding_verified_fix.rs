@@ -1684,7 +1684,6 @@ fn decode_bounded(encoded: &str, max_bytes: usize, label: &'static str) -> Resul
     Ok(bytes)
 }
 
-
 fn pinned_checkpoint_signers(
     profile: &chio_finding::FindingChallengeVerifierProfile,
 ) -> Vec<chio_core::PublicKey> {

@@ -563,9 +563,13 @@ mod tests {
         );
         let binding = sample_binding();
         let now = 1_000_000;
-        let mut signed =
-            mint_execution_nonce(&Ed25519Backend::new(kp.clone()), binding.clone(), &ExecutionNonceConfig::default(), now)
-                .unwrap();
+        let mut signed = mint_execution_nonce(
+            &Ed25519Backend::new(kp.clone()),
+            binding.clone(),
+            &ExecutionNonceConfig::default(),
+            now,
+        )
+        .unwrap();
         for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &signed.nonce) {
             signed.signature = signature;
             assert!(

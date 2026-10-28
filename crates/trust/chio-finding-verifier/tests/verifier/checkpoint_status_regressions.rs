@@ -47,8 +47,10 @@ fn production_checkpoint_must_predate_the_finding() -> TestResult {
         chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core_types::CanonicalBytes::from_serializable(&checkpoint.body)?,
     )?;
-    evidence.checkpoint_transparency =
-        build_checkpoint_transparency(std::slice::from_ref(checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
+    evidence.checkpoint_transparency = build_checkpoint_transparency(
+        std::slice::from_ref(checkpoint),
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
 
     let draft = verify_finding_evidence(&fx.raw_finding, &trust, &evidence)?;
     assert_eq!(

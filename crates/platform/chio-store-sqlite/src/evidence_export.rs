@@ -6,8 +6,7 @@ use chio_kernel::capability_lineage::CapabilitySnapshot;
 use chio_kernel::checkpoint::{
     bind_checkpoint_publication_trust_anchor, build_inclusion_proof,
     validate_checkpoint_transparency, verify_integrity_embedded_key_set, CheckpointPublication,
-    CheckpointTransparencySummary,
-    KernelCheckpoint, ReceiptInclusionProof,
+    CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
 };
 use chio_kernel::evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
@@ -748,7 +747,15 @@ pub(crate) mod tests {
             .live_db_size_bytes
             .is_some_and(|size| size > 0));
 
-        let transparency = validate_checkpoint_transparency(&bundle.checkpoints, &bundle.checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>()).unwrap();
+        let transparency = validate_checkpoint_transparency(
+            &bundle.checkpoints,
+            &bundle
+                .checkpoints
+                .iter()
+                .map(|checkpoint| checkpoint.body.kernel_key.clone())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
         assert_eq!(transparency.publications.len(), 1);
         assert!(transparency.witnesses.is_empty());
         assert!(transparency.equivocations.is_empty());

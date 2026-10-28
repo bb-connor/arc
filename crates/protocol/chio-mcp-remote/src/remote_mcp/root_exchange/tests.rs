@@ -77,7 +77,8 @@ fn snapshot_digest(keys: &[Value]) -> Sha256Digest {
     let signature = exchange_keypair()
         .sign_wrapped(
             chio_core::root_authority::CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body()).unwrap(),
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body())
+                .unwrap(),
         )
         .unwrap();
     let mut fields = unsigned.into_fields();
@@ -243,7 +244,8 @@ fn loaded_policy(identity_digest: Sha256Digest, edit: impl FnOnce(&mut Value)) -
     let signature = policy_keypair()
         .sign_wrapped(
             chio_core::root_authority::CHIO_ROOT_POLICY_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body()).unwrap(),
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body())
+                .unwrap(),
         )
         .unwrap();
     let mut fields = unsigned.into_fields();

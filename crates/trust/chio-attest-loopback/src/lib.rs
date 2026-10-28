@@ -670,7 +670,9 @@ pub fn fresh_proof_package_keeping_disclosure(
     let mut package = fresh_proof_package()?;
     let derived = &package.selective_disclosure_proof;
     let mut comparable = committed.clone();
-    comparable.proof_bytes_hex.clone_from(&derived.proof_bytes_hex);
+    comparable
+        .proof_bytes_hex
+        .clone_from(&derived.proof_bytes_hex);
     let mut registry = InMemoryIssuerRegistry::default();
     registry.insert(
         derived.issuer_fingerprint.clone(),

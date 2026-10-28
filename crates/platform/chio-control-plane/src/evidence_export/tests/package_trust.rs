@@ -10,7 +10,11 @@ fn package_rejects_receipt_checkpoint_signer_substitution() {
         bundle.checkpoints[0].body.kernel_key
     );
     let receipts = verify_tool_receipts(&bundle.tool_receipts).test_unwrap();
-    let checkpoints = verify_checkpoints(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)).test_unwrap();
+    let checkpoints = verify_checkpoints(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let error = verify_inclusion_proofs(&receipts, &checkpoints, &bundle.inclusion_proofs, 0)
         .test_unwrap_err();
     assert!(error.to_string().contains("signer"), "{error}");

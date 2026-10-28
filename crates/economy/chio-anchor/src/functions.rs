@@ -344,8 +344,7 @@ mod tests {
     use super::{
         assess_functions_verification, prepare_functions_batch_verification,
         ChainlinkFunctionsTarget, FunctionsFallbackStatus, FunctionsVerificationPolicy,
-        FunctionsVerificationPurpose, FunctionsVerificationResponse,
-        CHIO_FUNCTIONS_ED25519_SOURCE,
+        FunctionsVerificationPurpose, FunctionsVerificationResponse, CHIO_FUNCTIONS_ED25519_SOURCE,
     };
 
     use chio_test_support::prelude::*;
@@ -452,8 +451,8 @@ mod tests {
             let mut script_wrapper = b"chio.signing-wrapper.v1\0".to_vec();
             script_wrapper.extend_from_slice(sha256(b"chio.receipt.v1").as_bytes());
             script_wrapper.extend_from_slice(sha256(&signing_body).as_bytes());
-            let wrapper = chio_core::crypto::SigningWrapper::new("chio.receipt.v1", &canonical)
-                .test_unwrap();
+            let wrapper =
+                chio_core::crypto::SigningWrapper::new("chio.receipt.v1", &canonical).test_unwrap();
             assert_eq!(script_wrapper.as_slice(), wrapper.as_bytes().as_slice());
             chio_core::crypto::verify_wrapped_bytes(
                 &receipt.kernel_key,

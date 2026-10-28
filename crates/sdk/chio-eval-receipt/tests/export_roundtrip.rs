@@ -1,6 +1,6 @@
 use chio_eval_receipt::{
-    export_scenario_run, verify_bundle, BundleError, EvalRunMeta, EvalRunMetaParts, ExportError, Receipt, ReceiptParts,
-    VERDICT_MATRIX_CORPUS_SHA256, VERDICT_MATRIX_SCENARIO_COUNT,
+    export_scenario_run, verify_bundle, BundleError, EvalRunMeta, EvalRunMetaParts, ExportError,
+    Receipt, ReceiptParts, VERDICT_MATRIX_CORPUS_SHA256, VERDICT_MATRIX_SCENARIO_COUNT,
 };
 
 #[test]
@@ -84,7 +84,9 @@ fn production_verifier_rejects_the_committed_placeholder_bundles() {
     for (label, bundle) in [
         (
             "metr sample",
-            include_str!("../../../../examples/eval-receipt-ingest/metr/out/metr-sample-bundle.json"),
+            include_str!(
+                "../../../../examples/eval-receipt-ingest/metr/out/metr-sample-bundle.json"
+            ),
         ),
         (
             "fuzz seed",

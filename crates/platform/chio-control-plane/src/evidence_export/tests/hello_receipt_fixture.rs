@@ -7,7 +7,9 @@
 use super::*;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
-use chio_kernel::{CapabilitySnapshot, CapabilitySnapshotProvenance, EvidenceUncheckpointedReceipt};
+use chio_kernel::{
+    CapabilitySnapshot, CapabilitySnapshotProvenance, EvidenceUncheckpointedReceipt,
+};
 
 const FIXTURE_DIR: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -188,7 +190,10 @@ fn committed_hello_receipt_fixture_is_the_generator_output() {
         );
     }
 
-    assert_eq!(kernel_keypair().public_key().to_hex(), KERNEL_PUBLIC_KEY_HEX);
+    assert_eq!(
+        kernel_keypair().public_key().to_hex(),
+        KERNEL_PUBLIC_KEY_HEX
+    );
     let policy =
         EvidenceVerificationPolicy::new(vec![kernel_keypair().public_key()], None).test_unwrap();
     let package = load_verified_evidence_package(committed_dir, &policy).test_unwrap();

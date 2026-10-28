@@ -1598,8 +1598,9 @@ mod capital_and_liability_tests {
             TrustedCapitalAuthority::new(vec![chio_core::crypto::Keypair::generate().public_key()])
                 .test_unwrap();
 
-        let error = validate_capital_execution_envelope(&authority_chain, &window, &rail, 10, &foreign)
-            .test_unwrap_err();
+        let error =
+            validate_capital_execution_envelope(&authority_chain, &window, &rail, 10, &foreign)
+                .test_unwrap_err();
 
         assert_eq!(error.status, StatusCode::FORBIDDEN);
         assert_eq!(

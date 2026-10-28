@@ -165,7 +165,9 @@ fn supported_protocols_and_signed_mediated_receipt_verify() {
 }
 
 fn assert_receipt_crypto_valid(receipt: &ChioReceipt) {
-    assert!(receipt.verify_integrity_embedded_key().test_expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .test_expect("signature verifies"));
     assert!(receipt
         .action
         .verify_hash()

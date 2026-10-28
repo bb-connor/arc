@@ -79,7 +79,8 @@ pub fn run(check_only: bool) -> Result<(), XtaskError> {
     );
     outputs.push((corpus.join("minimal-receipts.ndjson"), evidence_row.clone()));
     outputs.push((
-        root.join(MERKLE_CHECKPOINT_CORPUS).join("minimal-receipts.ndjson"),
+        root.join(MERKLE_CHECKPOINT_CORPUS)
+            .join("minimal-receipts.ndjson"),
         evidence_row,
     ));
 
@@ -88,7 +89,8 @@ pub fn run(check_only: bool) -> Result<(), XtaskError> {
         .map_err(|err| XtaskError::Json(display_path(&frost_path), err))?;
     for (index, envelope) in frost.iter().enumerate() {
         outputs.push((
-            root.join(FROST_ROUND2_CORPUS).join(format!("pair-{index:02}.json")),
+            root.join(FROST_ROUND2_CORPUS)
+                .join(format!("pair-{index:02}.json")),
             serde_json::to_string(envelope).map_err(json_error)?,
         ));
     }
@@ -170,16 +172,22 @@ fn with_seed_digest(metadata: &str, seed_path: &str, contents: &str) -> Result<S
     let index = lines
         .iter()
         .position(|line| {
-            line.split_once('=').is_some_and(|(key, value)| {
-                key.trim() == "path" && value.trim() == quoted_path
-            })
+            line.split_once('=')
+                .is_some_and(|(key, value)| key.trim() == "path" && value.trim() == quoted_path)
         })
-        .ok_or_else(|| XtaskError::Drift(format!("{CORPUS_METADATA} has no entry for {seed_path}")))?;
+        .ok_or_else(|| {
+            XtaskError::Drift(format!("{CORPUS_METADATA} has no entry for {seed_path}"))
+        })?;
     let digest_line = lines
         .get_mut(index + 1)
-        .filter(|line| line.split_once('=').is_some_and(|(key, _)| key.trim() == "sha256"))
+        .filter(|line| {
+            line.split_once('=')
+                .is_some_and(|(key, _)| key.trim() == "sha256")
+        })
         .ok_or_else(|| {
-            XtaskError::Drift(format!("{CORPUS_METADATA} entry for {seed_path} has no sha256 line"))
+            XtaskError::Drift(format!(
+                "{CORPUS_METADATA} entry for {seed_path} has no sha256 line"
+            ))
         })?;
     let key = digest_line
         .split_once('=')
@@ -197,8 +205,8 @@ fn with_seed_digest(metadata: &str, seed_path: &str, contents: &str) -> Result<S
 }
 
 fn load_cases(path: &Path) -> Result<Vec<Value>, XtaskError> {
-    let value: Value =
-        serde_json::from_str(&read(path)?).map_err(|err| XtaskError::Json(display_path(path), err))?;
+    let value: Value = serde_json::from_str(&read(path)?)
+        .map_err(|err| XtaskError::Json(display_path(path), err))?;
     value
         .get("cases")
         .and_then(Value::as_array)

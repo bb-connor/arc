@@ -683,8 +683,11 @@ fn verify_checkpoint_chain_integrity_with_frontier_at_watermark(
         }
         expected_publication_ids.insert(row.checkpoint_seq);
         if let Some(predecessor) = latest.as_ref() {
-            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, &checkpoint)
-                .map_err(checkpoint_error_to_receipt_store)?;
+            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+                predecessor,
+                &checkpoint,
+            )
+            .map_err(checkpoint_error_to_receipt_store)?;
         } else {
             validate_checkpoint_base(&checkpoint)?;
         }
@@ -1053,7 +1056,7 @@ pub(crate) fn latest_checkpoint_is_chain_connected(
     };
     let predecessor = parse_persisted_checkpoint_row(predecessor_row)?;
     chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(&predecessor, checkpoint)
-    .map_err(checkpoint_error_to_receipt_store)
+        .map_err(checkpoint_error_to_receipt_store)
 }
 
 pub(crate) fn validate_checkpoint_against_claim_log(
@@ -1244,12 +1247,15 @@ pub(crate) fn insert_checkpoint_incremental_tx(
         .map_err(checkpoint_error_to_receipt_store)?;
     match predecessor {
         Some(predecessor) => {
-            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(predecessor, checkpoint)
-                .map_err(|error| {
-                    ReceiptStoreError::Conflict(format!(
-                        "checkpoint predecessor continuity violation: {error}"
-                    ))
-                })?;
+            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+                predecessor,
+                checkpoint,
+            )
+            .map_err(|error| {
+                ReceiptStoreError::Conflict(format!(
+                    "checkpoint predecessor continuity violation: {error}"
+                ))
+            })?;
         }
         None => validate_checkpoint_base(checkpoint)?,
     }
@@ -1416,7 +1422,7 @@ fn expected_checkpoint_projection_rows(
         checkpoint,
         std::slice::from_ref(&checkpoint.body.kernel_key),
     )
-        .map_err(checkpoint_error_to_receipt_store)?;
+    .map_err(checkpoint_error_to_receipt_store)?;
     let head = CheckpointTreeHeadProjectionRow {
         checkpoint_seq: row.checkpoint_seq,
         batch_start_seq: row.batch_start_seq,

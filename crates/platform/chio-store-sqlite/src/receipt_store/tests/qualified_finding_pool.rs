@@ -569,7 +569,10 @@ fn qualified_receipt_sink_anchors_checkpoint_publication_bindings(
     let checkpoint = store
         .load_checkpoint_by_seq(checkpoint_seq)?
         .ok_or("qualified receipt store did not retain its checkpoint")?;
-    let publication = build_checkpoint_publication(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key))?;
+    let publication = build_checkpoint_publication(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
     let connection = rusqlite::Connection::open(&database)?;
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
     drop(connection);

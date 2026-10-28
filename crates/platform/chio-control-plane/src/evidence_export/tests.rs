@@ -603,7 +603,9 @@ fn checkpoint_transparency_records_match_derived_chain() {
     .test_unwrap();
     let checkpoints = vec![first, second];
 
-    let summary = validate_checkpoint_transparency_summary(&checkpoints, &carried_kernel_keys(&checkpoints)).test_unwrap();
+    let summary =
+        validate_checkpoint_transparency_summary(&checkpoints, &carried_kernel_keys(&checkpoints))
+            .test_unwrap();
     verify_checkpoint_transparency_records(
         &checkpoints,
         &summary.publications,
@@ -656,7 +658,11 @@ fn checkpoint_transparency_verification_fails_closed_on_duplicate_checkpoint_for
 #[test]
 fn anchored_transparency_claims_fail_closed_during_export_verification() {
     let bundle = sample_bundle();
-    let transparency = validate_checkpoint_transparency_summary(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)).test_unwrap();
+    let transparency = validate_checkpoint_transparency_summary(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let anchored_claims = EvidenceTransparencyClaims {
         schema: chio_kernel::evidence_export::EVIDENCE_TRANSPARENCY_CLAIMS_SCHEMA.to_string(),
         publication_state: chio_kernel::evidence_export::EvidencePublicationState::TrustAnchored,
@@ -689,7 +695,10 @@ fn anchored_transparency_claims_fail_closed_during_export_verification() {
 #[test]
 fn transparency_claim_boundary_validation_uses_attest_domain() {
     let bundle = sample_bundle();
-    let transparency = match validate_checkpoint_transparency_summary(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)) {
+    let transparency = match validate_checkpoint_transparency_summary(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    ) {
         Ok(summary) => summary,
         Err(error) => panic!("failed to build transparency summary: {error}"),
     };
@@ -708,8 +717,11 @@ fn transparency_claim_boundary_validation_uses_attest_domain() {
 fn self_declared_anchor_does_not_qualify_manifest_claims() {
     let bundle = sample_bundle();
     let checkpoint = bundle.checkpoints.first().cloned().test_unwrap();
-    let mut transparency =
-        validate_checkpoint_transparency_summary(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)).test_unwrap();
+    let mut transparency = validate_checkpoint_transparency_summary(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let binding = chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
         publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
             chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
@@ -724,8 +736,12 @@ fn self_declared_anchor_does_not_qualify_manifest_claims() {
         publication_profile_version: "phase4-pilot".to_string(),
     };
     transparency.publications = vec![
-        chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(&checkpoint, binding, std::slice::from_ref(&checkpoint.body.kernel_key))
-            .test_unwrap(),
+        chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+            &checkpoint,
+            binding,
+            std::slice::from_ref(&checkpoint.body.kernel_key),
+        )
+        .test_unwrap(),
     ];
     let anchored_claims =
         build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
@@ -748,8 +764,11 @@ fn self_declared_anchor_does_not_qualify_manifest_claims() {
 fn evidence_export_fails_closed_on_stale_or_missing_publication() {
     let bundle = sample_bundle();
     let checkpoint = bundle.checkpoints.first().cloned().test_unwrap();
-    let mut transparency =
-        validate_checkpoint_transparency_summary(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)).test_unwrap();
+    let mut transparency = validate_checkpoint_transparency_summary(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let binding = chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
         publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
             chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
@@ -764,14 +783,21 @@ fn evidence_export_fails_closed_on_stale_or_missing_publication() {
         publication_profile_version: "phase4-pilot".to_string(),
     };
     transparency.publications = vec![
-        chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(&checkpoint, binding, std::slice::from_ref(&checkpoint.body.kernel_key))
-            .test_unwrap(),
+        chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+            &checkpoint,
+            binding,
+            std::slice::from_ref(&checkpoint.body.kernel_key),
+        )
+        .test_unwrap(),
     ];
     let anchored_claims =
         build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
 
-    let missing_publication =
-        validate_checkpoint_transparency_summary(&bundle.checkpoints, &carried_kernel_keys(&bundle.checkpoints)).test_unwrap();
+    let missing_publication = validate_checkpoint_transparency_summary(
+        &bundle.checkpoints,
+        &carried_kernel_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let missing_error =
         verify_transparency_claim_boundary(Some(&anchored_claims), &bundle, &missing_publication)
             .test_unwrap_err();

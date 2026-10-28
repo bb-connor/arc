@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use chio_attest_loopback::{
     authority_issuance_request_for_package, authority_profile_document, authority_profile_json,
     authority_signing_keys_document, disclosure_policy, fresh_proof_package,
-    fresh_proof_package_keeping_disclosure, issuance_request_json,
-    package_json, peer_pins_document_for_package, peer_pins_json, proof_package_from_json,
-    report_json, revocation_publication_request, revocation_publication_request_json,
-    signing_keys_json, verification_context, verification_context_json,
-    verifier_trust_bundle_document_for_package, verifier_trust_bundle_json, verify_package,
-    write_signed_negative_case_inputs, ChioPackageError, ChioProofPackage, ChioVerificationContext,
-    ChioVerifierTrustBundle, ChioVerifierTrustBundleDocument, VerifierReport,
+    fresh_proof_package_keeping_disclosure, issuance_request_json, package_json,
+    peer_pins_document_for_package, peer_pins_json, proof_package_from_json, report_json,
+    revocation_publication_request, revocation_publication_request_json, signing_keys_json,
+    verification_context, verification_context_json, verifier_trust_bundle_document_for_package,
+    verifier_trust_bundle_json, verify_package, write_signed_negative_case_inputs,
+    ChioPackageError, ChioProofPackage, ChioVerificationContext, ChioVerifierTrustBundle,
+    ChioVerifierTrustBundleDocument, VerifierReport,
 };
 use chio_core_types::merkle::MerkleTree;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
@@ -37,6 +37,12 @@ use chio_pheromone::{
     PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, PHEROMONE_SCARCITY_POLICY_SCHEMA,
     PHEROMONE_WORKFLOW_CONTEXT_SCHEMA,
 };
+use chio_pheromone_relay::{
+    promote_peer_directory_candidate, sign_peer_directory_bundle, PeerDirectoryBundleDocument,
+    PeerDirectoryBundleSigningInput, PeerDirectoryBundleTrust, PeerDirectoryDocument,
+    PeerDirectoryEntry, PeerDirectoryStateDocument, RelayLadderRef, RelayProfile,
+    RelayProfileLimits, RelayRole, TrustedPeerDirectoryIssuer, PHEROMONE_PEER_DIRECTORY_SCHEMA,
+};
 use chio_pheromone_runtime::store::SqlitePheromoneRuntimeStore;
 use chio_pheromone_runtime::{
     runtime_policy_document_sha256, runtime_policy_from_json, ChioWorkflowProofPackage,
@@ -44,13 +50,6 @@ use chio_pheromone_runtime::{
     PeerWeightsDocument, PheromoneAdmissionPolicyDocument, PheromoneReceiver,
     PheromoneRuntimeStore, StaticPeerWeightProvider, VerifiedChioWorkflowResolver,
     PHEROMONE_PEER_WEIGHTS_SCHEMA,
-};
-use chio_pheromone_relay::{
-    promote_peer_directory_candidate, sign_peer_directory_bundle, PeerDirectoryBundleDocument,
-    PeerDirectoryBundleSigningInput, PeerDirectoryBundleTrust, PeerDirectoryDocument,
-    PeerDirectoryEntry,
-    PeerDirectoryStateDocument, RelayLadderRef, RelayProfile, RelayProfileLimits, RelayRole,
-    TrustedPeerDirectoryIssuer, PHEROMONE_PEER_DIRECTORY_SCHEMA,
 };
 
 pub fn run_from_env() -> Result<(), ChioPackageError> {
@@ -66,14 +65,34 @@ pub fn run_with_args(args: &[String]) -> Result<(), ChioPackageError> {
 enum Command {
     PrintPackage,
     PrintReport,
-    SignTransitPolicy { body: PathBuf, out: PathBuf },
-    WriteOutDir { dir: PathBuf, keep_disclosure: Option<PathBuf> },
-    WriteSignedNegativeDir { dir: PathBuf },
-    WriteAuthorityInputDir { dir: PathBuf },
-    WriteAuthorityInputForPackage { package: PathBuf, dir: PathBuf },
-    WritePheromoneOutDir { dir: PathBuf },
-    WritePheromoneForPackage { package: PathBuf, dir: PathBuf },
-    WriteRelayDirectoryOutDir { dir: PathBuf },
+    SignTransitPolicy {
+        body: PathBuf,
+        out: PathBuf,
+    },
+    WriteOutDir {
+        dir: PathBuf,
+        keep_disclosure: Option<PathBuf>,
+    },
+    WriteSignedNegativeDir {
+        dir: PathBuf,
+    },
+    WriteAuthorityInputDir {
+        dir: PathBuf,
+    },
+    WriteAuthorityInputForPackage {
+        package: PathBuf,
+        dir: PathBuf,
+    },
+    WritePheromoneOutDir {
+        dir: PathBuf,
+    },
+    WritePheromoneForPackage {
+        package: PathBuf,
+        dir: PathBuf,
+    },
+    WriteRelayDirectoryOutDir {
+        dir: PathBuf,
+    },
 }
 
 impl Command {

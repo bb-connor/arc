@@ -1152,9 +1152,9 @@ fn signed_role_wrapper_schema(role: EvidenceNodeRole) -> Option<&'static str> {
         EvidenceNodeRole::Capability => Some("chio.capability.proof.v1"),
         EvidenceNodeRole::TrustRoot => Some("chio.trust.root.v1"),
         EvidenceNodeRole::GuardDecision => Some("chio.guard.decision.v1"),
-        EvidenceNodeRole::Receipt => Some(
-            chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
-        ),
+        EvidenceNodeRole::Receipt => {
+            Some(chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA)
+        }
         _ => None,
     }
 }

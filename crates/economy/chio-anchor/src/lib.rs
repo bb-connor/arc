@@ -899,8 +899,11 @@ mod tests {
         let keypair = Keypair::generate();
         let checkpoint = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
             .test_expect("checkpoint");
-        let transparency =
-            build_checkpoint_transparency(&[checkpoint.clone()], std::slice::from_ref(&checkpoint.body.kernel_key)).test_expect("transparency summary");
+        let transparency = build_checkpoint_transparency(
+            &[checkpoint.clone()],
+            std::slice::from_ref(&checkpoint.body.kernel_key),
+        )
+        .test_expect("transparency summary");
 
         let error = verify_checkpoint_publication_records(&transparency).test_unwrap_err();
 
@@ -928,7 +931,8 @@ mod tests {
                 trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
                 signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
                 publication_profile_version: "phase4-preview.v1".to_string(),
-            }, std::slice::from_ref(&checkpoint.body.kernel_key),
+            },
+            std::slice::from_ref(&checkpoint.body.kernel_key),
         )
         .test_expect("trust-anchored publication");
         publication
@@ -957,8 +961,11 @@ mod tests {
         let conflicting =
             build_checkpoint(2, 1, 2, &[b"one".to_vec(), b"changed".to_vec()], &keypair)
                 .test_expect("conflicting checkpoint");
-        let transparency = build_checkpoint_transparency(&[first.clone(), conflicting], std::slice::from_ref(&first.body.kernel_key))
-            .test_expect("transparency summary");
+        let transparency = build_checkpoint_transparency(
+            &[first.clone(), conflicting],
+            std::slice::from_ref(&first.body.kernel_key),
+        )
+        .test_expect("transparency summary");
 
         let error = verify_checkpoint_publication_records(&transparency).test_unwrap_err();
 

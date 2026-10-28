@@ -2013,8 +2013,8 @@ mod roster_enforcement {
             settlement_reference: None,
             note: None,
         };
-        let capital_authority = TrustedCapitalAuthority::new(vec![kp.public_key()])
-            .test_unwrap("capital authority");
+        let capital_authority =
+            TrustedCapitalAuthority::new(vec![kp.public_key()]).test_unwrap("capital authority");
         build_liability_claim_settlement_instruction_artifact(
             &request,
             1_700_011_100,

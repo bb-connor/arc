@@ -53,11 +53,11 @@ pub(crate) async fn handle_issue_capital_execution_instruction(
         }
     };
 
-    let capital_authority =
-        match require_capital_authority(state.config.capital_authority.as_ref()) {
-            Ok(trust) => trust,
-            Err(error) => return error.into_response(),
-        };
+    let capital_authority = match require_capital_authority(state.config.capital_authority.as_ref())
+    {
+        Ok(trust) => trust,
+        Err(error) => return error.into_response(),
+    };
 
     match issue_signed_capital_execution_instruction_detailed(
         receipt_store,
@@ -90,11 +90,11 @@ pub(crate) async fn handle_issue_capital_allocation_decision(
         }
     };
 
-    let capital_authority =
-        match require_capital_authority(state.config.capital_authority.as_ref()) {
-            Ok(trust) => trust,
-            Err(error) => return error.into_response(),
-        };
+    let capital_authority = match require_capital_authority(state.config.capital_authority.as_ref())
+    {
+        Ok(trust) => trust,
+        Err(error) => return error.into_response(),
+    };
 
     match issue_signed_capital_allocation_decision_detailed(
         receipt_store,

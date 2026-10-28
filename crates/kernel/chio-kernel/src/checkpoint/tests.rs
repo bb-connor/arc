@@ -14,12 +14,16 @@ fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn std::error::E
         "0100000000000000000000000000000000000000000000000000000000000000",
         "0000000000000000000000000000000000000000000000000000000000000000"
     ))?;
-    assert!(!verify_checkpoint_signature(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key))?);
+    assert!(!verify_checkpoint_signature(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key)
+    )?);
     Ok(())
 }
 
 #[test]
-fn checkpoint_signature_refuses_kernel_key_outside_trusted_set() -> Result<(), Box<dyn std::error::Error>> {
+fn checkpoint_signature_refuses_kernel_key_outside_trusted_set(
+) -> Result<(), Box<dyn std::error::Error>> {
     let signer = Keypair::generate();
     let checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
     let foreign = [Keypair::generate().public_key()];
@@ -85,7 +89,8 @@ fn build_checkpoint_signature_verifies() {
     let batch = make_receipt_bytes(10);
     let cp = build_checkpoint(1, 1, 10, &batch, &kp).expect("build_checkpoint failed");
     assert!(
-        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).expect("verify failed"),
+        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key))
+            .expect("verify failed"),
         "signature should be valid"
     );
 }
@@ -96,7 +101,10 @@ fn checkpoint_validation_refuses_unwrapped_and_foreign_id_signatures() {
     let mut cp = build_checkpoint(1, 1, 5, &make_receipt_bytes(5), &kp).unwrap();
     for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &cp.body) {
         cp.signature = signature;
-        assert!(!verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).unwrap(), "{label}");
+        assert!(
+            !verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).unwrap(),
+            "{label}"
+        );
         assert!(
             matches!(
                 validate_checkpoint(&cp, std::slice::from_ref(&cp.body.kernel_key)),
@@ -116,7 +124,8 @@ fn build_checkpoint_wrong_key_fails_verification() {
     // Replace the kernel_key with a different key -- signature no longer matches.
     cp.body.kernel_key = kp2.public_key();
     assert!(
-        !verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).expect("verify call failed"),
+        !verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key))
+            .expect("verify call failed"),
         "tampered key should fail"
     );
 }
@@ -128,7 +137,8 @@ fn build_checkpoint_single_receipt() {
     let cp = build_checkpoint(1, 1, 1, &batch, &kp).expect("build_checkpoint failed");
     assert_eq!(cp.body.tree_size, 1);
     assert!(
-        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).expect("verify failed"),
+        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key))
+            .expect("verify failed"),
         "single-receipt checkpoint should have valid signature"
     );
 }
@@ -166,7 +176,8 @@ fn build_checkpoint_single_receipt_merkle_root_equals_leaf_hash() {
     );
     assert_eq!(cp.body.tree_size, 1);
     assert!(
-        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).expect("verify failed"),
+        verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key))
+            .expect("verify failed"),
         "single-receipt checkpoint signature should verify"
     );
 }
@@ -203,7 +214,12 @@ fn build_checkpoint_with_previous_sets_continuity_hash() {
         Some(expected_previous_checkpoint_sha256.as_str())
     );
     assert!(
-        verify_checkpoint_continuity(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect("continuity verification"),
+        verify_checkpoint_continuity(
+            &first,
+            &second,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("continuity verification"),
         "second checkpoint should extend the first"
     );
 }
@@ -226,7 +242,11 @@ fn build_checkpoint_with_chain_frontier_accepts_canonical_successor() -> Result<
         &frontier,
     )?;
 
-    validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key))?;
+    validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )?;
     assert!(second.body.chain_root.is_some());
     Ok(())
 }
@@ -417,8 +437,11 @@ fn build_checkpoint_transparency_derives_publications_and_witnesses() {
     )
     .expect("build second");
 
-    let transparency =
-        validate_checkpoint_transparency(&[first.clone(), second.clone()], std::slice::from_ref(&first.body.kernel_key)).expect("summary");
+    let transparency = validate_checkpoint_transparency(
+        &[first.clone(), second.clone()],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("summary");
 
     assert_eq!(transparency.publications.len(), 2);
     assert_eq!(transparency.witnesses.len(), 1);
@@ -468,8 +491,14 @@ fn transparency_verifies_each_checkpoint_once_for_a_large_prefix() {
 
     let verifications_before = checkpoint_signature_verification_count_for_test();
     let inspections_before = checkpoint_equivocation_inspection_count_for_test();
-    let transparency =
-        validate_checkpoint_transparency(&checkpoints, &checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>()).expect("validate checkpoint prefix");
+    let transparency = validate_checkpoint_transparency(
+        &checkpoints,
+        &checkpoints
+            .iter()
+            .map(|checkpoint| checkpoint.body.kernel_key.clone())
+            .collect::<Vec<_>>(),
+    )
+    .expect("validate checkpoint prefix");
     let verification_count =
         checkpoint_signature_verification_count_for_test() - verifications_before;
     let inspection_count = checkpoint_equivocation_inspection_count_for_test() - inspections_before;
@@ -488,8 +517,11 @@ fn transparency_verifies_each_checkpoint_once_for_a_large_prefix() {
     let conflicting = build_checkpoint(1, 1, 1, &[b"conflicting-receipt".to_vec()], &keypair)
         .expect("build conflicting checkpoint");
     let inspections_before = checkpoint_equivocation_inspection_count_for_test();
-    let conflict_summary = build_checkpoint_transparency(&[checkpoints[0].clone(), conflicting], std::slice::from_ref(&checkpoints[0].body.kernel_key))
-        .expect("derive conflicting transparency");
+    let conflict_summary = build_checkpoint_transparency(
+        &[checkpoints[0].clone(), conflicting],
+        std::slice::from_ref(&checkpoints[0].body.kernel_key),
+    )
+    .expect("derive conflicting transparency");
     let inspection_count = checkpoint_equivocation_inspection_count_for_test() - inspections_before;
     assert_eq!(inspection_count, 1, "one indexed pair must be inspected");
     assert_eq!(conflict_summary.equivocations.len(), 1);
@@ -501,8 +533,14 @@ fn transparency_verifies_each_checkpoint_once_for_a_large_prefix() {
     let duplicate_checkpoints = vec![checkpoints[0].clone(); CHECKPOINT_COUNT as usize];
     let verifications_before = checkpoint_signature_verification_count_for_test();
     let inspections_before = checkpoint_equivocation_inspection_count_for_test();
-    let duplicate_summary = build_checkpoint_transparency(&duplicate_checkpoints, &duplicate_checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())
-        .expect("derive duplicate checkpoint transparency");
+    let duplicate_summary = build_checkpoint_transparency(
+        &duplicate_checkpoints,
+        &duplicate_checkpoints
+            .iter()
+            .map(|checkpoint| checkpoint.body.kernel_key.clone())
+            .collect::<Vec<_>>(),
+    )
+    .expect("derive duplicate checkpoint transparency");
     let verification_count =
         checkpoint_signature_verification_count_for_test() - verifications_before;
     let inspection_count = checkpoint_equivocation_inspection_count_for_test() - inspections_before;
@@ -533,8 +571,11 @@ fn validate_checkpoint_transparency_rejects_duplicate_signed_checkpoints() {
     )
     .expect("build second");
 
-    let error = validate_checkpoint_transparency(&[first.clone(), first.clone(), second], std::slice::from_ref(&first.body.kernel_key))
-        .expect_err("duplicate signed checkpoints must fail closed");
+    let error = validate_checkpoint_transparency(
+        &[first.clone(), first.clone(), second],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("duplicate signed checkpoints must fail closed");
     assert!(
         error
             .to_string()
@@ -548,10 +589,17 @@ fn validate_checkpoint_transparency_requires_the_first_receipt_prefix() {
     let keypair = Keypair::generate();
     let checkpoint = build_checkpoint(1, 5, 5, &make_receipt_bytes(1), &keypair)
         .expect("build signed late-starting checkpoint");
-    validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect("single-checkpoint integrity remains valid");
+    validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect("single-checkpoint integrity remains valid");
 
-    let error = validate_checkpoint_transparency(&[checkpoint.clone()], std::slice::from_ref(&checkpoint.body.kernel_key))
-        .expect_err("transparency must reject a prefix that starts after receipt one");
+    let error = validate_checkpoint_transparency(
+        &[checkpoint.clone()],
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("transparency must reject a prefix that starts after receipt one");
     assert!(
         error
             .to_string()
@@ -568,15 +616,19 @@ fn validate_checkpoint_rejects_zero_time_and_malformed_predecessor_digest() {
 
     let mut zero_time = checkpoint.clone();
     zero_time.body.issued_at = 0;
-    let error = validate_checkpoint(&zero_time, std::slice::from_ref(&zero_time.body.kernel_key)).expect_err("zero issued_at must fail closed");
+    let error = validate_checkpoint(&zero_time, std::slice::from_ref(&zero_time.body.kernel_key))
+        .expect_err("zero issued_at must fail closed");
     assert!(error
         .to_string()
         .contains("issued_at must be greater than zero"));
 
     let mut malformed_predecessor = checkpoint;
     malformed_predecessor.body.previous_checkpoint_sha256 = Some("not-a-digest".to_string());
-    let error = validate_checkpoint(&malformed_predecessor, std::slice::from_ref(&malformed_predecessor.body.kernel_key))
-        .expect_err("malformed predecessor digest must fail closed");
+    let error = validate_checkpoint(
+        &malformed_predecessor,
+        std::slice::from_ref(&malformed_predecessor.body.kernel_key),
+    )
+    .expect_err("malformed predecessor digest must fail closed");
     assert!(error
         .to_string()
         .contains("must be 64 lowercase hex characters"));
@@ -670,8 +722,11 @@ fn verify_checkpoint_transparency_records_rejects_duplicate_publication_coverage
         &chain_leaves(&[&first]),
     )
     .expect("second checkpoint");
-    let derived =
-        validate_checkpoint_transparency(&[first.clone(), second.clone()], std::slice::from_ref(&first.body.kernel_key)).expect("transparency");
+    let derived = validate_checkpoint_transparency(
+        &[first.clone(), second.clone()],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("transparency");
     let supplied = CheckpointTransparencySummary {
         publications: vec![
             derived.publications[0].clone(),
@@ -682,8 +737,12 @@ fn verify_checkpoint_transparency_records_rejects_duplicate_publication_coverage
         equivocations: derived.equivocations.clone(),
     };
 
-    let error = verify_checkpoint_transparency_records(&[first.clone(), second], &supplied, std::slice::from_ref(&first.body.kernel_key))
-        .expect_err("duplicate publication coverage should fail");
+    let error = verify_checkpoint_transparency_records(
+        &[first.clone(), second],
+        &supplied,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("duplicate publication coverage should fail");
     assert!(
         error
             .to_string()
@@ -767,7 +826,8 @@ fn build_trust_anchored_checkpoint_publication_rejects_mismatched_local_log_iden
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
             signer_cert_ref: "did:web:chio.example#checkpoint-signer".to_string(),
             publication_profile_version: "phase4-preview.v1".to_string(),
-        }, std::slice::from_ref(&checkpoint.body.kernel_key),
+        },
+        std::slice::from_ref(&checkpoint.body.kernel_key),
     )
     .expect_err("mismatched local log identity must be rejected");
     assert!(error.to_string().contains("does not match log_id"));
@@ -781,9 +841,13 @@ fn detect_checkpoint_equivocation_reports_conflicting_sequence() {
     let conflicting = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"changed".to_vec()], &kp)
         .expect("conflicting checkpoint");
 
-    let equivocation = detect_checkpoint_equivocation(&first, &conflicting, std::slice::from_ref(&first.body.kernel_key))
-        .expect("equivocation detection")
-        .expect("expected conflict");
+    let equivocation = detect_checkpoint_equivocation(
+        &first,
+        &conflicting,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("equivocation detection")
+    .expect("expected conflict");
     assert_eq!(
         equivocation.kind,
         CheckpointEquivocationKind::ConflictingCheckpointSeq
@@ -798,8 +862,12 @@ fn pairwise_checkpoint_equivocations(
     let mut equivocations = Vec::new();
     for (position, checkpoint) in checkpoints.iter().enumerate() {
         for conflicting in checkpoints.iter().skip(position + 1) {
-            if let Some(equivocation) = detect_checkpoint_equivocation(checkpoint, conflicting, std::slice::from_ref(&checkpoint.body.kernel_key))
-                .expect("pairwise equivocation detection")
+            if let Some(equivocation) = detect_checkpoint_equivocation(
+                checkpoint,
+                conflicting,
+                std::slice::from_ref(&checkpoint.body.kernel_key),
+            )
+            .expect("pairwise equivocation detection")
             {
                 equivocations.push(equivocation);
             }
@@ -897,9 +965,15 @@ fn indexed_equivocation_matches_pairwise_orientation_and_priority() {
         ),
     ] {
         let expected = pairwise_checkpoint_equivocations(&checkpoints);
-        let actual = build_checkpoint_transparency(&checkpoints, &checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())
-            .expect("indexed transparency")
-            .equivocations;
+        let actual = build_checkpoint_transparency(
+            &checkpoints,
+            &checkpoints
+                .iter()
+                .map(|checkpoint| checkpoint.body.kernel_key.clone())
+                .collect::<Vec<_>>(),
+        )
+        .expect("indexed transparency")
+        .equivocations;
         assert_eq!(actual, expected);
         assert!(actual
             .iter()
@@ -939,8 +1013,11 @@ fn checkpoint_rejects_same_log_same_tree_size_fork() {
     )
     .expect("fork");
 
-    let error = validate_checkpoint_transparency(&[first.clone(), second, fork], std::slice::from_ref(&first.body.kernel_key))
-        .expect_err("same-log same-tree-size fork should fail");
+    let error = validate_checkpoint_transparency(
+        &[first.clone(), second, fork],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("same-log same-tree-size fork should fail");
     assert!(
         error.to_string().contains("cumulative tree size 6"),
         "unexpected error: {error}"
@@ -973,7 +1050,13 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
     .expect("third");
 
     let leaves = chain_leaves(&[&first, &second, &third]);
-    let proof = build_checkpoint_consistency_proof(&first, &second, &leaves[..2], std::slice::from_ref(&first.body.kernel_key)).expect("proof");
+    let proof = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &leaves[..2],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("proof");
     assert_eq!(proof.schema, CHECKPOINT_CONSISTENCY_PROOF_SCHEMA);
     assert_eq!(proof.log_id, checkpoint_log_id(&first));
     assert_eq!(proof.from_log_tree_size, 3);
@@ -983,11 +1066,23 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
     assert_eq!(Some(proof.from_chain_root), first.body.chain_root);
     assert_eq!(Some(proof.to_chain_root), second.body.chain_root);
     assert!(
-        verify_checkpoint_consistency_proof(&first, &second, &proof, std::slice::from_ref(&first.body.kernel_key)).expect("verify proof"),
+        verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &proof,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify proof"),
         "chain-growth proof should verify"
     );
 
-    let later = build_checkpoint_consistency_proof(&second, &third, &leaves, std::slice::from_ref(&second.body.kernel_key)).expect("later");
+    let later = build_checkpoint_consistency_proof(
+        &second,
+        &third,
+        &leaves,
+        std::slice::from_ref(&second.body.kernel_key),
+    )
+    .expect("later");
     assert!(
         !later.chain_proof_hashes.is_empty(),
         "a chain extension past one leaf must carry node hashes"
@@ -997,7 +1092,8 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
             &second,
             &third,
             &later,
-            CheckpointConsistencyAnchor::ChainPrefix(&leaves[..2]), std::slice::from_ref(&second.body.kernel_key),
+            CheckpointConsistencyAnchor::ChainPrefix(&leaves[..2]),
+            std::slice::from_ref(&second.body.kernel_key),
         )
         .expect("verify later"),
         "second chain-growth proof should verify against the verified prefix"
@@ -1009,7 +1105,8 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
             &later,
             CheckpointConsistencyAnchor::VerifiedChainRoot(
                 second.body.chain_root.expect("second chain root")
-            ), std::slice::from_ref(&second.body.kernel_key),
+            ),
+            std::slice::from_ref(&second.body.kernel_key),
         )
         .expect("verify later against a pinned root"),
         "a previously verified chain root anchors the same proof"
@@ -1055,14 +1152,23 @@ fn consistency_proof_rejects_maximum_untrusted_leaf_index_without_panicking() {
         &chain_leaves(&[&first]),
     )
     .expect("second");
-    let mut proof =
-        build_checkpoint_consistency_proof(&first, &second, &chain_leaves(&[&first, &second]), std::slice::from_ref(&first.body.kernel_key))
-            .expect("proof");
+    let mut proof = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &chain_leaves(&[&first, &second]),
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("proof");
     proof.from_leaf_inclusion.leaf_index = usize::MAX;
 
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &second, &proof, std::slice::from_ref(&first.body.kernel_key))
-            .expect("malformed proof is denied"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &proof,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("malformed proof is denied"),
         "an overflowing leaf index must fail closed"
     );
 }
@@ -1094,8 +1200,11 @@ fn transparency_preserves_post_rotation_consistency_proofs() {
     )
     .expect("post-rotation checkpoint");
 
-    let transparency =
-        build_checkpoint_transparency(&[first.clone(), second, third], &[first_key.public_key(), rotated_key.public_key()]).expect("transparency");
+    let transparency = build_checkpoint_transparency(
+        &[first.clone(), second, third],
+        &[first_key.public_key(), rotated_key.public_key()],
+    )
+    .expect("transparency");
     assert_eq!(transparency.consistency_proofs.len(), 1);
     assert_eq!(transparency.consistency_proofs[0].from_checkpoint_seq, 2);
     assert_eq!(transparency.consistency_proofs[0].to_checkpoint_seq, 3);
@@ -1121,8 +1230,11 @@ fn transparency_rejects_divergent_chain_root_at_key_rotation() {
         Some(checkpoint_chain_root(&[leaf_hash(b"unrelated-rotated-history")]).expect("root"));
     second.signature = sign_checkpoint_body(&rotated_key, &second.body);
 
-    let error = build_checkpoint_transparency(&[first.clone(), second], &[first_key.public_key(), rotated_key.public_key()])
-        .expect_err("key rotation must not bypass the global chain commitment");
+    let error = build_checkpoint_transparency(
+        &[first.clone(), second],
+        &[first_key.public_key(), rotated_key.public_key()],
+    )
+    .expect_err("key rotation must not bypass the global chain commitment");
     assert!(
         error
             .to_string()
@@ -1146,7 +1258,13 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
     )
     .expect("second");
     let leaves = chain_leaves(&[&first, &second]);
-    let honest = build_checkpoint_consistency_proof(&first, &second, &leaves, std::slice::from_ref(&first.body.kernel_key)).expect("proof");
+    let honest = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &leaves,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("proof");
 
     // A key-holding log that rewrites history: the successor commits a
     // chain root with no append-only relation to the predecessor's, and
@@ -1162,7 +1280,13 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
         checkpoint_body_sha256(&rewritten.body).expect("rewritten digest");
     forged.to_chain_root = rewritten.body.chain_root.expect("rewritten chain root");
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &rewritten, &forged, std::slice::from_ref(&first.body.kernel_key)).expect("verify forged"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &rewritten,
+            &forged,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify forged"),
         "a chain root with no append-only relation must not verify"
     );
 
@@ -1170,13 +1294,25 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
     let mut tampered = honest.clone();
     tampered.to_chain_root = Hash::zero();
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &second, &tampered, std::slice::from_ref(&first.body.kernel_key)).expect("verify tampered"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &tampered,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify tampered"),
         "a tampered to_chain_root must not verify"
     );
     let mut truncated = honest.clone();
     truncated.chain_proof_hashes.push(Hash::zero());
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &second, &truncated, std::slice::from_ref(&first.body.kernel_key)).expect("verify extended"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &truncated,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify extended"),
         "an extended proof path must not verify"
     );
 }
@@ -1196,7 +1332,13 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
     )
     .expect("second");
     let leaves = chain_leaves(&[&first, &second]);
-    let honest = build_checkpoint_consistency_proof(&first, &second, &leaves, std::slice::from_ref(&first.body.kernel_key)).expect("proof");
+    let honest = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &leaves,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("proof");
 
     // A key holder commits a chain whose last leaf is not its own body and
     // re-signs. The verifier recomputes from the checkpoint's true leaf, so
@@ -1216,16 +1358,26 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
         .inclusion_proof(1)
         .expect("smuggled inclusion");
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &smuggled, &smuggled_proof, std::slice::from_ref(&first.body.kernel_key))
-            .expect("verify smuggled chain"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &smuggled,
+            &smuggled_proof,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify smuggled chain"),
         "a chain whose last leaf is not this checkpoint must not verify"
     );
 
     let mut wrong_index = honest.clone();
     wrong_index.to_leaf_inclusion.leaf_index = 0;
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &second, &wrong_index, std::slice::from_ref(&first.body.kernel_key))
-            .expect("verify wrong index"),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &wrong_index,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .expect("verify wrong index"),
         "the checkpoint leaf must be proven at the last position"
     );
 }
@@ -1260,8 +1412,13 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
     )
     .expect("third");
     let honest_leaves = chain_leaves(&[&first, &second, &third]);
-    let honest =
-        build_checkpoint_consistency_proof(&second, &third, &honest_leaves, std::slice::from_ref(&second.body.kernel_key)).expect("honest");
+    let honest = build_checkpoint_consistency_proof(
+        &second,
+        &third,
+        &honest_leaves,
+        std::slice::from_ref(&second.body.kernel_key),
+    )
+    .expect("honest");
 
     // Same sizes as the honest chain, but the second leaf is junk instead
     // of checkpoint 2's body; checkpoint 3's real leaf is still appended.
@@ -1312,7 +1469,8 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
             &forged_second,
             &forged_third,
             &forged,
-            CheckpointConsistencyAnchor::VerifiedChainRoot(forged_from_tree.root()), std::slice::from_ref(&forged_second.body.kernel_key),
+            CheckpointConsistencyAnchor::VerifiedChainRoot(forged_from_tree.root()),
+            std::slice::from_ref(&forged_second.body.kernel_key),
         )
         .expect("verify forged mid-chain pair"),
         "an earlier root that does not commit the earlier body must not verify"
@@ -1348,8 +1506,13 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
     )
     .expect("third");
     let honest_leaves = chain_leaves(&[&first, &second, &third]);
-    let honest =
-        build_checkpoint_consistency_proof(&second, &third, &honest_leaves, std::slice::from_ref(&second.body.kernel_key)).expect("honest");
+    let honest = build_checkpoint_consistency_proof(
+        &second,
+        &third,
+        &honest_leaves,
+        std::slice::from_ref(&second.body.kernel_key),
+    )
+    .expect("honest");
 
     // Checkpoint 1's leaf is replaced by junk; checkpoints 2 and 3 keep their
     // real leaves at their own positions.
@@ -1382,8 +1545,13 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
         ..honest.clone()
     };
 
-    let error = verify_checkpoint_consistency_proof(&forged_second, &forged_third, &forged, std::slice::from_ref(&forged_second.body.kernel_key))
-        .expect_err("a mid-chain pair is not genesis-anchored");
+    let error = verify_checkpoint_consistency_proof(
+        &forged_second,
+        &forged_third,
+        &forged,
+        std::slice::from_ref(&forged_second.body.kernel_key),
+    )
+    .expect_err("a mid-chain pair is not genesis-anchored");
     assert!(
         error.to_string().contains("is unanchored"),
         "unexpected error: {error}"
@@ -1394,7 +1562,8 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
             &forged_second,
             &forged_third,
             &forged,
-            CheckpointConsistencyAnchor::ChainPrefix(&honest_leaves[..2]), std::slice::from_ref(&forged_second.body.kernel_key),
+            CheckpointConsistencyAnchor::ChainPrefix(&honest_leaves[..2]),
+            std::slice::from_ref(&forged_second.body.kernel_key),
         )
         .expect("verify forged prefix"),
         "a fabricated pre-pair history must not verify against the real prefix"
@@ -1405,7 +1574,8 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
             &second,
             &third,
             &honest,
-            CheckpointConsistencyAnchor::ChainPrefix(&honest_leaves[..2]), std::slice::from_ref(&second.body.kernel_key),
+            CheckpointConsistencyAnchor::ChainPrefix(&honest_leaves[..2]),
+            std::slice::from_ref(&second.body.kernel_key),
         )
         .expect("verify honest prefix"),
         "the honest pair still verifies against the real prefix"
@@ -1427,14 +1597,25 @@ fn checkpoint_consistency_proof_requires_chain_commitment() {
     )
     .expect("second");
     let leaves = chain_leaves(&[&first, &second]);
-    let proof = build_checkpoint_consistency_proof(&first, &second, &leaves, std::slice::from_ref(&first.body.kernel_key)).expect("proof");
+    let proof = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &leaves,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("proof");
 
     let mut rootless_second = second.clone();
     rootless_second.body.chain_root = None;
     rootless_second.signature = sign_checkpoint_body(&kp, &rootless_second.body);
 
-    let error = verify_checkpoint_consistency_proof(&first, &rootless_second, &proof, std::slice::from_ref(&first.body.kernel_key))
-        .expect_err("a rootless endpoint cannot carry a consistency proof");
+    let error = verify_checkpoint_consistency_proof(
+        &first,
+        &rootless_second,
+        &proof,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("a rootless endpoint cannot carry a consistency proof");
     assert!(
         error
             .to_string()
@@ -1460,8 +1641,12 @@ fn validate_checkpoint_predecessor_rejects_chain_commitment_downgrade() {
     second.body.chain_root = None;
     second.signature = sign_checkpoint_body(&kp, &second.body);
 
-    let error =
-        validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect_err("downgrade should fail");
+    let error = validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("downgrade should fail");
     assert!(
         error
             .to_string()
@@ -1478,7 +1663,11 @@ fn validate_checkpoint_rejects_first_checkpoint_chain_root_mismatch() {
     checkpoint.body.chain_root = Some(Hash::zero());
     checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("checkpoint should be invalid");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("checkpoint should be invalid");
     assert!(
         error
             .to_string()
@@ -1519,7 +1708,11 @@ fn validate_checkpoint_rejects_a_first_checkpoint_without_chain_root() {
     checkpoint.body.chain_root = None;
     checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("checkpoint 1 needs its chain root");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("checkpoint 1 needs its chain root");
     assert_eq!(
         error.to_string(),
         "invalid checkpoint: checkpoint 1 must carry chain_root"
@@ -1534,7 +1727,11 @@ fn validate_checkpoint_rejects_retired_statement_schema() {
     checkpoint.body.schema = "chio.checkpoint_statement.v2".to_string();
     checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("retired schema must be refused");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("retired schema must be refused");
     assert_eq!(
         error.to_string(),
         "invalid checkpoint: unsupported checkpoint schema chio.checkpoint_statement.v2"
@@ -1608,7 +1805,8 @@ fn kernel_checkpoint_serde_roundtrip() {
     assert_eq!(cp.signature.to_hex(), restored.signature.to_hex());
     // Verify signature still works after roundtrip.
     assert!(
-        verify_checkpoint_signature(&restored, std::slice::from_ref(&restored.body.kernel_key)).expect("verify failed"),
+        verify_checkpoint_signature(&restored, std::slice::from_ref(&restored.body.kernel_key))
+            .expect("verify failed"),
         "roundtripped checkpoint signature should verify"
     );
 }
@@ -1620,7 +1818,11 @@ fn validate_checkpoint_rejects_zero_checkpoint_seq() {
     let mut checkpoint = build_checkpoint(1, 1, 3, &batch, &kp).expect("build failed");
     checkpoint.body.checkpoint_seq = 0;
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("checkpoint should be invalid");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("checkpoint should be invalid");
     assert!(
         error
             .to_string()
@@ -1636,7 +1838,11 @@ fn validate_checkpoint_rejects_tampered_signature() {
     let mut checkpoint = build_checkpoint(1, 1, 3, &batch, &kp).expect("build failed");
     checkpoint.body.issued_at = checkpoint.body.issued_at.saturating_add(1);
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("checkpoint should be invalid");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("checkpoint should be invalid");
     assert!(
         matches!(error, CheckpointError::InvalidSignature),
         "unexpected error: {error}"
@@ -1651,7 +1857,11 @@ fn validate_checkpoint_rejects_tree_size_that_does_not_match_entry_range() {
     checkpoint.body.tree_size = 2;
     checkpoint.signature = sign_checkpoint_body(&kp, &checkpoint.body);
 
-    let error = validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)).expect_err("checkpoint should be invalid");
+    let error = validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .expect_err("checkpoint should be invalid");
     assert!(
         error
             .to_string()
@@ -1675,7 +1885,12 @@ fn validate_checkpoint_predecessor_accepts_contiguous_batches() {
     )
     .expect("build failed");
 
-    validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect("continuity should hold");
+    validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("continuity should hold");
 }
 
 #[test]
@@ -1687,8 +1902,12 @@ fn validate_checkpoint_predecessor_rejects_batch_gap() {
         Some(checkpoint_body_sha256(&first.body).expect("predecessor digest"));
     second.signature = sign_checkpoint_body(&kp, &second.body);
 
-    let error =
-        validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect_err("continuity should fail");
+    let error = validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("continuity should fail");
     assert!(
         error.to_string().contains("does not immediately follow"),
         "unexpected error: {error}"
@@ -1712,8 +1931,12 @@ fn validate_checkpoint_predecessor_rejects_wrong_predecessor_digest() {
     second.body.previous_checkpoint_sha256 = Some("00".repeat(32));
     second.signature = sign_checkpoint_body(&kp, &second.body);
 
-    let error =
-        validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect_err("continuity should fail");
+    let error = validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("continuity should fail");
     assert!(
         error
             .to_string()
@@ -1728,8 +1951,12 @@ fn validate_checkpoint_predecessor_rejects_missing_predecessor_digest() {
     let first = build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build failed");
     let second = build_checkpoint(2, 4, 6, &make_receipt_bytes(3), &kp).expect("build failed");
 
-    let error =
-        validate_checkpoint_predecessor(&first, &second, std::slice::from_ref(&first.body.kernel_key)).expect_err("continuity should fail");
+    let error = validate_checkpoint_predecessor(
+        &first,
+        &second,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("continuity should fail");
     assert!(
         error.to_string().contains("missing predecessor digest"),
         "unexpected error: {error}"
@@ -1765,8 +1992,11 @@ fn validate_checkpoint_transparency_rejects_predecessor_fork() {
         Some(checkpoint_body_sha256(&first.body).expect("first checkpoint digest"));
     fork.signature = sign_checkpoint_body(&kp, &fork.body);
 
-    let error = validate_checkpoint_transparency(&[first.clone(), second, fork], std::slice::from_ref(&first.body.kernel_key))
-        .expect_err("forked checkpoint set should fail");
+    let error = validate_checkpoint_transparency(
+        &[first.clone(), second, fork],
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect_err("forked checkpoint set should fail");
     assert!(
         error
             .to_string()
@@ -1791,8 +2021,11 @@ fn validate_checkpoint_transparency_rejects_truncated_predecessor_chain() {
     )
     .expect("second checkpoint");
 
-    let error = validate_checkpoint_transparency(&[second.clone()], std::slice::from_ref(&second.body.kernel_key))
-        .expect_err("a checkpoint set with an unresolved predecessor must fail closed");
+    let error = validate_checkpoint_transparency(
+        &[second.clone()],
+        std::slice::from_ref(&second.body.kernel_key),
+    )
+    .expect_err("a checkpoint set with an unresolved predecessor must fail closed");
     assert!(
         error.to_string().contains("unresolved predecessor"),
         "unexpected error: {error}"

@@ -1701,13 +1701,11 @@ fn derive_publication_materials_with_summary(
                 summary,
                 &carried_kernel_keys,
             )
-            .map_err(
-                |error| {
-                    MercuryContractError::Validation(format!(
-                        "checkpoint transparency verification failed: {error}"
-                    ))
-                },
-            )?,
+            .map_err(|error| {
+                MercuryContractError::Validation(format!(
+                    "checkpoint transparency verification failed: {error}"
+                ))
+            })?,
         ),
         None => None,
     };
@@ -1715,10 +1713,10 @@ fn derive_publication_materials_with_summary(
         Some(summary) => summary.clone(),
         None => validate_checkpoint_transparency(&bundle.checkpoints, &carried_kernel_keys)
             .map_err(|error| {
-            MercuryContractError::Validation(format!(
-                "checkpoint transparency verification failed: {error}"
-            ))
-        })?,
+                MercuryContractError::Validation(format!(
+                    "checkpoint transparency verification failed: {error}"
+                ))
+            })?,
     };
     let claim_boundary = build_evidence_transparency_claims(
         bundle,

@@ -80,8 +80,10 @@ pub(super) fn settled_delivery_evidence(
     let leaves = vec![canonical_json_bytes(&receipt)?];
     let checkpoint = build_checkpoint(1, 1, 1, &leaves, &delivery_log_signer())?;
     let receipt = resolve(receipt, &leaves, 0, 1, 1)?;
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&checkpoint),
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
     let profile = verifier_profile()?;
     let delivery_policy = profile
         .body

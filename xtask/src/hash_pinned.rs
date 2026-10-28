@@ -37,8 +37,7 @@ const WEB3_APP_SOURCES: &[&str] = &[
 ];
 
 /// Signature verification primitives the app must not apply to the bundle.
-const SIGNATURE_VERIFIER_PATTERN: &str =
-    r"ed25519|nacl|@noble|chio-ts|@chio/|verifyAsync|subtle\.verify|verify_signature|verifySignature";
+const SIGNATURE_VERIFIER_PATTERN: &str = r"ed25519|nacl|@noble|chio-ts|@chio/|verifyAsync|subtle\.verify|verify_signature|verifySignature";
 
 /// `git grep -l -F good-bundle` lists only [`WEB3_GOOD_BUNDLE_READERS`]
 /// outside the bundle, and `git grep -l -i -E` [`SIGNATURE_VERIFIER_PATTERN`]

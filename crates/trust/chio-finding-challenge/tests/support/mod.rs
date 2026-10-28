@@ -977,8 +977,10 @@ impl World {
         let leaves = vec![canonical_json_bytes(&receipt)?];
         let checkpoint = build_checkpoint(1, 1, 1, &leaves, &self.delivery_checkpoint)?;
         let resolved = resolve(receipt, &leaves, 0, 1, 1)?;
-        let checkpoint_transparency =
-            build_checkpoint_transparency(core::slice::from_ref(&checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
+        let checkpoint_transparency = build_checkpoint_transparency(
+            core::slice::from_ref(&checkpoint),
+            std::slice::from_ref(&checkpoint.body.kernel_key),
+        )?;
         let delivery_policy = self
             .profile
             .body
@@ -1334,8 +1336,10 @@ fn digest_case_for(world: &World, shape: &DenyShape, buyer_filing: bool) -> Buil
         deny_checkpoint
     };
 
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&deny_checkpoint), std::slice::from_ref(&deny_checkpoint.body.kernel_key))?;
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&deny_checkpoint),
+        std::slice::from_ref(&deny_checkpoint.body.kernel_key),
+    )?;
     Ok(DigestCase {
         challenge,
         failed_delivery,
@@ -1631,9 +1635,11 @@ fn build_evidence_case(
     // cannot produce valid derived transparency. Keep the supplied summary
     // empty so the evaluator, rather than fixture setup, performs the
     // fail-closed rejection.
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&challenged_checkpoint), std::slice::from_ref(&challenged_checkpoint.body.kernel_key))
-            .unwrap_or_default();
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&challenged_checkpoint),
+        std::slice::from_ref(&challenged_checkpoint.body.kernel_key),
+    )
+    .unwrap_or_default();
     let production_log_id = log_id_for(&world.production_checkpoint)?;
     let checkpoint_policy = world
         .profile
@@ -1959,8 +1965,10 @@ pub fn replay_case(world: &World, shape: &ReplayShape) -> Built<ReplayCase> {
     let replay_authority_status =
         signed_authority_status(&replay_policy.policy, &world.authority_status, None)?;
 
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&checkpoint), std::slice::from_ref(&checkpoint.body.kernel_key))?;
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&checkpoint),
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
     Ok(ReplayCase {
         challenge,
         purchase_record,

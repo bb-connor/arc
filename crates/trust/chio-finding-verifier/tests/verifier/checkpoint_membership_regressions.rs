@@ -10,7 +10,13 @@ fn checkpoint_equivocation_fails_before_membership() -> TestResult {
         &chio_core_types::CanonicalBytes::from_serializable(&fork.body)?,
     )?;
     let checkpoints = vec![fx.checkpoint.clone(), fork];
-    let transparency = build_checkpoint_transparency(&checkpoints, &checkpoints.iter().map(|checkpoint| checkpoint.body.kernel_key.clone()).collect::<Vec<_>>())?;
+    let transparency = build_checkpoint_transparency(
+        &checkpoints,
+        &checkpoints
+            .iter()
+            .map(|checkpoint| checkpoint.body.kernel_key.clone())
+            .collect::<Vec<_>>(),
+    )?;
 
     assert_eq!(
         verify_checkpoint_membership(

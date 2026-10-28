@@ -1489,9 +1489,7 @@ fn liability_claim_settlement_instruction_rejects_self_asserted_authority_role()
         "self-asserted settlement authority",
     );
     assert_eq!(error.code(), crate::MarketErrorCode::SignatureInvalid);
-    assert!(error
-        .detail()
-        .contains("signer must match principalId"));
+    assert!(error.detail().contains("signer must match principalId"));
 }
 
 #[test]

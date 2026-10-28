@@ -472,9 +472,11 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
             oldest_live_receipt_timestamp: Some(1_775_137_626),
         },
     };
-    let mut transparency =
-        validate_checkpoint_transparency(&[first_checkpoint.clone(), second_checkpoint.clone()], std::slice::from_ref(&first_checkpoint.body.kernel_key))
-            .expect("transparency");
+    let mut transparency = validate_checkpoint_transparency(
+        &[first_checkpoint.clone(), second_checkpoint.clone()],
+        std::slice::from_ref(&first_checkpoint.body.kernel_key),
+    )
+    .expect("transparency");
     let binding = CheckpointPublicationTrustAnchorBinding {
         publication_identity: CheckpointPublicationIdentity::new(
             CheckpointPublicationIdentityKind::LocalLog,
@@ -489,10 +491,18 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         publication_profile_version: "phase4-pilot".to_string(),
     };
     transparency.publications = vec![
-        build_trust_anchored_checkpoint_publication(&first_checkpoint, binding.clone(), std::slice::from_ref(&first_checkpoint.body.kernel_key))
-            .expect("first anchored publication"),
-        build_trust_anchored_checkpoint_publication(&second_checkpoint, binding, std::slice::from_ref(&second_checkpoint.body.kernel_key))
-            .expect("second anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &first_checkpoint,
+            binding.clone(),
+            std::slice::from_ref(&first_checkpoint.body.kernel_key),
+        )
+        .expect("first anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &second_checkpoint,
+            binding,
+            std::slice::from_ref(&second_checkpoint.body.kernel_key),
+        )
+        .expect("second anchored publication"),
     ];
     (bundle, transparency)
 }

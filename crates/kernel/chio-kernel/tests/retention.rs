@@ -487,7 +487,11 @@ mod retention {
 
         // Verify the checkpoint signature.
         assert!(
-            verify_checkpoint_signature(&loaded_cp, std::slice::from_ref(&loaded_cp.body.kernel_key)).unwrap(),
+            verify_checkpoint_signature(
+                &loaded_cp,
+                std::slice::from_ref(&loaded_cp.body.kernel_key)
+            )
+            .unwrap(),
             "checkpoint signature should verify in archive"
         );
 

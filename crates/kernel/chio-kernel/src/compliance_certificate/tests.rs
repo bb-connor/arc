@@ -18,12 +18,21 @@ fn verification_refuses_unwrapped_and_foreign_id_signatures() {
         &Ed25519Backend::new(key.clone()),
     )
     .unwrap();
-    verify_session_compliance_certificate(&cert, &key.public_key(), KernelCryptoFloor::AllowClassical).unwrap();
+    verify_session_compliance_certificate(
+        &cert,
+        &key.public_key(),
+        KernelCryptoFloor::AllowClassical,
+    )
+    .unwrap();
     for (label, signature) in crate::wrapper_refusals::refused_signatures(&key, &cert.body) {
         cert.signature = signature;
         assert!(
             matches!(
-                verify_session_compliance_certificate(&cert, &key.public_key(), KernelCryptoFloor::AllowClassical),
+                verify_session_compliance_certificate(
+                    &cert,
+                    &key.public_key(),
+                    KernelCryptoFloor::AllowClassical
+                ),
                 Err(ComplianceCertificateError::SignatureVerificationFailed)
             ),
             "{label}"
