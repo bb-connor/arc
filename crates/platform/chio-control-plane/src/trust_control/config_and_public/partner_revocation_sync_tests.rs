@@ -12,7 +12,7 @@ use chio_revocation_oracle::{
 use chio_security_types::clock::FixedClock;
 
 use super::super::portable_issuer_fetch::{
-    build_portable_fetch_agent, PortableFetchDeadline, PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT,
+    PortableFetchDeadline, PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT,
 };
 use super::{sync_partner_revocation_mirror, sync_within, PartnerRevocationFeed};
 use crate::bounded_worker_pool::tests::{drain, single_worker_pool};
@@ -118,13 +118,13 @@ fn loopback_feed(
     addr: std::net::SocketAddr,
     deadline: PortableFetchDeadline,
 ) -> Fallible<PartnerRevocationFeed> {
-    let agent = build_portable_fetch_agent(vec![addr], false, &deadline)?;
     Ok(PartnerRevocationFeed::new(
         PARTNER,
         &format!("http://{addr}"),
-        agent,
+        &chio_egress_contract::HttpEgressContract::permissive_for_tests(&addr.to_string()),
+        chio_egress_contract::system_lookup(),
         deadline,
-    ))
+    )?)
 }
 
 fn page_after(path: &str) -> u64 {

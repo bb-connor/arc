@@ -1,11 +1,14 @@
 //! Blocking ureq transport that dispatches only under an [`HttpEgressContract`].
 
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract, RequestFailure};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::{self, Read};
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::sync::Arc;
-use std::time::Duration;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::sync::{mpsc, Arc, Mutex, MutexGuard};
+use std::thread;
+use std::time::{Duration, Instant};
+use url::Url;
 
 /// Name lookup for one host and port. Every address it returns still passes
 /// the contract address checks before a socket opens.
@@ -17,22 +20,38 @@ pub fn system_lookup() -> ContractLookup {
     Arc::new(|host: &str, port: u16| (host, port).to_socket_addrs().map(Iterator::collect))
 }
 
-/// Blocking HTTP agent whose only constructor is [`BlockingContractAgent::new`].
-/// It never follows redirects, ignores proxy environment variables, checks
-/// every request URL against the contract, and resolves through a resolver
-/// that refuses hosts outside the contract and addresses in denied classes
-/// before a socket opens.
-#[derive(Debug, Clone)]
+/// Checked answers by host and port.
+type PinnedAnswers = BTreeMap<(String, u16), Vec<SocketAddr>>;
+
+/// Blocking HTTP agent whose only constructors are [`BlockingContractAgent::new`]
+/// and [`BlockingContractAgent::with_lookup`]. The first request to a host
+/// resolves it within that request's deadline and checks every address in the
+/// answer against the contract; that request and every later request to the
+/// host, on this agent or its clones, dial only those addresses. It never
+/// follows redirects and ignores proxy environment variables.
+#[derive(Clone)]
 pub struct BlockingContractAgent {
-    agent: ureq::Agent,
     prepared: PreparedHttpEgressContract,
+    timeout: Duration,
+    deadline: Duration,
+    lookup: ContractLookup,
+    pinned: Arc<Mutex<PinnedAnswers>>,
+}
+
+impl std::fmt::Debug for BlockingContractAgent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BlockingContractAgent")
+            .field("prepared", &self.prepared)
+            .field("timeout", &self.timeout)
+            .field("deadline", &self.deadline)
+            .finish_non_exhaustive()
+    }
 }
 
 impl BlockingContractAgent {
     /// `timeout` bounds connect, each read and each write. `deadline` bounds
-    /// the request from connect through the last body byte. Name resolution
-    /// runs before the deadline applies and is bounded only by the system
-    /// resolver.
+    /// each request from name resolution through the last body byte.
     pub fn new(
         contract: &HttpEgressContract,
         timeout: Duration,
@@ -50,19 +69,13 @@ impl BlockingContractAgent {
     ) -> Result<Self, HttpEgressError> {
         let prepared = contract.prepare()?;
         prepared.validate_dispatchable_with_pinned_dns()?;
-        let agent = ureq::AgentBuilder::new()
-            .timeout(deadline)
-            .timeout_connect(timeout)
-            .timeout_read(timeout)
-            .timeout_write(timeout)
-            .redirects(0)
-            .try_proxy_from_env(false)
-            .resolver(ContractResolver {
-                prepared: prepared.clone(),
-                lookup,
-            })
-            .build();
-        Ok(Self { agent, prepared })
+        Ok(Self {
+            prepared,
+            timeout,
+            deadline,
+            lookup,
+            pinned: Arc::new(Mutex::new(BTreeMap::new())),
+        })
     }
 
     pub fn get(&self, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
@@ -73,11 +86,19 @@ impl BlockingContractAgent {
         self.request("POST", url)
     }
 
-    fn request(&self, method: &str, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
+    fn request(
+        &self,
+        method: &'static str,
+        url: &str,
+    ) -> Result<BlockingContractRequest, HttpEgressError> {
         self.prepared.enforce_url(url, 0)?;
         Ok(BlockingContractRequest {
-            request: self.agent.request(method, url),
-            prepared: self.prepared.clone(),
+            agent: self.clone(),
+            deadline: self.deadline,
+            method,
+            url: url.to_string(),
+            headers: Vec::new(),
+            query: Vec::new(),
         })
     }
 }
@@ -85,15 +106,19 @@ impl BlockingContractAgent {
 /// A request whose URL passed the contract. Sending it reads the whole body
 /// under the contract byte ceiling, whatever the status.
 pub struct BlockingContractRequest {
-    request: ureq::Request,
-    prepared: PreparedHttpEgressContract,
+    agent: BlockingContractAgent,
+    deadline: Duration,
+    method: &'static str,
+    url: String,
+    headers: Vec<(String, String)>,
+    query: Vec<(String, String)>,
 }
 
 impl std::fmt::Debug for BlockingContractRequest {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("BlockingContractRequest")
-            .field("method", &self.request.method())
+            .field("method", &self.method)
             .finish_non_exhaustive()
     }
 }
@@ -101,22 +126,59 @@ impl std::fmt::Debug for BlockingContractRequest {
 impl BlockingContractRequest {
     #[must_use]
     pub fn header(mut self, name: &str, value: &str) -> Self {
-        self.request = self.request.set(name, value);
+        self.headers.push((name.to_string(), value.to_string()));
         self
     }
 
     #[must_use]
     pub fn query(mut self, name: &str, value: &str) -> Self {
-        self.request = self.request.query(name, value);
+        self.query.push((name.to_string(), value.to_string()));
+        self
+    }
+
+    /// Bound this request by `deadline` when it is shorter than the agent's.
+    #[must_use]
+    pub fn deadline(mut self, deadline: Duration) -> Self {
+        self.deadline = self.deadline.min(deadline);
         self
     }
 
     pub fn call(self) -> Result<BlockingContractResponse, HttpEgressError> {
-        collect_capped_response(&self.prepared, self.request.call())
+        self.dispatch(None)
     }
 
     pub fn send_bytes(self, body: &[u8]) -> Result<BlockingContractResponse, HttpEgressError> {
-        collect_capped_response(&self.prepared, self.request.send_bytes(body))
+        self.dispatch(Some(body))
+    }
+
+    fn dispatch(self, body: Option<&[u8]>) -> Result<BlockingContractResponse, HttpEgressError> {
+        let ends = Instant::now().checked_add(self.deadline).ok_or_else(|| {
+            HttpEgressError::InvalidContract("request deadline is out of range".to_string())
+        })?;
+        let (host, port) = target_host_and_port(&self.url)?;
+        let addresses = resolve_within(&self.agent, &host, port, ends)?;
+        let remaining = remaining_before(ends, &host)?;
+        let agent = ureq::AgentBuilder::new()
+            .timeout(remaining)
+            .timeout_connect(self.agent.timeout.min(remaining))
+            .timeout_read(self.agent.timeout)
+            .timeout_write(self.agent.timeout)
+            .redirects(0)
+            .try_proxy_from_env(false)
+            .resolver(PinnedResolver { host, addresses })
+            .build();
+        let mut request = agent.request(self.method, &self.url);
+        for (name, value) in &self.headers {
+            request = request.set(name, value);
+        }
+        for (name, value) in &self.query {
+            request = request.query(name, value);
+        }
+        let outcome = match body {
+            Some(body) => request.send_bytes(body),
+            None => request.call(),
+        };
+        collect_capped_response(&self.agent.prepared, outcome)
     }
 }
 
@@ -183,36 +245,128 @@ fn contract_refusal(error: &(dyn Error + 'static)) -> Option<HttpEgressError> {
     None
 }
 
-struct ContractResolver {
-    prepared: PreparedHttpEgressContract,
-    lookup: ContractLookup,
+fn target_host_and_port(url: &str) -> Result<(String, u16), HttpEgressError> {
+    let parsed = Url::parse(url).map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+    let host = parsed
+        .host_str()
+        .ok_or(HttpEgressError::MissingAuthority)?
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_string();
+    let port = parsed.port_or_known_default().ok_or_else(|| {
+        HttpEgressError::InvalidUrl(format!("egress URL {url} has no port or known default"))
+    })?;
+    Ok((host, port))
 }
 
-impl ureq::Resolver for ContractResolver {
-    fn resolve(&self, netloc: &str) -> io::Result<Vec<SocketAddr>> {
-        resolve_with_contract(&self.prepared, &self.lookup, netloc)
-            .map_err(|refusal| io::Error::new(io::ErrorKind::PermissionDenied, refusal))
+/// The addresses pinned for `host`, resolving it before `ends` when this
+/// agent has not resolved it yet. An answer is pinned only if every address
+/// passes the contract.
+fn resolve_within(
+    agent: &BlockingContractAgent,
+    host: &str,
+    port: u16,
+    ends: Instant,
+) -> Result<Vec<SocketAddr>, HttpEgressError> {
+    agent.prepared.enforce_resolver_hostname(host)?;
+    let key = (host.to_string(), port);
+    if let Some(pinned) = pinned_addresses(agent, host)?.get(&key) {
+        return Ok(pinned.clone());
+    }
+    let addresses = match host.parse::<IpAddr>() {
+        Ok(address) => vec![SocketAddr::new(address, port)],
+        Err(_) => lookup_before(&agent.lookup, host, port, ends)?,
+    };
+    let addresses = enforce_resolved_addresses(&agent.prepared, host, addresses)?;
+    Ok(pinned_addresses(agent, host)?
+        .entry(key)
+        .or_insert(addresses)
+        .clone())
+}
+
+fn pinned_addresses<'a>(
+    agent: &'a BlockingContractAgent,
+    host: &str,
+) -> Result<MutexGuard<'a, PinnedAnswers>, HttpEgressError> {
+    agent
+        .pinned
+        .lock()
+        .map_err(|_poisoned| HttpEgressError::DnsResolutionFailed {
+            host: host.to_string(),
+            details: "pinned answers are unavailable".to_string(),
+        })
+}
+
+/// A lookup that outlives `ends` is abandoned on its own thread, which ends
+/// when the resolver returns.
+fn lookup_before(
+    lookup: &ContractLookup,
+    host: &str,
+    port: u16,
+    ends: Instant,
+) -> Result<Vec<SocketAddr>, HttpEgressError> {
+    let wait = remaining_before(ends, host)?;
+    let (answer, answered) = mpsc::sync_channel(1);
+    let lookup = Arc::clone(lookup);
+    let name = host.to_string();
+    thread::Builder::new()
+        .name("chio-egress-lookup".to_string())
+        .spawn(move || {
+            let _receiver_gone = answer.send(lookup(&name, port));
+        })
+        .map_err(|error| HttpEgressError::DnsResolutionFailed {
+            host: host.to_string(),
+            details: error.to_string(),
+        })?;
+    match answered.recv_timeout(wait) {
+        Ok(Ok(addresses)) => Ok(addresses),
+        Ok(Err(error)) => Err(HttpEgressError::DnsResolutionFailed {
+            host: host.to_string(),
+            details: error.to_string(),
+        }),
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(deadline_refusal(host)),
+        Err(mpsc::RecvTimeoutError::Disconnected) => Err(HttpEgressError::DnsResolutionFailed {
+            host: host.to_string(),
+            details: "resolver ended without an answer".to_string(),
+        }),
     }
 }
 
-fn resolve_with_contract(
-    prepared: &PreparedHttpEgressContract,
-    lookup: &ContractLookup,
-    netloc: &str,
-) -> Result<Vec<SocketAddr>, HttpEgressError> {
-    let (host, port) = netloc
-        .rsplit_once(':')
-        .ok_or(HttpEgressError::MissingAuthority)?;
-    let host = host.trim_start_matches('[').trim_end_matches(']');
-    let port = port
-        .parse::<u16>()
-        .map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
-    prepared.enforce_resolver_hostname(host)?;
-    let addresses = lookup(host, port).map_err(|error| HttpEgressError::DnsResolutionFailed {
+fn remaining_before(ends: Instant, host: &str) -> Result<Duration, HttpEgressError> {
+    ends.checked_duration_since(Instant::now())
+        .filter(|remaining| !remaining.is_zero())
+        .ok_or_else(|| deadline_refusal(host))
+}
+
+fn deadline_refusal(host: &str) -> HttpEgressError {
+    HttpEgressError::DnsResolutionFailed {
         host: host.to_string(),
-        details: error.to_string(),
-    })?;
-    enforce_resolved_addresses(prepared, host, addresses)
+        details: "resolution did not finish within the request deadline".to_string(),
+    }
+}
+
+/// Answers only for the request host, with the addresses already checked
+/// against the contract.
+struct PinnedResolver {
+    host: String,
+    addresses: Vec<SocketAddr>,
+}
+
+impl ureq::Resolver for PinnedResolver {
+    fn resolve(&self, netloc: &str) -> io::Result<Vec<SocketAddr>> {
+        let host = netloc
+            .rsplit_once(':')
+            .map(|(host, _port)| host.trim_start_matches('[').trim_end_matches(']'));
+        if host == Some(self.host.as_str()) {
+            return Ok(self.addresses.clone());
+        }
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            HttpEgressError::AuthorityDenied {
+                authority: netloc.to_string(),
+            },
+        ))
+    }
 }
 
 /// Every address in the answer must pass, so one private record refuses the

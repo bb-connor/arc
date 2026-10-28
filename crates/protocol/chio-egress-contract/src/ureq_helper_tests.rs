@@ -45,17 +45,21 @@ fn request_outside_the_authority_set_is_refused_before_dispatch() {
 }
 
 #[test]
-fn resolver_refusal_surfaces_as_the_contract_error() {
-    let agent = agent_for("127.0.0.1:9", 1024);
-    let outcome = agent.agent.get("http://unlisted.invalid:9/").call();
-    let Err(ureq::Error::Transport(transport)) = outcome else {
-        panic!("resolver must refuse the unlisted host");
+fn pinned_resolver_refuses_any_other_host() {
+    let resolver = PinnedResolver {
+        host: "rail.example".to_string(),
+        addresses: vec![SocketAddr::from(([93, 184, 216, 34], 443))],
     };
+    let refusal = ureq::Resolver::resolve(&resolver, "other.example:443").expect_err("other host");
     assert_eq!(
-        transport_failure(transport),
-        HttpEgressError::AuthorityDenied {
-            authority: "unlisted.invalid".to_string()
-        }
+        contract_refusal(&refusal),
+        Some(HttpEgressError::AuthorityDenied {
+            authority: "other.example:443".to_string()
+        })
+    );
+    assert_eq!(
+        ureq::Resolver::resolve(&resolver, "rail.example:443").expect("pinned host"),
+        vec![SocketAddr::from(([93, 184, 216, 34], 443))]
     );
 }
 

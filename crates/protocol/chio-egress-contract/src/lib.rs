@@ -322,7 +322,7 @@ impl HttpEgressContract {
         Ok(false)
     }
 
-    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+    #[cfg(feature = "reqwest-egress")]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.prepare()?.enforce_resolver_hostname(host)
     }
