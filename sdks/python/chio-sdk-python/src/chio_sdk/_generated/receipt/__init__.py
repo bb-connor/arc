@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8f4d04243cd350fcdbd87808b58e0b5565570e6b2d3406614efbe9dce3de495e
+# Schema sha256: 06789f7cc8fb9ed55f9aba55aadcbf4ec7c60d519627433209cdf916fda34f0d
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from .admission_metadata_schema import ChioDurableAdmissionReceiptMetadata, CompensationStatus, Digest, DispatchCommit, DispatchLaunch, Identifier, LaunchRef, NativeLaunch, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, StoreFence, WorkerProfile
+from .decision_model_witness_schema import ChioDecisionModelWitnessReceiptMetadata, Digest, Evaluation, FallbackReason, Outcome
 from .delivery_contract_schema import ChioDeliveryContractReceiptMetadata, Digest, Result
 from .disclosure_schema import ChioReceiptDisclosure, Opening
 from .finding_delivery_schema import ChioFindingDeliveryReceiptMetadata, Digest, DigestCheck, HierarchicalIdentifier, IJsonU64NonZero, Identifier, MediaTypeCheck, SettlementMode, StatusProof, TransformProfile
@@ -25,6 +26,7 @@ __all__ = [
     "Asset",
     "BbsReceiptSignature",
     "BoundaryClass",
+    "ChioDecisionModelWitnessReceiptMetadata",
     "ChioDeliveryContractReceiptMetadata",
     "ChioDurableAdmissionReceiptMetadata",
     "ChioFindingDeliveryReceiptMetadata",
@@ -43,7 +45,9 @@ __all__ = [
     "DigestCheck",
     "DispatchCommit",
     "DispatchLaunch",
+    "Evaluation",
     "EvidenceClass",
+    "FallbackReason",
     "GuardEvidence",
     "HierarchicalIdentifier",
     "IJsonU64NonZero",
@@ -54,6 +58,7 @@ __all__ = [
     "NativeLaunch",
     "ObservationOutcome",
     "Opening",
+    "Outcome",
     "PositiveIJsonInteger",
     "ProjectedDispatchState",
     "ProjectedState",
