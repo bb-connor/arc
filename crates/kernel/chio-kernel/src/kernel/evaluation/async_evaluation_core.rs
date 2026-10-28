@@ -651,7 +651,8 @@ impl ChioKernel {
                                 durable_operation: durable_admission
                                     .as_ref()
                                     .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: runtime_metadata,
+                                runtime_admission_metadata: error
+                                    .rejection_metadata(runtime_metadata),
                                 verified_payee_binding: None,
                                 budget_lease_acquired: false,
                             },
