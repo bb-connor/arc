@@ -650,6 +650,22 @@ pub fn agent() -> Http {
 }
 EOF
 
+http_client_case ureq_parenthesized_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = (ureq::Agent);
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_parenthesized_alias_chain crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as A;
+type Http = (A);
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
@@ -666,7 +682,8 @@ for expectation in \
     reject:ureq_qualified_type_alias reject:ureq_trait_qualified \
     reject:ureq_self_qualified_alias reject:ureq_trait_generic_qualified \
     reject:ureq_alias_trait_generic_qualified accept:ureq_agent_in_turbofish \
-    reject:ureq_parenthesized_qualified reject:ureq_parenthesized_alias_qualified; do
+    reject:ureq_parenthesized_qualified reject:ureq_parenthesized_alias_qualified \
+    reject:ureq_parenthesized_type_alias reject:ureq_parenthesized_alias_chain; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
