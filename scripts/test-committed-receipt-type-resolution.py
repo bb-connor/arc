@@ -375,6 +375,13 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertEqual(len(findings), 1, findings)
         self.assertIn("raw decode", findings[0])
 
+    def test_macro_template_private_wrapper_keeps_concrete_strict_fields(self):
+        findings = self.findings({
+            "crates/demo/src/lib.rs": "macro_rules! m { ($ty:ty) => { struct Private { item: $ty, receipt: ChioReceipt } fn bad(s: &str) { serde_json::from_str::<Private>(s); } }; } m!(u32);",
+        })
+        self.assertEqual(len(findings), 1, findings)
+        self.assertIn("raw decode", findings[0])
+
     def test_macro_template_unknown_concrete_target_is_an_error(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "macro_rules! m { () => { fn bad(s: &str) { serde_json::from_str::<missing::Envelope>(s); } }; } m!();",
