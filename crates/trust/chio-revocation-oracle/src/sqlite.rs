@@ -245,6 +245,12 @@ impl SqliteRevocationOracle {
         Ok(leaves)
     }
 
+    /// The committed tree at one instant. Its root and its membership answer
+    /// from that one state, so a check of its members binds the root it yields.
+    pub fn snapshot(&self) -> Result<InMemoryRevocationOracle> {
+        self.current()
+    }
+
     pub fn current_epoch_root(&self) -> Result<EpochRoot> {
         Ok(self.current()?.epoch_root())
     }

@@ -62,6 +62,7 @@ pub mod fiscal_state_recovery;
 pub mod issuance;
 mod keyring_runtime;
 pub mod passport_revocation;
+pub mod passport_revocation_feed;
 pub mod passport_verifier;
 pub mod policy;
 pub mod reputation;

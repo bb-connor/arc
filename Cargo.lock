@@ -3310,6 +3310,7 @@ dependencies = [
  "clap 4.6.0",
  "futures-util",
  "hex",
+ "jsonschema",
  "libc",
  "nix",
  "p384",

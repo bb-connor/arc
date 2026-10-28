@@ -14,6 +14,11 @@ use super::*;
 #[path = "passport_handlers/public_authority_trust.rs"]
 mod public_authority_trust;
 use public_authority_trust::{public_oid4vp_trusted_keys, run_public_authority_trust_read};
+#[path = "passport_handlers/revocation_feed.rs"]
+mod revocation_feed;
+pub(crate) use revocation_feed::{
+    handle_public_passport_revocation_leaves, handle_public_passport_revocation_root,
+};
 
 pub(crate) async fn handle_passport_issuer_metadata(
     State(state): State<TrustServiceState>,

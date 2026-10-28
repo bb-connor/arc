@@ -192,6 +192,12 @@ async fn serve_async_inner(
             ))
         })?
         .map(Arc::new);
+    let passport_revocation_oracle = config
+        .passport_statuses_file
+        .as_deref()
+        .map(crate::passport_revocation::open_passport_revocation_oracle)
+        .transpose()?
+        .map(Arc::new);
     let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
         Arc::new(chio_security_types::clock::SystemClock);
     provision_service_authority(&config, finding_challenge_clock.clone())?;
@@ -252,6 +258,7 @@ async fn serve_async_inner(
         fiscal_runtime,
         budget_store,
         revocation_store,
+        passport_revocation_oracle,
         receipt_store,
         receipt_query_snapshots,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),

@@ -32,7 +32,9 @@ pub fn passport_revocation_oracle_path(registry: &Path) -> Result<PathBuf, CliEr
     Ok(registry.with_file_name(format!("{name}.revocations.sqlite3")))
 }
 
-fn open_passport_revocation_oracle(registry: &Path) -> Result<SqliteRevocationOracle, CliError> {
+pub(crate) fn open_passport_revocation_oracle(
+    registry: &Path,
+) -> Result<SqliteRevocationOracle, CliError> {
     SqliteRevocationOracle::open(&passport_revocation_oracle_path(registry)?).map_err(|error| {
         CliError::policy_error(format!("passport revocation oracle unavailable: {error}"))
     })

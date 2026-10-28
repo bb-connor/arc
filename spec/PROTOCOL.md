@@ -4782,6 +4782,32 @@ Portable lifecycle resolution itself remains Chio-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
+Trust-control also publishes its passport revocation set to federation
+partners. Revoking a passport writes one leaf for the passport and one leaf for
+each credential digest its lifecycle record lists, in one oracle transaction,
+before the lifecycle registry is written:
+
+- `GET /v1/public/passport/revocations/root` returns a
+  `chio.trust.passport-revocation-root.v1` document whose `signedRoot` is the
+  oracle's `SignedEpochRoot`, signed with the trust-control authority key over
+  the `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
+  the signing time and its `signer_id` is the authority public key in hex
+- `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
+  `chio.trust.passport-revocation-leaves.v1` page of the leaves with a sequence
+  number above `after`, in insertion order, at most 256 leaves and 512 KiB;
+  each leaf carries `seq`, `kind` (`passport` or `credential`) and `subject`
+  (the passport id or the credential digest), and `after` is required
+- every integer in both documents is at most 2^53 - 1; a cursor above that
+  bound, a missing cursor, or any other query member is refused as a client
+  error
+- the publisher signs the root of one oracle snapshot, and refuses to sign
+  when the oracle file is missing, when that snapshot lacks the passport key
+  or any credential key of a passport the lifecycle registry records as
+  revoked, or when the authority clock reads earlier than the oracle's last
+  commit; it refuses a page that would carry a leaf of any other kind
+- both reads share the bounded public passport admission lane and refuse at
+  capacity instead of queueing
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 
