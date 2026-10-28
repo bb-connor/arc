@@ -574,6 +574,34 @@ fn single_endpoint_refuses_non_public_literals_and_userinfo() {
     }
 }
 
+#[test]
+fn a_localhost_name_admits_only_loopback_answers() {
+    let contract =
+        HttpEgressContract::single_endpoint("passport-document", "http://localhost:9/", 1)
+            .expect("loopback name");
+    for address in [
+        IpAddr::V4(Ipv4Addr::LOCALHOST),
+        IpAddr::V6(Ipv6Addr::LOCALHOST),
+        IpAddr::V6(Ipv4Addr::LOCALHOST.to_ipv6_mapped()),
+    ] {
+        contract
+            .enforce_resolved_address("localhost", SocketAddr::new(address, 9))
+            .expect("loopback answer");
+    }
+    for address in [
+        IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)),
+        IpAddr::V6(Ipv4Addr::new(93, 184, 216, 34).to_ipv6_mapped()),
+        IpAddr::V6("2606:2800:220:1::1".parse().unwrap()),
+    ] {
+        for host in ["localhost", "localhost.localdomain", "LocalHost."] {
+            assert!(
+                contract.enforce_resolved_ip(host, address).is_err(),
+                "{host} resolved to {address} was admitted"
+            );
+        }
+    }
+}
+
 #[cfg(all(test, feature = "reqwest-egress"))]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod reqwest_egress_tests {

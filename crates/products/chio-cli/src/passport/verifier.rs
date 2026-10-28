@@ -1047,3 +1047,98 @@ pub(crate) fn cmd_passport_status_revoke(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod verifier_chosen_url_tests {
+    use super::*;
+    use chio_credentials::{
+        CHIO_PASSPORT_SD_JWT_VC_FORMAT, CHIO_PASSPORT_SD_JWT_VC_TYPE,
+        OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI, OID4VP_OPENID4VP_SCHEME,
+        OID4VP_RESPONSE_MODE_DIRECT_POST_JWT, OID4VP_RESPONSE_TYPE_VP_TOKEN,
+    };
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::mpsc;
+
+    fn read_request_head(stream: &mut TcpStream) {
+        let mut head = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !head.ends_with(b"\r\n\r\n") && stream.read(&mut byte).unwrap() == 1 {
+            head.push(byte[0]);
+        }
+    }
+
+    fn reply(body: &str) -> Vec<u8> {
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn a_verifier_chosen_jwks_uri_on_another_loopback_authority_is_not_dialed() {
+        let jwks = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let jwks_uri = format!("http://{}/jwks", jwks.local_addr().unwrap());
+        let (dialed, dial_seen) = mpsc::channel();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = jwks.accept() {
+                let _ = dialed.send(());
+                read_request_head(&mut stream);
+                let _ = stream.write_all(&reply(r#"{"keys":[]}"#));
+            }
+        });
+
+        let verifier = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let origin = format!("http://{}", verifier.local_addr().unwrap());
+        let request_prefix = format!("{origin}/v1/public/passport/oid4vp/requests/");
+        let request_url = format!("{request_prefix}request-1");
+        let metadata = Oid4vpVerifierMetadata {
+            verifier_id: "http://127.0.0.1".to_string(),
+            client_id: "http://127.0.0.1".to_string(),
+            client_id_scheme: OID4VP_CLIENT_ID_SCHEME_REDIRECT_URI.to_string(),
+            request_uri_prefix: request_prefix,
+            response_uri: format!("{origin}/v1/public/passport/oid4vp/direct-post"),
+            same_device_launch_prefix: format!("{OID4VP_OPENID4VP_SCHEME}?request_uri="),
+            jwks_uri,
+            request_object_signing_alg_values_supported: vec!["EdDSA".to_string()],
+            response_mode: OID4VP_RESPONSE_MODE_DIRECT_POST_JWT.to_string(),
+            response_type: OID4VP_RESPONSE_TYPE_VP_TOKEN.to_string(),
+            credential_format: CHIO_PASSPORT_SD_JWT_VC_FORMAT.to_string(),
+            credential_vct: CHIO_PASSPORT_SD_JWT_VC_TYPE.to_string(),
+            authority_generation: None,
+            authority_rotated_at: None,
+            trusted_key_count: 1,
+        };
+        metadata.validate().unwrap();
+        let metadata_body = serde_json::to_string(&metadata).unwrap();
+        let server = std::thread::spawn(move || {
+            for body in ["header.payload.signature".to_string(), metadata_body] {
+                let (mut stream, _) = verifier.accept().unwrap();
+                read_request_head(&mut stream);
+                let _ = stream.write_all(&reply(&body));
+            }
+        });
+
+        let dir = tempfile::tempdir().unwrap();
+        let result = cmd_passport_oid4vp_respond(PassportOid4vpRespondArgs {
+            input: &dir.path().join("credential.jwt"),
+            request_url: Some(&request_url),
+            same_device_url: None,
+            cross_device_url: None,
+            holder_seed_file: &dir.path().join("holder.seed"),
+            output: Some(&dir.path().join("response.jwt")),
+            submit: false,
+            submit_url: None,
+            at: Some(1),
+            json_output: true,
+        });
+        server.join().unwrap();
+        assert!(result.is_err());
+        assert!(
+            dial_seen.try_recv().is_err(),
+            "the holder dialed a verifier-chosen jwks_uri on another loopback authority"
+        );
+    }
+}
