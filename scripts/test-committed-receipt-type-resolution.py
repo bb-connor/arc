@@ -660,6 +660,20 @@ class TypeResolutionTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.assertEqual(self.findings({"crates/demo/src/lib.rs": marker + body}), inferred)
 
+    def test_generic_scrutinee_patterns_leave_the_target_inferred(self):
+        stamp = "fn stamp(r: ChioReceipt) -> u64 { r.timestamp } "
+        inferred = ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"]
+        for body in [
+            "struct Envelope<T> { payload: T } fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Envelope { payload }) => stamp(payload), Err(_) => 0 } }",
+            "struct Envelope<T>(T); fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Envelope(payload)) => stamp(payload), Err(_) => 0 } }",
+            "struct Envelope<T>(T); fn unknown(s: &str) -> u64 { if let Ok(Envelope(payload)) = serde_json::from_str(s) { stamp(payload) } else { 0 } }",
+            "enum Slot<T> { Full(T), Empty } fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Slot::Full(payload)) => stamp(payload), _ => 0 } }",
+        ]:
+            with self.subTest(body=body):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": stamp + body}), inferred)
+        self.assertEqual(len(self.raw_decodes("struct Envelope<T> { payload: T } fn bad(s: &str) { serde_json::from_str::<Envelope<ChioReceipt>>(s); }")), 1)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "struct Envelope<'a> { payload: &'a str } fn good(s: &str) -> usize { match serde_json::from_str(s) { Ok(Envelope { payload }) => payload.len(), Err(_) => 0 } }"}), [])
+
     def test_complete_scrutinee_patterns_name_the_target(self):
         marker = "struct Marker { n: u64 } "
         for body, expected in [
