@@ -1330,6 +1330,23 @@ fn trusted_proof_verification_rejects_invalid_checkpoint_when_profile_flag_is_fa
 }
 
 #[test]
+fn untrusted_proof_verification_rejects_forged_checkpoint_signature() {
+    let mut package = full_trusted_sample_package();
+    package.chio_bundle.checkpoints[0].signature = Keypair::generate().sign(b"forged");
+
+    let error = package
+        .verify(1_775_137_923)
+        .expect_err("forged checkpoint signature");
+
+    assert!(
+        error
+            .to_string()
+            .contains("checkpoint transparency verification failed"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn trusted_proof_verification_rejects_checkpoint_free_audit_only_package() {
     let manifest = sample_mercury_bundle_manifest();
     let bundle_ref = MercuryBundleReference::from_manifest(&manifest).expect("bundle ref");
