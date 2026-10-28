@@ -1958,7 +1958,10 @@ matched capital execution instruction that a pinned execution authority signed
 over the depositor's reserve for the ledger amount, beneficiary, and settlement
 reconciliation reference. The order context presented at release MUST carry
 every accepted order context field unchanged except `id`, `issued_at`,
-`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`.
+`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`. The buyer
+named in the order context at lock time is not authenticated by any signed
+artifact; release binds the depositor to the signed execution instruction's
+`subject_key`, and only that binding authenticates the buyer.
 
 Commerce verification fails closed on currency drift, amount drift,
 merchant/provider mismatch, untrusted provider evidence, expired or overused
