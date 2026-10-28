@@ -182,8 +182,7 @@ fn requalification_callback_reentry_and_owner_change_refuse_atomically(
         let replacement = Source::new(&fixture, behavior);
         let expected = match behavior {
             Behavior::Reenter => AdmissionOperationStoreError::Invariant(
-                "invalid sqlite authority store: replay source migration is already in progress"
-                    .into(),
+                "invalid sqlite authority store: source installation is already in progress".into(),
             ),
             Behavior::ChangeOwner => AdmissionOperationStoreError::Fenced,
             _ => unreachable!(),

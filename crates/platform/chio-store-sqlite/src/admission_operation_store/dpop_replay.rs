@@ -173,9 +173,9 @@ impl SqliteAdmissionOperationStore {
         // Share this guard across every adapter belonging to the owner. A
         // concurrent stale pending plan must not reseal a source after another
         // import has already made its barriers permanent historical evidence.
-        let _migration = self
+        let _installation = self
             .serving_owner
-            .begin_replay_source_migration()
+            .begin_source_installation()
             .map_err(map_owner_error)?;
         let expected = self
             .load_dpop_replay_migration(dpop_authority_id, fence, trusted_now_unix_ms)?

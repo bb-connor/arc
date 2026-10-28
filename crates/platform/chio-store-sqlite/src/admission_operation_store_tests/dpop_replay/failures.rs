@@ -142,10 +142,7 @@ fn owner_wide_installation_guard_refuses_concurrent_import_without_source_access
     let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
-    let guard = fixture
-        .store
-        .serving_owner
-        .begin_replay_source_migration()?;
+    let guard = fixture.store.serving_owner.begin_source_installation()?;
     assert_eq!(
         import(&fixture, &source, &expected),
         Err(AdmissionOperationStoreError::Invariant(

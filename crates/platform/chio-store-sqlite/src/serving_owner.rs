@@ -23,8 +23,8 @@ mod global_commit_chain;
 mod lease_history;
 mod path_identity;
 mod relocation;
-mod replay_source_migration;
 mod rollback_anchor;
+mod source_installation;
 
 pub(crate) use global_commit_chain::budget_event_reference_digest;
 use global_commit_chain::{
@@ -194,7 +194,7 @@ pub(crate) struct SqliteServingOwner {
     pub(crate) fence: StoreMutationFence,
     poisoned: AtomicBool,
     expected_data_version: AtomicU64,
-    replay_source_migration_in_flight: AtomicBool,
+    source_installation_in_flight: AtomicBool,
 }
 
 impl SqliteServingOwner {
@@ -739,7 +739,7 @@ impl SqliteAuthorityStore {
             },
             poisoned: AtomicBool::new(false),
             expected_data_version: AtomicU64::new(expected_data_version),
-            replay_source_migration_in_flight: AtomicBool::new(false),
+            source_installation_in_flight: AtomicBool::new(false),
         });
         crate::channel_release_publisher_store::quarantine_incomplete_dispatches_at_startup(
             &mut connection,
