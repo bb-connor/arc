@@ -707,6 +707,48 @@ pub use reqwest_helper::{
 };
 
 impl HttpEgressContract {
+    /// Contract for the single endpoint `url` names: that URL's scheme and
+    /// authority only, `https` or plaintext `http` to a loopback host, no
+    /// redirects, and `max_response_bytes`. Loopback is admitted only when
+    /// `url` names a loopback host; link-local, unique-local, private and
+    /// special-use addresses are refused. `url` itself is enforced before the
+    /// contract is returned, and resolved addresses are enforced at connect.
+    pub fn single_endpoint(
+        tenant_egress_namespace: &str,
+        url: &str,
+        max_response_bytes: u64,
+    ) -> Result<Self, HttpEgressError> {
+        let parsed =
+            Url::parse(url).map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+        let loopback = match parsed.host() {
+            Some(Host::Domain(domain)) => matches!(
+                normalize_domain_name(domain).as_str(),
+                "localhost" | "localhost.localdomain"
+            ),
+            Some(Host::Ipv4(address)) => address.is_loopback(),
+            Some(Host::Ipv6(address)) => address.is_loopback(),
+            None => return Err(HttpEgressError::MissingAuthority),
+        };
+        let scheme = parsed.scheme();
+        if scheme != "https" && !(scheme == "http" && loopback) {
+            return Err(HttpEgressError::SchemeDenied {
+                scheme: scheme.to_owned(),
+            });
+        }
+        let contract = Self {
+            tenant_egress_namespace: tenant_egress_namespace.to_owned(),
+            allowed_schemes: BTreeSet::from([scheme.to_owned()]),
+            allowed_authority_set: BTreeSet::from([normalized_url_authority(&parsed)?]),
+            deny_loopback: !loopback,
+            deny_link_local: true,
+            deny_ipv6_ula: true,
+            max_redirect_chain: 0,
+            max_response_bytes,
+        };
+        contract.enforce_url(url, 0)?;
+        Ok(contract)
+    }
+
     /// Construct a permissive contract suitable for tests that exercise a
     /// wiremock or other local loopback HTTP server. Production code MUST NOT
     /// use this; production always builds a contract from tenant-scoped
