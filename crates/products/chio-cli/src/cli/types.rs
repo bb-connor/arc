@@ -32,7 +32,6 @@ pub(crate) use finding::*;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum OutputFormat {
     #[default]
-    #[value(alias = "table")]
     Human,
     Json,
 }

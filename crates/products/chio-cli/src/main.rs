@@ -92,7 +92,6 @@ use crate::policy::load_policy;
 
 #[path = "cli/types.rs"]
 mod types_cli;
-#[allow(unused_imports)]
 pub(crate) use types_cli::{
     ApiCommands, ArenaCommands, AuthorityDeploymentCommands, AuthorityStoreCommands, CertCommands,
     CertifyCommands, CertifyRegistryCommands, CheckMode, ChioAttestCommands, ChioBuyerCommands,
@@ -140,11 +139,7 @@ mod security_preflight_cli;
 pub(crate) use security_preflight_cli::{cmd_security_preflight, PreflightArgs, PreflightStores};
 #[path = "cli/security_supervise.rs"]
 mod security_supervise_cli;
-#[allow(unused_imports)]
-pub(crate) use doctor_cli::{
-    cmd_doctor, render_doctor_human, render_doctor_json, render_titled_human, write_doctor_report,
-    DoctorArgs,
-};
+pub(crate) use doctor_cli::{cmd_doctor, render_doctor_json, render_titled_human, DoctorArgs};
 pub(crate) use security_supervise_cli::{cmd_security_supervise, SuperviseArgs};
 #[path = "cli/dispatch/mod.rs"]
 mod dispatch_cli;
@@ -185,15 +180,10 @@ fn main() {
 mod process_host;
 #[path = "cli/runtime.rs"]
 mod runtime_cli;
-#[allow(unused_imports)]
 pub(crate) use runtime_cli::{
-    cli_normalized_url_authority, cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http,
-    cmd_run, cmd_start, cmd_trust_revoke, cmd_trust_serve, cmd_trust_status,
-    is_cli_ipv6_unicast_link_local, is_cli_ipv6_unique_local, load_roster_policy,
-    optional_secret_with_env_fallback,
-    parse_trusted_capability_issuers_from_env, remote_mcp_auth_egress_contract,
-    require_receipt_db_path, require_revocation_db_path, verdict_label, CHIO_START_NO_UPSTREAM_URL,
-    CHIO_START_SIDECAR_OPENAPI_SPEC,
+    cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http, cmd_run, cmd_start,
+    cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
+    require_receipt_db_path,
 };
 #[path = "cli/runtime/trust_reports.rs"]
 mod runtime_trust_reports;
@@ -201,13 +191,8 @@ mod runtime_trust_reports;
 mod trust_config_check;
 #[path = "cli/trust_commands.rs"]
 mod trust_commands_cli;
-#[cfg(test)]
-#[allow(unused_imports)]
-pub(crate) use trust_commands_cli::select_receipt_for_explain;
-#[allow(unused_imports)]
 pub(crate) use trust_commands_cli::{
-    build_underwriting_policy_input_query, cmd_receipt_audit,
-    cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
+    cmd_receipt_audit, cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
     cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
     cmd_trust_credit_loss_lifecycle_evaluate, cmd_trust_credit_loss_lifecycle_issue,
@@ -228,68 +213,32 @@ pub(crate) use trust_commands_cli::{
     cmd_trust_underwriting_appeal_resolve, cmd_trust_underwriting_decision_evaluate,
     cmd_trust_underwriting_decision_issue, cmd_trust_underwriting_decision_list,
     cmd_trust_underwriting_decision_simulate, cmd_trust_underwriting_input_export,
-    decision_details, explain_decision_label, explain_dsse_envelope,
-    explain_receipt_value, finish_receipt_for_explain, inspect_bilateral_envelope_trace,
-    is_dsse_envelope_value, json_path_str, load_credit_bonded_execution_control_policy,
-    load_existing_kernel_checkpoint_keypair, load_json_or_yaml,
-    load_liability_auto_bind_issue_request, load_liability_bound_coverage_issue_request,
-    load_liability_claim_adjudication_issue_request, load_liability_claim_dispute_issue_request,
-    load_liability_claim_issue_request, load_liability_claim_payout_instruction_issue_request,
-    load_liability_claim_payout_receipt_issue_request, load_liability_claim_response_issue_request,
-    load_liability_claim_settlement_instruction_issue_request,
-    load_liability_claim_settlement_receipt_issue_request, load_liability_placement_issue_request,
-    load_liability_pricing_authority_issue_request, load_liability_provider_report,
-    load_liability_quote_request_issue_request, load_liability_quote_response_issue_request,
-    load_receipt_for_explain, load_runtime_attestation_evidence,
-    load_runtime_attestation_import_policy, load_signed_runtime_attestation_appraisal_result,
-    load_underwriting_decision_policy, local_receipt_read_context, local_receipt_store,
-    optional_u64, parse_credit_bond_disposition, parse_credit_bond_lifecycle_state,
-    parse_credit_facility_disposition, parse_credit_facility_lifecycle_state,
-    parse_credit_loss_lifecycle_event_kind, parse_governed_autonomy_tier,
-    parse_liability_coverage_class, parse_liability_provider_lifecycle_state,
-    parse_runtime_assurance_tier, parse_underwriting_appeal_resolution,
-    parse_underwriting_appeal_status, parse_underwriting_decision_outcome,
-    parse_underwriting_lifecycle_state, print_bilateral_human, print_receipt_operator_json,
-    push_receipt_explain_matches, push_writer_counters_human, receipt_checkpoint_report_error,
-    receipt_health_report_error, receipt_operator_json_value, receipt_value_matches_id,
-    render_bilateral_explain, render_receipt_checkpoint_create_human,
-    render_receipt_checkpoint_status_human, render_receipt_flush_human,
-    render_receipt_health_human, repair_hint, trusted_kernel_keys_from_authority,
+    load_credit_bonded_execution_control_policy, load_json_or_yaml, parse_credit_bond_disposition,
+    parse_credit_bond_lifecycle_state, parse_credit_facility_disposition,
+    parse_credit_facility_lifecycle_state, parse_credit_loss_lifecycle_event_kind,
+    parse_governed_autonomy_tier, parse_runtime_assurance_tier, trusted_kernel_keys_from_authority,
     BudgetQueryBackend, CreditBacktestExportArgs, CreditLossLifecycleListArgs,
     LiabilityClaimsListArgs, LiabilityMarketListArgs, ProviderRiskPackageExportArgs, QueryBackend,
-    ReceiptExplainArgs, ReceiptListArgs, ReceiptOperatorJsonEnvelope, SignedQueryBackend,
-    UnderwritingAppealResolveArgs, UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs,
-    UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
-    CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
-    CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
+    ReceiptExplainArgs, ReceiptListArgs, SignedQueryBackend, UnderwritingAppealResolveArgs,
+    UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs, UnderwritingDecisionSimulateArgs,
+    UnderwritingPolicyInputArgs,
+};
+#[cfg(test)]
+pub(crate) use trust_commands_cli::{
+    load_runtime_attestation_evidence, load_signed_runtime_attestation_appraisal_result,
+    load_underwriting_decision_policy,
 };
 #[path = "cli/session/mod.rs"]
 mod session_cli;
-#[allow(unused_imports)]
 pub(crate) use session_cli::{
-    control_request_id, handle_agent_message, normalize_agent_message, print_summary,
-    select_capability_for_request, tool_response_messages, SessionStats,
+    handle_agent_message, print_summary, select_capability_for_request, SessionStats,
 };
-#[cfg(test)]
-#[allow(unused_imports)]
-pub(crate) use session_cli::{StubSqlResultToolServer, StubStreamingToolServer, StubToolServer};
 #[path = "cli/conformance.rs"]
 mod conformance_cli;
-#[allow(unused_imports)]
-pub(crate) use conformance_cli::{
-    cmd_conformance_fetch_peers, cmd_conformance_run, download_and_verify, extract_archive,
-    parse_peer_selection, parse_report_format, resolve_peers_lock_path,
-    validate_extracted_peer_binary, write_human_report, write_json_report,
-    FETCH_PEERS_HTTP_TIMEOUT_SECS,
-};
+pub(crate) use conformance_cli::{cmd_conformance_fetch_peers, cmd_conformance_run};
 #[path = "cli/mcp.rs"]
 mod mcp_cli;
-#[allow(unused_imports)]
-pub(crate) use mcp_cli::{
-    cmd_mcp_governed_sim, cmd_mcp_wrap, cmd_mcp_wrap_e2e_fixture, cmd_mcp_wrap_run,
-    load_tools_fixture, GovernedSimArgs, McpWrapArgs,
-};
+pub(crate) use mcp_cli::{cmd_mcp_governed_sim, cmd_mcp_wrap, GovernedSimArgs, McpWrapArgs};
 #[path = "cli/replay.rs"]
 mod replay_cli;
 pub(crate) use replay_cli::{cmd_replay, load_trusted_kernel_pubkey};
