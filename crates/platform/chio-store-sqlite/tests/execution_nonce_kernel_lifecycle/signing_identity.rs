@@ -1,5 +1,6 @@
 use super::*;
 use chio_core::receipt::crypto_floor::ReceiptCryptoFloor;
+use chio_core::receipt::PresentedNonceView;
 use chio_core::SigningAlgorithm;
 use chio_kernel::{HybridSigningConfig, KernelCryptoFloor};
 
