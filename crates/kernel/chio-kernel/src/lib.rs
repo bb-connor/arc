@@ -653,7 +653,9 @@ mod kernel;
 #[cfg(not(loom))]
 pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 
-pub use chio_core::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+pub use chio_core::receipt::metadata::{
+    DecisionModelWitness, EvidenceDisclosure, GuardEvidenceDeclaration,
+};
 
 #[cfg(not(loom))]
 pub use kernel::{
@@ -685,16 +687,16 @@ pub use kernel::{
     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
     MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
-    PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
-    PreparedNativeSecurityEgress, PromptProvider, ProtocolRefusalReason, ProtocolRefusalSummary,
-    ProtocolRequestDigest, ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog,
-    ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
-    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
-    RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
-    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
-    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
-    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    PreDispatchActiveResponseReconstruction, PreInvocationGuardOutput,
+    PreparedActiveResponseAdmission, PreparedNativeSecurityEgress, PromptProvider,
+    ProtocolRefusalReason, ProtocolRefusalSummary, ProtocolRequestDigest,
+    ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog, ReplayClockDirection,
+    ResourceProvider, ResponseDispatchPreparationRequest, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
+    RuntimeAdmissionRevalidationContext, RuntimeParticipantClaimAuthority, SecurityDispatchOutcome,
+    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
+    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
     SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
     VerifiedFederationTreatyMaterial, VerifiedResponseSimulationAuthorization,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,

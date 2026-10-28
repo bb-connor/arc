@@ -5,6 +5,8 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use chio_core::capability::governance::GovernedUpstreamCallChainProof;
 use chio_core::receipt::metadata::GuardEvidence;
 
+use crate::kernel::PreInvocationGuardOutput;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct GovernedCallChainReceiptEvidence {
     pub(crate) local_parent_request_id: Option<String>,
@@ -21,8 +23,13 @@ thread_local! {
         const { RefCell::new(None) };
     static GOVERNED_RUNTIME_ATTESTATION_RECORD: RefCell<Option<VerifiedRuntimeAttestationRecord>> =
         const { RefCell::new(None) };
-    static PRE_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
-        const { RefCell::new(Vec::new()) };
+    static PRE_INVOCATION_GUARD_OUTPUT: RefCell<PreInvocationGuardOutput> =
+        const {
+            RefCell::new(PreInvocationGuardOutput {
+                evidence: Vec::new(),
+                witness: None,
+            })
+        };
     static POST_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
         const { RefCell::new(Vec::new()) };
     static FIXED_RUNTIME_RECEIPT_IDS: RefCell<Option<FixedRuntimeReceiptIds>> =
@@ -116,28 +123,28 @@ pub(super) fn current_governed_runtime_attestation_record(
     GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| slot.borrow().clone())
 }
 
-pub(crate) struct ScopedPreInvocationGuardEvidence {
-    previous: Vec<GuardEvidence>,
+pub(crate) struct ScopedPreInvocationGuardOutput {
+    previous: PreInvocationGuardOutput,
 }
 
-impl Drop for ScopedPreInvocationGuardEvidence {
+impl Drop for ScopedPreInvocationGuardOutput {
     fn drop(&mut self) {
         let previous = core::mem::take(&mut self.previous);
-        PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| {
+        PRE_INVOCATION_GUARD_OUTPUT.with(|slot| {
             slot.replace(previous);
         });
     }
 }
 
-pub(crate) fn scope_pre_invocation_guard_evidence(
-    evidence: Vec<GuardEvidence>,
-) -> ScopedPreInvocationGuardEvidence {
-    let previous = PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.replace(evidence));
-    ScopedPreInvocationGuardEvidence { previous }
+pub(crate) fn scope_pre_invocation_guard_output(
+    output: PreInvocationGuardOutput,
+) -> ScopedPreInvocationGuardOutput {
+    let previous = PRE_INVOCATION_GUARD_OUTPUT.with(|slot| slot.replace(output));
+    ScopedPreInvocationGuardOutput { previous }
 }
 
-pub(crate) fn current_pre_invocation_guard_evidence() -> Vec<GuardEvidence> {
-    PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.borrow().clone())
+pub(crate) fn current_pre_invocation_guard_output() -> PreInvocationGuardOutput {
+    PRE_INVOCATION_GUARD_OUTPUT.with(|slot| slot.borrow().clone())
 }
 
 pub(crate) struct ScopedPostInvocationGuardEvidence {

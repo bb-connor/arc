@@ -3,7 +3,6 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::sha256_hex;
-use chio_core::receipt::metadata::GuardEvidence;
 use chio_core_types::{provider_attempt::ProviderAttemptBindingV1, StoreMutationFence};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -373,7 +372,7 @@ pub struct RawInvocationOutcomeV1 {
     output: InvocationOutputV1,
     reported_cost: Option<MonetaryAmount>,
     receipt_metadata_snapshot: Option<Value>,
-    pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
     request_canonical_json: String,
     security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     federation_context_json: Option<String>,
@@ -403,7 +402,7 @@ pub struct PersistedRawInvocationOutcomeV1 {
     pub reported_cost: Option<MonetaryAmount>,
     #[serde(deserialize_with = "required_option")]
     pub receipt_metadata_snapshot: Option<Value>,
-    pub pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pub pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
     pub request_canonical_json: String,
     #[serde(deserialize_with = "required_option")]
     pub security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
@@ -484,7 +483,7 @@ impl RawInvocationOutcomeV1 {
         output: InvocationOutputV1,
         reported_cost: Option<MonetaryAmount>,
         receipt_metadata_snapshot: Option<Value>,
-        pre_invocation_guard_evidence: Vec<GuardEvidence>,
+        pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
         context: RawInvocationContext<'_>,
     ) -> Result<Self, ToolOutcomeError> {
         validate_committed_operation(operation, commit)?;
@@ -508,7 +507,7 @@ impl RawInvocationOutcomeV1 {
             output,
             reported_cost,
             receipt_metadata_snapshot,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
             request_canonical_json,
             security_invocation_context: context.security_invocation_context,
             federation_context_json: context.federation_context_json,
@@ -542,7 +541,7 @@ impl RawInvocationOutcomeV1 {
             output: self.output.clone(),
             reported_cost: self.reported_cost.clone(),
             receipt_metadata_snapshot: self.receipt_metadata_snapshot.clone(),
-            pre_invocation_guard_evidence: self.pre_invocation_guard_evidence.clone(),
+            pre_invocation_guard_output: self.pre_invocation_guard_output.clone(),
             request_canonical_json: self.request_canonical_json.clone(),
             security_invocation_context: self.security_invocation_context.clone(),
             federation_context_json: self.federation_context_json.clone(),
@@ -610,12 +609,17 @@ impl RawInvocationOutcomeV1 {
         if let Some(cost) = &self.reported_cost {
             amount(cost)?;
         }
-        if self.pre_invocation_guard_evidence.len() > MAX_RECEIPT_GUARD_EVIDENCE {
+        if self.pre_invocation_guard_output.evidence.len() > MAX_RECEIPT_GUARD_EVIDENCE {
             return Err(ToolOutcomeError::TooLarge {
-                field: "raw.pre_invocation_guard_evidence",
-                actual: self.pre_invocation_guard_evidence.len(),
+                field: "raw.pre_invocation_guard_output",
+                actual: self.pre_invocation_guard_output.evidence.len(),
                 maximum: MAX_RECEIPT_GUARD_EVIDENCE,
             });
+        }
+        if let Some(witness) = &self.pre_invocation_guard_output.witness {
+            witness.validate().map_err(|_| {
+                ToolOutcomeError::Invalid("raw.pre_invocation_guard_output.witness")
+            })?;
         }
         let request = self.recovery_request()?;
         if canonical(&request)? != self.request_canonical_json.as_bytes()
@@ -673,8 +677,8 @@ impl RawInvocationOutcomeV1 {
         self.reported_cost.as_ref()
     }
 
-    pub(crate) fn pre_invocation_guard_evidence(&self) -> &[GuardEvidence] {
-        &self.pre_invocation_guard_evidence
+    pub(crate) fn pre_invocation_guard_output(&self) -> &crate::kernel::PreInvocationGuardOutput {
+        &self.pre_invocation_guard_output
     }
 
     pub(crate) fn recovery_request(&self) -> Result<ToolCallRequest, ToolOutcomeError> {

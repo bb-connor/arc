@@ -5,7 +5,7 @@ pub use active_response_simulation::{
 use std::sync::Arc;
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
-use chio_core::receipt::metadata::{GuardEvidence, GuardEvidenceDeclaration};
+use chio_core::receipt::metadata::{DecisionModelWitness, GuardEvidence, GuardEvidenceDeclaration};
 use dashmap::DashMap;
 
 use crate::budget_store::BudgetCommitMetadata;
@@ -916,15 +916,15 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
 pub struct GuardDecision {
     pub verdict: Verdict,
     pub evidence: Vec<GuardEvidence>,
+    /// Decision-model witness the kernel binds into the receipt. The kernel
+    /// refuses a call whose guards return more than one.
+    pub witness: Option<DecisionModelWitness>,
 }
 
 impl GuardDecision {
     #[must_use]
     pub fn allow() -> Self {
-        Self {
-            verdict: Verdict::Allow,
-            evidence: Vec::new(),
-        }
+        Self::allow_with_evidence(Vec::new())
     }
 
     #[must_use]
@@ -932,6 +932,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::Allow,
             evidence,
+            witness: None,
         }
     }
 
@@ -940,6 +941,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::Deny,
             evidence,
+            witness: None,
         }
     }
 
@@ -948,6 +950,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::PendingApproval,
             evidence,
+            witness: None,
         }
     }
 
@@ -959,6 +962,22 @@ impl GuardDecision {
             Verdict::PendingApproval => Self::pending_approval(Vec::new()),
         }
     }
+
+    #[must_use]
+    pub fn with_witness(mut self, witness: DecisionModelWitness) -> Self {
+        self.witness = Some(witness);
+        self
+    }
+}
+
+/// Pre-invocation guard output the kernel carries to the receipt, including
+/// across a frozen durable return context: the guards' evidence and at most
+/// one validated decision-model witness.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreInvocationGuardOutput {
+    pub evidence: Vec<GuardEvidence>,
+    pub witness: Option<DecisionModelWitness>,
 }
 
 impl PartialEq<Verdict> for GuardDecision {

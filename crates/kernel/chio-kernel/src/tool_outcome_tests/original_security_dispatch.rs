@@ -52,7 +52,7 @@ fn complete_raw_security_envelope_roundtrips_canonical_bytes(
             currency: "USD".to_owned(),
         }),
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         RawInvocationContext {
             request: &request,
             security_invocation_context: Some(context.clone()),

@@ -12,7 +12,7 @@ impl ChioKernel {
         &self,
         denial: PreDispatchCleanupDeny<'_>,
         credentials: DispatchCredentialReservation<'_>,
-        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        evidence: &crate::kernel::PreInvocationGuardOutput,
     ) -> Result<ToolCallResponse, KernelError> {
         let mut reason = denial.reason.to_owned();
         let disposition = if denial.payment_authorization.is_some() {
@@ -26,7 +26,7 @@ impl ChioKernel {
                 }
             }
         };
-        self.with_pre_invocation_guard_evidence(evidence, || {
+        self.with_pre_invocation_guard_output(evidence, || {
             self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                 PreDispatchCleanupDeny {
                     reason: &reason,
@@ -42,10 +42,10 @@ impl ChioKernel {
         failure: DurableDispatchCommitError,
         denial: PreDispatchCleanupDeny<'_>,
         credentials: DispatchCredentialReservation<'_>,
-        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        evidence: &crate::kernel::PreInvocationGuardOutput,
         security_outcome: Option<SecurityDispatchOutcomeHandle>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let response = self.with_pre_invocation_guard_evidence(evidence, || {
+        let response = self.with_pre_invocation_guard_output(evidence, || {
             match failure {
                 DurableDispatchCommitError::RejectedBeforeCommit(_) => self
                     .build_pre_commit_credential_rejection_response(denial, credentials, evidence),

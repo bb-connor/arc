@@ -76,6 +76,7 @@ impl Guard for StalledGuard {
         Ok(GuardDecision {
             verdict: Verdict::Allow,
             evidence: Vec::new(),
+            witness: None,
         })
     }
 }

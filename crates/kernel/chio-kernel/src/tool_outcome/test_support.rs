@@ -76,7 +76,7 @@ pub fn returned_value(
         InvocationOutputV1::Value { value },
         reported_cost,
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         RawInvocationContext {
             request: &request,
             security_invocation_context: None,
@@ -182,7 +182,7 @@ pub fn native_returned_value(
         InvocationOutputV1::Value { value },
         None,
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         RawInvocationContext {
             request,
             security_invocation_context: Some(context.clone()),

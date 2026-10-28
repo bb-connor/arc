@@ -22,7 +22,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         matched_grant_index: usize,
         metadata: &Option<serde_json::Value>,
-        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        evidence: &crate::kernel::PreInvocationGuardOutput,
         payee: Option<&VerifiedGovernedPayeeBinding>,
         denial: &crate::finding_denial::FindingDenial,
     ) -> Result<crate::kernel::responses::PreparedResponse, KernelError> {
@@ -30,7 +30,7 @@ impl ChioKernel {
             "finding recovery status changed before ordinary output finalization: {denial}"
         );
         tracing::warn!(request_id = %request.request_id, reason = %chio_log_redact::redacted!(&reason), "finding recovery output withheld");
-        self.with_pre_invocation_guard_evidence(evidence, || {
+        self.with_pre_invocation_guard_output(evidence, || {
             self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
                 &reason,
@@ -306,12 +306,12 @@ impl ChioKernel {
         .map(Some)
     }
 
-    pub(in crate::kernel) fn with_pre_invocation_guard_evidence<T>(
+    pub(in crate::kernel) fn with_pre_invocation_guard_output<T>(
         &self,
-        evidence: &[chio_core::receipt::metadata::GuardEvidence],
+        output: &crate::kernel::PreInvocationGuardOutput,
         build: impl FnOnce() -> Result<T, KernelError>,
     ) -> Result<T, KernelError> {
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(evidence.to_vec());
+        let _guard_output_scope = scope_pre_invocation_guard_output(output.clone());
         build()
     }
 

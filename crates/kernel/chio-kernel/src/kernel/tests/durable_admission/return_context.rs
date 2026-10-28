@@ -164,12 +164,18 @@ fn pending_admission(
     Ok((admission, mutation))
 }
 
+static EMPTY_GUARD_OUTPUT: crate::kernel::PreInvocationGuardOutput =
+    crate::kernel::PreInvocationGuardOutput {
+        evidence: Vec::new(),
+        witness: None,
+    };
+
 fn input(request: &ToolCallRequest) -> DurableToolReturnContextInput<'_> {
     DurableToolReturnContextInput {
         request,
         matched_grant_index: 0,
         extra_receipt_metadata: Some(serde_json::json!({"admitted_value": "original"})),
-        pre_invocation_guard_evidence: &[],
+        pre_invocation_guard_output: &EMPTY_GUARD_OUTPUT,
         verified_payee_binding: None,
         verified_purchase: None,
         verified_recovery: None,
@@ -403,5 +409,76 @@ fn frozen_return_context_cannot_cross_operations_with_the_same_request_id() -> T
         other_store.operation().state(),
         AdmissionOperationState::DispatchCommitted
     );
+    Ok(())
+}
+
+/// A witness frozen into the durable return context is persisted with the raw
+/// outcome, and the terminal receipt built from that persisted outcome binds
+/// the identical validated witness.
+#[test]
+fn frozen_return_context_binds_the_decision_model_witness_into_the_terminal_receipt() -> TestResult
+{
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY,
+    };
+
+    let (kernel, request, store, invocations) = durable_admission_fixture("frozen-dm-witness");
+    let (mut admission, mut mutation) = pending_admission(&kernel, &request)?;
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    let output = crate::kernel::PreInvocationGuardOutput {
+        evidence: Vec::new(),
+        witness: Some(witness.clone()),
+    };
+    let mut frozen = input(&request);
+    frozen.pre_invocation_guard_output = &output;
+    let context = kernel.freeze_and_commit_durable_dispatch(
+        &mut admission,
+        &request.capability,
+        &mut mutation,
+        frozen,
+    )?;
+    let returned = kernel.record_durable_tool_return(
+        &mut admission,
+        DurableToolReturnInput {
+            request: &request,
+            output: &ToolServerOutput::Value(serde_json::json!({"done": true})),
+            reported_cost: None,
+            context: &context,
+            elapsed: Duration::ZERO,
+            trusted_now_unix_ms: current_unix_timestamp_ms(),
+        },
+    )?;
+    {
+        let state = store.state.lock().map_err(|_| "test lock")?;
+        let raw = state.raw_outcome.as_ref().ok_or("missing raw outcome")?;
+        assert_eq!(
+            raw.pre_invocation_guard_output().witness.as_ref(),
+            Some(&witness)
+        );
+    }
+    let response = kernel.finalize_durable_tool_return_with_security_release(
+        &mut admission,
+        &request,
+        &returned,
+        None,
+    )?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert!(response.receipt.verify_signature()?);
+    let block = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY))
+        .cloned()
+        .ok_or("terminal receipt carries no witness")?;
+    let bound: DecisionModelWitness = serde_json::from_value(block)?;
+    bound.validate()?;
+    assert_eq!(bound, witness);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }

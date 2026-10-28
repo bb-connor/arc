@@ -82,7 +82,7 @@ struct LocalToolReturnEvidence<'a> {
     output: &'a InvocationOutputV1,
     reported_cost: &'a Option<ToolInvocationCost>,
     receipt_metadata_snapshot: &'a Option<serde_json::Value>,
-    pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pre_invocation_guard_output: &'a crate::kernel::PreInvocationGuardOutput,
 }
 
 #[derive(Serialize)]
@@ -781,7 +781,8 @@ impl ChioKernel {
             || receipt.evidence
                 != tool_return
                     .raw
-                    .pre_invocation_guard_evidence()
+                    .pre_invocation_guard_output()
+                    .evidence
                     .iter()
                     .chain(expected_post_invocation_evidence)
                     .cloned()
@@ -872,8 +873,8 @@ impl ChioKernel {
             .transpose()?
             .flatten();
 
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            tool_return.raw.pre_invocation_guard_evidence().to_vec(),
+        let _guard_evidence_scope = scope_pre_invocation_guard_output(
+            tool_return.raw.pre_invocation_guard_output().clone(),
         );
         let DurableEvaluationContract {
             matched_grant_index,

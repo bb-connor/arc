@@ -6,7 +6,6 @@ use chio_core::receipt::{
     kinds::{
         BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
     },
-    metadata::GuardEvidence,
     signing::ReceiptSigningHandle,
 };
 use chio_log_redact::redacted;
@@ -29,7 +28,7 @@ const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
 
 pub(crate) struct PostAdmissionReceiptContext {
     pub(crate) extra_metadata: Option<serde_json::Value>,
-    pub(crate) pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pub(crate) pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
     pub(crate) verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
 }
 
@@ -267,8 +266,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
         if faults.is_empty() {
             if let Some(operation) = self.durable_operation {
-                if let Err(error) = self.kernel.with_pre_invocation_guard_evidence(
-                    &self.receipt_context.pre_invocation_guard_evidence,
+                if let Err(error) = self.kernel.with_pre_invocation_guard_output(
+                    &self.receipt_context.pre_invocation_guard_output,
                     || {
                         self.kernel
                             .compensate_durable_admission_after_pre_dispatch_cleanup(
@@ -427,7 +426,11 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 actor_chain: Vec::new(),
                 content_hash: sha256_hex(&content),
                 policy_hash: self.kernel.config.policy_hash.clone(),
-                evidence: self.receipt_context.pre_invocation_guard_evidence.clone(),
+                evidence: self
+                    .receipt_context
+                    .pre_invocation_guard_output
+                    .evidence
+                    .clone(),
                 metadata,
                 trust_level: TrustLevel::Verified,
                 tenant_id,

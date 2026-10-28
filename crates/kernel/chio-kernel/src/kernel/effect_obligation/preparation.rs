@@ -84,7 +84,7 @@ pub(in crate::kernel) struct PostEffectPreparation<'a> {
     pub budget: &'a PreExecutionBudgetMutation,
     pub payment: Option<&'a PaymentAuthorization>,
     pub metadata: &'a Option<serde_json::Value>,
-    pub evidence: &'a [GuardEvidence],
+    pub evidence: &'a crate::kernel::PreInvocationGuardOutput,
     pub payee: Option<&'a VerifiedGovernedPayeeBinding>,
     pub admission: Option<&'a DurableToolAdmission>,
     pub evaluation_started_at: u64,
@@ -163,32 +163,34 @@ impl ChioKernel {
         )?;
         let canonical_content = b"null".to_vec();
         let signing_identity = self.freeze_receipt_signing_identity()?;
-        let mut body = self.prepare_receipt_body(
-            ReceiptParams {
-                request_id: Some(&input.request.request_id),
-                capability_id: &input.request.capability.id,
-                tool_name: &input.request.tool_name,
-                server_id: &input.request.server_id,
-                decision: Decision::Cancelled {
-                    reason: FAULT_REASON.into(),
+        let mut body = self.with_pre_invocation_guard_output(input.evidence, || {
+            self.prepare_receipt_body(
+                ReceiptParams {
+                    request_id: Some(&input.request.request_id),
+                    capability_id: &input.request.capability.id,
+                    tool_name: &input.request.tool_name,
+                    server_id: &input.request.server_id,
+                    decision: Decision::Cancelled {
+                        reason: FAULT_REASON.into(),
+                    },
+                    action,
+                    content_hash: chio_core::crypto::sha256_hex(&canonical_content),
+                    canonical_content: Vec::new(),
+                    metadata: merge_metadata_objects(
+                        merge_metadata_objects(metadata, request_metadata),
+                        receipt_attribution_metadata(
+                            &input.request.capability,
+                            Some(input.matched_grant_index),
+                        )?,
+                    ),
+                    timestamp: 0,
+                    trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+                    tenant_id: None,
                 },
-                action,
-                content_hash: chio_core::crypto::sha256_hex(&canonical_content),
-                canonical_content: Vec::new(),
-                metadata: merge_metadata_objects(
-                    merge_metadata_objects(metadata, request_metadata),
-                    receipt_attribution_metadata(
-                        &input.request.capability,
-                        Some(input.matched_grant_index),
-                    )?,
-                ),
-                timestamp: 0,
-                trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-                tenant_id: None,
-            },
-            signing_identity.public_key().clone(),
-        )?;
-        body.evidence = input.evidence.to_vec();
+                signing_identity.public_key().clone(),
+            )
+        })?;
+        body.evidence = input.evidence.evidence.clone();
         let bytes = chio_core::canonical::canonical_json_bytes(&body)
             .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?
             .len()

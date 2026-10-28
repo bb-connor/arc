@@ -303,7 +303,7 @@ fn changed_security_identity_is_rejected_before_dispatch_capture() -> TestResult
             request: &request,
             matched_grant_index: 0,
             extra_receipt_metadata: None,
-            pre_invocation_guard_evidence: &[],
+            pre_invocation_guard_output: &crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
             verified_purchase: None,
             verified_recovery: None,

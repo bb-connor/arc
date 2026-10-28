@@ -43,7 +43,7 @@ pub(super) fn verify(
         "output": {"kind":"value","value":{"retained":true}},
         "reported_cost": {"units":25,"currency":"USD"},
         "receipt_metadata_snapshot": null,
-        "pre_invocation_guard_evidence": [],
+        "pre_invocation_guard_output": {"evidence": [], "witness": null},
         "request_canonical_json": String::from_utf8(request_bytes)?,
         "security_invocation_context": {
             "version": "v1",

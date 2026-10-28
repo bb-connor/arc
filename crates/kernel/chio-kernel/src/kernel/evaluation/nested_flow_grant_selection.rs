@@ -30,7 +30,7 @@ pub(super) struct SelectedNestedFlowGrant {
     pub(super) budget_mutation: PreExecutionBudgetMutation,
     pub(super) validated_governed_admission: Option<ValidatedGovernedAdmission>,
     pub(super) governed_call_chain_receipt_evidence: Option<GovernedCallChainReceiptEvidence>,
-    pub(super) pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pub(super) pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
 }
 
@@ -114,7 +114,7 @@ impl ChioKernel {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata: extra_metadata.clone(),
-                    pre_invocation_guard_evidence: Vec::new(),
+                    pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
                     verified_payee_binding: validated_governed_admission
                         .as_ref()
                         .and_then(|admission| admission.verified_payee_binding.clone()),
@@ -138,7 +138,7 @@ impl ChioKernel {
                 .await;
             guard_drop_guard.disarm();
             drop(guard_drop_guard);
-            let pre_invocation_guard_evidence = match guard_result {
+            let pre_invocation_guard_output = match guard_result {
                 Ok(evidence) => evidence,
                 Err(error) => {
                     let msg = error.error.to_string();
@@ -180,7 +180,7 @@ impl ChioKernel {
                     ));
                 }
                 return self
-                    .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                    .with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                         if runtime_release_confirmed && durable_admission.is_some() {
                             if let Some(response) = self
                                 .compensate_durable_admission_after_pre_dispatch_cleanup(
@@ -263,7 +263,7 @@ impl ChioKernel {
                         *mutation,
                         validated_governed_admission,
                         governed_call_chain_receipt_evidence,
-                        pre_invocation_guard_evidence,
+                        pre_invocation_guard_output,
                         runtime_admission_metadata,
                     ));
                     break;
@@ -289,7 +289,7 @@ impl ChioKernel {
                         break;
                     }
                     return self
-                        .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        .with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                             self.build_pending_approval_response_with_metadata(
                                 request,
                                 &proposal,
@@ -343,7 +343,7 @@ impl ChioKernel {
                         self.budget_backend_receipt_metadata()?,
                     );
                     return self
-                        .with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                        .with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                             if runtime_release_confirmed && durable_admission.is_some() {
                                 let (matched_grant_index, financial_metadata) =
                                     self.monetary_deny_metadata(matching_grants, cap)?;
@@ -396,7 +396,7 @@ impl ChioKernel {
             budget_mutation,
             validated_governed_admission,
             governed_call_chain_receipt_evidence,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
             runtime_admission_metadata,
         )) = selected
         else {
@@ -409,7 +409,7 @@ impl ChioKernel {
                     let msg = denial.error.to_string();
                     let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
                     return self
-                        .with_pre_invocation_guard_evidence(&denial.evidence, || {
+                        .with_pre_invocation_guard_output(&denial.output, || {
                             if durable_admission.is_some() {
                                 let (matched_grant_index, financial_metadata) =
                                     self.monetary_deny_metadata(matching_grants, cap)?;
@@ -528,7 +528,7 @@ impl ChioKernel {
             budget_mutation,
             validated_governed_admission,
             governed_call_chain_receipt_evidence,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
             runtime_admission_metadata,
         }))
     }

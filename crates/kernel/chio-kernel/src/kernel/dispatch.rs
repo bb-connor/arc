@@ -382,12 +382,57 @@ impl Drop for RuntimeAdmissionReadinessRegistration<'_> {
 
 pub(crate) struct GuardRunError {
     pub(crate) error: KernelError,
-    pub(crate) evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
+    pub(crate) output: Box<PreInvocationGuardOutput>,
 }
 
 impl GuardRunError {
-    fn new(error: KernelError, evidence: Vec<chio_core::receipt::metadata::GuardEvidence>) -> Self {
-        Self { error, evidence }
+    fn new(error: KernelError, output: PreInvocationGuardOutput) -> Self {
+        Self {
+            error,
+            output: Box::new(output),
+        }
+    }
+}
+
+impl PreInvocationGuardOutput {
+    /// Appends one guard's decision. A witness that fails validation, or a
+    /// second witness for the call, refuses the call.
+    fn absorb_decision(
+        &mut self,
+        guard_name: &str,
+        evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
+        witness: Option<chio_core::receipt::metadata::DecisionModelWitness>,
+    ) -> Result<(), KernelError> {
+        self.evidence.extend(evidence);
+        let Some(witness) = witness else {
+            return Ok(());
+        };
+        if self.witness.is_some() {
+            return Err(KernelError::GuardDenied(format!(
+                "guard \"{guard_name}\" returned a duplicate decision-model witness"
+            )));
+        }
+        witness.validate().map_err(|error| {
+            KernelError::GuardDenied(format!(
+                "guard \"{guard_name}\" returned an invalid decision-model witness: {error}"
+            ))
+        })?;
+        self.witness = Some(witness);
+        Ok(())
+    }
+
+    /// Appends the output of guards that ran after this one.
+    fn absorb_output(&mut self, later: PreInvocationGuardOutput) -> Result<(), KernelError> {
+        self.evidence.extend(later.evidence);
+        if let Some(witness) = later.witness {
+            if self.witness.is_some() {
+                return Err(KernelError::GuardDenied(
+                    "guards returned a duplicate decision-model witness".to_string(),
+                ));
+            }
+            self.witness = Some(witness);
+        }
+        Ok(())
     }
 }
 
@@ -416,12 +461,17 @@ struct OwnedGuardInvocation {
 fn evaluate_guards_sequential(
     guards: &[Arc<dyn Guard>],
     ctx: &GuardContext,
-) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
-    let mut evidence = Vec::new();
+) -> Result<PreInvocationGuardOutput, GuardRunError> {
+    let mut evidence = PreInvocationGuardOutput::default();
     for guard in guards {
         match guard.evaluate(ctx) {
             Ok(decision) => {
-                evidence.extend(decision.evidence);
+                if let Err(error) =
+                    evidence.absorb_decision(guard.name(), decision.evidence, decision.witness)
+                {
+                    evidence.witness = None;
+                    return Err(GuardRunError::new(error, evidence));
+                }
                 match decision.verdict {
                     Verdict::Allow => {
                         debug!(guard = guard.name(), "guard passed");
@@ -468,7 +518,7 @@ fn evaluate_guards_sequential(
 fn run_guards_owned(
     guards: &[Arc<dyn Guard>],
     owned: &OwnedGuardInvocation,
-) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+) -> Result<PreInvocationGuardOutput, GuardRunError> {
     let ctx = GuardContext::new(&owned.request, &owned.scope)
         .with_session_filesystem_roots(owned.session_filesystem_roots.as_deref())
         .with_matched_grant_index(owned.matched_grant_index)
@@ -1223,7 +1273,7 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         security_context: Option<&SecurityInvocationContext>,
         guard_attempt: &GuardInvocationAttempt,
-    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    ) -> Result<PreInvocationGuardOutput, GuardRunError> {
         let ctx = GuardContext::new(request, scope)
             .with_session_filesystem_roots(session_filesystem_roots)
             .with_matched_grant_index(matched_grant_index)
@@ -1256,7 +1306,7 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         security_context: Option<&SecurityInvocationContext>,
         guard_attempt: &GuardInvocationAttempt,
-    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    ) -> Result<PreInvocationGuardOutput, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
         let needs_timer = pipeline_budget.is_some() || has_per_guard;
@@ -1325,7 +1375,7 @@ impl ChioKernel {
                             stage: HotPathStage::GuardPipeline,
                             budget_ms: budget_ms_saturating(budget),
                         },
-                        Vec::new(),
+                        PreInvocationGuardOutput::default(),
                     )),
                 },
                 None => per_guard.await,
@@ -1345,21 +1395,21 @@ impl ChioKernel {
                 Ok(Ok(result)) => result,
                 Ok(Err(join_err)) => Err(GuardRunError::new(
                     KernelError::Internal(format!("guard task join failed: {join_err}")),
-                    Vec::new(),
+                    PreInvocationGuardOutput::default(),
                 )),
                 Err(_elapsed) => Err(GuardRunError::new(
                     KernelError::HotPathDeadlineExceeded {
                         stage: HotPathStage::GuardPipeline,
                         budget_ms: budget_ms_saturating(budget),
                     },
-                    Vec::new(),
+                    PreInvocationGuardOutput::default(),
                 )),
             },
             None => match join.await {
                 Ok(result) => result,
                 Err(join_err) => Err(GuardRunError::new(
                     KernelError::Internal(format!("guard task join failed: {join_err}")),
-                    Vec::new(),
+                    PreInvocationGuardOutput::default(),
                 )),
             },
         }
@@ -1371,8 +1421,8 @@ impl ChioKernel {
     async fn run_guards_per_guard_offloaded(
         &self,
         owned: &Arc<OwnedGuardInvocation>,
-    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
-        let mut evidence = Vec::new();
+    ) -> Result<PreInvocationGuardOutput, GuardRunError> {
+        let mut evidence = PreInvocationGuardOutput::default();
         for guard in self.guards.iter() {
             let budget = self.config.deadlines.guard_budget_for(guard.name());
             let guard = Arc::clone(guard);
@@ -1401,12 +1451,23 @@ impl ChioKernel {
                 None => run_one.await,
             };
             match outcome {
-                Ok(Ok(mut guard_evidence)) => evidence.append(&mut guard_evidence),
-                Ok(Err(mut guard_error)) => {
-                    // Preserve the evidence accumulated from earlier guards ahead
-                    // of the failing guard's own evidence.
-                    guard_error.evidence.splice(0..0, evidence);
-                    return Err(guard_error);
+                Ok(Ok(guard_output)) => {
+                    if let Err(error) = evidence.absorb_output(guard_output) {
+                        evidence.witness = None;
+                        return Err(GuardRunError::new(error, evidence));
+                    }
+                }
+                Ok(Err(guard_error)) => {
+                    // Preserve the output accumulated from earlier guards ahead
+                    // of the failing guard's own output.
+                    let GuardRunError { error, output } = guard_error;
+                    return Err(match evidence.absorb_output(*output) {
+                        Ok(()) => GuardRunError::new(error, evidence),
+                        Err(duplicate) => {
+                            evidence.witness = None;
+                            GuardRunError::new(duplicate, evidence)
+                        }
+                    });
                 }
                 Err(join_err) => {
                     return Err(GuardRunError::new(
