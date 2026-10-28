@@ -83,6 +83,31 @@ assert_rc "$(run_checker "$CHECKER" "$duplicate" "$work/duplicate.out" "$work/du
   "one value declared in two crates fails even under two different names"
 grep -F 'chio.example.effect.v1\0: declared in 2 places' "$work/duplicate.err" >/dev/null
 
+shared="$work/shared-delegation"
+init_case "$shared"
+write_source "$shared/crates/core/chio-core-types/src/receipt/commitment.rs" <<'EOF'
+pub const DELEGATION_CLAIM_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.claim.v1\0";
+pub const DELEGATION_SUBJECT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.subject.v1\0";
+pub const DELEGATION_TENANT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.tenant.v1\0";
+EOF
+write_source "$shared/crates/protocol/chio-mcp-remote/src/exchange.rs" <<'EOF'
+use chio_core::receipt::commitment::{
+    DELEGATION_CLAIM_COMMITMENT_DOMAIN, DELEGATION_SUBJECT_COMMITMENT_DOMAIN,
+    DELEGATION_TENANT_COMMITMENT_DOMAIN,
+};
+EOF
+track_case "$shared"
+assert_rc "$(run_checker "$CHECKER" "$shared" "$work/shared.out" "$work/shared.err")" 0 \
+  "the exchange imports the three delegation commitment domains from their owner"
+for kind in claim subject tenant; do
+  printf 'const EXCHANGE_DOMAIN: &[u8] = b"chio.delegation-context.%s.v1\\0";\n' "$kind" \
+    >> "$shared/crates/protocol/chio-mcp-remote/src/exchange.rs"
+  assert_rc "$(run_checker "$CHECKER" "$shared" "$work/shared-$kind.out" "$work/shared-$kind.err")" 1 \
+    "redeclaring the $kind commitment domain in the exchange fails"
+  grep -F "chio.delegation-context.$kind.v1\0: declared in 2 places" \
+    "$work/shared-$kind.err" >/dev/null
+done
+
 test_duplicate="$work/test-duplicate"
 init_case "$test_duplicate"
 write_source "$test_duplicate/crates/security/chio-producer/src/lib.rs" <<'EOF'

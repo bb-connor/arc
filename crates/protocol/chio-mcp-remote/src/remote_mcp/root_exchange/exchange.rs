@@ -8,6 +8,10 @@ use chio_core::capability::anchor::{AnchorKind, RootAnchor};
 use chio_core::capability::scope::{ChioScope, ToolGrant};
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::receipt::commitment::{
+    DELEGATION_CLAIM_COMMITMENT_DOMAIN, DELEGATION_SUBJECT_COMMITMENT_DOMAIN,
+    DELEGATION_TENANT_COMMITMENT_DOMAIN,
+};
 use chio_core::rng::Rng;
 use chio_core::root_authority::{
     ClaimMode, ClaimValue, DelegationAnchor, DelegationAnchorFields, DelegationContext,
@@ -29,10 +33,6 @@ use super::key_lookup::IdpKeyLookup;
 use super::kinds::entra_jwt;
 use super::provider::ProviderRecord;
 use super::replay::{ExchangeReplayStore, ReplayBinding, ReplayKey, ReplayNamespace};
-
-const SUBJECT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.subject.v1\0";
-const TENANT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.tenant.v1\0";
-const CLAIM_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.claim.v1\0";
 
 /// Retention of a spent replay key past the assertion's `exp`: the load-time
 /// cap on `max_clock_skew_secs`, whatever the matched rule's own skew.
@@ -387,7 +387,7 @@ fn record_claims(
                     .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
                 let reference = salt_ref(&format!("anchor.claims.{name}"))?;
                 let commit = commitment(
-                    CLAIM_COMMITMENT_DOMAIN,
+                    DELEGATION_CLAIM_COMMITMENT_DOMAIN,
                     &[name.as_bytes(), &[0], &salt, &canonical],
                 );
                 openings.push(ContextOpening {
@@ -724,14 +724,14 @@ impl RootExchange {
             None => Keypair::from_seed(&random::<32>(entropy)?).public_key(),
         };
         let subject_commitment = salted(
-            SUBJECT_COMMITMENT_DOMAIN,
+            DELEGATION_SUBJECT_COMMITMENT_DOMAIN,
             "anchor.sub",
             &evidence.principal,
             entropy,
             &mut openings,
         )?;
         let tenant_commitment = salted(
-            TENANT_COMMITMENT_DOMAIN,
+            DELEGATION_TENANT_COMMITMENT_DOMAIN,
             "anchor.tenant",
             &evidence.tenant,
             entropy,
