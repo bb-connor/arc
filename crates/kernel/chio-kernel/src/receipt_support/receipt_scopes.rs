@@ -32,6 +32,7 @@ thread_local! {
 struct FixedRuntimeReceiptIds {
     ids: VecDeque<String>,
     counter: u64,
+    episode_counter: u64,
 }
 
 pub struct ReceiptIdScope {
@@ -56,6 +57,7 @@ pub fn scope_receipt_ids_for_current_thread(
         slot.replace(Some(FixedRuntimeReceiptIds {
             ids: receipt_ids.into_iter().collect(),
             counter: 0,
+            episode_counter: 0,
         }))
     });
     ReceiptIdScope {
@@ -183,9 +185,46 @@ pub(super) fn next_fixed_runtime_receipt_id(
     })
 }
 
+pub(crate) fn next_fixed_runtime_episode_id() -> Result<Option<String>, crate::KernelError> {
+    FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
+        let mut fixed = slot.borrow_mut();
+        let Some(fixed) = fixed.as_mut() else {
+            return Ok(None);
+        };
+        let id = format!("runtime-episode-fixed-{}", fixed.episode_counter);
+        fixed.episode_counter = fixed.episode_counter.checked_add(1).ok_or_else(|| {
+            crate::KernelError::ReceiptSigningFailed(
+                "fixed runtime episode counter exhausted".into(),
+            )
+        })?;
+        Ok(Some(id))
+    })
+}
+
 #[cfg(test)]
 mod counter_tests {
     use super::*;
+    #[test]
+    fn runtime_episode_counter_preserves_receipt_seed_and_refuses_exhaustion() {
+        let _scope = scope_receipt_ids_for_current_thread(["receipt-seed".to_owned()]);
+        assert_eq!(
+            next_fixed_runtime_episode_id().expect("episode"),
+            Some("runtime-episode-fixed-0".to_owned())
+        );
+        assert_eq!(
+            next_fixed_runtime_receipt_id("receipt").expect("receipt"),
+            Some("receipt-seed".to_owned())
+        );
+        FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
+            slot.borrow_mut()
+                .as_mut()
+                .expect("scoped IDs")
+                .episode_counter = u64::MAX;
+        });
+        assert!(matches!(next_fixed_runtime_episode_id(),
+            Err(crate::KernelError::ReceiptSigningFailed(message)) if message == "fixed runtime episode counter exhausted"));
+    }
+
     #[test]
     fn deterministic_receipt_counter_refuses_exhaustion() {
         let _scope = scope_receipt_ids_for_current_thread([]);

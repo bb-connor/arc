@@ -50,7 +50,9 @@ impl RuntimeParticipantClaimAuthority<'_> {
     }
     /// Expected source evidence from the qualified activation record, not from
     /// request metadata. The runtime must verify its actual backend against it.
-    pub fn source_qualification(&self) -> &crate::admission_operation::RuntimeSourceQualificationV1 {
+    pub fn source_qualification(
+        &self,
+    ) -> &crate::admission_operation::RuntimeSourceQualificationV1 {
         &self.source_qualification
     }
     pub fn episode_id(&self) -> &AdmissionIdentifier {
@@ -443,7 +445,7 @@ impl ChioKernel {
             source_qualification,
             episode_id: AdmissionIdentifier::try_new(
                 "runtime_episode_id",
-                uuid::Uuid::now_v7().to_string(),
+                self.next_runtime_episode_id()?,
             )?,
             grant_index,
             phase,
@@ -457,6 +459,24 @@ impl ChioKernel {
         }))
         .unwrap_or_else(|_| Err(acquisition_error("operation-owned runtime hook panicked")));
         authority.finish(result)
+    }
+}
+
+impl ChioKernel {
+    fn next_runtime_episode_id(&self) -> Result<String, KernelError> {
+        let now = self.trusted_now_millis()?.get();
+        if now >= 1_u64 << 48 {
+            return Err(acquisition_error(
+                "runtime episode clock exceeds UUIDv7 timestamp range",
+            ));
+        }
+        if let Some(id) = crate::receipt_support::next_fixed_runtime_episode_id()? {
+            return Ok(id);
+        }
+        let nanos = u32::try_from((now % 1000) * 1_000_000)
+            .map_err(|_| acquisition_error("runtime episode clock nanoseconds overflow"))?;
+        let timestamp = uuid::Timestamp::from_unix(uuid::NoContext, now / 1000, nanos);
+        Ok(uuid::Uuid::new_v7(timestamp).to_string())
     }
 }
 
