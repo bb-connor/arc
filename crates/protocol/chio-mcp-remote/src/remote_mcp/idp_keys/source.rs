@@ -168,6 +168,8 @@ pub enum IdpKeySourceError {
     NotAJwksRecord,
     #[error(transparent)]
     Document(#[from] JwksDocumentError),
+    #[error("provider id cannot name a registry key snapshot source: {0}")]
+    UnrepresentableProviderId(RootAuthorityShapeError),
 }
 
 enum Origin {

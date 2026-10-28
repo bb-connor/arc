@@ -8,8 +8,8 @@ use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBa
 use chio_core::root_authority::{
     EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, HttpsUrl, Identifier,
     IdpKeySnapshot, IdpKeySnapshotSignatureError, InlineJwks, Jwk, JwsAlgorithm, KeySnapshotSource,
-    ProviderRecordKind, SubjectMapping, Uri, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
-    CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+    ProviderRecordKind, RootAuthorityShapeError, SubjectMapping, Uri,
+    CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA, CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
 };
 use chio_egress_contract::{HttpEgressContract, HttpEgressError};
 use serde::Deserialize;
@@ -304,6 +304,41 @@ fn inline_keys_drop_a_kid_shared_with_an_inadmissible_key() {
     ])
     .unwrap();
     assert_eq!(kids(&admitted), ["other"]);
+}
+
+#[test]
+fn document_admits_signing_keys_that_carry_key_ops_or_x5u() {
+    let mut verify_ops = rsa_key("verify-ops", 2048);
+    verify_ops["key_ops"] = json!(["verify"]);
+    let mut x5u = ec_key("x5u");
+    x5u["x5u"] = json!("https://idp.example/certs/x5u.pem");
+    let mut encrypt_ops = rsa_key("encrypt-ops", 2048);
+    encrypt_ops["key_ops"] = json!(["encrypt", "wrapKey"]);
+    let mut scalar_ops = rsa_key("scalar-ops", 2048);
+    scalar_ops["key_ops"] = json!("verify");
+    let mut repeated_ops = rsa_key("repeated-ops", 2048);
+    repeated_ops["key_ops"] = json!(["verify", "verify"]);
+    let mut numeric_x5u = ec_key("numeric-x5u");
+    numeric_x5u["x5u"] = json!(7);
+    let mut private_ops = rsa_key("private-ops", 2048);
+    private_ops["key_ops"] = json!(["verify"]);
+    private_ops["d"] = json!(b64(&[1; 32]));
+    let keys = admit_jwks_document(&jwks(&[
+        verify_ops,
+        x5u,
+        encrypt_ops,
+        scalar_ops,
+        repeated_ops,
+        numeric_x5u,
+        private_ops,
+    ]))
+    .unwrap();
+    assert_eq!(kids(&keys), ["verify-ops", "x5u"]);
+    assert_eq!(
+        keys[0],
+        serde_json::from_value(rsa_key("verify-ops", 2048)).unwrap()
+    );
+    assert_eq!(keys[1], serde_json::from_value(ec_key("x5u")).unwrap());
 }
 
 #[test]
@@ -642,6 +677,22 @@ fn provider_records_without_one_key_source_reject() {
     assert_eq!(
         harness_for(&introspection).err(),
         Some(IdpKeySourceError::NotAJwksRecord),
+    );
+}
+
+#[test]
+fn inline_provider_id_outside_the_snapshot_source_grammar_rejects() {
+    let record = identity_with(None, Some(vec![rsa_key("k1", 2048)]), |fields| {
+        fields.provider_id = Identifier::new("acme okta").unwrap();
+    });
+    assert_eq!(
+        harness_for(&record).err(),
+        Some(IdpKeySourceError::UnrepresentableProviderId(
+            RootAuthorityShapeError::Pattern {
+                field: "source",
+                expected: "registry:<1 to 128 characters without NUL or whitespace>",
+            }
+        )),
     );
 }
 
