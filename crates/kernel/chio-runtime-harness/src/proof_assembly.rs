@@ -12,6 +12,7 @@ use crate::proof_parity::{
 use crate::scenario::RuntimeLoopbackStep;
 use crate::RuntimeLoopbackError;
 
+#[derive(Clone)]
 pub(crate) struct StaticProofBaseline {
     pub(crate) package: chio_attest_buyer_core::proof_package::ChioProofPackage,
     pub(crate) report: chio_attest_buyer_core::report::VerifierReport,

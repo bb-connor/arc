@@ -3,6 +3,7 @@ use crate::kernel::runtime_loopback_policy_summary;
 use crate::scenario::RuntimeLoopbackStep;
 use crate::RuntimeLoopbackError;
 
+#[derive(Clone)]
 pub(crate) struct RuntimeLoopbackTreatyContext {
     pub(crate) treaty_scope: chio_runtime_core::TreatyScope,
     pub(crate) treaty_scope_sha256: String,
