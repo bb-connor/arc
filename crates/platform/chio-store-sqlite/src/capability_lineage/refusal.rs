@@ -56,6 +56,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn lineage_reader_negative_integer_keeps_field_and_value(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        let valid = connection.query_row("SELECT 0", [], |row| {
+            crate::capability_lineage::non_negative_u64_from_column(row, 0, "issued_at")
+        })?;
+        assert_eq!(valid, 0);
+        let source = connection
+            .query_row("SELECT -1", [], |row| {
+                crate::capability_lineage::non_negative_u64_from_column(row, 0, "issued_at")
+            })
+            .err()
+            .ok_or("negative lineage timestamp was accepted")?;
+        let refusal = LineageReaderRefusal::from_sql(source)?;
+        assert_eq!(refusal.message("cap"), "capability lineage of cap is refused by the local reader: capability_lineage.issued_at must be non-negative, got -1 at column 0");
+        Ok(())
+    }
+
+    #[test]
+    fn lineage_reader_unknown_provenance_keeps_field_and_value(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = rusqlite::Connection::open_in_memory()?;
+        let valid = connection.query_row("SELECT 'signed_token'", [], |row| {
+            crate::capability_lineage::provenance_from_row(row, 0)
+        })?;
+        assert_eq!(
+            valid,
+            crate::capability_lineage::CapabilitySnapshotProvenance::SignedToken
+        );
+        let source = connection
+            .query_row("SELECT 'unknown'", [], |row| {
+                crate::capability_lineage::provenance_from_row(row, 0)
+            })
+            .err()
+            .ok_or("unknown lineage provenance was accepted")?;
+        let refusal = LineageReaderRefusal::from_sql(source)?;
+        assert_eq!(refusal.message("cap"), "capability lineage of cap is refused by the local reader: capability_lineage.provenance has unsupported value \"unknown\" at column 0");
+        Ok(())
+    }
+
+    #[test]
     fn lineage_reader_backend_failures_keep_sqlite_codes() {
         for code in [
             rusqlite::ffi::SQLITE_BUSY,
