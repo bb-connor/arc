@@ -417,7 +417,6 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
 mod tests {
     use super::insert_runtime_loopback_treaty_context;
     use crate::scenario::RuntimeLoopbackStep;
-    use chio_runtime_core::RuntimeAdmissionStore;
 
     fn fixed_hash(ch: char) -> String {
         ch.to_string().repeat(64)
