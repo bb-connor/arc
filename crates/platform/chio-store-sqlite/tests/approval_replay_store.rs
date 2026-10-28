@@ -8,9 +8,34 @@ use chio_test_support::prelude::*;
 
 const HASH: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 
+fn owned_directory() -> tempfile::TempDir {
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder.tempdir().test_unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn group_writable_parent_is_refused_before_creating_a_database() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = owned_directory();
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o770))
+        .test_unwrap();
+    let path = directory.path().join("approvals.db");
+    assert!(matches!(
+        SqliteApprovalReplayStore::open(&path),
+        Err(SqliteApprovalReplayStoreError::InvalidPath)
+    ));
+    assert!(!path.exists());
+}
+
 #[test]
 fn a_consumed_approval_remains_spent_after_reopen() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let store = SqliteApprovalReplayStore::open(&path).test_unwrap();
     assert_eq!(
@@ -31,7 +56,7 @@ fn a_consumed_approval_remains_spent_after_reopen() {
 
 #[test]
 fn concurrent_handles_have_exactly_one_fresh_issuance() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     drop(SqliteApprovalReplayStore::open(&path).test_unwrap());
     let barrier = Arc::new(Barrier::new(8));
@@ -69,7 +94,7 @@ fn concurrent_handles_have_exactly_one_fresh_issuance() {
 
 #[test]
 fn collection_cannot_resurrect_an_approval_after_clock_rollback_and_reopen() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let store = SqliteApprovalReplayStore::open(&path).test_unwrap();
     assert_eq!(
@@ -99,7 +124,7 @@ fn collection_cannot_resurrect_an_approval_after_clock_rollback_and_reopen() {
 
 #[test]
 fn capacity_is_persistent_and_only_expired_entries_release_it() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let store = SqliteApprovalReplayStore::open_with_capacity(&path, 1).test_unwrap();
     assert_eq!(
@@ -126,7 +151,7 @@ fn capacity_is_persistent_and_only_expired_entries_release_it() {
 
 #[test]
 fn an_unstamped_database_is_not_adopted() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let connection = rusqlite::Connection::open(&path).test_unwrap();
     connection
@@ -150,7 +175,7 @@ fn an_unstamped_database_is_not_adopted() {
 
 #[test]
 fn additional_schema_objects_are_refused_without_consuming() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let store = SqliteApprovalReplayStore::open(&path).test_unwrap();
     let connection = rusqlite::Connection::open(&path).test_unwrap();
@@ -190,7 +215,7 @@ fn nondurable_paths_are_refused() {
 #[cfg(unix)]
 #[test]
 fn aliased_or_replaced_files_cannot_issue_approvals() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = owned_directory();
     let path = directory.path().join("approvals.db");
     let store = SqliteApprovalReplayStore::open(&path).test_unwrap();
     let alias = directory.path().join("alias.db");
