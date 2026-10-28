@@ -66,7 +66,7 @@ pub use buyer::{
     verify_buyer_attestation_packet, verify_buyer_attestation_review_package,
     verify_buyer_attestation_review_package_with_trust, verify_receipt_lineage_bundle,
 };
-pub use error::ChioRuntimeError;
+pub use error::{ChioRuntimeError, RuntimeAdmissionWrite};
 pub(crate) use hash::canonical_sha256;
 pub use hash::{
     buyer_attestation_packet_sha256, runtime_admission_bundle_sha256,

@@ -16,8 +16,38 @@ pub enum ChioRuntimeError {
     Json(#[from] serde_json::Error),
     #[error("runtime admission SQLite failed")]
     Sqlite(#[from] rusqlite::Error),
+    #[error("runtime admission durable write failed: {write}")]
+    DurableWrite {
+        write: RuntimeAdmissionWrite,
+        #[source]
+        source: rusqlite::Error,
+    },
     #[error("runtime admission canonical JSON failed: {0}")]
     Canonical(String),
+}
+
+/// Durable runtime admission write that a store fault interrupted. The
+/// display names only the write, never the backend error text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeAdmissionWrite {
+    TrustFloor,
+}
+
+impl RuntimeAdmissionWrite {
+    pub(crate) fn fault(self) -> impl FnOnce(rusqlite::Error) -> ChioRuntimeError {
+        move |source| ChioRuntimeError::DurableWrite {
+            write: self,
+            source,
+        }
+    }
+}
+
+impl std::fmt::Display for RuntimeAdmissionWrite {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::TrustFloor => "trust floor",
+        })
+    }
 }
 
 impl ChioRuntimeError {
@@ -29,6 +59,7 @@ impl ChioRuntimeError {
             ChioRuntimeError::Rejected { code, .. } => code,
             ChioRuntimeError::DuplicateAdmissionBundle => "duplicate_admission_bundle",
             ChioRuntimeError::Sqlite(_) => "runtime_admission_store",
+            ChioRuntimeError::DurableWrite { .. } => "runtime_admission_store",
             ChioRuntimeError::Store(_) => "runtime_admission_store",
             ChioRuntimeError::Io(_) => "runtime_admission_io",
             ChioRuntimeError::Json(_) => "runtime_admission_json",
