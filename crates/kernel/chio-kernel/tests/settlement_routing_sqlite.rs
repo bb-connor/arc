@@ -305,7 +305,12 @@ fn kernel(
     authority: &SqliteAuthorityStore,
 ) -> Result<(ChioKernel, CapabilityToken), KernelError> {
     let (mut kernel, capability) = unsettled_kernel(receipts, authority)?;
-    kernel.set_settlement_observer_runtime(hook, outcomes, RetryPolicy::default())?;
+    kernel.set_settlement_observer_runtime(
+        hook,
+        outcomes,
+        RetryPolicy::default(),
+        chio_kernel::SettlementDrainTrust::from(kernel.public_key()),
+    )?;
     Ok((kernel, capability))
 }
 
@@ -590,7 +595,11 @@ fn settlement_ledger_records_one_reconciliation_for_a_settled_durable_receipt(
     let fixture = sqlite_fixture()?;
     let (mut kernel, capability) = unsettled_kernel(&fixture.receipts, &fixture.authority)?;
     let outcomes: Arc<dyn SettlementOutcomeStore> = fixture.outcomes.clone();
-    kernel.install_settlement_ledger(outcomes, RetryPolicy::default())?;
+    kernel.install_settlement_ledger(
+        outcomes,
+        RetryPolicy::default(),
+        chio_kernel::SettlementDrainTrust::from(kernel.public_key()),
+    )?;
 
     let receipt = execute(&kernel, &capability, "ledger-settled")?;
 

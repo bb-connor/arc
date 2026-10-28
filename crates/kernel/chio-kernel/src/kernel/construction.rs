@@ -1142,11 +1142,13 @@ impl ChioKernel {
         hook: Arc<dyn chio_settle::SettlementHook>,
         outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
         retry_policy: chio_settle::RetryPolicy,
+        drain_trust: crate::SettlementDrainTrust,
     ) -> Result<(), KernelError> {
         let runtime = crate::settlement_routing::SettlementObserverRuntime::new(
             hook,
             outcome_store,
             retry_policy,
+            drain_trust,
         )
         .map_err(crate::SettlementRuntimeConfigError::from)?;
         if let Some(receipt_store) = self.receipt_store.as_ref() {
@@ -1167,6 +1169,7 @@ impl ChioKernel {
         &mut self,
         outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
         retry_policy: chio_settle::RetryPolicy,
+        drain_trust: crate::SettlementDrainTrust,
     ) -> Result<(), KernelError> {
         let Some(receipt_store) = self.receipt_store.clone() else {
             return Err(crate::SettlementRuntimeConfigError::MissingReceiptStore.into());
@@ -1177,7 +1180,7 @@ impl ChioKernel {
         let hook = Arc::new(crate::settlement_ledger::KernelSettlementLedgerHook::new(
             receipt_store,
         ));
-        self.set_settlement_observer_runtime(hook, outcome_store, retry_policy)
+        self.set_settlement_observer_runtime(hook, outcome_store, retry_policy, drain_trust)
     }
 
     fn validate_settlement_receipt_store(

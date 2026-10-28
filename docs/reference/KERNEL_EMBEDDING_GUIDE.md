@@ -39,12 +39,30 @@ sync-bridge incompatibility error before any dispatch side effect.
 ## Settlement runtime installation
 
 `ChioKernel::set_settlement_observer_runtime` takes the settlement hook, its
-durable outcome store, and a retry policy, and returns
+durable outcome store, a retry policy, and explicit receipt-signer trust for
+persisted drain claims. It returns
 `Result<(), KernelError>`:
 
 ```rust
-kernel.set_settlement_observer_runtime(hook, outcome_store, retry_policy)?;
+let drain_trust = chio_kernel::SettlementDrainTrust::new(trusted_receipt_keys)?;
+kernel.set_settlement_observer_runtime(hook, outcome_store, retry_policy, drain_trust)?;
 ```
+
+The trusted runtime supplies the receipt keys; never derive this set from an
+untrusted receipt or an unauthenticated history. `SettlementDrainTrust::new`
+requires one to 64 distinct full public keys, including any historical signers
+that may have pending work. Empty or duplicate sets are refused. There is no
+default set or implicit insertion of the current key. For a runtime that trusts
+only its current key, pass `SettlementDrainTrust::from(kernel.public_key())`
+explicitly. Reinstallation replaces the set. Fresh observations still trust
+only the current kernel key.
+
+The drain loads receipts in batches of at most 256, checks exact response length
+and each claimed receipt ID and timestamp, and retains per-claim completion CAS.
+A batch error falls back to point reads so a failed row does not prevent healthy
+claims from completing. Signature verification remains mandatory. A store that
+implements optimized batch reads can share integrity verification within one
+immutable snapshot; the default trait implementation still uses point reads.
 
 Propagate the error or fail startup on it. A discarded error leaves the kernel
 dispatching charges with settlement uninstalled.
@@ -55,7 +73,8 @@ A host that configures a payment adapter installs the kernel settlement ledger
 and refuses to start when the install fails:
 
 ```rust
-kernel.install_settlement_ledger(outcome_store, retry_policy)?;
+let drain_trust = chio_kernel::SettlementDrainTrust::new(trusted_receipt_keys)?;
+kernel.install_settlement_ledger(outcome_store, retry_policy, drain_trust)?;
 ```
 
 `install_settlement_ledger` builds `KernelSettlementLedgerHook` over the

@@ -124,8 +124,15 @@ impl ChioKernel {
                 ));
             }
         };
-        self.run_settlement_observer(
+        super::settlement_observer::run_observer(
+            self.settlement_observer
+                .as_ref()
+                .map(crate::settlement_routing::SettlementObserverRuntime::hook_ref),
             receipt,
+            self.settlement_observer.as_ref().map_or(
+                &[],
+                crate::settlement_routing::SettlementObserverRuntime::drain_keys,
+            ),
             &SettlementIdempotencyKey {
                 receipt_id: claim.receipt_id.clone(),
                 row_version: claim.row_version,

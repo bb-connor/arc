@@ -68,7 +68,11 @@ fn install_settlement_ledger(
         ))
     })?;
     kernel
-        .install_settlement_ledger(Arc::new(outcome_store), Default::default())
+        .install_settlement_ledger(
+            Arc::new(outcome_store),
+            Default::default(),
+            chio_kernel::SettlementDrainTrust::from(kernel.public_key()),
+        )
         .map_err(|error| {
             ProtectError::Config(format!("failed to install the settlement ledger: {error}"))
         })

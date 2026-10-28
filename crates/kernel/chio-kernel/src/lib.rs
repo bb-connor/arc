@@ -150,7 +150,13 @@ mod settlement_ledger;
 #[cfg(not(loom))]
 pub use settlement_ledger::KernelSettlementLedgerHook;
 #[cfg(not(loom))]
+mod settlement_drain_trust;
+#[cfg(not(loom))]
 mod settlement_routing;
+#[cfg(not(loom))]
+pub use settlement_drain_trust::{
+    SettlementDrainTrust, SettlementDrainTrustError, MAX_SETTLEMENT_DRAIN_KEYS,
+};
 #[cfg(not(loom))]
 pub mod stop;
 #[cfg(not(loom))]

@@ -35,6 +35,7 @@ pub(crate) struct SettlementObserverRuntime {
     hook: Arc<dyn SettlementHook>,
     outcome_store: Arc<dyn SettlementOutcomeStore>,
     retry_policy: RetryPolicy,
+    drain_trust: crate::SettlementDrainTrust,
     store_binding: chio_settle::SettlementStoreBinding,
 }
 
@@ -43,6 +44,7 @@ impl SettlementObserverRuntime {
         hook: Arc<dyn SettlementHook>,
         outcome_store: Arc<dyn SettlementOutcomeStore>,
         retry_policy: RetryPolicy,
+        drain_trust: crate::SettlementDrainTrust,
     ) -> Result<Self, RetryPolicyError> {
         retry_policy.validate()?;
         let store_binding = outcome_store.settlement_store_binding();
@@ -50,8 +52,13 @@ impl SettlementObserverRuntime {
             hook,
             outcome_store,
             retry_policy,
+            drain_trust,
             store_binding,
         })
+    }
+
+    pub(crate) fn drain_keys(&self) -> &[chio_core::crypto::PublicKey] {
+        self.drain_trust.keys()
     }
 
     pub(crate) fn hook(&self) -> Arc<dyn SettlementHook> {
@@ -644,7 +651,14 @@ mod tests {
 
     fn routing_runtime(store: &Arc<RoutingOutcomeStore>) -> SettlementObserverRuntime {
         let outcome_store: Arc<dyn SettlementOutcomeStore> = store.clone();
-        match SettlementObserverRuntime::new(hook(), outcome_store, RetryPolicy::default()) {
+        match SettlementObserverRuntime::new(
+            hook(),
+            outcome_store,
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(
+                chio_core::crypto::Keypair::from_seed(&[61; 32]).public_key(),
+            ),
+        ) {
             Ok(runtime) => runtime,
             Err(error) => panic!("test runtime rejected: {error}"),
         }
@@ -921,6 +935,9 @@ mod tests {
             Arc::clone(&hook),
             Arc::clone(&outcome_store),
             policy,
+            crate::SettlementDrainTrust::from(
+                chio_core::crypto::Keypair::from_seed(&[61; 32]).public_key(),
+            ),
         ) {
             Ok(runtime) => runtime,
             Err(error) => panic!("valid runtime rejected: {error}"),
@@ -940,6 +957,7 @@ mod tests {
             hook(),
             outcome_store(&store),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(result.is_ok());
@@ -961,6 +979,7 @@ mod tests {
             hook(),
             outcome_store(&store),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(matches!(
@@ -983,8 +1002,12 @@ mod tests {
         let outcomes = RoutingOutcomeStore::new(Ok(SettlementRoute::NoAction));
         let outcome_store: Arc<dyn SettlementOutcomeStore> = outcomes;
 
-        let result =
-            kernel.set_settlement_observer_runtime(hook(), outcome_store, RetryPolicy::default());
+        let result = kernel.set_settlement_observer_runtime(
+            hook(),
+            outcome_store,
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(matches!(
             result,
@@ -1007,8 +1030,12 @@ mod tests {
             ..RetryPolicy::default()
         };
 
-        let result =
-            kernel.set_settlement_observer_runtime(hook(), outcome_store(&store), invalid_policy);
+        let result = kernel.set_settlement_observer_runtime(
+            hook(),
+            outcome_store(&store),
+            invalid_policy,
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(matches!(
             result,
@@ -1106,8 +1133,11 @@ mod tests {
         let mut kernel = kernel();
         let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
 
-        let result =
-            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+        let result = kernel.install_settlement_ledger(
+            outcome_store(&store),
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(matches!(
             result,
@@ -1126,8 +1156,11 @@ mod tests {
             .set_receipt_store_handle(receipt_store(&store))
             .is_ok());
 
-        let result =
-            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+        let result = kernel.install_settlement_ledger(
+            outcome_store(&store),
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(matches!(
             result,
@@ -1151,8 +1184,11 @@ mod tests {
             .set_receipt_store_handle(receipt_store(&store))
             .is_ok());
 
-        let result =
-            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+        let result = kernel.install_settlement_ledger(
+            outcome_store(&store),
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(matches!(
             result,
@@ -1176,8 +1212,11 @@ mod tests {
             .set_receipt_store_handle(receipt_store(&store))
             .is_ok());
 
-        let result =
-            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+        let result = kernel.install_settlement_ledger(
+            outcome_store(&store),
+            RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
+        );
 
         assert!(result.is_ok());
         assert!(kernel.settlement_observer().is_some());
@@ -1195,6 +1234,7 @@ mod tests {
             hook(),
             outcome_store(&store),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(result.is_ok());
@@ -1215,6 +1255,7 @@ mod tests {
             hook(),
             outcome_store(&outcome_store_backend),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(result.is_ok());
@@ -1235,6 +1276,7 @@ mod tests {
             hook(),
             outcome_store(&outcome_store_backend),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(matches!(
@@ -1258,6 +1300,7 @@ mod tests {
             hook(),
             outcome_store(&store),
             RetryPolicy::default(),
+            crate::SettlementDrainTrust::from(kernel.public_key()),
         );
 
         assert!(matches!(
@@ -1277,7 +1320,12 @@ mod tests {
             .set_receipt_store_handle(receipt_store(&store))
             .is_ok());
         assert!(kernel
-            .set_settlement_observer_runtime(hook(), outcome_store(&store), RetryPolicy::default(),)
+            .set_settlement_observer_runtime(
+                hook(),
+                outcome_store(&store),
+                RetryPolicy::default(),
+                crate::SettlementDrainTrust::from(kernel.public_key())
+            )
             .is_ok());
         let replacement = atomic_store(AtomicReceiptProjection::Unsupported);
 
@@ -1300,7 +1348,12 @@ mod tests {
             .set_receipt_store_handle(receipt_store(&store))
             .is_ok());
         assert!(kernel
-            .set_settlement_observer_runtime(hook(), outcome_store(&store), RetryPolicy::default(),)
+            .set_settlement_observer_runtime(
+                hook(),
+                outcome_store(&store),
+                RetryPolicy::default(),
+                crate::SettlementDrainTrust::from(kernel.public_key())
+            )
             .is_ok());
         let replacement = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
 
