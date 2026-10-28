@@ -120,6 +120,7 @@ struct SchedulerState {
     claim_expiry_extension_ms: u64,
     trusted_now_unix_ms: Option<u64>,
     record_lock_wait_ms: u64,
+    retired: bool,
 }
 
 #[derive(Default)]
@@ -396,6 +397,12 @@ impl ResponseSchedulerStore for SchedulerStore {
 
     fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()> {
         let state = self.state()?;
+        if state.retired {
+            return Err(PortError::new(
+                chio_security_types::ports::PortErrorKind::Conflict,
+                ErrorCode::new("store.retired")?,
+            ));
+        }
         if state.work.as_ref() == Some(work) {
             Ok(())
         } else {
@@ -1434,4 +1441,38 @@ fn dispatch_rejection_survives_retry_and_operator_evidence(
     assert!(body.to_string().contains(expected));
     assert_eq!(pages.pages.len(), 1);
     Ok(())
+}
+
+#[test]
+fn scheduler_reports_a_retired_store_instead_of_a_lost_lease() {
+    let store = Arc::new(SchedulerStore::default());
+    let planned = plan(Arc::clone(&store));
+    let executor = Arc::new(UnavailableExecutor::default());
+    let scheduler = ResponseScheduler::new(
+        Arc::clone(&store),
+        Arc::clone(&executor),
+        Arc::new(TestHealthSink::default()),
+        policy(),
+    )
+    .unwrap_or_else(|error| panic!("scheduler: {error}"));
+    let live = ScheduledWork {
+        tenant_id: planned.tenant_id,
+        action_id: planned.action_id,
+        lease_owner_id: LeaseOwnerId::new("live-worker")
+            .unwrap_or_else(|error| panic!("lease owner id: {error}")),
+        lease_expires_at_unix_ms: 1_100,
+        fencing_token: 1,
+    };
+    store.install_work(live.clone());
+    store
+        .state()
+        .unwrap_or_else(|error| panic!("scheduler state: {error}"))
+        .retired = true;
+
+    let outcome = scheduler.process(&live, 1_050);
+    assert!(
+        matches!(outcome, Err(SchedulerError::Store(ref error)) if error.code().as_str() == "store.retired"),
+        "{outcome:?}"
+    );
+    assert_eq!(executor.calls(), 0);
 }
