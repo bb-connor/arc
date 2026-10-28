@@ -78,8 +78,11 @@ impl PaymentAdapterConfig {
                 )
                 .map_err(|error| format!("http-x402 rail: {error}"))?;
                 let clock = crate::input::time::clock();
+                let replay_db = required("CHIO_PAYMENT_X402_REPLAY_DB")?;
+                let replay_db = durable_replay_db_path(&replay_db)
+                    .map_err(|error| format!("CHIO_PAYMENT_X402_REPLAY_DB: {error}"))?;
                 let replay = SqliteExecutionNonceStore::open_with_clock(
-                    required("CHIO_PAYMENT_X402_REPLAY_DB")?,
+                    replay_db,
                     DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
                     clock.clone(),
                 )
@@ -136,6 +139,22 @@ impl PaymentAdapterConfig {
             }
         }
     }
+}
+
+/// Why a configured x402 replay store path cannot hold spent nonces across a
+/// restart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum X402ReplayStorePathError {
+    #[error("x402 replay store path is empty")]
+    Empty,
+    #[error("x402 replay store path names a non-durable SQLite database")]
+    NonDurable,
+}
+
+/// The configured replay store path, refused unless SQLite would open it as a
+/// durable file.
+pub fn durable_replay_db_path(path: &str) -> Result<&str, X402ReplayStorePathError> {
+    Ok(path)
 }
 
 #[cfg(test)]
@@ -200,5 +219,49 @@ mod tests {
         };
         http.validate().test_unwrap();
         let _ = http.build_adapter();
+    }
+
+    #[test]
+    fn replay_store_path_refuses_an_empty_path() {
+        for path in ["", "   "] {
+            assert_eq!(
+                durable_replay_db_path(path),
+                Err(X402ReplayStorePathError::Empty),
+                "{path:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn replay_store_path_refuses_non_durable_databases() {
+        for path in [
+            ":memory:",
+            ":MEMORY:",
+            "file::memory:",
+            "file::memory:?cache=shared",
+            "file:x402?mode=memory&cache=shared",
+            "file:x402?vfs=memdb",
+            "file:",
+            "file:?cache=shared",
+            "file:#fragment",
+        ] {
+            assert_eq!(
+                durable_replay_db_path(path),
+                Err(X402ReplayStorePathError::NonDurable),
+                "{path:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn replay_store_path_accepts_durable_files() {
+        for path in [
+            "/var/lib/chio/x402-replay.sqlite3",
+            "x402-replay.sqlite3",
+            "file:/var/lib/chio/x402-replay.sqlite3",
+            "file:x402-replay.sqlite3?mode=rwc",
+        ] {
+            assert_eq!(durable_replay_db_path(path), Ok(path), "{path:?}");
+        }
     }
 }
