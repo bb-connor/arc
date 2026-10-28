@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
+use rusqlite::types::ValueRef;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use crate::store_connection::StoreConnection;
@@ -161,24 +162,39 @@ fn valid_node_id(node_id: &str) -> bool {
     !node_id.is_empty() && node_id.len() <= MAX_NODE_ID_BYTES
 }
 
+/// Read every stored mark. The row count and each column's type and size are
+/// bounded in SQL, so a corrupt row is refused before any of it is copied out.
 fn read_high_waters(
     connection: &Connection,
 ) -> Result<BTreeMap<String, i64>, ClusterPeerReplayStoreError> {
-    let mut statement =
-        connection.prepare("SELECT node_id, issued_at FROM cluster_peer_replay_high_water")?;
-    let rows = statement.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-    })?;
+    let rows: i64 = connection.query_row(
+        "SELECT count(*) FROM cluster_peer_replay_high_water",
+        [],
+        |row| row.get(0),
+    )?;
+    if !usize::try_from(rows).is_ok_and(|rows| rows <= CLUSTER_PEER_REPLAY_MAX_PEERS) {
+        return Err(ClusterPeerReplayStoreError::InvalidRow);
+    }
+    let mut statement = connection.prepare(&format!(
+        "SELECT CASE WHEN typeof(node_id) = 'text' AND octet_length(node_id) BETWEEN 1 AND {MAX_NODE_ID_BYTES} THEN node_id END, \
+                CASE WHEN typeof(issued_at) = 'integer' AND issued_at >= 0 THEN issued_at END \
+         FROM cluster_peer_replay_high_water"
+    ))?;
+    let mut rows = statement.query([])?;
     let mut high_waters = BTreeMap::new();
-    for row in rows {
-        let (node_id, issued_at) = row?;
-        if !valid_node_id(&node_id)
-            || issued_at < 0
-            || high_waters.len() >= CLUSTER_PEER_REPLAY_MAX_PEERS
-        {
+    while let Some(row) = rows.next()? {
+        let node_id = match row.get_ref(0)? {
+            ValueRef::Text(bytes) => std::str::from_utf8(bytes)
+                .map_err(|_| ClusterPeerReplayStoreError::InvalidRow)?
+                .to_owned(),
+            _ => return Err(ClusterPeerReplayStoreError::InvalidRow),
+        };
+        let ValueRef::Integer(issued_at) = row.get_ref(1)? else {
+            return Err(ClusterPeerReplayStoreError::InvalidRow);
+        };
+        if high_waters.insert(node_id, issued_at).is_some() {
             return Err(ClusterPeerReplayStoreError::InvalidRow);
         }
-        high_waters.insert(node_id, issued_at);
     }
     Ok(high_waters)
 }

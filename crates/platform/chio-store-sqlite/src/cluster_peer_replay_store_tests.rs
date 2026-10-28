@@ -178,7 +178,9 @@ fn oversized_node_id_refuses_on_open() {
 fn a_valid_store_reopens_after_corrupt_row_controls() {
     let dir = tempfile::tempdir().test_unwrap();
     let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
-    store.advance(&"n".repeat(MAX_NODE_ID_BYTES), 1).test_unwrap();
+    store
+        .advance(&"n".repeat(MAX_NODE_ID_BYTES), 1)
+        .test_unwrap();
     drop(store);
     assert_eq!(
         SqliteClusterPeerReplayStore::open(store_path(&dir))
