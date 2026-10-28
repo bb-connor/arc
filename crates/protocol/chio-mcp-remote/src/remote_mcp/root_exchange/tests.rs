@@ -437,6 +437,16 @@ async fn refusal(header: Value, claims: Value) -> RootExchangeError {
 }
 
 #[tokio::test]
+async fn id_jag_context_carries_the_assertion_digest() {
+    let harness = Harness::new();
+    let id_jag = compact(&id_jag_header(), &id_jag_claims(), idp_sign);
+    let body = jwt_bearer_body(&id_jag, &client_assertion(&client_assertion_claims()));
+    let prepared = harness.run_body(&body, None, NOW).await.unwrap();
+    let digest = Sha256Digest::from_hash(sha256(id_jag.as_bytes()));
+    assert_eq!(prepared.context().anchor.artifact_digest, Some(digest));
+}
+
+#[tokio::test]
 async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     let harness = Harness::new();
     let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();

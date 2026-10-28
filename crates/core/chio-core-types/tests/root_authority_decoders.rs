@@ -46,6 +46,44 @@ fn delegation_anchor_decode_applies_its_kind_rules() {
     );
 }
 
+/// The static-bearer example anchor, re-kinded as `kind` with the members
+/// that kind requires.
+fn non_jws_anchor(kind: &str) -> Value {
+    let mut anchor =
+        example("valid", "delegation-context.operator-static-bearer.json")["anchor"].clone();
+    anchor["kind"] = json!(kind);
+    if kind != "operator_static_bearer" {
+        anchor["issuer"] = json!("https://as.acme.example");
+    }
+    if kind == "oauth_introspection" {
+        anchor["provider_record_id"] = json!("acme-introspection");
+        anchor["provider_identity_digest"] =
+            json!("sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae");
+    }
+    anchor
+}
+
+#[test]
+fn delegation_anchor_decode_refuses_artifact_digest_on_non_jws_kinds() {
+    for kind in [
+        "oauth_introspection",
+        "chio_local_as",
+        "chio_operator_key",
+        "operator_static_bearer",
+    ] {
+        let anchor = non_jws_anchor(kind);
+        DelegationAnchor::deserialize(anchor.clone()).unwrap();
+        let mut carrying = anchor;
+        carrying["artifact_digest"] =
+            json!("sha256:cd36b537365257d2d7a2789136e5c4db82ff6c849b3299fd4aa9352367a42093");
+        assert_eq!(
+            refused!(DelegationAnchor, carrying),
+            format!("`artifact_digest` is not allowed for {kind}"),
+            "{kind}"
+        );
+    }
+}
+
 #[test]
 fn delegation_context_decode_pins_its_schema() {
     let mut context = example("valid", "delegation-context.spec-5-6-3.json");

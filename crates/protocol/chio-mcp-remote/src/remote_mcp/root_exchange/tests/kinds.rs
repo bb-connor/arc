@@ -424,9 +424,20 @@ async fn every_kind_reaches_the_same_prepare() {
         } else {
             issuer
         };
+        let artifact_digest = evidence.artifact_digest().copied();
         let prepared = exchange
             .prepare(evidence, None, None, NOW, &entropy())
             .unwrap();
+        if kind.is_jws_verified() {
+            assert!(artifact_digest.is_some(), "{kind:?}");
+            assert_eq!(
+                prepared.context().anchor.artifact_digest,
+                artifact_digest,
+                "{kind:?}"
+            );
+        } else {
+            assert_eq!(prepared.context().anchor.artifact_digest, None, "{kind:?}");
+        }
         assert_eq!(prepared.anchor().kind, kind);
         assert_eq!(prepared.context().anchor.kind, kind);
         assert_eq!(prepared.context().anchor.issuer.as_str(), issuer);
