@@ -4805,6 +4805,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-predicate-dag"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+ "proptest",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "chio-process"
 version = "0.1.0"
 dependencies = [
@@ -16623,6 +16632,7 @@ dependencies = [
  "chio-eval-receipt",
  "chio-formal-diff-tests",
  "chio-manifest",
+ "chio-predicate-dag",
  "chio-spec-codegen",
  "chio-spec-validate",
  "clap 4.6.0",
