@@ -819,6 +819,11 @@ fn runtime_contract_fingerprint_binds_upstream_argument_file_contents() {
         .expect("fingerprint authority-bound runtime contract");
     assert_ne!(first, authority_bound);
 
+    config.control_internal_url = Some("https://control-internal.example".to_string());
+    let internal_bound = fingerprint_remote_runtime_contract(&config, &registry)
+        .expect("fingerprint internal-endpoint-bound runtime contract");
+    assert_ne!(authority_bound, internal_bound);
+
     std::fs::write(&argument_path, b"print('second revision')\n")
         .expect("write changed upstream argument content");
     let second = fingerprint_remote_runtime_contract(&config, &registry)
