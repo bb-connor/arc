@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use chio_core::Keypair;
-use chio_credentials::PassportStatusDistribution;
+use chio_credentials::{PassportLifecycleRecord, PassportStatusDistribution};
 use chio_revocation_oracle::{
     credential_revocation_key, passport_revocation_key, EpochNonce, PassportRevocationLeaf,
     PassportRevocationLeafKind, RevocationKey, RevocationOracleError, SqliteRevocationOracle,
@@ -133,31 +133,115 @@ fn an_absent_oracle_refuses_the_root_and_the_leaves() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn a_registry_with_more_revoked_records_than_passport_leaves_refuses_to_sign() -> TestResult {
+struct Revoked {
+    feed: Feed,
+    record: PassportLifecycleRecord,
+}
+
+impl Revoked {
+    fn keys(&self) -> Vec<RevocationKey> {
+        let mut keys = vec![passport_revocation_key(&self.record.passport_id)];
+        keys.extend(
+            self.record
+                .credential_digests
+                .iter()
+                .map(|digest| credential_revocation_key(digest)),
+        );
+        keys
+    }
+
+    fn restore(&self, keys: &[RevocationKey]) -> Fallible<SqliteRevocationOracle> {
+        let path = passport_revocation_oracle_path(&self.feed.registry)?;
+        std::fs::rename(&path, self.feed.registry.with_file_name("lost.sqlite3"))?;
+        let restored = SqliteRevocationOracle::open(&path)?;
+        revoke_many(&restored, keys)?;
+        Ok(restored)
+    }
+}
+
+/// A feed whose registry has revoked one published passport through the
+/// oracle.
+fn revoked_passport() -> Fallible<Revoked> {
     let feed = feed()?;
-    let passport = passport_from_issuers(3, &[4], ISSUED_AT)?;
+    let passport = passport_from_issuers(3, &[4, 5], ISSUED_AT)?;
     let record = PassportStatusRegistry::update(&feed.registry, |registry| {
         registry.publish(&passport, ISSUED_AT, PassportStatusDistribution::default())
     })?;
-    revoke_passport_status(
+    let record = revoke_passport_status(
         &feed.registry,
         &record.passport_id,
         None,
         Some(ISSUED_AT + 1),
         ISSUED_AT + 2,
     )?;
-    let now = (ISSUED_AT + 3) * 1_000;
-    sign_passport_revocation_root(&feed.oracle, &feed.registry, authority(), now)?;
+    Ok(Revoked { feed, record })
+}
 
-    let lost = feed.registry.with_file_name("lost.sqlite3");
-    std::fs::rename(passport_revocation_oracle_path(&feed.registry)?, &lost)?;
-    let empty = SqliteRevocationOracle::open(&passport_revocation_oracle_path(&feed.registry)?)?;
+const SIGN_AT: u64 = (ISSUED_AT + 3) * 1_000;
+
+#[test]
+fn an_oracle_holding_every_registry_revocation_signs_its_own_snapshot() -> TestResult {
+    let revoked = revoked_passport()?;
+    let mut keys = revoked.keys();
+    keys.push(passport_revocation_key("unrelated-passport"));
+    let restored = revoked.restore(&keys)?;
+    let signed =
+        sign_passport_revocation_root(&restored, &revoked.feed.registry, authority(), SIGN_AT)?;
+    let current = restored.current_epoch_root()?;
+    assert_eq!(signed.root.root_hash, current.root_hash);
+    assert_eq!(signed.root.leaf_count, 4);
+    assert_eq!(signed.root.issued_at_unix_ms, SIGN_AT);
+    Ok(())
+}
+
+#[test]
+fn a_lost_oracle_refuses_to_sign() -> TestResult {
+    let revoked = revoked_passport()?;
+    let empty = revoked.restore(&[])?;
     assert_eq!(
-        sign_passport_revocation_root(&empty, &feed.registry, authority(), now),
-        Err(PassportRevocationFeedError::OracleBehindRegistry {
-            revoked: 1,
-            passport_leaves: 0,
+        sign_passport_revocation_root(&empty, &revoked.feed.registry, authority(), SIGN_AT),
+        Err(PassportRevocationFeedError::OracleMissingRevocation {
+            passport_id: revoked.record.passport_id.clone(),
+            subject: revoked.record.passport_id.clone(),
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn an_equal_count_restore_of_unrelated_revocations_refuses_to_sign() -> TestResult {
+    let revoked = revoked_passport()?;
+    let unrelated: Vec<RevocationKey> = (0..revoked.keys().len())
+        .map(|index| match index {
+            0 => passport_revocation_key("unrelated-passport"),
+            index => credential_revocation_key(&format!("{index:064x}")),
+        })
+        .collect();
+    let restored = revoked.restore(&unrelated)?;
+    assert_eq!(
+        sign_passport_revocation_root(&restored, &revoked.feed.registry, authority(), SIGN_AT),
+        Err(PassportRevocationFeedError::OracleMissingRevocation {
+            passport_id: revoked.record.passport_id.clone(),
+            subject: revoked.record.passport_id.clone(),
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn a_restore_missing_one_credential_revocation_refuses_to_sign() -> TestResult {
+    let revoked = revoked_passport()?;
+    let mut keys = revoked.keys();
+    let missing = keys
+        .pop()
+        .ok_or("a revoked passport carries a credential")?;
+    keys.push(credential_revocation_key(&"ef".repeat(32)));
+    let restored = revoked.restore(&keys)?;
+    assert_eq!(
+        sign_passport_revocation_root(&restored, &revoked.feed.registry, authority(), SIGN_AT),
+        Err(PassportRevocationFeedError::OracleMissingRevocation {
+            passport_id: revoked.record.passport_id.clone(),
+            subject: missing.subject_id.as_str().to_owned(),
         })
     );
     Ok(())

@@ -52,6 +52,11 @@ pub enum PassportRevocationFeedError {
         "passport lifecycle registry holds {revoked} revoked passports but the revocation oracle holds {passport_leaves} passport leaves"
     )]
     OracleBehindRegistry { revoked: u64, passport_leaves: u64 },
+    #[error("passport lifecycle registry revokes `{passport_id}` but the revocation oracle snapshot lacks its key `{subject}`")]
+    OracleMissingRevocation {
+        passport_id: String,
+        subject: String,
+    },
     #[error("authority clock reads {now_unix_ms}, before the revocation oracle root at {root_issued_at_unix_ms}")]
     ClockBehindOracle {
         now_unix_ms: u64,

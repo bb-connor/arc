@@ -37,6 +37,7 @@ fn feed_error_response(error: &PassportRevocationFeedError) -> Response {
             "passport revocation root signing failed",
         ),
         PassportRevocationFeedError::OracleBehindRegistry { .. }
+        | PassportRevocationFeedError::OracleMissingRevocation { .. }
         | PassportRevocationFeedError::ClockBehindOracle { .. }
         | PassportRevocationFeedError::BeyondJsonPrecision(_)
         | PassportRevocationFeedError::UnsupportedSchema(_)
