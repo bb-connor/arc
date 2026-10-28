@@ -43,6 +43,7 @@ pub(crate) fn verify_runtime_budget_selection_tx(
             "budget selection differs from the runtime prepared grant or phase",
         ));
     }
+    runtime_source::require_active_source(connection, live.intent().runtime_authority_id())?;
     Ok(())
 }
 
@@ -140,6 +141,7 @@ impl SqliteAdmissionOperationStore {
         )?;
         ensure_no_reserved_terminal_stage(&transaction, operation.binding().operation_id())?;
         require_intent(&transaction, operation, intent)?;
+        runtime_source::require_active_source(&transaction, intent.runtime_authority_id())?;
         let episodes = records::load(&transaction, operation)?;
         if let Some(existing) = episodes
             .iter()
