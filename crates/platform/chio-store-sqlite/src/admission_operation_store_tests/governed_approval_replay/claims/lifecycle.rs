@@ -2,42 +2,6 @@ use super::*;
 #[path = "lifecycle/dispatch_snapshot.rs"]
 mod dispatch_snapshot;
 
-#[test]
-fn expiry_reclaims_live_capacity_without_deleting_legacy_evidence() -> AnchoredTestResult {
-    let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let expires = now_ms() / 1000 + 60;
-    for index in 0..8 {
-        Connection::open(&source.path)?.execute("INSERT INTO chio_governed_approval_replay_entries VALUES ('historical', ?1, 'intent', ?2, NULL)",
-            params![format!("historical-{index}"), i64::try_from(expires)?])?;
-    }
-    let binding = activate(&fixture, &source)?;
-    let (operation, lease, credential) = setup(&fixture, "capacity-new")?;
-    let intent = candidate(&operation, &binding, "claim", credential)?;
-    let count = global_count(&fixture);
-    let error = fixture
-        .store
-        .claim_governed_approval(&operation, &lease, &intent, now_ms())
-        .expect_err("live capacity must deny");
-    assert!(error.to_string().contains("live capacity"), "{error}");
-    assert_eq!(global_count(&fixture), count);
-    let _clock = chio_test_support::clock::scope_unix_secs(expires);
-    let now = expires * 1000;
-    let lease = renew(&fixture, &operation, &lease, now)?;
-    fixture
-        .store
-        .claim_governed_approval(&operation, &lease, &intent, now)?;
-    assert_eq!(
-        fixture.store.connection()?.query_row(
-            "SELECT COUNT(*) FROM governed_approval_replay_legacy_tombstones",
-            [],
-            |row| row.get::<_, i64>(0)
-        )?,
-        8
-    );
-    Ok(())
-}
-
 fn capture_pending(
     fixture: &Fixture,
     mut operation: AdmissionOperationV1,
@@ -72,8 +36,7 @@ fn capture_pending(
 fn expired_or_released_claim_cannot_cross_dispatch_commit() -> AnchoredTestResult {
     for released in [false, true] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, mut credential) = setup(&fixture, "dispatch-guard")?;
         let expires = now_ms() / 1000 + 60;
         credential.expires_at_unix_secs = expires;
@@ -121,8 +84,7 @@ fn expired_or_released_claim_cannot_cross_dispatch_commit() -> AnchoredTestResul
 fn committed_approval_survives_expiry_and_restart_without_release_authority() -> AnchoredTestResult
 {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let binding = activate(&fixture, &source)?;
+    let binding = install(&fixture)?;
     let (operation, lease, mut credential) = setup(&fixture, "committed-approval")?;
     let expires = now_ms() / 1000 + 60;
     credential.expires_at_unix_secs = expires;
@@ -145,7 +107,6 @@ fn committed_approval_survives_expiry_and_restart_without_release_authority() ->
             now_ms(),
         )?
         .into_operation();
-    drop(source);
     let Fixture {
         _temp,
         database,
@@ -197,80 +158,30 @@ fn committed_approval_survives_expiry_and_restart_without_release_authority() ->
 }
 
 #[test]
-fn activation_waits_for_actual_authority_clock_and_never_uses_caller_skew() -> AnchoredTestResult {
+fn live_capacity_refuses_until_expiry_reclaims_it() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let high = now_ms() / 1000 + 120;
-    Connection::open(&source.path)?.execute("UPDATE chio_governed_approval_replay_clock SET wall_clock_high_water = ?1, pruned_through = ?1", [i64::try_from(high)?])?;
-    let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
-    let binding = GovernedApprovalAuthorityBindingV1::new(
-        identifier("authority", AUTHORITY_ID),
-        imported.expectation_id().clone(),
-    );
-    let count = global_count(&fixture);
-    assert!(fixture
+    let binding = install_with_capacity(&fixture, 1)?;
+    let (first, first_lease, mut first_credential) = setup(&fixture, "capacity-first")?;
+    let expires = now_ms() / 1000 + 60;
+    first_credential.expires_at_unix_secs = expires;
+    let held = candidate(&first, &binding, "held", first_credential)?;
+    fixture
         .store
-        .activate_governed_approval_replay_source(&binding, &source, &fixture.fence, high * 1000)
-        .is_err());
+        .claim_governed_approval(&first, &first_lease, &held, now_ms())?;
+    let (operation, lease, credential) = setup(&fixture, "capacity-next")?;
+    let intent = candidate(&operation, &binding, "claim", credential)?;
+    let count = global_count(&fixture);
+    let error = fixture
+        .store
+        .claim_governed_approval(&operation, &lease, &intent, now_ms())
+        .expect_err("live capacity must deny");
+    assert!(error.to_string().contains("live capacity"), "{error}");
     assert_eq!(global_count(&fixture), count);
-    assert!(load(&fixture)?
-        .ok_or("history missing")?
-        .imported_inactive());
-    let _clock = chio_test_support::clock::scope_unix_secs(high);
-    let active = fixture.store.activate_governed_approval_replay_source(
-        &binding,
-        &source,
-        &fixture.fence,
-        high * 1000,
-    )?;
-    assert!(active.is_active());
-    assert_eq!(
-        fixture.store.activate_governed_approval_replay_source(
-            &binding,
-            &source,
-            &fixture.fence,
-            high * 1000
-        )?,
-        active
-    );
-    assert_eq!(global_count(&fixture), count + 1);
-    Ok(())
-}
-
-#[test]
-fn expired_scoped_and_wildcard_legacy_markers_never_become_operation_owners() -> AnchoredTestResult
-{
-    for wildcard in [false, true] {
-        let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let (operation, lease, credential) = setup(&fixture, "historical-marker")?;
-        let subject = if wildcard {
-            LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT
-        } else {
-            credential.subject_id.as_str()
-        };
-        Connection::open(&source.path)?.execute(
-            "INSERT INTO chio_governed_approval_replay_entries VALUES (?1, ?2, ?3, 1, ?4)",
-            params![
-                subject,
-                credential.request_id.as_str(),
-                credential.intent_hash.as_str(),
-                lease.coordinator_lease_id().as_str()
-            ],
-        )?;
-        let binding = activate(&fixture, &source)?;
-        let intent = candidate(
-            &operation,
-            &binding,
-            lease.coordinator_lease_id().as_str(),
-            credential,
-        )?;
-        let count = global_count(&fixture);
-        assert!(fixture
-            .store
-            .claim_governed_approval(&operation, &lease, &intent, now_ms())
-            .is_err());
-        assert_eq!(global_count(&fixture), count);
-    }
+    let _clock = chio_test_support::clock::scope_unix_secs(expires);
+    let now = expires * 1000;
+    let lease = renew(&fixture, &operation, &lease, now)?;
+    fixture
+        .store
+        .claim_governed_approval(&operation, &lease, &intent, now)?;
     Ok(())
 }

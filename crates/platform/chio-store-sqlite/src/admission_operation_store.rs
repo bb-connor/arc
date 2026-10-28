@@ -65,7 +65,7 @@ mod errors;
 mod execution_nonce;
 mod governed_approval_claim;
 pub(crate) use dpop_claim::{verify_dpop_budget_selection_tx, verify_fresh_dpop_tx};
-mod governed_approval_replay;
+mod governed_approval_authority;
 mod native_capture_readback;
 pub use native_capture_readback::NativeDispatchCaptureWitness;
 mod native_capture_diagnostic;
@@ -202,10 +202,9 @@ pub use factor_assignment::{
     FactorAssignmentSigningAuthorityV1, FactorAssignmentVerificationAuthorityV1,
     SqliteFactorAssignmentStore, StoredFactorAssignmentResultV1,
 };
-pub use governed_approval_replay::GovernedApprovalReplayMigrationRecordV1;
-pub(crate) use governed_approval_replay::{
-    governed_approval_replay_projection_reference, verify_governed_approval_replay_pristine,
-    verify_governed_approval_replay_projection_coverage,
+pub(crate) use governed_approval_authority::{
+    governed_approval_authority_projection_reference, verify_governed_approval_authority_pristine,
+    verify_governed_approval_authority_projection_coverage,
 };
 use obligation::load_durable_obligation;
 pub(crate) use participant::{
@@ -263,8 +262,8 @@ const GOVERNED_APPROVAL_CLAIM_SCHEMA: &str =
     include_str!("admission_operation_governed_approval_claim.sql");
 const RUNTIME_REPLAY_MIGRATION_SCHEMA: &str =
     include_str!("admission_operation_runtime_replay.sql");
-const GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA: &str =
-    include_str!("admission_operation_governed_approval_replay.sql");
+const GOVERNED_APPROVAL_AUTHORITY_SCHEMA: &str =
+    include_str!("admission_operation_governed_approval_authority.sql");
 const DPOP_REPLAY_MIGRATION_SCHEMA: &str = include_str!("admission_operation_dpop_replay.sql");
 const DPOP_AUTHORITY_SCHEMA: &str = include_str!("admission_operation_dpop_authority.sql");
 const DPOP_CLAIM_SCHEMA: &str = include_str!("admission_operation_dpop_claim.sql");

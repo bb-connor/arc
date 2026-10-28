@@ -49,8 +49,7 @@ fn kernel_restart_releases_expired_approval_custody_from_original_history() -> A
         GovernedApprovalClaimPhase::Dispatch,
     ] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, mut credential) =
             setup_for_phase(&fixture, "kernel-recovery", phase)?;
         let expires = now_ms() / 1000 + 60;
@@ -62,7 +61,6 @@ fn kernel_restart_releases_expired_approval_custody_from_original_history() -> A
         let port: &dyn AdmissionOperationStore = &fixture.store;
         let (operation, reference) =
             port.claim_governed_approval(&operation, &lease, &intent, now_ms())?;
-        drop(source);
         let Fixture {
             _temp,
             database,

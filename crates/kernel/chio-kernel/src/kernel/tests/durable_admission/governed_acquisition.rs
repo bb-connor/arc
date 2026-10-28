@@ -1,7 +1,6 @@
-//! Adversarial coordinator callbacks, not SQLite source or commit qualification.
+//! Adversarial coordinator callbacks, not SQLite authority or commit qualification.
 use super::*;
 use crate::admission_operation::governed_approval_claim::*;
-use crate::admission_operation::governed_approval_replay::*;
 use crate::admission_operation::{AdmissionDigest, AdmissionRecoveryLease};
 use std::sync::{Arc, Mutex};
 
@@ -21,7 +20,7 @@ enum Mode {
 pub(super) struct TestApproval(Mutex<State>);
 #[derive(Default)]
 struct State {
-    source: Option<GovernedApprovalReplaySourceSnapshot>,
+    install: Option<GovernedApprovalAuthorityInstallV1>,
     history: Vec<GovernedApprovalClaimHistoryV1>,
     mode: Mode,
     history_panics: usize,
@@ -29,18 +28,18 @@ struct State {
 }
 
 impl TestApproval {
-    pub(super) fn activation(
+    pub(super) fn authority(
         &self,
         binding: &GovernedApprovalAuthorityBindingV1,
-    ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
+    ) -> Result<GovernedApprovalAuthorityInstallV1, AdmissionOperationStoreError> {
         let state = self.0.lock().expect("approval state");
-        let source = state.source.as_ref().ok_or_else(|| {
-            AdmissionOperationStoreError::Unavailable("test approval source unsupported".into())
+        let install = state.install.as_ref().ok_or_else(|| {
+            AdmissionOperationStoreError::Unavailable("test approval authority unsupported".into())
         })?;
-        if binding.approval_authority_id().as_str() != source.approval_authority_id() {
+        if binding.approval_authority_id() != install.binding().approval_authority_id() {
             return Err(AdmissionOperationStoreError::Fenced);
         }
-        Ok(source.clone())
+        Ok(install.clone())
     }
 
     pub(super) fn claim(
@@ -139,34 +138,22 @@ impl TestApproval {
     }
 }
 
-struct Source(GovernedApprovalReplaySourceSnapshot);
-impl GovernedApprovalReplaySourcePort for Source {
-    fn preview_unsealed(
-        &self,
-        _: &GovernedApprovalReplaySourceBinding,
-    ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
-        panic!("kernel must not preview a source");
-    }
-    fn seal_exact(
-        &self,
-        _: &GovernedApprovalReplaySourceSnapshot,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        panic!("kernel must not activate a source");
-    }
-    fn verify_exact(
-        &self,
-        snapshot: &GovernedApprovalReplaySourceSnapshot,
-    ) -> Result<(), AdmissionOperationStoreError> {
-        assert_eq!(snapshot, &self.0);
-        Ok(())
-    }
-}
-
 fn digest(c: char) -> AdmissionDigest {
     AdmissionDigest::try_new("test", c.to_string().repeat(64)).expect("digest")
 }
 fn id(value: &str) -> AdmissionIdentifier {
     AdmissionIdentifier::try_new("test", value).expect("identifier")
+}
+
+fn test_binding() -> GovernedApprovalAuthorityBindingV1 {
+    GovernedApprovalAuthorityBindingV1::new(id("test-authority"), id("test-generation"))
+}
+
+fn install(
+    binding: GovernedApprovalAuthorityBindingV1,
+    destination: String,
+) -> GovernedApprovalAuthorityInstallV1 {
+    GovernedApprovalAuthorityInstallV1::new(binding, destination, 8, 0).expect("test install")
 }
 
 fn fixture(
@@ -179,37 +166,16 @@ fn fixture(
 ) {
     let (mut kernel, mut request, store, calls) =
         durable_admission_fixture("prepared-approval-owner");
-    let source = GovernedApprovalReplaySourceSnapshot::from_inventory(
-        GovernedApprovalReplaySourceBinding {
-            source_id: id("test-source"),
-            approval_authority_id: id("test-authority"),
-            destination_authority_id: id(&store.fence.lock().expect("fence").store_uuid),
-        },
-        GovernedApprovalReplaySourceFileIdentity {
-            device: 1,
-            inode: 2,
-            link_count: 1,
-        },
-        "b".repeat(64),
-        GovernedApprovalReplaySourceInventory {
-            wall_clock_high_water: "0".into(),
-            pruned_through: "0".into(),
-            capacity: "8".into(),
-            markers: vec![],
-        },
-    )
-    .expect("test snapshot data");
+    let binding = test_binding();
+    let destination = store.fence.lock().expect("fence").store_uuid.clone();
     *store.approval_recovery.0.lock().expect("state") = State {
-        source: Some(source.clone()),
+        install: Some(install(binding.clone(), destination)),
         mode,
         ..Default::default()
     };
     kernel
-        .set_operation_owned_governed_approval_source(
-            GovernedApprovalAuthorityBindingV1::new(id("test-authority"), id("test-generation")),
-            Arc::new(Source(source)),
-        )
-        .expect("configured test port");
+        .set_operation_owned_governed_approval_authority(binding)
+        .expect("configured test authority");
     let mut intent = chio_core::capability::governance::GovernedTransactionIntent {
         id: request.request_id.clone(),
         server_id: request.server_id.clone(),
@@ -519,4 +485,66 @@ fn nested_flow_uses_operation_owned_approval_acquisition() {
             .len(),
         1
     );
+}
+
+fn is_unavailable(result: Result<(), KernelError>) -> bool {
+    matches!(
+        result,
+        Err(KernelError::AdmissionRecovery(ref error)) if matches!(
+            **error,
+            crate::admission_operation::AdmissionRecoveryError::Store(
+                AdmissionOperationStoreError::Unavailable(_)
+            )
+        )
+    )
+}
+
+fn is_binding_mismatch(result: Result<(), KernelError>) -> bool {
+    matches!(
+        result,
+        Err(KernelError::DurableAdmission(ref reason))
+            if reason == "approval authority install differs from its configured binding"
+    )
+}
+
+#[test]
+fn approval_authority_configuration_requires_the_exact_installed_binding() {
+    let (mut kernel, _, store, _) = durable_admission_fixture("approval-authority-binding");
+    assert!(is_unavailable(
+        kernel.set_operation_owned_governed_approval_authority(test_binding())
+    ));
+    let destination = store.fence.lock().expect("fence").store_uuid.clone();
+    let cases = [
+        install(
+            GovernedApprovalAuthorityBindingV1::new(id("test-authority"), id("other-generation")),
+            destination.clone(),
+        ),
+        install(test_binding(), format!("{destination}-foreign")),
+    ];
+    for case in cases {
+        store.approval_recovery.0.lock().expect("state").install = Some(case.clone());
+        assert!(
+            is_binding_mismatch(
+                kernel.set_operation_owned_governed_approval_authority(test_binding())
+            ),
+            "{case:?}"
+        );
+        assert!(matches!(
+            kernel.verify_configured_governed_approval_authority(),
+            Err(KernelError::DurableAdmission(ref reason))
+                if reason == "operation-owned approval authority is not configured"
+        ));
+    }
+    store.approval_recovery.0.lock().expect("state").install =
+        Some(install(test_binding(), destination));
+    kernel
+        .set_operation_owned_governed_approval_authority(test_binding())
+        .expect("exact install");
+    kernel
+        .verify_configured_governed_approval_authority()
+        .expect("exact install verifies");
+    store.approval_recovery.0.lock().expect("state").install = None;
+    assert!(is_unavailable(
+        kernel.verify_configured_governed_approval_authority()
+    ));
 }

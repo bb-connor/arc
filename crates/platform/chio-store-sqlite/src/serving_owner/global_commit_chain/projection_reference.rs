@@ -55,8 +55,8 @@ pub(super) fn projection_reference_digest(
                 connection, key, sequence,
             )
         }
-        "governed_approval_replay_migration" => {
-            crate::admission_operation_store::governed_approval_replay_projection_reference(
+        "governed_approval_authority" => {
+            crate::admission_operation_store::governed_approval_authority_projection_reference(
                 connection, key, sequence,
             )
         }

@@ -2,7 +2,6 @@
 
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
 
 use chio_core_types::crypto::PublicKey;
 use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
@@ -11,14 +10,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::ProtectError;
 
-/// Pins an already activated replay authority and its authenticated executor.
-/// Loading this configuration never imports or activates a replay source.
+/// Pins an already installed approval authority and its authenticated executor.
+/// Loading this configuration never installs an approval authority.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProtectApprovalConfig {
     pub tenant_id: String,
     pub approvers: Vec<PublicKey>,
-    pub replay_source_path: String,
     pub binding: GovernedApprovalAuthorityBindingV1,
     pub caller_executor: CallerExecutorIdentityV1,
 }
@@ -51,13 +49,8 @@ pub(super) fn configure(
     kernel
         .set_governed_approval_policy(config.tenant_id.clone(), config.approvers.clone())
         .map_err(config_error)?;
-    let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-        &config.replay_source_path,
-        kernel.authority_clock(),
-    )
-    .map_err(config_error)?;
     kernel
-        .set_operation_owned_governed_approval_source(config.binding.clone(), Arc::new(source))
+        .set_operation_owned_governed_approval_authority(config.binding.clone())
         .map_err(config_error)?;
     kernel
         .set_caller_executor(config.caller_executor.clone())

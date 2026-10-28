@@ -2790,11 +2790,6 @@ files = ["crates/trust/chio-governance/src/authorization.rs"]
 first_seen = "769c627445"
 
 [[schema]]
-value = "chio.governed-approval-replay-source-seal.v1"
-files = ["crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
 value = "chio.governed-auth-binding.v1"
 files = ["crates/core/chio-core/src/standards.rs"]
 first_seen = "11e573d2d7"

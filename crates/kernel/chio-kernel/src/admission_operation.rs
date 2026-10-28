@@ -12,7 +12,6 @@ mod dispatch_launch;
 pub mod dpop_claim;
 mod execution_nonce;
 pub mod governed_approval_claim;
-pub mod governed_approval_replay;
 mod identity;
 mod native_caller_custody;
 mod native_dispatch_binding;

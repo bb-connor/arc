@@ -264,13 +264,13 @@ pub(super) fn load(
             .intent()
             .credential()
             .validate_at(stored_u64(authority_time, "approval_claim_clock")?)?;
-        let source = governed_approval_replay::require_active_source(
+        let authority = governed_approval_authority::require_installed_authority(
             connection,
             claim.intent().approval_authority_id(),
             claim.intent().expectation_id(),
         )?;
-        governed_approval_replay::verify_source_clock_floor(
-            &source,
+        governed_approval_authority::verify_install_clock_floor(
+            &authority,
             stored_u64(observed, "approval_claim_observation")?,
         )?;
         verify_resources(connection, &claim)?;
@@ -325,12 +325,12 @@ pub(in crate::admission_operation_store) fn verify_stored_operation(
         recorded.ok_or_else(|| invariant("approval dispatch time absent"))?,
         "approval_dispatch_time",
     )?;
-    let source = governed_approval_replay::require_active_source(
+    let authority = governed_approval_authority::require_installed_authority(
         connection,
         claim.intent().approval_authority_id(),
         claim.intent().expectation_id(),
     )?;
-    governed_approval_replay::verify_source_clock_floor(&source, observed)?;
+    governed_approval_authority::verify_install_clock_floor(&authority, observed)?;
     claim
         .intent()
         .credential()
@@ -365,18 +365,6 @@ fn verify_resources(
     if !exact {
         return Err(invariant(
             "approval credential projection differs from canonical claim",
-        ));
-    }
-    let legacy_conflict: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM governed_approval_replay_legacy_tombstones
-         WHERE approval_authority_id = ?1 AND request_id = ?2 AND intent_hash = ?3
-           AND (subject_id = ?4 OR subject_id = ?5))",
-        params![intent.approval_authority_id().as_str(), credential.request_id.as_str(), credential.intent_hash.as_str(),
-            credential.subject_id.as_str(), chio_kernel::admission_operation::governed_approval_replay::LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT],
-        |row| row.get(0)).map_err(sqlite_error)?;
-    if legacy_conflict {
-        return Err(invariant(
-            "approval claim conflicts with permanent imported replay history",
         ));
     }
     Ok(())

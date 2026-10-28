@@ -82,7 +82,6 @@
     "crates/kernel/chio-kernel/src/admission_operation.rs",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs",
-    "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs",
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs",
     "crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs",
@@ -1196,7 +1195,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::validate_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs::from_canonical_bytes::from_wire",
-    "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::native_release_custody::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::validate::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs::from_ledger::from_wire",
@@ -13708,17 +13706,6 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "from_canonical_bytes",
-          "decode_signed",
-          "MAX_GOVERNED_APPROVAL_REPLAY_SOURCE_BYTES"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs": {
       "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
       "migrations": [],
@@ -18131,7 +18118,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::validate_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs::from_canonical_bytes::from_wire#1::decode_signed",
-    "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::native_release_custody::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::validate::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs::from_ledger::from_wire#1::decode_signed",
@@ -19047,9 +19033,6 @@
       "validate_payload::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs": [
-      "from_canonical_bytes::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs": [

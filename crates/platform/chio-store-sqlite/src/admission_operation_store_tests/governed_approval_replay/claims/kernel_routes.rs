@@ -1,4 +1,4 @@
-//! Normal kernel routes against the real SQLite authority and sealed source.
+//! Normal kernel routes against the real SQLite authority and its installed approval authority.
 use super::*;
 use chio_core::capability::scope::{ChioScope, Constraint, Operation, ToolGrant};
 use chio_kernel::governed_approval_replay::GovernedApprovalReplayStore;
@@ -79,7 +79,6 @@ impl GovernedApprovalReplayStore for RefuseLegacy {
 
 struct Route {
     fixture: Fixture,
-    source: Arc<Source>,
     binding: GovernedApprovalAuthorityBindingV1,
     signer: Keypair,
     kernel: ChioKernel,
@@ -89,19 +88,17 @@ struct Route {
 impl Route {
     fn new() -> AnchoredTestResult<Self> {
         let fixture = fixture();
-        let source = Arc::new(Source::new(&fixture, true)?);
-        let binding = activate(&fixture, source.as_ref())?;
+        let binding = install(&fixture)?;
         let signer = Keypair::generate();
         let mut kernel = kernel_recovery::kernel_with_signer(&fixture, signer.clone())?;
         kernel.set_governed_approval_policy(APPROVAL_TENANT.into(), vec![signer.public_key()])?;
-        kernel.set_operation_owned_governed_approval_source(binding.clone(), source.clone())?;
+        kernel.set_operation_owned_governed_approval_authority(binding.clone())?;
         let calls = Arc::new(AtomicUsize::new(0));
         let legacy = Arc::new(AtomicUsize::new(0));
         kernel.set_governed_approval_replay_store(Box::new(RefuseLegacy(legacy.clone())));
         kernel.register_tool_server(Box::new(Server(calls.clone())));
         Ok(Self {
             fixture,
-            source,
             binding,
             signer,
             kernel,
@@ -188,8 +185,6 @@ impl Route {
             ..
         } = self.fixture;
         drop(self.kernel);
-        let source_path = self.source.path.clone();
-        drop(self.source);
         drop(store);
         drop(authority);
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
@@ -202,17 +197,14 @@ impl Route {
             lock_root,
             _clock: None,
         };
-        let source = Arc::new(Source::reopen(source_path, &fixture.store)?);
         let mut kernel = kernel_recovery::kernel_with_signer(&fixture, self.signer.clone())?;
         kernel
             .set_governed_approval_policy(APPROVAL_TENANT.into(), vec![self.signer.public_key()])?;
-        kernel
-            .set_operation_owned_governed_approval_source(self.binding.clone(), source.clone())?;
+        kernel.set_operation_owned_governed_approval_authority(self.binding.clone())?;
         kernel.set_governed_approval_replay_store(Box::new(RefuseLegacy(self.legacy.clone())));
         kernel.register_tool_server(Box::new(Server(self.calls.clone())));
         Ok(Self {
             fixture,
-            source,
             binding: self.binding,
             signer: self.signer,
             kernel,
@@ -332,10 +324,13 @@ fn grant_fallback_releases_only_the_preceding_approval_episode() -> AnchoredTest
 }
 
 #[test]
-fn source_verification_failure_precedes_claim_and_budget() -> AnchoredTestResult {
+fn tampered_authority_install_precedes_claim_and_budget() -> AnchoredTestResult {
     let route = Route::new()?;
-    let request = route.request("source-failed", &[1])?;
-    route.source.state.lock().expect("state").panic_on = Some("verify");
+    let request = route.request("authority-tampered", &[1])?;
+    route.fixture.store.connection()?.execute_batch(
+        "DROP TRIGGER governed_approval_replay_authorities_immutable;
+         UPDATE governed_approval_replay_authorities SET capacity = capacity + 1",
+    )?;
     let response = route.kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(route.counts()?, (0, 0));
@@ -366,15 +361,15 @@ fn budget_denial_compensates_approval_without_legacy_rollback() -> AnchoredTestR
 }
 
 #[test]
-fn rejected_source_reconfiguration_preserves_the_installed_authority() -> AnchoredTestResult {
+fn rejected_authority_reconfiguration_preserves_the_installed_authority() -> AnchoredTestResult {
     let mut route = Route::new()?;
     let wrong = GovernedApprovalAuthorityBindingV1::new(
         route.binding.approval_authority_id().clone(),
-        identifier("expectation", "not-activated"),
+        identifier("expectation", "not-installed"),
     );
     assert!(route
         .kernel
-        .set_operation_owned_governed_approval_source(wrong, route.source.clone())
+        .set_operation_owned_governed_approval_authority(wrong)
         .is_err());
     let request = route.request("retained-config", &[1])?;
     let response = route.kernel.evaluate_tool_call_blocking(&request)?;
@@ -388,19 +383,12 @@ fn rejected_source_reconfiguration_preserves_the_installed_authority() -> Anchor
 }
 
 #[test]
-fn imported_inactive_approval_source_cannot_configure_kernel_acquisition() -> AnchoredTestResult {
+fn uninstalled_approval_authority_cannot_configure_kernel_acquisition() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Arc::new(Source::new(&fixture, true)?);
-    let pinned = pin(&fixture, source.as_ref())?;
-    let imported = import(&fixture, source.as_ref(), &pinned)?;
-    let binding = GovernedApprovalAuthorityBindingV1::new(
-        identifier("authority", AUTHORITY_ID),
-        imported.expectation_id().clone(),
-    );
     let mut kernel = kernel_recovery::kernel_with_signer(&fixture, Keypair::generate())?;
     let before = global_count(&fixture);
     assert!(kernel
-        .set_operation_owned_governed_approval_source(binding, source)
+        .set_operation_owned_governed_approval_authority(binding())
         .is_err());
     assert_eq!(global_count(&fixture), before);
     Ok(())

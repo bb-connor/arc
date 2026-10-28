@@ -2,8 +2,9 @@ use super::dpop_claim::{
     DpopReplayClaimHistoryV1, DpopReplayClaimIntentV1, DpopReplayClaimReferenceV1,
 };
 use super::governed_approval_claim::{
-    GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimHistoryV1,
-    GovernedApprovalClaimIntentV1, GovernedApprovalClaimReferenceV1,
+    GovernedApprovalAuthorityBindingV1, GovernedApprovalAuthorityInstallV1,
+    GovernedApprovalClaimHistoryV1, GovernedApprovalClaimIntentV1,
+    GovernedApprovalClaimReferenceV1,
 };
 use super::runtime_participant::{
     RuntimeParticipantAuthorityBindingV1, RuntimeParticipantClaimHistoryV1,
@@ -436,19 +437,16 @@ pub trait AdmissionOperationStore: Send + Sync {
             "operation-owned DPoP recovery is unsupported".into(),
         ))
     }
-    /// Require an exact activated approval source and a non-regressed authority
-    /// clock. Configuration and imported-inactive history cannot grant claims.
-    fn load_governed_approval_activation(
+    /// Require the exact operator-installed approval authority and a
+    /// non-regressed authority clock. Configuration alone cannot grant claims.
+    fn load_governed_approval_authority(
         &self,
         _binding: &GovernedApprovalAuthorityBindingV1,
         _fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
-    ) -> Result<
-        super::governed_approval_replay::GovernedApprovalReplaySourceSnapshot,
-        AdmissionOperationStoreError,
-    > {
+    ) -> Result<GovernedApprovalAuthorityInstallV1, AdmissionOperationStoreError> {
         Err(AdmissionOperationStoreError::Unavailable(
-            "operation-owned approval activation is unsupported".into(),
+            "operation-owned approval authority is unsupported".into(),
         ))
     }
     /// Atomically claim the verifier-prepared approval replay identity under

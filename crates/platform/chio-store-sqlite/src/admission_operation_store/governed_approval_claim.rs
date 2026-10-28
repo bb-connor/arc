@@ -1,14 +1,13 @@
-//! Operation-owned replay custody. These primitives do not activate an approval
-//! profile or verify approval artifacts; only the configured verifier may supply
+//! Operation-owned replay custody. These primitives do not install an approval
+//! authority or verify approval artifacts; only the configured verifier may supply
 //! a completely prepared intent. Agent metadata is never mutation authority.
 
 use super::*;
 use chio_kernel::admission_operation::governed_approval_claim::{
-    GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimDisposition,
-    GovernedApprovalClaimHistoryV1, GovernedApprovalClaimIntentV1, GovernedApprovalClaimPhase,
-    GovernedApprovalClaimReferenceV1, MAX_GOVERNED_APPROVAL_CLAIM_EPISODES,
+    GovernedApprovalClaimDisposition, GovernedApprovalClaimHistoryV1,
+    GovernedApprovalClaimIntentV1, GovernedApprovalClaimPhase, GovernedApprovalClaimReferenceV1,
+    MAX_GOVERNED_APPROVAL_CLAIM_EPISODES,
 };
-use chio_kernel::admission_operation::governed_approval_replay::GovernedApprovalReplaySourceSnapshot;
 use participant::{ParticipantCommit, ParticipantMutation};
 
 mod dispatch_snapshot;
@@ -63,14 +62,14 @@ pub(crate) fn verify_fresh_approval_tx(
         .iter()
         .find(|episode| !episode.released())
         .ok_or_else(|| invariant("fresh approval authority requires a live claim"))?;
-    let source = governed_approval_replay::require_active_source(
+    let authority = governed_approval_authority::require_installed_authority(
         connection,
         live.intent().approval_authority_id(),
         live.intent().expectation_id(),
     )?;
-    let observed = governed_approval_replay::approval_clock_tx(
+    let observed = governed_approval_authority::approval_clock_tx(
         connection,
-        &source,
+        &authority,
         trusted_now_unix_ms,
         owner,
     )?;
@@ -79,28 +78,6 @@ pub(crate) fn verify_fresh_approval_tx(
 }
 
 impl SqliteAdmissionOperationStore {
-    pub fn load_governed_approval_activation(
-        &self,
-        binding: &GovernedApprovalAuthorityBindingV1,
-        fence: &StoreMutationFence,
-        trusted_now_unix_ms: u64,
-    ) -> Result<GovernedApprovalReplaySourceSnapshot, AdmissionOperationStoreError> {
-        let mut connection = self.connection()?;
-        let tx = self.begin_read(&mut connection)?;
-        verify_active_owner(&tx, &self.serving_owner, Some(fence))?;
-        let source = governed_approval_replay::require_active_source(
-            &tx,
-            binding.approval_authority_id(),
-            binding.expectation_id(),
-        )?;
-        governed_approval_replay::approval_clock_tx(
-            &tx,
-            &source,
-            trusted_now_unix_ms,
-            &self.serving_owner,
-        )?;
-        Ok(source)
-    }
     /// Fenced, anchored readback for a lost claim or release acknowledgement.
     /// This does not rerun preparation, reacquire resources or require artifacts
     /// to remain unexpired. Returned history cannot authorize fresh execution.
@@ -187,30 +164,26 @@ impl SqliteAdmissionOperationStore {
                 "approval operation has a live episode or exhausted its episode bound",
             ));
         }
-        let source = governed_approval_replay::require_active_source(
+        let authority = governed_approval_authority::require_installed_authority(
             &transaction,
             intent.approval_authority_id(),
             intent.expectation_id(),
         )?;
-        let observed = governed_approval_replay::approval_clock_tx(
+        let observed = governed_approval_authority::approval_clock_tx(
             &transaction,
-            &source,
+            &authority,
             trusted_now_unix_ms,
             &self.serving_owner,
         )?;
         intent.credential().validate_at(observed)?;
         let credential = intent.credential();
         let occupied: bool = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM governed_approval_replay_legacy_tombstones
-                WHERE approval_authority_id = ?1 AND request_id = ?3 AND intent_hash = ?4
-                  AND (subject_id = ?2 OR subject_id = ?5))
-             OR EXISTS(SELECT 1 FROM governed_approval_replay_claim_resources AS resource
+            "SELECT EXISTS(SELECT 1 FROM governed_approval_replay_claim_resources AS resource
                 WHERE approval_authority_id = ?1 AND subject_id = ?2 AND request_id = ?3 AND intent_hash = ?4
                   AND NOT EXISTS(SELECT 1 FROM governed_approval_replay_claim_releases AS released
                     WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id))",
             params![intent.approval_authority_id().as_str(), credential.subject_id.as_str(),
-                credential.request_id.as_str(), credential.intent_hash.as_str(),
-                chio_kernel::admission_operation::governed_approval_replay::LEGACY_UNSCOPED_GOVERNED_APPROVAL_SUBJECT],
+                credential.request_id.as_str(), credential.intent_hash.as_str()],
             |row| row.get(0)).map_err(sqlite_error)?;
         if occupied {
             return Err(invariant(
@@ -218,19 +191,13 @@ impl SqliteAdmissionOperationStore {
             ));
         }
         let live: i64 = transaction.query_row(
-            "SELECT (SELECT COUNT(*) FROM governed_approval_replay_legacy_tombstones
-                WHERE approval_authority_id = ?1 AND expires_at > ?2)
-             + (SELECT COUNT(*) FROM governed_approval_replay_claim_resources AS resource
+            "SELECT COUNT(*) FROM governed_approval_replay_claim_resources AS resource
                 WHERE approval_authority_id = ?1 AND expires_at > ?2
                   AND NOT EXISTS(SELECT 1 FROM governed_approval_replay_claim_releases AS released
-                    WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id))",
+                    WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id)",
             params![intent.approval_authority_id().as_str(), sqlite_i64(observed / 1000, "approval_clock")?],
             |row| row.get(0)).map_err(sqlite_error)?;
-        let capacity: i64 = source
-            .inventory()
-            .capacity
-            .parse()
-            .map_err(|_| invariant("invalid approval source capacity"))?;
+        let capacity = sqlite_i64(authority.capacity(), "approval_capacity")?;
         if live >= capacity {
             return Err(invariant("approval replay live capacity exhausted"));
         }
@@ -416,7 +383,7 @@ fn require_intent(
             "approval credential differs from original request provenance",
         ));
     }
-    governed_approval_replay::require_active_source(
+    governed_approval_authority::require_installed_authority(
         connection,
         intent.approval_authority_id(),
         intent.expectation_id(),

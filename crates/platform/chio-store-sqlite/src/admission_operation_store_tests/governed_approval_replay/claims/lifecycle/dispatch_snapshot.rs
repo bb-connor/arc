@@ -5,8 +5,7 @@ use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalC
 #[test]
 fn native_approval_ledger_snapshot_retains_exact_claim_after_release() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let authority = activate(&fixture, &source)?;
+    let authority = install(&fixture)?;
     let (initial, lease, credential) = setup(&fixture, "approval-ledger-snapshot")?;
     let intent = candidate(&initial, &authority, "claim", credential)?;
     let (operation, reference) =

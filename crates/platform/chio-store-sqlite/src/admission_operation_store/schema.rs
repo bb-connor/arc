@@ -16,7 +16,7 @@ pub(crate) fn admission_operation_schema_sql() -> Result<String, AdmissionOperat
         include_str!("../admission_operation_nonce_preflight.sql"),
         RUNTIME_REPLAY_MIGRATION_SCHEMA,
         RUNTIME_PARTICIPANT_SCHEMA,
-        GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA,
+        GOVERNED_APPROVAL_AUTHORITY_SCHEMA,
         GOVERNED_APPROVAL_CLAIM_SCHEMA,
         DPOP_REPLAY_MIGRATION_SCHEMA,
         DPOP_AUTHORITY_SCHEMA,
@@ -81,7 +81,7 @@ pub(crate) fn verify_admission_operation_invariants(
     super::runtime_participant::verify_all(connection)?;
     super::governed_approval_claim::verify_all(connection)?;
     super::dpop_claim::verify_all(connection)?;
-    super::governed_approval_replay::verify_all_records(connection)
+    super::governed_approval_authority::verify_all_records(connection)
         .map(|_| ())
         .map_err(invariant)?;
     super::dpop_replay::verify_all_records(connection)

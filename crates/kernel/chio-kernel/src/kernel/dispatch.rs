@@ -757,7 +757,7 @@ impl ChioKernel {
         )?;
 
         if request.approval_token.is_some() && self.governed_approval_authority.is_some() {
-            self.verify_configured_governed_approval_source()?;
+            self.verify_configured_governed_approval_authority()?;
         }
 
         let current_session_roots = session_id
