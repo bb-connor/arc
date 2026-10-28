@@ -1271,29 +1271,10 @@ symbol_sha256 = [
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
-rust_source = "crates/kernel/chio-runtime-core/src/admission.rs"
-rust_symbols = [
-  "commit_prepared_runtime_admission",
-  "RuntimeAdmissionReservationTracker",
-  "evaluate_runtime_admission_tracked",
-]
-normalized_sha256 = "651b7aa695ff66b8b514a7aaf273527598d7f104e019d04a9b171fd432e555b9"
-symbol_sha256 = [
-  { symbol = "commit_prepared_runtime_admission", sha256 = "b6351cfffbbd13744e824aff2900e42a9877979cd979670660b4df758df6ff34" },
-  { symbol = "RuntimeAdmissionReservationTracker", sha256 = "d2dab3eb6bdbe11925f7d448c2abdc4d360bf19b52cb79ed9a243f4effc68508" },
-  { symbol = "evaluate_runtime_admission_tracked", sha256 = "b2fe838fdbbebfe9c7529ff8dbb04caa8a3a87f065269dd07788240d8b8b4216" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-runtime-core/src/admission_hook.rs"
 rust_symbols = [
   "ChioRuntimeAdmissionHook::evaluate",
-  "ChioRuntimeAdmissionHook::release_reservations",
   "ChioRuntimeAdmissionHook::release_reserved",
-  "ChioRuntimeAdmissionHook::admission_time",
   "ChioRuntimeAdmissionHook::runtime_participant_binding",
   "ChioRuntimeAdmissionHook::evaluate_operation_owned",
   "ChioRuntimeAdmissionHook::revalidate_admitted_request",
@@ -1305,9 +1286,7 @@ rust_symbols = [
 normalized_sha256 = "eec40bc49b2be7686f9f0b78bd72f3409837cd9a10036f55f0fa1b88259aed8c"
 symbol_sha256 = [
   { symbol = "ChioRuntimeAdmissionHook::evaluate", sha256 = "a8b7d0ebdc544ffa725b3fcdb71dd5dbdc0e3e05bcf61eda5771d566d89773e5" },
-  { symbol = "ChioRuntimeAdmissionHook::release_reservations", sha256 = "c763a9967aaacebbd19c7dc1248fc59c71f9939b62ee075e8e42b3b6f9910311" },
   { symbol = "ChioRuntimeAdmissionHook::release_reserved", sha256 = "a06eaa5ff220e979a825761c4c6efd55022b07426f57112668b01f950f94548a" },
-  { symbol = "ChioRuntimeAdmissionHook::admission_time", sha256 = "e7235c875ffffcda97fbda7d6365683680d918529a3fa5ae30c0811af243140f" },
   { symbol = "ChioRuntimeAdmissionHook::runtime_participant_binding", sha256 = "f38baa802d138c882eb73c22d577c3b80407465b063d01467be60c05068b2a76" },
   { symbol = "ChioRuntimeAdmissionHook::evaluate_operation_owned", sha256 = "bb5af7d7549376402961c5da42cc310d4dc1d26f127c7c88728006a31b2be6f7" },
   { symbol = "ChioRuntimeAdmissionHook::revalidate_admitted_request", sha256 = "d5843c4d2055c45c3d7a51310fddb9f06253cf709b3aa8d52b6e78bfb3b3ddf3" },
@@ -1655,19 +1634,6 @@ symbol_sha256 = [
   { symbol = "HookAdmissionPreparation", sha256 = "4d0eb4e4cd05c48edb6e8361ed3c47c214bdcaca17d6f5b9a30e800a49cc6c70" },
   { symbol = "PreparedHookAdmission", sha256 = "0241dfd630de952b0eb8ef100541a93e0ae749dee6ec9e37e63035df2338ef03" },
   { symbol = "ChioRuntimeAdmissionHook::prepare_request", sha256 = "861c007d65814f416a724f160545287abad0d6994cba9ffe54c4aac51873eca3" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
-rust_source = "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs"
-rust_symbols = [
-  "PreparedHookAdmission::reserve",
-]
-normalized_sha256 = "a4092352da0d7b072ccfc745df57f1aae0a4e5d3fff659bbaa0be67182728192"
-symbol_sha256 = [
-  { symbol = "PreparedHookAdmission::reserve", sha256 = "a60b136ae0cfd16c864e627b055e6a73f9b4465788f31e94e23518a635521186" },
 ]
 
 [[mirror]]
