@@ -16,6 +16,15 @@ struct BindingFixture {
 }
 
 impl BindingFixture {
+    fn route_metadata(&self) -> serde_json::Value {
+        let route = &self.swarm.route_plan_receipts[0];
+        serde_json::json!({"route": {
+            "bridge": route.bridge_id,
+            "protocolTarget": route.protocol_target,
+            "selectedRoute": route.selected_route
+        }})
+    }
+
     fn new() -> TestResult<Self> {
         Self::with_swarm(runtime_swarm_bundle(false)?)
     }
@@ -67,7 +76,7 @@ impl BindingFixture {
     ) -> TestResult<
         super::super::preparation::PreparedHookAdmission<'_, InMemoryRuntimeAdmissionStore>,
     > {
-        let route_metadata = swarm_route_metadata();
+        let route_metadata = self.route_metadata();
         match self.hook.prepare_request(&RuntimeAdmissionContext {
             request,
             extra_metadata: Some(&route_metadata),
@@ -93,7 +102,7 @@ impl BindingFixture {
             &self.hook,
             &RuntimeAdmissionContext {
                 request,
-                extra_metadata: Some(&swarm_route_metadata()),
+                extra_metadata: Some(&self.route_metadata()),
                 now_unix_secs: 1_800_000_001,
                 now_unix_ms: 1_800_000_001_000,
                 matched_grant_index: Some(0),

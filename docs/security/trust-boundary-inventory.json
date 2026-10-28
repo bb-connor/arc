@@ -91,7 +91,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/projection/economic_cancellation.rs",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs",
+    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs",
     "crates/kernel/chio-kernel/src/caller_delivery.rs",
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs",
     "crates/kernel/chio-kernel/src/capability_lineage.rs",
@@ -118,7 +118,6 @@
     "crates/kernel/chio-runtime-core/src/buyer/helpers.rs",
     "crates/kernel/chio-runtime-core/src/ops.rs",
     "crates/kernel/chio-runtime-core/src/orchestration.rs",
-    "crates/kernel/chio-runtime-core/src/replay_source.rs",
     "crates/kernel/chio-runtime-core/src/serde_io.rs",
     "crates/kernel/chio-runtime-core/src/store/json.rs",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
@@ -1217,7 +1216,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs::from_canonical_bytes::from_wire",
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs::from_canonical_bytes::from_wire",
+    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::decode::from_wire",
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs::validate_native_original::from_wire",
     "crates/kernel/chio-kernel/src/capability_lineage.rs::validate_signed_token::from_wire",
@@ -1259,7 +1258,6 @@
     "crates/kernel/chio-runtime-core/src/ops.rs::runtime_evidence_manifest_report_binding_mismatches::from_wire",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_json_artifact_hashes::from_wire",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::parse_json::from_wire",
-    "crates/kernel/chio-runtime-core/src/replay_source.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::buyer_attestation_packet_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::buyer_attestation_review_package_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::runtime_admission_bundle_from_json::from_wire",
@@ -13846,13 +13844,13 @@
       "migrations": [],
       "retained_typed_conversions": []
     },
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
+    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs": {
+      "contract": "Source qualification reads at most 4096 canonical JSON bytes and rejects unknown fields, duplicate keys, noncanonical numbers, wrong v1 schema, non-single link counts and domain-separated digest mismatches. The descriptor grants no admission authority: installation and dispatch also verify the live SQLite file identity, exact runtime/destination binding and fenced operation-owned custody.",
       "migrations": [
         [
           "from_canonical_bytes",
-          "decode_signed",
-          "MAX_RUNTIME_REPLAY_SOURCE_BYTES"
+          "decode_canonical",
+          "MAX_RUNTIME_SOURCE_BYTES"
         ]
       ],
       "retained_typed_conversions": []
@@ -15510,17 +15508,6 @@
           "load_runtime_json_artifact_hashes",
           "bounded signed JSON",
           "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
-    "crates/kernel/chio-runtime-core/src/replay_source.rs": {
-      "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
-      "migrations": [
-        [
-          "from_canonical_bytes",
-          "bounded signed JSON",
-          "MAX_RUNTIME_REPLAY_SOURCE_BYTES"
         ]
       ],
       "retained_typed_conversions": []
@@ -18140,7 +18127,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars::from_wire#3::decode_canonical",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs::from_canonical_bytes::from_wire#1::decode_canonical",
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs::from_canonical_bytes::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs::from_canonical_bytes::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/caller_delivery.rs::decode::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs::validate_native_original::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/capability_lineage.rs::validate_signed_token::from_wire#1::decode_signed",
@@ -18182,7 +18169,6 @@
     "crates/kernel/chio-runtime-core/src/ops.rs::runtime_evidence_manifest_report_binding_mismatches::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_json_artifact_hashes::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::parse_json::from_wire#1::decode_signed",
-    "crates/kernel/chio-runtime-core/src/replay_source.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::buyer_attestation_packet_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::buyer_attestation_review_package_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/serde_io.rs::runtime_admission_bundle_from_json::from_wire#1::decode_signed",
@@ -19082,7 +19068,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_replay.rs": [
+    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/caller_delivery.rs": [
@@ -19310,9 +19296,6 @@
     "crates/kernel/chio-runtime-core/src/program/mod.rs": [
       "from_json#1::shared-reader::crates/kernel/chio-runtime-core/src/computer/mod.rs::decode",
       "from_json#2::shared-reader::crates/kernel/chio-runtime-core/src/computer/mod.rs::decode"
-    ],
-    "crates/kernel/chio-runtime-core/src/replay_source.rs": [
-      "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-runtime-core/src/serde_io.rs": [
       "buyer_attestation_packet_from_json::original-json-reader::UntrustedJsonText",
@@ -22176,22 +22159,6 @@
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/runtime.rs": [
       "cmd_chio_pheromone_query::shared-reader::crates/trust/chio-pheromone-runtime/src/lib.rs::peer_weights_from_json",
       "cmd_chio_pheromone_receive::shared-reader::crates/trust/chio-pheromone-runtime/src/lib.rs::runtime_policy_from_json"
-    ],
-    "crates/products/chio-cli/src/cli/chio/dispatch/runtime/admission.rs": [
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_admission_bundle_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_admission_profile_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_request_binding_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_trusted_verifier_keys_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_peer_weights_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_pheromone_policy_from_json",
-      "cmd_chio_runtime_admit::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_verifier_trust_bundle_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_admission_bundle_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_trusted_verifier_keys_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_peer_weights_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_pheromone_policy_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_verifier_trust_bundle_from_json",
-      "cmd_chio_runtime_pheromone_evaluate::shared-reader::crates/products/chio-cli/src/cli/chio/dispatch/runtime/admission.rs::read_chio_runtime_pheromone_query_report",
-      "read_chio_runtime_pheromone_query_report::shared-reader::crates/kernel/chio-runtime/src/lib.rs::signed_runtime_pheromone_query_report_from_json"
     ],
     "crates/products/chio-cli/src/cli/chio/dispatch/runtime/io.rs": [
       "load_runtime_orchestration_profile::shared-reader::crates/kernel/chio-runtime/src/lib.rs::runtime_orchestration_profile_from_json",
