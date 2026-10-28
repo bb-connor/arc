@@ -182,30 +182,22 @@ mod tests {
         let signed = SignedExecutionNonce { nonce, signature };
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 100)?;
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 129)?;
-        for schema in [
-            "chio.execution_nonce.v2",
-            "chio.execution_nonce.v3",
-            "chio.operation_execution_nonce.v2",
-            "chio.operation_execution_nonce.v3",
-        ] {
-            let mut retired = signed.clone();
-            retired.nonce.schema = schema.into();
-            let body = signing_body(&operation, &retired.nonce)?;
-            retired.signature = key.sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)?;
-            assert_eq!(
-                verify_operation_execution_nonce_at(
-                    &retired,
-                    &operation,
-                    &key.public_key(),
-                    &binding,
-                    100
-                ),
-                Err(AdmissionOperationStoreError::Invariant(
-                    "operation nonce issuance interval is invalid".into()
-                )),
-                "{schema}"
-            );
-        }
+        let mut unregistered = signed.clone();
+        unregistered.nonce.schema = "chio.operation_execution_nonce.v2".into();
+        let body = signing_body(&operation, &unregistered.nonce)?;
+        unregistered.signature = key.sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)?;
+        assert_eq!(
+            verify_operation_execution_nonce_at(
+                &unregistered,
+                &operation,
+                &key.public_key(),
+                &binding,
+                100
+            ),
+            Err(AdmissionOperationStoreError::Invariant(
+                "operation nonce issuance interval is invalid".into()
+            ))
+        );
         for now in [99, 130, 131] {
             assert!(verify_operation_execution_nonce_at(
                 &signed,

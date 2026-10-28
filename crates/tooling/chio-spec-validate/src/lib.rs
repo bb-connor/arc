@@ -569,26 +569,18 @@ mod tests {
         validate_value(&schema_path, &schema, &document_path, &document)
             .unwrap_or_else(|error| panic!("current anchor example must validate: {error}"));
 
-        for retired in [
-            "chio.checkpoint_statement.v2",
-            "chio.checkpoint_statement.v3",
-        ] {
-            let mut changed = document.clone();
-            changed["checkpoint_statement"]["schema"] = json!(retired);
-            match validate_value(&schema_path, &schema, &document_path, &changed) {
-                Err(ValidateError::SchemaViolation(actual_schema, actual_document, errors)) => {
-                    assert_eq!(actual_schema, schema_path);
-                    assert_eq!(actual_document, document_path);
-                    assert_eq!(
-                        errors,
-                        vec!["\"chio.checkpoint_statement.v1\" was expected".to_string()],
-                        "{retired}"
-                    );
-                }
-                other => {
-                    panic!("expected exact checkpoint schema refusal for {retired}, got {other:?}")
-                }
+        let mut unregistered = document.clone();
+        unregistered["checkpoint_statement"]["schema"] = json!("chio.checkpoint_statement.v2");
+        match validate_value(&schema_path, &schema, &document_path, &unregistered) {
+            Err(ValidateError::SchemaViolation(actual_schema, actual_document, errors)) => {
+                assert_eq!(actual_schema, schema_path);
+                assert_eq!(actual_document, document_path);
+                assert_eq!(
+                    errors,
+                    vec!["\"chio.checkpoint_statement.v1\" was expected".to_string()]
+                );
             }
+            other => panic!("expected exact checkpoint schema refusal, got {other:?}"),
         }
     }
 

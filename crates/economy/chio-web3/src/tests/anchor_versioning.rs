@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn anchor_inclusion_proof_refuses_retired_schemas() {
+fn anchor_inclusion_proof_refuses_unregistered_schemas() {
     let mut proof = sample_anchor_inclusion_proof();
     proof.schema = "chio.anchor-inclusion-proof.v2".to_string();
     assert!(matches!(
