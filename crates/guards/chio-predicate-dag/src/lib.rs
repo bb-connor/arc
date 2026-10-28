@@ -26,6 +26,9 @@
 //! maps the rule trits to an outcome: any true Deny rule denies; otherwise any
 //! unknown Deny or Hold rule, or any true Hold rule, holds; otherwise allow.
 //!
+//! The core never allocates. The `alloc` feature adds `HeapScheduleStorage`,
+//! which holds a schedule's ops on the heap for hosts with an allocator.
+//!
 //! Wire layout, all integers little-endian:
 //!
 //! | Offset | Size | Field |
@@ -54,8 +57,13 @@
 //! rule literal names only an earlier rule. Complementary literals in one
 //! clause are kept, since dropping them is unsound in Kleene logic.
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 mod artifact;
 mod eval;
+#[cfg(feature = "alloc")]
+mod heap;
 mod schedule;
 mod thresholds;
 mod trit;
@@ -64,6 +72,8 @@ mod trit;
 pub mod kani_public_harnesses;
 
 pub use eval::{Evaluation, Outcome};
+#[cfg(feature = "alloc")]
+pub use heap::HeapScheduleStorage;
 pub use schedule::{RulePolarity, Schedule, ScheduleStorage};
 pub use thresholds::{classify, ScoreFrame, Thresholds};
 pub use trit::{TriSet, Trit};

@@ -16,6 +16,7 @@ chio-fixed = { workspace = true }
 
 [features]
 default = []
+alloc = []
 kani = []
 
 [dev-dependencies]
