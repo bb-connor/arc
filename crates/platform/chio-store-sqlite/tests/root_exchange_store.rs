@@ -275,9 +275,11 @@ fn refusal(edit: impl FnOnce(&mut Case)) -> TestResult<E> {
     env.refused(&case, &Admit, NOW)
 }
 
+type CaseEdit = Box<dyn FnOnce(&mut Case)>;
+
 #[test]
 fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
-    let cases: Vec<(MintRequestRefusal, Box<dyn FnOnce(&mut Case)>)> = vec![
+    let cases: Vec<(MintRequestRefusal, CaseEdit)> = vec![
         (
             MintRequestRefusal::IssuerNotExchangeKey,
             Box::new(|case| case.signer = support::holder_keypair()),
