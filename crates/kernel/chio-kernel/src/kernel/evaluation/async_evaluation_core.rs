@@ -35,7 +35,7 @@ impl ChioKernel {
             self.scope_receipt_tenant_id_for_request(&request.request_id, tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
         let _session_anchor_scope =
-            self.scope_receipt_session_anchor_for_request(&request.request_id, session_id)?;
+            self.scope_receipt_session_anchor_for_request(&request.request_id, session_id);
 
         // Emergency kill switch: every evaluate path checks the flag
         // before receipt negotiation, capability validation, guard evaluation,

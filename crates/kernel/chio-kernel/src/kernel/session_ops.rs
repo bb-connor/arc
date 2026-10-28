@@ -779,7 +779,7 @@ impl ChioKernel {
         let _session_anchor_scope = self.scope_receipt_session_anchor_for_request(
             context.request_id.as_str(),
             Some(&context.session_id),
-        )?;
+        );
 
         self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();
