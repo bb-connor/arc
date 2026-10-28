@@ -51,6 +51,9 @@ use crate::validate_positive_money;
 /// the `lane_kind` convention used elsewhere in the chio-settle stack.
 pub const INSURANCE_CLAIM_LANE_KIND: &str = "chio.insurance.claim.v1";
 
+/// Largest canonical receipt body a claim may cite as evidence.
+const MAX_RECEIPT_EVIDENCE_BODY_BYTES: usize = 1_048_576;
+
 /// Error surface for the insurance flow.
 #[derive(Debug, thiserror::Error)]
 pub enum InsuranceFlowError {
@@ -794,7 +797,11 @@ fn validate_clean_required(value: &str, field_name: &str) -> Result<(), Insuranc
 /// The kernel signature covers the signing wrapper of the canonical receipt
 /// body under `chio.receipt.v1`; `canonical_body` must already be canonical.
 fn receipt_signature_verifies(resolved: &ResolvedReceiptEvidence) -> bool {
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&resolved.canonical_body) else {
+    let Ok(value) = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &resolved.canonical_body,
+        MAX_RECEIPT_EVIDENCE_BODY_BYTES,
+    )
+    .and_then(|input| input.decode_canonical::<serde_json::Value>()) else {
         return false;
     };
     let Ok(canonical) = CanonicalBytes::from_value(&value) else {

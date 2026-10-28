@@ -359,10 +359,9 @@ fn validate_authorization(
         return Err(CallerDeliveryError::Binding);
     }
     // Validate public mutable DTO fields through the domain decoder as well.
-    let _: AdmissionDispatchCommitBindingV1 = serde_json::from_slice(&bounded_canonical(
-        &body.committed.dispatch_commit,
-        MAX_AUTHORIZATION_BYTES,
-    )?)
+    let _: AdmissionDispatchCommitBindingV1 = serde_json::from_slice(
+        bounded_body(&body.committed.dispatch_commit, MAX_AUTHORIZATION_BYTES)?.as_bytes(),
+    )
     .map_err(|_| CallerDeliveryError::Shape)?;
     Ok(())
 }

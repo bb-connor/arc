@@ -188,9 +188,13 @@ fn node(path: &str, role: &str, schema: &str, bytes: &[u8]) -> Value {
 }
 
 fn finding_id(finding: &[u8]) -> Result<String, CliError> {
-    let finding: chio_finding::Finding = serde_json::from_slice(finding)?;
+    let finding: chio_finding::Finding =
+        chio_core::canonical::UntrustedJsonText::from_wire(finding, MAX_FINDING_BYTES)?
+            .decode_canonical()?;
     Ok(finding.finding_id)
 }
+
+const MAX_FINDING_BYTES: usize = 1_048_576;
 
 /// The verified-fix finding re-bound to the qualified replay recipe digest.
 fn finding_bytes(recipe: &[u8]) -> Result<Vec<u8>, CliError> {
