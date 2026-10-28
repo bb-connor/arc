@@ -6,11 +6,11 @@ use std::time::Duration;
 use chio_core::{canonical_json_bytes, sha256};
 #[cfg(test)]
 use chio_core::{capability::scope::MonetaryAmount, receipt::economics::SettlementStatus};
+pub use chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST;
 use chio_egress_contract::{
     BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
     PrivateNetworkAllowance,
 };
-pub use chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
@@ -1038,7 +1038,8 @@ mod tests {
             hold_id: Some("hold-1".to_owned()),
             rail: "acp".to_owned(),
             rail_mode: PaymentRailMode::ReversibleHold,
-            rail_egress_allowance_digest: crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST.to_owned(),
+            rail_egress_allowance_digest: crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+                .to_owned(),
             authorization_id: None,
             transaction_id: None,
             amount_units: 125,

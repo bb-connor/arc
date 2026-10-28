@@ -40,6 +40,9 @@ This example validates a URL without DNS or network access. DNS checks require
 - `HttpEgressContract::prepare` validates shape and captures an immutable snapshot.
 - `enforce_url` checks schemes, normalized authorities, address literals, userinfo,
   and redirect count. It does not resolve domain names.
+- `private_network_allowances` is the only way to reach a private address: each
+  entry pins one `host:port` to a CIDR every resolved address must fall inside.
+  Link-local and cloud metadata addresses are never reachable.
 - `enforce_url_with_dns` checks every resolved address. Response-size enforcement
   requires an observed byte count or the feature-gated dispatch helper.
 

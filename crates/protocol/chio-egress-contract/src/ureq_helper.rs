@@ -746,7 +746,9 @@ fn enforce_resolved_addresses(
         });
     }
     for address in &addresses {
-        prepared.contract().enforce_resolved_address(host, *address)?;
+        prepared
+            .contract()
+            .enforce_resolved_address(host, *address)?;
     }
     Ok(addresses)
 }

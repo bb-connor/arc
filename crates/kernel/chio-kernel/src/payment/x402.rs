@@ -32,9 +32,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     payment_identifier_is_valid, post_json, validate_payment_endpoint, PaymentAdapter,
-    PaymentRailEgress,
     PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
-    PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus, X402SettlementRef,
+    PaymentRailEgress, PaymentRailMode, PaymentResult, RailSettlementState, RailSettlementStatus,
+    X402SettlementRef,
 };
 use crate::execution_nonce::ExecutionNonceStore;
 use crate::KernelError;

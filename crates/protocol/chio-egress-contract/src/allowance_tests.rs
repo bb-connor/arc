@@ -42,7 +42,12 @@ fn facilitator_contract() -> HttpEgressContract {
     vpc_contract(&[allowance(FACILITATOR, 8443, "10.20.0.0/24")])
 }
 
-fn resolved(contract: &HttpEgressContract, host: &str, ip: &str, port: u16) -> Result<(), HttpEgressError> {
+fn resolved(
+    contract: &HttpEgressContract,
+    host: &str,
+    ip: &str,
+    port: u16,
+) -> Result<(), HttpEgressError> {
     let address: IpAddr = ip.parse().expect("ip");
     contract
         .prepare()?
@@ -108,7 +113,10 @@ fn pinned_host_refuses_every_address_outside_its_cidr() {
 #[test]
 fn mapped_ipv6_answer_is_compared_as_ipv4() {
     let contract = facilitator_contract();
-    assert_eq!(resolved(&contract, FACILITATOR, "::ffff:10.20.0.5", 8443), Ok(()));
+    assert_eq!(
+        resolved(&contract, FACILITATOR, "::ffff:10.20.0.5", 8443),
+        Ok(())
+    );
     assert_eq!(
         resolved(&contract, FACILITATOR, "::ffff:10.21.0.5", 8443),
         Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
@@ -132,7 +140,7 @@ fn metadata_addresses_are_refused_whatever_the_flags() {
     let mut open = HttpEgressContract::permissive_for_tests("metadata.test:80");
     open.deny_link_local = false;
     open.deny_ipv6_ula = false;
-    for address in ["169.254.169.254", "fd00:ec2::254", "100.100.100.200", "::ffff:169.254.169.254"] {
+    for address in ["169.254.169.254", "fd00:ec2::254", "::ffff:169.254.169.254"] {
         let ip: IpAddr = address.parse().expect("ip");
         let shown = match ip {
             IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, IpAddr::V4),
@@ -146,6 +154,34 @@ fn metadata_addresses_are_refused_whatever_the_flags() {
             "{address}"
         );
     }
+    assert_eq!(
+        open.enforce_resolved_address(
+            "metadata.test",
+            SocketAddr::new("100.100.100.200".parse().expect("ip"), 80)
+        ),
+        Err(HttpEgressError::PrivateNetworkDenied {
+            host: "metadata.test resolved to 100.100.100.200".to_string()
+        })
+    );
+    assert_eq!(
+        resolved(&vpc_contract(&[]), FACILITATOR, "169.254.169.254", 8443),
+        Err(HttpEgressError::LinkLocalDenied {
+            host: format!("{FACILITATOR} resolved to 169.254.169.254")
+        })
+    );
+    assert_eq!(
+        resolved(
+            &facilitator_contract(),
+            FACILITATOR,
+            "169.254.169.254",
+            8443
+        ),
+        Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+            address: "169.254.169.254".parse().expect("ip"),
+        })
+    );
     assert_eq!(
         open.enforce_url("http://[fd00:ec2::254]/latest/meta-data", 0),
         Err(HttpEgressError::ReservedAddressDenied {
@@ -226,7 +262,13 @@ fn cidr_broader_than_the_bound_is_refused_at_load() {
 
 #[test]
 fn cidr_outside_the_private_ranges_is_refused_at_load() {
-    for network in ["8.8.0.0/16", "127.0.0.0/16", "192.0.2.0/24", "2001:db8::/48", "100.128.0.0/16"] {
+    for network in [
+        "8.8.0.0/16",
+        "127.0.0.0/16",
+        "192.0.2.0/24",
+        "2001:db8::/48",
+        "100.128.0.0/16",
+    ] {
         assert_eq!(
             load_error(&[allowance(FACILITATOR, 8443, network)]),
             HttpEgressError::InvalidAllowance(
@@ -331,7 +373,10 @@ fn malformed_allowances_are_refused_at_load() {
 fn public_host_on_the_default_port_may_be_pinned() {
     let contract = vpc_contract(&[allowance("public.example", 443, "10.30.0.0/24")]);
     contract.validate().expect("bare authority admits port 443");
-    assert_eq!(resolved(&contract, "public.example", "10.30.0.9", 443), Ok(()));
+    assert_eq!(
+        resolved(&contract, "public.example", "10.30.0.9", 443),
+        Ok(())
+    );
     assert_eq!(
         resolved(&contract, "public.example", "93.184.216.34", 443),
         Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
@@ -399,9 +444,12 @@ fn contract_and_allowance_refuse_unknown_fields() {
         "max_response_bytes": 1,
         "allow_private": true
     });
-    let error = serde_json::from_value::<HttpEgressContract>(contract)
-        .expect_err("unknown contract field");
-    assert!(error.to_string().contains("unknown field `allow_private`"), "{error}");
+    let error =
+        serde_json::from_value::<HttpEgressContract>(contract).expect_err("unknown contract field");
+    assert!(
+        error.to_string().contains("unknown field `allow_private`"),
+        "{error}"
+    );
 
     let entry = serde_json::json!({
         "host": FACILITATOR,
@@ -411,7 +459,10 @@ fn contract_and_allowance_refuse_unknown_fields() {
     });
     let error = serde_json::from_value::<PrivateNetworkAllowance>(entry)
         .expect_err("unknown allowance field");
-    assert!(error.to_string().contains("unknown field `wildcard`"), "{error}");
+    assert!(
+        error.to_string().contains("unknown field `wildcard`"),
+        "{error}"
+    );
 
     let parsed: PrivateNetworkAllowance = serde_json::from_value(serde_json::json!({
         "host": FACILITATOR,
@@ -433,7 +484,10 @@ fn allowance_digest_is_tagged_ordered_and_content_bound() {
     let forward = BTreeSet::from([first.clone(), second.clone()]);
     let reverse = BTreeSet::from([second, first]);
     let digest = private_network_allowance_digest(&forward).expect("digest");
-    assert_eq!(digest, private_network_allowance_digest(&reverse).expect("digest"));
+    assert_eq!(
+        digest,
+        private_network_allowance_digest(&reverse).expect("digest")
+    );
     assert_eq!(digest.len(), 64);
     let widened = BTreeSet::from([allowance(FACILITATOR, 8443, "10.20.0.0/23")]);
     assert_ne!(
@@ -463,10 +517,8 @@ fn allowance_digest_is_tagged_ordered_and_content_bound() {
 fn portless_resolver_refuses_a_pinned_host() {
     let contract = facilitator_contract();
     assert_eq!(
-        contract.enforce_resolved_address_without_port(
-            FACILITATOR,
-            "10.20.0.5".parse().expect("ip")
-        ),
+        contract
+            .enforce_resolved_address_without_port(FACILITATOR, "10.20.0.5".parse().expect("ip")),
         Err(HttpEgressError::AllowanceRequiresPortAwareResolver {
             host: FACILITATOR.to_string()
         })

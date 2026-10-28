@@ -15,11 +15,12 @@ use url::{Host, Url};
 use crate::HttpEgressError;
 
 /// Schema tag bound into [`private_network_allowance_digest`].
-pub const PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA: &str = "chio.egress.private-network-allowance.v1";
+pub const PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA: &str =
+    "chio.egress.private-network-allowance.v1";
 
 /// Digest of an empty allowance set.
 pub const EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST: &str =
-    "2db7ba6d8c2c4ae9d07cad3c2a0bdbac06e6b4e0a7a53f5d4c8deea11893d31c";
+    "a415a53243de0cb9bd018c68795dbb13cdc3f0efc3e1ef803b9103bb61a01d38";
 
 /// Narrowest IPv4 prefix length an allowance may declare.
 pub const MIN_IPV4_ALLOWANCE_PREFIX: u8 = 16;
@@ -243,7 +244,9 @@ pub(crate) fn is_metadata_address(address: IpAddr) -> bool {
 
 pub(crate) fn is_unlockable_address(address: IpAddr) -> bool {
     let address = canonical_ip(address);
-    UNLOCKABLE_RANGES.iter().any(|range| range.contains(address))
+    UNLOCKABLE_RANGES
+        .iter()
+        .any(|range| range.contains(address))
         && !RESERVED_RANGES.iter().any(|range| range.contains(address))
 }
 
@@ -292,7 +295,9 @@ pub(crate) fn validate_allowances(
     Ok(())
 }
 
-fn validate_allowance(allowance: &PrivateNetworkAllowance) -> Result<(), PrivateNetworkAllowanceError> {
+fn validate_allowance(
+    allowance: &PrivateNetworkAllowance,
+) -> Result<(), PrivateNetworkAllowanceError> {
     let host = allowance.host.as_str();
     if host.is_empty() || host.contains('*') || host.starts_with('.') {
         return Err(PrivateNetworkAllowanceError::WildcardHost {
