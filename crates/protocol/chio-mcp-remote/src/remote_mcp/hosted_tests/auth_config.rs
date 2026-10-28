@@ -79,6 +79,7 @@ fn local_authorization_server_refuses_invalid_client_registrations() {
     let registration = |client_id: &str, redirect_uri: &str| crate::OAuthClientRegistration {
         client_id: client_id.to_string(),
         redirect_uri: redirect_uri.to_string(),
+        token_endpoint_auth: crate::TokenEndpointAuth::None,
     };
     let cases = [
         (

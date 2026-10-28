@@ -2,12 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use chio_core::root_authority::Jwk;
-
 use super::claims::{audience_is, required_seconds, required_string, seconds};
 use super::error::RootExchangeError;
 use super::jws::{CompactJws, VerifyingKey};
 use super::replay::{ExchangeReplayStore, ReplayBinding, ReplayKey, ReplayNamespace};
+use crate::{OAuthClientRegistration, TokenEndpointAuth};
 
 pub const CLIENT_ASSERTION_TYPE_JWT_BEARER: &str =
     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
@@ -19,43 +18,48 @@ pub const MAX_CLIENT_ASSERTION_SKEW_SECS: u64 = 60;
 /// Longest admitted client assertion, `exp - iat`.
 pub const MAX_CLIENT_ASSERTION_LIFETIME_SECS: u64 = 60;
 
-/// A registered confidential client and its public key.
-#[derive(Debug, Clone)]
-pub struct ConfidentialClient {
-    pub client_id: String,
-    pub key: Jwk,
-}
-
 #[derive(Debug, Clone)]
 struct RegisteredClient {
     kid: String,
     key: VerifyingKey,
 }
 
-/// Registered confidential clients. Public clients are absent, so they can
-/// never authenticate here.
+/// The confidential clients among the `--auth-client` registrations.
+/// Public clients are absent, so they can never authenticate here.
 #[derive(Debug, Clone, Default)]
 pub struct ClientRegistry {
     clients: BTreeMap<String, RegisteredClient>,
 }
 
 impl ClientRegistry {
-    /// Refuses duplicate client ids and keys that cannot verify.
-    pub fn new(clients: Vec<ConfidentialClient>) -> Result<Self, RootExchangeError> {
+    /// Take the `private_key_jwt` clients of `registrations`. A client id
+    /// appears once per redirect URI; its registrations must all carry the
+    /// same authentication, and its key must verify.
+    pub fn new(registrations: &[OAuthClientRegistration]) -> Result<Self, RootExchangeError> {
+        let mut auth: BTreeMap<&str, &TokenEndpointAuth> = BTreeMap::new();
+        for registration in registrations {
+            let first = *auth
+                .entry(registration.client_id.as_str())
+                .or_insert(&registration.token_endpoint_auth);
+            if first != &registration.token_endpoint_auth {
+                return Err(RootExchangeError::ClientAssertionInvalid(
+                    "client id is registered with different authentication",
+                ));
+            }
+        }
         let mut registry = BTreeMap::new();
-        for client in clients {
-            let key = VerifyingKey::from_jwk(&client.key).ok_or(
+        for (client_id, auth) in auth {
+            let TokenEndpointAuth::PrivateKeyJwt(jwk) = auth else {
+                continue;
+            };
+            let key = VerifyingKey::from_jwk(jwk).ok_or(
                 RootExchangeError::ClientAssertionInvalid("registered key is unusable"),
             )?;
             let registered = RegisteredClient {
-                kid: client.key.kid.as_str().to_owned(),
+                kid: jwk.kid.as_str().to_owned(),
                 key,
             };
-            if registry.insert(client.client_id, registered).is_some() {
-                return Err(RootExchangeError::ClientAssertionInvalid(
-                    "client id is registered twice",
-                ));
-            }
+            registry.insert(client_id.to_owned(), registered);
         }
         Ok(Self { clients: registry })
     }
