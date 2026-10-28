@@ -15,6 +15,15 @@ dependency changes there change every fuzz build. Manifests of crates outside
 that graph, and the root Cargo.lock, cannot change the fuzz build (the fuzz
 workspace resolves against its own lock) and select nothing on their own. A
 manifest whose package name cannot be read selects every target.
+
+--classification names a file that receives one line: "targets-selected"
+when targets were selected, "no-fuzz-relevant-change" when the diff cannot
+reach any fuzz build, or "unclassified" when it can but no target is mapped. A
+changed path is fuzz-relevant unless it is test, bench or example code, belongs
+to a crate outside the fuzz dependency graph (owner found at the head or the
+base revision), or is a non-Rust file owned by no crate outside spec/schemas/.
+Paths under fuzz/, owned by fuzz-graph crates, Rust files with no owning
+crate, and quoted (escaped) paths are fuzz-relevant.
 """
 
 from __future__ import annotations
@@ -38,6 +47,11 @@ INVENTORY_CONTROL = re.compile(
     r"|scripts/select-fuzz-targets\.py$)"
 )
 MEMBER_MANIFEST = re.compile(r"^(.+/)?Cargo\.toml$")
+NON_PRODUCTION = re.compile(r"(^|/)(tests|benches|examples)/|_tests(\.rs$|/)|(^|/)tests\.rs$")
+ALWAYS_RELEVANT = re.compile(r"^(fuzz/|spec/schemas/)")
+TARGETS_SELECTED = "targets-selected"
+NO_FUZZ_RELEVANT_CHANGE = "no-fuzz-relevant-change"
+UNCLASSIFIED = "unclassified"
 
 
 class SelectionError(Exception):
@@ -115,6 +129,40 @@ def manifest_names(root: Path, path: str, base: str | None) -> list[str | None]:
     return names
 
 
+def owning_package(root: Path, path: str, base: str | None) -> str | None:
+    """Name of the nearest enclosing package at the head or base revision."""
+    parts = path.split("/")[:-1]
+    while parts:
+        manifest = "/".join(parts + ["Cargo.toml"])
+        names = [name for name in manifest_names(root, manifest, base) if name is not None]
+        if names:
+            return names[0]
+        parts.pop()
+    return None
+
+
+def fuzz_relevant(root: Path, path: str, graph: set[str], base: str | None) -> bool:
+    if path.startswith('"'):
+        return True
+    if NON_PRODUCTION.search(path):
+        return False
+    if ALWAYS_RELEVANT.match(path):
+        return True
+    owner = owning_package(root, path, base)
+    if owner is None:
+        return path.endswith(".rs")
+    return owner in graph
+
+
+def classify(
+    fired: list[str], changed: list[str], graph: set[str], root: Path, base: str | None
+) -> tuple[str, list[str]]:
+    if fired:
+        return TARGETS_SELECTED, []
+    relevant = [path for path in changed if fuzz_relevant(root, path, graph, base)]
+    return (UNCLASSIFIED if relevant else NO_FUZZ_RELEVANT_CHANGE), relevant
+
+
 def select(
     changed: list[str],
     targets: dict[str, list[re.Pattern[str]]],
@@ -147,6 +195,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--changed", required=True, type=Path)
     parser.add_argument("--base", help="git revision the diff is taken against")
     parser.add_argument("--root", type=Path, default=root)
+    parser.add_argument("--classification", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         changed = [
@@ -157,11 +206,18 @@ def main(argv: list[str]) -> int:
         targets = load_targets(args.root / "fuzz/target-map.toml")
         graph = fuzz_graph_packages(args.root / "fuzz/Cargo.lock")
         fired, reason = select(changed, targets, graph, args.root, args.base)
+        classification, relevant = classify(fired, changed, graph, args.root, args.base)
+        args.classification.write_text(classification + "\n", encoding="utf-8")
     except (OSError, SelectionError) as error:
         print(f"select-fuzz-targets: {error}", file=sys.stderr)
         return 2
     if reason is not None:
         print(f"select-fuzz-targets: {reason}; selecting all {len(fired)} targets", file=sys.stderr)
+    for path in relevant:
+        print(
+            f"select-fuzz-targets: fuzz-relevant change without a mapped target: {path}",
+            file=sys.stderr,
+        )
     for name in fired:
         print(name)
     return 0

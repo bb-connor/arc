@@ -26,10 +26,30 @@ def select(
     with tempfile.TemporaryDirectory() as temporary:
         listing = Path(temporary) / "changed.txt"
         listing.write_text("".join(path + "\n" for path in changed))
-        command = [sys.executable, str(SELECTOR), "--changed", str(listing), "--root", str(root)]
+        classification = Path(temporary) / "classification.txt"
+        command = [
+            sys.executable,
+            str(SELECTOR),
+            "--changed",
+            str(listing),
+            "--root",
+            str(root),
+            "--classification",
+            str(classification),
+        ]
         if base is not None:
             command += ["--base", base]
-        return subprocess.run(command, capture_output=True, text=True, check=False)
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        result.classification = (  # type: ignore[attr-defined]
+            classification.read_text() if classification.exists() else None
+        )
+        return result
+
+
+def classified(changed: list[str], **kwargs: object) -> str:
+    result = select(changed, **kwargs)  # type: ignore[arg-type]
+    assert result.returncode == 0, (changed, result.stderr)
+    return result.classification  # type: ignore[attr-defined]
 
 
 def selected(changed: list[str], **kwargs: object) -> list[str]:
@@ -130,6 +150,68 @@ def invalid_inputs_fail_closed() -> None:
         assert result.returncode == 2 and "records no path packages" in result.stderr, result
 
 
+def selections_are_classified() -> None:
+    assert classified(["crates/core/chio-core-types/src/canonical.rs"]) == "targets-selected\n"
+    assert classified(["Cargo.toml"]) == "targets-selected\n"
+
+
+def irrelevant_diffs_are_classified() -> None:
+    for changed in [
+        ["docs/README.md"],
+        ["Cargo.lock"],
+        ["crates/core/chio-adversarial-suite/Cargo.toml"],
+        ["crates/core/chio-adversarial-suite/src/lib.rs"],
+        ["crates/core/chio-core-types/tests/canonical_roundtrip.rs"],
+        ["crates/kernel/chio-kernel-core/benches/eval.rs"],
+        ["crates/core/chio-bounded/src/bounds_tests.rs"],
+        ["tests/bindings/vectors/unmapped/v1.json"],
+    ]:
+        assert selected(changed) == [], changed
+        assert classified(changed) == "no-fuzz-relevant-change\n", changed
+
+
+def unmapped_fuzz_graph_changes_stay_unclassified() -> None:
+    graph_crate = "crates/core/chio-bounded/src/unmapped_module.rs"
+    for changed in [
+        [graph_crate],
+        ["docs/README.md", graph_crate],
+        ["crates/core/chio-bounded/src/data/table.json"],
+        ["fuzz/src/unmapped.rs"],
+        ["spec/schemas/unmapped/v1.json"],
+        ['"crates/core/chio-core/src/\\303\\251.rs"'],
+        ["crates/future/unowned/src/lib.rs"],
+    ]:
+        result = select(changed)
+        assert result.returncode == 0, (changed, result.stderr)
+        assert result.stdout == "", (changed, result.stdout)
+        assert result.classification == "unclassified\n", (changed, result.classification)  # type: ignore[attr-defined]
+        assert "fuzz-relevant change without a mapped target" in result.stderr, result.stderr
+
+
+def deleted_crate_files_use_base_manifest() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fake_repo(root, triggers=["mapped/**"], graph=["alpha"])
+        for name in ["alpha", "beta"]:
+            manifest = root / f"crates/{name}/Cargo.toml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(f'[package]\nname = "{name}"\n')
+            (root / f"crates/{name}/src").mkdir()
+            (root / f"crates/{name}/src/lib.rs").write_text("")
+        git(root, "add", "-A")
+        git(root, "commit", "-qm", "base")
+        base = git(root, "rev-parse", "HEAD").strip()
+        for name in ["alpha", "beta"]:
+            for path in (root / f"crates/{name}").rglob("*"):
+                if path.is_file():
+                    path.unlink()
+        assert classified(["crates/beta/src/lib.rs"], root=root, base=base) == (
+            "no-fuzz-relevant-change\n"
+        )
+        assert classified(["crates/alpha/src/lib.rs"], root=root, base=base) == "unclassified\n"
+        assert classified(["crates/beta/src/lib.rs"], root=root) == "unclassified\n"
+
+
 def git(root: Path, *args: str) -> str:
     return subprocess.check_output(
         ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
@@ -158,6 +240,10 @@ CASES = [
     single_star_does_not_cross_directories,
     renamed_member_uses_base_name,
     invalid_inputs_fail_closed,
+    selections_are_classified,
+    irrelevant_diffs_are_classified,
+    unmapped_fuzz_graph_changes_stay_unclassified,
+    deleted_crate_files_use_base_manifest,
 ]
 
 
