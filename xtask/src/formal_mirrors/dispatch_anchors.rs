@@ -907,14 +907,6 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
 
 const RUNTIME_PREPARATION_SOURCES: &[RequiredSource] = &[
     RequiredSource {
-        path: "crates/kernel/chio-runtime-core/src/admission.rs",
-        symbols: &[
-            "RuntimeAdmissionReservationTracker",
-            "evaluate_runtime_admission_tracked",
-            "commit_prepared_runtime_admission",
-        ],
-    },
-    RequiredSource {
         path: "crates/kernel/chio-runtime-core/src/admission/preparation.rs",
         symbols: &[
             "RuntimeAdmissionPreparation",
@@ -928,9 +920,7 @@ const RUNTIME_PREPARATION_SOURCES: &[RequiredSource] = &[
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
         symbols: &[
             "ChioRuntimeAdmissionHook::evaluate",
-            "ChioRuntimeAdmissionHook::release_reservations",
             "ChioRuntimeAdmissionHook::release_reserved",
-            "ChioRuntimeAdmissionHook::admission_time",
             "ChioRuntimeAdmissionHook::runtime_participant_binding",
             "ChioRuntimeAdmissionHook::evaluate_operation_owned",
             "ChioRuntimeAdmissionHook::revalidate_admitted_request",
@@ -946,10 +936,6 @@ const RUNTIME_PREPARATION_SOURCES: &[RequiredSource] = &[
             "PreparedHookAdmission",
             "ChioRuntimeAdmissionHook::prepare_request",
         ],
-    },
-    RequiredSource {
-        path: "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
-        symbols: &["PreparedHookAdmission::reserve"],
     },
     RequiredSource {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs",
