@@ -191,3 +191,29 @@ fn a_valid_store_reopens_after_corrupt_row_controls() {
         1
     );
 }
+
+#[test]
+fn utf16_node_id_over_the_utf8_bound_refuses_on_open() {
+    let dir = tempfile::tempdir().test_unwrap();
+    Connection::open(store_path(&dir))
+        .test_unwrap()
+        .execute_batch("PRAGMA encoding = 'UTF-16'; CREATE TABLE fixture (x); DROP TABLE fixture;")
+        .test_unwrap();
+    seed_raw_row(&dir, "printf('%.*c', 1024, char(8364))", "1");
+    let raw = Connection::open(store_path(&dir)).test_unwrap();
+    let (encoding, stored_octets): (String, i64) = raw
+        .query_row(
+            "SELECT (SELECT encoding FROM pragma_encoding), octet_length(node_id) \
+             FROM cluster_peer_replay_high_water WHERE node_id != ?1",
+            [NODE_B],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .test_unwrap();
+    drop(raw);
+    assert!(encoding.starts_with("UTF-16"), "{encoding}");
+    assert_eq!(stored_octets, 2048);
+    assert!(matches!(
+        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        ClusterPeerReplayStoreError::InvalidRow
+    ));
+}
