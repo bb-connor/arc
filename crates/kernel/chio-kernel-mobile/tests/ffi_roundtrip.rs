@@ -909,3 +909,194 @@ fn inspect_mobile_receipt_envelopes_accepts_known_attestation_platform_shape() {
     assert_eq!(value["authorized"], false);
     assert_eq!(value["platform"], "app_attest");
 }
+
+const REPEATED_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+
+fn repeat_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member},{member}"), 1)
+}
+
+fn assert_signed_input_refused<T: std::fmt::Debug>(
+    result: Result<T, ChioMobileError>,
+    context: &str,
+) {
+    match result {
+        Err(ChioMobileError::InvalidJson { message }) => {
+            assert_eq!(message, format!("{context}: {REPEATED_KEY}"));
+        }
+        other => panic!("{context}: expected InvalidJson, got {other:?}"),
+    }
+}
+
+#[test]
+fn entry_points_refuse_a_repeated_key_in_the_original_json() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let token_id = format!(r#""id":"{}""#, capability.id);
+
+    let request_json = serde_json::json!({
+        "capability": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "request": {
+            "request_id": "req-dup",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+        },
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+    evaluate(request_json.clone()).expect("evaluate without a repeated key");
+    assert_signed_input_refused(
+        evaluate(repeat_member(&request_json, &token_id)),
+        "evaluate request",
+    );
+
+    let context_json = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+    verify_capability_with_context(context_json.clone()).expect("verify without a repeated key");
+    assert_signed_input_refused(
+        verify_capability_with_context(repeat_member(&context_json, &token_id)),
+        "verify capability request",
+    );
+
+    let token_json = serde_json::to_string(&capability).unwrap();
+    assert_signed_input_refused(
+        verify_capability(
+            repeat_member(&token_json, &token_id),
+            issuer.public_key().to_hex(),
+        ),
+        "capability token",
+    );
+
+    let keypair = Keypair::generate();
+    let body = make_receipt_body(&keypair);
+    let body_json = serde_json::to_string(&body).unwrap();
+    let receipt_id = format!(r#""id":"{}""#, body.id);
+    sign_receipt_relaying_trusted_body(body_json.clone(), keypair.seed_hex())
+        .expect("sign without a repeated key");
+    assert_signed_input_refused(
+        sign_receipt_relaying_trusted_body(
+            repeat_member(&body_json, &receipt_id),
+            keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+    assert_signed_input_refused(
+        sign_receipt(
+            repeat_member(&body_json, &receipt_id),
+            hex::encode(b"{}"),
+            keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+}
+
+fn exponent_member(json: &str, member: &str) -> String {
+    assert_eq!(json.matches(member).count(), 1, "{member} occurs once");
+    json.replacen(member, &format!("{member}e0"), 1)
+}
+
+#[test]
+fn signed_entry_points_refuse_a_non_canonical_number() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let now = format!(r#""now_secs":{EVAL_TIME}"#);
+
+    let request_json = serde_json::json!({
+        "capability": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "request": {
+            "request_id": "req-number",
+            "tool_name": "echo",
+            "server_id": "srv-a",
+            "agent_id": subject.public_key().to_hex(),
+            "arguments": {"msg": "hello"},
+        },
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+    evaluate(request_json.clone()).expect("evaluate with canonical numbers");
+    for number in ["1e-07", "1.0E-7"] {
+        let member = r#""msg":"hello""#;
+        assert_eq!(request_json.matches(member).count(), 1);
+        let arguments = request_json.replacen(member, &format!(r#""threshold":{number}"#), 1);
+        evaluate(arguments).expect("unsigned argument exponent is accepted");
+    }
+    assert_signed_input_refused(
+        evaluate(exponent_member(
+            &request_json,
+            &format!(r#""issued_at":{ISSUED_AT}"#),
+        )),
+        "evaluate request",
+    );
+
+    let context_json = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+    })
+    .to_string();
+    verify_capability_with_context(context_json.clone()).expect("verify with canonical numbers");
+    assert_signed_input_refused(
+        verify_capability_with_context(exponent_member(&context_json, &now)),
+        "verify capability request",
+    );
+
+    let token_json = serde_json::to_string(&capability).unwrap();
+    assert_signed_input_refused(
+        verify_capability(
+            exponent_member(&token_json, &format!(r#""issued_at":{ISSUED_AT}"#)),
+            issuer.public_key().to_hex(),
+        ),
+        "capability token",
+    );
+
+    let keypair = Keypair::generate();
+    let body_json = serde_json::to_string(&make_receipt_body(&keypair)).unwrap();
+    let timestamp = format!(r#""timestamp":{ISSUED_AT}"#);
+    sign_receipt_relaying_trusted_body(body_json.clone(), keypair.seed_hex())
+        .expect("sign with canonical numbers");
+    assert_signed_input_refused(
+        sign_receipt_relaying_trusted_body(
+            exponent_member(&body_json, &timestamp),
+            keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+    assert_signed_input_refused(
+        sign_receipt(
+            exponent_member(&body_json, &timestamp),
+            hex::encode(b"{}"),
+            keypair.seed_hex(),
+        ),
+        "receipt body",
+    );
+}
+
+#[test]
+fn json_entry_points_refuse_input_over_the_bound() {
+    let oversized = " ".repeat(1024 * 1024 + 1);
+    match evaluate(oversized.clone()) {
+        Err(ChioMobileError::InvalidJson { message }) => assert_eq!(
+            message,
+            "evaluate request: urn:chio:error:attest:signed-json-too-large"
+        ),
+        other => panic!("expected InvalidJson, got {other:?}"),
+    }
+    match verify_capability(oversized, "00".repeat(32)) {
+        Err(ChioMobileError::InvalidJson { message }) => assert_eq!(
+            message,
+            "capability token: urn:chio:error:attest:signed-json-too-large"
+        ),
+        other => panic!("expected InvalidJson, got {other:?}"),
+    }
+}

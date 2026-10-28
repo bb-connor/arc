@@ -11,6 +11,7 @@ use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{
     attenuation::ScopeHash, crypto_floor::CapabilityCryptoFloor, features::CapabilityNegotiation,
     token::CapabilityToken,
@@ -131,7 +132,7 @@ use chio_kernel_core::clock::SystemClock;
 
 #[derive(Debug, Deserialize)]
 struct EvaluateRequestEnvelope {
-    capability: serde_json::Value,
+    capability: CapabilityToken,
     trusted_issuers: Vec<String>,
     request: EvaluateRequestBody,
     #[serde(default)]
@@ -142,7 +143,7 @@ struct EvaluateRequestEnvelope {
     peer_capabilities: Option<CapabilityNegotiation>,
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
-    direct_root_capability: Option<serde_json::Value>,
+    direct_root_capability: Option<CapabilityToken>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry here; absent issuers fail-closed.
     #[serde(default)]
@@ -155,7 +156,7 @@ struct EvaluateRequestEnvelope {
 
 #[derive(Debug, Deserialize)]
 struct VerifyCapabilityRequestEnvelope {
-    token: serde_json::Value,
+    token: CapabilityToken,
     trusted_issuers: Vec<String>,
     #[serde(default)]
     now_secs: Option<i64>,
@@ -163,7 +164,7 @@ struct VerifyCapabilityRequestEnvelope {
     peer_capabilities: Option<CapabilityNegotiation>,
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
-    direct_root_capability: Option<serde_json::Value>,
+    direct_root_capability: Option<CapabilityToken>,
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     #[serde(default)]
@@ -379,22 +380,23 @@ fn fixed_clock_from_secs(now_secs: i64) -> Option<FixedClock> {
     }
 }
 
+mod evaluate_input;
+
+/// Maximum byte length of each JSON text argument.
+const MAX_JSON_INPUT_BYTES: usize = 1024 * 1024;
+
 fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
-    let parsed: EvaluateRequestEnvelope = serde_json::from_str(request_json)
-        .map_err(|error| KernelFfiError::invalid_json("evaluate request", error))?;
+    let parsed: EvaluateRequestEnvelope =
+        evaluate_input::decode_evaluate_request(request_json, MAX_JSON_INPUT_BYTES)
+            .map_err(|error| KernelFfiError::invalid_json("evaluate request", error))?;
     if parsed.request.has_unsupported_authorization_extensions() {
         return Err(KernelFfiError::InvalidCapability(
             "C++ portable evaluation cannot authenticate governed approvals or supplemental authorization".to_string(),
         ));
     }
 
-    let capability: CapabilityToken = serde_json::from_value(parsed.capability)
-        .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
-    let direct_root_capability = parsed
-        .direct_root_capability
-        .map(serde_json::from_value)
-        .transpose()
-        .map_err(|error| KernelFfiError::invalid_json("direct root capability", error))?;
+    let capability = parsed.capability;
+    let direct_root_capability = parsed.direct_root_capability;
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     validate_capability_trust_roots(&parsed.capability_trust_roots)?;
@@ -506,9 +508,10 @@ fn sign_receipt_json_str(
     canonical_content_hex: &str,
     signing_seed_hex: &str,
 ) -> Result<String, KernelFfiError> {
-    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(body_json)
-        .decode_signed()
-        .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
+    let body: ChioReceiptBody =
+        UntrustedJsonText::from_wire(body_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
 
     let canonical_content = hex::decode(canonical_content_hex.trim_start_matches("0x"))
         .map_err(|error| KernelFfiError::invalid_hex("canonical content", error))?;
@@ -536,9 +539,10 @@ fn sign_receipt_relaying_trusted_body_json_str(
     body_json: &str,
     signing_seed_hex: &str,
 ) -> Result<String, KernelFfiError> {
-    let body: ChioReceiptBody = chio_core_types::canonical::UntrustedJsonText::new(body_json)
-        .decode_signed()
-        .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
+    let body: ChioReceiptBody =
+        UntrustedJsonText::from_wire(body_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| KernelFfiError::invalid_json("receipt body", error))?;
 
     let keypair = Keypair::from_seed_hex(signing_seed_hex)
         .map_err(|error| KernelFfiError::invalid_hex("signing seed", error))?;
@@ -554,8 +558,10 @@ fn verify_capability_json_str(
     authority_pub_hex: &str,
     now_secs: i64,
 ) -> Result<String, KernelFfiError> {
-    let token: CapabilityToken = serde_json::from_str(token_json)
-        .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
+    let token: CapabilityToken =
+        UntrustedJsonText::from_wire(token_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
     let authority = public_key_from_hex(authority_pub_hex, "authority public key")?;
 
     verify_capability_with_parts(
@@ -570,15 +576,10 @@ fn verify_capability_json_str(
 }
 
 fn verify_capability_with_context_json_str(request_json: &str) -> Result<String, KernelFfiError> {
-    let parsed: VerifyCapabilityRequestEnvelope = serde_json::from_str(request_json)
-        .map_err(|error| KernelFfiError::invalid_json("verify capability request", error))?;
-    let token: CapabilityToken = serde_json::from_value(parsed.token)
-        .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
-    let direct_root_capability = parsed
-        .direct_root_capability
-        .map(serde_json::from_value)
-        .transpose()
-        .map_err(|error| KernelFfiError::invalid_json("direct root capability", error))?;
+    let parsed: VerifyCapabilityRequestEnvelope =
+        UntrustedJsonText::from_wire(request_json.as_bytes(), MAX_JSON_INPUT_BYTES)
+            .and_then(|text| text.decode_signed())
+            .map_err(|error| KernelFfiError::invalid_json("verify capability request", error))?;
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     let peer_profile = parsed
         .peer_capabilities
@@ -586,11 +587,11 @@ fn verify_capability_with_context_json_str(request_json: &str) -> Result<String,
         .unwrap_or_else(CapabilityNegotiation::t1_default);
 
     verify_capability_with_parts(
-        token,
+        parsed.token,
         trusted,
         parsed.now_secs,
         peer_profile,
-        direct_root_capability,
+        parsed.direct_root_capability,
         parsed.capability_trust_roots,
         &parsed.parent_budget_snapshots,
     )

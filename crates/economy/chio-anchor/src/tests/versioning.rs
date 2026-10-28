@@ -126,6 +126,12 @@ fn proof_bundle_refuses_retired_bundle_and_primary_proof_schemas() {
 
     assert!(verify_proof_bundle(&bundle).test_unwrap().verified);
 
+    let document = serde_json::to_string(&bundle).test_unwrap();
+    let solana = serde_json::to_string(&bundle.solana_anchor).test_unwrap();
+    chio_test_support::duplicate_keys::assert_repeated_member_refused::<AnchorProofBundle>(
+        &document, &solana,
+    );
+
     let mut retired_primary = bundle.clone();
     retired_primary.primary_proof.schema = "chio.anchor-inclusion-proof.v2".to_string();
     let error = verify_proof_bundle(&retired_primary).test_unwrap_err();

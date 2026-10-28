@@ -15,15 +15,12 @@ where
     D: Deserializer<'de>,
     T: serde::de::DeserializeOwned,
 {
-    let value = serde_json::Value::deserialize(deserializer)?;
-    if value.is_null() {
-        return Err(<D::Error as serde::de::Error>::custom(
+    match Option::<T>::deserialize(deserializer)? {
+        Some(value) => Ok(Some(value)),
+        None => Err(<D::Error as serde::de::Error>::custom(
             "explicit null is not permitted; omit the optional field",
-        ));
+        )),
     }
-    T::deserialize(value)
-        .map(Some)
-        .map_err(<D::Error as serde::de::Error>::custom)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

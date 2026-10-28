@@ -13,6 +13,8 @@ name = "chio_test_support"
 
 [dependencies]
 chio-security-types = { workspace = true, features = ["std"] }
+serde.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 
 [lints]

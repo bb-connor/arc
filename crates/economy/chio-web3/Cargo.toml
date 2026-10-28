@@ -25,6 +25,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 chio-spec-validate = { workspace = true }
+chio-test-support = { workspace = true }
 
 [lints.clippy]
 undocumented_unsafe_blocks = "deny"

@@ -463,6 +463,14 @@ mod tests {
     }
 
     #[test]
+    fn canonicalize_normalizes_rfc8785_numbers_over_c_abi() {
+        let input = c_string("[4.50,1E30,2e-3]");
+        let result = chio_canonicalize_json(input.as_ptr());
+        assert_eq!(result.status, CHIO_FFI_STATUS_OK);
+        assert_eq!(result_to_string(result.data), "[4.5,1e+30,0.002]");
+    }
+
+    #[test]
     fn hashing_roundtrips_over_c_abi() {
         let input = c_string("hello");
         let result = chio_sha256_hex_utf8(input.as_ptr());
