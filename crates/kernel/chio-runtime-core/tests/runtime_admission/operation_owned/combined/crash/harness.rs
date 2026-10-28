@@ -12,7 +12,7 @@ const CHILD_CUT: &str = "CHIO_COMBINED_CUSTODY_CRASH_CUT";
 pub(super) struct RestartState {
     request: ToolCallRequest,
     runtime_authority_id: String,
-    expectation_id: String,
+    qualification_id: String,
     origin_seed: String,
     local_seed: String,
 }
@@ -28,7 +28,7 @@ impl RestartState {
                 .runtime_authority_id()
                 .as_str()
                 .to_owned(),
-            expectation_id: fixture.inner.binding.expectation_id().as_str().to_owned(),
+            qualification_id: fixture.inner.binding.qualification_id().as_str().to_owned(),
             origin_seed: fixture.origin_key.seed_hex(),
             local_seed: fixture.local_key.seed_hex(),
         };
@@ -54,7 +54,7 @@ impl RestartState {
                         "runtime_authority_id",
                         &self.runtime_authority_id,
                     )?,
-                    AdmissionIdentifier::try_new("expectation_id", &self.expectation_id)?,
+                    AdmissionIdentifier::try_new("qualification_id", &self.qualification_id)?,
                 ),
                 request: self.request.clone(),
                 invocations: Arc::new(AtomicU64::new(0)),
