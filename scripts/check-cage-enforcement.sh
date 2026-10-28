@@ -112,8 +112,14 @@ set -e
 if [[ "$status" -ne 0 ]]; then
   exit "$status"
 fi
+expected_all_targets="$(python3 -I "$inventory_checker" --root "$workspace" --expected all-targets)"
+probe_names="$(python3 -I "$inventory_checker" --root "$workspace" --expected probes)"
+mutation_names="$(python3 -I "$inventory_checker" --root "$workspace" --expected mutations)"
+expected_probes="$(grep -c . <<<"$probe_names")"
+expected_mutations="$(grep -c . <<<"$mutation_names")"
 marker="CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=$challenge"
-if [[ "$(grep -Ec "^${marker} all_targets=104 probes=40 mutations=10$" "$output")" -ne 1 ]]; then
+marker="$marker all_targets=$expected_all_targets probes=$expected_probes mutations=$expected_mutations"
+if [[ "$(grep -Ec "^${marker}$" "$output")" -ne 1 ]]; then
   echo "real-Linux cage evidence marker is absent, stale, or ambiguous" >&2
   exit 1
 fi
