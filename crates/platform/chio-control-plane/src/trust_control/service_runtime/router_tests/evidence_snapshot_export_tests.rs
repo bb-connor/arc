@@ -394,7 +394,7 @@ async fn refused_lineage_of_unattributed_receipts_fails_the_snapshot_after_exten
     assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
 }
 
-const READER_REFUSAL_BODY: &str = "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token";
+const READER_REFUSAL_BODY: &str = "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token";
 
 async fn assert_reader_refusal_fails_the_snapshot(
     snapshots: &ReceiptQuerySnapshots,
@@ -649,7 +649,7 @@ async fn non_utf8_lineage_issuer_of_unsigned_receipts_returns_snapshot_invalid()
     assert_eq!(body["code"], "receipt_query_snapshot_invalid");
     assert_eq!(
         body["error"],
-        "receipt query snapshot failed authentication: capability lineage of cap-signed is refused by the local reader: invalid utf-8 sequence of 1 bytes from index 0 at index 2"
+        "receipt query snapshot failed authentication: capability lineage of cap-signed is refused by the local reader: capability lineage contains invalid UTF-8 at column 2"
     );
     assert!(body.get("bundle").is_none(), "{body}");
     assert!(matches!(
