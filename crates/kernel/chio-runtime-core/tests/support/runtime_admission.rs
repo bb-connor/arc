@@ -282,34 +282,6 @@ fn signed_policy_inputs(strength: f64) -> Result<SignedPolicyInputs, Box<dyn std
     ))
 }
 
-fn allowing_policy_hook<S>(
-    store: S,
-) -> Result<ChioRuntimeAdmissionHook<S>, Box<dyn std::error::Error>> {
-    let (signed_trust, trusted, advisory, signed_policy, signed_weights) =
-        signed_policy_inputs(0.10)?;
-    Ok(
-        ChioRuntimeAdmissionHook::new(profile(), store, uninstalled_binding()?)
-            .with_runtime_trust_input(signed_trust, trusted)
-            .with_pheromone_query_report(advisory)
-            .with_runtime_pheromone_policy(signed_policy, signed_weights),
-    )
-}
-
-fn allowing_chio_policy_hook<S>(
-    store: S,
-) -> Result<ChioRuntimeAdmissionHook<S>, Box<dyn std::error::Error>> {
-    let mut profile = profile();
-    profile.schema = "chio.runtime.admission-profile.v1".to_string();
-    let (signed_trust, trusted, advisory, signed_policy, signed_weights) =
-        signed_policy_inputs(0.10)?;
-    Ok(
-        ChioRuntimeAdmissionHook::new(profile, store, uninstalled_binding()?)
-            .with_runtime_trust_input(signed_trust, trusted)
-            .with_pheromone_query_report(advisory)
-            .with_runtime_pheromone_policy(signed_policy, signed_weights),
-    )
-}
-
 #[derive(Clone)]
 struct TreatyRuntimeFixture {
     treaty_scope: TreatyScope,
@@ -1007,17 +979,4 @@ fn runtime_swarm_bundle(
     }
 
     Ok(bundle)
-}
-
-fn uninstalled_binding() -> Result<
-    chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
-    Box<dyn std::error::Error>,
-> {
-    use chio_kernel::admission_operation::{
-        runtime_participant::RuntimeParticipantAuthorityBindingV1, AdmissionIdentifier,
-    };
-    Ok(RuntimeParticipantAuthorityBindingV1::new(
-        AdmissionIdentifier::try_new("runtime_id", "uninstalled-runtime")?,
-        AdmissionIdentifier::try_new("qualification_id", "a".repeat(64))?,
-    ))
 }
