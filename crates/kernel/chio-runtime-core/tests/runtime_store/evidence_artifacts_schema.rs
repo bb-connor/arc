@@ -18,16 +18,16 @@ fn open_refuses_evidence_artifacts_table_without_run_scoped_primary_key(
             );",
         )?;
     }
+    let original = std::fs::read(&path)?;
     match SqliteRuntimeOrchestrationStore::open(&path) {
         Err(ChioRuntimeError::Rejected { code, detail }) => {
-            assert_eq!(code, "runtime_evidence_artifacts_schema_mismatch");
-            assert_eq!(
-                detail,
-                "runtime_evidence_artifacts primary key must be (run_id, artifact_sha256)"
-            );
+            assert_eq!(code, "runtime_store_schema_mismatch");
+            assert_eq!(detail, "runtime store requires the exact v1 schema");
         }
         Err(other) => panic!("unexpected error {other:?}"),
         Ok(_) => panic!("a mismatched evidence artifacts table must be refused"),
     }
+    assert_eq!(std::fs::read(&path)?, original);
+    assert!(!path.with_extension("sqlite3-wal").exists());
     Ok(())
 }
