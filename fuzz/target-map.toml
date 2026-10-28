@@ -396,6 +396,18 @@ triggers = [
 seeds    = "fuzz/corpus/commerce_receipt_verify"
 notes    = "Commerce authority receipts through order replay and settlement verification: bounded signed decode, re-signed action mutations, and the action hash mismatch versus encoding fault error classes; no input may panic."
 
+[targets.decision_model_artifact]
+crate    = "chio-predicate-dag"
+path     = "fuzz/fuzz_targets/decision_model_artifact.rs"
+triggers = [
+    "crates/guards/chio-predicate-dag/src/**",
+    "fuzz/src/entries.rs",
+    "fuzz/fuzz_targets/decision_model_artifact.rs",
+    "fuzz/corpus/decision_model_artifact/**",
+]
+seeds    = "fuzz/corpus/decision_model_artifact"
+notes    = "Decision-model artifact images: header, threshold and op decode with canonical-form validation; refused images leave no schedule and validated schedules evaluate exactly at their op count without panics."
+
 [targets.peers_lock_decode]
 crate    = "chio-conformance"
 path     = "fuzz/fuzz_targets/peers_lock_decode.rs"

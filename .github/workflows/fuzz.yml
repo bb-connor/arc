@@ -160,6 +160,7 @@ jobs:
           - rollback_anchor_slots
           - commerce_receipt_verify
           - peers_lock_decode
+          - decision_model_artifact
           - fuzz_tool_action
     steps:
       # GHA `exit 0` only marks the step successful; it does
