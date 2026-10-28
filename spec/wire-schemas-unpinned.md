@@ -98,8 +98,8 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/recovery_gate.rs:34` `FINDING_RECOVERY_REQUEST_BINDING_SCHEMA` = `chio.finding.recovery-request-binding.v1`
 - `crates/kernel/chio-kernel/src/memory_provenance.rs:46` `MEMORY_PROVENANCE_ENTRY_SCHEMA` = `chio.memory_provenance_entry.v1`
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:23` `ECONOMIC_COMPLETION_FLOW_SCHEMA` = `chio.economic-completion-flow.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:443` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:444` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:477` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:478` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
 - `crates/kernel/chio-kernel/src/receipt_store.rs:1112` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
@@ -137,7 +137,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:176` `TRIGGER_DOMAIN` = `chio.finding.challenge-trigger.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:179` `PURCHASE_SNAPSHOT_DOMAIN` = `chio.finding.claim-snapshot.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:187` `ENFORCEMENT_ROOT_DOMAIN` = `chio.finding.enforcement-root.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:101` `FINDING_CHALLENGE_STATUS_SCHEMA` = `chio.finding.challenge-status.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:100` `FINDING_CHALLENGE_STATUS_SCHEMA` = `chio.finding.challenge-status.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:33` `FINDING_HOSTED_PROFILE_SCHEMA` = `chio.finding.hosted-operator-profile.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:341` `FINDING_HOSTED_CANARY_OBSERVATION_SCHEMA` = `chio.finding.hosted-canary-observation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:15` `FINDING_OPERATOR_PROFILE_SCHEMA` = `chio.finding.operator-profile.v1`
@@ -146,8 +146,8 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:18` `FINDING_OPERATOR_SELLER_CLIENT_SCHEMA` = `chio.finding.seller-client.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs:19` `FINDING_VOLUNTARY_RETRACTION_REQUEST_SCHEMA` = `chio.finding.voluntary-retraction-request.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs:71` `RESERVATION_DOMAIN` = `chio.finding.reservation.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:50` `FINDING_PURCHASE_REQUEST_SCHEMA` = `chio.finding.purchase-request.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:54` `FINDING_PURCHASE_ERROR_SCHEMA` = `chio.finding.purchase-error.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:51` `FINDING_PURCHASE_REQUEST_SCHEMA` = `chio.finding.purchase-request.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:55` `FINDING_PURCHASE_ERROR_SCHEMA` = `chio.finding.purchase-error.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:25` `FINDING_STATUS_INTENT_SCHEMA` = `chio.finding.status-intent-submission.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:26` `FINDING_STATUS_INTENT_ID_DOMAIN` = `chio.finding.status-intent-id.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:27` `FINDING_VOLUNTARY_RETRACTION_RECEIPT_SCHEMA` = `chio.finding.voluntary-retraction-receipt.v1`
