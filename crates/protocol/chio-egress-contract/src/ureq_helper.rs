@@ -19,7 +19,9 @@ pub struct BlockingContractAgent {
 
 impl BlockingContractAgent {
     /// `timeout` bounds connect, each read and each write. `deadline` bounds
-    /// the whole request, from resolution to the last body byte.
+    /// the request from connect through the last body byte. Name resolution
+    /// runs before the deadline applies and is bounded only by the system
+    /// resolver.
     pub fn new(
         contract: &HttpEgressContract,
         timeout: Duration,
