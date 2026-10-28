@@ -605,6 +605,52 @@ class TypeResolutionTests(unittest.TestCase):
         self.assertIn("::bad: raw extractor Bounded<ChioReceipt>", findings[0])
         self.assertEqual(self.findings({"crates/demo/src/lib.rs": extractor + "async fn good(Bounded(r): Bounded<u32>) {}"}), [])
 
+    def test_tail_scrutinee_takes_the_return_type_only_through_identity_arms(self):
+        self.assertEqual(len(self.raw_decodes("fn bad(s: &str) -> Result<ChioReceipt,E> { match serde_json::from_str(s) { Ok(r) => Ok(r), Err(e) => Err(e) } }")), 1)
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "fn good(s: &str) -> Result<u64,E> { match serde_json::from_str(s) { Ok(r) => Ok(r), Err(e) => Err(e) } }"}), [])
+
+    def test_projected_tail_decodes_take_the_pattern_or_closure_type(self):
+        for source in [
+            "fn bad(s: &str) -> u64 { match serde_json::from_str(s) { Ok(ChioReceipt { timestamp, .. }) => timestamp, Err(_) => 0 } }",
+            "fn bad(s: &str) -> u64 { if let Ok(ChioReceipt { timestamp, .. }) = serde_json::from_str(s) { timestamp } else { 0 } }",
+            "fn bad(s: &str) -> Result<u64, serde_json::Error> { serde_json::from_str(s).map(|r: ChioReceipt| r.timestamp) }",
+        ]:
+            with self.subTest(source=source):
+                findings = self.findings({"crates/demo/src/lib.rs": source})
+                self.assertEqual(findings, ["crates/demo/src/lib.rs::bad: raw decode serde_json::from_str(s)"])
+
+    def test_projected_tail_decode_without_a_named_type_is_inferred(self):
+        for source in [
+            "fn unknown(s: &str) -> u64 { match serde_json::from_str(s) { Ok(r) => stamp(r), Err(_) => 0 } }",
+            "fn unknown(s: &str) -> Result<u64, serde_json::Error> { serde_json::from_str(s).map(stamp) }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), ["crates/demo/src/lib.rs::unknown: inferred decode target serde_json::from_str(s)"])
+
+    def test_projected_tail_decode_of_a_plain_type_is_allowed(self):
+        for source in [
+            "struct Plain { n: u64 } fn good(s: &str) -> u64 { match serde_json::from_str(s) { Ok(Plain { n }) => n, Err(_) => 0 } }",
+            "struct Plain { n: u64 } fn good(s: &str) -> Result<u64, serde_json::Error> { serde_json::from_str(s).map(|p: Plain| p.n) }",
+        ]:
+            with self.subTest(source=source):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": source}), [])
+
+    def test_extractor_alias_chains_resolve_before_filtering(self):
+        local = "mod input { pub struct Bounded<T>(pub T); impl<S, T> FromRequest<S> for Bounded<T> where T: DeserializeOwned { type Rejection = E; async fn from_request(request: Request, state: &S) -> Result<Self,E> { let bytes=read(request); serde_json::from_slice(&bytes).map(Self).map_err(wrap) } } } "
+        for prefix in [
+            "use axum::Json as Body; ",
+            "use axum::Json as First; use First as Body; ",
+            "use axum::extract as ex; use ex::Json as Body; ",
+            local + "use input::Bounded as Body; ",
+            local + "use input::Bounded as First; use First as Body; ",
+        ]:
+            with self.subTest(prefix=prefix):
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": prefix + "async fn bad(Body(r): Body<ChioReceipt>) {}"}), ["crates/demo/src/lib.rs::bad: raw extractor Body<ChioReceipt>"])
+                self.assertEqual(self.findings({"crates/demo/src/lib.rs": prefix + "async fn good(Body(r): Body<u32>) {}"}), [])
+
+    def test_non_extractor_alias_chain_is_not_an_extractor(self):
+        self.assertEqual(self.findings({"crates/demo/src/lib.rs": "use axum::extract::State as First; use First as Body; async fn good(Body(r): Body<ChioReceipt>) {}"}), [])
+
     def test_plain_wrappers_are_allowed(self):
         findings = self.findings({
             "crates/demo/src/lib.rs": "struct Envelope { value: u32 }\nfn good(s: &str) { serde_json::from_str::<Option<Envelope>>(s); }",
