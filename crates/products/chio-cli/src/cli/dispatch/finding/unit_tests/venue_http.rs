@@ -31,6 +31,7 @@ async fn verify_by_id_runs_the_strict_ingress_over_the_served_bytes() {
             true,
             true,
             Some(&uri),
+            &NONE,
         )
     })
     .await
@@ -69,6 +70,7 @@ async fn verify_by_id_rejects_a_different_valid_artifact() {
             true,
             true,
             Some(&uri),
+            &NONE,
         )
     })
     .await
@@ -134,6 +136,7 @@ async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
             true,
             Some(&uri),
             Some("venue-token"),
+            &NONE,
         )
     })
     .await
@@ -148,11 +151,12 @@ fn venue_reads_do_not_follow_a_redirect_to_a_second_authority() {
         return;
     }
     let probe = super::super::redirect_probe::RedirectProbe::start("302 Found");
-    assert!(fetch_finding_bytes(&probe.venue_url, GOLDEN_FINDING_ID).is_err());
+    assert!(fetch_finding_bytes(&probe.venue_url, GOLDEN_FINDING_ID, &NONE).is_err());
     assert!(!probe.followed(), "the finding fetch followed a venue redirect");
 
     let probe = super::super::redirect_probe::RedirectProbe::start("302 Found");
-    assert!(cmd_finding_search("repo:", None, None, None, true, Some(&probe.venue_url)).is_err());
+    let venue = Some(probe.venue_url.as_str());
+    assert!(cmd_finding_search("repo:", None, None, None, true, venue, &NONE).is_err());
     assert!(!probe.followed(), "the finding search followed a venue redirect");
 }
 
@@ -165,6 +169,7 @@ fn venue_publish_does_not_follow_a_redirect_to_a_second_authority() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
     let probe = super::super::redirect_probe::RedirectProbe::start("303 See Other");
-    assert!(cmd_finding_publish(&path, true, Some(&probe.venue_url), Some("venue-token")).is_err());
+    let venue = Some(probe.venue_url.as_str());
+    assert!(cmd_finding_publish(&path, true, venue, Some("venue-token"), &NONE).is_err());
     assert!(!probe.followed(), "the finding publish followed a venue redirect");
 }

@@ -1,12 +1,15 @@
 use super::*;
 
-use std::io::Read as _;
-
 use chio_control_plane::trust_control::finding_purchase_routes::{
     FindingPurchaseRequest, FindingPurchaseResult, FindingPurchaseVerdict,
     FINDING_PURCHASE_MAX_RESULT_BYTES,
 };
 use chio_finding_verifier::MAX_RAW_FINDING_BYTES;
+
+#[path = "finding/control_http.rs"]
+mod control_http;
+use chio_egress_contract::EgressAllowanceSet;
+use control_http::{is_success, venue_failure, venue_get, venue_post, venue_text};
 
 #[path = "finding/verify.rs"]
 mod finding_verify;
@@ -65,6 +68,7 @@ pub(crate) fn dispatch_finding(
     json_output: bool,
     control_url: Option<String>,
     control_token: Option<String>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     match command {
         FindingCommands::Operator { command } => match command {
@@ -86,9 +90,11 @@ pub(crate) fn dispatch_finding(
                 &seller_payout,
                 json_output,
             ),
-            FindingOperatorCommands::Serve { profile } => cmd_finding_operator_serve(&profile),
+            FindingOperatorCommands::Serve { profile } => {
+                cmd_finding_operator_serve(&profile, allowances)
+            }
             FindingOperatorCommands::Tick { profile } => {
-                cmd_finding_operator_tick(&profile, json_output)
+                cmd_finding_operator_tick(&profile, json_output, allowances)
             }
             FindingOperatorCommands::ValidateHosted { profile } => {
                 cmd_finding_operator_validate_hosted(&profile, json_output)
@@ -125,7 +131,7 @@ pub(crate) fn dispatch_finding(
             ),
         },
         FindingCommands::Admit { profile, package } => {
-            cmd_finding_admit(&profile, &package, json_output)
+            cmd_finding_admit(&profile, &package, json_output, allowances)
         }
         FindingCommands::VerifyBundle {
             input,
@@ -144,6 +150,7 @@ pub(crate) fn dispatch_finding(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
+            allowances,
         ),
         FindingCommands::Search {
             topic_prefix,
@@ -157,6 +164,7 @@ pub(crate) fn dispatch_finding(
             limit,
             json_output,
             control_url.as_deref(),
+            allowances,
         ),
         FindingCommands::Verify {
             file,
@@ -176,6 +184,7 @@ pub(crate) fn dispatch_finding(
             integrity_only,
             json_output,
             control_url.as_deref(),
+            allowances,
         ),
         FindingCommands::Buy {
             id,
@@ -192,6 +201,7 @@ pub(crate) fn dispatch_finding(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
+            allowances,
         ),
         FindingCommands::Status {
             id,
@@ -209,6 +219,7 @@ pub(crate) fn dispatch_finding(
             max_epoch_age_secs,
             json_output,
             control_url.as_deref(),
+            allowances,
         ),
         FindingCommands::Challenge {
             finding,
@@ -227,6 +238,7 @@ pub(crate) fn dispatch_finding(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
+            allowances,
         ),
     }
 }
@@ -261,30 +273,28 @@ pub(super) fn require_finding_id(value: &str) -> Result<&str, CliError> {
     }
 }
 
-fn http_status_error(status: u16, response: ureq::Response) -> CliError {
-    let _ = response;
+fn http_status_error(status: u16) -> CliError {
     CliError::transport_error(format!("finding request failed with HTTP {status}"))
 }
 
 /// Fetch the exact stored bytes of one artifact from the public
 /// by-id surface. The venue serves what it accepted verbatim, so the
 /// response body is the canonical artifact and never a reserialization.
-pub(super) fn fetch_finding_bytes(control_url: &str, finding_id: &str) -> Result<String, CliError> {
+pub(super) fn fetch_finding_bytes(
+    control_url: &str,
+    finding_id: &str,
+    allowances: &EgressAllowanceSet,
+) -> Result<String, CliError> {
     let url = finding_endpoint(control_url, &format!("/v1/findings/{finding_id}"));
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    match ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(30))
-        .call()
-    {
-        Ok(response) => read_bounded_response(response, MAX_RAW_FINDING_BYTES, "finding response"),
-        Err(ureq::Error::Status(status, _)) => Err(CliError::transport_error(format!(
-            "finding request failed with status {status}"
-        ))),
-        Err(ureq::Error::Transport(error)) => Err(CliError::transport_error(format!(
-            "transport request failed: {error}"
-        ))),
+    let response = venue_get(&url, MAX_RAW_FINDING_BYTES, allowances)
+        .map_err(|error| venue_failure(error, "finding response"))?;
+    if !is_success(&response) {
+        return Err(CliError::transport_error(format!(
+            "finding request failed with status {}",
+            response.status()
+        )));
     }
+    venue_text(response.body(), "finding response")
 }
 
 #[derive(serde::Deserialize)]
@@ -299,6 +309,7 @@ fn cmd_finding_publish(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let url = require_control_url(control_url)?;
     let token = require_control_token(control_token)?;
@@ -317,28 +328,22 @@ fn cmd_finding_publish(
 
     let accepted = finding_verify::strict_finding_ingress(artifact, "publish input")?;
     let endpoint = finding_endpoint(url, FINDING_PUBLISH_PATH);
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::post(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
-        .set("Content-Type", "application/json")
-        .send_string(&accepted.raw)
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(http_status_error(status, response))
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "transport request failed: {error}"
-            )))
-        }
-    };
-    let published: FindingPublishResponse = crate::input::json(&crate::input::read_stream(
-        response.into_reader(),
+    let bearer = format!("Bearer {token}");
+    let response = venue_post(
+        &endpoint,
+        &[
+            (AUTHORIZATION_HEADER, bearer.as_str()),
+            ("Content-Type", "application/json"),
+        ],
+        accepted.raw.as_bytes(),
         crate::input::MAX_DOCUMENT_BYTES,
-    )?)?;
+        allowances,
+    )
+    .map_err(|error| venue_failure(error, "publish response"))?;
+    if !is_success(&response) {
+        return Err(http_status_error(response.status()));
+    }
+    let published: FindingPublishResponse = crate::input::json(response.body())?;
 
     validate_publish_response(
         &published,
@@ -412,6 +417,7 @@ fn cmd_finding_search(
     limit: Option<usize>,
     json_output: bool,
     control_url: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let url = require_control_url(control_url)?;
     if let Some(context) = context_sha256 {
@@ -432,26 +438,12 @@ fn cmd_finding_search(
     })?;
     let endpoint = format!("{}?{encoded}", finding_endpoint(url, FINDING_SEARCH_PATH));
 
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let body = match ureq::get(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .call()
-    {
-        Ok(response) => read_bounded_response(
-            response,
-            crate::input::MAX_DOCUMENT_BYTES,
-            "search response",
-        )?,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(http_status_error(status, response))
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "transport request failed: {error}"
-            )))
-        }
-    };
+    let response = venue_get(&endpoint, crate::input::MAX_DOCUMENT_BYTES, allowances)
+        .map_err(|error| venue_failure(error, "search response"))?;
+    if !is_success(&response) {
+        return Err(http_status_error(response.status()));
+    }
+    let body = venue_text(response.body(), "search response")?;
 
     if json_output {
         let value: serde_json::Value = crate::input::text(&body)?;
@@ -512,21 +504,17 @@ struct FindingPurchaseErrorBody {
     message: String,
 }
 
-fn purchase_http_status_error(status: u16, response: ureq::Response) -> CliError {
-    let body = match read_bounded_response(
-        response,
-        FINDING_PURCHASE_ERROR_MAX_BYTES,
-        "purchase error response",
-    ) {
-        Ok(body) => body,
-        Err(_) => {
+fn purchase_http_status_error(status: u16, body: &[u8]) -> CliError {
+    let body = match std::str::from_utf8(body) {
+        Ok(body) if body.len() <= FINDING_PURCHASE_ERROR_MAX_BYTES => body,
+        _ => {
             return CliError::transport_error(format!(
                 "purchase request failed with status {status}"
             ))
         }
     };
-    let strict = chio_core::canonical::canonical_json_bytes_from_str(&body);
-    let parsed = crate::input::text::<FindingPurchaseErrorBody>(&body);
+    let strict = chio_core::canonical::canonical_json_bytes_from_str(body);
+    let parsed = crate::input::text::<FindingPurchaseErrorBody>(body);
     match (strict, parsed) {
         (Ok(strict), Ok(error))
             if strict.as_slice() == body.as_bytes()
@@ -564,6 +552,7 @@ fn cmd_finding_buy(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let url = require_control_url(control_url)?;
     let token = require_control_token(control_token)?;
@@ -580,7 +569,7 @@ fn cmd_finding_buy(
     // Resolve and verify the signed commitment before asking the venue to
     // reserve anything. This is a buyer usability check; the kernel remains
     // the authority for the reveal digest and media type.
-    let accepted = finding_verify::accept_finding_from_venue(url, finding_id)?;
+    let accepted = finding_verify::accept_finding_from_venue(url, finding_id, allowances)?;
     if accepted.finding.finding_id != finding_id {
         return Err(CliError::cli_other_error(
             "venue returned a different finding than the requested id".to_owned(),
@@ -589,52 +578,25 @@ fn cmd_finding_buy(
 
     let request_bytes = chio_core::canonical_json_bytes(&request)?;
     let endpoint = finding_endpoint(url, &format!("/v1/findings/{finding_id}/purchase"));
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::post(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .set(AUTHORIZATION_HEADER, &format!("Bearer {token}"))
-        .set("Content-Type", "application/json")
-        .send_bytes(&request_bytes)
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(purchase_http_status_error(status, response))
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "transport request failed: {error}"
-            )))
-        }
-    };
-    let raw_result = read_bounded_response(
-        response,
+    let bearer = format!("Bearer {token}");
+    let response = venue_post(
+        &endpoint,
+        &[
+            (AUTHORIZATION_HEADER, bearer.as_str()),
+            ("Content-Type", "application/json"),
+        ],
+        &request_bytes,
         FINDING_PURCHASE_MAX_RESULT_BYTES,
-        "purchase response",
-    )?;
+        allowances,
+    )
+    .map_err(|error| venue_failure(error, "purchase response"))?;
+    if !is_success(&response) {
+        return Err(purchase_http_status_error(response.status(), response.body()));
+    }
+    let raw_result = venue_text(response.body(), "purchase response")?;
     let result = parse_purchase_result(&raw_result, &request)?;
     verify_purchased_output(&accepted.finding, &result)?;
     emit_purchase_result(&result, json_output)
-}
-
-fn read_bounded_response(
-    response: ureq::Response,
-    max_bytes: usize,
-    label: &str,
-) -> Result<String, CliError> {
-    let mut bytes = Vec::new();
-    response
-        .into_reader()
-        .take(max_bytes.saturating_add(1) as u64)
-        .read_to_end(&mut bytes)
-        .map_err(|error| CliError::transport_error(format!("failed to read {label}: {error}")))?;
-    if bytes.len() > max_bytes {
-        return Err(CliError::transport_shape_error(format!(
-            "{label} exceeds the {max_bytes} byte bound"
-        )));
-    }
-    String::from_utf8(bytes)
-        .map_err(|_| CliError::transport_shape_error(format!("{label} is not UTF-8")))
 }
 
 fn parse_purchase_result(
@@ -1058,6 +1020,7 @@ fn cmd_finding_status(
     max_epoch_age_secs: u64,
     json_output: bool,
     control_url: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let url = require_control_url(control_url)?;
     let finding_id = require_finding_id(finding_id)?;
@@ -1085,27 +1048,12 @@ fn cmd_finding_status(
         url,
         &format!("/v1/findings/status/{encoded_feed}/proof/{finding_id}"),
     );
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::get(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .call()
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(http_status_error(status, response))
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "transport request failed: {error}"
-            )))
-        }
-    };
-    let raw_status = read_bounded_response(
-        response,
-        FINDING_STATUS_RESPONSE_MAX_BYTES,
-        "finding status response",
-    )?;
+    let response = venue_get(&endpoint, FINDING_STATUS_RESPONSE_MAX_BYTES, allowances)
+        .map_err(|error| venue_failure(error, "finding status response"))?;
+    if !is_success(&response) {
+        return Err(http_status_error(response.status()));
+    }
+    let raw_status = venue_text(response.body(), "finding status response")?;
     let status: FindingStatusProofResponse = crate::input::text(&raw_status)?;
     let post_fetch_now = crate::input::time::seconds()?;
     if post_fetch_now < now {

@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use super::super::*;
 
 use std::fs::{self, OpenOptions};
@@ -258,8 +259,9 @@ pub(super) fn cmd_finding_admit(
     profile_path: &Path,
     package_path: &Path,
     json_output: bool,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
-    let result = run_finding_admission(profile_path, package_path)?;
+    let result = run_finding_admission(profile_path, package_path, allowances)?;
     let output = serde_json::json!({
         "activation": result.activation,
         "findingId": result.finding_id,
@@ -290,6 +292,7 @@ pub(super) struct FindingAdmissionReconciliation {
 
 pub(super) fn reconcile_admission_jobs(
     profile_path: &Path,
+    allowances: &EgressAllowanceSet,
 ) -> Result<FindingAdmissionReconciliation, CliError> {
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
@@ -312,7 +315,7 @@ pub(super) fn reconcile_admission_jobs(
     }
     pending.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(reconcile_pending_admissions(pending, |package| {
-        run_finding_admission(profile_path, package).map(|_| ())
+        run_finding_admission(profile_path, package, allowances).map(|_| ())
     }))
 }
 
@@ -348,6 +351,7 @@ fn reconciliation_error_message(error: &CliError) -> &str {
 fn run_finding_admission(
     profile_path: &Path,
     package_path: &Path,
+    allowances: &EgressAllowanceSet,
 ) -> Result<FindingAdmissionRunResult, CliError> {
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
@@ -406,6 +410,7 @@ fn run_finding_admission(
             "governanceAuthorityStatus": governance_status,
             "profile": draft.verifier_profile,
         }),
+        allowances,
     )?;
     let recipe = decode_canonical_b64(&draft.replay_recipe_b64, 1024 * 1024, "replay recipe")?;
     post_bytes(
@@ -413,6 +418,7 @@ fn run_finding_admission(
         "/v1/findings/recipes",
         &profile.service_token,
         &recipe,
+        allowances,
     )?;
     for blob in &draft.recipe_blobs {
         let bytes = decode_canonical_b64(&blob.bytes_b64, 4 * 1024 * 1024, "recipe blob")?;
@@ -426,6 +432,7 @@ fn run_finding_admission(
             "/v1/findings/recipes",
             &profile.service_token,
             &bytes,
+            allowances,
         )?;
     }
     post_bytes(
@@ -433,6 +440,7 @@ fn run_finding_admission(
         "/v1/findings/publish",
         &profile.service_token,
         &canonical_json_bytes(&draft.finding)?,
+        allowances,
     )?;
     let collateral_now = unix_time()?;
     let collateral_status = resolver
@@ -446,6 +454,7 @@ fn run_finding_admission(
             "backing": draft.bond_backing,
             "collateralAuthorityStatus": collateral_status,
         }),
+        allowances,
     )?;
     let accepted_at = collateral_response
         .get("acceptedAt")
@@ -519,6 +528,7 @@ fn run_finding_admission(
         ),
         &profile.service_token,
         b"",
+        allowances,
     )?;
     let activation_now = unix_time()?;
     let status = |pin| {
@@ -549,6 +559,7 @@ fn run_finding_admission(
         &format!("/v1/findings/{}/activate", draft.finding.finding_id),
         &profile.service_token,
         &activation,
+        allowances,
     )?;
     if let Some(stored) = job.activation.as_ref() {
         if !same_activation(stored, &activation_response) {
@@ -1148,8 +1159,9 @@ fn post_json(
     path: &str,
     token: &str,
     value: &serde_json::Value,
+    allowances: &EgressAllowanceSet,
 ) -> Result<serde_json::Value, CliError> {
-    post_bytes(base_url, path, token, &canonical_json_bytes(value)?)
+    post_bytes(base_url, path, token, &canonical_json_bytes(value)?, allowances)
 }
 
 fn post_bytes(
@@ -1157,34 +1169,36 @@ fn post_bytes(
     path: &str,
     token: &str,
     bytes: &[u8],
+    allowances: &EgressAllowanceSet,
 ) -> Result<serde_json::Value, CliError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::post(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .set("authorization", &format!("Bearer {token}"))
-        .set("content-type", "application/json")
-        .send_bytes(bytes)
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            let _ = response;
-            return Err(CliError::transport_error(format!(
-                "operator request to {path} failed with HTTP {status}"
-            )));
+    let bearer = format!("Bearer {token}");
+    let response = super::control_http::venue_post(
+        &endpoint,
+        &[
+            ("authorization", bearer.as_str()),
+            ("content-type", "application/json"),
+        ],
+        bytes,
+        1024 * 1024,
+        allowances,
+    )
+    .map_err(|error| match error {
+        error @ chio_egress_contract::HttpEgressError::ResponseTooLarge { .. } => {
+            super::control_http::venue_failure(error, "operator response")
         }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "operator request to {path} failed: {error}"
-            )));
-        }
-    };
-    let body = crate::input::read_stream(response.into_reader(), 1024 * 1024)?;
-    if body.is_empty() {
+        error => CliError::transport_error(format!("operator request to {path} failed: {error}")),
+    })?;
+    if !super::control_http::is_success(&response) {
+        return Err(CliError::transport_error(format!(
+            "operator request to {path} failed with HTTP {}",
+            response.status()
+        )));
+    }
+    if response.body().is_empty() {
         return Ok(serde_json::json!({}));
     }
-    crate::input::json(&body).map_err(CliError::from)
+    crate::input::json(response.body()).map_err(CliError::from)
 }
 
 fn load_verification_market(

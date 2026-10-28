@@ -81,6 +81,7 @@ pub(super) fn cmd_finding_challenge(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let url = require_control_url(control_url)?;
     let finding_id = require_finding_id(finding)?;
@@ -101,7 +102,7 @@ pub(super) fn cmd_finding_challenge(
         Some(require_control_token(control_token)?)
     };
 
-    let accepted = accept_finding_from_venue(url, finding_id)?;
+    let accepted = accept_finding_from_venue(url, finding_id, allowances)?;
     if accepted.finding.finding_id != finding_id {
         return Err(CliError::cli_other_error(format!(
             "venue served finding {} for the requested id {finding_id}",
@@ -117,7 +118,7 @@ pub(super) fn cmd_finding_challenge(
     let token = control_token.ok_or_else(|| {
         CliError::cli_other_error("finding challenge submission requires a control token")
     })?;
-    submit_prepared_challenge(url, token, &prepared, json_output)
+    submit_prepared_challenge(url, token, &prepared, json_output, allowances)
 }
 
 fn live_venue_audit_error() -> CliError {
@@ -132,6 +133,7 @@ fn submit_prepared_challenge(
     control_token: &str,
     prepared: &PreparedChallenge,
     json_output: bool,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let signed = prepared
         .signed
@@ -142,27 +144,22 @@ fn submit_prepared_challenge(
         control_url,
         &format!("/v1/findings/{}/challenges", prepared.challenge.finding_id),
     );
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::post(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .set(AUTHORIZATION_HEADER, &format!("Bearer {control_token}"))
-        .set("Content-Type", "application/json")
-        .send_string(&canonical_envelope)
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            return Err(http_status_error(status, response))
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(CliError::transport_error(format!(
-                "transport request failed: {error}"
-            )))
-        }
-    };
-    let submitted: FindingChallengeSubmissionResponse = crate::input::json(
-        &crate::input::read_stream(response.into_reader(), 64 * 1024)?,
-    )?;
+    let bearer = format!("Bearer {control_token}");
+    let response = venue_post(
+        &endpoint,
+        &[
+            (AUTHORIZATION_HEADER, bearer.as_str()),
+            ("Content-Type", "application/json"),
+        ],
+        canonical_envelope.as_bytes(),
+        64 * 1024,
+        allowances,
+    )
+    .map_err(|error| venue_failure(error, "challenge submission response"))?;
+    if !is_success(&response) {
+        return Err(http_status_error(response.status()));
+    }
+    let submitted: FindingChallengeSubmissionResponse = crate::input::json(response.body())?;
     if submitted.challenge_id != prepared.challenge.challenge_id {
         return Err(CliError::transport_error(
             "challenge submission response named a different challenge id".to_string(),

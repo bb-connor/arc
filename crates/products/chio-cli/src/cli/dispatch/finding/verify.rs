@@ -55,6 +55,7 @@ pub(super) fn cmd_finding_verify(
     integrity_only: bool,
     json_output: bool,
     control_url: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let accepted = match (file, id) {
         (Some(path), None) => {
@@ -74,7 +75,7 @@ pub(super) fn cmd_finding_verify(
         (None, Some(finding_id)) => {
             let url = require_control_url(control_url)?;
             let finding_id = require_finding_id(finding_id)?;
-            accept_finding_from_venue(url, finding_id)?
+            accept_finding_from_venue(url, finding_id, allowances)?
         }
         _ => {
             return Err(CliError::cli_other_error(
@@ -252,8 +253,9 @@ pub(super) fn cmd_finding_verify(
 pub(super) fn accept_finding_from_venue(
     control_url: &str,
     finding_id: &str,
+    allowances: &EgressAllowanceSet,
 ) -> Result<AcceptedFinding, CliError> {
-    let raw = fetch_finding_bytes(control_url, finding_id)?;
+    let raw = fetch_finding_bytes(control_url, finding_id, allowances)?;
     if raw.len() > MAX_RAW_FINDING_BYTES {
         return Err(CliError::cli_other_error(format!(
             "finding {finding_id} is {} bytes, above the {MAX_RAW_FINDING_BYTES} byte finding bound",

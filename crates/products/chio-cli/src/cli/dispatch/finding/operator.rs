@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::HttpEgressError;
 
 use std::fs::{self, OpenOptions};
 use std::net::SocketAddr;
@@ -90,6 +91,7 @@ struct FindingSellerRetractionJob {
 }
 
 struct OperatorSellerSubmissionExecutor {
+    allowances: EgressAllowanceSet,
     profile_path: PathBuf,
     reports_directory: PathBuf,
     packages_directory: PathBuf,
@@ -106,6 +108,7 @@ impl OperatorSellerSubmissionExecutor {
         profile: &FindingOperatorProfile,
         paths: &ResolvedOperatorPaths,
         authority: Arc<SqliteAuthorityStore>,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self, String> {
         let sellers = profile
             .sellers
@@ -122,6 +125,7 @@ impl OperatorSellerSubmissionExecutor {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| error.to_string())?;
         Ok(Self {
+            allowances: allowances.clone(),
             profile_path,
             reports_directory: paths.reports_directory.clone(),
             packages_directory: paths.packages_directory.clone(),
@@ -521,6 +525,7 @@ impl FindingSellerSubmissionExecutor for OperatorSellerSubmissionExecutor {
             &format!("/v1/findings/status/{encoded_feed}/intents"),
             &self.profile.service_token,
             &intent,
+            &self.allowances,
         )?;
         let intent_id = intent_response
             .get("intent_id")
@@ -592,33 +597,32 @@ fn post_operator_bytes(
     path: &str,
     token: &str,
     bytes: &[u8],
+    allowances: &EgressAllowanceSet,
 ) -> Result<serde_json::Value, FindingSellerSubmissionError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
-    // operator named
-    let response = match ureq::post(&endpoint)
-        .timeout(std::time::Duration::from_secs(30))
-        .set("authorization", &format!("Bearer {token}"))
-        .set("content-type", "application/json")
-        .send_bytes(bytes)
-    {
-        Ok(response) => response,
-        Err(ureq::Error::Status(status, response)) => {
-            let _ = response;
-            return Err(operator_status_error(status, ""));
-        }
-        Err(ureq::Error::Transport(error)) => {
-            return Err(FindingSellerSubmissionError::Pending(format!(
-                "operator status request failed: {error}"
-            )));
-        }
-    };
-    let bytes = crate::input::read_stream(response.into_reader(), 1024 * 1024).map_err(|_| {
-        FindingSellerSubmissionError::Internal(
+    let bearer = format!("Bearer {token}");
+    let response = super::control_http::venue_post(
+        &endpoint,
+        &[
+            ("authorization", bearer.as_str()),
+            ("content-type", "application/json"),
+        ],
+        bytes,
+        1024 * 1024,
+        allowances,
+    )
+    .map_err(|error| match error {
+        HttpEgressError::ResponseTooLarge { .. } => FindingSellerSubmissionError::Internal(
             "operator status response exceeds its input boundary".to_owned(),
-        )
+        ),
+        error => FindingSellerSubmissionError::Pending(format!(
+            "operator status request failed: {error}"
+        )),
     })?;
-    crate::input::json(&bytes).map_err(|_| {
+    if !super::control_http::is_success(&response) {
+        return Err(operator_status_error(response.status(), ""));
+    }
+    crate::input::json(response.body()).map_err(|_| {
         FindingSellerSubmissionError::Internal(
             "operator status response was not valid JSON".to_owned(),
         )
@@ -1010,7 +1014,10 @@ pub(super) fn cmd_finding_operator_init(
     Ok(())
 }
 
-pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliError> {
+pub(super) fn cmd_finding_operator_serve(
+    profile_path: &Path,
+    allowances: &EgressAllowanceSet,
+) -> Result<(), CliError> {
     set_operator_umask();
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
@@ -1074,6 +1081,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
             &profile,
             &paths,
             authority.clone(),
+            allowances,
         )
         .map_err(CliError::cli_other_error)?,
     );
@@ -1120,6 +1128,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
 pub(super) fn cmd_finding_operator_tick(
     profile_path: &Path,
     json_output: bool,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     set_operator_umask();
     let (profile, root) = load_profile(profile_path)?;
@@ -1128,7 +1137,7 @@ pub(super) fn cmd_finding_operator_tick(
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let payments = SqliteFindingOperatorPaymentAdapter::open(&paths.operator_database)
         .map_err(CliError::cli_other_error)?;
-    let reconciliation = reconcile_admission_jobs(profile_path)?;
+    let reconciliation = reconcile_admission_jobs(profile_path, allowances)?;
     let report = serde_json::json!({
         "schema": "chio.finding.operator-tick.v1",
         "bundleCount": bundles.bundle_count().map_err(|error| CliError::cli_other_error(error.to_string()))?,
