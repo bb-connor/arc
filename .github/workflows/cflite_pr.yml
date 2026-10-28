@@ -36,6 +36,12 @@ on:
       - ".github/workflows/cflite_pr.yml"
       - ".clusterfuzzlite/**"
       - "scripts/check-fuzz-budget.sh"
+      - "scripts/select-fuzz-targets.py"
+      - "scripts/tests/check-fuzz-manifest-selection.test.py"
+      - "Makefile"
+      - "scripts/ci-pr-tier.sh"
+      - "scripts/spec-drift-check.sh"
+      - "scripts/check-review-slices.py"
 
 permissions:
   contents: read
