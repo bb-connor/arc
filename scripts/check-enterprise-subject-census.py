@@ -83,6 +83,7 @@ LINE_RULES: tuple[tuple[str, str, str], ...] = (
     (CONTROL_PLANE + "scim_lifecycle.rs", r".", DERIVED),
     (CONTROL_PLANE + "trust_control/config_and_public.rs", r"identity\.subject_key|\bsubject_key: &str|bind_capability\(provider_id, subject_key|subject `\{subject_key\}`", DERIVED),
     (CONTROL_PLANE + "trust_control/passport_handlers.rs", r"identity\.subject_key|missing subject_key|requires subject_key", DERIVED),
+    (CONTROL_PLANE + "trust_control/passport_handlers/partner_revocation_door_tests.rs", r"^subject_key: token\.subject\.to_hex\(\),$", REAL),
     (CONTROL_PLANE + "trust_control/service_types/paths.rs", r"\{subject_key\}", REAL),
     (CONTROL_PLANE + "trust_control/service_types/requests.rs", r"^pub subject_key: String,$", DERIVED),
     (CONTROL_PLANE + "trust_control/service_types/requests.rs", r"token\.subject\.to_hex\(\)|^subject_key: &str,$|\"subjectKey\": subject_key|subject_key: subject_key\.to_string\(\)|/v1/agents/:subject_key/receipts", REAL),
