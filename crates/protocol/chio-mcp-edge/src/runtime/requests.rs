@@ -237,7 +237,7 @@ impl ChioMcpEdge {
                 "schema": "chio.mcp.execution-evidence.v1",
                 "resultMetaField": "chioEvidence",
                 "contextMethod": "chio/execution-context",
-                "outputKinds": ["value", "none"],
+                "outputKinds": ["value", "stream", "none"],
             }),
         );
         experimental.insert(
