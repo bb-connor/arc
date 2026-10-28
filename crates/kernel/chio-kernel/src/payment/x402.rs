@@ -12,7 +12,7 @@
 //! (network, asset, payer, nonce) its durable replay store already holds. The
 //! key is reserved after `/verify` and before `/settle`, the first call that
 //! can broadcast, so a verification refusal leaves the nonce unspent and a
-//! settlement of any outcome consumes it.
+//! settlement of any outcome consumes it permanently.
 //!
 //! The adapter holds no keys and never broadcasts. It has no rail status
 //! query: `settlement_state` answers `Unavailable`, so a settlement whose
@@ -35,6 +35,7 @@ use super::{
     X402SettlementRef,
 };
 use crate::execution_nonce::ExecutionNonceStore;
+use crate::KernelError;
 
 /// x402 protocol version this adapter speaks.
 pub const X402_VERSION: u8 = 2;
@@ -47,6 +48,13 @@ const X402_AUTHORIZATION_ID_PREFIX: &str = "x402";
 /// Non-terminal settle `errorReason`: broadcast, confirmation not established.
 const X402_SETTLEMENT_PENDING: &str = "settlement_pending";
 const MAX_X402_SIGNATURE_HEX_BYTES: usize = 4096;
+/// Retention horizon, in Unix seconds, of a spent authorization key. The token
+/// contract consumes an EIP-3009 nonce permanently, whatever `validBefore` the
+/// payer signed, so the local marker outlives every authorization that can
+/// carry it and is never pruned; a full store refuses new nonces instead. The
+/// value stays representable in Unix milliseconds and leaves headroom for a
+/// store's retention grace.
+const X402_NONCE_RETAINED_UNTIL: i64 = i64::MAX / 1_000;
 
 /// CAIP-2 networks the x402 rail may settle on. On-chain value stays
 /// rehearsal-only: Base Sepolia.
@@ -435,10 +443,7 @@ impl X402PaymentAdapter {
         ) else {
             return Err(X402Refusal::MalformedAuthorization);
         };
-        if valid_after >= valid_before
-            || i64::try_from(valid_before).is_err()
-            || !signature_is_well_formed(&payload.payload.signature)
-        {
+        if valid_after >= valid_before || !signature_is_well_formed(&payload.payload.signature) {
             return Err(X402Refusal::MalformedAuthorization);
         }
         if to != self.rail.pay_to {
@@ -490,14 +495,15 @@ impl X402PaymentAdapter {
         valid_after: u64,
     ) -> Result<(), PaymentError> {
         check_window(self.now_unix_secs()?, valid_after, identity.valid_before)?;
-        let valid_before = i64::try_from(identity.valid_before)
-            .map_err(|_| X402Refusal::MalformedAuthorization)?;
         match self
             .replay
-            .reserve_until(&identity.replay_key(), valid_before)
+            .reserve_until(&identity.replay_key(), X402_NONCE_RETAINED_UNTIL)
         {
             Ok(true) => Ok(()),
             Ok(false) => Err(X402Refusal::NonceReused.into()),
+            Err(KernelError::ExecutionNonceCapacity) => {
+                Err(X402Refusal::ReplayCapacityExhausted.into())
+            }
             Err(_) => Err(replay_store_unavailable()),
         }
     }

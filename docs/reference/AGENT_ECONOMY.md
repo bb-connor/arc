@@ -778,7 +778,9 @@ trusted clock), and refuses a `(network, asset, from, nonce)` its durable
 replay store already holds, then calls the facilitator's `/verify` and
 `/settle`. The nonce is consumed after `/verify` and before `/settle`, so a
 verification refusal leaves it unspent and a settlement of any outcome,
-including an unknown one, spends it. Every authorization is a final prepayment: there is no
+including an unknown one, spends it. A spent nonce is retained permanently,
+as the token contract retains it, so a later `validBefore` cannot revive it;
+a full replay store refuses new nonces. Every authorization is a final prepayment: there is no
 hold to release and no remote refund. Charges are denominated in the token base
 unit, and the adapter requires a durable admission reference so a retry cannot
 settle twice. The authorization identifier carries the settlement transaction
