@@ -208,83 +208,98 @@ impl From<OidcRsaKeyResolveError> for GoogleConfidentialVmVerificationError {
     }
 }
 
+const ISSUER_DOCUMENT_TIMEOUT: Duration = Duration::from_secs(10);
+const ISSUER_DOCUMENT_DEADLINE: Duration = Duration::from_secs(30);
+const MAX_ISSUER_DOCUMENT_BYTES: u64 = 1024 * 1024;
+
+#[derive(Debug)]
+pub(super) enum IssuerDocumentFailure {
+    Fetch(String),
+    Parse(String),
+}
+
+impl IssuerDocumentFailure {
+    fn into_azure(self, url: &str) -> AzureMaaVerificationError {
+        let url = url.to_string();
+        match self {
+            Self::Fetch(error) => AzureMaaVerificationError::MetadataFetch { url, error },
+            Self::Parse(error) => AzureMaaVerificationError::MetadataParse { url, error },
+        }
+    }
+
+    fn into_google(self, url: &str) -> GoogleConfidentialVmVerificationError {
+        let url = url.to_string();
+        match self {
+            Self::Fetch(error) => {
+                GoogleConfidentialVmVerificationError::MetadataFetch { url, error }
+            }
+            Self::Parse(error) => {
+                GoogleConfidentialVmVerificationError::MetadataParse { url, error }
+            }
+        }
+    }
+}
+
+/// Issuer metadata and key sets come only from the HTTPS authority the URL
+/// names, with no redirects and a bounded body.
+fn fetch_issuer_document<T: DeserializeOwned>(url: &str) -> Result<T, IssuerDocumentFailure> {
+    let endpoint =
+        url::Url::parse(url).map_err(|error| IssuerDocumentFailure::Fetch(error.to_string()))?;
+    let contract = crate::anchor_egress::strict_https_contract(
+        &endpoint,
+        "attestation-issuer-document",
+        MAX_ISSUER_DOCUMENT_BYTES,
+    )
+    .map_err(IssuerDocumentFailure::Fetch)?;
+    fetch_issuer_document_under(&contract, url)
+}
+
+pub(super) fn fetch_issuer_document_under<T: DeserializeOwned>(
+    contract: &chio_egress_contract::HttpEgressContract,
+    url: &str,
+) -> Result<T, IssuerDocumentFailure> {
+    let response = chio_egress_contract::BlockingContractAgent::new(
+        contract,
+        ISSUER_DOCUMENT_TIMEOUT,
+        ISSUER_DOCUMENT_DEADLINE,
+    )
+    .and_then(|agent| agent.get(url))
+    .and_then(chio_egress_contract::BlockingContractRequest::call)
+    .map_err(|error| IssuerDocumentFailure::Fetch(error.to_string()))?;
+    if !(200..300).contains(&response.status()) {
+        return Err(IssuerDocumentFailure::Fetch(format!(
+            "issuer returned HTTP status {}",
+            response.status()
+        )));
+    }
+    chio_core::canonical::UntrustedJsonText::from_wire(
+        response.body(),
+        usize::try_from(contract.max_response_bytes).unwrap_or(usize::MAX),
+    )
+    .and_then(|document| document.decode_external())
+    .map_err(|error| IssuerDocumentFailure::Parse(error.to_string()))
+}
+
 pub fn fetch_azure_maa_openid_metadata(
     metadata_url: &str,
 ) -> Result<AzureMaaOpenIdMetadata, AzureMaaVerificationError> {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
-    // helper has no production caller in the workspace
-    let response = ureq::get(metadata_url).call().map_err(|error| {
-        AzureMaaVerificationError::MetadataFetch {
-            url: metadata_url.to_string(),
-            error: error.to_string(),
-        }
-    })?;
-    response
-        .into_json::<AzureMaaOpenIdMetadata>()
-        .map_err(|error| AzureMaaVerificationError::MetadataParse {
-            url: metadata_url.to_string(),
-            error: error.to_string(),
-        })
+    fetch_issuer_document(metadata_url).map_err(|failure| failure.into_azure(metadata_url))
 }
 
 pub fn fetch_azure_maa_jwks(jwks_url: &str) -> Result<AzureMaaJwks, AzureMaaVerificationError> {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
-    // helper has no production caller in the workspace
-    let response =
-        ureq::get(jwks_url)
-            .call()
-            .map_err(|error| AzureMaaVerificationError::MetadataFetch {
-                url: jwks_url.to_string(),
-                error: error.to_string(),
-            })?;
-    response
-        .into_json::<AzureMaaJwks>()
-        .map_err(|error| AzureMaaVerificationError::MetadataParse {
-            url: jwks_url.to_string(),
-            error: error.to_string(),
-        })
+    fetch_issuer_document(jwks_url).map_err(|failure| failure.into_azure(jwks_url))
 }
 
 pub fn fetch_google_confidential_vm_openid_metadata(
     metadata_url: &str,
 ) -> Result<GoogleConfidentialVmOpenIdMetadata, GoogleConfidentialVmVerificationError> {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
-    // helper has no production caller in the workspace
-    let response = ureq::get(metadata_url).call().map_err(|error| {
-        GoogleConfidentialVmVerificationError::MetadataFetch {
-            url: metadata_url.to_string(),
-            error: error.to_string(),
-        }
-    })?;
-    response
-        .into_json::<GoogleConfidentialVmOpenIdMetadata>()
-        .map_err(
-            |error| GoogleConfidentialVmVerificationError::MetadataParse {
-                url: metadata_url.to_string(),
-                error: error.to_string(),
-            },
-        )
+    fetch_issuer_document(metadata_url).map_err(|failure| failure.into_google(metadata_url))
 }
 
 pub fn fetch_google_confidential_vm_jwks(
     jwks_url: &str,
 ) -> Result<GoogleConfidentialVmJwks, GoogleConfidentialVmVerificationError> {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: caller-supplied attestation issuer metadata URL; this
-    // helper has no production caller in the workspace
-    let response = ureq::get(jwks_url).call().map_err(|error| {
-        GoogleConfidentialVmVerificationError::MetadataFetch {
-            url: jwks_url.to_string(),
-            error: error.to_string(),
-        }
-    })?;
-    response
-        .into_json::<GoogleConfidentialVmJwks>()
-        .map_err(
-            |error| GoogleConfidentialVmVerificationError::MetadataParse {
-                url: jwks_url.to_string(),
-                error: error.to_string(),
-            },
-        )
+    fetch_issuer_document(jwks_url).map_err(|failure| failure.into_google(jwks_url))
 }
 
 pub fn verify_azure_maa_attestation_jwt(

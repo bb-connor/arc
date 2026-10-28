@@ -78,7 +78,10 @@ fn public_registry_refuses_a_private_target_before_dialing() {
     let (port, dials) = watch_for_dials();
     let registry_url = format!("https://0.0.0.0:{port}");
     let failures = registry_failures(&registry_url);
-    assert!(!dials.join().test_unwrap(), "a registry fetcher dialed 0.0.0.0");
+    assert!(
+        !dials.join().test_unwrap(),
+        "a registry fetcher dialed 0.0.0.0"
+    );
     let refusal = HttpEgressError::PrivateNetworkDenied {
         host: "0.0.0.0".to_owned(),
     };
@@ -103,17 +106,17 @@ fn public_registry_does_not_follow_redirects() {
     for (label, fetch) in [
         (
             "public registry",
-            (|url: &str| resolve_public_generic_namespace(url).err().map(|e| e.to_string()))
-                as fn(&str) -> Option<String>,
-        ),
-        (
-            "public certification registry",
-            |url: &str| {
-                resolve_public_certification_metadata(url)
+            (|url: &str| {
+                resolve_public_generic_namespace(url)
                     .err()
                     .map(|e| e.to_string())
-            },
+            }) as fn(&str) -> Option<String>,
         ),
+        ("public certification registry", |url: &str| {
+            resolve_public_certification_metadata(url)
+                .err()
+                .map(|e| e.to_string())
+        }),
     ] {
         let (port, dials) = watch_for_dials();
         let registry_url = redirect_once(format!("http://127.0.0.1:{port}/elsewhere"));

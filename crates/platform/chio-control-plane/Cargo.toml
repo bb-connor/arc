@@ -41,7 +41,7 @@ chio-decoy = { workspace = true }
 chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
-chio-egress-contract = { workspace = true }
+chio-egress-contract = { workspace = true, features = ["ureq-egress"] }
 chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
