@@ -18,10 +18,7 @@ use chio_federation::{
     bilateral_dsse::PolicyEvaluationSummary, bilateral_dsse::PolicyVerdict,
     bilateral_dsse::TreatyBindingRef, bilateral_dsse::PAYLOAD_TYPE_IN_TOTO,
 };
-use chio_kernel::{
-    RuntimeAdmissionContext, RuntimeAdmissionHook, RuntimeAdmissionRevalidationContext,
-    ToolCallRequest,
-};
+use chio_kernel::{RuntimeAdmissionContext, ToolCallRequest};
 use chio_swarm_authority::{
     sign_swarm_continuation_token, sign_swarm_delegation_witness_hop, sign_swarm_join_receipt,
     sign_swarm_revocation_epoch, sign_swarm_route_plan_receipt, sign_swarm_task_graph,
@@ -48,8 +45,8 @@ use runtime_api::{
     CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
     CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
     CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
-    CHIO_RUNTIME_FAILURE_CODES, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
-    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
+    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
 use std::io;
 

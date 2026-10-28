@@ -15,6 +15,15 @@ struct BindingFixture {
     swarm: SwarmAuthorityBundle,
 }
 impl BindingFixture {
+    fn route_metadata(&self) -> serde_json::Value {
+        let route = &self.swarm.route_plan_receipts[0];
+        serde_json::json!({"route": {
+            "bridge": route.bridge_id,
+            "protocolTarget": route.protocol_target,
+            "selectedRoute": route.selected_route
+        }})
+    }
+
     fn new() -> TestResult<Self> {
         Self::with_swarm(runtime_swarm_bundle(false)?)
     }
@@ -88,7 +97,7 @@ impl BindingFixture {
     fn evaluate(&self, request: &ToolCallRequest) -> TestResult<chio_kernel::ToolCallResponse> {
         let response = self
             .kernel
-            .evaluate_tool_call_blocking_with_metadata(request, Some(swarm_route_metadata()))?;
+            .evaluate_tool_call_blocking_with_metadata(request, Some(self.route_metadata()))?;
         assert!(response.receipt.verify_signature()?);
         Ok(response)
     }
