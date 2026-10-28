@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use chio_core::capability::aggregate_invocation::{
     verify_aggregate_invocation_budget, AggregateInvocationScope,
 };
-use chio_kernel::admission_operation::RuntimeReplayParticipantKind;
+use chio_kernel::admission_operation::RuntimeParticipantKind;
 use chio_swarm_authority::{
     verify_swarm_authority_for_admission, SwarmAuthorityBundle, SwarmContinuationMode,
 };
@@ -308,7 +308,7 @@ fn task_authority(
             let resources = history.history.intent.resources();
             require(
                 resources.len() == 1
-                    && resources[0].kind() == RuntimeReplayParticipantKind::SwarmContinuation
+                    && resources[0].kind() == RuntimeParticipantKind::SwarmContinuation
                     && resources[0].resource_id().as_str() == token.token_id
                     && resources[0].artifact_digest().as_str() == hash(token)?,
                 "retained continuation differs from issued task authority",

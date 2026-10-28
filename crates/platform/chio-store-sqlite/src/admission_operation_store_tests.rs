@@ -84,8 +84,8 @@ mod observation_clock;
 mod recovery;
 #[path = "admission_operation_store_tests/retained_request.rs"]
 mod retained_request;
-#[path = "admission_operation_store_tests/runtime_replay.rs"]
-mod runtime_replay;
+#[path = "admission_operation_store_tests/runtime_source.rs"]
+mod runtime_source;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
 #[path = "admission_operation_store_tests/security_participant_migration.rs"]

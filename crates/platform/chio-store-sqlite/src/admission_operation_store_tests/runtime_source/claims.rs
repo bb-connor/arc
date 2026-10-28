@@ -5,14 +5,14 @@ use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantClaimIntentInput, RuntimeParticipantClaimIntentV1, RuntimeParticipantPhase,
     RuntimeParticipantResourceV1,
 };
-use chio_kernel::admission_operation::RuntimeReplayParticipantKind as Kind;
+use chio_kernel::admission_operation::RuntimeParticipantKind as Kind;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]
 fn budget_selection_requires_the_live_runtime_grant_and_phase() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "budget-selection-binding")?;
     let candidate = intent(&operation, &source, "selected", &[])?;
     let (operation, reference) =
@@ -135,7 +135,7 @@ fn selected_profile(
     let selected = load(fixture)?;
     super::super::retained_request::authority_profile::selection(
         selected.map(|selected| chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1::new(
-            identifier("runtime", RUNTIME_ID), selected.expectation_id().clone(),
+            identifier("runtime", RUNTIME_ID), selected.qualification_id().clone(),
         )), None, None,
     )
 }
@@ -147,7 +147,7 @@ fn runtime_claim_cannot_upgrade_original_absent_runtime_selection() -> TestResul
         // The operation predates source selection. Importing later cannot
         // provide the authority its immutable original request never selected.
         let (operation, lease) = setup(&fixture, "no-original-runtime")?;
-        let source = imported(&fixture, true)?;
+        let source = installed(&fixture)?;
         let (_, original) = fixture
             .store
             .load_retained_tool_request(
@@ -191,7 +191,7 @@ fn intent(
         RuntimeParticipantClaimIntentInput {
             episode_id: identifier("episode", episode),
             runtime_authority_id: identifier("runtime", RUNTIME_ID),
-            expectation_id: source.expectation_id().clone(),
+            qualification_id: source.qualification_id().clone(),
             request_binding_hash: operation.binding().request_binding_hash().clone(),
             grant_index: 0,
             phase: RuntimeParticipantPhase::Dispatch,
@@ -210,10 +210,8 @@ fn intent(
     )?)
 }
 
-fn imported(fixture: &Fixture, empty: bool) -> TestResult<RuntimeSourceRecordV1> {
-    let source = Source::new(fixture, empty);
-    let pinned = pin(fixture, &source)?;
-    Ok(import(fixture, &source, &pinned)?)
+fn installed(fixture: &Fixture) -> TestResult<RuntimeSourceRecordV1> {
+    Ok(install(fixture, &Source::new(fixture, Behavior::Normal))?)
 }
 
 fn capture_pending(
@@ -250,7 +248,7 @@ fn capture_pending(
 #[test]
 fn claim_retry_release_and_successor_have_exact_episode_ownership() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "claim-lifecycle")?;
     let first = intent(
         &operation,
@@ -312,9 +310,9 @@ fn claim_retry_release_and_successor_have_exact_episode_ownership() -> TestResul
 }
 
 #[test]
-fn multi_resource_conflict_is_atomic_and_legacy_tombstones_remain_spent() -> TestResult {
+fn multi_resource_conflict_is_atomic() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, false)?;
+    let source = installed(&fixture)?;
     let (first, lease) = setup(&fixture, "first-owner")?;
     let claim = intent(
         &first,
@@ -326,16 +324,11 @@ fn multi_resource_conflict_is_atomic_and_legacy_tombstones_remain_spent() -> Tes
         .store
         .claim_runtime_participants(&first, &lease, &claim, now_ms())?;
     let (second, lease) = setup(&fixture, "second-owner")?;
-    for resources in [
-        vec![
-            (Kind::DestructiveLease, "free"),
-            (Kind::TreatyContinuation, "free"),
-            (Kind::SwarmContinuation, "swarm"),
-        ],
-        vec![(Kind::DestructiveLease, "same-resource")],
-        vec![(Kind::TreatyContinuation, "same-resource")],
-        vec![(Kind::SwarmContinuation, "same-resource")],
-    ] {
+    for resources in [vec![
+        (Kind::DestructiveLease, "free"),
+        (Kind::TreatyContinuation, "free"),
+        (Kind::SwarmContinuation, "swarm"),
+    ]] {
         let candidate = intent(&second, &source, "conflict", &resources)?;
         let count = global_count(&fixture.store);
         assert!(fixture
@@ -368,7 +361,7 @@ fn multi_resource_conflict_is_atomic_and_legacy_tombstones_remain_spent() -> Tes
 #[test]
 fn dispatch_committed_claim_cannot_be_released_after_recovery() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "committed")?;
     let candidate = intent(
         &operation,
@@ -419,7 +412,7 @@ fn dispatch_committed_claim_cannot_be_released_after_recovery() -> TestResult {
 #[test]
 fn release_before_dispatch_blocks_generic_dispatch_commit() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "released")?;
     let candidate = intent(&operation, &source, "released", &[])?;
     let (operation, reference) =
@@ -456,7 +449,7 @@ fn missing_or_altered_claim_history_rejects_reads_and_replay() -> TestResult {
         "PRAGMA ignore_check_constraints = ON; DROP TRIGGER runtime_replay_claim_episodes_no_update; UPDATE runtime_replay_claim_episodes SET claim_json = zeroblob(16385)",
     ] {
         let fixture = fixture();
-        let source = imported(&fixture, true)?;
+        let source = installed(&fixture)?;
         let (operation, lease) = setup(&fixture, "damaged")?;
         let candidate = intent(&operation, &source, "damaged", &[(Kind::DestructiveLease, "resource")])?;
         let (operation, _) = fixture.store.claim_runtime_participants(&operation, &lease, &candidate, now_ms())?;

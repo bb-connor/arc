@@ -8,7 +8,7 @@ use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantClaimHistoryV1, RuntimeParticipantClaimIntentInput,
     RuntimeParticipantClaimIntentV1, RuntimeParticipantResourceV1,
 };
-use chio_kernel::admission_operation::RuntimeReplayParticipantKind;
+use chio_kernel::admission_operation::RuntimeParticipantKind;
 use chio_kernel::admission_operation::{
     expected_dispatch_committed_version, AdmissionCompensationStatus, AdmissionIdentifier,
     AdmissionOperationBindingInputV1, AdmissionOperationV1, AdmissionParticipantRequirements,
@@ -491,7 +491,7 @@ impl SemanticRefusal {
             phase: RuntimeParticipantPhase::Dispatch,
             plan_digest: AdmissionDigest::try_new("plan_digest", "c".repeat(64)).map_err(error)?,
             resources: vec![RuntimeParticipantResourceV1::new(
-                RuntimeReplayParticipantKind::SwarmContinuation,
+                RuntimeParticipantKind::SwarmContinuation,
                 AdmissionIdentifier::try_new("resource_id", "semantic-continuation")
                     .map_err(error)?,
                 AdmissionDigest::try_new("artifact_digest", "d".repeat(64)).map_err(error)?,

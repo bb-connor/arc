@@ -7,7 +7,7 @@ use chio_federation::trust_establishment::{KernelTrustExchange, PeerHandshakeEnv
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantClaimHistoryV1, RuntimeParticipantClaimReferenceV1,
 };
-use chio_kernel::admission_operation::{AdmissionOperationV1, RuntimeReplayParticipantKind};
+use chio_kernel::admission_operation::{AdmissionOperationV1, RuntimeParticipantKind};
 use chio_store_sqlite::SqliteReceiptStore;
 
 #[path = "combined/lifecycle.rs"]
@@ -33,19 +33,19 @@ impl CombinedFixture {
         Self::with_retired_resource(None)
     }
 
-    fn with_retired_resource(retired: Option<RuntimeReplayParticipantKind>) -> TestResult<Self> {
+    fn with_retired_resource(retired: Option<RuntimeParticipantKind>) -> TestResult<Self> {
         Self::with_treaty_input(retired, |_, _, _| Ok(()))
     }
 
     fn with_treaty_input(
-        retired: Option<RuntimeReplayParticipantKind>,
+        retired: Option<RuntimeParticipantKind>,
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
     ) -> TestResult<Self> {
         Self::with_swarm_input(retired, prepare, runtime_swarm_bundle(false)?)
     }
 
     fn with_swarm_input(
-        retired: Option<RuntimeReplayParticipantKind>,
+        retired: Option<RuntimeParticipantKind>,
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
         swarm: SwarmAuthorityBundle,
     ) -> TestResult<Self> {
@@ -68,15 +68,15 @@ impl CombinedFixture {
             // Imported markers model an earlier legacy consumer. They must
             // exclude the entire new live claim, not only the colliding member.
             match retired {
-                Some(RuntimeReplayParticipantKind::DestructiveLease) => {
+                Some(RuntimeParticipantKind::DestructiveLease) => {
                     source.consume_destructive_lease("lease-live-1", "earlier-legacy-admission")?
                 }
-                Some(RuntimeReplayParticipantKind::TreatyContinuation) => source
+                Some(RuntimeParticipantKind::TreatyContinuation) => source
                     .consume_treaty_continuation(
                         "continue-runtime-1",
                         "earlier-legacy-admission",
                     )?,
-                Some(RuntimeReplayParticipantKind::SwarmContinuation) => source
+                Some(RuntimeParticipantKind::SwarmContinuation) => source
                     .consume_swarm_continuation(
                         "continuation-child-a",
                         "earlier-legacy-admission",
@@ -231,9 +231,9 @@ fn combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacq
     assert_eq!(
         kinds,
         vec![
-            RuntimeReplayParticipantKind::DestructiveLease,
-            RuntimeReplayParticipantKind::TreatyContinuation,
-            RuntimeReplayParticipantKind::SwarmContinuation,
+            RuntimeParticipantKind::DestructiveLease,
+            RuntimeParticipantKind::TreatyContinuation,
+            RuntimeParticipantKind::SwarmContinuation,
         ]
     );
     let repeated = kernel.evaluate_tool_call_blocking_with_metadata(
@@ -329,9 +329,9 @@ fn combined_owned_imported_collision_in_any_resource_rejects_without_partial_cus
 {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     for kind in [
-        RuntimeReplayParticipantKind::DestructiveLease,
-        RuntimeReplayParticipantKind::TreatyContinuation,
-        RuntimeReplayParticipantKind::SwarmContinuation,
+        RuntimeParticipantKind::DestructiveLease,
+        RuntimeParticipantKind::TreatyContinuation,
+        RuntimeParticipantKind::SwarmContinuation,
     ] {
         let fixture = CombinedFixture::with_retired_resource(Some(kind))?;
         let kernel = fixture.kernel(fixture.hook()?)?;
