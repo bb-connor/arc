@@ -57480,6 +57480,154 @@ pub mod receipt_lineage_statement {
         }
     }
 }
+pub mod receipt_session_anchor_metadata {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioReceiptSessionAnchorMetadata`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json",
+    ///  "title": "Chio Receipt Session Anchor Metadata",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "schema",
+    ///    "session_anchor_commitment"
+    ///  ],
+    ///  "properties": {
+    ///    "schema": {
+    ///      "const": "chio.receipt-session-anchor.v1"
+    ///    },
+    ///    "session_anchor_commitment": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioReceiptSessionAnchorMetadata {
+        pub schema: ::serde_json::Value,
+        pub session_anchor_commitment: ChioReceiptSessionAnchorMetadataSessionAnchorCommitment,
+    }
+    impl ::std::convert::From<&ChioReceiptSessionAnchorMetadata> for ChioReceiptSessionAnchorMetadata {
+        fn from(value: &ChioReceiptSessionAnchorMetadata) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioReceiptSessionAnchorMetadataSessionAnchorCommitment`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioReceiptSessionAnchorMetadataSessionAnchorCommitment(::std::string::String);
+    impl ::std::ops::Deref for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioReceiptSessionAnchorMetadataSessionAnchorCommitment>
+        for ::std::string::String
+    {
+        fn from(value: ChioReceiptSessionAnchorMetadataSessionAnchorCommitment) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioReceiptSessionAnchorMetadataSessionAnchorCommitment>
+        for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment
+    {
+        fn from(value: &ChioReceiptSessionAnchorMetadataSessionAnchorCommitment) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioReceiptSessionAnchorMetadataSessionAnchorCommitment {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod receipt_settlement_closure {
     /// Error types.
     pub mod error {

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 7d0932abf0341c1df9fef32e6cae6a9749b509f783e23a15ab10501b0e3a5457
+// Schema SHA: 459df52a530f6a5733f96ec030997b7f9413e961351cb40000ea5ec8204f1bf6
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -3675,6 +3675,15 @@ export namespace Receipt_Record {
     issuer_public_key_hex: string;
     message_count: 14;
     signature_hex: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json
+export namespace Receipt_SessionAnchorMetadata {
+  export interface ChioReceiptSessionAnchorMetadata {
+    schema: "chio.receipt-session-anchor.v1";
+    session_anchor_commitment: string;
   }
 }
 
