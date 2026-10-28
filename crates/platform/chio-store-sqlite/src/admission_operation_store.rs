@@ -260,8 +260,7 @@ const COMBINED_CAPTURE_OPERATION_MUTATION_KIND: &str = "compare_and_swap";
 const ADMISSION_OPERATION_SCHEMA: &str = include_str!("admission_operation_store.sql");
 const GOVERNED_APPROVAL_CLAIM_SCHEMA: &str =
     include_str!("admission_operation_governed_approval_claim.sql");
-const RUNTIME_SOURCE_SCHEMA: &str =
-    include_str!("admission_operation_runtime_source.sql");
+const RUNTIME_SOURCE_SCHEMA: &str = include_str!("admission_operation_runtime_source.sql");
 const GOVERNED_APPROVAL_AUTHORITY_SCHEMA: &str =
     include_str!("admission_operation_governed_approval_authority.sql");
 const DPOP_REPLAY_MIGRATION_SCHEMA: &str = include_str!("admission_operation_dpop_replay.sql");
