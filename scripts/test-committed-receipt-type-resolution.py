@@ -12,6 +12,7 @@ GATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GATE)
 GATE.ALLOWED = ()
 GATE.ALLOWED_INFERRED = {}
+GATE.ALLOWED_GENERIC_INFERRED = {}
 
 
 class TypeResolutionTests(unittest.TestCase):
@@ -721,6 +722,24 @@ class TypeResolutionTests(unittest.TestCase):
                 findings = self.findings({"crates/demo/src/lib.rs": helper + alias + "fn bad(s: &str) -> Result<ChioReceipt, E> { " + name + "::decode(s) }"})
                 self.assertEqual(findings, ["crates/demo/src/lib.rs::bad: raw decode " + name + "::decode(s)"])
                 self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + alias + "fn good(s: &str) -> Result<u32, E> { " + name + "::decode(s) }"}), [])
+
+    def test_generic_inferred_allowance_makes_a_checked_helper(self):
+        helper = "fn decode<T: DeserializeOwned>(t: &str) -> Result<(u8, T), E> { let v = serde_json::from_str(t)?; Ok((0, v)) } "
+        key = ("crates/demo/src/lib.rs", "decode", "serde_json::from_str(t)")
+        try:
+            GATE.ALLOWED_GENERIC_INFERRED[key] = "The value is returned as the T of (u8, T)."
+            self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn good(t: &str) -> Result<(u8, u32), E> { decode(t) }"}), [])
+            self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper + "fn bad(t: &str) { let r: (u8, ChioReceipt) = decode(t).unwrap(); }"}), ["crates/demo/src/lib.rs::bad: raw decode decode(t)"])
+            plain = "fn decode(t: &str) -> u32 { let v = serde_json::from_str(t).unwrap(); stamp(v) }"
+            self.assertEqual(self.findings({"crates/demo/src/lib.rs": plain}), [
+                "crates/demo/src/lib.rs::decode: inferred decode target serde_json::from_str(t)",
+                "crates/demo/src/lib.rs::decode: inferred decode allowance serde_json::from_str(t) matched no call",
+            ])
+            self.assertEqual(self.findings({"crates/demo/src/lib.rs": "fn other() {}"}), ["crates/demo/src/lib.rs::decode: inferred decode allowance serde_json::from_str(t) matched no call"])
+            GATE.ALLOWED_GENERIC_INFERRED[key] = " "
+            self.assertEqual(self.findings({"crates/demo/src/lib.rs": helper}), ["crates/demo/src/lib.rs::decode: inferred decode target serde_json::from_str(t)"])
+        finally:
+            GATE.ALLOWED_GENERIC_INFERRED.pop(key, None)
 
     def test_serde_json_glob_import_reaches_submodule_qualifiers(self):
         for source in [

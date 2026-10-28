@@ -29,7 +29,9 @@ strict type leaves the target inferred), or the construct's own context when eve
 the value unchanged; a closure that consumes the value gives its annotated
 parameter type. A `_` placeholder in a target is completed by that context. A decode
 whose target is neither named nor completed by context is refused as inferred
-unless ALLOWED_INFERRED names it with a reason. An extractor (`Json`, `Query`,
+unless ALLOWED_INFERRED names it with a reason, or ALLOWED_GENERIC_INFERRED
+names it as decoding its function's `Deserialize` parameter (no other generic
+decode is exempt). An extractor (`Json`, `Query`,
 `Form`, or an import of axum's) is flagged when its type argument is strict.
 A `macro_rules!` template decode is flagged when its concrete target is
 strict, when a target that depends on a capture is expanded by an invocation
@@ -96,6 +98,29 @@ ALLOWED_TYPE_PATHS: dict[tuple[str, str], str] = {}
 # Raw decodes whose target the scan cannot name (inferred from a use the scan
 # does not follow), keyed by (path, function, whitespace-normalized call), each
 # with the reason its inferred type holds no strict receipt type.
+# Raw decodes inside a function generic over a `Deserialize` parameter whose
+# target the scan cannot name but which decode that parameter. An entry on a
+# direct decode makes its function a generic raw helper, so every caller's
+# target is checked. An entry in a function without such a parameter is refused.
+ALLOWED_GENERIC_INFERRED: dict[tuple[str, str, str], str] = {
+    ("crates/kernel/chio-runtime-core/src/work/decode.rs", "recovery_observation", "recovery_contract(value)"):
+        "Decodes the observation value T of WorkObservationV1<T>, the function's DeserializeOwned parameter.",
+    ("crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs", "read_json_documents_from_dir", "crate::input::project(value)"):
+        "Each document is pushed into the returned Vec<T>; T is the function's DeserializeOwned parameter.",
+    ("crates/products/chio-cli/src/cli/input/config.rs", "load_document", "super::UntrustedJsonText::from_wire(bytes,super::MAX_DOCUMENT_BYTES)"):
+        "The load_with closure returns the decoded T, the function's DeserializeOwned parameter and return type.",
+    ("crates/products/chio-finding-market-canary/src/main.rs", "read_canonical_private", "read_canonical_private_bytes(path)"):
+        "The (bytes, value) tuple is projected to its T, the function's DeserializeOwned parameter and return type.",
+    ("crates/products/chio-finding-market-canary/src/main.rs", "read_canonical_private_bytes", "serde_json::from_slice(&bytes)"):
+        "The value is returned as the T in Ok((bytes, value)); T is the function's DeserializeOwned parameter.",
+    ("crates/protocol/chio-openapi/src/extensions.rs", "decode_extension", "serde_json::from_value(value.clone())"):
+        "The closure result is transposed into the Option<T> return; T is the function's DeserializeOwned parameter.",
+    ("crates/tooling/chio-bundle-verify/src/read.rs", "read_ndjson", "decode_strict(name,type_name,line.as_bytes())"):
+        "Each line is collected into the returned Vec<T>; T is the function's DeserializeOwned parameter.",
+    ("crates/trust/chio-finding-challenge/src/digest_mismatch.rs", "typed_block", "serde_json::from_value(value.clone())"):
+        "The Ok(block) arm wraps the value as MetadataBlock::Present(block) of the MetadataBlock<T> return; T is the DeserializeOwned parameter.",
+}
+
 ALLOWED_INFERRED: dict[tuple[str, str, str], str] = {
     ("crates/core/chio-response-model/src/simulation.rs", "apply_effect", "decode(&effect.canonical_contribution)"):
         "Inferred SessionSuspensionSpec and SessionThrottleLimits, effect contribution members; neither holds a receipt type.",
@@ -785,15 +810,6 @@ def let_annotation(fn_code: str, offset: int) -> str:
     return enclosing_let(fn_code, offset)[1]
 
 
-def impl_deserialize_parameters(code: str, offset: int) -> set[str]:
-    """The generic parameters of the innermost `impl` holding `offset` that are bound by `Deserialize`."""
-    header = ""
-    for start, end, text in block_spans(code):
-        if start < offset < end and text.startswith("impl"):
-            header = text
-    return set(GENERIC_BOUND.findall(header)) & impl_parameters(code, offset)
-
-
 def call_end(code: str, offset: int) -> int:
     """The end of the call starting at `offset`, past any turbofish or qualified-path angles."""
     index = offset
@@ -802,6 +818,9 @@ def call_end(code: str, offset: int) -> int:
             index = _contracts.closing(code, index, "<", ">")
         elif code[index] == "(":
             return _contracts.closing(code, index)
+        elif code[index] == "!" and re.match(r"!\s*[({\[]", code[index:]):
+            opening = index + re.match(r"!\s*", code[index:]).end()
+            return _contracts.closing(code, opening, code[opening], {"(": ")", "[": "]", "{": "}"}[code[opening]])
         elif code[index] in ";{}":
             return index
         else:
@@ -901,8 +920,14 @@ def postfix_end(code: str, index: int, wrappers: bool = True) -> tuple[int, str]
         index = close
 
 
+SELF_FIELD = "Self.0"
+
+
 def closure_parameter_type(projection: str) -> str:
-    """The annotated parameter type of a closure passed to a value-changing method."""
+    """The annotated parameter type of a closure passed to a value-changing method,
+    or SELF_FIELD when the value becomes the field of a `Self` newtype."""
+    if re.fullmatch(r"\.\s*map\s*\(\s*Self\s*\)", projection):
+        return SELF_FIELD
     closure = re.match(r"\.\s*\w+\s*\(\s*(?:move\s+)?\|\s*(?:mut\s+)?\w+\s*:\s*([^|]+)\|", projection)
     return closure.group(1).strip() if closure else ""
 
@@ -1262,7 +1287,10 @@ def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], resolve
         for match in QUALIFIED_DECODE.finditer(fn_code, body_start):
             if match.start() in seen:
                 continue
-            paths = {key[2:] for key in resolve(match.group(1), match.start()) if key[:2] == (":external", "serde_json")}
+            keys = resolve(match.group(1), match.start())
+            paths = {key[2:] for key in keys if key[:2] == (":external", "serde_json")}
+            if not keys and resolve.serde_json_glob(match.start()):
+                paths = {tuple(part.strip() for part in match.group(1).split("::"))}
             if paths & SERDE_JSON_STREAMS:
                 site = stream(match.start(), fn_code.index("(", match.end()))
                 if site:
@@ -1341,9 +1369,10 @@ def generic_raw_helpers(files: list[tuple[str, str]], resolver=None, aliases=Non
     """Per crate, functions generic over a `Deserialize` parameter that raw decode it.
 
     Each helper maps to "value" when every such decode reads a Value, else "text".
-    A decode whose target the scan cannot name counts as a decode of the
-    parameter, so every caller is checked. The second value lists each helper
-    definition as (path, offset, name, whether it is an associated function).
+    A direct decode counts when its target names the parameter, or when
+    ALLOWED_GENERIC_INFERRED names it as decoding the parameter. The second
+    value lists each helper definition as (path, offset, name, whether it is
+    an associated function).
     """
     helpers: dict[str, dict[str, str]] = {}
     definitions = set()
@@ -1357,7 +1386,8 @@ def generic_raw_helpers(files: list[tuple[str, str]], resolver=None, aliases=Non
             resolve = resolver(rel, row[1]) if resolver else None
             for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], {}, resolve, aliases):
                 target = targets(fn_code, offset, explicit, returns)
-                if not target or set(IDENTIFIER.findall(target)) & parameters:
+                allowed = not target and (rel, row[0], call_text(fn_code, offset)) in ALLOWED_GENERIC_INFERRED
+                if set(IDENTIFIER.findall(target)) & parameters or allowed:
                     crate = helpers.setdefault(crate_of(rel), {})
                     name = row[0].split("#")[0]
                     crate[name] = "text" if "text" in (kind, crate.get(name)) else "value"
@@ -1490,14 +1520,26 @@ def scan(root: Path) -> list[str]:
         def __call__(self, text, offset):
             return resolve_path(text, self.rel, self.base + offset)
 
+        def serde_json_glob(self, offset):
+            """Whether a `serde_json` glob import is visible at `offset`, so an
+            unresolved `de::`/`value::` qualifier may name its module."""
+            for scope in strict.scopes(self.rel, self.base + offset):
+                current = scope
+                while current:
+                    for glob in strict.globs[current]:
+                        if any(key[:2] == (":external", "serde_json") for key in strict.resolve(glob, current)) or glob[:1] == ("serde_json",):
+                            return True
+                    current = current[:-1]
+            return False
+
         def helper(self, qualifier, name, offset):
+            scopes = strict.scopes(self.rel, self.base + offset)
+            paths = [function_paths(qualifier + (name,), scope) for scope in scopes]
+            if any(found & helper_paths for found in paths):
+                return True
             if qualifier and (qualifier[-1] == "Self" or qualifier[-1][:1].isupper()):
                 return name in associated_helpers
-            for scope in strict.scopes(self.rel, self.base + offset):
-                paths = function_paths(qualifier + (name,), scope)
-                if paths & helper_paths or paths and not paths & known_functions and all(path[0] != ":external" for path in paths):
-                    return True
-            return False
+            return any(found and not found & known_functions and all(path[0] != ":external" for path in found) for found in paths)
 
     def resolver(rel, base):
         return Paths(rel, base)
@@ -1550,6 +1592,13 @@ def scan(root: Path) -> list[str]:
         return (row[0], row) if row else (fallback, None)
 
     findings, inferred = [], []
+
+    def newtype_field(self_type, rel, offset):
+        """The field type of a single-field tuple struct `self_type`, or empty."""
+        name = re.match(r"(?:\w+\s*::\s*)*\w+", self_type or "")
+        bodies = {entry[0] for key in resolve_path(name.group(), rel, offset) if name for entry in strict.definitions.get(key, ())} if name else set()
+        fields = [re.fullmatch(r"\(\s*([^,]+?)\s*,?\s*\)", body.strip()) for body in bodies]
+        return fields[0].group(1) if len(fields) == 1 and fields[0] else ""
 
     def names_generic(text, rel, offset):
         """Whether a pattern names a type it cannot complete: one with type
@@ -1646,12 +1695,12 @@ def scan(root: Path) -> list[str]:
             parameters = generic_parameters(fn_code)
             for offset, explicit, kind in decode_sites(fn_code, body_start, crate_helpers, resolver(rel, row[1]), aliases):
                 target = targets(fn_code, offset, explicit, returns)
+                if target == SELF_FIELD:
+                    target = newtype_field(self_type, rel, row[1])
                 if self_type:
                     target = re.sub(r"\bSelf\b", self_type, target)
                 if not target and placeholder_strict(explicit, lambda text: mentions_target(text, rel, row[1] + offset)):
                     target = PLACEHOLDER.sub("()", explicit)
-                if not target and (parameters or impl_deserialize_parameters(code, row[1])):
-                    continue
                 generic = set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}
                 if generic:
                     target = re.sub(r"\b(?:" + "|".join(sorted(generic)) + r")\b", "()", target)
@@ -1702,16 +1751,19 @@ def scan(root: Path) -> list[str]:
             remaining.remove(finding)
     errors.extend(f"{rel}::{owner}: raw {site} {text}" for rel, owner, text, site, _ in remaining)
     used = set()
+    generic_owners = {(rel, row[0]) for rel, code in files for row in _contracts.functions(code) if generic_parameters(_contracts.owner_code(code, row))}
     for rel, owner, call in sorted(set(inferred)):
-        if ALLOWED_INFERRED.get((rel, owner, call), "").strip():
-            used.add((rel, owner, call))
+        key = (rel, owner, call)
+        if ALLOWED_INFERRED.get(key, "").strip() or ALLOWED_GENERIC_INFERRED.get(key, "").strip() and (rel, owner) in generic_owners:
+            used.add(key)
         else:
             errors.append(f"{rel}::{owner}: inferred decode target {call}")
-    errors.extend(
-        f"{rel}::{owner}: inferred decode allowance {call} matched no call"
-        for rel, owner, call in sorted(set(ALLOWED_INFERRED) - used)
-        if ALLOWED_INFERRED[(rel, owner, call)].strip()
-    )
+    for allowances in (ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED):
+        errors.extend(
+            f"{rel}::{owner}: inferred decode allowance {call} matched no call"
+            for rel, owner, call in sorted(set(allowances) - used)
+            if allowances[(rel, owner, call)].strip()
+        )
     return errors
 
 
@@ -1810,12 +1862,13 @@ FIXTURES = {
 
 
 def self_test() -> None:
-    global ALLOWED_INFERRED
-    allowed, ALLOWED_INFERRED = ALLOWED_INFERRED, {}
+    global ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED
+    allowed, generic = ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED
+    ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED = {}, {}
     try:
         fixture_self_test()
     finally:
-        ALLOWED_INFERRED = allowed
+        ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED = allowed, generic
 
 
 def fixture_self_test() -> None:
