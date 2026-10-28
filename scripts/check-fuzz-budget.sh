@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
 # check-fuzz-budget.sh - Budget gate for GitHub Actions fuzz runner minutes.
 #
-# Sums the runner-executed time of every job in the cflite_pr.yml,
-# cflite_batch.yml, fuzz.yml, mutants.yml, mutants-fuzz-cocoverage.yml, and
-# proof-mutants.yml workflows across the last 30 days. A job counts from the
-# moment a runner picks it up until it completes; time spent waiting in the
-# queue, and jobs that never received a runner, consume no runner minutes and
-# are not counted. Jobs still running count up to the current time. Matrix
-# jobs that run in parallel each count in full.
+# Measures the runner-executed time of every job across the last 30 days, per
+# budget envelope:
 #
-# cap_mode defaults to "fail" so exceeding the cap hard-halts; set
-# GH_FUZZ_BUDGET_CAP_MODE=warn only for ad hoc budget reports.
+#   cflite    cflite_pr.yml, cflite_batch.yml        cap  1,800 min
+#   native    fuzz.yml                               cap 26,000 min
+#   mutation  mutants.yml, mutants-fuzz-cocoverage.yml,
+#             proof-mutants.yml                      reported, not capped
+#
+# A job counts from the moment a runner picks it up until it completes; time
+# spent waiting in the queue, and jobs that never received a runner, consume
+# no runner minutes and are not counted. Jobs still running count up to the
+# current time. Matrix jobs that run in parallel each count in full.
+#
+# A capped envelope at or over its cap fails the gate, and an API error,
+# truncated listing or unregistered workflow in a capped envelope fails it
+# closed. The mutation envelope only reports: its usage, or the reason it is
+# unverified, is printed and never changes the exit code. cap_mode defaults to
+# "fail"; set GH_FUZZ_BUDGET_CAP_MODE=warn only for advisory lanes.
 #
 # Usage:
 #   scripts/check-fuzz-budget.sh                      # default repo: backbay-labs/chio
 #   scripts/check-fuzz-budget.sh OWNER/REPO
-#   GH_FUZZ_BUDGET_MINUTES=900 scripts/check-fuzz-budget.sh    # override cap
-#   GH_FUZZ_BUDGET_WORKFLOWS=cflite_pr.yml,fuzz.yml scripts/check-fuzz-budget.sh
+#   GH_FUZZ_BUDGET_SCOPE=cflite scripts/check-fuzz-budget.sh   # cflite|native|mutation|all
 #   GH_FUZZ_BUDGET_LEDGER=/path/ledger.json scripts/check-fuzz-budget.sh
 #   GH_FUZZ_BUDGET_RATE_LIMIT_MODE=warn scripts/check-fuzz-budget.sh
 #   GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE=warn scripts/check-fuzz-budget.sh
@@ -30,10 +37,10 @@
 # queried again.
 #
 # Exit codes:
-#   0  budget OK
-#   1  budget exceeded (sum >= cap)
-#   2  precondition failure (gh missing, jq missing, API error, truncated
-#      run listing)
+#   0  every measured capped envelope is under its cap
+#   1  a capped envelope is at or over its cap
+#   2  precondition failure in a capped envelope (gh missing, jq missing, API
+#      error, truncated run listing, unknown scope)
 #
 # Requires: gh, jq
 
@@ -42,32 +49,29 @@ set -euo pipefail
 err() { printf '%s\n' "$*" >&2; }
 
 REPO="${1:-backbay-labs/chio}"
-CAP_MINUTES="${GH_FUZZ_BUDGET_MINUTES:-1800}"
 WINDOW_DAYS=30
 # GitHub stops returning results after the first 1000 matches of a filtered
 # workflow-run listing. Windows larger than that are listed one day at a time.
 LISTING_RESULT_LIMIT=1000
 LEDGER="${GH_FUZZ_BUDGET_LEDGER:-}"
-if [[ -n "${GH_FUZZ_BUDGET_WORKFLOWS:-}" ]]; then
-    IFS=',' read -r -a WORKFLOWS <<<"${GH_FUZZ_BUDGET_WORKFLOWS}"
-else
-    WORKFLOWS=(
-        "cflite_pr.yml"
-        "cflite_batch.yml"
-        "fuzz.yml"
-        "mutants.yml"
-        "mutants-fuzz-cocoverage.yml"
-        "proof-mutants.yml"
-    )
-fi
-if [[ "${#WORKFLOWS[@]}" -eq 0 ]]; then
-    err "fuzz-budget: GH_FUZZ_BUDGET_WORKFLOWS selected no workflows"
-    exit 2
-fi
-if ! [[ "${CAP_MINUTES}" =~ ^[1-9][0-9]*$ ]]; then
-    err "fuzz-budget: GH_FUZZ_BUDGET_MINUTES must be a positive integer: ${CAP_MINUTES}"
-    exit 2
-fi
+SCOPE="${GH_FUZZ_BUDGET_SCOPE:-all}"
+
+CFLITE_WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml")
+CFLITE_CAP_MINUTES=1800
+NATIVE_WORKFLOWS=("fuzz.yml")
+NATIVE_CAP_MINUTES=26000
+MUTATION_WORKFLOWS=("mutants.yml" "mutants-fuzz-cocoverage.yml" "proof-mutants.yml")
+
+case "${SCOPE}" in
+    cflite) ENVELOPES=(cflite) ;;
+    native) ENVELOPES=(native) ;;
+    mutation) ENVELOPES=(mutation) ;;
+    all) ENVELOPES=(cflite native mutation) ;;
+    *)
+        err "fuzz-budget: unknown GH_FUZZ_BUDGET_SCOPE: ${SCOPE} (cflite|native|mutation|all)"
+        exit 2
+        ;;
+esac
 
 require() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -180,96 +184,137 @@ list_runs() {
     return 0
 }
 
-total_seconds=0
-for wf in "${WORKFLOWS[@]}"; do
-    runs="${work}/runs-${wf}.ndjson"
-    status=0
-    list_runs "${wf}" "${since}" "" "${runs}" || status=$?
-    if [[ "${status}" -eq 5 ]]; then
-        : >"${runs}"
-        slice_start="${since_epoch}"
-        while (( slice_start < now_epoch )); do
-            slice_end=$(( slice_start + 86400 ))
-            slice="${work}/slice.ndjson"
-            status=0
-            list_runs "${wf}" "$(iso_utc "${slice_start}")" "$(iso_utc "${slice_end}")" \
-                "${slice}" || status=$?
-            if [[ "${status}" -eq 5 ]]; then
-                err "fuzz-budget: ${wf} has more than ${LISTING_RESULT_LIMIT} runs in one day starting $(iso_utc "${slice_start}"); budget usage is unverified"
-                exit 2
+# measure_workflows OUTPUT_FILE WORKFLOW...: writes the summed runner seconds.
+measure_workflows() {
+    local output="$1" total_seconds=0
+    shift
+    for wf in "$@"; do
+        runs="${work}/runs-${wf}.ndjson"
+        status=0
+        list_runs "${wf}" "${since}" "" "${runs}" || status=$?
+        if [[ "${status}" -eq 5 ]]; then
+            : >"${runs}"
+            slice_start="${since_epoch}"
+            while (( slice_start < now_epoch )); do
+                slice_end=$(( slice_start + 86400 ))
+                slice="${work}/slice.ndjson"
+                status=0
+                list_runs "${wf}" "$(iso_utc "${slice_start}")" "$(iso_utc "${slice_end}")" \
+                    "${slice}" || status=$?
+                if [[ "${status}" -eq 5 ]]; then
+                    err "fuzz-budget: ${wf} has more than ${LISTING_RESULT_LIMIT} runs in one day starting $(iso_utc "${slice_start}"); budget usage is unverified"
+                    exit 2
+                fi
+                if [[ "${status}" -ne 0 ]]; then
+                    break
+                fi
+                cat "${slice}" >>"${runs}"
+                slice_start="${slice_end}"
+            done
+        fi
+        if [[ "${status}" -eq 3 ]]; then
+            err "fuzz-budget: workflow ${wf} is not registered; budget usage is unverified"
+            if [[ "${missing_workflow_mode}" == "warn" ]]; then
+                err "fuzz-budget: continuing because GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE=warn"
+                continue
             fi
-            if [[ "${status}" -ne 0 ]]; then
-                break
-            fi
-            cat "${slice}" >>"${runs}"
-            slice_start="${slice_end}"
-        done
-    fi
-    if [[ "${status}" -eq 3 ]]; then
-        err "fuzz-budget: workflow ${wf} is not registered; budget usage is unverified"
-        if [[ "${missing_workflow_mode}" == "warn" ]]; then
-            err "fuzz-budget: continuing because GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE=warn"
+            exit 2
+        fi
+        if [[ "${status}" -eq 4 ]]; then
+            rate_limited "${wf}"
             continue
         fi
-        exit 2
-    fi
-    if [[ "${status}" -eq 4 ]]; then
-        rate_limited "${wf}"
-        continue
-    fi
 
-    workflow_seconds=0
-    run_count=0
-    queried=0
-    while IFS=$'\t' read -r run_id attempt run_status created; do
-        run_count=$(( run_count + 1 ))
-        key="${run_id}:${attempt}"
-        cached="$(jq -r --arg key "${key}" '.[$key].seconds // empty' "${ledger_in}")"
-        if [[ -n "${cached}" ]]; then
-            run_seconds="${cached}"
-        else
-            jobs="${work}/jobs.json"
-            status=0
-            api_get "repos/${REPO}/actions/runs/${run_id}/jobs?filter=all&per_page=100" \
-                "${jobs}" || status=$?
-            if [[ "${status}" -eq 4 ]]; then
-                rate_limited "${wf}"
-                workflow_seconds=-1
-                break
+        workflow_seconds=0
+        run_count=0
+        queried=0
+        while IFS=$'\t' read -r run_id attempt run_status created; do
+            run_count=$(( run_count + 1 ))
+            key="${run_id}:${attempt}"
+            cached="$(jq -r --arg key "${key}" '.[$key].seconds // empty' "${ledger_in}")"
+            if [[ -n "${cached}" ]]; then
+                run_seconds="${cached}"
+            else
+                jobs="${work}/jobs.json"
+                status=0
+                api_get "repos/${REPO}/actions/runs/${run_id}/jobs?filter=all&per_page=100" \
+                    "${jobs}" || status=$?
+                if [[ "${status}" -eq 4 ]]; then
+                    rate_limited "${wf}"
+                    workflow_seconds=-1
+                    break
+                fi
+                if [[ "${status}" -ne 0 ]]; then
+                    err "fuzz-budget: jobs for ${wf} run ${run_id} are missing"
+                    exit 2
+                fi
+                queried=$(( queried + 1 ))
+                if ! run_seconds="$(jq -s --argjson now "${now_epoch}" \
+                    '[.[].jobs[]?
+                      | select((.runner_name // "") != "" and .started_at != null)
+                      | (if .completed_at == null then $now
+                         else (.completed_at | fromdateiso8601) end)
+                        - (.started_at | fromdateiso8601)
+                      | if . < 0 then 0 else . end
+                     ] | add // 0 | floor' "${jobs}")" \
+                    || ! [[ "${run_seconds}" =~ ^[0-9]+$ ]]; then
+                    err "fuzz-budget: failed to parse jobs for ${wf} run ${run_id}"
+                    exit 2
+                fi
             fi
-            if [[ "${status}" -ne 0 ]]; then
-                err "fuzz-budget: jobs for ${wf} run ${run_id} are missing"
-                exit 2
+            if [[ "${run_status}" == "completed" ]]; then
+                jq -nc --arg key "${key}" --argjson seconds "${run_seconds}" \
+                    --arg created "${created}" \
+                    '{key: $key, value: {seconds: $seconds, created: $created}}' \
+                    >>"${ledger_out}"
             fi
-            queried=$(( queried + 1 ))
-            if ! run_seconds="$(jq -s --argjson now "${now_epoch}" \
-                '[.[].jobs[]?
-                  | select((.runner_name // "") != "" and .started_at != null)
-                  | (if .completed_at == null then $now
-                     else (.completed_at | fromdateiso8601) end)
-                    - (.started_at | fromdateiso8601)
-                  | if . < 0 then 0 else . end
-                 ] | add // 0 | floor' "${jobs}")" \
-                || ! [[ "${run_seconds}" =~ ^[0-9]+$ ]]; then
-                err "fuzz-budget: failed to parse jobs for ${wf} run ${run_id}"
-                exit 2
-            fi
+            workflow_seconds=$(( workflow_seconds + run_seconds ))
+        done < <(jq -rs 'unique_by(.id) | .[]
+            | [.id, (.run_attempt // 1), .status, .created_at] | @tsv' "${runs}")
+        if [[ "${workflow_seconds}" -lt 0 ]]; then
+            continue
         fi
-        if [[ "${run_status}" == "completed" ]]; then
-            jq -nc --arg key "${key}" --argjson seconds "${run_seconds}" \
-                --arg created "${created}" \
-                '{key: $key, value: {seconds: $seconds, created: $created}}' \
-                >>"${ledger_out}"
+        printf 'fuzz-budget: workflow=%s runs=%d queried=%d executed=%d min\n' \
+            "${wf}" "${run_count}" "${queried}" "$(( (workflow_seconds + 59) / 60 ))"
+        total_seconds=$(( total_seconds + workflow_seconds ))
+    done
+    printf '%d\n' "${total_seconds}" >"${output}"
+}
+
+over_cap=0
+for envelope in "${ENVELOPES[@]}"; do
+    case "${envelope}" in
+        cflite) workflows=("${CFLITE_WORKFLOWS[@]}"); cap="${CFLITE_CAP_MINUTES}" ;;
+        native) workflows=("${NATIVE_WORKFLOWS[@]}"); cap="${NATIVE_CAP_MINUTES}" ;;
+        mutation) workflows=("${MUTATION_WORKFLOWS[@]}"); cap="" ;;
+    esac
+    measured="${work}/measured-${envelope}"
+    set +e
+    (
+        set -e
+        measure_workflows "${measured}" "${workflows[@]}"
+    )
+    status=$?
+    set -e
+    if [[ "${status}" -ne 0 ]]; then
+        if [[ -z "${cap}" ]]; then
+            err "fuzz-budget: envelope=${envelope} usage is unverified; reported only, not capped"
+            continue
         fi
-        workflow_seconds=$(( workflow_seconds + run_seconds ))
-    done < <(jq -rs 'unique_by(.id) | .[]
-        | [.id, (.run_attempt // 1), .status, .created_at] | @tsv' "${runs}")
-    if [[ "${workflow_seconds}" -lt 0 ]]; then
+        exit "${status}"
+    fi
+    used=$(( ($(cat "${measured}") + 59) / 60 ))
+    if [[ -z "${cap}" ]]; then
+        printf 'fuzz-budget: envelope=%s window=%s days, used=%d min, reported only, not capped\n' \
+            "${envelope}" "${WINDOW_DAYS}" "${used}"
         continue
     fi
-    printf 'fuzz-budget: workflow=%s runs=%d queried=%d executed=%d min\n' \
-        "${wf}" "${run_count}" "${queried}" "$(( (workflow_seconds + 59) / 60 ))"
-    total_seconds=$(( total_seconds + workflow_seconds ))
+    printf 'fuzz-budget: envelope=%s window=%s days, used=%d min, cap=%d min, remaining=%d min\n' \
+        "${envelope}" "${WINDOW_DAYS}" "${used}" "${cap}" "$(( cap - used ))"
+    if (( used >= cap )); then
+        err "fuzz-budget: HALT - envelope=${envelope} used ${used} min >= cap ${cap} min in last ${WINDOW_DAYS} days"
+        over_cap=1
+    fi
 done
 
 if [[ -n "${LEDGER}" ]]; then
@@ -283,14 +328,7 @@ if [[ -n "${LEDGER}" ]]; then
     mv "${ledger_tmp}" "${LEDGER}"
 fi
 
-total_minutes=$(( (total_seconds + 59) / 60 ))
-remaining=$(( CAP_MINUTES - total_minutes ))
-
-printf 'fuzz-budget: window=%s days, used=%d min, cap=%d min, remaining=%d min\n' \
-    "${WINDOW_DAYS}" "${total_minutes}" "${CAP_MINUTES}" "${remaining}"
-
-if (( total_minutes >= CAP_MINUTES )); then
-    err "fuzz-budget: HALT - used ${total_minutes} min >= cap ${CAP_MINUTES} min in last ${WINDOW_DAYS} days"
+if (( over_cap )); then
     if [[ "${cap_mode}" == "warn" ]]; then
         err "fuzz-budget: continuing because GH_FUZZ_BUDGET_CAP_MODE=warn"
         exit 0

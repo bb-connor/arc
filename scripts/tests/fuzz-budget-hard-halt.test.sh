@@ -10,13 +10,45 @@ BUDGET_SCRIPT="${REPO_ROOT}/scripts/check-fuzz-budget.sh"
 
 python3 - <<'PY' "${PR_WORKFLOW}" "${MUTANTS_WORKFLOW}"
 from pathlib import Path
+import re
 import sys
 
+workflows = Path(sys.argv[1]).resolve().parent
+expected_steps = {
+    "cflite_pr.yml": [("cflite", "warn")],
+    "cflite_batch.yml": [("cflite", "fail")],
+    "fuzz.yml": [("native", "fail")],
+    "mutants.yml": [("mutation", None), ("mutation", None)],
+    "mutants-fuzz-cocoverage.yml": [("mutation", None)],
+    "proof-mutants.yml": [("mutation", None)],
+}
+for name, expected in expected_steps.items():
+    text = (workflows / name).read_text(encoding="utf-8")
+    steps = [
+        block
+        for block in re.split(r"\n      - ", text)
+        if "check-fuzz-budget.sh \"${{ github.repository }}\"" in block
+    ]
+    observed = []
+    for block in steps:
+        scope = re.search(r"GH_FUZZ_BUDGET_SCOPE: (\S+)", block)
+        mode = re.search(r"GH_FUZZ_BUDGET_CAP_MODE: (\S+)", block)
+        observed.append((scope and scope.group(1), mode and mode.group(1)))
+        for removed in ("GH_FUZZ_BUDGET_WORKFLOWS", "GH_FUZZ_BUDGET_MINUTES"):
+            if removed in block:
+                raise SystemExit(f"{name} budget step still sets {removed}")
+        if "GH_FUZZ_BUDGET_LEDGER:" not in block:
+            raise SystemExit(f"{name} budget step must use the shared ledger")
+    if observed != expected:
+        raise SystemExit(f"{name} budget steps {observed} != {expected}")
+
 pr_text = Path(sys.argv[1]).read_text(encoding="utf-8")
-pr_start = pr_text.index("name: Verify 30-day fuzz budget")
-pr_end = pr_text.index("changed-target-sampling:", pr_start)
-if "GH_FUZZ_BUDGET_CAP_MODE: warn" not in pr_text[pr_start:pr_end]:
-    raise SystemExit("cflite_pr budget gate must keep its advisory cap mode")
+fail_start = pr_text.index("name: Fail if no targets fired (changed-target mode)")
+fail_block = pr_text[fail_start:pr_text.index("\n      - name:", fail_start)]
+if '"${CLASSIFICATION}" == "no-fuzz-relevant-change"' not in fail_block:
+    raise SystemExit("cflite_pr must pass an empty selection only on the explicit classification")
+if "--classification classification.txt" not in pr_text:
+    raise SystemExit("cflite_pr must record the selector classification")
 
 mutants_text = Path(sys.argv[2]).read_text(encoding="utf-8")
 mutants_path = Path(sys.argv[2]).resolve()
@@ -49,13 +81,6 @@ if '--config "${{ steps.select.outputs.crate_path }}/mutants.toml"' not in mutat
 if '--config "crates/${{ matrix.package }}/mutants.toml"' in mutants_text:
     raise SystemExit("mutants-pr still reconstructs a flat crate config path")
 
-mutants_start = mutants_text.index("name: Verify shared 30-day fuzz/mutants budget")
-mutants_end = mutants_text.index("name: Capture PR diff for --in-diff scoping", mutants_start)
-mutants_block = mutants_text[mutants_start:mutants_end]
-if "GH_FUZZ_BUDGET_CAP_MODE: fail" not in mutants_block:
-    raise SystemExit("mutants-pr budget gate must set cap mode to fail")
-if "hard halt" not in mutants_block:
-    raise SystemExit("mutants-pr budget gate must document hard halt behavior")
 PY
 
 if ! grep -q "PR-time CFLite budget checks are advisory" "${DOCS}"; then
@@ -63,8 +88,8 @@ if ! grep -q "PR-time CFLite budget checks are advisory" "${DOCS}"; then
   exit 1
 fi
 
-if ! grep -q "PR-time mutation gates hard halt" "${DOCS}"; then
-  echo "FAIL: docs/fuzzing/continuous.md must describe PR mutation hard halt behavior" >&2
+if ! grep -q "Mutation and proof-mutation lanes are reported, not capped" "${DOCS}"; then
+  echo "FAIL: docs/fuzzing/continuous.md must describe report-only mutation budgets" >&2
   exit 1
 fi
 if ! grep -q 'proof-mutants.yml' "${DOCS}"; then
@@ -83,8 +108,16 @@ if 'missing_workflow_mode="${GH_FUZZ_BUDGET_MISSING_WORKFLOW_MODE:-fail}"' not i
     raise SystemExit("missing workflow mode must default to fail")
 if "workflow ${wf} is not registered yet; counting 0 minutes" in script:
     raise SystemExit("missing workflow must not be counted as zero minutes by default")
-if '"proof-mutants.yml"' not in script:
-    raise SystemExit("proof-mutants workflow must count against the shared budget")
+for line in [
+    'CFLITE_WORKFLOWS=("cflite_pr.yml" "cflite_batch.yml")',
+    "CFLITE_CAP_MINUTES=1800",
+    'NATIVE_WORKFLOWS=("fuzz.yml")',
+    "NATIVE_CAP_MINUTES=26000",
+    'MUTATION_WORKFLOWS=("mutants.yml" "mutants-fuzz-cocoverage.yml" "proof-mutants.yml")',
+    'SCOPE="${GH_FUZZ_BUDGET_SCOPE:-all}"',
+]:
+    if line not in script:
+        raise SystemExit(f"fuzz budget envelopes must declare {line}")
 PY
 
-echo "PASS: PR fuzz budget gates and docs agree on advisory and hard halt behavior"
+echo "PASS: fuzz budget envelopes, workflow scopes and docs agree"
