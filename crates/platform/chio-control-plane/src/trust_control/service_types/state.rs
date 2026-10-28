@@ -23,6 +23,9 @@ pub(crate) struct TrustServiceState {
     /// opened before serving. The public revocation feed reads through it.
     pub(crate) passport_revocation_oracle:
         Option<Arc<chio_revocation_oracle::SqliteRevocationOracle>>,
+    /// The partner mirror handles every passport door prepares and admits
+    /// through.
+    pub(crate) partner_revocation_door: Arc<crate::trust_control::PartnerRevocationDoor>,
     /// The single receipt store for `config.receipt_db_path`, opened before
     /// serving. Handlers share it and its one writer instead of opening a store
     /// (and seeding a writer) per request.

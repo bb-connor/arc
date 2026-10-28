@@ -1756,6 +1756,10 @@ pub(crate) async fn handle_federated_issue(
 #[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
 mod oid4vp_issuer_fetch_tests;
 
+#[cfg(test)]
+#[path = "passport_handlers/partner_revocation_door_tests.rs"]
+mod partner_revocation_door_tests;
+
 #[path = "passport_handlers/issuer_authority.rs"]
 mod issuer_authority;
 
