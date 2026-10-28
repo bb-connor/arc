@@ -213,6 +213,12 @@ fn real_trust_floor_write_failure_denies_and_releases_the_prior_claim() -> TestR
     let kernel = fixture.kernel(hook, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(
+            "runtime admission hook \"chio-runtime-admission\" error (fail-closed): durable admission failed: runtime admission SQLite failed"
+        )
+    );
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     let history = history(&fixture)?;
     assert_eq!(history.len(), 1);
