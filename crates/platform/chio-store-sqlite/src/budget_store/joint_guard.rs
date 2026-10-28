@@ -115,7 +115,7 @@ impl SqliteBudgetStore {
         }
     }
 
-    pub(super) fn reject_legacy_admission_after_composite_history(
+    pub(super) fn reject_standalone_admission_after_composite_history(
         transaction: &rusqlite::Transaction<'_>,
         capability_id: &str,
         grant_index: usize,
@@ -136,7 +136,7 @@ impl SqliteBudgetStore {
         )?;
         if exists {
             return Err(BudgetStoreError::Invariant(format!(
-                "legacy budget admission is disabled after structured history for `{capability_id}` grant {grant_index}"
+                "standalone budget admission is disabled after structured history for `{capability_id}` grant {grant_index}"
             )));
         }
         Ok(())

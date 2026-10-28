@@ -696,7 +696,7 @@ impl SqliteBudgetStore {
     ) -> Result<(), BudgetStoreError> {
         Self::validate_import_record_sqlite_range(record)?;
         let mut normalized = record.clone();
-        if legacy_event_lifecycle_is_unset(&normalized) {
+        if standalone_event_lifecycle_is_unset(&normalized) {
             let lifecycle = imported_event_lifecycle(transaction, &normalized)?;
             normalized.authorization_outcome = lifecycle.0;
             normalized.invocation_state_before = lifecycle.1;
@@ -764,7 +764,7 @@ impl SqliteBudgetStore {
                 record.kind.as_str()
             )));
         }
-        validate_legacy_event_lifecycle(record)?;
+        validate_standalone_event_lifecycle(record)?;
         Self::validate_import_event_shape(record)?;
         Ok(())
     }

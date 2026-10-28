@@ -271,7 +271,7 @@ impl SqliteBudgetStore {
                     |row| row.get(0),
                 )?;
                 if projection_kind == "standalone" {
-                    validate_legacy_event_lifecycle(&event)?;
+                    validate_standalone_event_lifecycle(&event)?;
                 }
                 if let Some(previous) = previous.as_ref() {
                     validate_usage_authority_progression(previous, &event)?;

@@ -32,7 +32,7 @@ struct BudgetHoldState {
     remaining_exposure_units: u64,
     invocation_state: BudgetInvocationState,
     invocation_quotas: Vec<BudgetInvocationQuota>,
-    legacy_captured_invocation_quota: Option<BudgetInvocationQuota>,
+    standalone_captured_invocation_quota: Option<BudgetInvocationQuota>,
     captured_cancellation_allowed: bool,
     cumulative_approval: Option<BudgetCumulativeApprovalHoldState>,
     monetary_state: BudgetMonetaryState,
@@ -214,7 +214,7 @@ struct InMemoryBudgetStoreInner {
     hold_authorizations: HashMap<String, BudgetMutationRequest>,
     operation_authorizations: HashMap<String, BudgetMutationRequest>,
     invocation_quotas: HashMap<BudgetQuotaKey, BudgetInvocationQuotaState>,
-    legacy_reversible_invocations: HashMap<(String, usize), u32>,
+    standalone_reversible_invocations: HashMap<(String, usize), u32>,
     cumulative_approval_accounts:
         HashMap<BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountState>,
     next_seq: u64,

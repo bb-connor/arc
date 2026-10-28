@@ -340,7 +340,7 @@ pub(super) fn load_quota_state(
         .transpose()
 }
 
-pub(super) fn legacy_grant_quota_limit(
+pub(super) fn standalone_grant_quota_limit(
     transaction: &Transaction<'_>,
     capability_id: &str,
     grant_index: usize,
@@ -368,14 +368,14 @@ pub(super) fn legacy_grant_quota_limit(
     )?;
     if row.2 > 1 || row.0 != row.1 {
         return Err(BudgetStoreError::Invariant(format!(
-            "legacy grant quota for `{capability_id}` grant {grant_index} is inconsistent"
+            "standalone grant quota for `{capability_id}` grant {grant_index} is inconsistent"
         )));
     }
     row.0
         .map(|maximum| {
             u32::try_from(maximum).map_err(|_| {
                 BudgetStoreError::Invariant(format!(
-                    "legacy grant quota for `{capability_id}` grant {grant_index} is outside u32 range"
+                    "standalone grant quota for `{capability_id}` grant {grant_index} is outside u32 range"
                 ))
             })
         })

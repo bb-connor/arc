@@ -98,7 +98,7 @@ impl InMemoryBudgetStoreInner {
                 captured: hold.is_none()
                     || cancels_captured
                     || hold.is_some_and(|hold| {
-                        hold.legacy_captured_invocation_quota.as_ref() == Some(quota)
+                        hold.standalone_captured_invocation_quota.as_ref() == Some(quota)
                     }),
             },
             Transition::Reverse {
