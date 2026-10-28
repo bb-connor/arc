@@ -58,6 +58,8 @@ mod settlement_routing_tests {
         batch_sizes: Vec<usize>,
         point_reads: usize,
         point_failure: Option<String>,
+        point_missing: Option<String>,
+        point_wrong_time: bool,
         plain_appends: usize,
         atomic_appends: usize,
         timed_atomic_appends: usize,
@@ -81,6 +83,8 @@ mod settlement_routing_tests {
                 batch_sizes: Vec::new(),
                 point_reads: 0,
                 point_failure: None,
+                point_missing: None,
+                point_wrong_time: false,
                 plain_appends: 0,
                 atomic_appends: 0,
                 timed_atomic_appends: 0,
@@ -150,7 +154,16 @@ mod settlement_routing_tests {
                     "forced point failure".to_owned(),
                 ));
             }
-            Ok(state.receipts.get(receipt_id).cloned())
+            if state.point_missing.as_deref() == Some(receipt_id) {
+                return Ok(None);
+            }
+            let mut receipt = state.receipts.get(receipt_id).cloned();
+            if state.point_wrong_time {
+                if let Some(receipt) = receipt.as_mut() {
+                    receipt.timestamp += 1;
+                }
+            }
+            Ok(receipt)
         }
 
         fn load_chio_receipts(

@@ -204,8 +204,7 @@ fn drain_trust_replacement_does_not_retain_the_previous_signer() -> TestResult {
     );
     let historical = Keypair::from_seed(&[114; 32]);
     let current = harness.keypair.public_key();
-    trust(&mut harness, vec![current, historical.public_key()])?;
-    let current = harness.keypair.public_key();
+    trust(&mut harness, vec![current.clone(), historical.public_key()])?;
     trust(&mut harness, vec![current])?;
     seed_receipt(&harness, &positive_receipt(&historical, 1))?;
     assert_eq!(harness.kernel.drain_settlement_attempts(1)?.completed, 1);
@@ -250,9 +249,7 @@ fn drain_refuses_mismatched_claim_time_before_the_hook() -> TestResult {
     {
         let mut state = harness.store.state();
         state.batch_mode = BatchMode::Error;
-        for receipt in state.receipts.values_mut() {
-            receipt.timestamp += 1;
-        }
+        state.point_wrong_time = true;
     }
     assert_eq!(harness.kernel.drain_settlement_attempts(1)?.completed, 1);
     assert_eq!(harness.hook.calls(), 0);
@@ -280,7 +277,8 @@ fn drain_missing_receipt_does_not_block_a_healthy_neighbor() -> TestResult {
             .min()
             .cloned()
             .ok_or("missing seeded receipt")?;
-        state.receipts.remove(&first);
+        state.batch_mode = BatchMode::MissingFirst;
+        state.point_missing = Some(first);
     }
     assert_eq!(harness.kernel.drain_settlement_attempts(2)?.completed, 2);
     assert_eq!(harness.hook.calls(), 1);
