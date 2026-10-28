@@ -361,7 +361,7 @@ pub(crate) fn embedded_commerce_order_bundle(
 /// The escrow ledger that `order_context.escrow_digest` pins: none without a
 /// pin, otherwise the single escrow ledger node whose schema and graph digest
 /// check and whose canonical digest equals the pin.
-fn embedded_commerce_escrow_ledger_bytes(
+pub(crate) fn embedded_commerce_escrow_ledger_bytes(
     nodes: &[ProofRoomEmbeddedEvidenceNode],
     artifacts: &BTreeMap<String, Vec<u8>>,
     order_context: &chio_commerce_order::CommerceOrderContext,
