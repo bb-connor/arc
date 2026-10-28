@@ -39,6 +39,9 @@ pub(crate) struct TrustServiceState {
     pub(crate) evidence_export_lane: Arc<tokio::sync::Semaphore>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
     pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
+    /// The peer nonce cache and durable peer high-water marks every listener
+    /// shares; `None` on a receiver without pinned peers.
+    pub(crate) peer_nonces: Option<Arc<crate::trust_control::caller_credentials::PeerNonceCache>>,
     /// Progress signal for the single background cluster-sync loop. `Some`
     /// exactly when `cluster` is `Some`. A budget-write handler parks on this
     /// watch instead of driving its own inline sync.

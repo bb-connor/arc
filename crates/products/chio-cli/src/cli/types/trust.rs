@@ -50,6 +50,12 @@ pub(crate) enum TrustCommands {
         #[arg(long, default_value_t = 500)]
         cluster_sync_interval_ms: u64,
 
+        /// SQLite database holding each pinned cluster peer's highest accepted
+        /// request issue time. Required when the access configuration pins
+        /// cluster peers.
+        #[arg(long, value_name = "PATH")]
+        cluster_peer_replay_db: Option<PathBuf>,
+
         /// Explicit future issue skew for authority replication; expiry remains strict.
         #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u64).range(0..=60))]
         authority_replication_max_future_skew_seconds: u64,

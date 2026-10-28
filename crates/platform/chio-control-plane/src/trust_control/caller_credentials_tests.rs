@@ -428,8 +428,41 @@ const ISSUED_AT: i64 = 1_792_234_800;
 const NODE_B: &str = "https://node-b.example:9101";
 const NODE_C: &str = "https://node-c.example:9101";
 
+/// A fresh cluster peer replay database path, in a directory that lives as
+/// long as the test process.
+pub(crate) fn test_peer_replay_db_path() -> std::path::PathBuf {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let index = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    DIR.get_or_init(|| tempfile::tempdir().test_unwrap())
+        .path()
+        .join(format!("cluster-peer-replay-{index}.sqlite3"))
+}
+
+/// A fresh, empty cluster peer replay store.
+pub(crate) fn test_peer_replay_store() -> Arc<SqliteClusterPeerReplayStore> {
+    Arc::new(SqliteClusterPeerReplayStore::open(test_peer_replay_db_path()).test_unwrap())
+}
+
+/// A peer nonce cache on `store` that started at `start_secs`.
+pub(crate) fn test_nonce_cache(
+    store: &Arc<SqliteClusterPeerReplayStore>,
+    start_secs: Option<i64>,
+    pinned_peers: usize,
+) -> PeerNonceCache {
+    PeerNonceCache::open(Arc::clone(store), start_secs, pinned_peers).test_unwrap()
+}
+
 fn nonce_cache() -> PeerNonceCache {
-    PeerNonceCache::new(Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS), 1)
+    nonce_cache_on(&test_peer_replay_store())
+}
+
+fn nonce_cache_on(store: &Arc<SqliteClusterPeerReplayStore>) -> PeerNonceCache {
+    test_nonce_cache(
+        store,
+        Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
+        1,
+    )
 }
 
 fn status_target() -> PeerRequestTarget<'static> {
@@ -1130,6 +1163,7 @@ pub(crate) fn set_test_peers_with_secret(
         .collect();
     config.advertise_url = Some(self_node.to_string());
     config.access = test_access_with_cluster(secret, &[], Some(self_node), &peers);
+    config.cluster_peer_replay_db_path = Some(test_peer_replay_db_path());
 }
 
 /// Scopes of the authority workload credential tests stand up beside the
@@ -1178,7 +1212,7 @@ pub(crate) fn test_access_with_roles(
 }
 
 #[test]
-fn peer_replay_after_restart_refuses() {
+fn peer_replay_after_restart_on_a_reset_store_keeps_the_start_plus_lead_floor() {
     let keypair = Keypair::generate();
     let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
@@ -1193,7 +1227,8 @@ fn peer_replay_after_restart_refuses() {
             &nonce_cache(),
         )
         .test_unwrap();
-    let restarted = PeerNonceCache::new(Some(ISSUED_AT + 3), 1);
+    let reset = test_peer_replay_store();
+    let restarted = test_nonce_cache(&reset, Some(ISSUED_AT + 3), 1);
     let error = access
         .peers
         .verify(
@@ -1210,7 +1245,7 @@ fn peer_replay_after_restart_refuses() {
         "cluster peer signature is outside the freshness window"
     );
     assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
-    let started_without_clock = PeerNonceCache::new(None, 1);
+    let started_without_clock = test_nonce_cache(&test_peer_replay_store(), None, 1);
     assert_eq!(
         access
             .peers
@@ -1258,7 +1293,8 @@ fn peer_replay_in_the_restart_second_refuses() {
     let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
     let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
-    let before_restart = nonce_cache();
+    let store = test_peer_replay_store();
+    let before_restart = nonce_cache_on(&store);
     access
         .peers
         .verify(
@@ -1269,7 +1305,7 @@ fn peer_replay_in_the_restart_second_refuses() {
             &before_restart,
         )
         .test_unwrap();
-    let restarted = PeerNonceCache::new(Some(ISSUED_AT), 1);
+    let restarted = test_nonce_cache(&store, Some(ISSUED_AT), 1);
     assert_eq!(
         access
             .peers
@@ -1290,7 +1326,8 @@ fn peer_future_dated_replay_after_restart_refuses() {
     let keypair = Keypair::generate();
     let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
-    let before_restart = nonce_cache();
+    let store = test_peer_replay_store();
+    let before_restart = nonce_cache_on(&store);
     let led = signed_peer_headers(
         &keypair,
         NODE_B,
@@ -1308,7 +1345,7 @@ fn peer_future_dated_replay_after_restart_refuses() {
             &before_restart,
         )
         .test_unwrap();
-    let restarted = PeerNonceCache::new(Some(ISSUED_AT + 1), 1);
+    let restarted = test_nonce_cache(&store, Some(ISSUED_AT + 1), 1);
     assert_eq!(
         access
             .peers
@@ -1349,7 +1386,8 @@ fn peer_replay_after_restart_with_clock_moved_back_refuses() {
     let keypair = Keypair::generate();
     let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
     let target = status_target();
-    let before_restart = nonce_cache();
+    let store = test_peer_replay_store();
+    let before_restart = nonce_cache_on(&store);
     let older = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT - 10, None);
     let latest = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
     for (headers, now) in [(&older, ISSUED_AT - 10), (&latest, ISSUED_AT)] {
@@ -1364,7 +1402,7 @@ fn peer_replay_after_restart_with_clock_moved_back_refuses() {
             )
             .test_unwrap();
     }
-    let restarted = PeerNonceCache::new(Some(ISSUED_AT - 20), 1);
+    let restarted = test_nonce_cache(&store, Some(ISSUED_AT - 20), 1);
     for headers in [&latest, &older] {
         assert_eq!(
             access
@@ -1379,6 +1417,169 @@ fn peer_replay_after_restart_with_clock_moved_back_refuses() {
                 .test_unwrap_err(),
             PeerAuthError::Stale
         );
+    }
+}
+
+fn two_peer_access(node_b: &Keypair, node_c: &Keypair) -> TrustAccessConfig {
+    TrustAccessConfig::from_toml_str(&config(&format!(
+        "{}{}{}",
+        reader(),
+        peer(NODE_B, node_b, REPLICA_SCOPES),
+        peer(NODE_C, node_c, REPLICA_SCOPES)
+    )))
+    .test_unwrap()
+}
+
+fn verify_at(
+    access: &TrustAccessConfig,
+    headers: &HeaderMap,
+    now: i64,
+    nonces: &PeerNonceCache,
+) -> Result<AuthenticatedPeer, PeerAuthError> {
+    access.peers.verify(
+        headers,
+        &status_target(),
+        now,
+        Scope::ClusterReplicate,
+        nonces,
+    )
+}
+
+#[test]
+fn peer_without_a_stored_mark_after_restart_gets_the_start_plus_lead_floor() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let access = two_peer_access(&node_b, &node_c);
+    let target = status_target();
+    let store = test_peer_replay_store();
+    let before_restart = test_nonce_cache(
+        &store,
+        Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
+        2,
+    );
+    let from_b = signed_peer_headers(&node_b, NODE_B, &target, ISSUED_AT, None);
+    verify_at(&access, &from_b, ISSUED_AT, &before_restart).test_unwrap();
+    let start = ISSUED_AT - 20;
+    let restarted = test_nonce_cache(&store, Some(start), 2);
+    let at_floor = start + CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS;
+    let now = start + 10;
+    let c_at_floor = signed_peer_headers(&node_c, NODE_C, &target, at_floor, None);
+    assert_eq!(
+        verify_at(&access, &c_at_floor, now, &restarted).test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+    let c_above_floor = signed_peer_headers(&node_c, NODE_C, &target, at_floor + 1, None);
+    verify_at(&access, &c_above_floor, now, &restarted).test_unwrap();
+    let b_above_start_floor = signed_peer_headers(&node_b, NODE_B, &target, at_floor + 1, None);
+    assert_eq!(
+        verify_at(&access, &b_above_start_floor, now, &restarted).test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+    assert_eq!(
+        store.high_waters().test_unwrap(),
+        std::collections::BTreeMap::from([
+            (NODE_B.to_string(), ISSUED_AT),
+            (NODE_C.to_string(), at_floor + 1),
+        ])
+    );
+}
+
+#[test]
+fn peer_high_water_marks_are_independent_per_peer() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let access = two_peer_access(&node_b, &node_c);
+    let target = status_target();
+    let store = test_peer_replay_store();
+    let before_restart = test_nonce_cache(
+        &store,
+        Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
+        2,
+    );
+    let b_late = signed_peer_headers(&node_b, NODE_B, &target, ISSUED_AT + 3, None);
+    verify_at(&access, &b_late, ISSUED_AT, &before_restart).test_unwrap();
+    let c_early = signed_peer_headers(&node_c, NODE_C, &target, ISSUED_AT, None);
+    verify_at(&access, &c_early, ISSUED_AT, &before_restart).test_unwrap();
+    let restarted = test_nonce_cache(&store, Some(ISSUED_AT - 30), 2);
+    let c_next = signed_peer_headers(&node_c, NODE_C, &target, ISSUED_AT + 1, None);
+    verify_at(&access, &c_next, ISSUED_AT, &restarted).test_unwrap();
+    let b_same_second = signed_peer_headers(&node_b, NODE_B, &target, ISSUED_AT + 3, None);
+    assert_eq!(
+        verify_at(&access, &b_same_second, ISSUED_AT, &restarted).test_unwrap_err(),
+        PeerAuthError::Stale
+    );
+    let b_next = signed_peer_headers(&node_b, NODE_B, &target, ISSUED_AT + 4, None);
+    verify_at(&access, &b_next, ISSUED_AT, &restarted).test_unwrap();
+}
+
+#[test]
+fn peer_requests_in_one_second_share_one_durable_mark() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    let target = status_target();
+    let store = test_peer_replay_store();
+    let nonces = nonce_cache_on(&store);
+    for _ in 0..3 {
+        let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+        verify_at(&access, &headers, ISSUED_AT, &nonces).test_unwrap();
+    }
+    let earlier = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT - 1, None);
+    verify_at(&access, &earlier, ISSUED_AT, &nonces).test_unwrap();
+    assert_eq!(
+        store.high_waters().test_unwrap(),
+        std::collections::BTreeMap::from([(NODE_B.to_string(), ISSUED_AT)])
+    );
+}
+
+#[test]
+fn peer_replay_store_fault_refuses_with_503() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    let target = status_target();
+    let path = test_peer_replay_db_path();
+    let store = Arc::new(SqliteClusterPeerReplayStore::open(&path).test_unwrap());
+    let nonces = nonce_cache_on(&store);
+    rusqlite::Connection::open(&path)
+        .test_unwrap()
+        .execute_batch("DROP TABLE cluster_peer_replay_high_water;")
+        .test_unwrap();
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    let error = verify_at(&access, &headers, ISSUED_AT, &nonces).test_unwrap_err();
+    assert_eq!(error, PeerAuthError::PeerReplayStoreUnavailable);
+    assert_eq!(
+        error.to_string(),
+        "cluster peer replay high-water store is unavailable"
+    );
+    assert_eq!(error.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        verify_at(&access, &headers, ISSUED_AT, &nonces).test_unwrap_err(),
+        PeerAuthError::PeerReplayStoreUnavailable
+    );
+    assert!(matches!(
+        PeerNonceCache::open(Arc::clone(&store), Some(ISSUED_AT), 1).test_unwrap_err(),
+        ClusterPeerReplayStoreError::Sqlite(_)
+    ));
+}
+
+#[test]
+fn concurrent_duplicate_peer_requests_accept_exactly_once() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    let target = status_target();
+    let nonces = nonce_cache();
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    let outcomes: Vec<Result<AuthenticatedPeer, PeerAuthError>> = std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..8)
+            .map(|_| scope.spawn(|| verify_at(&access, &headers, ISSUED_AT, &nonces)))
+            .collect();
+        workers
+            .into_iter()
+            .map(|worker| worker.join().test_unwrap())
+            .collect()
+    });
+    assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
+    for refused in outcomes.iter().filter_map(|outcome| outcome.as_ref().err()) {
+        assert_eq!(*refused, PeerAuthError::ReplayedNonce);
     }
 }
 
@@ -1501,7 +1702,11 @@ fn peer_nonce_quota_keeps_other_peers_admitted() {
     )))
     .test_unwrap();
     let target = status_target();
-    let nonces = PeerNonceCache::new(Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS), 2);
+    let nonces = test_nonce_cache(
+        &test_peer_replay_store(),
+        Some(ISSUED_AT - CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
+        2,
+    );
     for index in 0..CLUSTER_PEER_NONCE_CACHE_CAPACITY / 2 {
         nonces
             .record(NODE_B, &format!("{index:064x}"), ISSUED_AT, ISSUED_AT)

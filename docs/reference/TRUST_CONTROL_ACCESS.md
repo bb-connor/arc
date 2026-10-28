@@ -155,19 +155,21 @@ or another deployment, a stale `issued_at`, and a key that is not pinned in its
 window, holds at most 65,536 of them, and refuses every new peer request with
 503 while that store is full.
 
-Nonces live in memory. A restarted receiver refuses every peer request issued
-at or before its start time plus 5 seconds, so no request an earlier process
-accepted is admitted again, including one issued in the restart second or
-dated ahead of the receiver clock. This relies on an operational assumption:
-the receiver clock does not step backward across a restart, so the earlier
-process saw no receiver time later than the new start. A backward step can
-readmit a request the earlier process accepted.
+Each receiver also keeps, in its `--cluster-peer-replay-db` database, one row
+per peer: the highest `issued_at` it has accepted from that peer. The row is
+raised before the request is admitted, and a store that cannot be read or
+raised refuses the request with 503
+(`cluster peer replay high-water store is unavailable`). A restarted receiver
+loads every row and refuses each request issued at or before its peer's row,
+so no request an earlier process accepted is admitted again. Replay closure
+across a restart does not depend on the receiver clock: it holds even when the
+receiver clock steps backward across the restart.
 
-After a restart, a peer whose clock matches the receiver is refused for the
-first 6 seconds. A peer whose clock leads by L seconds (at most 5) is admitted
-L seconds sooner: a peer leading by 5 seconds can be accepted one second after
-the receiver starts, with `issued_at` 6 seconds after the start. A peer whose
-clock lags by L seconds is refused for L seconds more.
+A peer without a row (one that has not been accepted since the database was
+created) is refused for every request issued at or before the receiver's
+start time plus 5 seconds. A missing or reset database therefore never admits
+more than that clock-based bound. Inside one process, requests from one peer
+with distinct nonces in the same second are all admitted.
 
 Followers forward writes to the leader with the caller's own bearer secret, so
 the leader applies the caller's credential, scopes, and tenant authority.

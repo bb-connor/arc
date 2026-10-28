@@ -12,7 +12,8 @@ use tower::ServiceExt;
 
 use super::super::caller_credentials::tests::{
     config, credential, fresh_nonce, peer, signed_peer_headers, signed_peer_headers_for,
-    withhold_peer_scope, DEPLOYMENT, REPLICA_SCOPES, SELF_NODE,
+    test_nonce_cache, test_peer_replay_store, withhold_peer_scope, DEPLOYMENT, REPLICA_SCOPES,
+    SELF_NODE,
 };
 use super::super::caller_credentials::{
     sign_cluster_peer_request, AuthenticatedPeer, PeerAddressing, TrustAccess, TrustAccessConfig,
@@ -306,12 +307,16 @@ fn authorizer_for(listener: Listener, text: &str) -> RouteAuthorizer {
 fn authorizer_from(listener: Listener, config: TrustAccessConfig) -> RouteAuthorizer {
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
-    let nonces = PeerNonceCache::new(Some(started_before_now()), access.peers().iter().count());
-    RouteAuthorizer::with_nonce_cache(
+    let nonces = test_nonce_cache(
+        &test_peer_replay_store(),
+        Some(started_before_now()),
+        access.peers().iter().count(),
+    );
+    RouteAuthorizer::new(
         listener,
         Arc::new(access),
         Arc::new(FixedClock::new(NOW)),
-        nonces,
+        Some(Arc::new(nonces)),
     )
 }
 
@@ -1088,15 +1093,17 @@ fn mounted_with_nonce_capacity(listener: Listener, text: &str, capacity: usize) 
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = PeerNonceCache::with_capacity(
+        test_peer_replay_store(),
         Some(started_before_now()),
         access.peers().iter().count(),
         capacity,
-    );
-    mounted_router(RouteAuthorizer::with_nonce_cache(
+    )
+    .test_unwrap();
+    mounted_router(RouteAuthorizer::new(
         listener,
         Arc::new(access),
         Arc::new(FixedClock::new(NOW)),
-        nonces,
+        Some(Arc::new(nonces)),
     ))
 }
 
@@ -1173,10 +1180,16 @@ async fn peer_request_signed_at_the_authorizer_start_refuses_as_stale() {
     let config = TrustAccessConfig::from_toml_str(&fixture_config(&node_b, &node_c)).test_unwrap();
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let nonces = test_nonce_cache(
+        &test_peer_replay_store(),
+        Some(i64::try_from(NOW).test_unwrap()),
+        access.peers().iter().count(),
+    );
     let internal = mounted_router(RouteAuthorizer::new(
         Listener::Internal,
         Arc::new(access),
         Arc::new(FixedClock::new(NOW)),
+        Some(Arc::new(nonces)),
     ));
     let rule = peer_row("/v1/internal/cluster/status");
     let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
@@ -1194,16 +1207,44 @@ async fn peer_route_refuses_with_503_when_the_receiver_clock_is_unavailable() {
     let config = TrustAccessConfig::from_toml_str(&fixture_config(&node_b, &node_c)).test_unwrap();
     let node_keypair = config.peers.identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let nonces = test_nonce_cache(
+        &test_peer_replay_store(),
+        None,
+        access.peers().iter().count(),
+    );
     let internal = mounted_router(RouteAuthorizer::new(
         Listener::Internal,
         Arc::new(access),
         Arc::new(FixedClock::new(u64::MAX)),
+        Some(Arc::new(nonces)),
     ));
     let rule = peer_row("/v1/internal/cluster/status");
     let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(
         body.contains("receiver clock is unavailable for cluster peer authentication"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn peer_route_without_a_replay_store_refuses_with_503() {
+    let node_b = Keypair::generate();
+    let node_c = Keypair::generate();
+    let config = TrustAccessConfig::from_toml_str(&fixture_config(&node_b, &node_c)).test_unwrap();
+    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    let internal = mounted_router(RouteAuthorizer::new(
+        Listener::Internal,
+        Arc::new(access),
+        Arc::new(FixedClock::new(NOW)),
+        None,
+    ));
+    let rule = peer_row("/v1/internal/cluster/status");
+    let (status, body) = call(&internal, rule, "", peer_headers(&node_b, NODE_B, rule, "")).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(
+        body.contains("cluster peer replay high-water store is unavailable"),
         "{body}"
     );
 }

@@ -135,6 +135,16 @@ fn spawn_trust_service(
         args.push("--policy".to_string());
         args.push(policy_path.to_str().expect("policy path").to_string());
     }
+    if !peer_urls.is_empty() {
+        args.push("--cluster-peer-replay-db".to_string());
+        args.push(
+            budget_db_path
+                .with_extension("peer-replay.sqlite3")
+                .to_str()
+                .expect("peer replay db path")
+                .to_string(),
+        );
+    }
     register_internal_peer(advertise_url, peer_urls);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))

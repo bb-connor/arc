@@ -100,6 +100,7 @@ fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         authority_keyring_config_path: None,
         authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
+        cluster_peer_replay_db_path: None,
         joint_authority_db_path: Some(joint_authority_db_path),
         fiscal_runtime: None,
         enterprise_providers_file: None,

@@ -88,6 +88,10 @@ Clustered deployments additionally require:
   signing custodian and `chio federation authority replication-pin` on every
   follower (see `docs/security/kernel-signing-authority.md`). Startup refuses a
   clustered authority database without one.
+- `--cluster-peer-replay-db <path>`: a SQLite database, private to this node,
+  that holds each pinned peer's highest accepted request issue time. Startup
+  refuses a node with pinned peers without it, and refuses a database it cannot
+  read. Keep it on durable storage beside the other node databases.
 
 ### Remote MCP Edge
 
