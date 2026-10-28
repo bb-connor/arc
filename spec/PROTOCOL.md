@@ -1935,11 +1935,30 @@ references. AP2, x402, ACP-Commerce, or PSP payloads are accepted only as
 digest-bound protocol payload evidence named by the mandate or payment
 artifact; they do not replace Chio receipts or widen payment authority.
 
+An order context MAY pin `escrow_digest`, the sha256 of the canonical JSON of a
+`chio.commerce.escrow-ledger.v1` custody ledger. The ledger's custody account
+MUST be `chio:commerce:escrow:custody`, its depositor, beneficiary, and custody
+accounts MUST be pairwise distinct, and its legs MUST be exactly the lock leg
+(depositor to custody) and, once `released`, the release leg (custody to
+beneficiary), each for the full ledger amount. A verifier rejects a pinned
+digest without a supplied ledger, a supplied ledger without a pinned digest, a
+ledger whose canonical digest differs from the pin, and a ledger whose order id,
+amount, currency, depositor, or beneficiary differ from the order id, quote
+amount, quote currency, buyer subject, or merchant subject of the order
+context. A ledger is `locked` from `settlement_packet_assembled` through
+`settlement_observed` and `released` from `settlement_reconciled` on; earlier
+states MUST NOT pin a digest. A ledger is locked only against a
+`chio.commerce.reservation-receipt.v1` that a pinned reservation authority
+signed for the order and the exact offer token, and released only against a
+matched capital execution instruction that a pinned execution authority signed
+for the ledger amount, beneficiary, and settlement reconciliation reference.
+
 Commerce verification fails closed on currency drift, amount drift,
 merchant/provider mismatch, untrusted provider evidence, expired or overused
 mandates, missing authority receipts, PSP status that does not support the
-claimed state, settlement packet mismatch, duplicate completion, or a public
-order passport whose summary digests do not match the private order context.
+claimed state, settlement packet mismatch, escrow ledger drift, duplicate
+completion, or a public order passport whose summary digests do not match the
+private order context.
 
 ### 6.4.5 Disclosure And Lineage Family
 

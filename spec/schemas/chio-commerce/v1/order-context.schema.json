@@ -207,6 +207,9 @@
       "type": "string",
       "minLength": 1
     },
+    "escrow_digest": {
+      "$ref": "#/$defs/sha256"
+    },
     "provider_passport_ref": {
       "type": "string",
       "minLength": 1
