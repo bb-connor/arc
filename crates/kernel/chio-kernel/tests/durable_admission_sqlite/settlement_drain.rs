@@ -2,6 +2,7 @@ use super::*;
 use chio_core::receipt::{
     body::{ChioReceipt, ChioReceiptBody},
     decision::{Decision, ToolCallAction},
+    economics::{FinancialReceiptMetadata, SettlementStatus},
     kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel},
 };
 use chio_kernel::{PendingSettlementObservation, SettlementDrainTrust};
@@ -64,8 +65,19 @@ fn settlement_drain_completes_257_persisted_claims() -> Result<(), Box<dyn Error
             content_hash: format!("{sequence:064x}"),
             policy_hash: sha256_hex(b"sqlite-drain-policy"),
             evidence: Vec::new(),
-            metadata: Some(serde_json::json!({"financial": {
-                "cost_charged": 100, "currency": "USD", "settlement_status": "settled"
+            metadata: Some(serde_json::json!({"financial": FinancialReceiptMetadata {
+                grant_index: 0,
+                cost_charged: 100,
+                currency: "USD".to_string(),
+                budget_remaining: Some(900),
+                budget_total: Some(1000),
+                delegation_depth: 0,
+                root_budget_holder: "sqlite-drain-agent".to_string(),
+                payment_reference: None,
+                settlement_status: SettlementStatus::Settled,
+                cost_breakdown: None,
+                oracle_evidence: None,
+                attempted_cost: None,
             }})),
             trust_level: TrustLevel::default(),
             tenant_id: None,
