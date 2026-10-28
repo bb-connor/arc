@@ -4970,9 +4970,9 @@ files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
 first_seen = "de519d7776"
 
 [[schema]]
-value = "chio.runtime-replay-source-seal.v1"
-files = ["crates/core/chio-core-types/src/runtime_replay.rs"]
-first_seen = "7e54c14a60"
+value = "chio.runtime-source-qualification.v1"
+files = ["crates/core/chio-core-types/src/runtime_source.rs"]
+first_seen = "e566536248"
 
 [[schema]]
 value = "chio.runtime.admission-bundle.v1"
