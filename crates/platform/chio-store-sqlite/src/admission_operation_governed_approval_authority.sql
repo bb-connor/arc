@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS governed_approval_replay_authorities (
         AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     destination_store_uuid TEXT NOT NULL CHECK (
-        typeof(destination_store_uuid) = 'text' AND length(destination_store_uuid) BETWEEN 1 AND 512
+        typeof(destination_store_uuid) = 'text'
+        AND length(destination_store_uuid) BETWEEN 1 AND 512 AND octet_length(destination_store_uuid) <= 512 AND instr(destination_store_uuid, char(0)) = 0
     ),
     capacity INTEGER NOT NULL CHECK (typeof(capacity) = 'integer' AND capacity BETWEEN 1 AND 65536),
     installed_at_unix_ms INTEGER NOT NULL CHECK (
