@@ -127,3 +127,44 @@ async fn host_reader_stop_token_writer_refuses_symlink_without_truncation() -> T
     assert_eq!(std::fs::read(outside.path())?, b"preserve these bytes");
     Ok(())
 }
+
+#[tokio::test]
+async fn host_reader_stop_token_writer_preserves_hardlink_target() -> TestResult {
+    use std::os::unix::fs::MetadataExt;
+    let directory = tempfile::tempdir()?;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let lease = Lease::acquire(directory.path(), true)?;
+    let outside = tempfile::NamedTempFile::new()?;
+    std::fs::write(outside.path(), b"outside file must survive")?;
+    let path = directory.path().join(TOKEN_FILE);
+    std::fs::hard_link(outside.path(), &path)?;
+    let server = ControlServer::bind(&lease)?;
+    assert_eq!(std::fs::read(outside.path())?, b"outside file must survive");
+    assert_eq!(std::fs::read(&path)?, server.token.as_bytes());
+    assert_ne!(
+        std::fs::metadata(&path)?.ino(),
+        outside.as_file().metadata()?.ino()
+    );
+    assert_eq!(std::fs::metadata(&path)?.nlink(), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn host_reader_stop_token_writer_replaces_stale_public_mode() -> TestResult {
+    use std::os::unix::fs::MetadataExt;
+    let directory = tempfile::tempdir()?;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let lease = Lease::acquire(directory.path(), true)?;
+    let path = directory.path().join(TOKEN_FILE);
+    std::fs::write(&path, b"old token")?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
+    let before = std::fs::metadata(&path)?.ino();
+    let server = ControlServer::bind(&lease)?;
+    let metadata = std::fs::metadata(&path)?;
+    assert_eq!(metadata.mode() & 0o777, 0o600);
+    assert_ne!(metadata.ino(), before);
+    assert_eq!(metadata.nlink(), 1);
+    assert_eq!(metadata.uid(), rustix::process::geteuid().as_raw());
+    assert_eq!(std::fs::read(&path)?, server.token.as_bytes());
+    Ok(())
+}
