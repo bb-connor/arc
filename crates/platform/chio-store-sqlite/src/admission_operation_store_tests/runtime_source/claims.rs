@@ -324,11 +324,12 @@ fn multi_resource_conflict_is_atomic() -> TestResult {
         .store
         .claim_runtime_participants(&first, &lease, &claim, now_ms())?;
     let (second, lease) = setup(&fixture, "second-owner")?;
-    for resources in [vec![
-        (Kind::DestructiveLease, "free"),
-        (Kind::TreatyContinuation, "free"),
-        (Kind::SwarmContinuation, "swarm"),
-    ]] {
+    {
+        let resources = [
+            (Kind::DestructiveLease, "free"),
+            (Kind::TreatyContinuation, "free"),
+            (Kind::SwarmContinuation, "swarm"),
+        ];
         let candidate = intent(&second, &source, "conflict", &resources)?;
         let count = global_count(&fixture.store);
         assert!(fixture
