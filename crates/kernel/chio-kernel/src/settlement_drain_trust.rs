@@ -26,7 +26,7 @@ impl SettlementDrainTrust {
             return Err(SettlementDrainTrustError::TooManyKeys);
         }
         for (index, key) in keys.iter().enumerate() {
-            if keys[..index].contains(key) {
+            if keys.iter().take(index).any(|previous| previous == key) {
                 return Err(SettlementDrainTrustError::DuplicateKey);
             }
         }

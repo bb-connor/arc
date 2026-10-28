@@ -57,9 +57,10 @@ impl ChioKernel {
                             ),
                         )
                     }
-                    Some(Ok(receipts)) => {
-                        self.loaded_settlement_status(claim, Ok(receipts[index].as_ref()))
-                    }
+                    Some(Ok(receipts)) => self.loaded_settlement_status(
+                        claim,
+                        Ok(receipts.get(index).and_then(Option::as_ref)),
+                    ),
                     Some(Err(_)) | None => self.drained_settlement_status(claim),
                 };
                 let completion = runtime
