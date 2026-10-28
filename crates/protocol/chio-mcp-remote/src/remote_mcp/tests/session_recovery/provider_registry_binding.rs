@@ -87,6 +87,27 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
         provider_change.shutdown_upstream_transport()?;
     }
 
+    std::fs::write(
+        &registry_path,
+        br#"{"version":"chio.enterprise-providers.v1","providers":{}}"#,
+    )?;
+    if enterprise {
+        let removed = factory
+            .restore_session(&record)
+            .err()
+            .ok_or("a removed provider still resumed its session")?;
+        assert_eq!(removed.to_string(), "urn:chio:error:cli:json");
+        assert!(matches!(
+            EnterpriseProviderRegistryRefusal::find(&removed),
+            Some(EnterpriseProviderRegistryRefusal::Invalid(_))
+        ));
+    } else {
+        let Some(RestoredSession::Serve(removed)) = factory.restore_session(&record)? else {
+            return Err("removing a provider invalidated a static-bearer session".into());
+        };
+        removed.shutdown_upstream_transport()?;
+    }
+
     write_registry(&registry_path, true);
     let Some(RestoredSession::Serve(restored)) = factory.restore_session(&record)? else {
         return Err("a session under the restored provider registry was not restorable".into());
