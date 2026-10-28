@@ -26,7 +26,7 @@ use crate::service::{
     canonical_json_byte_array_length, canonical_json_string_length, canonical_json_u64_length,
     checked_canonical_length, AuthenticatedIpcRequest, BoundedZeroizingByteArray,
     BrokerExecuteOutcome, BrokerIpcHandler, BrokerService, IpcOperation, IpcResponse,
-    ZeroizingCanonicalJsonWriter,
+    SensitiveJsonRefusal, SensitiveJsonResult, ZeroizingCanonicalJsonWriter,
 };
 use crate::{validate_identifier, BrokerError, Result};
 
@@ -241,6 +241,19 @@ pub fn encode_credential_mutation_payload(
 }
 
 fn decode_canonical_credential_mutation_payload(bytes: &[u8]) -> Result<CredentialMutationCommand> {
+    let command = parse_canonical_credential_mutation(bytes)?;
+    let canonical = canonical_credential_mutation_payload(&command)?;
+    if canonical.as_slice() != bytes {
+        return Err(BrokerError::InvalidRequest(
+            "IPC credential mutation payload is not canonical JSON".to_string(),
+        ));
+    }
+    Ok(command)
+}
+
+fn parse_canonical_credential_mutation(
+    bytes: &[u8],
+) -> SensitiveJsonResult<CredentialMutationCommand> {
     let mut parser = crate::service::SensitiveJsonParser::new(bytes);
     parser.expect_literal(b"{\"credential\":{\"credentialId\":")?;
     let credential_id = parser.parse_string::<512>()?;
@@ -255,11 +268,7 @@ fn decode_canonical_credential_mutation_payload(bytes: &[u8]) -> Result<Credenti
         "rotate" => CredentialMutationKind::Rotate,
         "disable" => CredentialMutationKind::Disable,
         "delete" => CredentialMutationKind::Delete,
-        _ => {
-            return Err(BrokerError::InvalidRequest(
-                "sensitive JSON payload is invalid".to_string(),
-            ));
-        }
+        _ => return Err(SensitiveJsonRefusal::UnknownOperation),
     };
     parser.expect_literal(b",\"schema\":")?;
     let schema = parser.parse_string::<128>()?;
@@ -277,12 +286,6 @@ fn decode_canonical_credential_mutation_payload(bytes: &[u8]) -> Result<Credenti
         },
         secret,
     };
-    let canonical = canonical_credential_mutation_payload(&command)?;
-    if canonical.as_slice() != bytes {
-        return Err(BrokerError::InvalidRequest(
-            "IPC credential mutation payload is not canonical JSON".to_string(),
-        ));
-    }
     Ok(command)
 }
 
@@ -984,6 +987,23 @@ mod tests {
     {
     }
 
+    fn credential_mutation_refusal(bytes: &[u8]) -> SensitiveJsonRefusal {
+        match parse_canonical_credential_mutation(bytes) {
+            Err(refusal) => refusal,
+            Ok(_) => panic!("credential mutation parse accepted a refused vector"),
+        }
+    }
+
+    fn assert_sensitive_payload_invalid<T>(result: Result<T>) {
+        let Err(error) = result else {
+            panic!("credential mutation decode accepted a refused vector");
+        };
+        assert!(
+            matches!(&error, BrokerError::InvalidRequest(message) if message == "sensitive JSON payload is invalid"),
+            "{error:?}"
+        );
+    }
+
     #[test]
     fn credential_mutation_parser_is_strictly_canonical_redacted_and_zeroizing() {
         fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
@@ -1011,41 +1031,70 @@ mod tests {
         drop(decoded);
         assert_eq!(crate::service::sensitive_drop_observation().0, 1);
 
-        let reordered = br#"{"schema":"chio.broker-credential-mutation.v1","credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(reordered).is_err());
-        let duplicate = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9],"secret":[10]}"#;
-        assert!(decode_canonical_credential_mutation_payload(duplicate).is_err());
-        let duplicate_nested = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","provider":"other","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(duplicate_nested).is_err());
-        let unknown = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9],"unexpected":true}"#;
-        assert!(decode_canonical_credential_mutation_payload(unknown).is_err());
-        let unsafe_integer = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":9007199254740992},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(unsafe_integer).is_err());
-        let exponent_version = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1e0},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(exponent_version).is_err());
-        let negative_version = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":-1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(negative_version).is_err());
-        let fractional_version = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1.0},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(fractional_version).is_err());
-        let escaped_key = br#"{"credential":{"credential\u0049d":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(escaped_key).is_err());
-        let surrogate_pair = br#"{"credential":{"credentialId":"\ud83d\ude00","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
-        assert!(decode_canonical_credential_mutation_payload(surrogate_pair).is_err());
-        let exponent_byte = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7e0]}"#;
-        assert!(decode_canonical_credential_mutation_payload(exponent_byte).is_err());
-        let negative_byte = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[-7]}"#;
-        assert!(decode_canonical_credential_mutation_payload(negative_byte).is_err());
-        let fractional_byte = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7.0]}"#;
-        assert!(decode_canonical_credential_mutation_payload(fractional_byte).is_err());
-        let trailing_data = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}null"#;
-        assert!(decode_canonical_credential_mutation_payload(trailing_data).is_err());
-        let deep_nesting = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[[[[7]]]]}"#;
-        assert!(decode_canonical_credential_mutation_payload(deep_nesting).is_err());
+        let reordered: &[u8] = br#"{"schema":"chio.broker-credential-mutation.v1","credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","secret":[7,8,9]}"#;
+        let duplicate: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9],"secret":[10]}"#;
+        let duplicate_nested: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","provider":"other","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let unknown: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9],"unexpected":true}"#;
+        let unsafe_integer: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":9007199254740992},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let exponent_version: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1e0},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let negative_version: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":-1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let fractional_version: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1.0},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let escaped_key: &[u8] = br#"{"credential":{"credential\u0049d":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let surrogate_pair: &[u8] = br#"{"credential":{"credentialId":"\ud83d\ude00","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let exponent_byte: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7e0]}"#;
+        let negative_byte: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[-7]}"#;
+        let fractional_byte: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7.0]}"#;
+        let trailing_data: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}null"#;
+        let deep_nesting: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[[[[7]]]]}"#;
+        let unknown_mutation: &[u8] = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"rename","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#;
+        let refused = [
+            (
+                reordered,
+                SensitiveJsonRefusal::UnexpectedToken(b"{\"credential\":{\"credentialId\":"),
+            ),
+            (duplicate, SensitiveJsonRefusal::UnexpectedToken(b"}")),
+            (
+                duplicate_nested,
+                SensitiveJsonRefusal::UnexpectedToken(b",\"version\":"),
+            ),
+            (unknown, SensitiveJsonRefusal::UnexpectedToken(b"}")),
+            (unsafe_integer, SensitiveJsonRefusal::IntegerOverflow),
+            (
+                exponent_version,
+                SensitiveJsonRefusal::UnexpectedToken(b"},\"mutation\":"),
+            ),
+            (negative_version, SensitiveJsonRefusal::NotUnsignedInteger),
+            (
+                fractional_version,
+                SensitiveJsonRefusal::UnexpectedToken(b"},\"mutation\":"),
+            ),
+            (
+                escaped_key,
+                SensitiveJsonRefusal::UnexpectedToken(b"{\"credential\":{\"credentialId\":"),
+            ),
+            (surrogate_pair, SensitiveJsonRefusal::NonCanonicalEscape),
+            (exponent_byte, SensitiveJsonRefusal::MissingArrayDelimiter),
+            (negative_byte, SensitiveJsonRefusal::NotUnsignedInteger),
+            (fractional_byte, SensitiveJsonRefusal::MissingArrayDelimiter),
+            (trailing_data, SensitiveJsonRefusal::TrailingData),
+            (deep_nesting, SensitiveJsonRefusal::NotUnsignedInteger),
+            (unknown_mutation, SensitiveJsonRefusal::UnknownOperation),
+        ];
+        for (vector, refusal) in refused {
+            assert_eq!(credential_mutation_refusal(vector), refusal);
+            assert_sensitive_payload_invalid(decode_canonical_credential_mutation_payload(vector));
+        }
 
         let mut malformed_utf8 = Zeroizing::new(br#"{"credential":{"credentialId":""#.to_vec());
         malformed_utf8.push(0xff);
         malformed_utf8.extend_from_slice(br#"","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,8,9]}"#);
-        assert!(decode_canonical_credential_mutation_payload(&malformed_utf8).is_err());
+        assert_eq!(
+            credential_mutation_refusal(&malformed_utf8),
+            SensitiveJsonRefusal::InvalidUtf8
+        );
+        assert_sensitive_payload_invalid(decode_canonical_credential_mutation_payload(
+            &malformed_utf8,
+        ));
 
         let malformed_secret = br#"{"credential":{"credentialId":"credential-ipc","provider":"generic-https","version":1},"mutation":"provision","schema":"chio.broker-credential-mutation.v1","secret":[7,"secret-canary"]}"#;
         crate::service::reset_sensitive_drop_observer();
