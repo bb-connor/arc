@@ -63,3 +63,36 @@ fn runtime_source_utf16le_install_round_trip() -> Result<(), Box<dyn Error>> {
 fn runtime_source_utf16be_install_round_trip() -> Result<(), Box<dyn Error>> {
     round_trip("UTF-16be")
 }
+
+#[test]
+fn runtime_source_digest_shape_refuses_before_decoding() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture();
+    install(&fixture, &Source::new(&fixture, Behavior::Normal))?;
+    let mut connection = fixture.store.connection()?;
+    connection.execute_batch(
+        "DROP TRIGGER runtime_source_qualifications_no_update;
+         PRAGMA ignore_check_constraints = ON;",
+    )?;
+    for column in ["qualification_id", "record_digest"] {
+        for malformed in [
+            "a".repeat(63),
+            "a".repeat(65),
+            "A".repeat(64),
+            "g".repeat(64),
+            format!("{}\0", "a".repeat(64)),
+        ] {
+            let transaction = connection.transaction()?;
+            transaction.execute(
+                &format!("UPDATE runtime_source_qualifications SET {column} = ?1"),
+                [malformed],
+            )?;
+            assert_eq!(
+                crate::admission_operation_store::runtime_source::verify_all_records(&transaction),
+                Err("runtime source row violates storage bounds".into()),
+                "{column}",
+            );
+            transaction.rollback()?;
+        }
+    }
+    Ok(())
+}
