@@ -8,7 +8,7 @@ use chio_core::economic_continuity::{
 };
 use chio_kernel::admission_operation::{
     verified_economic_cancellation_projection, verify_economic_cancellation_terminal_replay,
-    AdmissionIdentifier, AdmissionMutationSequencer, AdmissionOperationError, AdmissionOperationId,
+    AdmissionMutationSequencer, AdmissionOperationError, AdmissionOperationId,
     AdmissionOperationState, AdmissionProjectionContext, AdmissionTerminal,
     QualifiedAdmissionOperationStoreExt, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
 };
