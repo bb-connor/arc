@@ -152,7 +152,7 @@ fn a_claim_value_refuses_an_unknown_commitment_member() {
         r#"{{"commit":"sha256:{}","salt_ref":"anchor.sub","pad":1}}"#,
         "a9".repeat(32)
     );
-    let expected = "data did not match any variant of untagged enum LosslessTarget";
+    let expected = "data did not match any variant of untagged enum ClaimValue";
     let direct = ClaimValue::deserialize(&mut serde_json::Deserializer::from_str(&text))
         .err()
         .map(|error| error.to_string());
