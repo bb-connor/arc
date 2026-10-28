@@ -31,8 +31,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{CommerceEscrowError, CommerceOrderError};
 use crate::ids::{
-    COMMERCE_ESCROW_LEDGER_SCHEMA_ID, COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID,
-    COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
+    COMMERCE_ESCROW_ACCEPTANCE_SCHEMA_ID, COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+    COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID, COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
 };
 use crate::types::{CommerceOrderContext, CommerceSettlementPacket};
 
@@ -261,10 +261,35 @@ pub struct CommerceReservationReceipt {
     pub token_offer_id: String,
     /// sha256 hex over the canonical JSON of the offer token.
     pub token_offer_sha256: String,
+    /// The account whose funds are reserved. Equals the order `buyer_subject`
+    /// and the signed acceptance `buyer_subject`, which binds the accepting
+    /// key to the account the lock debits.
+    pub depositor_account: String,
     pub reserved_amount: MonetaryAmount,
 }
 
 pub type SignedCommerceReservationReceipt = SignedExportEnvelope<CommerceReservationReceipt>;
+
+/// The offer token subject's signed acceptance of one order quote.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CommerceEscrowAcceptance {
+    pub schema: String,
+    /// Equals the order `order_id`.
+    pub order_id: String,
+    /// Equals the order `quote_sha256`, which covers amount and currency.
+    pub quote_sha256: String,
+    /// Equals the order `buyer_subject`.
+    pub buyer_subject: String,
+    /// Equals the offer token `id`.
+    pub token_offer_id: String,
+    /// sha256 hex over the canonical JSON of the offer token.
+    pub token_offer_sha256: String,
+    /// Unix seconds; the offer token must be valid at this time.
+    pub accepted_at: u64,
+}
+
+pub type SignedCommerceEscrowAcceptance = SignedExportEnvelope<CommerceEscrowAcceptance>;
 
 /// Inputs to [`accept`].
 pub struct CommerceEscrowAcceptRequest<'a> {
@@ -272,10 +297,8 @@ pub struct CommerceEscrowAcceptRequest<'a> {
     pub order_context: &'a CommerceOrderContext,
     /// Its grants' `max_total_cost` sum is the custodial liability.
     pub token_offer: &'a CapabilityToken,
-    /// Must equal the offer token subject.
-    pub acceptor: &'a PublicKey,
-    /// Unix seconds; the offer token must be valid at this time.
-    pub accepted_at: u64,
+    /// Signed by the offer token subject.
+    pub acceptance: &'a SignedCommerceEscrowAcceptance,
     pub reservation: &'a SignedCommerceReservationReceipt,
     /// Pinned from verified launch configuration, never from the reservation.
     pub trusted_reservation_authorities: &'a [PublicKey],
@@ -394,7 +417,8 @@ pub fn accept(
             CommerceEscrowError::AcceptStateNotAllowed(context.current_state.clone()).into(),
         );
     }
-    authenticate_offer(request.token_offer, request.acceptor, request.accepted_at)?;
+    authenticate_offer(request.token_offer)?;
+    authenticate_acceptance(request.acceptance, context, request.token_offer)?;
     let liability = token_offer_liability(request.token_offer)?;
     let reserved = verify_reservation(
         request.reservation,
@@ -584,24 +608,53 @@ fn required_escrow_status(
     }
 }
 
-fn authenticate_offer(
-    token: &CapabilityToken,
-    acceptor: &PublicKey,
-    accepted_at: u64,
-) -> Result<(), CommerceEscrowError> {
+fn authenticate_offer(token: &CapabilityToken) -> Result<(), CommerceEscrowError> {
     if !matches!(token.verify_signature(), Ok(true)) {
         return Err(CommerceEscrowError::OfferSignatureInvalid);
     }
-    token
-        .validate_time(accepted_at)
-        .map_err(|_| CommerceEscrowError::OfferOutsideValidityWindow)?;
     if token.issuer == token.subject {
         return Err(CommerceEscrowError::OfferSelfIssued);
     }
-    if *acceptor != token.subject {
+    Ok(())
+}
+
+/// The acceptance must be signed by the offer subject, bind this order, quote,
+/// buyer and offer, and fall inside the offer validity window.
+fn authenticate_acceptance(
+    acceptance: &SignedCommerceEscrowAcceptance,
+    context: &CommerceOrderContext,
+    token: &CapabilityToken,
+) -> Result<(), CommerceEscrowError> {
+    let body = &acceptance.body;
+    if body.schema != COMMERCE_ESCROW_ACCEPTANCE_SCHEMA_ID {
+        return Err(CommerceEscrowError::AcceptanceSchemaUnsupported(
+            body.schema.clone(),
+        ));
+    }
+    if acceptance.signer_key != token.subject {
         return Err(CommerceEscrowError::AcceptorNotSubject);
     }
-    Ok(())
+    if !matches!(acceptance.verify_signature(), Ok(true)) {
+        return Err(CommerceEscrowError::AcceptanceSignatureInvalid);
+    }
+    if body.order_id != context.order_id {
+        return Err(CommerceEscrowError::AcceptanceUnbound("order_id"));
+    }
+    if body.quote_sha256 != context.quote_sha256 {
+        return Err(CommerceEscrowError::AcceptanceUnbound("quote_sha256"));
+    }
+    if body.buyer_subject != context.buyer_subject {
+        return Err(CommerceEscrowError::AcceptanceUnbound("buyer_subject"));
+    }
+    if body.token_offer_id != token.id {
+        return Err(CommerceEscrowError::AcceptanceUnbound("token_offer_id"));
+    }
+    if body.token_offer_sha256 != canonical_sha256(token)? {
+        return Err(CommerceEscrowError::AcceptanceUnbound("token_offer_sha256"));
+    }
+    token
+        .validate_time(body.accepted_at)
+        .map_err(|_| CommerceEscrowError::OfferOutsideValidityWindow)
 }
 
 /// Sum of every grant's `max_total_cost`. Every grant must carry a cap in one
@@ -668,6 +721,9 @@ fn verify_reservation(
         return Err(CommerceEscrowError::ReservationUnbound(
             "token_offer_sha256",
         ));
+    }
+    if body.depositor_account != context.buyer_subject {
+        return Err(CommerceEscrowError::ReservationUnbound("depositor_account"));
     }
     Ok(body.reserved_amount.clone())
 }
