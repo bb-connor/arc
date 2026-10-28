@@ -213,9 +213,14 @@ impl SqliteRevocationOracle {
         &self,
         body: impl FnOnce(&Connection, &InMemoryRevocationOracle) -> Result<T>,
     ) -> Result<T> {
-        let tree = self.current()?;
-        let connection = self.lock_connection()?;
-        body(&connection, &tree)
+        let mut connection = self.lock_connection()?;
+        let mut replayed = self.lock_replayed()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let caught_up = catch_up(&transaction, replayed.clone())?;
+        let value = body(&transaction, &caught_up.oracle)?;
+        transaction.commit()?;
+        *replayed = caught_up;
+        Ok(value)
     }
 
     /// Revokes `key`, or returns [`RevocationOracleError::AlreadyRevoked`].

@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use chio_revocation_oracle::{
     verify_fresh_epoch_root, EpochRoot, FreshnessConfig, PassportRevocationLeaf, RevocationKey,
     RevocationOracle, RevocationOracleError, SignedEpochRoot, SqliteRevocationOracle,
-    SqliteRevocationOracleError,
+    SqliteRevocationOracleError, MAX_REVOCATION_SUBJECT_BYTES,
 };
 use chio_security_types::clock::Clock;
 use rusqlite::{params, OptionalExtension};
@@ -746,6 +746,11 @@ fn check_page(
     for leaf in &page.leaves {
         if Some(leaf.seq) != previous.checked_add(1) {
             return Err(malformed("leaf sequence is not contiguous"));
+        }
+        if leaf.subject.len() > MAX_REVOCATION_SUBJECT_BYTES {
+            return Err(malformed(
+                "leaf subject exceeds the revocation subject bound",
+            ));
         }
         previous = leaf.seq;
     }
