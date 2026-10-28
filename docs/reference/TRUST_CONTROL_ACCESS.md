@@ -141,7 +141,7 @@ Clustered nodes authenticate to each other with Ed25519 signatures. Each request
 - the HTTP method, path, and query
 - the SHA-256 of the raw request body
 - a single-use 32-byte nonce
-- `issued_at`, accepted from 60 seconds behind to 5 seconds ahead of the receiver clock
+- `issued_at`, accepted from 60 seconds behind to 5 seconds ahead of the receiver clock. A peer clock may lead the receiver clock by at most 5 seconds; a peer leading by more is refused as stale.
 - the sender's term
 
 The receiver checks the deployment and recipient against its own configuration.
@@ -154,10 +154,16 @@ window, holds at most 65,536 of them, and refuses every new peer request with
 Nonces live in memory. A restarted receiver refuses every peer request issued
 at or before its start time plus 5 seconds, so no request an earlier process
 accepted is admitted again, including one issued in the restart second or
-dated ahead of the receiver clock. Peers are refused for the first 6 seconds
-after a receiver starts, and a peer whose clock lags the receiver by L seconds
-for L seconds more. This holds while the receiver clock does not step backward
-across a restart.
+dated ahead of the receiver clock. This relies on an operational assumption:
+the receiver clock does not step backward across a restart, so the earlier
+process saw no receiver time later than the new start. A backward step can
+readmit a request the earlier process accepted.
+
+After a restart, a peer whose clock matches the receiver is refused for the
+first 6 seconds. A peer whose clock leads by L seconds (at most 5) is admitted
+L seconds sooner: a peer leading by 5 seconds can be accepted one second after
+the receiver starts, with `issued_at` 6 seconds after the start. A peer whose
+clock lags by L seconds is refused for L seconds more.
 
 Followers forward writes to the leader with the caller's own bearer secret, so
 the leader applies the caller's credential, scopes, and tenant authority.

@@ -36,9 +36,12 @@ pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-signature.v1"
 pub const CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS: i64 = 60;
 
 /// A peer request is fresh only while its `issued_at` is at most this many
-/// seconds after the highest receiver time its nonce cache has observed. A
-/// restarted receiver refuses every request issued at or before its start
-/// plus this lead.
+/// seconds after the highest receiver time its nonce cache has observed.
+///
+/// Clock-skew contract: a peer clock may lead the receiver clock by at most
+/// this many seconds. A request from a peer leading by more is refused as
+/// stale. A restarted receiver refuses every request issued at or before its
+/// start plus this lead.
 pub const CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS: i64 = 5;
 
 /// Header carrying the lowercase hex SHA-256 of the request body (of the
@@ -1119,15 +1122,21 @@ fn is_lowercase_hex_32(value: &str) -> bool {
 /// nonce that request could reuse, and a backward clock step never reopens a
 /// pruned nonce.
 ///
-/// Restart invariant: a cache admits no request that an earlier cache on the
-/// same receiver accepted. An earlier cache accepted only issue times at or
-/// below its own `high_water + MAX_LEAD`, and its `high_water` is at or below
-/// this cache's `start` while the receiver clock does not step backward across
-/// the restart. This cache refuses every issue time at or below
-/// `start + MAX_LEAD`, including a request issued in the restart second and a
-/// future-dated request an earlier cache accepted. The cost is that a
-/// restarted receiver refuses every peer for its first `MAX_LEAD + 1`
-/// seconds, and a peer whose clock lags by `L` seconds for `L` more.
+/// Restart invariant: while the earlier cache's final `high_water` is at or
+/// below this cache's `start`, this cache admits no request that an earlier
+/// cache on the same receiver accepted. An earlier cache accepted only issue
+/// times at or below its own `high_water + MAX_LEAD`, and this cache refuses
+/// every issue time at or below `start + MAX_LEAD`, including a request issued
+/// in the restart second and a future-dated request an earlier cache accepted.
+/// The precondition is an operational assumption: the receiver clock does not
+/// step backward across a restart. Nonces are not durable, so a backward step
+/// can readmit a request the earlier cache accepted.
+///
+/// The cost falls on new requests after a restart. A peer whose clock matches
+/// the receiver is refused for the first `MAX_LEAD + 1` seconds. A peer that
+/// leads by `L <= MAX_LEAD` seconds is admitted `L` seconds sooner, from
+/// `start + 1` at `L = MAX_LEAD` with `issued_at = start + MAX_LEAD + 1`. A
+/// peer that lags by `L` seconds is refused for `L` seconds more.
 ///
 /// The cache holds at most `CLUSTER_PEER_NONCE_CACHE_CAPACITY` entries and
 /// each pinned peer at most an equal share of them. A full cache or a full
