@@ -1336,10 +1336,10 @@ fn continuation_token_session_anchor_ignores_top_level_lineage_references() {
             })),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
-            kernel_key: parent_kernel.public_key(),
+            kernel_key: child_kernel.public_key(),
             bbs_projection_version: None,
         },
-        &parent_kernel.config.keypair,
+        &child_kernel.config.keypair,
     )
     .unwrap();
     let parent_receipt_hash = chio_core::crypto::sha256_hex(

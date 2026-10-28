@@ -298,22 +298,11 @@ impl ChioKernel {
         Err("approval signer is not in configured roster".to_string())
     }
 
-    /// Keys trusted to sign a persisted continuation parent: this kernel's own
-    /// receipt key and the trust-control authority set. CA keys sign
-    /// capabilities, never receipts, and the receipt's embedded key is never
-    /// trusted on its own.
-    fn trusted_persisted_parent_signers(&self) -> Vec<chio_core::PublicKey> {
-        let mut trusted = self.capability_authority.trusted_public_keys();
-        let kernel_pk = self.config.keypair.public_key();
-        if !trusted.contains(&kernel_pk) {
-            trusted.push(kernel_pk);
-        }
-        trusted
-    }
-
     /// Verify a continuation token's parent anchor against the session anchor
     /// block signed into the persisted parent receipt. The caller has already
     /// verified the receipt signature and, when present, its artifact hash.
+    /// Only this kernel's receipt-signing key is trusted to sign the parent;
+    /// capability-authority keys and the receipt's embedded key are not.
     fn verify_persisted_parent_session_anchor(
         &self,
         parent: Option<&LocalReceiptArtifact>,
@@ -333,10 +322,7 @@ impl ChioKernel {
         let Some(LocalReceiptArtifact::Tool(parent)) = parent else {
             return Err(denied("parent receipt carries no session anchor"));
         };
-        if !self
-            .trusted_persisted_parent_signers()
-            .contains(&parent.kernel_key)
-        {
+        if parent.kernel_key != self.receipt_signing_public_key()? {
             return Err(denied("parent receipt signer is not trusted"));
         }
         if parent.decision != Some(Decision::Allow)
