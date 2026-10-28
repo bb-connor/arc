@@ -69,7 +69,7 @@
 1. **A target revocation that misses a live root.** Expected: entry insert, fan-out into `revoked_capabilities` and the mint-side entry check all run in IMMEDIATE transactions on the serving owner's one connection, so for every pair (revocation W, mint M) either M commits first and W's fan-out marks M's root, or W commits first and M refuses. Pinned in PR 3 by the barrier schedules S5 and S6 (Linearization) and by `revocation_and_mint_interleavings_never_leave_a_live_matching_root` (500 iterations against real SQLite).
 2. **An in-transaction reader that stops seeing revocations.** Expected: no change to the R4 readers; every target revocation becomes `revoked_capabilities` rows that those readers already read. Pinned by schedules S1 to S3.
 3. **An overclaim about publication.** Expected: the plan, PROTOCOL and spec 7.11 state the guarantee G-A/G-C/G-M (Linearization) and the disclosed receipt gap; no text says an acknowledgement prevents every later allowed receipt or guarantees that an admitted call completes. Pinned by schedules S4 and S9, which assert the gap as current behavior, including a check whose per-id reads straddle the revocation.
-4. **Plaintext reaching disk, logs or exports.** Expected: only `subject_tag` and `tenant_tag` (64 lowercase hex) are stored; `reason` is a closed enum. Pinned in PR 3 by `subject_and_tenant_revocations_store_only_tags` (scans the database file, WAL and SHM bytes for the fixture marker) and in PR 4 by a log-capture test on the admin route.
+4. **Plaintext reaching disk, logs or exports.** Expected: only subject and tenant tags (keyed index values: a `key_id` and 64 lowercase hex) are stored; `reason` is a closed enum. Pinned in PR 3 by `subject_and_tenant_revocations_store_only_tags` (scans the database file, WAL and SHM bytes for the fixture marker) and in PR 4 by a log-capture test on the admin route.
 5. **An entry lost on backup restore, or orphaned by a key change.** Expected: every entry advances the global commit chain, including an entry that matches no root; startup refuses when a tenant index key generation that a stored entry references is not loaded, and an entry tag with an unknown `key_id` refuses. Pinned in PR 1 by `restored_snapshot_missing_an_entry_refuses_open` and in PR 3 by `startup_refuses_when_only_a_revocation_entry_references_a_generation` and `revoke_under_n_then_admit_under_n_plus_1_denies`.
 6. **A mis-attributed deny.** Expected: a deny names an entry only from evidence recorded by the read that refused, in the transaction that refused; no later read relabels an error. Pinned in PR 2 by `hold_denied_by_revocation_names_the_entry`, `capture_refused_by_revocation_names_the_entry`, `capture_failure_then_revoke_keeps_the_original_error` and `budget_denied_then_revoke_keeps_the_budget_denial`.
 7. **Export coverage that depends on fan-out order.** Expected: `revocations_covering` derives coverage from `anchored_roots` columns, so a root first revoked by entry E1 is still covered by a later rule entry E2. Pinned in PR 3 by `later_rule_entry_covers_a_root_revoked_earlier`.
@@ -178,15 +178,17 @@ pub enum RevocationReason {
     TenantOffboarded, PolicyWithdrawn, IncidentResponse,
 }
 
-/// Stored form. `value` is the capability id, the rule id, or 64 lowercase hex
-/// (subject tag, tenant tag, replay key digest).
+/// Stored form. `value` is the capability id, the rule id, the replay key digest
+/// as 64 lowercase hex, or a tag in its keyed string form under the active
+/// generation: `st1.<hex key_id>.<hex value>` for a subject tag,
+/// `tt1.<hex key_id>.<hex value>` for a tenant tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RevocationTarget { kind: RevocationTargetKind, value: String }
 impl RevocationTarget {
     pub fn capability(id: &str) -> Result<Self>;          // 1..=512 bytes, no NUL
     pub fn root_policy_rule(rule_id: &str) -> Result<Self>;
-    pub fn subject_tag(tag: Sha256Digest) -> Self;
-    pub fn tenant_tag(tag: Sha256Digest) -> Self;
+    pub fn subject_tag(tag: KeyedIndexValue) -> Self;   // string form under IndexPurpose::SubjectTag
+    pub fn tenant_tag(tag: KeyedIndexValue) -> Self;    // string form under IndexPurpose::TenantTag
     pub fn replay_key(digest: Sha256Digest) -> Self;
     /// "rev_" + lowercase hex of
     /// SHA-256(REVOCATION_ENTRY_ID_DOMAIN || ascii(kind.as_str()) || 0x00 || utf8(value)).
@@ -222,8 +224,10 @@ struct RevocationEntryWire {
 /// `TryFrom<RevocationEntryWire>` refuses, with `invalid revocation entry: <rule>`:
 /// a `schema` other than "chio.revocation-entry.v1"; an `entry_id` that is not
 /// "rev_" plus 64 lowercase hex; a `target_value` that does not satisfy its kind
-/// (`RevocationTarget::capability` and `root_policy_rule` limits, or exactly 64
-/// lowercase hex for the three digest kinds); `revoked_at = 0`; and an `entry_id`
+/// (`RevocationTarget::capability` and `root_policy_rule` limits, exactly 64
+/// lowercase hex for `replay_key`, and `KeyedIndexValue::parse_string_form` under
+/// the kind's own purpose for `anchor_subject` and `tenant_tag`, so a `tt1` subject
+/// target or an `st1` tenant target refuses); `revoked_at = 0`; and an `entry_id`
 /// not equal to `RevocationTarget { kind, value }.id()` (G18).
 ```
 
@@ -252,7 +256,14 @@ CREATE TABLE IF NOT EXISTS revocation_entries (
     UNIQUE (target_kind, target_value),
     CHECK (
         target_kind IN ('capability_id', 'root_policy_rule')
-        OR (length(target_value) = 64 AND target_value NOT GLOB '*[^0-9a-f]*')
+        OR (target_kind = 'replay_key' AND length(target_value) = 64
+            AND target_value NOT GLOB '*[^0-9a-f]*')
+        OR (target_kind IN ('anchor_subject', 'tenant_tag') AND length(target_value) = 133
+            AND substr(target_value, 1, 4) =
+                CASE target_kind WHEN 'anchor_subject' THEN 'st1.' ELSE 'tt1.' END
+            AND substr(target_value, 69, 1) = '.'
+            AND substr(target_value, 5, 64) NOT GLOB '*[^0-9a-f]*'
+            AND substr(target_value, 70) NOT GLOB '*[^0-9a-f]*')
     )
 ) STRICT;
 
@@ -408,7 +419,7 @@ pub trait RevocationStore: Send + Sync {
 - `anchored_roots`: `capability_id TEXT PRIMARY KEY`, `root_policy_rule_id TEXT NOT NULL`, `tag_key_id TEXT NOT NULL` (the generation that computed both tags), `subject_tag TEXT NOT NULL` (64 hex, HMAC of the provider record's principal claim, R16), `tenant_tag TEXT` (64 hex or NULL when the rule has no tenant), `replay_key_digest TEXT NOT NULL` (64 hex, R11), `expires_at INTEGER NOT NULL`, with item 4's indexes `root_policy_rule_id`, `replay_key_digest`, `(tag_key_id, subject_tag)` and `(tag_key_id, tenant_tag)`, which the fan-out and coverage joins use.
 - Every insert goes through the serving owner's connection in an IMMEDIATE transaction; the root is returned to the client only after that transaction commits.
 - Rows are retained as long as any receipt under the root is retained, so export coverage stays computable (R15).
-- Index-key generations: the tenant index key set rotates (item 2 Task 5, all-generation match mode). Each `anchor_subject` and `tenant_tag` entry's `target_value` is the tag under the active generation, and the entry id derives from it. In the same transaction the entry writes one `revocation_entry_tags` row per loaded generation (`key_ids()` with `derive_in` over the admin plaintext), so the entry carries its tag under every generation that can have tagged a live or retained root. Every match is on `(tag_key_id, tag)` against those rows: the fan-out joins `anchored_roots (tag_key_id, subject_tag | tenant_tag)` to them, coverage does the same (below), and the mint check derives the request's tag under every loaded generation and looks each pair up, so a generation added after the revocation still refuses the target. Open validates every entry's tag rows: an `anchor_subject` or `tenant_tag` entry has at least one row and exactly one row whose `tag` equals its `target_value`, and every other kind has none; a violation refuses open with `revocation entry <entry id> has inconsistent tag rows`. Because a tag entry writes a row under every generation loaded at write time, every such generation stays pinned for the life of the store (entries are never removed); operators retire a generation only from the active role, never unload it. Startup refuses when a generation that any `revocation_entry_tags` row references is not loaded (`tenant index key generation <key_id> referenced by a revocation entry is not loaded`), and an entry or request naming an unknown `key_id` refuses. Tests: `startup_refuses_when_only_a_revocation_entry_references_a_generation`, `revoke_under_n_then_admit_under_n_plus_1_denies`, `revocation_entry_with_unknown_key_id_refuses`, `rotation_to_a_new_active_generation_starts_and_keeps_old_entries_matching`, `entry_written_under_b_covers_a_root_tagged_under_a`.
+- Index-key generations: the tenant index key set rotates (item 2 Task 5, all-generation match mode). Each `anchor_subject` and `tenant_tag` entry's `target_value` is the tag under the active generation in its keyed string form, which names that generation's `key_id`, and the entry id derives from it. In the same transaction the entry writes one `revocation_entry_tags` row per loaded generation (`key_ids()` with `derive_in` over the admin plaintext), so the entry carries its tag under every generation that can have tagged a live or retained root. Every match is on `(tag_key_id, tag)` against those rows: the fan-out joins `anchored_roots (tag_key_id, subject_tag | tenant_tag)` to them, coverage does the same (below), and the mint check derives the request's tag under every loaded generation and looks each pair up, so a generation added after the revocation still refuses the target. Open validates every entry's tag rows: an `anchor_subject` or `tenant_tag` entry has at least one row and exactly one row whose `(tag_key_id, tag)` equals the `key_id` and value of its `target_value`, and every other kind has none; a violation refuses open with `revocation entry <entry id> has inconsistent tag rows`. Because a tag entry writes a row under every generation loaded at write time, every such generation stays pinned for the life of the store (entries are never removed); operators retire a generation only from the active role, never unload it. Startup refuses when a generation that any `revocation_entry_tags` row references is not loaded (`tenant index key generation <key_id> referenced by a revocation entry is not loaded`), and an entry or request naming an unknown `key_id` refuses. Tests: `startup_refuses_when_only_a_revocation_entry_references_a_generation`, `revoke_under_n_then_admit_under_n_plus_1_denies`, `revocation_entry_with_unknown_key_id_refuses`, `rotation_to_a_new_active_generation_starts_and_keeps_old_entries_matching`, `entry_written_under_b_covers_a_root_tagged_under_a`.
 
 **Store API:**
 

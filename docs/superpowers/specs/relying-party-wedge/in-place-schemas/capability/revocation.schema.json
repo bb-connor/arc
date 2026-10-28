@@ -42,10 +42,7 @@
       "if": {
         "properties": {
           "target_kind": {
-            "enum": [
-              "anchor_subject",
-              "tenant_tag"
-            ]
+            "const": "anchor_subject"
           }
         },
         "required": [
@@ -55,8 +52,28 @@
       "then": {
         "properties": {
           "target": {
-            "pattern": "^[0-9a-f]{64}$",
-            "description": "HMAC-SHA256 tag as 64 lowercase hex characters."
+            "pattern": "^st1\\.[0-9a-f]{64}\\.[0-9a-f]{64}$",
+            "description": "Keyed index tag in its string form, `st1.<hex key_id>.<hex value>`. Only the `st1` prefix is accepted for `anchor_subject`."
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "target_kind": {
+            "const": "tenant_tag"
+          }
+        },
+        "required": [
+          "target_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "pattern": "^tt1\\.[0-9a-f]{64}\\.[0-9a-f]{64}$",
+            "description": "Keyed index tag in its string form, `tt1.<hex key_id>.<hex value>`. Only the `tt1` prefix is accepted for `tenant_tag`."
           }
         }
       }

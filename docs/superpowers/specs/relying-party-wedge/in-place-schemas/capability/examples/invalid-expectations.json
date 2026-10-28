@@ -1,0 +1,10 @@
+{
+  "revocation.anchor-subject-tenant-prefix.json": {
+    "keyword": "pattern",
+    "path": "/target"
+  },
+  "revocation.tenant-tag-subject-prefix.json": {
+    "keyword": "pattern",
+    "path": "/target"
+  }
+}
