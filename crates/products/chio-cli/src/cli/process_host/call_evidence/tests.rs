@@ -484,8 +484,11 @@ impl SemanticRefusal {
                 .map_err(error)?,
             runtime_authority_id: AdmissionIdentifier::try_new("runtime_authority_id", RUNTIME)
                 .map_err(error)?,
-            expectation_id: AdmissionIdentifier::try_new("expectation_id", "semantic-generation")
-                .map_err(error)?,
+            qualification_id: AdmissionIdentifier::try_new(
+                "qualification_id",
+                "semantic-qualification",
+            )
+            .map_err(error)?,
             request_binding_hash: binding.request_binding_hash().clone(),
             grant_index: 0,
             phase: RuntimeParticipantPhase::Dispatch,
