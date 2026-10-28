@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod error;
+mod escrow;
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 mod ids;
@@ -15,18 +16,25 @@ mod validation;
 #[cfg(test)]
 mod receipt_action_hash_tests;
 
-pub use error::CommerceOrderError;
+pub use error::{CommerceEscrowError, CommerceOrderError};
+pub use escrow::{
+    accept, release, CommerceEscrowAcceptRequest, CommerceEscrowAcceptance, CommerceEscrowLedger,
+    CommerceEscrowLeg, CommerceEscrowLegKind, CommerceEscrowRelease, CommerceEscrowReleaseRequest,
+    CommerceEscrowStatus, CommerceReservationReceipt, CommerceSettlementDispatch,
+    SignedCommerceReservationReceipt, COMMERCE_ESCROW_CUSTODY_ACCOUNT,
+};
 pub use ids::{
-    COMMERCE_EVENT_LOG_SCHEMA_ID, COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
-    COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID, COMMERCE_ORDER_CONTEXT_SCHEMA_ID,
-    COMMERCE_ORDER_PASSPORT_SCHEMA_ID, COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
-    COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID, COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID,
-    COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID, COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
+    COMMERCE_ESCROW_LEDGER_SCHEMA_ID, COMMERCE_EVENT_LOG_SCHEMA_ID,
+    COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID, COMMERCE_MANDATE_ALLOWANCE_LEDGER_SCHEMA_ID,
+    COMMERCE_ORDER_CONTEXT_SCHEMA_ID, COMMERCE_ORDER_PASSPORT_SCHEMA_ID,
+    COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID, COMMERCE_PROTOCOL_PAYLOAD_SCHEMA_ID,
+    COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID, COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID,
+    COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID, COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID,
 };
 pub use types::{
     CommerceCoverageRequirement, CommerceEventAuthorityReceiptArtifact,
     CommerceMandateProtocolPayload, CommerceOrderContext, CommerceOrderPassportReport,
-    CommerceOrderVerificationBundle, CommerceTrustMarketRequirement,
+    CommerceOrderVerificationBundle, CommerceSettlementPacket, CommerceTrustMarketRequirement,
     CommerceVerifiedTrustMarketContext,
 };
 
@@ -39,7 +47,7 @@ use settlement::validate_settlement_packet;
 use types::{
     CommerceFederationTrustBundle, CommerceOrderDisclosurePolicy,
     CommerceOrderPassportArtifactDigests, CommercePaymentLifecycle, CommerceProviderPassport,
-    CommerceReputationSnapshot, CommerceSettlementPacket,
+    CommerceReputationSnapshot,
 };
 
 const CLAIM_ORDER_REPLAY_CONSISTENT: &str = "claim.commerce.order_replay_consistent";
@@ -94,6 +102,7 @@ pub fn verify_commerce_order(
         &bundle.order_context.settlement_packet_sha256,
         &bundle.settlement_packet_bytes,
     )?;
+    escrow::verify_escrow_ledger(&bundle.order_context, bundle.escrow_ledger_bytes.as_deref())?;
     let coverage_decision_bound = verify_coverage_requirement(
         &bundle.order_context,
         bundle.risk_comptroller_report_bytes.as_deref(),

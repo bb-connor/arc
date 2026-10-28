@@ -19513,8 +19513,12 @@
     "crates/platform/chio-commerce-order/src/input.rs": [
       "decode::original-json-reader::UntrustedJsonText"
     ],
+    "crates/platform/chio-commerce-order/src/escrow.rs": [
+      "verify_escrow_ledger::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode"
+    ],
     "crates/platform/chio-commerce-order/src/lib.rs": [
       "parse_json::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
+      "verify_commerce_order::shared-reader::crates/platform/chio-commerce-order/src/escrow.rs::verify_escrow_ledger",
       "verify_commerce_order::shared-reader::crates/platform/chio-commerce-order/src/lib.rs::parse_json",
       "verify_commerce_order::shared-reader::crates/platform/chio-commerce-order/src/lib.rs::parse_json",
       "verify_commerce_order::shared-reader::crates/platform/chio-commerce-order/src/lib.rs::parse_json",

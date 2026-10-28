@@ -37,6 +37,7 @@ pub(crate) fn validate_budget(
     ]
     .into_iter()
     .chain(bundle.risk_comptroller_report_bytes.as_deref())
+    .chain(bundle.escrow_ledger_bytes.as_deref())
     .chain(
         bundle
             .event_authority_receipts

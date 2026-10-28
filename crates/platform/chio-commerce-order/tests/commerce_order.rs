@@ -159,6 +159,7 @@ fn load_bundle(case_name: &str) -> chio_commerce_order::CommerceOrderVerificatio
         settlement_packet_bytes: read_fixture(&dir, "settlement-packet.json"),
         mandate_protocol_payloads: mandate_protocol_payloads(),
         risk_comptroller_report_bytes: None,
+        escrow_ledger_bytes: None,
         verified_trust_market_context: None,
         trusted_event_authority_receipt_kernel_keys: vec![commerce_event_authority_receipt_key()],
         trusted_payment_signer_keys: vec![commerce_payment_signer_key()],
