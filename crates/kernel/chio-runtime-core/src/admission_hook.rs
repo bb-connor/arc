@@ -586,3 +586,7 @@ where
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/runtime_admission/preparation_tests.rs"]
+mod preparation_tests;
