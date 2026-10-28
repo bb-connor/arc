@@ -236,12 +236,9 @@ fn run_cut(cut: Cut, test: &str) -> TestResult {
     if cut.committed() {
         assert_eq!(response.verdict, Verdict::Deny, "{response:#?}");
         assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains(
-                    "runtime participant resource is already reserved or historically spent"
-                )),
+            response.reason.as_deref().is_some_and(
+                |reason| reason.contains("runtime participant resource is already reserved")
+            ),
             "fresh operation must hit retained physical custody: {response:#?}"
         );
         assert_eq!(worker::effects(path)?, cut.effects());

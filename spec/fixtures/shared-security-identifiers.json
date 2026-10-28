@@ -19,9 +19,9 @@
   },
   {
     "kind": "schema",
-    "identity": "chio.runtime-replay-source-seal.v1",
+    "identity": "chio.runtime-source-qualification.v1",
     "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
-    "sha256": "67a445c2d72a77100559000bfb58ea127eaad7837d566e290fa3bbc2b5f5b089"
+    "sha256": "f01b72688c2fe841e627943b8ddedc51f3575d3328a363a11bcb48e7f579317f"
   },
   {
     "kind": "schema",
@@ -241,9 +241,9 @@
   },
   {
     "kind": "domain",
-    "identity": "chio.runtime-replay-source-seal.v1\u0000",
+    "identity": "chio.runtime-source-qualification.v1\u0000",
     "canonical_payload": "{\"a\":1,\"z\":\"identity-fixture\"}",
-    "sha256": "8fdeaf171e37c0ca86b1d0637d691afeb2000ad0ef3dc1d1cf1a944f1cd08844"
+    "sha256": "38d3a18fad377f451d60c424cf37761addfc22217c130d64fb0471a0cca7b92b"
   },
   {
     "kind": "domain",

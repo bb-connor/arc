@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use chio_core_types::{crypto::Keypair, receipt::lineage::SignedExportEnvelope};
 
 use super::*;
-use crate::admission::commit_prepared_runtime_admission;
 use crate::schema::*;
 use crate::store::RuntimeAdmissionStore;
 use crate::InMemoryRuntimeAdmissionStore;
@@ -84,16 +83,6 @@ impl RuntimeAdmissionStore for CallbackCountingStore {
     fn bundle(&self, id: &str) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.inner.bundle(id)
-    }
-
-    fn consume_destructive_lease(&self, id: &str, admission: &str) -> Result<(), ChioRuntimeError> {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        self.inner.consume_destructive_lease(id, admission)
-    }
-
-    fn release_destructive_lease(&self, id: &str, admission: &str) -> Result<(), ChioRuntimeError> {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        self.inner.release_destructive_lease(id, admission)
     }
 
     fn runtime_trust_floor(
@@ -266,12 +255,6 @@ fn destructive_preparation_and_drop_never_reserve_or_claim_the_lease() -> TestRe
         .inner
         .runtime_trust_floor("verifier-preparation", "key-preparation")?
         .is_none());
-    store
-        .inner
-        .consume_destructive_lease("lease-preparation", "admission-preparation")?;
-    store
-        .inner
-        .release_destructive_lease("lease-preparation", "admission-preparation")?;
     Ok(())
 }
 
@@ -279,7 +262,7 @@ fn destructive_preparation_and_drop_never_reserve_or_claim_the_lease() -> TestRe
 fn commit_uses_owned_inputs_after_preparation_locals_are_dropped() -> TestResult {
     let store = CallbackCountingStore::default();
     let prepared = prepare_owned(&store)?;
-    let report = commit_prepared_runtime_admission(prepared, &store, None)?;
+    let report = prepared.commit_operation_owned(&store)?;
     assert!(report.accepted);
     assert_eq!(report.admission_id, "admission-preparation");
     assert_eq!(report.receipt_metadata["chio_runtime"]["accepted"], true);
@@ -306,7 +289,7 @@ fn commit_rechecks_trust_floor_advanced_after_preparation() -> TestResult {
     advanced.latest_bundle_sha256 = "e".repeat(64);
     store.inner.record_runtime_trust_floor(advanced.clone())?;
 
-    let report = commit_prepared_runtime_admission(prepared, &store, None)?;
+    let report = prepared.commit_operation_owned(&store)?;
     assert!(!report.accepted);
     assert_eq!(
         report.failure_code.as_deref(),
@@ -323,7 +306,7 @@ fn commit_rechecks_trust_floor_advanced_after_preparation() -> TestResult {
 }
 
 #[test]
-fn destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation() -> TestResult {
+fn destructive_commit_refuses_when_trust_floor_advanced_after_preparation() -> TestResult {
     let store = CallbackCountingStore::default();
     let prepared = prepare_owned_with_destructive(&store, true)?;
     let mut advanced = prepared
@@ -337,7 +320,7 @@ fn destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation
     store.inner.record_runtime_trust_floor(advanced.clone())?;
     assert_eq!(store.calls.load(Ordering::SeqCst), 0);
 
-    let report = commit_prepared_runtime_admission(prepared, &store, None)?;
+    let report = prepared.commit_operation_owned(&store)?;
     assert!(!report.accepted);
     assert_eq!(
         report.failure_code.as_deref(),
@@ -349,20 +332,12 @@ fn destructive_commit_releases_lease_when_trust_floor_advanced_after_preparation
     assert!(report.receipt_metadata["chio_runtime"]
         .get("reservation_release_failed")
         .is_none());
-    // The destructive consume was acknowledged, the atomic floor transition
-    // rejected stale input, and the owned lease was released exactly once.
-    assert_eq!(store.calls.load(Ordering::SeqCst), 3);
+    assert_eq!(store.calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         store
             .inner
             .runtime_trust_floor("verifier-preparation", "key-preparation")?,
         Some(advanced)
     );
-    store
-        .inner
-        .consume_destructive_lease("lease-preparation", "admission-preparation")?;
-    store
-        .inner
-        .release_destructive_lease("lease-preparation", "admission-preparation")?;
     Ok(())
 }
