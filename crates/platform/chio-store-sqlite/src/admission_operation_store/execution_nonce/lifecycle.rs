@@ -105,7 +105,7 @@ fn fresh_nonce(
         return Err(invariant("nonce capture requires durable issuance"));
     }
     super::super::nonce_preflight::verify_issued_cleanup(transaction, operation, None)?;
-    if lease.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex()) {
+    if lease.claimant_id().as_str() != execution_nonce_coordinator_id(nonce.issuer())?.as_str() {
         return Err(invariant(
             "nonce capture coordinator does not own its issuer",
         ));
@@ -159,7 +159,9 @@ pub(in crate::admission_operation_store) fn verify_capture(
             // before returning, and must not append a second nonce phase.
             let nonce = verify_reservation(transaction, updated)?
                 .ok_or_else(|| invariant("nonce capture replay lost its reservation"))?;
-            if lease.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex()) {
+            if lease.claimant_id().as_str()
+                != execution_nonce_coordinator_id(nonce.issuer())?.as_str()
+            {
                 return Err(AdmissionOperationStoreError::Fenced);
             }
             return Ok(true);
@@ -209,10 +211,12 @@ pub(in crate::admission_operation_store) fn prepare_terminal(
     };
     let stored = load_by_operation_id_tx(transaction, source.binding().operation_id())?
         .ok_or(AdmissionOperationStoreError::NotFound)?;
+    let expected_claimant = execution_nonce_coordinator_id(nonce.issuer())?;
     if stored.operation != *source
-        || stored.recovery_claim.as_ref().is_none_or(|claim| {
-            claim.claimant_id().as_str() != format!("kernel:{}", nonce.issuer().to_hex())
-        })
+        || stored
+            .recovery_claim
+            .as_ref()
+            .is_none_or(|claim| claim.claimant_id() != &expected_claimant)
     {
         return Err(AdmissionOperationStoreError::Fenced);
     }

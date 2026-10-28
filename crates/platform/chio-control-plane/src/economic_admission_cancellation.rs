@@ -125,9 +125,8 @@ impl EconomicAdmissionCancellationCoordinator {
         let lease = self.operations.claim_recovery(
             &operation_id,
             operation.version(),
-            &AdmissionIdentifier::try_new(
-                "claimant_id",
-                format!("kernel:{}", self.signer.public_key().to_hex()),
+            &chio_kernel::admission_operation::execution_nonce_coordinator_id(
+                &self.signer.public_key(),
             )?,
             trusted_now_unix_ms,
             expires_at_unix_ms,
@@ -717,7 +716,11 @@ mod tests {
     ) -> TestResult<String> {
         let claimant = id(
             "claimant_id",
-            &format!("kernel:{}", signer.public_key().to_hex()),
+            &chio_kernel::admission_operation::execution_nonce_coordinator_id(
+                &signer.public_key(),
+            )?
+            .as_str()
+            .to_owned(),
         );
         let lease = store.claim_recovery(
             operation.binding().operation_id(),

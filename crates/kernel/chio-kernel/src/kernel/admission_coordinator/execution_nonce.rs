@@ -598,7 +598,7 @@ impl ChioKernel {
             .require_operation_bound_profile()
             .map_err(durable_store_error)?;
         if original_nonce.signed_nonce() != nonce
-            || original_nonce.issuer() != &self.config.keypair.public_key()
+            || original_nonce.issuer() != &self.receipt_signing_public_key()?
             || operation.execution_nonce_id() != Some(original_nonce.nonce_id())
             || !operation
                 .provider_attempt()

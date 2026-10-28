@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS admission_execution_nonce_issuances (
     operation_id TEXT PRIMARY KEY REFERENCES admission_operations(operation_id),
     nonce_id TEXT NOT NULL UNIQUE CHECK(typeof(nonce_id) = 'text' AND length(nonce_id) BETWEEN 1 AND 512 AND octet_length(nonce_id) <= 2048 AND instr(nonce_id, char(0)) = 0),
-    issuer TEXT NOT NULL CHECK(typeof(issuer) = 'text' AND length(issuer) = 64 AND octet_length(issuer) <= 256 AND instr(issuer, char(0)) = 0),
+    issuer TEXT NOT NULL CHECK(typeof(issuer) = 'text' AND octet_length(issuer) BETWEEN 1 AND 4129 AND instr(issuer, char(0)) = 0),
     issuance_json BLOB NOT NULL CHECK(typeof(issuance_json) = 'blob' AND length(issuance_json) BETWEEN 1 AND 16384),
     operation_json BLOB NOT NULL CHECK(typeof(operation_json) = 'blob' AND length(operation_json) BETWEEN 1 AND 262144),
     issued_at_unix_ms INTEGER NOT NULL CHECK(issued_at_unix_ms BETWEEN 0 AND 9007199254740991)
@@ -24,7 +24,7 @@ END;
 CREATE TABLE IF NOT EXISTS admission_execution_nonce_reservations (
     operation_id TEXT PRIMARY KEY REFERENCES admission_operations(operation_id),
     nonce_id TEXT NOT NULL UNIQUE CHECK(typeof(nonce_id) = 'text' AND length(nonce_id) BETWEEN 1 AND 512 AND octet_length(nonce_id) <= 2048 AND instr(nonce_id, char(0)) = 0),
-    issuer TEXT NOT NULL CHECK(typeof(issuer) = 'text' AND length(issuer) = 64 AND octet_length(issuer) <= 256 AND instr(issuer, char(0)) = 0),
+    issuer TEXT NOT NULL CHECK(typeof(issuer) = 'text' AND octet_length(issuer) BETWEEN 1 AND 4129 AND instr(issuer, char(0)) = 0),
     reservation_json BLOB NOT NULL CHECK(typeof(reservation_json) = 'blob' AND length(reservation_json) BETWEEN 1 AND 16384),
     ready_operation_json BLOB NOT NULL CHECK(typeof(ready_operation_json) = 'blob' AND length(ready_operation_json) BETWEEN 1 AND 262144),
     reserved_at_unix_ms INTEGER NOT NULL CHECK(reserved_at_unix_ms BETWEEN 0 AND 9007199254740991)

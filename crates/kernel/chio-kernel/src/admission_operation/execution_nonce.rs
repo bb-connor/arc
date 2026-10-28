@@ -13,12 +13,15 @@ use crate::execution_nonce::{validate_execution_nonce, NonceBinding, SignedExecu
 mod profile;
 pub use profile::{verify_operation_execution_nonce_at, OPERATION_EXECUTION_NONCE_SCHEMA};
 
+const COORDINATOR_SIGNING_IDENTITY_DOMAIN: &[u8] =
+    b"chio.admission-coordinator-signing-identity.v1\0";
+
 const MAX_NONCE_BYTES: usize = 16 * 1024;
 
 pub fn execution_nonce_coordinator_id(
     issuer: &PublicKey,
 ) -> Result<AdmissionIdentifier, super::AdmissionOperationError> {
-    let mut preimage = b"chio.admission-coordinator-signing-identity.v1\0".to_vec();
+    let mut preimage = COORDINATOR_SIGNING_IDENTITY_DOMAIN.to_vec();
     preimage.extend_from_slice(issuer.to_hex().as_bytes());
     AdmissionIdentifier::try_new(
         "admission_claimant_id",

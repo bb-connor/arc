@@ -62,7 +62,11 @@ fn exercise(route: Route) -> TestResult {
         let fence = runtime.authority.mutation_fence();
         let claimant = AdmissionIdentifier::try_new(
             "claimant",
-            format!("kernel:{}", fixture.signer.public_key().to_hex()),
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(
+                &fixture.signer.public_key(),
+            )?
+            .as_str()
+            .to_owned(),
         )?;
         let database = fixture.database();
         let kernel = Arc::get_mut(&mut runtime.kernel).ok_or("unique kernel")?;

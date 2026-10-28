@@ -254,7 +254,12 @@ fn nonce_command(
     let lease = store.claim_recovery(
         operation.binding().operation_id(),
         operation.version(),
-        &identifier("claimant", &format!("kernel:{}", key.public_key().to_hex())),
+        &identifier(
+            "claimant",
+            &chio_kernel::admission_operation::execution_nonce_coordinator_id(&key.public_key())?
+                .as_str()
+                .to_owned(),
+        ),
         now,
         now + 60_000,
         fence,

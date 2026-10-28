@@ -1018,7 +1018,9 @@ impl SqliteEconomicStateCache {
         let context = verified.context();
         let source = verified.source_operation();
         let lease = operation.recovery_lease;
-        let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+        let expected_claimant =
+            chio_kernel::admission_operation::execution_nonce_coordinator_id(verified.signer_key())
+                .map_err(|_| EconomicStateCacheError::Conflict)?;
         if operation.operation != source
             || context.operation_id != *source.binding().operation_id()
             || context.request_id != source.replay_key().request_id
@@ -1026,7 +1028,7 @@ impl SqliteEconomicStateCache {
             || context.coordinator_lease_id != *lease.coordinator_lease_id()
             || context.coordinator_lease_epoch != lease.coordinator_lease_epoch()
             || context.store_fence != *lease.store_fence()
-            || lease.claimant_id().as_str() != expected_claimant
+            || lease.claimant_id().as_str() != expected_claimant.as_str()
             || context.trusted_time_unix_ms > trusted_now_unix_ms
             || context.trusted_time_unix_ms >= lease.expires_at_unix_ms()
         {
@@ -1484,7 +1486,9 @@ pub(crate) fn load_anchored_terminal_projection_in_transaction(
         Some(committed) => committed_view_matches_batch(committed, &record.batch),
         None => record.status == EconomicStateStageStatus::DbStaged,
     };
-    let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+    let expected_claimant =
+        chio_kernel::admission_operation::execution_nonce_coordinator_id(verified.signer_key())
+            .map_err(|_| EconomicStateCacheError::Conflict)?;
     if descriptor.kind != ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
         || descriptor.key != operation_id
         || record.batch.operation_id.as_deref() != Some(operation_id)
@@ -1493,7 +1497,7 @@ pub(crate) fn load_anchored_terminal_projection_in_transaction(
         || binding.operation_version != source.version()
         || binding.coordinator_lease_epoch != source.coordinator_lease_epoch()
         || binding.coordinator_lease_id != context.coordinator_lease_id.as_str()
-        || binding.recovery_claimant_id != expected_claimant
+        || binding.recovery_claimant_id != expected_claimant.as_str()
         || binding.recovery_expires_at_unix_ms <= context.trusted_time_unix_ms
         || !current_fence_serves_historical(&binding.store_fence, active_fence)
         || context.store_fence != binding.store_fence

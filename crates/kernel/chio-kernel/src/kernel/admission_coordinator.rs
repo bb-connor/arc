@@ -171,7 +171,7 @@ impl DurableAdmissionRuntime {
         store: Arc<dyn QualifiedAdmissionProjectionStore>,
         outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
         fence: StoreMutationFence,
-        kernel_id: &str,
+        claimant_id: AdmissionIdentifier,
         clock: Arc<dyn chio_security_types::clock::Clock>,
         clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     ) -> Result<Self, crate::admission_operation::AdmissionOperationError> {
@@ -180,8 +180,6 @@ impl DurableAdmissionRuntime {
         if fence.owner_epoch == 0 || fence.owner_epoch > I_JSON_MAX_SAFE_INTEGER {
             return Err(crate::admission_operation::AdmissionOperationError::InvalidStoreFence);
         }
-        let claimant_id =
-            AdmissionIdentifier::try_new("admission_claimant_id", format!("kernel:{kernel_id}"))?;
         Ok(Self {
             clock,
             clock_fence,

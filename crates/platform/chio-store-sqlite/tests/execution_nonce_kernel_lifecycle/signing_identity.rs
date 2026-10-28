@@ -1,6 +1,5 @@
 use super::*;
 use chio_core::receipt::crypto_floor::ReceiptCryptoFloor;
-use chio_core::receipt::PresentedNonceView;
 use chio_core::SigningAlgorithm;
 use chio_kernel::{HybridSigningConfig, KernelCryptoFloor};
 
@@ -17,7 +16,17 @@ fn durable_nonce_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
     assert_eq!(request.capability.issuer, key);
     assert!(request.capability.verify_signature()?);
     let nonce = preflight(&runtime, &request)?;
-    assert!(nonce.verify_signed_by(&key));
+    let (operation_id, _) =
+        operation_state(&fixture, &request.request_id)?.ok_or("nonce operation")?;
+    let operation_id =
+        chio_kernel::admission_operation::AdmissionOperationId::from_persisted(operation_id)?;
+    chio_kernel::admission_operation::verify_operation_execution_nonce_at(
+        &nonce,
+        &operation_id,
+        &key,
+        &nonce.nonce.bound_to,
+        nonce.nonce.issued_at,
+    )?;
     assert_eq!(nonce.signature.algorithm(), SigningAlgorithm::Hybrid);
     assert_eq!(
         count_rows(&fixture, "admission_execution_nonce_issuances")?,
