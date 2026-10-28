@@ -30,13 +30,13 @@ mod combined;
 #[path = "operation_owned/live_swarm.rs"]
 mod live_swarm;
 
-struct Fixture {
+pub(super) struct Fixture {
     _directory: FixtureDirectory,
-    authority: SqliteAuthorityStore,
+    pub(super) authority: SqliteAuthorityStore,
     source: SqliteRuntimeOrchestrationStore,
-    binding: RuntimeParticipantAuthorityBindingV1,
-    request: ToolCallRequest,
-    invocations: Arc<AtomicU64>,
+    pub(super) binding: RuntimeParticipantAuthorityBindingV1,
+    pub(super) request: ToolCallRequest,
+    pub(super) invocations: Arc<AtomicU64>,
 }
 
 // A crash worker borrows its parent's private directory. Only the parent owns
@@ -83,6 +83,10 @@ impl chio_kernel::ToolServerConnection for CountingTool {
 }
 
 impl Fixture {
+    pub(super) fn directory(&self) -> &std::path::Path {
+        self._directory.path()
+    }
+
     fn reopen(self) -> TestResult<Self> {
         let Self {
             _directory,
@@ -135,7 +139,7 @@ impl Fixture {
         })
     }
 
-    fn with_request(
+    pub(super) fn with_request(
         activate: bool,
         prepare: impl FnOnce(
             &SqliteRuntimeOrchestrationStore,
@@ -187,7 +191,9 @@ impl Fixture {
         })
     }
 
-    fn hook(&self) -> TestResult<ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>> {
+    pub(super) fn hook(
+        &self,
+    ) -> TestResult<ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>> {
         self.hook_with_inputs(signed_policy_inputs(0.1)?)
     }
 
@@ -207,7 +213,7 @@ impl Fixture {
         .with_swarm_graph_source(Arc::new(IssuedGraphs(self.authority.work_graph_store()))))
     }
 
-    fn kernel(
+    pub(super) fn kernel(
         &self,
         hook: impl RuntimeAdmissionHook + 'static,
         durable: bool,

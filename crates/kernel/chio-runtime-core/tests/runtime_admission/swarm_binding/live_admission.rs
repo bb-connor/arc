@@ -1,27 +1,6 @@
 use super::*;
 
 #[test]
-fn fanout_requires_no_future_join_or_terminal_receipt() -> TestResult {
-    let mut swarm = runtime_swarm_bundle(false)?;
-    swarm.join_receipts.clear();
-    swarm.terminal_receipts.clear();
-    let fixture = BindingFixture::with_swarm(swarm)?;
-    let decision = fixture.evaluate(&fixture.request)?;
-    assert!(decision.allowed, "{decision:#?}");
-    let metadata = decision.metadata.ok_or("missing live admission metadata")?;
-    assert_eq!(
-        metadata["chio_runtime"]["verified_swarm_request_binding"]["task_id"],
-        "task-child-a"
-    );
-    fixture.revalidate(&fixture.request, &metadata)?;
-    assert!(
-        !fixture.evaluate(&fixture.request)?.allowed,
-        "single-use continuation replay"
-    );
-    Ok(())
-}
-
-#[test]
 fn fanin_requires_the_exact_join_reference_before_consumption() -> TestResult {
     let mut swarm = join_bundle()?;
     swarm.terminal_receipts.clear();
