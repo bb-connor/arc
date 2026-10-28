@@ -262,7 +262,7 @@ fn ddl_checks_refuse_malformed_rows() -> TestResult {
         ),
         "INSERT INTO root_exchange_openings VALUES ('cap-1', 'Anchor.sub', 'erased', NULL, 1);"
             .to_string(),
-        format!("INSERT INTO root_exchange_events VALUES (1, 'rotate', 'cap-1', '{lower}');"),
+        format!("INSERT INTO root_exchange_events VALUES (1, 'rotate', 'cap-1', '{lower}', 1);"),
     ];
     for sql in cases {
         assert_eq!(refused_insert(&sql)?, ffi::SQLITE_CONSTRAINT_CHECK, "{sql}");

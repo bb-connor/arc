@@ -5,6 +5,7 @@ use chio_core::StoreMutationFence;
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
+use super::bindings::{admit_replay_key, ReplayRecord};
 use super::projection::read_root_row;
 use super::reads::retain_snapshot;
 use super::{
@@ -47,6 +48,7 @@ impl SqliteRootExchangeStore {
                     MintRequestRefusal::ReplayRetentionPast,
                 ));
             }
+            admit_replay_key(tx, replay_key_digest, now)?;
             let replay = digest_column(replay_key_digest);
             let retained: Option<i64> = tx
                 .query_row(
@@ -85,8 +87,16 @@ impl SqliteRootExchangeStore {
                 (),
                 Some(Change {
                     mutation: Mutation::ClientAssertion,
-                    subject: replay,
+                    subject: replay.clone(),
                     digest,
+                    replay: Some(ReplayRecord {
+                        replay_key_digest: replay,
+                        namespace: "client_assertion".to_owned(),
+                        bound_at: now,
+                        retain_until,
+                        capability_id: None,
+                    }),
+                    bearer: None,
                 }),
             ))
         })
@@ -139,6 +149,8 @@ impl SqliteRootExchangeStore {
                     mutation: Mutation::EraseOpenings,
                     subject: capability_id.to_owned(),
                     digest,
+                    replay: None,
+                    bearer: None,
                 }),
             ))
         })
@@ -166,6 +178,8 @@ impl SqliteRootExchangeStore {
                 mutation: Mutation::KeySnapshot,
                 subject: digest_column(&digest),
                 digest: digest_column(&digest),
+                replay: None,
+                bearer: None,
             };
             Ok((digest, Some(change)))
         })
@@ -207,6 +221,8 @@ impl SqliteRootExchangeStore {
                     mutation: Mutation::Prune,
                     subject: now.to_string(),
                     digest,
+                    replay: None,
+                    bearer: None,
                 }),
             ))
         })

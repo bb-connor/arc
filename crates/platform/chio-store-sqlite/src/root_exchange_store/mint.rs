@@ -7,6 +7,7 @@ use chio_core::root_authority::{ClaimValue, Sha256Digest};
 use chio_core::StoreMutationFence;
 use rusqlite::{params, OptionalExtension, Transaction};
 
+use super::bindings::{admit_bearer_token, admit_replay_key, BearerRecord, ReplayRecord};
 use super::projection::{insert_root_row, read_root_row, required_root, RootRow};
 use super::reads::{retain_identity, retain_policy, retain_snapshot};
 use super::{
@@ -104,6 +105,18 @@ fn mint_transaction(
         mutation: Mutation::Mint,
         subject: row.capability_id.clone(),
         digest: digest_column(&row.authorization_projection_digest),
+        replay: Some(ReplayRecord {
+            replay_key_digest: digest_column(&request.context.anchor.replay_key_digest),
+            namespace: replay_namespace(request).to_owned(),
+            bound_at: now,
+            retain_until: request.replay_retain_until,
+            capability_id: Some(request.root.id.clone()),
+        }),
+        bearer: request.bearer.map(|mapping| BearerRecord {
+            token_digest: digest_column(&mapping.token_digest),
+            capability_id: request.root.id.clone(),
+            retain_until: mapping.retain_until,
+        }),
     };
     Ok((MintOutcome::Minted(stored), Some(change)))
 }
@@ -283,6 +296,7 @@ fn live_replay_root(
     request: &MintRequest<'_>,
     now: u64,
 ) -> Result<Option<StoredRoot>> {
+    admit_replay_key(tx, &request.context.anchor.replay_key_digest, now)?;
     let replay = digest_column(&request.context.anchor.replay_key_digest);
     let binding: Option<(i64, Option<String>)> = tx
         .query_row(
@@ -327,6 +341,7 @@ fn live_bearer_root(
     token_digest: &Sha256Digest,
     now: u64,
 ) -> Result<Option<StoredRoot>> {
+    admit_bearer_token(tx, token_digest, now)?;
     let token = digest_column(token_digest);
     let mapped: Option<String> = tx
         .query_row(
@@ -417,10 +432,7 @@ fn bind_replay(tx: &Transaction<'_>, request: &MintRequest<'_>, now: u64) -> Res
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
             digest_column(&request.context.anchor.replay_key_digest),
-            match request.replay_namespace {
-                MintReplayNamespace::AnchorKind => request.context.anchor.kind.as_str(),
-                MintReplayNamespace::LocalAsIssue => "chio_local_as_issue",
-            },
+            replay_namespace(request),
             sql_u64(now)?,
             sql_u64(request.replay_retain_until)?,
             request.root.id,
@@ -428,6 +440,13 @@ fn bind_replay(tx: &Transaction<'_>, request: &MintRequest<'_>, now: u64) -> Res
     )
     .map_err(sqlite_error)?;
     Ok(())
+}
+
+fn replay_namespace(request: &MintRequest<'_>) -> &'static str {
+    match request.replay_namespace {
+        MintReplayNamespace::AnchorKind => request.context.anchor.kind.as_str(),
+        MintReplayNamespace::LocalAsIssue => "chio_local_as_issue",
+    }
 }
 
 fn insert_openings(tx: &Transaction<'_>, request: &MintRequest<'_>, now: u64) -> Result<()> {

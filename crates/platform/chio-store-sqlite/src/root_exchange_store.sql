@@ -12,6 +12,9 @@ CREATE TABLE root_exchange_events (
     digest TEXT NOT NULL CHECK (
         typeof(digest) = 'text' AND length(digest) = 64
         AND instr(digest, char(0)) = 0 AND octet_length(digest) <= 256 AND digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    occurred_at INTEGER NOT NULL CHECK (
+        typeof(occurred_at) = 'integer' AND occurred_at BETWEEN 0 AND 9007199254740991
     )
 );
 
@@ -27,6 +30,89 @@ CREATE TRIGGER root_exchange_events_no_delete
 BEFORE DELETE ON root_exchange_events
 BEGIN
     SELECT RAISE(ABORT, 'root exchange event is immutable');
+END;
+
+-- Every replay binding a mint or client assertion made, recorded with its
+-- event so the live table is reconciled against authenticated history.
+CREATE TABLE root_exchange_replay_bindings (
+    sequence INTEGER PRIMARY KEY REFERENCES root_exchange_events(sequence) CHECK (
+        typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 9007199254740991
+    ),
+    replay_key_digest TEXT NOT NULL CHECK (
+        typeof(replay_key_digest) = 'text' AND length(replay_key_digest) = 64
+        AND instr(replay_key_digest, char(0)) = 0 AND octet_length(replay_key_digest) <= 256
+        AND replay_key_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    namespace TEXT NOT NULL CHECK (
+        namespace IN (
+            'oauth_id_jag', 'entra_jwt', 'entra_agent_id', 'oidc_jwt', 'oauth_introspection',
+            'chio_local_as', 'chio_operator_key', 'operator_static_bearer',
+            'chio_local_as_issue', 'client_assertion'
+        )
+    ),
+    bound_at INTEGER NOT NULL CHECK (
+        typeof(bound_at) = 'integer' AND bound_at BETWEEN 0 AND 9007199254740991
+    ),
+    retain_until INTEGER NOT NULL CHECK (
+        typeof(retain_until) = 'integer' AND retain_until BETWEEN 0 AND 9007199254740991
+    ),
+    capability_id TEXT CHECK (
+        capability_id IS NULL OR (
+            typeof(capability_id) = 'text' AND length(capability_id) BETWEEN 1 AND 256
+            AND octet_length(capability_id) <= 1024 AND instr(capability_id, char(0)) = 0
+        )
+    ),
+    CHECK (retain_until > bound_at),
+    CHECK ((namespace = 'client_assertion') = (capability_id IS NULL))
+) WITHOUT ROWID;
+
+CREATE INDEX root_exchange_replay_bindings_key
+    ON root_exchange_replay_bindings(replay_key_digest, sequence);
+
+CREATE TRIGGER root_exchange_replay_bindings_immutable
+BEFORE UPDATE ON root_exchange_replay_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'recorded replay binding is immutable');
+END;
+
+CREATE TRIGGER root_exchange_replay_bindings_no_delete
+BEFORE DELETE ON root_exchange_replay_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'recorded replay binding is immutable');
+END;
+
+-- Every bearer mapping a mint made, recorded with its event.
+CREATE TABLE root_exchange_bearer_bindings (
+    sequence INTEGER PRIMARY KEY REFERENCES root_exchange_events(sequence) CHECK (
+        typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 9007199254740991
+    ),
+    token_digest TEXT NOT NULL CHECK (
+        typeof(token_digest) = 'text' AND length(token_digest) = 64
+        AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256
+        AND token_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    capability_id TEXT NOT NULL CHECK (
+        typeof(capability_id) = 'text' AND length(capability_id) BETWEEN 1 AND 256
+        AND octet_length(capability_id) <= 1024 AND instr(capability_id, char(0)) = 0
+    ),
+    retain_until INTEGER NOT NULL CHECK (
+        typeof(retain_until) = 'integer' AND retain_until BETWEEN 0 AND 9007199254740991
+    )
+) WITHOUT ROWID;
+
+CREATE INDEX root_exchange_bearer_bindings_token
+    ON root_exchange_bearer_bindings(token_digest, sequence);
+
+CREATE TRIGGER root_exchange_bearer_bindings_immutable
+BEFORE UPDATE ON root_exchange_bearer_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'recorded bearer mapping is immutable');
+END;
+
+CREATE TRIGGER root_exchange_bearer_bindings_no_delete
+BEFORE DELETE ON root_exchange_bearer_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'recorded bearer mapping is immutable');
 END;
 
 CREATE TABLE root_exchange_replay (
