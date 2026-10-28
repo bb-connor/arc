@@ -635,20 +635,27 @@ fn explicit_exchange_identical_repeat_refuses_replay() -> TestResult {
     Ok(())
 }
 
+/// A context of a non-JWS kind that carries `artifact_digest` never reaches
+/// the mint: the delegation context decoder refuses it.
 #[test]
 fn non_jws_context_carrying_artifact_digest_refuses_mint() -> TestResult {
-    for kind in [Kind::LocalAs, Kind::OperatorKey] {
-        let env = Env::new()?;
+    for (kind, name) in [
+        (Kind::LocalAs, "chio_local_as"),
+        (Kind::OperatorKey, "chio_operator_key"),
+        (Kind::StaticBearer, "operator_static_bearer"),
+    ] {
         let mut case = Case::non_jws(kind, "cap-1")?;
         case.edit_context = |value| {
             value["anchor"]["artifact_digest"] = serde_json::json!(support::digest(0x13));
         };
-        assert_eq!(digest(case.artifact), digest(0x13));
+        let refused = case
+            .context()
+            .err()
+            .ok_or("a non-JWS context carrying artifact_digest decoded")?;
         assert_eq!(
-            env.refused(&case, &Admit, NOW)?,
-            E::InvalidMintRequest(MintRequestRefusal::ArtifactDigestPresence)
+            refused.to_string(),
+            format!("`artifact_digest` is not allowed for {name}")
         );
-        assert_eq!(env.replay_bindings()?, Vec::new());
     }
     Ok(())
 }
