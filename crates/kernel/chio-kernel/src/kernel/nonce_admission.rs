@@ -79,8 +79,7 @@ impl ChioKernel {
             parameter_hash: receipt.action.parameter_hash.clone(),
         };
         let reserving_request_id = reserved_hold_id.map(|_| request.request_id.clone());
-        let signed = crate::execution_nonce::mint_execution_nonce_with_reservation(
-            &self.config.keypair,
+        let signed = self.sign_execution_nonce(
             binding,
             reserved_hold_id.map(str::to_string),
             reserving_request_id,
@@ -90,11 +89,31 @@ impl ChioKernel {
         Ok(Some(Box::new(signed)))
     }
 
+    /// Sign an execution nonce with the receipt signing backend, so the nonce
+    /// meets the same boot floor as the receipt that links it.
+    pub(crate) fn sign_execution_nonce(
+        &self,
+        binding: crate::execution_nonce::NonceBinding,
+        reserved_hold_id: Option<String>,
+        reserving_request_id: Option<String>,
+        config: &crate::execution_nonce::ExecutionNonceConfig,
+        now: i64,
+    ) -> Result<crate::execution_nonce::SignedExecutionNonce, KernelError> {
+        crate::execution_nonce::mint_execution_nonce_with_reservation(
+            self.receipt_signing_backend()?,
+            binding,
+            reserved_hold_id,
+            reserving_request_id,
+            config,
+            now,
+        )
+    }
+
     /// Verify a caller-presented execution nonce against the
     /// expected binding, consuming it in the replay store on success.
     ///
     /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
-    /// by this kernel, and has not been consumed. Returns an error
+    /// by this kernel's receipt signing key, and has not been consumed. Returns an error
     /// wrapping `ExecutionNonceError` on any failure (expired, tampered,
     /// replayed, binding mismatch, store unreachable).
     pub fn verify_presented_execution_nonce(
@@ -119,13 +138,10 @@ impl ChioKernel {
                 chio_security_types::clock::ClockError::Overflow,
             )
         })?;
-        crate::execution_nonce::verify_execution_nonce(
-            presented,
-            &self.config.keypair.public_key(),
-            expected,
-            now,
-            store,
-        )
+        let signer = self
+            .receipt_signing_public_key()
+            .map_err(crate::execution_nonce::ExecutionNonceError::from_store)?;
+        crate::execution_nonce::verify_execution_nonce(presented, &signer, expected, now, store)
     }
 
     /// Execution-nonce dispatch gate.
@@ -253,7 +269,7 @@ impl ChioKernel {
         };
         crate::execution_nonce::validate_execution_nonce(
             presented,
-            &self.config.keypair.public_key(),
+            &self.receipt_signing_public_key()?,
             &expected,
             i64::try_from(now).map_err(|_| chio_security_types::clock::ClockError::Overflow)?,
         )

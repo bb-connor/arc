@@ -23,7 +23,7 @@ fn signed(fixture: &NonceFixture) -> TestResult<SignedExecutionNonce> {
 
 fn legacy_packet(fixture: &NonceFixture) -> TestResult<SignedExecutionNonce> {
     Ok(mint_execution_nonce(
-        &fixture.key,
+        &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
         signed(fixture)?.nonce.bound_to,
         &ExecutionNonceConfig::default(),
         i64::try_from(now_ms() / 1_000)?,
@@ -284,7 +284,7 @@ fn durable_nonce_domain_checks_mint_bounds_and_canonical_decode() -> TestResult 
         assert!(AdmissionExecutionNonceReservationV1::mint_for_operation(
             &fixture.operation,
             &fixture.original,
-            &fixture.key,
+            &chio_core::crypto::Ed25519Backend::new(fixture.key.clone()),
             &config,
             at,
         )

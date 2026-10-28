@@ -6,6 +6,8 @@ mod delegated_shares;
 mod receipt_and_reaper;
 #[path = "execution_nonce/reservations.rs"]
 mod reservations;
+#[path = "execution_nonce/signing_authority.rs"]
+mod signing_authority;
 #[path = "execution_nonce/verification.rs"]
 mod verification;
 

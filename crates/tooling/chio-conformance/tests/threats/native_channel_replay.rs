@@ -58,7 +58,12 @@ fn threat_native_channel_replay_replayed_nonce_rejected() {
     let binding = sample_binding();
     let now = current_unix_time();
 
-    let signed = match mint_execution_nonce(&kp, binding.clone(), &cfg, now) {
+    let signed = match mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    ) {
         Ok(signed) => signed,
         Err(err) => panic!("mint_execution_nonce failed: {err:?}"),
     };
@@ -95,7 +100,12 @@ fn threat_native_channel_replay_binding_mismatch_rejected() {
     let minted = sample_binding();
     let now: i64 = 1_700_000_100;
 
-    let signed = match mint_execution_nonce(&kp, minted.clone(), &cfg, now) {
+    let signed = match mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        minted.clone(),
+        &cfg,
+        now,
+    ) {
         Ok(signed) => signed,
         Err(err) => panic!("mint_execution_nonce failed: {err:?}"),
     };
@@ -131,7 +141,12 @@ fn threat_native_channel_replay_tampered_signature_rejected() {
     let binding = sample_binding();
     let now: i64 = 1_700_000_200;
 
-    let mut signed = match mint_execution_nonce(&kp, binding.clone(), &cfg, now) {
+    let mut signed = match mint_execution_nonce(
+        &chio_core::crypto::Ed25519Backend::new(kp.clone()),
+        binding.clone(),
+        &cfg,
+        now,
+    ) {
         Ok(signed) => signed,
         Err(err) => panic!("mint_execution_nonce failed: {err:?}"),
     };

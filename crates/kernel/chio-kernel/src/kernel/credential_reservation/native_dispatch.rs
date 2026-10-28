@@ -327,7 +327,7 @@ impl DispatchCredentialReservation<'_> {
             issued.canonical_bytes(),
             admission.operation(),
             original,
-            &self.kernel.config.keypair.public_key(),
+            &self.kernel.receipt_signing_public_key()?,
             match binding {
                 Some(binding) => binding.bound_at_unix_ms,
                 None => self.kernel.read_authority_time()?.get(),

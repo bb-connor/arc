@@ -477,7 +477,7 @@ fn signed_nonce_for_request(
             .as_secs(),
     )?;
     Ok(crate::execution_nonce::mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding,
         config,
         now,

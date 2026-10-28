@@ -81,7 +81,7 @@ fn fully_populated_request() -> Result<ToolCallRequest, Box<dyn std::error::Erro
             &issuer,
         )?),
         execution_nonce: Some(mint_execution_nonce(
-            &issuer,
+            &chio_core::crypto::Ed25519Backend::new(issuer.clone()),
             NonceBinding {
                 subject_id: issuer.public_key().to_hex(),
                 request_id: "request-identity".into(),

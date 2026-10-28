@@ -449,7 +449,7 @@ fn request_with_panicking_execution_nonce_store(
         make_request_with_arguments(request_id, &capability, tool, server, arguments.clone());
     let binding = binding_for_request(&capability, &request);
     request.execution_nonce = Some(mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding,
         &nonce_config,
         i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX),
@@ -509,7 +509,7 @@ pub(super) fn request_with_recording_execution_nonce_store(
     );
     let binding = binding_for_request(&capability, &request);
     request.execution_nonce = Some(mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding,
         &nonce_config,
         i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX),

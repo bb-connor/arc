@@ -562,9 +562,10 @@ impl ChioKernel {
                     tool_name: request.tool_name.clone(),
                     parameter_hash: action.parameter_hash,
                 };
-                Some(Box::new(crate::execution_nonce::mint_execution_nonce(
-                    &self.config.keypair,
+                Some(Box::new(self.sign_execution_nonce(
                     binding,
+                    None,
+                    None,
                     nonce_config,
                     now,
                 )?))

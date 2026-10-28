@@ -132,7 +132,7 @@ fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestRes
     ));
     request.governed_intent = Some(intent);
     request.execution_nonce = Some(mint_execution_nonce(
-        &kernel.config.keypair,
+        kernel.signing_authority.backend.as_ref(),
         binding_for_request(&request.capability, &request),
         kernel
             .execution_nonce_config
