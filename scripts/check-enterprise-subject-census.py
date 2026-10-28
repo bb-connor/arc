@@ -52,6 +52,7 @@ REAL_KEY_CRATES = (
     "crates/economy/chio-web3/",
     "crates/kernel/chio-kernel/",
     "crates/kernel/chio-process/",
+    "crates/platform/chio-commerce-order/",
     "crates/platform/chio-control-plane/",
     "crates/platform/chio-store-sqlite/",
     "crates/products/chio-api-protect/",
