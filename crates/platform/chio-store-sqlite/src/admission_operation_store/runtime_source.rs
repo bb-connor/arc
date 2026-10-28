@@ -19,6 +19,8 @@ pub(super) use records::verify_all_records;
 const PROJECTION_KIND: &str = "runtime_source_qualification";
 const INSTALL_MUTATION: &str = "install_runtime_source";
 const MAX_SOURCES: usize = 128;
+const MAX_SUPERSEDED: usize = 1024;
+const MAX_QUALIFICATION_HISTORY: usize = MAX_SOURCES + MAX_SUPERSEDED;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuntimeSourceRecordV1 {

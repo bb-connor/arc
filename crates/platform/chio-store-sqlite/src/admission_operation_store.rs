@@ -225,11 +225,11 @@ use projection::{
     verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
 pub(crate) use runtime_participant::verify_runtime_budget_selection_tx;
-pub use runtime_source::{RuntimeSourceRecordV1, RuntimeSourceRequalificationInput};
 pub(crate) use runtime_source::{
     runtime_source_projection_reference, verify_runtime_source_pristine,
     verify_runtime_source_projection_coverage,
 };
+pub use runtime_source::{RuntimeSourceRecordV1, RuntimeSourceRequalificationInput};
 use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use schema::{
     initialize_admission_operation_schema, observe_authority_time, validate_trusted_time,
