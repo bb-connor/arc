@@ -41,6 +41,14 @@ per budget envelope:
   minutes, and parallel matrix jobs each count in full. Run listings beyond
   GitHub's 1,000-result search limit are split by day, and a day that still
   exceeds it fails closed.
+- The `cflite` window starts at the later of 30 days ago and the UTC
+  timestamp in `fuzz/cflite-budget-epoch` (2026-10-28T00:00:00Z). Runs before
+  it are excluded: until then every ClusterFuzzLite run built all targets
+  because the selection never reached the builder, so that usage does not
+  describe the current workflows. Once the epoch is older than 30 days it has
+  no effect and the file is removed. A missing, malformed or future epoch
+  fails the `cflite` envelope closed. `native` and `mutation` always use the
+  30-day window.
 - A capped envelope at or over its cap exits 1. An API error, truncated
   listing or unregistered workflow in a capped envelope exits 2.
 - Mutation and proof-mutation lanes are reported, not capped. The gate prints

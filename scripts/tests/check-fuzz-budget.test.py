@@ -75,11 +75,17 @@ def job(start: int, end: int | None, runner: str | None) -> dict:
 
 
 class Case:
-    def __init__(self) -> None:
+    def __init__(self, epoch: str | None = "2000-01-01T00:00:00Z") -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = Path(self.tmp.name)
         self.bin = self.dir / "bin"
         self.bin.mkdir()
+        self.script = self.dir / "tree/scripts/check-fuzz-budget.sh"
+        self.script.parent.mkdir(parents=True)
+        self.script.write_text(SCRIPT.read_text())
+        (self.dir / "tree/fuzz").mkdir()
+        if epoch is not None:
+            self.epoch(epoch)
         gh = self.bin / "gh"
         gh.write_text(FAKE_GH, encoding="utf-8")
         gh.chmod(0o755)
@@ -104,6 +110,9 @@ class Case:
     def jobs(self, run_id: int, jobs: list[dict]) -> None:
         (self.dir / f"jobs-{run_id}.json").write_text(json.dumps({"jobs": jobs}))
 
+    def epoch(self, text: str) -> None:
+        (self.dir / "tree/fuzz/cflite-budget-epoch").write_text(text)
+
     def error(self, name: str, text: str) -> None:
         (self.dir / f"{name}.err").write_text(text)
 
@@ -120,7 +129,7 @@ class Case:
         }
         full_env.update(env)
         return subprocess.run(
-            ["bash", str(SCRIPT), REPO],
+            ["bash", str(self.script), REPO],
             env=full_env,
             capture_output=True,
             text=True,
@@ -146,7 +155,7 @@ def queued_time_is_not_runner_time() -> None:
         case.check(),
         0,
         "workflow=fuzz.yml runs=1 queried=1 executed=10 min",
-        "envelope=native window=30 days, used=10 min, cap=26000 min, remaining=25990 min",
+        "used=10 min, cap=26000 min, remaining=25990 min",
     )
 
 
@@ -159,7 +168,7 @@ def parallel_matrix_jobs_each_count() -> None:
     expect(
         case.check("cflite"),
         1,
-        "envelope=cflite window=30 days, used=1800 min, cap=1800 min, remaining=0 min",
+        "used=1800 min, cap=1800 min, remaining=0 min",
         "HALT - envelope=cflite used 1800 min >= cap 1800 min",
     )
 
@@ -182,11 +191,11 @@ def native_cap_is_separate() -> None:
     case.listing([run(22, start, start + 60)])
     case.jobs(22, [job(start, start + 25999 * 60, "runner")])
     case.quiet("cflite", "mutation")
-    expect(case.check("all"), 0, "envelope=native window=30 days, used=25999 min, cap=26000 min")
+    expect(case.check("all"), 0, "used=25999 min, cap=26000 min")
     case.jobs(22, [job(start, start + 26000 * 60, "runner")])
     result = case.check("all")
     expect(result, 1, "HALT - envelope=native used 26000 min >= cap 26000 min")
-    assert "envelope=cflite window=30 days, used=0 min, cap=1800 min" in result.stdout, result.stdout
+    assert "used=0 min, cap=1800 min" in result.stdout, result.stdout
 
 
 def mutation_lanes_are_reported_not_capped() -> None:
@@ -198,7 +207,7 @@ def mutation_lanes_are_reported_not_capped() -> None:
     expect(
         case.check("mutation"),
         0,
-        "envelope=mutation window=30 days, used=500000 min, reported only, not capped",
+        "used=500000 min, reported only, not capped",
     )
     assert "HALT" not in case.check("mutation").stderr
 
@@ -210,7 +219,63 @@ def mutation_errors_do_not_fail_the_gate() -> None:
     case.quiet("mutation", "cflite", "native")
     expect(case.check("mutation"), 0, "envelope=mutation usage is unverified")
     result = case.check("all")
-    expect(result, 0, "envelope=mutation usage is unverified", "envelope=native window=30 days")
+    expect(result, 0, "envelope=mutation usage is unverified", "envelope=native window_start=")
+
+
+def cflite_epoch_excludes_earlier_runs() -> None:
+    start = NOW - 10 * 86400
+    case = Case(epoch=iso(NOW - 5 * 86400))
+    case.listing([run(30, start, start + 60)], workflow="cflite_pr.yml")
+    case.jobs(30, [job(start, start + 5000 * 60, "runner")])
+    case.quiet("cflite")
+    expect(
+        case.check("cflite"),
+        0,
+        f"envelope=cflite window_start={iso(NOW - 5 * 86400)}",
+        "used=0 min, cap=1800 min",
+    )
+    created = [call for call in case.calls() if "/workflows/cflite_pr.yml/runs" in call]
+    assert created and all(f"created=>={iso(NOW - 5 * 86400)}" in call for call in created), created
+
+
+def cflite_epoch_counts_later_runs() -> None:
+    start = NOW - 86400
+    case = Case(epoch=iso(NOW - 5 * 86400))
+    case.listing([run(31, start, start + 60)], workflow="cflite_batch.yml")
+    case.jobs(31, [job(start, start + 1800 * 60, "runner")])
+    case.quiet("cflite")
+    expect(case.check("cflite"), 1, "HALT - envelope=cflite used 1800 min >= cap 1800 min")
+
+
+def old_cflite_epoch_keeps_thirty_day_window() -> None:
+    case = Case(epoch="2026-01-01T00:00:00Z")
+    case.quiet("cflite")
+    result = case.check("cflite")
+    expect(result, 0, f"envelope=cflite window_start={iso(NOW - 30 * 86400)[:13]}")
+
+
+def native_window_ignores_cflite_epoch() -> None:
+    case = Case(epoch=iso(NOW - 86400))
+    case.quiet("native")
+    expect(case.check("native"), 0, f"envelope=native window_start={iso(NOW - 30 * 86400)[:13]}")
+    created = [call for call in case.calls() if "/workflows/fuzz.yml/runs" in call]
+    assert created and all(f"created=>={iso(NOW - 30 * 86400)[:13]}" in call for call in created), created
+
+
+def bad_cflite_epoch_fails_closed() -> None:
+    for text, needle in [
+        (None, "cflite budget epoch"),
+        ("", "cflite budget epoch"),
+        ("2026-10-28", "cflite budget epoch"),
+        ("2026-13-40T00:00:00Z", "cflite budget epoch"),
+        ("2026-10-28T00:00:00Z\n2026-10-29T00:00:00Z\n", "cflite budget epoch"),
+        (iso(NOW + 3600), "is in the future"),
+    ]:
+        case = Case(epoch=text)
+        case.quiet("cflite", "native", "mutation")
+        expect(case.check("cflite"), 2, needle)
+        expect(case.check("all"), 2, needle)
+        expect(case.check("native"), 0, "envelope=native")
 
 
 def unknown_scope_fails_closed() -> None:
@@ -366,6 +431,11 @@ CASES = [
     mutation_lanes_are_reported_not_capped,
     mutation_errors_do_not_fail_the_gate,
     unknown_scope_fails_closed,
+    cflite_epoch_excludes_earlier_runs,
+    cflite_epoch_counts_later_runs,
+    old_cflite_epoch_keeps_thirty_day_window,
+    native_window_ignores_cflite_epoch,
+    bad_cflite_epoch_fails_closed,
     cap_warn_mode_reports_overrun,
     running_job_counts_until_now,
     large_window_is_listed_by_day,

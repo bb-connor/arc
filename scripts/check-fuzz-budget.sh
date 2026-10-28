@@ -9,6 +9,10 @@
 #   mutation  mutants.yml, mutants-fuzz-cocoverage.yml,
 #             proof-mutants.yml                      reported, not capped
 #
+# The cflite envelope's window starts at the later of 30 days ago and the
+# UTC timestamp in fuzz/cflite-budget-epoch (one line, YYYY-MM-DDTHH:MM:SSZ).
+# A missing, malformed or future epoch fails the cflite envelope closed.
+#
 # A job counts from the moment a runner picks it up until it completes; time
 # spent waiting in the queue, and jobs that never received a runner, consume
 # no runner minutes and are not counted. Jobs still running count up to the
@@ -91,10 +95,44 @@ cap_mode="${GH_FUZZ_BUDGET_CAP_MODE:-fail}"
 now_epoch="$(date -u +%s)"
 since_epoch=$(( now_epoch - WINDOW_DAYS * 86400 ))
 case "$(uname -s)" in
-    Darwin) iso_utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; } ;;
-    Linux)  iso_utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; } ;;
+    Darwin)
+        iso_utc() { date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
+        utc_epoch() { date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null; }
+        ;;
+    Linux)
+        iso_utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+        utc_epoch() { date -u -d "$1" +%s 2>/dev/null; }
+        ;;
     *)      err "unsupported platform: $(uname -s)"; exit 2 ;;
 esac
+
+CFLITE_EPOCH_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/fuzz/cflite-budget-epoch"
+
+# cflite_window_start: prints the cflite envelope's window start in epoch
+# seconds, or exits 2 when the epoch file is unusable.
+cflite_window_start() {
+    local text epoch
+    if [[ ! -f "${CFLITE_EPOCH_FILE}" ]]; then
+        err "fuzz-budget: cflite budget epoch ${CFLITE_EPOCH_FILE} is missing"
+        exit 2
+    fi
+    text="$(cat "${CFLITE_EPOCH_FILE}")"
+    if ! [[ "${text}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
+        || ! epoch="$(utc_epoch "${text}")" \
+        || [[ "$(iso_utc "${epoch}")" != "${text}" ]]; then
+        err "fuzz-budget: cflite budget epoch in ${CFLITE_EPOCH_FILE} is not one UTC timestamp: ${text}"
+        exit 2
+    fi
+    if (( epoch > now_epoch )); then
+        err "fuzz-budget: cflite budget epoch ${text} is in the future"
+        exit 2
+    fi
+    if (( epoch > since_epoch )); then
+        printf '%d\n' "${epoch}"
+    else
+        printf '%d\n' "${since_epoch}"
+    fi
+}
 since="$(iso_utc "${since_epoch}")"
 
 work="$(mktemp -d)"
@@ -184,17 +222,19 @@ list_runs() {
     return 0
 }
 
-# measure_workflows OUTPUT_FILE WORKFLOW...: writes the summed runner seconds.
+# measure_workflows OUTPUT_FILE WINDOW_START WORKFLOW...: writes the summed
+# runner seconds of runs created at or after WINDOW_START (epoch seconds).
 measure_workflows() {
-    local output="$1" total_seconds=0
-    shift
+    local output="$1" window_epoch="$2" window total_seconds=0
+    shift 2
+    window="$(iso_utc "${window_epoch}")"
     for wf in "$@"; do
         runs="${work}/runs-${wf}.ndjson"
         status=0
-        list_runs "${wf}" "${since}" "" "${runs}" || status=$?
+        list_runs "${wf}" "${window}" "" "${runs}" || status=$?
         if [[ "${status}" -eq 5 ]]; then
             : >"${runs}"
-            slice_start="${since_epoch}"
+            slice_start="${window_epoch}"
             while (( slice_start < now_epoch )); do
                 slice_end=$(( slice_start + 86400 ))
                 slice="${work}/slice.ndjson"
@@ -269,7 +309,8 @@ measure_workflows() {
                     >>"${ledger_out}"
             fi
             workflow_seconds=$(( workflow_seconds + run_seconds ))
-        done < <(jq -rs 'unique_by(.id) | .[]
+        done < <(jq -rs --arg window "${window}" 'unique_by(.id) | .[]
+            | select(.created_at >= $window)
             | [.id, (.run_attempt // 1), .status, .created_at] | @tsv' "${runs}")
         if [[ "${workflow_seconds}" -lt 0 ]]; then
             continue
@@ -289,10 +330,14 @@ for envelope in "${ENVELOPES[@]}"; do
         mutation) workflows=("${MUTATION_WORKFLOWS[@]}"); cap="" ;;
     esac
     measured="${work}/measured-${envelope}"
+    window_epoch="${since_epoch}"
+    if [[ "${envelope}" == "cflite" ]]; then
+        window_epoch="$(cflite_window_start)" || exit 2
+    fi
     set +e
     (
         set -e
-        measure_workflows "${measured}" "${workflows[@]}"
+        measure_workflows "${measured}" "${window_epoch}" "${workflows[@]}"
     )
     status=$?
     set -e
@@ -305,14 +350,14 @@ for envelope in "${ENVELOPES[@]}"; do
     fi
     used=$(( ($(cat "${measured}") + 59) / 60 ))
     if [[ -z "${cap}" ]]; then
-        printf 'fuzz-budget: envelope=%s window=%s days, used=%d min, reported only, not capped\n' \
-            "${envelope}" "${WINDOW_DAYS}" "${used}"
+        printf 'fuzz-budget: envelope=%s window_start=%s, used=%d min, reported only, not capped\n' \
+            "${envelope}" "$(iso_utc "${window_epoch}")" "${used}"
         continue
     fi
-    printf 'fuzz-budget: envelope=%s window=%s days, used=%d min, cap=%d min, remaining=%d min\n' \
-        "${envelope}" "${WINDOW_DAYS}" "${used}" "${cap}" "$(( cap - used ))"
+    printf 'fuzz-budget: envelope=%s window_start=%s, used=%d min, cap=%d min, remaining=%d min\n' \
+        "${envelope}" "$(iso_utc "${window_epoch}")" "${used}" "${cap}" "$(( cap - used ))"
     if (( used >= cap )); then
-        err "fuzz-budget: HALT - envelope=${envelope} used ${used} min >= cap ${cap} min in last ${WINDOW_DAYS} days"
+        err "fuzz-budget: HALT - envelope=${envelope} used ${used} min >= cap ${cap} min since $(iso_utc "${window_epoch}")"
         over_cap=1
     fi
 done

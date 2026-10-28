@@ -115,9 +115,19 @@ for line in [
     "NATIVE_CAP_MINUTES=26000",
     'MUTATION_WORKFLOWS=("mutants.yml" "mutants-fuzz-cocoverage.yml" "proof-mutants.yml")',
     'SCOPE="${GH_FUZZ_BUDGET_SCOPE:-all}"',
+    'CFLITE_EPOCH_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/fuzz/cflite-budget-epoch"',
 ]:
     if line not in script:
         raise SystemExit(f"fuzz budget envelopes must declare {line}")
 PY
+
+if ! grep -Eqx '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z' "${REPO_ROOT}/fuzz/cflite-budget-epoch"; then
+  echo "FAIL: fuzz/cflite-budget-epoch must hold one UTC timestamp" >&2
+  exit 1
+fi
+if ! grep -q 'fuzz/cflite-budget-epoch' "${DOCS}"; then
+  echo "FAIL: docs/fuzzing/continuous.md must describe the cflite budget epoch" >&2
+  exit 1
+fi
 
 echo "PASS: fuzz budget envelopes, workflow scopes and docs agree"
