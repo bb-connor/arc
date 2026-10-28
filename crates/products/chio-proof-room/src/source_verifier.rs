@@ -1724,3 +1724,7 @@ pub(crate) fn enterprise_export_sidecar_paths(
         .map(|artifact| artifact.path)
         .collect())
 }
+
+#[cfg(test)]
+#[path = "source_verifier/runtime_records_tests.rs"]
+mod runtime_records_tests;

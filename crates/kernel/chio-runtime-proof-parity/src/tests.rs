@@ -327,3 +327,34 @@ fn test_canonical_value_sha256(value: &Value) -> String {
         Err(error) => panic!("test canonical hash failed: {error}"),
     }
 }
+
+#[test]
+fn source_record_reader_refuses_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let record = serde_json::json!({
+        "stepIndex": 0,
+        "toolReceiptSha256": "1".repeat(64),
+        "bilateralDsseSha256": "2".repeat(64),
+        "workflowStepSha256": "3".repeat(64)
+    });
+    let workflow = serde_json::json!({"stepEvidence": [record.clone()]});
+    ensure_source_records_bind_workflow_step_evidence(
+        &serde_json::json!({"sourceRecords": [record.clone()]}),
+        &workflow,
+    )?;
+    for field in ["admissionReceiptSha256", "unexpectedBinding"] {
+        let mut extra = record.clone();
+        extra[field] = serde_json::json!("4".repeat(64));
+        let error = match ensure_source_records_bind_workflow_step_evidence(
+            &serde_json::json!({"sourceRecords": [extra]}),
+            &workflow,
+        ) {
+            Ok(()) => panic!("unknown source-record field accepted: {field}"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.code(),
+            "runtime_proof_regeneration_source_record_unknown_field"
+        );
+    }
+    Ok(())
+}
