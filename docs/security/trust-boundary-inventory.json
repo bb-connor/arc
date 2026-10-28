@@ -24062,6 +24062,16 @@
       "decode_receipt_row::original-json-reader::UntrustedJsonText",
       "poll_once::shared-reader::crates/observability/chio-siem/src/manager.rs::decode_receipt_row"
     ],
+    "crates/platform/chio-control-plane/src/passport_revocation_mirror.rs": [
+      "conflicts::shared-reader::crates/platform/chio-control-plane/src/passport_revocation_mirror.rs::decode_root",
+      "decode_root::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+    ],
+    "crates/platform/chio-control-plane/src/revocation_partner.rs": [
+      "from_json::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public/partner_revocation_sync.rs": [
+      "get::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+    ],
     "crates/tooling/chio-trace-validate/src/decode.rs": [
       "decode_observations::original-json-reader::UntrustedJsonText"
     ],

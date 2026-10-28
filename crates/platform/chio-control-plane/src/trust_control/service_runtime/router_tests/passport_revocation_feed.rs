@@ -225,3 +225,81 @@ async fn the_root_route_refuses_without_an_authority() -> TestResult {
     );
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_revocation_at_the_partner_reaches_the_mirror_over_http() -> TestResult {
+    use crate::passport_revocation_mirror::{
+        partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
+    };
+    use crate::revocation_partner::RevocationPartner;
+    use crate::trust_control::{
+        build_portable_fetch_agent, PartnerRevocationFeed, PortableFetchDeadline,
+    };
+
+    let publisher = publisher()?;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let addr = listener.local_addr()?;
+    let app = build_router(publisher.state.clone());
+    tokio::spawn(async move {
+        let _served = axum::serve(listener, app).await;
+    });
+    let dir = tempfile::tempdir()?;
+    let mirror_path =
+        partner_revocation_mirror_path(&dir.path().join("b-revocation-partners.json"), "acme")?;
+    let partner = RevocationPartner {
+        partner_id: "acme".to_owned(),
+        issuer: "https://trust.acme.example".to_owned(),
+        authority_public_key: publisher.authority.public_key(),
+        issuer_public_keys: vec![publisher.authority.public_key()],
+        revocation_freshness_ttl_seconds: 60,
+    };
+    let mut subjects = vec![chio_revocation_oracle::passport_revocation_key(
+        &publisher.passport_id,
+    )];
+    subjects.extend(
+        publisher
+            .credential_digests
+            .iter()
+            .map(|digest| chio_revocation_oracle::credential_revocation_key(digest)),
+    );
+    let registry = publisher.registry.clone();
+    let passport_id = publisher.passport_id.clone();
+    let outcomes = tokio::task::spawn_blocking(move || -> Result<_, String> {
+        let mirror = PartnerRevocationMirror::open(&mirror_path, "acme")
+            .map_err(|error| error.to_string())?;
+        let sync = || -> Result<(), String> {
+            let deadline = PortableFetchDeadline::start().map_err(|error| error.to_string())?;
+            let agent = build_portable_fetch_agent(vec![addr], false, &deadline)
+                .map_err(|error| error.to_string())?;
+            let mut feed =
+                PartnerRevocationFeed::new("acme", &format!("http://{addr}"), agent, deadline);
+            mirror
+                .sync(&partner, &mut feed, &FixedClock::from_millis(NOW_MS))
+                .map(|_| ())
+                .map_err(|error| error.to_string())
+        };
+        sync()?;
+        let before = mirror.check_passport(&partner, &subjects, NOW_MS);
+        revoke_passport_status(
+            &registry,
+            &passport_id,
+            Some("compromised"),
+            Some(ISSUED_AT + 1),
+            ISSUED_AT + 2,
+        )
+        .map_err(|error| error.to_string())?;
+        sync()?;
+        let after = mirror.check_passport(&partner, &subjects, NOW_MS);
+        Ok((before, after))
+    })
+    .await??;
+    assert_eq!(outcomes.0, Ok(()));
+    assert_eq!(
+        outcomes.1,
+        Err(PartnerRevocationError::Revoked {
+            partner_id: "acme".to_owned(),
+            subject: publisher.passport_id.clone(),
+        })
+    );
+    Ok(())
+}
