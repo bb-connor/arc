@@ -57,8 +57,15 @@ pub fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
 pub fn temp_sqlite_path(prefix: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     let root = std::fs::canonicalize(std::env::temp_dir())
         .unwrap_or_else(|error| panic!("temp root is not resolvable: {error}"));
-    let directory = tempfile::Builder::new()
-        .prefix(&format!("{prefix}-"))
+    let name = format!("{prefix}-");
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(&name);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let directory = builder
         .tempdir_in(root)
         .unwrap_or_else(|error| panic!("test temp directory was not created: {error}"));
     let path = directory.path().join(format!("{prefix}.sqlite3"));
