@@ -96,7 +96,11 @@ class TypeResolver:
             crate = gate.crate_of(rel)
             suffix = rel.split("/src/", 1)[-1]
             parts = list(Path(suffix).with_suffix("").parts)
-            if parts[-1] in {"lib", "main", "mod"}:
+            if parts[0] == "bin" and (len(parts) == 2 or len(parts) == 3 and parts[-1] == "main"):
+                parts = [":bin:" + parts[1]]
+            elif parts == ["main"]:
+                parts = [":bin:main"]
+            elif parts[-1] in {"lib", "mod"}:
                 parts.pop()
             self.bases[rel] = (crate, *parts)
             self.crates[Path(crate).name.replace("-", "_")] = crate
@@ -327,7 +331,8 @@ class TypeResolver:
     def absolute(self, path, scope):
         module = self.module(scope)
         if path[0] == "crate":
-            return (scope[0],) + path[1:]
+            root = scope[:2] if len(scope) > 1 and scope[1].startswith(":bin:") else scope[:1]
+            return root + path[1:]
         if path[0] == "self":
             return module + path[1:]
         if path[0] == "super":
