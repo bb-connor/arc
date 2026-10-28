@@ -1410,11 +1410,7 @@ mod http_service_tests {
     }
 }
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-enum GovernedDenialReason {
-    Denied,
-}
+const GOVERNED_DENIAL_REASON: &str = "denied";
 
 /// A send failure other than ingress capacity or a governed denial answers the
 /// fixed 500 URN; the cause stays in the server log.
@@ -1426,7 +1422,10 @@ fn remote_session_send_error(error: CliError) -> Response {
             "urn:chio:error:transport:stream-capacity-exceeded",
         ),
         CliError::Kernel(chio_kernel::KernelError::GovernedTransactionDenied(message)) => {
-            warn!(reason = %message, "remote MCP governed transaction denied");
+            warn!(
+                reason = %chio_log_redact::redacted!(&message),
+                "remote MCP governed transaction denied"
+            );
             (
                 StatusCode::FORBIDDEN,
                 Json(json!({
@@ -1434,7 +1433,7 @@ fn remote_session_send_error(error: CliError) -> Response {
                     "error": {
                         "code": -32003,
                         "message": "Governed transaction denied",
-                        "data": { "reason": GovernedDenialReason::Denied }
+                        "data": { "reason": GOVERNED_DENIAL_REASON }
                     }
                 })),
             )
