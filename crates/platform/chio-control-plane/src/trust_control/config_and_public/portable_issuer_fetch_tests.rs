@@ -850,7 +850,11 @@ fn a_local_lifecycle_is_resolved_again_at_acceptance() {
         panic!("a local registry plans without a fetch");
     };
     std::fs::write(&statuses, b"{").test_unwrap();
+    let unreadable = PassportStatusRegistry::load(&statuses)
+        .test_unwrap_err()
+        .to_string();
     let recheck =
-        recheck_oid4vp_passport_lifecycle(&config, "passport-1", None, planned, 1_000, 2_000);
-    assert!(recheck.is_err(), "the registry is read again at acceptance");
+        recheck_oid4vp_passport_lifecycle(&config, "passport-1", None, planned, 1_000, 2_000)
+            .test_unwrap_err();
+    assert_eq!(recheck.to_string(), unreadable);
 }
