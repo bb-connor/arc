@@ -3,11 +3,13 @@
 
 Every ureq request starts at an agent constructor, an agent configuration or a
 top-level dispatch function, and every hyper client lives under a `client`
-module. This scan resolves the names a source file binds to those items:
-renamed Cargo dependencies, `extern crate` aliases and every `use` tree form,
-including multi-line groups, nested groups, `self` renames and renames of the
-items themselves. A glob import from a client crate is refused because it hides
-what it binds.
+module. This scan resolves, to a fixed point, the names a source file binds to
+those items: renamed Cargo dependencies, `extern crate` aliases, type aliases
+and every `use` tree form, including multi-line groups, nested groups, `self`
+renames and renames of the items themselves. A glob import from a client crate
+is refused because it hides what it binds. Paths are matched over the whole
+source, so a path split across lines or written from the crate root (`::ureq`)
+still matches, and a client function named without a call still counts.
 
 A finding outside the kernel is accepted when one of the four lines above it
 carries the classification marker for its crate. Kernel crates take no
@@ -45,6 +47,7 @@ UNSCANNED_PACKAGES = frozenset(
 DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 USE_STATEMENT = re.compile(r"\b(pub(?:\([^)]*\))?\s+)?use\s+([^;]*);", re.S)
 EXTERN_CRATE = re.compile(r"\bextern\s+crate\s+([A-Za-z_]\w*)\s+as\s+([A-Za-z_]\w*)\s*;")
+TYPE_ALIAS = re.compile(r"\btype\s+([A-Za-z_]\w*)\s*(?:<[^=;]*>)?\s*=\s*([^;]+);")
 
 
 def dependency_tables(manifest: dict):
@@ -142,70 +145,96 @@ def classified(lines: list[str], line_no: int, marker: str) -> bool:
     return any(marker in lines[n - 1] for n in range(max(1, line_no - 4), line_no + 1))
 
 
+def alternation(names) -> str:
+    return "|".join(sorted(map(re.escape, names)))
+
+
+def bind_names(text: str, ureq_roots: set[str], hyper_roots: set[str]):
+    """Resolve aliases to a fixed point, since Rust imports are order-independent.
+
+    Returns the constructor names and the (offset, family) findings that come
+    from the imports themselves.
+    """
+    uses = [(match.start(), list(expand_use_tree(match.group(2), []))) for match in USE_STATEMENT.finditer(text)]
+    externs = [(match.group(1), match.group(2)) for match in EXTERN_CRATE.finditer(text)]
+    type_aliases = [
+        (match.group(1), [s.strip() for s in re.sub(r"<.*", "", match.group(2), flags=re.S).split("::") if s.strip()])
+        for match in TYPE_ALIAS.finditer(text)
+    ]
+    constructors: set[str] = set()
+    findings: set[tuple[int, str]] = set()
+    while True:
+        size = (len(ureq_roots), len(hyper_roots), len(constructors))
+        for crate, alias in externs:
+            if crate in ureq_roots:
+                ureq_roots.add(alias)
+            if crate in hyper_roots:
+                hyper_roots.add(alias)
+        for offset, trees in uses:
+            for path, bound in trees:
+                if path and path[0] == "":
+                    path = path[1:]
+                if not path:
+                    continue
+                crate = path[0]
+                if crate in ureq_roots:
+                    if bound is None or (len(path) == 2 and path[1] in UREQ_FUNCTIONS):
+                        findings.add((offset, "ureq"))
+                    elif len(path) == 1:
+                        ureq_roots.add(bound)
+                    elif any(segment in UREQ_CONSTRUCTORS for segment in path[1:]):
+                        constructors.add(bound)
+                elif crate in hyper_roots:
+                    if bound is None or "client" in path[1:]:
+                        findings.add((offset, "hyper"))
+                    elif len(path) == 1:
+                        hyper_roots.add(bound)
+                elif crate in constructors and len(path) == 1:
+                    constructors.add(bound)
+        for name, path in type_aliases:
+            if path and path[0] in ureq_roots and any(segment in UREQ_CONSTRUCTORS for segment in path[1:]):
+                constructors.add(name)
+            elif len(path) == 1 and path[0] in constructors:
+                constructors.add(name)
+        if size == (len(ureq_roots), len(hyper_roots), len(constructors)):
+            return constructors, findings
+
+
 def scan_file(rel: str, raw: str, roots: dict[str, set[str]]) -> list[tuple[int, str]]:
     text = lexer.blank_rust_noise(raw)
     ureq_roots = set(roots["ureq"])
     hyper_roots = set(roots["hyper"])
-    constructors: set[str] = set()
-    findings: list[tuple[int, str]] = []
-    for match in EXTERN_CRATE.finditer(text):
-        for family, family_roots in (("ureq", ureq_roots), ("hyper", hyper_roots)):
-            if match.group(1) in family_roots:
-                family_roots.add(match.group(2))
-    for match in USE_STATEMENT.finditer(text):
-        line_no = line_of(text, match.start())
-        for path, bound in expand_use_tree(match.group(2), []):
-            if path and path[0] == "":
-                path = path[1:]
-            if not path:
-                continue
-            crate = path[0]
-            if crate in ureq_roots:
-                if bound is None:
-                    findings.append((line_no, "ureq"))
-                elif len(path) == 1:
-                    ureq_roots.add(bound)
-                elif path[1] in UREQ_FUNCTIONS and len(path) == 2:
-                    findings.append((line_no, "ureq"))
-                elif any(segment in UREQ_CONSTRUCTORS for segment in path[1:]):
-                    constructors.add(bound)
-            elif crate in hyper_roots:
-                if bound is None or "client" in path[1:]:
-                    findings.append((line_no, "hyper"))
-                elif len(path) == 1:
-                    hyper_roots.add(bound)
-    ureq_pattern = re.compile(
-        r"(?<![\w:])(?:" + "|".join(sorted(map(re.escape, ureq_roots))) + r")\s*::\s*(?:"
-        r"(?:" + "|".join(sorted(UREQ_FUNCTIONS)) + r")\s*\(|(?:Agent|AgentBuilder)\s*::\s*\w+\s*\(|config\b)"
-    )
-    constructor_pattern = (
-        re.compile(r"(?<![\w:])(?:" + "|".join(sorted(map(re.escape, constructors))) + r")\s*::\s*\w+\s*\(")
-        if constructors
-        else None
-    )
-    hyper_pattern = re.compile(
-        r"(?<![\w:])(?:" + "|".join(sorted(map(re.escape, hyper_roots))) + r")\s*::\s*client\b"
-    )
-    kernel_pattern = re.compile(r"(?<![\w:])(?:" + "|".join(sorted(map(re.escape, ureq_roots))) + r")\b")
+    constructors, found = bind_names(text, ureq_roots, hyper_roots)
+    patterns = [
+        (
+            "ureq",
+            re.compile(
+                r"(?<!\w)(?:" + alternation(ureq_roots) + r")\s*::\s*(?:"
+                r"(?:" + "|".join(sorted(UREQ_FUNCTIONS)) + r")\b(?!\s*::)"
+                r"|(?:Agent|AgentBuilder)\s*::\s*\w+|config\b)"
+            ),
+        ),
+        ("hyper", re.compile(r"(?<!\w)(?:" + alternation(hyper_roots) + r")\s*::\s*client\b")),
+    ]
+    if constructors:
+        patterns.append(("ureq", re.compile(r"(?<![\w:])(?:" + alternation(constructors) + r")\s*::\s*\w+")))
     in_kernel = rel.startswith(KERNEL_ROOT)
-    for index, line in enumerate(text.split("\n"), start=1):
-        if in_kernel and kernel_pattern.search(line):
-            findings.append((index, "kernel"))
-            continue
-        if ureq_pattern.search(line) or (constructor_pattern and constructor_pattern.search(line)):
-            findings.append((index, "ureq"))
-        if hyper_pattern.search(line):
-            findings.append((index, "hyper"))
+    if in_kernel:
+        patterns.append(("kernel", re.compile(r"(?<!\w)(?:" + alternation(ureq_roots) + r")\b")))
+    for family, pattern in patterns:
+        for match in pattern.finditer(text):
+            found.add((match.start(), family))
     raw_lines = raw.split("\n")
-    result = []
-    for line_no, family in sorted(set(findings)):
+    result = set()
+    for offset, family in found:
+        line_no = line_of(text, offset)
         if in_kernel and family in ("ureq", "kernel"):
-            result.append((line_no, raw_lines[line_no - 1]))
+            result.add((line_no, raw_lines[line_no - 1]))
             continue
         marker = UREQ_MARKER if family == "ureq" else HYPER_MARKER
         if not classified(raw_lines, line_no, marker):
-            result.append((line_no, raw_lines[line_no - 1]))
-    return result
+            result.add((line_no, raw_lines[line_no - 1]))
+    return sorted(result)
 
 
 def main(argv: list[str]) -> int:
