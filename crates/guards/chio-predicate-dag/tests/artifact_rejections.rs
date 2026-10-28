@@ -480,22 +480,6 @@ fn evaluate_refuses_an_atom_set_of_the_wrong_width() -> Result<(), DagError> {
 }
 
 #[test]
-fn unprovided_atoms_are_refused() -> Result<(), DagError> {
-    let mut guard = storage();
-    guard.decode(&valid().bytes())?;
-    let schedule = guard.schedule()?;
-    let mut provided = [0u64; ATOM_WORDS];
-    provided[0] = 0b0111;
-    assert_eq!(
-        schedule.require_atoms(&provided).err(),
-        Some(DagError::UnprovidedAtom)
-    );
-    provided[0] = 0b1111;
-    assert_eq!(schedule.require_atoms(&provided), Ok(()));
-    Ok(())
-}
-
-#[test]
 fn tri_set_refuses_overlap_and_padding() {
     let mut pos = [0u64; 2];
     let mut neg = [0u64; 2];

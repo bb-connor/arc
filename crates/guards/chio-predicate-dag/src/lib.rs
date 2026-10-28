@@ -96,7 +96,6 @@ pub enum DagError {
     PaddingNotZero,
     ThresholdOrder,
     PlaneOverlap,
-    UnprovidedAtom,
     WorkExhausted,
     NotValidated,
 }

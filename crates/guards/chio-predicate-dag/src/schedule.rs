@@ -61,7 +61,10 @@ impl Meta {
 
 /// Caller-owned storage for one validated schedule. It holds a schedule only
 /// after a successful `decode`; any failed `decode` leaves it invalid.
-#[derive(Clone, Debug)]
+///
+/// The storage holds `MAX_SCHEDULE_OPS` ops, about 1 MiB. Place it in a
+/// `static` or a `Box`, never in a local on a thread stack.
+#[derive(Debug)]
 pub struct ScheduleStorage {
     ops: [Op; MAX_SCHEDULE_OPS],
     meta: Meta,
@@ -138,21 +141,6 @@ impl<'s> Schedule<'s> {
             Some(RulePolarity::Hold)
         } else {
             Some(RulePolarity::Advisory)
-        }
-    }
-
-    /// `UnprovidedAtom` when a referenced atom is missing from `provided`.
-    pub fn require_atoms(&self, provided: &[u64; ATOM_WORDS]) -> Result<(), DagError> {
-        let missing = self
-            .meta
-            .referenced_atoms
-            .iter()
-            .zip(provided)
-            .any(|(referenced, provided)| referenced & !provided != 0);
-        if missing {
-            Err(DagError::UnprovidedAtom)
-        } else {
-            Ok(())
         }
     }
 }
