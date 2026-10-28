@@ -351,7 +351,11 @@ Rules:
   INTEGRITY-ONLY (no authorization decision depends on the result) or
   NEEDS-TRUST-CONTEXT (an authorization path whose trusted key is not yet
   wired), and `scripts/check-self-key-verify.py` refuses an unclassified
-  site. Kernel call sites are PINNED or GUARDED.
+  site. Kernel call sites are PINNED or GUARDED. Each NEEDS-TRUST-CONTEXT
+  site is one row of `scripts/self-key-verify-baseline.tsv`. Until its row
+  is deleted, that path provides integrity only and makes no claim of
+  verification under a trusted key, and the release gate fails while the
+  file holds any row.
 - Strict decoding: a signed artifact rejects an unknown member, even when
   the signature over the body that carries it verifies. A tagged union
   rejects an unknown member in every variant, including variants that carry
