@@ -5,19 +5,155 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::io::{self, Read};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::sync::{mpsc, Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 use url::Url;
 
-/// Name lookup for one host and port. Every address it returns still passes
-/// the contract address checks before a socket opens.
-pub type ContractLookup = Arc<dyn Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync>;
+type ResolveFn = dyn Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync;
 
-/// The system resolver as a [`ContractLookup`].
+/// Lookups one [`ContractLookup`] runs at once. A lookup abandoned at a request
+/// deadline keeps its slot until it returns.
+const LOOKUPS_IN_FLIGHT: usize = 16;
+
+/// Name lookup for one host and port. Every address it returns still passes
+/// the contract address checks before a socket opens. Clones share their
+/// lookups: requests for a host and port wait on the one lookup in flight for
+/// it, and a request that needs a new lookup while a fixed number are running
+/// is refused.
+#[derive(Clone)]
+pub struct ContractLookup {
+    resolve: Arc<ResolveFn>,
+    flights: Arc<Mutex<Flights>>,
+}
+
+impl ContractLookup {
+    pub fn new(
+        resolve: impl Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            resolve: Arc::new(resolve),
+            flights: Arc::new(Mutex::new(BTreeMap::new())),
+        }
+    }
+
+    /// The lookup in flight for `host` and `port`, starting one on its own
+    /// thread when none is.
+    fn flight(&self, host: &str, port: u16) -> Result<Arc<Flight>, HttpEgressError> {
+        let key = (host.to_string(), port);
+        let flight = {
+            let mut flights = self.flights.lock().unwrap_or_else(PoisonError::into_inner);
+            if let Some(flight) = flights.get(&key) {
+                return Ok(Arc::clone(flight));
+            }
+            if flights.len() >= LOOKUPS_IN_FLIGHT {
+                return Err(HttpEgressError::DnsResolutionFailed {
+                    host: host.to_string(),
+                    details: "too many name lookups are in flight".to_string(),
+                });
+            }
+            let flight = Arc::new(Flight::default());
+            flights.insert(key.clone(), Arc::clone(&flight));
+            flight
+        };
+        let mut landing = FlightLanding {
+            flights: Arc::clone(&self.flights),
+            key,
+            flight: Arc::clone(&flight),
+            answer: None,
+        };
+        let resolve = Arc::clone(&self.resolve);
+        thread::Builder::new()
+            .name("chio-egress-lookup".to_string())
+            .spawn(move || {
+                let (host, port) = &landing.key;
+                let answer = resolve(host, *port).map_err(|error| error.to_string());
+                landing.record(answer);
+            })
+            .map_err(|error| HttpEgressError::DnsResolutionFailed {
+                host: host.to_string(),
+                details: error.to_string(),
+            })?;
+        Ok(flight)
+    }
+}
+
+/// The system resolver as a [`ContractLookup`]. Every caller shares one set of
+/// lookups.
 #[must_use]
 pub fn system_lookup() -> ContractLookup {
-    Arc::new(|host: &str, port: u16| (host, port).to_socket_addrs().map(Iterator::collect))
+    static SYSTEM: OnceLock<ContractLookup> = OnceLock::new();
+    SYSTEM
+        .get_or_init(|| {
+            ContractLookup::new(|host, port| (host, port).to_socket_addrs().map(Iterator::collect))
+        })
+        .clone()
+}
+
+type Flights = BTreeMap<(String, u16), Arc<Flight>>;
+type LookupAnswer = Result<Vec<SocketAddr>, String>;
+
+/// One running lookup and the answer its waiters share.
+#[derive(Default)]
+struct Flight {
+    answer: Mutex<Option<LookupAnswer>>,
+    answered: Condvar,
+}
+
+impl Flight {
+    fn wait_until(&self, ends: Instant, host: &str) -> Result<Vec<SocketAddr>, HttpEgressError> {
+        let mut answer = self.answer.lock().unwrap_or_else(PoisonError::into_inner);
+        loop {
+            if let Some(answer) = answer.as_ref() {
+                return answer
+                    .clone()
+                    .map_err(|details| HttpEgressError::DnsResolutionFailed {
+                        host: host.to_string(),
+                        details,
+                    });
+            }
+            let wait = remaining_before(ends, host)?;
+            answer = match self.answered.wait_timeout(answer, wait) {
+                Ok((answer, _timeout)) => answer,
+                Err(poisoned) => poisoned.into_inner().0,
+            };
+        }
+    }
+}
+
+/// Owned by the lookup thread. Dropping it, when the lookup returns or
+/// unwinds, frees the slot and answers every waiter.
+struct FlightLanding {
+    flights: Arc<Mutex<Flights>>,
+    key: (String, u16),
+    flight: Arc<Flight>,
+    answer: Option<LookupAnswer>,
+}
+
+impl FlightLanding {
+    fn record(&mut self, answer: LookupAnswer) {
+        self.answer = Some(answer);
+    }
+}
+
+impl Drop for FlightLanding {
+    fn drop(&mut self) {
+        self.flights
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&self.key);
+        let answer = self
+            .answer
+            .take()
+            .unwrap_or_else(|| Err("resolver ended without an answer".to_string()));
+        let mut slot = self
+            .flight
+            .answer
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *slot = Some(answer);
+        self.flight.answered.notify_all();
+    }
 }
 
 /// Checked answers by host and port.
@@ -297,39 +433,16 @@ fn pinned_addresses<'a>(
         })
 }
 
-/// A lookup that outlives `ends` is abandoned on its own thread, which ends
-/// when the resolver returns.
+/// Waits for the lookup of `host` until `ends`. A lookup still running then
+/// is abandoned and keeps its slot until it returns.
 fn lookup_before(
     lookup: &ContractLookup,
     host: &str,
     port: u16,
     ends: Instant,
 ) -> Result<Vec<SocketAddr>, HttpEgressError> {
-    let wait = remaining_before(ends, host)?;
-    let (answer, answered) = mpsc::sync_channel(1);
-    let lookup = Arc::clone(lookup);
-    let name = host.to_string();
-    thread::Builder::new()
-        .name("chio-egress-lookup".to_string())
-        .spawn(move || {
-            let _receiver_gone = answer.send(lookup(&name, port));
-        })
-        .map_err(|error| HttpEgressError::DnsResolutionFailed {
-            host: host.to_string(),
-            details: error.to_string(),
-        })?;
-    match answered.recv_timeout(wait) {
-        Ok(Ok(addresses)) => Ok(addresses),
-        Ok(Err(error)) => Err(HttpEgressError::DnsResolutionFailed {
-            host: host.to_string(),
-            details: error.to_string(),
-        }),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(deadline_refusal(host)),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Err(HttpEgressError::DnsResolutionFailed {
-            host: host.to_string(),
-            details: "resolver ended without an answer".to_string(),
-        }),
-    }
+    remaining_before(ends, host)?;
+    lookup.flight(host, port)?.wait_until(ends, host)
 }
 
 fn remaining_before(ends: Instant, host: &str) -> Result<Duration, HttpEgressError> {

@@ -177,14 +177,8 @@ fn deadline_bounds_a_response_that_drips_inside_the_phase_timeout() {
     handle.join().expect("server");
 }
 
-fn lookup_fn(
-    resolve: impl Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync + 'static,
-) -> ContractLookup {
-    Arc::new(resolve)
-}
-
 fn lookup_after(delay: Duration, answer: SocketAddr) -> ContractLookup {
-    lookup_fn(move |_host: &str, _port: u16| {
+    ContractLookup::new(move |_host: &str, _port: u16| {
         thread::sleep(delay);
         Ok(vec![answer])
     })
@@ -219,7 +213,7 @@ impl Hold {
 fn held_lookup(answer: SocketAddr) -> (ContractLookup, Arc<Hold>) {
     let hold = Arc::new(Hold::default());
     let gate = Arc::clone(&hold);
-    let lookup = lookup_fn(move |_host: &str, _port: u16| {
+    let lookup = ContractLookup::new(move |_host: &str, _port: u16| {
         gate.started.fetch_add(1, Ordering::SeqCst);
         let mut released = gate.released.lock().expect("hold");
         while !*released {
@@ -272,8 +266,6 @@ fn slow_resolution_spends_the_request_deadline() {
     hold.wait_finished(1);
 }
 
-const HELD_LOOKUPS: usize = 16;
-
 #[test]
 fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
     let (authority, handle) =
@@ -293,7 +285,7 @@ fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
         .expect("allowed")
         .call()
     };
-    for index in 0..HELD_LOOKUPS {
+    for index in 0..LOOKUPS_IN_FLIGHT {
         let host = format!("held{index}.example");
         assert_eq!(
             call(&host, Duration::from_millis(50)),
@@ -306,7 +298,7 @@ fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
             Err(deadline_refusal("held0.example"))
         );
     }
-    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS);
+    assert_eq!(hold.started.load(Ordering::SeqCst), LOOKUPS_IN_FLIGHT);
     let full = HttpEgressError::DnsResolutionFailed {
         host: "spare.example".to_string(),
         details: "too many name lookups are in flight".to_string(),
@@ -317,10 +309,10 @@ fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
         Err(full.clone())
     );
     assert!(started.elapsed() < Duration::from_secs(1));
-    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS);
+    assert_eq!(hold.started.load(Ordering::SeqCst), LOOKUPS_IN_FLIGHT);
 
     hold.open();
-    hold.wait_finished(HELD_LOOKUPS);
+    hold.wait_finished(LOOKUPS_IN_FLIGHT);
     let response = (0..100)
         .find_map(|_| match call("spare.example", Duration::from_secs(5)) {
             Err(refusal) if refusal == full => {
@@ -332,7 +324,7 @@ fn held_lookups_are_shared_bounded_and_freed_only_when_they_return() {
         .expect("a returned lookup frees its slot")
         .expect("response");
     assert_eq!(response.status(), 204);
-    assert_eq!(hold.started.load(Ordering::SeqCst), HELD_LOOKUPS + 1);
+    assert_eq!(hold.started.load(Ordering::SeqCst), LOOKUPS_IN_FLIGHT + 1);
     handle.join().expect("server");
 }
 
@@ -395,7 +387,7 @@ fn the_first_checked_answer_is_the_only_address_dialed() {
     let target = format!("rebind.example:{}", server.port());
     let lookups = Arc::new(AtomicUsize::new(0));
     let observed = Arc::clone(&lookups);
-    let rebinding = lookup_fn(move |_host: &str, port: u16| {
+    let rebinding = ContractLookup::new(move |_host: &str, port: u16| {
         if observed.fetch_add(1, Ordering::SeqCst) == 0 {
             Ok(vec![server])
         } else {

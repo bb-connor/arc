@@ -47,7 +47,7 @@ fn loopback_contract() -> HttpEgressContract {
 }
 
 fn answer_with(addr: std::net::SocketAddr) -> ContractLookup {
-    Arc::new(move |_host: &str, _port: u16| Ok(vec![addr]))
+    ContractLookup::new(move |_host: &str, _port: u16| Ok(vec![addr]))
 }
 
 fn empty_config() -> TrustServiceConfig {
@@ -240,7 +240,7 @@ fn strict_fetch_refuses_a_private_resolution() {
     .test_unwrap() else {
         panic!("expected a remote fetch plan");
     };
-    let private: ContractLookup = Arc::new(|_host: &str, port: u16| {
+    let private = ContractLookup::new(|_host: &str, port: u16| {
         Ok(vec![std::net::SocketAddr::from(([127, 0, 0, 1], port))])
     });
     let agent = portable_fetch_agent(&fetch.contract, &open_deadline(), private).test_unwrap();
@@ -264,7 +264,7 @@ fn dns_resolution_is_pinned_to_the_checked_addresses_once() {
     // A rebinding resolver: the test listener on the first lookup, a private
     // address on any later one. The fetch resolves exactly once and dials the
     // checked address, so the rebind is never reachable.
-    let rebinding: ContractLookup = Arc::new(move |_host: &str, port: u16| {
+    let rebinding = ContractLookup::new(move |_host: &str, port: u16| {
         if observed.fetch_add(1, Ordering::SeqCst) == 0 {
             Ok(vec![server_addr])
         } else {
