@@ -5,6 +5,7 @@ use super::*;
 use crate::root_exchange::kinds::local_as::{self, PresentedSender};
 use crate::root_exchange::{ReplayNamespace, RootExchangeError, SenderConstraintFailure};
 use chio_core::root_authority::Sha256Digest;
+use chio_core::sha256;
 
 const THUMBPRINT: &str = "cert-thumbprint";
 

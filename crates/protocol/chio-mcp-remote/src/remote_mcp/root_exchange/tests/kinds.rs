@@ -5,8 +5,8 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue};
 
 use super::*;
 use crate::root_exchange::kinds::local_as::{
-    LocalAuthorizationServer, PresentedSender, ReExchangeRequest, RedeemedCode, SubjectRoot,
-    LOCAL_AS_ISSUER,
+    CodeRedemption, LocalAuthorizationServer, PresentedSender, ReExchangeRequest, RedeemedCode,
+    SubjectRoot, LOCAL_AS_ISSUER,
 };
 use crate::root_exchange::kinds::oauth_introspection::TokenIntrospector;
 use crate::root_exchange::kinds::operator_key::{
@@ -279,9 +279,11 @@ fn constraint(cnf: Value) -> ChioSenderConstraintClaims {
 }
 
 /// The members of a redeemed code; `issue` borrows them into a
-/// [`RedeemedCode`].
+/// [`CodeRedemption`].
 struct CodeFixture {
     code: String,
+    issuer: String,
+    issued_at: u64,
     code_expires_at: u64,
     subject: String,
     client_id: String,
@@ -294,6 +296,8 @@ struct CodeFixture {
 fn code_fixture() -> CodeFixture {
     CodeFixture {
         code: AUTHORIZATION_CODE.to_owned(),
+        issuer: AS_ISSUER.to_owned(),
+        issued_at: NOW,
         code_expires_at: NOW + 60,
         subject: "local-user".to_owned(),
         client_id: CLIENT_ID.to_owned(),
@@ -311,19 +315,23 @@ fn issue_with(
     let key = local_keypair().public_key();
     let mut fixture = code_fixture();
     edit_code(&mut fixture);
+    let redeemed = RedeemedCode::from_redemption(CodeRedemption {
+        code: &fixture.code,
+        issuer: &fixture.issuer,
+        subject: &fixture.subject,
+        client_id: &fixture.client_id,
+        redirect_uri: "https://client.example/callback",
+        resource: &fixture.resource,
+        scopes: &fixture.scopes,
+        sender_constraint: fixture.sender_constraint.as_ref(),
+        issued_at: fixture.issued_at,
+        code_expires_at: fixture.code_expires_at,
+        token_exp: fixture.token_exp,
+    })
+    .unwrap();
     local_as::verify_issue(
         &local_server(&key),
-        RedeemedCode {
-            code: &fixture.code,
-            code_expires_at: fixture.code_expires_at,
-            subject: &fixture.subject,
-            client_id: &fixture.client_id,
-            resource: &fixture.resource,
-            scopes: &fixture.scopes,
-            sender_constraint: fixture.sender_constraint.as_ref(),
-            token_exp: fixture.token_exp,
-            request_digest: Sha256Digest::from_hash(sha256(b"code-exchange")),
-        },
+        &redeemed,
         PresentedSender::from(sender),
         NOW,
     )
@@ -1356,16 +1364,16 @@ fn local_issue_refusals() {
             OAuthErrorCode::InvalidGrant,
         ),
         (
-            Box::new(|code| code.code = String::new()),
+            Box::new(|code| code.issuer = "https://other-as.example".to_owned()),
             SenderRequest::from(&headers),
-            RootExchangeError::MalformedRequest("code"),
-            OAuthErrorCode::InvalidRequest,
+            RootExchangeError::IssuerMismatch,
+            OAuthErrorCode::InvalidGrant,
         ),
         (
-            Box::new(|code| code.code = "code\0".to_owned()),
+            Box::new(|code| code.issued_at = NOW + 1),
             SenderRequest::from(&headers),
-            RootExchangeError::MalformedRequest("code"),
-            OAuthErrorCode::InvalidRequest,
+            RootExchangeError::AssertionIssuedInFuture,
+            OAuthErrorCode::InvalidGrant,
         ),
         (
             Box::new(|code| code.subject = String::new()),

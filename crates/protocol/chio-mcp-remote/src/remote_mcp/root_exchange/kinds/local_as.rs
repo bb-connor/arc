@@ -31,6 +31,7 @@ use chio_core::capability::scope::ChioScope;
 use chio_core::crypto::PublicKey;
 use chio_core::root_authority::{Jwk, JwsAlgorithm, Sha256Digest};
 use chio_core::sha256;
+use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use super::super::claims::{required_seconds, required_string, scope_values, string};
@@ -41,6 +42,8 @@ use super::super::replay::{ReplayKey, ReplayNamespace};
 use crate::{ChioSenderConstraintClaims, SenderRequest};
 
 const KIND: AnchorKind = AnchorKind::ChioLocalAs;
+
+const CODE_REQUEST_DIGEST_DOMAIN: &[u8] = b"chio.root-exchange.local-as-code-request.v1\0";
 
 /// Issuer recorded for `chio_local_as` roots.
 pub const LOCAL_AS_ISSUER: &str = "urn:chio:local-as";
@@ -98,21 +101,121 @@ impl<'a> From<SenderRequest<'a>> for PresentedSender<'a> {
 ///     code.subject = "victim".into();
 /// }
 /// ```
-#[derive(Clone, Copy)]
-pub struct RedeemedCode<'a> {
-    pub code: &'a str,
-    /// Unix seconds from which the code is no longer redeemable.
-    pub code_expires_at: u64,
-    pub subject: &'a str,
-    pub client_id: &'a str,
-    pub resource: &'a str,
-    pub scopes: &'a [String],
+#[derive(Debug, Clone)]
+pub struct RedeemedCode {
+    code_digest: Sha256Digest,
+    issuer: String,
+    subject: String,
+    client_id: String,
+    resource: String,
+    scopes: Vec<String>,
+    sender_constraint: Option<ChioSenderConstraintClaims>,
+    issued_at: u64,
+    code_expires_at: u64,
+    token_exp: u64,
+    request_digest: Sha256Digest,
+}
+
+/// What a passed local authorization code redemption establishes.
+pub(crate) struct CodeRedemption<'a> {
+    pub(crate) code: &'a str,
+    /// The `iss` of the local authorization server that redeemed the code.
+    pub(crate) issuer: &'a str,
+    pub(crate) subject: &'a str,
+    pub(crate) client_id: &'a str,
+    pub(crate) redirect_uri: &'a str,
+    pub(crate) resource: &'a str,
+    pub(crate) scopes: &'a [String],
     /// The sender constraint the authorization request bound to the code.
-    pub sender_constraint: Option<&'a ChioSenderConstraintClaims>,
+    pub(crate) sender_constraint: Option<&'a ChioSenderConstraintClaims>,
+    /// The `iat` of the access token issued for the code.
+    pub(crate) issued_at: u64,
+    /// Unix seconds from which the code is no longer redeemable.
+    pub(crate) code_expires_at: u64,
     /// The `exp` of the access token issued for the code.
-    pub token_exp: u64,
-    /// SHA-256 of the exact token request body.
-    pub request_digest: Sha256Digest,
+    pub(crate) token_exp: u64,
+}
+
+#[derive(Serialize)]
+struct CodeRequestDigestInput<'a> {
+    grant_type: &'static str,
+    code: &'a str,
+    redirect_uri: &'a str,
+    client_id: &'a str,
+    resource: &'a str,
+}
+
+impl RedeemedCode {
+    /// The redeemed code of a redemption the local authorization server
+    /// passed. Its request digest covers the code digest, redirect URI,
+    /// client and resource the redemption checked.
+    pub(crate) fn from_redemption(
+        redemption: CodeRedemption<'_>,
+    ) -> Result<Self, RootExchangeError> {
+        let code_digest = Sha256Digest::from_hash(sha256(redemption.code.as_bytes()));
+        let code_hex = code_digest.to_bare_hex();
+        let canonical = chio_core::canonical_json_bytes(&CodeRequestDigestInput {
+            grant_type: "authorization_code",
+            code: &code_hex,
+            redirect_uri: redemption.redirect_uri,
+            client_id: redemption.client_id,
+            resource: redemption.resource,
+        })
+        .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
+        Ok(Self {
+            code_digest,
+            issuer: redemption.issuer.to_owned(),
+            subject: redemption.subject.to_owned(),
+            client_id: redemption.client_id.to_owned(),
+            resource: redemption.resource.to_owned(),
+            scopes: redemption.scopes.to_vec(),
+            sender_constraint: redemption.sender_constraint.cloned(),
+            issued_at: redemption.issued_at,
+            code_expires_at: redemption.code_expires_at,
+            token_exp: redemption.token_exp,
+            request_digest: Sha256Digest::of_domain(CODE_REQUEST_DIGEST_DOMAIN, &canonical),
+        })
+    }
+
+    #[must_use]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    #[must_use]
+    pub fn client_id(&self) -> &str {
+        &self.client_id
+    }
+
+    #[must_use]
+    pub fn resource(&self) -> &str {
+        &self.resource
+    }
+
+    #[must_use]
+    pub fn scopes(&self) -> &[String] {
+        &self.scopes
+    }
+
+    #[must_use]
+    pub fn sender_constraint(&self) -> Option<&ChioSenderConstraintClaims> {
+        self.sender_constraint.as_ref()
+    }
+
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+
+    #[must_use]
+    pub fn token_exp(&self) -> u64 {
+        self.token_exp
+    }
+
+    #[must_use]
+    pub fn request_digest(&self) -> &Sha256Digest {
+        &self.request_digest
+    }
 }
 
 /// The stored root a subject token resolves to.
@@ -195,66 +298,65 @@ fn verify_token(
     })
 }
 
-/// Verify the authorization `code` redeemed by `sender` at `now` (Unix
-/// seconds) for the root the access token issued for it names.
+/// Verify the authorization `code` that `server` redeemed for `sender`, at
+/// `now` (Unix seconds), for the root the access token issued for it names.
 pub fn verify_issue(
     server: &LocalAuthorizationServer<'_>,
-    code: RedeemedCode<'_>,
+    code: &RedeemedCode,
     sender: PresentedSender<'_>,
     now: u64,
 ) -> Result<AnchorEvidence, RootExchangeError> {
-    if code.code.is_empty() || code.code.contains('\0') {
-        return Err(RootExchangeError::MalformedRequest("code"));
+    if code.issuer != server.issuer {
+        return Err(RootExchangeError::IssuerMismatch);
     }
     if now >= code.code_expires_at {
         return Err(RootExchangeError::AssertionExpired);
     }
+    if code.issued_at > now {
+        return Err(RootExchangeError::AssertionIssuedInFuture);
+    }
     if code.token_exp <= now {
         return Err(RootExchangeError::ClaimInvalid("exp"));
     }
-    super::sender::check_constraint(code.sender_constraint, sender.0)?;
+    super::sender::check_constraint(code.sender_constraint.as_ref(), sender.0)?;
     let mut claims = Map::new();
-    claims.insert("iss".to_owned(), Value::String(server.issuer.to_owned()));
-    claims.insert("sub".to_owned(), Value::String(code.subject.to_owned()));
+    claims.insert("iss".to_owned(), Value::String(code.issuer.clone()));
+    claims.insert("sub".to_owned(), Value::String(code.subject.clone()));
     claims.insert(
         "client_id".to_owned(),
-        Value::String(code.client_id.to_owned()),
+        Value::String(code.client_id.clone()),
     );
-    claims.insert(
-        "resource".to_owned(),
-        Value::String(code.resource.to_owned()),
-    );
+    claims.insert("resource".to_owned(), Value::String(code.resource.clone()));
     if !code.scopes.is_empty() {
         claims.insert("scope".to_owned(), Value::String(code.scopes.join(" ")));
     }
-    claims.insert("iat".to_owned(), Value::from(now));
+    claims.insert("iat".to_owned(), Value::from(code.issued_at));
     claims.insert("exp".to_owned(), Value::from(code.token_exp));
     let principal = required_string(&claims, "sub")?.to_owned();
     required_string(&claims, "client_id")?;
     required_string(&claims, "resource")?;
     let scope_values = scope_values(&claims)?;
-    let code_digest = Sha256Digest::from_hash(sha256(code.code.as_bytes()));
     Ok(AnchorEvidence {
         kind: KIND,
         replay_key: ReplayKey {
             namespace: ReplayNamespace::LocalAsIssue,
             issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: code_digest.to_bare_hex(),
+            id: code.code_digest.to_bare_hex(),
         },
         issuer: LOCAL_AS_ISSUER.to_owned(),
         principal,
         tenant: server.issuer.to_owned(),
-        token_iat: now,
+        token_iat: code.issued_at,
         token_exp: code.token_exp,
         jws: None,
-        artifact_digest: Some(code_digest),
+        artifact_digest: Some(code.code_digest),
         request_digest: code.request_digest,
         claims,
         scope_values,
         provider_id: None,
         scope_bound: None,
         holder: None,
-        sender_constraint: code.sender_constraint.cloned(),
+        sender_constraint: code.sender_constraint.clone(),
     })
 }
 
