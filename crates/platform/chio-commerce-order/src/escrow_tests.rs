@@ -10,6 +10,8 @@ use chio_credit::{
 };
 use chio_test_support::prelude::*;
 
+use crate::types::{CommerceCoverageRequirement, CommerceTrustMarketRequirement};
+
 const HEX64: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const OTHER_HEX64: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ACCEPTED_AT: u64 = 500;
@@ -1092,10 +1094,119 @@ fn release_denies_advanced_context_that_rewrites_immutable_fields() {
         mutate(&mut fixture.advanced);
         assert_eq!(
             fixture.denial(),
-            escrow(CommerceEscrowError::ReleaseContextMismatch(field)),
+            escrow(CommerceEscrowError::ReleaseContextMismatch(
+                field.to_string()
+            )),
             "{field}"
         );
     }
+}
+
+fn coverage_requirement() -> CommerceCoverageRequirement {
+    CommerceCoverageRequirement {
+        required: true,
+        coverage_id: "coverage-1".to_string(),
+        risk_comptroller_report_ref: "risk-report-1".to_string(),
+        risk_comptroller_report_sha256: HEX64.to_string(),
+        risk_comptroller_report_path: "risk-comptroller-report.json".to_string(),
+    }
+}
+
+fn trust_market_requirement() -> CommerceTrustMarketRequirement {
+    CommerceTrustMarketRequirement {
+        required: true,
+        provider_discovery_snapshot_ref: "discovery-1".to_string(),
+        provider_selection_report_ref: "selection-1".to_string(),
+        trust_scorecard_ref: "scorecard-1".to_string(),
+        reputation_import_ref: "reputation-import-1".to_string(),
+        sla_commitment_ref: "sla-1".to_string(),
+        collateral_position_ref: "collateral-1".to_string(),
+        guarantee_decision_ref: "guarantee-1".to_string(),
+        adjudication_jurisdiction_ref: "jurisdiction-1".to_string(),
+    }
+}
+
+#[test]
+fn release_denies_advanced_context_that_drops_the_coverage_requirement() {
+    let mut fixture = ReleaseFixture::new();
+    fixture.acceptance.updated_context.coverage_requirement = Some(coverage_requirement());
+    fixture.advanced.coverage_requirement = None;
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ReleaseContextMismatch(
+            "coverage_requirement".to_string()
+        ))
+    );
+}
+
+#[test]
+fn release_denies_advanced_context_that_drops_the_trust_market_requirement() {
+    let mut fixture = ReleaseFixture::new();
+    fixture.acceptance.updated_context.trust_market_requirement = Some(trust_market_requirement());
+    fixture.advanced.trust_market_requirement = None;
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ReleaseContextMismatch(
+            "trust_market_requirement".to_string()
+        ))
+    );
+}
+
+#[test]
+fn release_binds_every_context_field_it_does_not_advance() {
+    let mutations: [Mutation<CommerceOrderContext>; 4] = [
+        ("intent_ref", |context| {
+            context.intent_ref = "intent-other".to_string()
+        }),
+        ("provider_passport_sha256", |context| {
+            context.provider_passport_sha256 = OTHER_HEX64.to_string()
+        }),
+        ("mandate_ledger_path", |context| {
+            context.mandate_ledger_path = "mandate-ledger-other.json".to_string()
+        }),
+        ("provider_admission_ref", |context| {
+            context.provider_admission_ref = "admission-other".to_string()
+        }),
+    ];
+    for (field, mutate) in mutations {
+        let mut fixture = ReleaseFixture::new();
+        mutate(&mut fixture.advanced);
+        assert_eq!(
+            fixture.denial(),
+            escrow(CommerceEscrowError::ReleaseContextMismatch(
+                field.to_string()
+            )),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn release_accepts_the_fields_settlement_progress_advances() {
+    let mut fixture = ReleaseFixture::new();
+    fixture.advanced.id = "ctx-2".to_string();
+    fixture.advanced.issued_at = "2026-06-25T01:00:00Z".to_string();
+    fixture.advanced.payment_lifecycle_sha256 = OTHER_HEX64.to_string();
+    let released = fixture.release().test_expect("release succeeds");
+    assert_eq!(released.updated_context.id, "ctx-2");
+    assert_eq!(
+        released.updated_context.payment_lifecycle_sha256,
+        OTHER_HEX64
+    );
+}
+
+#[test]
+fn release_denies_relabelled_depositor_with_original_signatures() {
+    let mut fixture = ReleaseFixture::new();
+    fixture.acceptance.updated_context.buyer_subject = "buyer:mallory".to_string();
+    fixture.advanced.buyer_subject = "buyer:mallory".to_string();
+    let mut ledger = fixture.acceptance.ledger.clone();
+    ledger.depositor_account = "buyer:mallory".to_string();
+    fixture.repin_ledger(with_canonical_legs(ledger));
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ExecutionUnbound("subject_key"))
+    );
 }
 
 #[test]

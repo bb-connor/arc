@@ -703,7 +703,9 @@ fn bind_release_context(
         ),
     ];
     match bindings.iter().find(|(_, bound)| !bound) {
-        Some((field, _)) => Err(CommerceEscrowError::ReleaseContextMismatch(field)),
+        Some((field, _)) => Err(CommerceEscrowError::ReleaseContextMismatch(
+            field.to_string(),
+        )),
         None => Ok(()),
     }
 }

@@ -133,7 +133,7 @@ pub enum CommerceEscrowError {
     #[error("settlement packet does not match the accepted context {0}")]
     SettlementPacketUnbound(&'static str),
     #[error("release context {0} does not match the accepted context")]
-    ReleaseContextMismatch(&'static str),
+    ReleaseContextMismatch(String),
     #[error("order state {0} does not allow settlement reconciliation")]
     ReleaseStateNotAllowed(String),
     #[error("no trusted execution authority is pinned")]
