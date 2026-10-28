@@ -30,6 +30,7 @@ pub(crate) struct PreparedRuntimeAdmission {
     pub(super) trust_floor_update: Option<(RuntimeTrustFloorEntry, Option<String>)>,
 }
 
+#[cfg(test)]
 pub(super) fn prepare_runtime_admission(
     input: RuntimeAdmissionInput<'_>,
 ) -> Result<RuntimeAdmissionPreparation, ChioRuntimeError> {

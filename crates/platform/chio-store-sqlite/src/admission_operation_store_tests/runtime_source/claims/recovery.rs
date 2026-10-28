@@ -5,7 +5,7 @@ use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantDis
 fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> TestResult {
     for dispatched in [false, true] {
         let fixture = fixture();
-        let source = imported(&fixture, true)?;
+        let source = installed(&fixture)?;
         let (operation, lease) = setup(&fixture, "reopen-claim")?;
         let candidate = intent(
             &operation,
@@ -84,7 +84,7 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
         assert_eq!(evidence.len(), 1);
         assert_eq!(evidence[0].history, history[0]);
         evidence[0].verify()?;
-        for field in ["expectationId", "requestBindingHash", "planDigest"] {
+        for field in ["qualificationId", "requestBindingHash", "planDigest"] {
             let mut changed = evidence[0].clone();
             changed.claim["intent"][field] = serde_json::json!("a".repeat(64));
             assert!(changed.verify().is_err(), "accepted substituted {field}");

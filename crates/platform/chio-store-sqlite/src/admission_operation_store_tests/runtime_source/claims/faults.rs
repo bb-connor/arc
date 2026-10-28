@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn wrong_request_grant_phase_generation_and_resource_order_reject_without_writes() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "wrong-intent")?;
     let candidate = intent(
         &operation,
@@ -17,7 +17,7 @@ fn wrong_request_grant_phase_generation_and_resource_order_reject_without_writes
         ("requestBindingHash", serde_json::json!("a".repeat(64))),
         ("grantIndex", serde_json::json!(1)),
         ("phase", serde_json::json!("nonce_preflight")),
-        ("expectationId", serde_json::json!("different-generation")),
+        ("qualificationId", serde_json::json!("different-generation")),
         (
             "runtimeAuthorityId",
             serde_json::json!("unconfigured-runtime"),
@@ -46,7 +46,7 @@ fn wrong_request_grant_phase_generation_and_resource_order_reject_without_writes
 #[test]
 fn superseded_recovery_lease_cannot_reserve_or_release_runtime_resources() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, old) = setup(&fixture, "stale-lease")?;
     let candidate = intent(&operation, &source, "claim", &[])?;
     let (operation, reference) =
@@ -120,7 +120,7 @@ fn claim_insert_cutpoints_roll_back_operation_global_commit_and_all_resources() 
         ),
     ] {
         let fixture = fixture();
-        let source = imported(&fixture, true)?;
+        let source = installed(&fixture)?;
         let (operation, lease) = setup(&fixture, table)?;
         let candidate = intent(
             &operation,
@@ -163,7 +163,7 @@ fn claim_insert_cutpoints_roll_back_operation_global_commit_and_all_resources() 
 #[test]
 fn failed_release_does_not_free_the_claim_and_missing_release_is_corruption() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "release-cutpoint")?;
     let candidate = intent(
         &operation,

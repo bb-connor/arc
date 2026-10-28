@@ -142,7 +142,7 @@ fn kernel_restart_releases_preflight_and_dispatch_claims_without_artifact_prepar
 {
     for preflight in [false, true] {
         let fixture = fixture();
-        let source = imported(&fixture, false)?;
+        let source = installed(&fixture)?;
         let (operation, lease) = if preflight {
             prepared_nonce(&fixture)?
         } else {
@@ -174,19 +174,7 @@ fn kernel_restart_releases_preflight_and_dispatch_claims_without_artifact_prepar
         expected[1].disposition = RuntimeParticipantDisposition::ReleasedBeforeDispatch;
         assert_eq!(after, expected);
 
-        // Free resources can serve a different operation, but imported legacy
-        // tombstones remain spent. Neither recovery nor owner rotation clears them.
         let (next, lease) = setup(&fixture, "after-kernel-recovery")?;
-        let spent = intent(
-            &next,
-            &source,
-            "historical",
-            &[(Kind::DestructiveLease, "same-resource")],
-        )?;
-        assert!(fixture
-            .store
-            .claim_runtime_participants(&next, &lease, &spent, now_ms())
-            .is_err());
         reserve(&fixture, &source, &next, &lease, "fresh")?;
     }
     Ok(())
@@ -195,7 +183,7 @@ fn kernel_restart_releases_preflight_and_dispatch_claims_without_artifact_prepar
 #[test]
 fn kernel_restart_retains_committed_runtime_claims_without_redispatch() -> TestResult {
     let fixture = fixture();
-    let source = imported(&fixture, true)?;
+    let source = installed(&fixture)?;
     let (operation, lease) = setup(&fixture, "kernel-committed-recovery")?;
     let (operation, _) = reserve(&fixture, &source, &operation, &lease, "committed")?;
     // The state fixture does not qualify executable budget settlement. This
@@ -243,7 +231,7 @@ fn kernel_recovery_release_and_terminal_cutpoints_preserve_retryable_custody() -
         ("admission_operation_terminal_projections", true),
     ] {
         let fixture = fixture();
-        let source = imported(&fixture, true)?;
+        let source = installed(&fixture)?;
         let (operation, lease) = setup(&fixture, "kernel-release-cutpoint")?;
         let (operation, reference) = reserve(&fixture, &source, &operation, &lease, "interrupted")?;
         let fixture = reopen(fixture)?;

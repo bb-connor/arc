@@ -273,7 +273,7 @@ fn run_cut(cut: Cut, test: &str) -> TestResult {
             assert_eq!(fresh.resource_id(), old.resource_id());
             // The destructive bundle binds the new request/admission identity;
             // the treaty and swarm artifacts themselves have not changed.
-            if fresh.kind() == RuntimeReplayParticipantKind::DestructiveLease {
+            if fresh.kind() == RuntimeParticipantKind::DestructiveLease {
                 assert_ne!(fresh.artifact_digest(), old.artifact_digest());
             } else {
                 assert_eq!(fresh.artifact_digest(), old.artifact_digest());
