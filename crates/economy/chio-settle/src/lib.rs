@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 #![cfg(feature = "web3")]
 
+mod approval_witness;
 mod automation;
 mod ccip;
 pub mod channel;
@@ -25,6 +26,11 @@ mod solana;
 
 use chio_core::capability::scope::MonetaryAmount;
 use serde::{Deserialize, Serialize};
+
+pub use approval_witness::{
+    verify_governed_approval, ApprovalReplayOutcome, ApprovalReplayStore,
+    InMemoryApprovalReplayStore, VerifiedApproval,
+};
 
 pub use automation::{
     assess_watchdog_execution, build_bond_watchdog_job, build_settlement_watchdog_job,
@@ -183,6 +189,8 @@ pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, Settl
 
 #[derive(Debug, thiserror::Error)]
 pub enum SettlementError {
+    #[error("settlement clock failed: {0}")]
+    Clock(#[from] chio_security_types::clock::ClockError),
     #[error("invalid settlement input: {0}")]
     Input(#[from] chio_core::canonical::SharedUntrustedJsonError),
     #[error("settlement file read failed")]

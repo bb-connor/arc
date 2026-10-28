@@ -1,11 +1,15 @@
 #![cfg(feature = "web3")]
 
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
+use chio_settle as settle_api;
 use chio_settle::{
     build_x402_payment_requirements, ApprovalBinding, SettlementError, X402PaymentRequirements,
     X402SettlementMode,
 };
 use chio_test_support::prelude::*;
+
+#[path = "support/approval.rs"]
+mod approval_support;
 
 fn fixture() -> (Web3SettlementDispatchArtifact, ApprovalBinding) {
     // This is a synthetic requirements fixture. No rail or payment service is invoked.
@@ -14,10 +18,21 @@ fn fixture() -> (Web3SettlementDispatchArtifact, ApprovalBinding) {
     ))
     .test_unwrap();
     let binding = ApprovalBinding {
+        schema: "chio.settlement-binding.v1".to_string(),
         chain_id: 8453,
         payee_address: dispatch.beneficiary_address.clone(),
         amount_minor_units: u128::from(dispatch.settlement_amount.units),
         token_symbol: dispatch.settlement_amount.currency.clone(),
+        settlement_currency: dispatch.settlement_amount.currency.clone(),
+        token_contract: None,
+        dispatch_id: dispatch.dispatch_id.clone(),
+        capability_id: dispatch
+            .capital_instruction
+            .body
+            .query
+            .capability_id
+            .clone()
+            .unwrap_or_else(|| dispatch.dispatch_id.clone()),
     };
     (dispatch, binding)
 }
@@ -26,7 +41,7 @@ fn requirements(tokens: &[&str]) -> Result<X402PaymentRequirements, SettlementEr
     let (dispatch, binding) = fixture();
     build_x402_payment_requirements(
         &dispatch,
-        &binding,
+        approval_support::witness(&binding),
         "https://facilitator.example/x402",
         "https://tool.example/v1/run",
         tokens.iter().map(|token| (*token).to_string()).collect(),
@@ -40,7 +55,7 @@ fn x402_keeps_the_approved_rail_token_distinct_from_the_settlement_currency() {
     binding.token_symbol = "USDC".to_string();
     let requirements = build_x402_payment_requirements(
         &dispatch,
-        &binding,
+        approval_support::witness(&binding),
         "https://facilitator.example/x402",
         "https://tool.example/v1/run",
         vec!["USDC".to_string()],
@@ -50,7 +65,10 @@ fn x402_keeps_the_approved_rail_token_distinct_from_the_settlement_currency() {
 
     assert_eq!(requirements.accepted_tokens, vec!["USDC".to_string()]);
     assert_eq!(requirements.currency, "USD");
-    assert_eq!(requirements.amount_minor_units, dispatch.settlement_amount.units);
+    assert_eq!(
+        requirements.amount_minor_units,
+        dispatch.settlement_amount.units
+    );
     assert_eq!(requirements.pay_to, dispatch.beneficiary_address);
 }
 
@@ -90,7 +108,7 @@ fn x402_preserves_the_single_approved_token_in_both_modes() {
     ] {
         let result = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec!["USD".to_string()],
@@ -130,11 +148,11 @@ fn x402_rejects_an_empty_accepted_token_list() {
 #[test]
 fn x402_preserves_case_equivalent_approved_symbols() {
     let (dispatch, mut binding) = fixture();
-    binding.token_symbol = " usd ".to_string();
+    binding.token_symbol = "usd".to_string();
     for symbol in ["usd", "UsD"] {
         let result = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec![symbol.to_string()],
@@ -189,7 +207,7 @@ fn x402_keeps_chain_payee_amount_and_currency_binding_checks() {
         }
         let result = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec!["USD".to_string()],

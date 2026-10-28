@@ -2,7 +2,7 @@ use chio_core::hashing::sha256;
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use serde::{Deserialize, Serialize};
 
-use crate::SettlementError;
+use crate::{SettlementError, VerifiedApproval};
 
 #[path = "payments_approval.rs"]
 mod approval_binding;
@@ -82,12 +82,15 @@ pub struct PreparedPaymasterCompatibility {
 
 pub fn build_x402_payment_requirements(
     dispatch: &Web3SettlementDispatchArtifact,
-    approval_binding: &ApprovalBinding,
+    mut approval: VerifiedApproval,
     facilitator_url: &str,
     resource: &str,
     accepted_tokens: Vec<String>,
     settlement_mode: X402SettlementMode,
 ) -> Result<X402PaymentRequirements, SettlementError> {
+    approval.check_time()?;
+    let approval_binding = approval.binding();
+    approval_binding.require_symbol_only_lane()?;
     approval_binding.assert_dispatch("x402", dispatch)?;
     validate_x402_field("facilitator URL", facilitator_url)?;
     validate_x402_field("resource", resource)?;
@@ -102,7 +105,7 @@ pub fn build_x402_payment_requirements(
     for token in &accepted_tokens {
         approval_binding.assert_token_symbol("x402", token)?;
     }
-    Ok(X402PaymentRequirements {
+    let requirements = X402PaymentRequirements {
         version: "x402".to_string(),
         chain_id: dispatch.chain_id.clone(),
         facilitator_url: facilitator_url.to_string(),
@@ -121,7 +124,9 @@ pub fn build_x402_payment_requirements(
         currency: dispatch.settlement_amount.currency.clone(),
         settlement_mode,
         governed_authorization_required: true,
-    })
+    };
+    approval.consume()?;
+    Ok(requirements)
 }
 
 fn validate_x402_field(label: &str, value: &str) -> Result<(), SettlementError> {
@@ -138,41 +143,38 @@ fn validate_x402_field(label: &str, value: &str) -> Result<(), SettlementError> 
     Ok(())
 }
 
-/// Approval-bound settlement parameters the caller MUST supply.
-///
-/// The caller is the trust boundary: it extracts these values from the
-/// verified governing approval and passes them to each settlement
-/// compatibility lane. Every lane asserts its dispatch or token against the
-/// binding and fails closed on any mismatch, so a governed spend cannot be
-/// redirected to a different chain, payee, amount, or token.
-///
-/// The `GovernedApprovalToken` itself does not carry chain/amount/payee/token
-/// as discrete fields (they are folded into its `governed_intent_hash`), so
-/// this layer cannot re-derive them from the token alone; it asserts the
-/// explicitly-bound values the caller resolved from the verified intent.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ApprovalBinding {
-    /// Chain id the governing approval authorized the spend on.
+    pub schema: String,
     pub chain_id: u64,
-    /// Payee the governing approval authorized. Compared case-insensitively.
     pub payee_address: String,
-    /// Amount in token minor units the governing approval authorized.
     pub amount_minor_units: u128,
-    /// Token/currency symbol the governing approval authorized (for example
-    /// `"USDC"`). Each lane asserts its lane-specific token identity against
-    /// this symbol (x402 accepted tokens, Circle token symbol). Compared
-    /// case-insensitively after trimming.
     pub token_symbol: String,
+    pub settlement_currency: String,
+    pub token_contract: Option<String>,
+    pub dispatch_id: String,
+    pub capability_id: String,
 }
 
 pub fn evaluate_circle_nanopayment(
     dispatch: &Web3SettlementDispatchArtifact,
-    approval_binding: &ApprovalBinding,
+    mut approval: VerifiedApproval,
     policy: &CircleNanopaymentPolicy,
 ) -> Result<Option<PreparedCircleNanopayment>, SettlementError> {
+    approval.check_time()?;
     if !policy.enabled {
         return Ok(None);
+    }
+    let approval_binding = approval.binding();
+    approval_binding.require_symbol_only_lane()?;
+    if !approval_binding
+        .token_symbol
+        .eq_ignore_ascii_case(&approval_binding.settlement_currency)
+    {
+        return Err(SettlementError::InvalidBinding(
+            "circle requires token-native settlement currency".to_string(),
+        ));
     }
     approval_binding.assert_dispatch("circle", dispatch)?;
     if !policy.operator_managed_custody_explicit {
@@ -197,7 +199,7 @@ pub fn evaluate_circle_nanopayment(
     if dispatch.settlement_amount.units > policy.max_amount_minor_units {
         return Ok(None);
     }
-    Ok(Some(PreparedCircleNanopayment {
+    let prepared = PreparedCircleNanopayment {
         payment_id: format!(
             "chio-circle-{}",
             &sha256(
@@ -215,7 +217,9 @@ pub fn evaluate_circle_nanopayment(
         currency: dispatch.settlement_amount.currency.clone(),
         beneficiary_address: dispatch.beneficiary_address.clone(),
         dispatch_id: dispatch.dispatch_id.clone(),
-    }))
+    };
+    approval.consume()?;
+    Ok(Some(prepared))
 }
 
 pub fn prepare_paymaster_compatibility(
@@ -264,6 +268,10 @@ pub fn prepare_paymaster_compatibility(
 
 #[cfg(test)]
 mod tests {
+    use crate as settle_api;
+    mod approval_support {
+        include!("../tests/support/approval.rs");
+    }
     use super::{
         build_x402_payment_requirements, evaluate_circle_nanopayment,
         prepare_paymaster_compatibility, ApprovalBinding, CircleNanopaymentPolicy,
@@ -282,10 +290,21 @@ mod tests {
 
     fn binding_for_dispatch(dispatch: &Web3SettlementDispatchArtifact) -> ApprovalBinding {
         ApprovalBinding {
+            schema: "chio.settlement-binding.v1".to_string(),
             chain_id: 8453,
             payee_address: dispatch.beneficiary_address.clone(),
             amount_minor_units: u128::from(dispatch.settlement_amount.units),
             token_symbol: dispatch.settlement_amount.currency.clone(),
+            settlement_currency: dispatch.settlement_amount.currency.clone(),
+            token_contract: None,
+            dispatch_id: dispatch.dispatch_id.clone(),
+            capability_id: dispatch
+                .capital_instruction
+                .body
+                .query
+                .capability_id
+                .clone()
+                .unwrap_or_else(|| dispatch.dispatch_id.clone()),
         }
     }
 
@@ -295,7 +314,7 @@ mod tests {
         let binding = binding_for_dispatch(&dispatch);
         let requirements = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec!["USD".to_string()],
@@ -315,7 +334,7 @@ mod tests {
 
         let error = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec!["USD".to_string(), " ".to_string()],
@@ -328,12 +347,8 @@ mod tests {
 
     #[test]
     fn assert_token_symbol_is_case_insensitive_and_fails_closed() {
-        let binding = ApprovalBinding {
-            chain_id: 8453,
-            payee_address: "0x1000000000000000000000000000000000000002".to_string(),
-            amount_minor_units: 42_000,
-            token_symbol: "USDC".to_string(),
-        };
+        let mut binding = binding_for_dispatch(&sample_dispatch());
+        binding.token_symbol = "USDC".to_string();
         // Case and surrounding whitespace must not matter.
         assert!(binding.assert_token_symbol("x402", " usdc ").is_ok());
         assert!(binding.assert_token_symbol("circle", "USDC").is_ok());
@@ -353,7 +368,7 @@ mod tests {
         let binding = binding_for_dispatch(&dispatch);
         let prepared = evaluate_circle_nanopayment(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             &CircleNanopaymentPolicy {
                 enabled: true,
                 managed_balance_id: "bal_123".to_string(),
@@ -377,7 +392,7 @@ mod tests {
 
         let error = build_x402_payment_requirements(
             &dispatch,
-            &binding,
+            approval_support::witness(&binding),
             "https://facilitator.example/x402",
             "https://tool.example/v1/run",
             vec!["USD".to_string()],
