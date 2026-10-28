@@ -177,6 +177,13 @@ impl PaymentAdapter for GatedRail {
     ) -> Result<crate::payment::RailSettlementState, PaymentError> {
         self.inner.settlement_state(reference, authorization_id)
     }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        self.inner.replayed_authorization_metadata(authorization_id)
+    }
 }
 
 struct GatedOracle {

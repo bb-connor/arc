@@ -97,23 +97,3 @@ fn review_payment_amount_over_exposure_refuses_before_effect() -> TestResult {
 fn review_payment_amount_currency_mismatch_refuses_before_effect() -> TestResult {
     assert_quote_refused_before_any_hold(5, "EUR")
 }
-
-#[test]
-fn review_payment_x402_refund_requires_actual_remote_evidence() -> TestResult {
-    let adapter = crate::payment::X402PaymentAdapter::new("http://127.0.0.1:1");
-    assert!(
-        matches!(adapter.refund("original-prepayment", 5, "USD", "original-operation"),
-        Err(PaymentError::Unavailable(detail)) if detail == "x402 remote refund is unsupported")
-    );
-    Ok(())
-}
-
-#[test]
-fn review_payment_x402_release_cannot_undo_final_prepayment() -> TestResult {
-    let adapter = crate::payment::X402PaymentAdapter::new("http://127.0.0.1:1");
-    assert!(
-        matches!(adapter.release("original-prepayment", "original-operation"),
-        Err(PaymentError::Unavailable(detail)) if detail == "x402 final prepayment has no releasable hold")
-    );
-    Ok(())
-}

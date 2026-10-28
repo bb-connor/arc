@@ -872,6 +872,10 @@ impl PaymentAdapter for UncapturablePaymentAdapter {
             metadata: serde_json::json!({ "adapter": "uncapturable" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 // Captures the prepaid hold at authorize time (settled == true) and counts every
@@ -942,6 +946,10 @@ impl PaymentAdapter for SettledAtAuthorizeTrackingAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "settled-at-authorize" }),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 
@@ -1334,6 +1342,10 @@ impl PaymentAdapter for DistinctCapturePaymentAdapter {
             metadata: serde_json::json!({ "adapter": "distinct" }),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 // A governed MustPrepay mediated reserve captures a prepayment before minting the
@@ -1465,6 +1477,10 @@ impl PaymentAdapter for AmountRecordingPaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "amount-recording" }),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

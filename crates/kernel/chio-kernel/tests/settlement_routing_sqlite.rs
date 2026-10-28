@@ -87,6 +87,10 @@ impl PaymentAdapter for ReversibleTestPaymentAdapter {
             metadata: serde_json::json!({}),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 #[async_trait::async_trait]

@@ -67,6 +67,10 @@ impl PaymentAdapter for ExactPrepayRail {
         }
         .refund(transaction, amount, currency, reference)
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 pub(super) fn scope_with_original_quote() -> ChioScope {

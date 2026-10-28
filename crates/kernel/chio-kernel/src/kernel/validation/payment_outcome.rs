@@ -3,13 +3,32 @@
 use super::*;
 use crate::payment::{PaymentAdapter, PaymentResult};
 
-pub(super) fn payment_error_code(error: &PaymentError) -> &'static str {
-    match error {
-        PaymentError::Unavailable(_) => "unavailable",
-        PaymentError::RailError(_) => "rail_error",
-        PaymentError::Declined(_) => "declined",
-        PaymentError::InsufficientFunds => "insufficient_funds",
+/// Receipt metadata for a payment authorization the rail did not confirm.
+pub(in crate::kernel) fn ambiguous_payment_authorization_metadata(
+    error: &PaymentError,
+    attempt_reference: &str,
+) -> serde_json::Value {
+    let mut financial = serde_json::Map::from_iter([
+        (
+            "payment_authorization_ambiguous".to_owned(),
+            serde_json::Value::Bool(true),
+        ),
+        (
+            "payment_authorization_error_code".to_owned(),
+            serde_json::json!(error.code()),
+        ),
+        (
+            "payment_attempt_reference".to_owned(),
+            serde_json::json!(attempt_reference),
+        ),
+    ]);
+    if let Some(evidence) = error.outcome_evidence() {
+        financial.insert(
+            "payment_authorization_evidence".to_owned(),
+            evidence.clone(),
+        );
     }
+    serde_json::json!({ "financial": financial })
 }
 
 pub(super) fn retained_payment_capture_metadata(
@@ -17,7 +36,7 @@ pub(super) fn retained_payment_capture_metadata(
     authorization: &PaymentAuthorization,
     error: &PaymentError,
 ) -> serde_json::Value {
-    let error_code = payment_error_code(error);
+    let error_code = error.code();
     warn!(
         request_id = %request.request_id,
         authorization_id = %authorization.authorization_id,
@@ -99,7 +118,7 @@ pub(super) fn release_unsettled_payment_metadata(
             }
         }
         Err(error) => {
-            let error_code = payment_error_code(&error);
+            let error_code = error.code();
             financial.insert(
                 "release_outcome".into(),
                 serde_json::json!("outcome_unknown"),

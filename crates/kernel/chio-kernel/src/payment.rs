@@ -17,6 +17,12 @@ pub use types::*;
 mod journal;
 pub use journal::*;
 
+mod x402;
+pub use x402::*;
+
+#[cfg(test)]
+mod test_http;
+
 /// Trait for executing payments against an external rail.
 pub trait PaymentAdapter: Send + Sync {
     fn rail_id(&self) -> &'static str {
@@ -81,6 +87,14 @@ pub trait PaymentAdapter: Send + Sync {
             "settlement_state query is unsupported by this payment adapter".to_owned(),
         ))
     }
+
+    /// Authorization metadata to restore when a durable journal replays
+    /// `authorization_id` without calling the rail. Must be side-effect free
+    /// and return a JSON object.
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -96,20 +110,79 @@ pub enum PaymentError {
 
     #[error("payment rail error: {0}")]
     RailError(String),
+
+    /// The rail accepted the request but has not confirmed whether value
+    /// moved. `evidence` is what the rail returned to locate the payment.
+    #[error("payment outcome unknown: {detail}")]
+    OutcomeUnknown {
+        detail: String,
+        evidence: serde_json::Value,
+    },
 }
 
-/// Thin prepaid HTTP payment bridge for x402-style per-request settlement.
-///
-/// The adapter intentionally stays narrow: it only performs one remote
-/// authorization request. A final prepayment has no unused hold to release,
-/// and this bridge has no remote refund protocol. Unsupported unwind actions
-/// retain the original payment for recovery rather than fabricating results.
-#[derive(Clone)]
-pub struct X402PaymentAdapter {
-    base_url: String,
-    authorize_path: String,
-    bearer_token: Option<String>,
-    http: ureq::Agent,
+impl PaymentError {
+    /// Stable classification recorded in receipts instead of the rail detail.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Unavailable(_) => "unavailable",
+            Self::RailError(_) => "rail_error",
+            Self::Declined(_) => "declined",
+            Self::InsufficientFunds => "insufficient_funds",
+            Self::OutcomeUnknown { .. } => "outcome_unknown",
+        }
+    }
+
+    /// Rail evidence for a payment whose outcome is unknown.
+    #[must_use]
+    pub fn outcome_evidence(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::OutcomeUnknown { evidence, .. } => Some(evidence),
+            _ => None,
+        }
+    }
+}
+
+/// Rebuild the authorization a durable journal already recorded, without
+/// calling the rail. Returns `None` when the journal still needs one.
+pub(crate) fn replayed_payment_authorization(
+    adapter: &dyn PaymentAdapter,
+    journal: &PaymentJournalRecord,
+) -> Result<Option<PaymentAuthorization>, PaymentError> {
+    let (state, missing_id) = match (journal.state, journal.rail_mode) {
+        (PaymentJournalState::Authorized, PaymentRailMode::ReversibleHold) => (
+            PaymentAuthorizationState::Held,
+            "authorized payment journal omitted authorization_id",
+        ),
+        (PaymentJournalState::Settled, PaymentRailMode::PrepaidFinal) => (
+            PaymentAuthorizationState::PrepaidFinal,
+            "settled prepayment journal omitted authorization_id",
+        ),
+        (PaymentJournalState::HoldPlaced, _) => return Ok(None),
+        _ => {
+            return Err(PaymentError::RailError(format!(
+                "payment journal cannot authorize from state {:?}",
+                journal.state
+            )));
+        }
+    };
+    let authorization_id = journal
+        .authorization_id
+        .clone()
+        .ok_or_else(|| PaymentError::RailError(missing_id.to_owned()))?;
+    let serde_json::Value::Object(mut metadata) =
+        adapter.replayed_authorization_metadata(&authorization_id)?
+    else {
+        return Err(PaymentError::RailError(
+            "replayed authorization metadata is not an object".to_owned(),
+        ));
+    };
+    metadata.insert("durable_replay".to_owned(), serde_json::Value::Bool(true));
+    Ok(Some(PaymentAuthorization {
+        authorization_id,
+        state,
+        metadata: serde_json::Value::Object(metadata),
+    }))
 }
 
 /// Shared-payment-token payment bridge for ACP-style commerce approvals.
@@ -129,20 +202,6 @@ pub struct AcpPaymentAdapter {
     http: ureq::Agent,
 }
 
-impl fmt::Debug for X402PaymentAdapter {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("X402PaymentAdapter")
-            .field("base_url", &self.base_url)
-            .field("authorize_path", &self.authorize_path)
-            .field(
-                "bearer_token",
-                &self.bearer_token.as_ref().map(|_| "[REDACTED]"),
-            )
-            .finish_non_exhaustive()
-    }
-}
-
 impl fmt::Debug for AcpPaymentAdapter {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -158,36 +217,6 @@ impl fmt::Debug for AcpPaymentAdapter {
                 &self.bearer_token.as_ref().map(|_| "[REDACTED]"),
             )
             .finish_non_exhaustive()
-    }
-}
-
-impl X402PaymentAdapter {
-    #[must_use]
-    pub fn new(base_url: impl Into<String>) -> Self {
-        Self {
-            base_url: base_url.into().trim_end_matches('/').to_string(),
-            authorize_path: "/authorize".to_string(),
-            bearer_token: None,
-            http: build_http_agent(Duration::from_secs(5)),
-        }
-    }
-
-    #[must_use]
-    pub fn with_authorize_path(mut self, path: impl Into<String>) -> Self {
-        self.authorize_path = normalize_http_path(&path.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_bearer_token(mut self, token: impl Into<String>) -> Self {
-        self.bearer_token = Some(token.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.http = build_http_agent(timeout);
-        self
     }
 }
 
@@ -246,93 +275,6 @@ impl AcpPaymentAdapter {
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.http = build_http_agent(timeout);
         self
-    }
-}
-
-impl PaymentAdapter for X402PaymentAdapter {
-    fn rail_id(&self) -> &'static str {
-        "x402"
-    }
-
-    fn rail_mode(&self) -> Option<PaymentRailMode> {
-        Some(PaymentRailMode::PrepaidFinal)
-    }
-
-    fn authorize(
-        &self,
-        request: &PaymentAuthorizeRequest,
-    ) -> Result<PaymentAuthorization, PaymentError> {
-        let response: X402AuthorizeResponse = post_json(
-            &self.http,
-            &self.base_url,
-            self.bearer_token.as_deref(),
-            &self.authorize_path,
-            request,
-        )?;
-        response.validate()?;
-        let state = if response.settled {
-            PaymentAuthorizationState::PrepaidFinal
-        } else {
-            PaymentAuthorizationState::Held
-        };
-        if !PaymentRailMode::PrepaidFinal.accepts(state) {
-            return Err(PaymentError::RailError(
-                "x402 authorization did not complete final prepayment".to_owned(),
-            ));
-        }
-        Ok(PaymentAuthorization {
-            authorization_id: response.authorization_id,
-            state,
-            metadata: merge_json_values(
-                Some(response.metadata),
-                Some(serde_json::json!({
-                    "adapter": "x402",
-                    "mode": "prepaid"
-                })),
-            )
-            .unwrap_or_else(|| serde_json::json!({ "adapter": "x402", "mode": "prepaid" })),
-        })
-    }
-
-    fn capture(
-        &self,
-        authorization_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        Ok(PaymentResult {
-            transaction_id: authorization_id.to_string(),
-            settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({
-                "adapter": "x402",
-                "mode": "prepaid",
-                "action": "capture",
-                "reference": reference
-            }),
-        })
-    }
-
-    fn release(
-        &self,
-        _authorization_id: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        Err(PaymentError::Unavailable(
-            "x402 final prepayment has no releasable hold".into(),
-        ))
-    }
-
-    fn refund(
-        &self,
-        _transaction_id: &str,
-        _amount_units: u64,
-        _currency: &str,
-        _reference: &str,
-    ) -> Result<PaymentResult, PaymentError> {
-        Err(PaymentError::Unavailable(
-            "x402 remote refund is unsupported".into(),
-        ))
     }
 }
 
@@ -456,6 +398,14 @@ impl PaymentAdapter for AcpPaymentAdapter {
         )?;
         response.into_state(&request_digest, &binding)
     }
+
+    /// Provider metadata is not journaled, so replay restores the rail identity.
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({
+            "adapter": "acp",
+            "mode": "shared_payment_token_hold"
+        }))
+    }
 }
 
 impl AcpPaymentAdapter {
@@ -481,27 +431,6 @@ impl AcpPaymentAdapter {
             &request,
         )?;
         response.into_result(operation, &request_digest, binding)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct X402AuthorizeResponse {
-    authorization_id: String,
-    #[serde(default)]
-    settled: bool,
-    #[serde(default)]
-    metadata: serde_json::Value,
-}
-
-impl X402AuthorizeResponse {
-    fn validate(&self) -> Result<(), PaymentError> {
-        if !payment_identifier_is_valid(&self.authorization_id) {
-            return Err(PaymentError::RailError(
-                "x402 authorization identifier is invalid".to_owned(),
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -987,11 +916,8 @@ fn merge_json_values(
 
 #[cfg(test)]
 mod tests {
+    use super::test_http::spawn_once_json_server;
     use super::*;
-    use std::io::{Read, Write};
-    use std::net::TcpListener;
-    use std::sync::mpsc;
-    use std::thread;
 
     fn hold_placed_payment_journal() -> PaymentJournalRecord {
         PaymentJournalRecord {
@@ -1279,156 +1205,52 @@ mod tests {
     }
 
     #[test]
-    fn x402_adapter_posts_authorize_request_and_returns_settled_payment() {
-        let (url, request_rx, handle) = spawn_once_json_server(
-            200,
-            serde_json::json!({
-                "authorizationId": "x402_txn_123",
-                "settled": true,
-                "metadata": {
-                    "network": "base"
-                }
-            }),
-        );
-        let adapter = X402PaymentAdapter::new(url).with_timeout(Duration::from_secs(2));
-
-        let authorization = adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units: 125,
-                currency: "USD".to_string(),
-                payer: "agent-1".to_string(),
-                payee: "tool-server".to_string(),
-                reference: "req-1".to_string(),
-                governed: None,
-                commerce: None,
+    fn durable_replay_restores_each_rail_identity() {
+        let acp = hold_placed_payment_journal()
+            .apply_transition(&PaymentJournalTransition::AuthorizationHeld {
+                authorization_id: "acp-authorization".to_owned(),
             })
-            .expect("authorization should succeed");
-
-        let request = request_rx.recv().expect("request should be captured");
-        assert!(request.starts_with("POST /authorize HTTP/1.1"));
-        assert!(request.contains("\"amountUnits\":125"));
-        assert!(request.contains("\"currency\":\"USD\""));
-        assert!(request.contains("\"payer\":\"agent-1\""));
-        assert!(request.contains("\"payee\":\"tool-server\""));
-        assert!(request.contains("\"reference\":\"req-1\""));
-
-        assert_eq!(authorization.authorization_id, "x402_txn_123");
-        assert_eq!(authorization.state, PaymentAuthorizationState::PrepaidFinal);
-        assert_eq!(authorization.metadata["adapter"], "x402");
-        assert_eq!(authorization.metadata["network"], "base");
-
-        handle.join().expect("server thread should exit cleanly");
-    }
-
-    #[test]
-    fn x402_response_without_settled_deserializes_as_unsettled() {
-        let response: X402AuthorizeResponse =
-            serde_json::from_value(serde_json::json!({"authorizationId": "x402_txn_absent"}))
-                .expect("response without settled should deserialize");
-        assert!(!response.settled);
-    }
-
-    #[test]
-    fn x402_response_requires_the_authorization_id_member() {
-        for field in ["authorization_id", "transaction_id", "transactionId"] {
-            let error = serde_json::from_value::<X402AuthorizeResponse>(serde_json::json!({
-                field: "x402_txn_renamed",
-                "settled": true,
-            }))
-            .expect_err("only authorizationId names the authorization");
-            assert_eq!(error.to_string(), "missing field `authorizationId`");
-        }
-    }
-
-    #[test]
-    fn x402_adapter_rejects_response_without_settled() {
-        let (url, _request_rx, handle) = spawn_once_json_server(
-            200,
-            serde_json::json!({"authorizationId": "x402_txn_absent"}),
-        );
-        let error = X402PaymentAdapter::new(url)
-            .with_timeout(Duration::from_secs(2))
-            .authorize(&test_payment_authorize_request())
-            .expect_err("a response without settled must not complete prepayment");
-        assert!(matches!(error, PaymentError::RailError(_)));
-        handle.join().expect("server thread should exit cleanly");
-    }
-
-    #[test]
-    fn x402_adapter_maps_http_402_to_insufficient_funds() {
-        let (url, _request_rx, handle) = spawn_once_json_server(
-            402,
+            .expect("authorized journal");
+        let replayed =
+            replayed_payment_authorization(&AcpPaymentAdapter::new("https://acp.example"), &acp)
+                .expect("replay succeeds")
+                .expect("authorized journal replays");
+        assert_eq!(replayed.state, PaymentAuthorizationState::Held);
+        assert_eq!(
+            replayed.metadata,
             serde_json::json!({
-                "error": "insufficient funds"
-            }),
-        );
-        let adapter = X402PaymentAdapter::new(url).with_timeout(Duration::from_secs(2));
-
-        let error = adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units: 125,
-                currency: "USD".to_string(),
-                payer: "agent-1".to_string(),
-                payee: "tool-server".to_string(),
-                reference: "req-1".to_string(),
-                governed: None,
-                commerce: None,
+                "adapter": "acp",
+                "mode": "shared_payment_token_hold",
+                "durable_replay": true
             })
-            .expect_err("authorization should fail");
+        );
 
-        assert!(matches!(error, PaymentError::InsufficientFunds));
-
-        handle.join().expect("server thread should exit cleanly");
-    }
-
-    #[test]
-    fn x402_adapter_uses_custom_path_bearer_token_and_governed_payload() {
-        let (url, request_rx, handle) = spawn_once_json_server(
-            200,
+        let mut prepaid = hold_placed_payment_journal();
+        prepaid.rail = "sim".to_owned();
+        prepaid.rail_mode = PaymentRailMode::PrepaidFinal;
+        prepaid.authorization_attempt = Some(PaymentAuthorizationAttempt::NotStarted);
+        prepaid.authorized_amount_units = Some(prepaid.amount_units);
+        let prepaid = prepaid
+            .apply_transition(&PaymentJournalTransition::BeginAuthorizationAttempt)
+            .and_then(|journal| {
+                journal.apply_transition(&PaymentJournalTransition::PrepaymentSettled {
+                    authorization_id: "sim-authorization".to_owned(),
+                })
+            })
+            .expect("settled prepaid journal");
+        let replayed =
+            replayed_payment_authorization(&super::sim::SimPaymentAdapter::new(), &prepaid)
+                .expect("replay succeeds")
+                .expect("settled journal replays");
+        assert_eq!(replayed.state, PaymentAuthorizationState::PrepaidFinal);
+        assert_eq!(
+            replayed.metadata,
             serde_json::json!({
-                "authorizationId": "x402_txn_custom",
-                "settled": true,
-                "metadata": {
-                    "network": "base-sepolia"
-                }
-            }),
-        );
-        let adapter = X402PaymentAdapter::new(url)
-            .with_authorize_path("/paywall/authorize")
-            .with_bearer_token("secret-token")
-            .with_timeout(Duration::from_secs(2));
-
-        let authorization = adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units: 4200,
-                currency: "USD".to_string(),
-                payer: "agent-2".to_string(),
-                payee: "payments-api".to_string(),
-                reference: "req-governed-x402".to_string(),
-                governed: Some(GovernedPaymentContext {
-                    intent_id: "intent-42".to_string(),
-                    intent_hash: "intent-hash-42".to_string(),
-                    purpose: "purchase premium dataset".to_string(),
-                    server_id: "payments-api".to_string(),
-                    tool_name: "fetch_dataset".to_string(),
-                    approval_token_id: Some("approval-42".to_string()),
-                }),
-                commerce: None,
+                "adapter": "sim",
+                "mode": "prepaid_no_broadcast",
+                "durable_replay": true
             })
-            .expect("authorization should succeed");
-
-        let request = request_rx.recv().expect("request should be captured");
-        assert!(request.starts_with("POST /paywall/authorize HTTP/1.1"));
-        assert!(request.contains("Authorization: Bearer secret-token"));
-        assert!(request.contains("\"governed\":{"));
-        assert!(request.contains("\"intentId\":\"intent-42\""));
-        assert!(request.contains("\"approvalTokenId\":\"approval-42\""));
-
-        assert_eq!(authorization.authorization_id, "x402_txn_custom");
-        assert_eq!(authorization.metadata["adapter"], "x402");
-        assert_eq!(authorization.metadata["mode"], "prepaid");
-
-        handle.join().expect("server thread should exit cleanly");
+        );
     }
 
     #[test]
@@ -1458,6 +1280,9 @@ mod tests {
                     currency: "USD".to_string(),
                 }),
             }),
+            x402: None,
+            authority_expires_at: None,
+            reference_is_durable: false,
         };
         let request_digest = acp_request_digest(&payment_request)
             .expect("ACP authorization request should canonicalize");
@@ -1680,16 +1505,6 @@ mod tests {
 
     #[test]
     fn payment_adapters_reject_unjournalable_rail_identifiers() {
-        assert!(matches!(
-            X402AuthorizeResponse {
-                authorization_id: "x".repeat(MAX_PAYMENT_IDENTIFIER_BYTES + 1),
-                settled: true,
-                metadata: serde_json::Value::Null,
-            }
-            .validate(),
-            Err(PaymentError::RailError(_))
-        ));
-
         let request = test_payment_authorize_request();
         let request_digest =
             acp_request_digest(&request).expect("ACP authorization request should canonicalize");
@@ -1754,8 +1569,19 @@ mod tests {
 
     #[test]
     fn payment_adapters_redact_bearer_credentials_from_debug() {
-        let x402 =
-            X402PaymentAdapter::new("https://payments.example").with_bearer_token("x402-secret");
+        let x402 = X402PaymentAdapter::new(
+            "https://payments.example",
+            X402RailConfig::new(
+                X402Network::allowlisted("eip155:84532").expect("allowlisted network"),
+                "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+                "USDC",
+                6,
+                "0x2000000000000000000000000000000000000002",
+            )
+            .expect("valid rail"),
+        )
+        .expect("valid facilitator")
+        .with_bearer_token("x402-secret");
         let acp = AcpPaymentAdapter::new("https://acp.example").with_bearer_token("acp-secret");
 
         let x402_debug = format!("{x402:?}");
@@ -1768,7 +1594,7 @@ mod tests {
 
     #[test]
     fn payment_adapters_reject_cleartext_non_loopback_endpoints() {
-        let error = X402PaymentAdapter::new("http://payments.example")
+        let error = AcpPaymentAdapter::new("http://payments.example")
             .authorize(&test_payment_authorize_request())
             .expect_err("cleartext production payment endpoints must be rejected");
         assert!(
@@ -1782,7 +1608,7 @@ mod tests {
             400,
             serde_json::json!({"error": "provider-secret-customer-record"}),
         );
-        let error = X402PaymentAdapter::new(url)
+        let error = AcpPaymentAdapter::new(url)
             .authorize(&test_payment_authorize_request())
             .expect_err("provider rejection should fail");
         let display = error.to_string();
@@ -1801,7 +1627,7 @@ mod tests {
                 "metadata": {"padding": "x".repeat(MAX_PAYMENT_RESPONSE_BYTES as usize)}
             }),
         );
-        let error = X402PaymentAdapter::new(url)
+        let error = AcpPaymentAdapter::new(url)
             .authorize(&test_payment_authorize_request())
             .expect_err("oversized payment response must be rejected");
         assert!(
@@ -1819,93 +1645,9 @@ mod tests {
             reference: "payment-test".to_owned(),
             governed: None,
             commerce: None,
-        }
-    }
-
-    fn spawn_once_json_server(
-        status_code: u16,
-        body: serde_json::Value,
-    ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
-        let address = listener
-            .local_addr()
-            .expect("listener should expose local address");
-        let (request_tx, request_rx) = mpsc::channel();
-        let body_text = body.to_string();
-        let handle = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("server should accept request");
-            let mut request = Vec::new();
-            let mut chunk = [0_u8; 1024];
-            let mut header_end = None;
-            let mut content_length = 0_usize;
-
-            stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .expect("server should configure read timeout");
-            loop {
-                let read = stream
-                    .read(&mut chunk)
-                    .expect("server should read request bytes");
-                if read == 0 {
-                    break;
-                }
-                request.extend_from_slice(&chunk[..read]);
-
-                if header_end.is_none() {
-                    header_end = find_header_end(&request);
-                    if let Some(end) = header_end {
-                        content_length = parse_content_length(&request[..end]);
-                    }
-                }
-
-                if let Some(end) = header_end {
-                    if request.len() >= end + content_length {
-                        break;
-                    }
-                }
-            }
-            request_tx
-                .send(String::from_utf8_lossy(&request).into_owned())
-                .expect("request should be sent to test");
-            let response = format!(
-                "HTTP/1.1 {status_code} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                status_text(status_code),
-                body_text.len(),
-                body_text
-            );
-            stream
-                .write_all(response.as_bytes())
-                .expect("server should write response");
-        });
-        (format!("http://{address}"), request_rx, handle)
-    }
-
-    fn find_header_end(request: &[u8]) -> Option<usize> {
-        request
-            .windows(4)
-            .position(|window| window == b"\r\n\r\n")
-            .map(|position| position + 4)
-    }
-
-    fn parse_content_length(headers: &[u8]) -> usize {
-        let text = String::from_utf8_lossy(headers);
-        text.lines()
-            .find_map(|line| {
-                let (name, value) = line.split_once(':')?;
-                if name.eq_ignore_ascii_case("content-length") {
-                    value.trim().parse::<usize>().ok()
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(0)
-    }
-
-    fn status_text(status_code: u16) -> &'static str {
-        match status_code {
-            200 => "OK",
-            402 => "Payment Required",
-            _ => "Error",
+            x402: None,
+            authority_expires_at: None,
+            reference_is_durable: false,
         }
     }
 }

@@ -73,6 +73,13 @@ impl PaymentAdapter for QueryRail {
             result: self.observed.clone(),
         })
     }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        self.inner.replayed_authorization_metadata(authorization_id)
+    }
 }
 
 #[test]

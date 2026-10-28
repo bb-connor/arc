@@ -7,6 +7,7 @@ use crate::budget_store::BudgetInvocationCaptureDecision;
 use crate::finding_denial::denied_metadata;
 use crate::kernel::admission_coordinator::{DispatchTransport, DurableRefusalResponse};
 use crate::kernel::dispatch::dispatch_admission_error_reason;
+use crate::kernel::validation::ambiguous_payment_authorization_metadata;
 
 impl ChioKernel {
     #[cfg(test)]
@@ -1142,12 +1143,7 @@ impl ChioKernel {
             Err(error) => {
                 let internal_reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&internal_reason), "payment denied");
-                let error_code = match &error {
-                    PaymentError::Unavailable(_) => "unavailable",
-                    PaymentError::RailError(_) => "rail_error",
-                    PaymentError::Declined(_) => "declined",
-                    PaymentError::InsufficientFunds => "insufficient_funds",
-                };
+                let error_code = error.code();
                 let reason = format!("payment authorization failed: {error_code}");
                 if matches!(
                     &error,
@@ -1220,16 +1216,15 @@ impl ChioKernel {
                         &budget_mutation,
                         runtime_admission_metadata,
                     ),
-                    Some(serde_json::json!({
-                        "financial": {
-                            "payment_authorization_ambiguous": true,
-                            "payment_authorization_error_code": error_code,
-                            "payment_attempt_reference": Self::payment_operation_reference(
-                                request,
-                                durable_admission.as_ref().map(DurableToolAdmission::operation),
-                            )
-                        }
-                    })),
+                    Some(ambiguous_payment_authorization_metadata(
+                        &error,
+                        Self::payment_operation_reference(
+                            request,
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                        ),
+                    )),
                 );
                 let (denial_reason, credential_disposition) =
                     match credential_reservation.commit() {

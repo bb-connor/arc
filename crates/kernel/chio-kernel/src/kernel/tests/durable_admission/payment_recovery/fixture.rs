@@ -161,6 +161,10 @@ impl PaymentAdapter for RecoveryRail {
             authorization_id: "original-payment-authorization".into(),
         })
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 pub(super) fn payment_fixture(

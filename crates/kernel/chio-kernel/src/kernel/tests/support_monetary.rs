@@ -447,27 +447,6 @@ pub(super) fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInv
     }
 }
 
-pub(super) fn spawn_payment_test_server(
-    status_code: u16,
-    body: serde_json::Value,
-) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
-    let address = listener
-        .local_addr()
-        .expect("listener should expose local address");
-    let (request_tx, request_rx) = mpsc::channel();
-    let handle = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().expect("server should accept request");
-        let request = read_payment_test_request(&mut stream);
-        request_tx
-            .send(String::from_utf8_lossy(&request).into_owned())
-            .expect("request should be sent to test");
-        write_payment_test_response(&mut stream, status_code, &body);
-    });
-
-    (format!("http://{address}"), request_rx, handle)
-}
-
 pub(super) fn spawn_bound_acp_test_server(
 ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
@@ -1230,6 +1209,10 @@ impl PaymentAdapter for TrackingPaymentAdapter {
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "tracking" }),
         })
+    }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
     }
 }
 

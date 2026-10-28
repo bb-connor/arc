@@ -157,6 +157,10 @@ impl PaymentAdapter for PendingRail {
             "fixture must preserve its original capture intent".into(),
         ))
     }
+
+    fn replayed_authorization_metadata(&self, _: &str) -> Result<serde_json::Value, PaymentError> {
+        Ok(serde_json::json!({}))
+    }
 }
 
 struct PaidOutput(Arc<RailTrace>);
