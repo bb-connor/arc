@@ -746,8 +746,8 @@ fn a_late_lineage_row_the_canonical_reader_refuses_is_refused_for_archived_histo
     service.shutdown();
 }
 
-const REFUSED_CAPTURED_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: Conversion error from type Text at index: 10, urn:chio:error:attest:signed-json-invalid-input";
-const REFUSED_REBUILT_LINEAGE: &str = "sqlite error: Conversion error from type Text at index: 10, urn:chio:error:attest:signed-json-invalid-input";
+const REFUSED_CAPTURED_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input";
+const REFUSED_REBUILT_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input";
 
 fn captured_lineage_reinsert(malformed: bool, export_first: bool) {
     use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportQuery};
