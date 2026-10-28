@@ -924,15 +924,20 @@ receipt, and the token is accepted only when all of these hold:
 - the token carries `parent_receipt_hash` and it equals the SHA-256 of the
   parent receipt's canonical JSON
 - the parent receipt signature verifies under the receipt crypto floor and
-  its `kernel_key` is this kernel's receipt key or a key in the trust-control
-  authority set; neither a capability CA key nor the receipt's own embedded
-  key is trusted for this purpose
+  its `kernel_key` is this kernel's current receipt-signing key; capability
+  authority keys (including the trust-control authority set and configured
+  CA keys) and the receipt's own embedded key are not trusted for this purpose
 - the parent is a mediated, preventive `allow` decision receipt
 - the parent carries a well-formed `session_anchor` block whose commitment
   equals the commitment recomputed from the token's `parent_session_anchor`
 
 Any other outcome denies the request. The accepted `sessionAnchorId` is the
 token's anchor id, now bound to the parent receipt's signed block.
+
+A receipt signed outside an evaluation scope, including one the kernel signs
+while recovering an admission after a restart, carries no `session_anchor`
+block even when the admission ran in a session. Such a receipt is refused as
+a persisted parent, so continuing from it needs a live parent session.
 
 ### 5.3 Verification Rules
 
@@ -1603,7 +1608,7 @@ unsupported schema versions fail closed.
 | `caller_delivery` | Chio signer | committed-safe | `chio.authenticated-caller-observation.v1` | Authenticated caller observation report and authorization digests, executor and claim identity and times; no raw output. Read by the kernel's return-context, terminal and replay paths. |
 | `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
 | `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
-| `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, so it is never written; the anchor id embeds the random session id, so the commitment confirms no guessed auth context. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
+| `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, and the receipt itself does not carry it. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
 | `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
 | `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
 | `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |

@@ -2,11 +2,9 @@
 //!
 //! A receipt signed for an evaluation inside a session binds that session's
 //! anchor. The block carries a domain-separated commitment to the anchor
-//! reference rather than the reference itself: the reference hash is an
-//! unsalted digest over the session auth context, while the commitment also
-//! covers the anchor id, which embeds the random session id. A verifier holding
-//! the reference recomputes the commitment; a receipt holder cannot test
-//! guessed auth contexts against it.
+//! reference rather than the reference itself. The reference hash is an
+//! unsalted digest over the session auth context, and the receipt itself does
+//! not carry it. A verifier holding the reference recomputes the commitment.
 
 use alloc::string::String;
 use alloc::vec::Vec;
