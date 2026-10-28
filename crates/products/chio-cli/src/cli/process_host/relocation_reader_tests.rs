@@ -2,6 +2,10 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn canonical_tempdir() -> std::io::Result<tempfile::TempDir> {
+    tempfile::tempdir_in(std::env::temp_dir().canonicalize()?)
+}
+
 #[test]
 fn relocation_artifact_fifo_is_refused_without_blocking() -> TestResult {
     super::super::artifact_reader_tests::fifo_refusal(|path, _| digest(path).map(|_| ()))
@@ -9,7 +13,7 @@ fn relocation_artifact_fifo_is_refused_without_blocking() -> TestResult {
 
 #[test]
 fn relocation_digest_accepts_regular_bytes_and_refuses_symlinks() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = canonical_tempdir()?;
     let artifact = directory.path().join("artifact");
     let alias = directory.path().join("alias");
     std::fs::write(&artifact, b"abc")?;
@@ -28,7 +32,7 @@ fn relocation_digest_accepts_regular_bytes_and_refuses_symlinks() -> TestResult 
 #[test]
 fn relocation_digest_refuses_growth_and_truncation_after_handle_metadata() -> TestResult {
     for changed_length in [2, 4] {
-        let directory = tempfile::tempdir()?;
+        let directory = canonical_tempdir()?;
         let artifact = directory.path().join("artifact");
         std::fs::write(&artifact, b"abc")?;
         let file = crate::input::open_regular(&artifact)?;
@@ -53,6 +57,7 @@ fn relocation_digest_refuses_growth_and_truncation_after_handle_metadata() -> Te
 type BeforeDescend = Box<dyn FnOnce(&Path) -> Result<(), CliError>>;
 
 thread_local! {
+    static BEFORE_FILE_OPEN: std::cell::RefCell<Option<BeforeDescend>> = const { std::cell::RefCell::new(None) };
     static BEFORE_DESCEND: std::cell::RefCell<Option<BeforeDescend>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -64,10 +69,21 @@ pub(super) fn before_descend(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(super) fn before_file_open(path: &Path) -> Result<(), CliError> {
+    let callback = BEFORE_FILE_OPEN.with(|slot| slot.borrow_mut().take());
+    if let Some(callback) = callback {
+        callback(path)?;
+    }
+    Ok(())
+}
+
 struct DescendHook;
 
 impl Drop for DescendHook {
     fn drop(&mut self) {
+        BEFORE_FILE_OPEN.with(|slot| {
+            slot.borrow_mut().take();
+        });
         BEFORE_DESCEND.with(|slot| {
             slot.borrow_mut().take();
         });
@@ -76,7 +92,7 @@ impl Drop for DescendHook {
 
 #[test]
 fn relocation_walk_accepts_nested_regular_files() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
     std::fs::create_dir(root.path().join("nested"))?;
     std::fs::write(root.path().join("nested/artifact"), b"abc")?;
     let files = digests(root.path(), SidecarPolicy::Sealed)?;
@@ -90,9 +106,9 @@ fn relocation_walk_accepts_nested_regular_files() -> TestResult {
 
 #[test]
 fn relocation_walk_refuses_directory_replaced_by_symlink_before_descent() -> TestResult {
-    let root = tempfile::tempdir()?;
-    let outside = tempfile::tempdir()?;
-    let moved = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
+    let outside = canonical_tempdir()?;
+    let moved = canonical_tempdir()?;
     std::fs::create_dir(root.path().join("nested"))?;
     std::fs::write(root.path().join("nested/artifact"), b"inside")?;
     std::fs::write(outside.path().join("artifact"), b"outside")?;
@@ -121,8 +137,8 @@ fn relocation_walk_refuses_directory_replaced_by_symlink_before_descent() -> Tes
 
 #[test]
 fn relocation_walk_refuses_directory_replaced_by_regular_file() -> TestResult {
-    let root = tempfile::tempdir()?;
-    let moved = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
+    let moved = canonical_tempdir()?;
     std::fs::create_dir(root.path().join("nested"))?;
     let moved_path = moved.path().join("original");
     let _hook = DescendHook;
@@ -145,7 +161,7 @@ fn relocation_walk_refuses_directory_replaced_by_regular_file() -> TestResult {
 
 #[test]
 fn relocation_walk_preserves_root_exclusions_and_sidecar_policy() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
     std::fs::create_dir(root.path().join("run-sockets"))?;
     std::fs::create_dir(root.path().join("nested"))?;
     for name in [
@@ -184,8 +200,8 @@ fn relocation_walk_preserves_root_exclusions_and_sidecar_policy() -> TestResult 
 
 #[test]
 fn relocation_walk_refuses_static_symlinks() -> TestResult {
-    let root = tempfile::tempdir()?;
-    let outside = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
+    let outside = canonical_tempdir()?;
     std::fs::write(outside.path().join("database"), b"outside")?;
     std::os::unix::fs::symlink(
         outside.path().join("database"),
@@ -204,8 +220,8 @@ fn relocation_walk_refuses_static_symlinks() -> TestResult {
 
 #[test]
 fn relocation_walk_refuses_symlinks_in_root_components() -> TestResult {
-    let root = tempfile::tempdir()?;
-    let outside = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
+    let outside = canonical_tempdir()?;
     std::fs::create_dir(outside.path().join("inner"))?;
     std::fs::write(outside.path().join("inner/artifact"), b"outside")?;
     let alias = root.path().join("alias");
@@ -226,13 +242,68 @@ fn relocation_walk_refuses_symlinks_in_root_components() -> TestResult {
 
 #[test]
 fn relocation_walk_refuses_parent_components() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = canonical_tempdir()?;
     let Err(CliError::Chio(error)) = digests(&root.path().join(".."), SidecarPolicy::Sealed) else {
         return Err("expected parent component refusal".into());
     };
     assert_eq!(
         error.message(),
         "process host: relocation root contains a parent or platform prefix component"
+    );
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_labels_file_replaced_by_symlink_before_open() -> TestResult {
+    let root = canonical_tempdir()?;
+    let outside = canonical_tempdir()?;
+    std::fs::write(root.path().join("artifact"), b"inside")?;
+    let outside_path = outside.path().join("artifact");
+    std::fs::write(&outside_path, b"outside")?;
+    let moved_path = outside.path().join("original");
+    let _hook = DescendHook;
+    BEFORE_FILE_OPEN.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(move |path| {
+            std::fs::rename(path, &moved_path)?;
+            std::os::unix::fs::symlink(&outside_path, path)?;
+            Ok(())
+        }));
+    });
+    let result = digests(root.path(), SidecarPolicy::Sealed);
+    assert!(BEFORE_FILE_OPEN.with(|slot| slot.borrow().is_none()));
+    let Err(CliError::Chio(error)) = result else {
+        return Err("expected labeled file symlink refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: host state must not contain symlinks: artifact"
+    );
+    assert_eq!(std::fs::read(outside.path().join("artifact"))?, b"outside");
+    Ok(())
+}
+
+#[test]
+fn relocation_walk_bounds_directory_depth() -> TestResult {
+    let root = canonical_tempdir()?;
+    let mut nested = root.path().to_path_buf();
+    for _ in 0..64 {
+        nested.push("d");
+        std::fs::create_dir(&nested)?;
+    }
+    std::fs::write(nested.join("artifact"), b"abc")?;
+    let files = digests(root.path(), SidecarPolicy::Sealed)?;
+    assert_eq!(files.len(), 1);
+    assert_eq!(
+        files.values().next().map(String::as_str),
+        Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    );
+    std::fs::create_dir(nested.join("too-deep"))?;
+    let Err(CliError::Chio(error)) = digests(root.path(), SidecarPolicy::Sealed) else {
+        return Err("expected relocation depth refusal".into());
+    };
+    assert_eq!(
+        error.message(),
+        "process host: relocation directory depth exceeds 64"
     );
     Ok(())
 }

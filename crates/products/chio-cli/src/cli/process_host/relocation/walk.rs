@@ -116,6 +116,8 @@ pub(super) fn digests(
             if at_root && EXCLUDED.contains(&name) {
                 continue;
             }
+            #[cfg(test)]
+            super::reader_tests::before_file_open(&directory.join(&relative))?;
             let file = open_regular(&current, OsStr::new(name), &label)?;
             if let Some(database) = SQLITE_SIDECARS
                 .iter()
