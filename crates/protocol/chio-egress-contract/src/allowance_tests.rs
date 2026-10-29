@@ -411,6 +411,38 @@ fn contract_takes_the_http_entries_of_its_own_authorities() {
 }
 
 #[test]
+fn an_entry_for_a_scheme_the_contract_lacks_is_refused_not_dropped() {
+    let set =
+        EgressAllowanceSet::new([http_allowance(FACILITATOR, 8443, "10.20.0.0/24")]).expect("set");
+    let contract = vpc_contract(&[]).with_private_network_allowances(&set);
+    assert_eq!(
+        contract.prepare().map(|_| ()),
+        Err(HttpEgressError::InvalidAllowance(
+            PrivateNetworkAllowanceError::SchemeNotAllowed {
+                host: FACILITATOR.to_string(),
+                port: 8443,
+                scheme: "http".to_string(),
+            }
+        ))
+    );
+    let bare = EgressAllowanceSet::new([http_allowance("public.example", 80, "10.30.0.0/24")])
+        .expect("set");
+    assert_eq!(
+        vpc_contract(&[])
+            .with_private_network_allowances(&bare)
+            .prepare()
+            .map(|_| ()),
+        Err(HttpEgressError::InvalidAllowance(
+            PrivateNetworkAllowanceError::SchemeNotAllowed {
+                host: "public.example".to_string(),
+                port: 80,
+                scheme: "http".to_string(),
+            }
+        ))
+    );
+}
+
+#[test]
 fn allowance_scheme_is_part_of_the_digest() {
     let https = BTreeSet::from([allowance(FACILITATOR, 8443, "10.20.0.0/24")]);
     let http = BTreeSet::from([http_allowance(FACILITATOR, 8443, "10.20.0.0/24")]);

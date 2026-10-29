@@ -226,26 +226,22 @@ impl HttpEgressContract {
     }
 
     /// Replace this contract's allowances with the entries of `allowances`
-    /// that pin one of its authorities under one of its schemes. A bare
-    /// authority stands for the default port of the scheme. The result is
-    /// checked when the contract is prepared.
+    /// that pin the `host:port` of one of its authorities. A bare authority
+    /// stands for the default port of each scheme. An entry whose scheme the
+    /// contract does not allow is kept so that validation refuses it. The
+    /// result is checked when the contract is prepared.
     #[must_use]
     pub fn with_private_network_allowances(mut self, allowances: &EgressAllowanceSet) -> Self {
         let mut pinned = BTreeSet::new();
-        for scheme in &self.allowed_schemes {
+        for scheme in [AllowanceScheme::Https, AllowanceScheme::Http] {
             for authority in &self.allowed_authority_set {
-                let Ok(url) = Url::parse(&format!("{scheme}://{authority}/")) else {
+                let Ok(url) = Url::parse(&format!("{}://{authority}/", scheme.as_str())) else {
                     continue;
                 };
                 let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
                     continue;
                 };
-                pinned.extend(
-                    allowances
-                        .for_endpoint(host, port)
-                        .into_iter()
-                        .filter(|entry| entry.scheme.as_str() == scheme),
-                );
+                pinned.extend(allowances.for_endpoint(host, port));
             }
         }
         self.private_network_allowances = pinned;

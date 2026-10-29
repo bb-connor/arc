@@ -40,8 +40,9 @@ This example validates a URL without DNS or network access. DNS checks require
 - `HttpEgressContract::prepare` validates shape and captures an immutable snapshot.
 - `enforce_url` checks schemes, normalized authorities, address literals, userinfo,
   and redirect count. It does not resolve domain names.
-- `private_network_allowances` is the only way to reach a private address: each
-  entry pins one `host:port` to a CIDR every resolved address must fall inside.
+- `private_network_allowances` is the only way to reach a private IPv4 address: each
+  entry pins one `host:port` and scheme (https by default) to a CIDR every
+  resolved address must fall inside.
   Link-local and cloud metadata addresses are never reachable. Both the reqwest
   client and the blocking ureq agent check every resolved address with the
   request's port.
