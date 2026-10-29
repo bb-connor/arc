@@ -1055,13 +1055,18 @@ files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "9019771960"
 
 [[schema]]
+value = "chio.cluster-budget-anchor-signature.v1"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "a0e370e82f"
+
+[[schema]]
 value = "chio.cluster.peer-signature.v1"
-files = ["crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs"]
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "869751bc7a"
 
 [[schema]]
 value = "chio.commerce.escrow-acceptance.v1"
-files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-commerce-order/src/ids.rs"]
 first_seen = "34d9e6bcf3"
 
 [[schema]]
@@ -1126,7 +1131,7 @@ first_seen = "2a36f21acf"
 
 [[schema]]
 value = "chio.commerce.reservation-receipt.v1"
-files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-commerce-order/src/ids.rs"]
 first_seen = "34d9e6bcf3"
 
 [[schema]]
