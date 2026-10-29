@@ -25,8 +25,9 @@ fn fs_guard_root_path() {
     // a no-match because the implementation's boundary check is
     // strict. This is safe (fail-closed).
     let guard = FsGuard::new(vec!["/".to_string()]);
-    assert!(
-        guard.check_read("/etc/passwd").is_err(),
+    assert_eq!(
+        guard_error(guard.check_read("/etc/passwd")),
+        AcpGuardError::PathOutsideScope,
         "root prefix '/' does not pass boundary check -- fail-closed"
     );
 }
@@ -35,7 +36,10 @@ fn fs_guard_root_path() {
 fn fs_guard_root_path_not_configured() {
     let guard = FsGuard::new(vec!["/home/user".to_string()]);
     // Root path itself should not match a non-root prefix.
-    assert!(guard.check_read("/").is_err());
+    assert_eq!(
+        guard_error(guard.check_read("/")),
+        AcpGuardError::PathOutsideScope
+    );
 }
 
 #[test]
@@ -65,7 +69,10 @@ fn fs_guard_multiple_prefixes_matches_second() {
     // Verify the first also works.
     assert!(guard.check_read("/opt/first/file.txt").is_ok());
     // Neither prefix matches.
-    assert!(guard.check_read("/opt/third/file.txt").is_err());
+    assert_eq!(
+        guard_error(guard.check_read("/opt/third/file.txt")),
+        AcpGuardError::PathOutsideScope
+    );
 }
 
 #[test]
@@ -75,9 +82,15 @@ fn fs_guard_write_blocked_read_allowed_separate_instances() {
     let write_guard = FsGuard::new(vec!["/home".to_string()]);
 
     assert!(read_guard.check_read("/tmp/data.txt").is_ok());
-    assert!(write_guard.check_write("/tmp/data.txt").is_err());
+    assert_eq!(
+        guard_error(write_guard.check_write("/tmp/data.txt")),
+        AcpGuardError::PathOutsideScope
+    );
     assert!(write_guard.check_write("/home/user/file.txt").is_ok());
-    assert!(read_guard.check_read("/home/user/file.txt").is_err());
+    assert_eq!(
+        guard_error(read_guard.check_read("/home/user/file.txt")),
+        AcpGuardError::PathOutsideScope
+    );
 }
 
 #[test]
@@ -102,7 +115,10 @@ fn fs_guard_prefix_exact_match_no_trailing_slash() {
 fn terminal_guard_empty_command_string() {
     let guard = TerminalGuard::new(vec!["cargo".to_string()]);
     // Empty command is not on the allowlist.
-    assert!(guard.check_command("", &[]).is_err());
+    assert_eq!(
+        guard_error(guard.check_command("", &[])),
+        AcpGuardError::EmptyCommand
+    );
 }
 
 #[test]
@@ -120,35 +136,46 @@ fn terminal_guard_multiple_allowed_matching_second() {
 #[test]
 fn terminal_guard_arg_with_pipe_only() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard.check_command("echo", &["|".to_string()]).is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &["|".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
 fn terminal_guard_arg_with_semicolon_only() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard.check_command("echo", &[";".to_string()]).is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &[";".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
 fn terminal_guard_arg_with_backtick() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard.check_command("echo", &["`".to_string()]).is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &["`".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
 fn terminal_guard_arg_with_dollar_paren() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard
-        .check_command("echo", &["$(whoami)".to_string()])
-        .is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &["$(whoami)".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
 fn terminal_guard_arg_with_newline_character() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard
-        .check_command("echo", &["line1\nline2".to_string()])
-        .is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &["line1\nline2".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
@@ -170,17 +197,24 @@ fn terminal_guard_clean_arg_with_dashes_and_numbers() {
 #[test]
 fn terminal_guard_arg_with_carriage_return() {
     let guard = TerminalGuard::new(vec!["echo".to_string()]);
-    assert!(guard
-        .check_command("echo", &["hello\rworld".to_string()])
-        .is_err());
+    assert_eq!(
+        guard_error(guard.check_command("echo", &["hello\rworld".to_string()])),
+        AcpGuardError::ShellArgument
+    );
 }
 
 #[test]
 fn terminal_guard_command_matching_is_exact() {
     let guard = TerminalGuard::new(vec!["cargo".to_string()]);
     // "cargoo" or "carg" should not match "cargo".
-    assert!(guard.check_command("cargoo", &[]).is_err());
-    assert!(guard.check_command("carg", &[]).is_err());
+    assert_eq!(
+        guard_error(guard.check_command("cargoo", &[])),
+        AcpGuardError::CommandOutsideScope
+    );
+    assert_eq!(
+        guard_error(guard.check_command("carg", &[])),
+        AcpGuardError::CommandOutsideScope
+    );
 }
 
 // ================================================================
