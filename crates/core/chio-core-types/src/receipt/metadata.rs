@@ -620,12 +620,18 @@ pub struct ReceiptAttributionMetadata {
     pub grant_index: Option<u32>,
 }
 
+mod commitment;
 mod decision_model;
 mod key_registry;
 mod session_anchor;
 
 pub use session_anchor::{
     ReceiptSessionAnchorV1, RECEIPT_SESSION_ANCHOR_SCHEMA, SESSION_ANCHOR_METADATA_KEY,
+};
+
+pub use commitment::{
+    check_metadata_salt_ref, metadata_salt_ref, MetadataCommitment, MetadataCommitmentError,
+    MetadataOpening, MetadataOpenings, MetadataValue, METADATA_SALT_REF_PREFIX,
 };
 
 pub use decision_model::{
