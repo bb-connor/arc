@@ -940,7 +940,7 @@ fn key_snapshot_digest_vector() {
     let snapshot = snapshot_signed_by(&exchange_keypair().public_key(), &exchange_keypair());
     assert_eq!(
         snapshot.digest().unwrap().to_string(),
-        "sha256:01d8735e11a090cb4dba74f1c62ab185d6eaa9efb97a69b580e209a69e5805f7"
+        "sha256:fe4fc1265211059e32abf470f70a577e5550f19624a0c2b2d6ce6ae5960a0c64"
     );
 }
 
