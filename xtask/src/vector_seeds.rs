@@ -11,6 +11,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::body::ChioReceipt;
 use serde_json::{json, Value};
@@ -161,7 +162,16 @@ fn receipt_of(case: &Value) -> Result<ChioReceipt, XtaskError> {
         .get("receipt")
         .cloned()
         .ok_or_else(|| XtaskError::Validation("allow_receipt case has no receipt".to_owned()))?;
-    serde_json::from_value(receipt).map_err(json_error)
+    let text = serde_json::to_string(&receipt).map_err(json_error)?;
+    let receipt: ChioReceipt = UntrustedJsonText::new(&text)
+        .decode_signed()
+        .map_err(|err| XtaskError::Validation(format!("allow_receipt does not decode: {err}")))?;
+    match receipt.verify_integrity_embedded_key() {
+        Ok(true) => Ok(receipt),
+        _ => Err(XtaskError::Validation(
+            "allow_receipt signature does not verify".to_owned(),
+        )),
+    }
 }
 
 /// Replace the `sha256` of the `[[seed]]` entry whose `path` is `seed_path`,
