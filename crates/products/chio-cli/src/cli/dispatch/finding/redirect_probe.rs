@@ -128,3 +128,23 @@ fn finish_returns_when_a_client_stalls_inside_its_request() {
     );
     drop(stalled);
 }
+
+#[test]
+fn finish_returns_when_a_client_trickles_its_request() {
+    let probe = RedirectProbe::start("302 Found");
+    let venue = probe.venue_url.trim_start_matches("http://").to_string();
+    let mut client = TcpStream::connect(venue).unwrap();
+    client.write_all(b"GET / HTTP/1.1\r\nX-Trickle: ").unwrap();
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let trickling = std::sync::Arc::clone(&stop);
+    let trickler = std::thread::spawn(move || {
+        while !trickling.load(std::sync::atomic::Ordering::SeqCst) && client.write_all(b"a").is_ok()
+        {
+            std::thread::sleep(HEAD_TIMEOUT / 5);
+        }
+    });
+    let outcome = finish_within(probe, HEAD_TIMEOUT * 4);
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(outcome, Some(NOTHING_RECEIVED));
+    trickler.join().unwrap();
+}
