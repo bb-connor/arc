@@ -224,8 +224,8 @@ scored_files = [
 scored_viability_target = 80
 scored_tools = [
   "cargo_mutants=25.3.1",
-  "kani=0.67.0",
-  "rustc=1.93.0",
+  "kani=0.68.0",
+  "rustc=1.95.0",
 ]
 
 [gates.apalache-temporal]

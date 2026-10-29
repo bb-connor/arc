@@ -431,8 +431,8 @@ pub(super) fn validate_formal_mutation_report(
     } else {
         vec![
             ("cargo_mutants", "25.3.1"),
-            ("kani", "0.67.0"),
-            ("rustc", "1.93.0"),
+            ("kani", "0.68.0"),
+            ("rustc", "1.95.0"),
         ]
     };
     if expected_tools.iter().any(|(tool, version)| {

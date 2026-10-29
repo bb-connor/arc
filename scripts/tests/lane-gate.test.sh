@@ -51,8 +51,8 @@ scored_files = [
 scored_viability_target = 80
 scored_tools = [
   "cargo_mutants=25.3.1",
-  "kani=0.67.0",
-  "rustc=1.93.0",
+  "kani=0.68.0",
+  "rustc=1.95.0",
 ]
 
 [gates.strict]
@@ -453,8 +453,8 @@ def proof_report(commit, run_id, run_attempt, run_number):
         "sample_size_requested": 10,
         "tools": {
             "cargo_mutants": "25.3.1",
-            "kani": "0.67.0",
-            "rustc": "1.93.0",
+            "kani": "0.68.0",
+            "rustc": "1.95.0",
         },
         "inputs": report_inputs(PROOF_INPUT_PATHS),
         "mutants": mutants,
@@ -690,7 +690,7 @@ proof_low_viability["aggregate"]["source_activation_met"] = True
 archive("proof-low-viability.zip", {"report.json": proof_low_viability})
 
 proof_tool_drift = deepcopy(valid_proof)
-proof_tool_drift["tools"]["kani"] = "0.68.0"
+proof_tool_drift["tools"]["kani"] = "0.67.0"
 archive("proof-tool-drift.zip", {"report.json": proof_tool_drift})
 
 proof_inventory_digest = deepcopy(valid_proof)
@@ -1599,6 +1599,30 @@ for msrv_contract in (
 ci_workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 if 'toolchain: "1.95.0"' not in ci_workflow:
     raise SystemExit("CI workspace MSRV toolchain is not Rust 1.95.0")
+rust_channel = tomllib.loads(Path("rust-toolchain.toml").read_text(encoding="utf-8"))[
+    "toolchain"
+]["channel"]
+kani_installer = Path("scripts/install-kani-toolchain.sh").read_text(encoding="utf-8")
+kani_version = re.search(r"^expected_version=(\S+)$", kani_installer, re.MULTILINE)
+if kani_version is None:
+    raise SystemExit("Kani installer does not declare its expected version")
+kani_version = kani_version.group(1)
+proof_mutants = Path("scripts/proof-mutants.py").read_text(encoding="utf-8")
+for pin in (f'EXPECTED_RUSTC = "{rust_channel}"', f'EXPECTED_KANI = "{kani_version}"'):
+    if pin not in proof_mutants:
+        raise SystemExit(f"proof-mutants runner does not pin {pin}")
+proof_lane = tomllib.loads(Path("releases.toml").read_text(encoding="utf-8"))["gates"][
+    "proof-mutants"
+]
+for tool in (f"rustc={rust_channel}", f"kani={kani_version}"):
+    if tool not in proof_lane["scored_tools"]:
+        raise SystemExit(f"proof-mutants lane scored_tools lacks {tool}")
+mutation_reports = Path("xtask/src/proof_coverage/mutation_reports.rs").read_text(
+    encoding="utf-8"
+)
+for tool in (f'("rustc", "{rust_channel}")', f'("kani", "{kani_version}")'):
+    if tool not in mutation_reports:
+        raise SystemExit(f"formal mutation report validation does not expect {tool}")
 enterprise_workflow = Path(
     ".github/workflows/enterprise-hardening.yml"
 ).read_text(encoding="utf-8")
