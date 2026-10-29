@@ -2,13 +2,11 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
-use std::io::Read as _;
-use std::net::{IpAddr, ToSocketAddrs as _};
 use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{system_lookup, ContractLookup, HttpEgressContract};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroizing;
@@ -19,6 +17,7 @@ use super::plan::{
 use super::reconcile::{
     reconcile_finding_impairment, FindingImpairmentAttempt, FindingImpairmentOutcome,
 };
+use super::remote_http::{self, RemoteJsonClient};
 use crate::PreparedEvmCall;
 
 /// Wire schema for a digest-bound remote impairment request.
@@ -87,10 +86,6 @@ pub enum FindingImpairmentPublisherConfigError {
     InvalidTimeout,
     #[error("remote impairment publisher egress policy is invalid")]
     InvalidEgressPolicy,
-    #[error("remote impairment publisher DNS resolution failed")]
-    DnsResolution,
-    #[error("remote impairment publisher HTTP client could not be built")]
-    HttpClient,
 }
 
 /// Immutable production transport configuration.
@@ -213,54 +208,24 @@ trait FindingImpairmentTransport: Send + Sync {
 }
 
 struct HttpsFindingImpairmentTransport {
-    client: reqwest::blocking::Client,
-    base_url: String,
-    bearer_token: Zeroizing<String>,
-    contract: HttpEgressContract,
+    http: RemoteJsonClient,
 }
 
 impl HttpsFindingImpairmentTransport {
-    fn new(
+    fn with_lookup(
         config: RemoteFindingImpairmentPublisherConfig,
+        lookup: ContractLookup,
     ) -> Result<Self, FindingImpairmentPublisherConfigError> {
-        let (endpoint, contract) = config.endpoint_and_contract()?;
-        let host = endpoint
-            .host_str()
-            .ok_or(FindingImpairmentPublisherConfigError::InvalidUrl)?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract is
-        // enforced for every pinned DNS answer and request below.
-        let mut builder = reqwest::blocking::Client::builder()
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .timeout(config.timeout);
-        if host.parse::<IpAddr>().is_err() {
-            let port = endpoint
-                .port_or_known_default()
-                .ok_or(FindingImpairmentPublisherConfigError::InvalidUrl)?;
-            let addresses = (host, port)
-                .to_socket_addrs()
-                .map_err(|_| FindingImpairmentPublisherConfigError::DnsResolution)?
-                .collect::<Vec<_>>();
-            if addresses.is_empty() {
-                return Err(FindingImpairmentPublisherConfigError::DnsResolution);
-            }
-            for address in &addresses {
-                contract
-                    .enforce_resolved_ip(host, address.ip())
-                    .map_err(|_| FindingImpairmentPublisherConfigError::InvalidEgressPolicy)?;
-            }
-            builder = builder.resolve_to_addrs(host, &addresses);
-        }
-        let client = builder
-            .build()
-            .map_err(|_| FindingImpairmentPublisherConfigError::HttpClient)?;
-        Ok(Self {
-            client,
-            base_url: config.base_url.trim_end_matches('/').to_owned(),
-            bearer_token: config.bearer_token,
+        let (_, contract) = config.endpoint_and_contract()?;
+        let http = RemoteJsonClient::new(
             contract,
-        })
+            &config.base_url,
+            &config.bearer_token,
+            config.timeout,
+            lookup,
+        )
+        .map_err(|_| FindingImpairmentPublisherConfigError::InvalidEgressPolicy)?;
+        Ok(Self { http })
     }
 }
 
@@ -275,82 +240,33 @@ impl FindingImpairmentTransport for HttpsFindingImpairmentTransport {
                 "remote impairment request exceeds its bound".to_owned(),
             ));
         }
-        let endpoint = format!("{}{}", self.base_url, operation.path());
-        self.contract
-            .enforce_url(&endpoint, 0)
-            .map_err(|error| FindingImpairmentPublishError::Permanent(error.to_string()))?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: construction pins every DNS
-        // answer after enforcing the stored contract, and this exact request
-        // is checked above. Redirects and proxies are disabled on the client.
         let response = self
-            .client
-            .post(endpoint)
-            .bearer_auth(self.bearer_token.as_str())
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(body.to_vec())
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with the
-            // contract-enforced, pinned-DNS client construction above.
-            .send()
+            .http
+            .post_json(operation.path(), body)
             .map_err(|error| {
-                FindingImpairmentPublishError::Transient(format!(
-                    "remote impairment publisher unavailable: {}",
-                    transport_error_class(&error)
-                ))
+                if remote_http::unreachable(&error) {
+                    FindingImpairmentPublishError::Transient(format!(
+                        "remote impairment publisher unavailable: {error}"
+                    ))
+                } else {
+                    FindingImpairmentPublishError::Permanent(error.to_string())
+                }
             })?;
         let status = response.status();
-        if !status.is_success() {
+        if !(200..300).contains(&status) {
             let message = format!("remote impairment publisher returned HTTP {status}");
-            return if status.is_server_error()
-                || status == reqwest::StatusCode::REQUEST_TIMEOUT
-                || status == reqwest::StatusCode::TOO_MANY_REQUESTS
-            {
+            return if (500..600).contains(&status) || status == 408 || status == 429 {
                 Err(FindingImpairmentPublishError::Transient(message))
             } else {
                 Err(FindingImpairmentPublishError::Permanent(message))
             };
         }
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.split(';').next())
-            .map(str::trim);
-        if content_type != Some("application/json") {
+        if remote_http::media_type(&response) != Some("application/json") {
             return Err(FindingImpairmentPublishError::Permanent(
                 "remote impairment publisher response media type is invalid".to_owned(),
             ));
         }
-        if response
-            .content_length()
-            .is_some_and(|length| length > MAX_PUBLISHER_RESPONSE_BYTES as u64)
-        {
-            return Err(FindingImpairmentPublishError::Permanent(
-                "remote impairment publisher response exceeds its bound".to_owned(),
-            ));
-        }
-        let mut response_body = Vec::new();
-        response
-            .take(MAX_PUBLISHER_RESPONSE_BYTES as u64 + 1)
-            .read_to_end(&mut response_body)
-            .map_err(|_| {
-                FindingImpairmentPublishError::Transient(
-                    "remote impairment publisher response could not be read".to_owned(),
-                )
-            })?;
-        self.contract
-            .enforce_response_bytes(response_body.len() as u64)
-            .map_err(|error| FindingImpairmentPublishError::Permanent(error.to_string()))?;
-        Ok(response_body)
-    }
-}
-
-fn transport_error_class(error: &reqwest::Error) -> &'static str {
-    if error.is_timeout() {
-        "timeout"
-    } else if error.is_connect() {
-        "connect"
-    } else {
-        "transport"
+        Ok(response.body().to_vec())
     }
 }
 
@@ -372,7 +288,10 @@ impl RemoteFindingImpairmentPublisher {
         config: RemoteFindingImpairmentPublisherConfig,
     ) -> Result<Self, FindingImpairmentPublisherConfigError> {
         Ok(Self {
-            transport: Arc::new(HttpsFindingImpairmentTransport::new(config)?),
+            transport: Arc::new(HttpsFindingImpairmentTransport::with_lookup(
+                config,
+                system_lookup(),
+            )?),
         })
     }
 

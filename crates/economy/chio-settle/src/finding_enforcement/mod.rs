@@ -27,6 +27,7 @@ mod observation_source;
 mod plan;
 mod publish;
 mod reconcile;
+mod remote_http;
 mod verify;
 
 #[cfg(test)]
