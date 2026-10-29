@@ -123,6 +123,13 @@ impl SqliteRuntimeOrchestrationStore {
             ));
         }
         update.validate_active_at(now).map_err(epoch_error)?;
+        if now < binding.scope().issued_at_unix_ms || now >= binding.scope().expires_at_unix_ms {
+            return Err(refusal(
+                "treaty_epoch_expired",
+                "authenticated treaty scope is not fresh at authority commit",
+            ));
+        }
+
         if digest.as_str() != binding.scope().revocation_epoch_sha256 {
             return Err(refusal(
                 "treaty_epoch_stale",
