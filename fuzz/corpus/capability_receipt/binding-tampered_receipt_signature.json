@@ -50,7 +50,7 @@
     "policy_hash": "policy-bindings-v1-tampered",
     "receipt_kind": "mediated_decision",
     "redaction_mode": "none",
-    "signature": "01a89acadd44e845d3ebed80b92234cd2579b218296924f10fb197b9e270adf50794c78218eddd8709e6bbdbba2a28ee734ab3733a00d504bafa78c8e9b5d00d",
+    "signature": "bcc218fd9af3126577113b00a38f3ee3fe562e12ba9813910a0410012aaa474d9bb7a1f816715eb37809eea37f70a13688082b3a9949d1f628b008e528673805",
     "timestamp": 1710000200,
     "tool_name": "file_read",
     "tool_origin": "caller_executed",

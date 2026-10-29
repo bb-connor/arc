@@ -9,7 +9,7 @@
     "receipt_id_valid": true,
     "receipt_kind": "mediated_decision",
     "result": "Authorized",
-    "signature_valid": false,
+    "signature_valid": true,
     "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
     "signer_trusted": false,
     "trust_level": "mediated"
@@ -50,7 +50,7 @@
     "policy_hash": "policy-bindings-v1",
     "receipt_kind": "mediated_decision",
     "redaction_mode": "none",
-    "signature": "cd57a64ada061677b7c1e59f2ecb1fae38cc79e1ee5895c36151537113b439c2d322915d6b88571a8c300ace65d7c794eafcea193d0c21c9043f0407d4f2440c",
+    "signature": "381177a41b406fda26032a39749f2b047c956aeffa6b508b6f0c71de56cb0a622f5f0f617e85bfd8d2e50e532d884ac509fe9411d7f1abbdcef8f944d9504d00",
     "timestamp": 1710000200,
     "tool_name": "file_read",
     "tool_origin": "caller_executed",

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "schema": "chio.evidence_export_commitment.v1",
+    "manifestSha256": "dacf9b70a2a2cfbb35425e7d9227e5c8a2843e62c5ec313c40e435e37d0ddf2b",
+    "payloadSha256": "faa4d101a4acfd4c39338d08a8a0542edd162bdd9d32046719c57553f81de958"
+  },
+  "signerKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+  "signature": "faa300ca4736143e01c931798504cca3e546b439d5e0c6e6c151de5a48ad650c7d9beda2c5f536a5f0adff1e0182cd5d0fc7e10a19d4f33e749d134de0a34e06"
+}

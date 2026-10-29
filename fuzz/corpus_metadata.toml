@@ -294,7 +294,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-allow_receipt.json"
-sha256    = "9a0220d42cefed19df1ae86bca48b0424f68a1cf2073db46a3ae4fc9eb24f9e1"
+sha256    = "ded7767416749a5caf24bc2f2462369106d28033d8ec132b71751427d9a3c8af"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -306,7 +306,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-deny_receipt.json"
-sha256    = "ea9686fe6f12c4282164af71ecace635e190abd4e8e6e749a6cb1088e6d11e8a"
+sha256    = "a79d162852fdf3b1b6e0f64790a673bf4d48dfb8eb5af553f0142cfd6b1aaa33"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -324,7 +324,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-signed_receipt_with_invalid_parameter_hash.json"
-sha256    = "9f9fad713d08d793f321fa67d1957707e6e79f6549ee47b3338e97a30857407f"
+sha256    = "0755f212954221f450295139d28686c91cef3975425c24214b6247646aae8a06"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -336,13 +336,13 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-tampered_receipt_signature.json"
-sha256    = "99a7f6e8a3642a8736b6fea15e673975e47b23e43a6ddcfdd879c056065bc801"
+sha256    = "ddbdcdc168a867a405765b9ba4d02aaa9ef145a17b7b3da8360ccbd97fe1bc7a"
 source    = "hand_curated_coverage"
 
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/binding-valid_delegated_capability.json"
-sha256    = "5c1900623ebfdd4f6a005ae0fc1fab6cab8f409dc90166e1fa30b608c402199b"
+sha256    = "43b3028726a8c704a941779837b4ec7b3aa9a22ac2df47bd1861746e15d50fd7"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -360,7 +360,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "capability_receipt"
 path      = "fuzz/corpus/capability_receipt/minimal-receipts.ndjson"
-sha256    = "7ef61e83c900fc49c1ccadb2bd6a622876361990a641f72d4ef4ad9bab49a0c0"
+sha256    = "e5558be88a4239ce0991a90322a72327f56283275a83842398f197e59a7e28aa"
 source    = "hand_curated_coverage"
 
 [[seed]]
@@ -402,7 +402,7 @@ source    = "hand_curated_coverage"
 [[seed]]
 target    = "fuzz_merkle_checkpoint"
 path      = "fuzz/corpus/fuzz_merkle_checkpoint/minimal-receipts.ndjson"
-sha256    = "7ef61e83c900fc49c1ccadb2bd6a622876361990a641f72d4ef4ad9bab49a0c0"
+sha256    = "e5558be88a4239ce0991a90322a72327f56283275a83842398f197e59a7e28aa"
 source    = "hand_curated_coverage"
 
 [[seed]]

@@ -783,6 +783,42 @@ fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLev
     })
 }
 
+/// Re-signs every receipt case with the corpus key over the case's own signing
+/// body and moves every occurrence of each old signature in `raw` to the new
+/// one. Each case is then rejected only by the rule it names, never by a
+/// signature in another format.
+fn resign_corpus_receipts(mut raw: String, fixture: &Value, keypair: &Keypair) -> String {
+    let corpus_key = keypair.public_key().to_hex();
+    for case in fixture["cases"]
+        .as_array()
+        .test_unwrap("receipt cases array")
+    {
+        let id = case["id"].as_str().test_unwrap("receipt case id");
+        assert_eq!(
+            case["receipt"]["kernel_key"].as_str(),
+            Some(corpus_key.as_str()),
+            "receipt case {id} is not under the corpus key"
+        );
+        let receipt: ChioReceipt =
+            serde_json::from_value(case["receipt"].clone()).test_unwrap("parse receipt case");
+        let signature = keypair
+            .sign_wrapped(
+                chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(
+                    &ChioReceiptSigningBody::from(&receipt.body()),
+                )
+                .test_unwrap("canonical receipt signing body"),
+            )
+            .test_unwrap("re-sign receipt");
+        let old_signature = case["receipt"]["signature"]
+            .as_str()
+            .test_unwrap("receipt signature")
+            .to_string();
+        raw = raw.replace(&old_signature, &signature.to_hex());
+    }
+    raw
+}
+
 #[test]
 #[ignore = "regenerator: rewrite each expected block of the checked-in receipt corpus in place from verify_receipt and append missing cases; run with --ignored, then `cargo xtask freeze-vectors`"]
 fn refresh_receipt_vector_fixture() {
@@ -791,6 +827,8 @@ fn refresh_receipt_vector_fixture() {
     let mut fixture: Value = serde_json::from_str(&raw).test_unwrap("parse receipt fixture");
     let keypair = Keypair::from_seed(&[7u8; 32]);
     assert_eq!(fixture["signing_key_seed_hex"], keypair.seed_hex());
+    raw = resign_corpus_receipts(raw, &fixture, &keypair);
+    fixture = serde_json::from_str(&raw).test_unwrap("parse re-signed receipt fixture");
 
     let cases = fixture["cases"]
         .as_array_mut()
@@ -888,7 +926,7 @@ fn regenerate_manifest_vector_fixture() {
 #[test]
 #[ignore = "regenerator: re-sign capability vectors after a signing-schema change; run with --ignored"]
 fn rebless_capability_vector_signatures() {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
     let path = capability_fixture_path();
     let raw = fs::read_to_string(&path).test_unwrap("read capability fixture");
     let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse capability fixture");
@@ -908,50 +946,57 @@ fn rebless_capability_vector_signatures() {
             by_pub.insert(keypair.public_key().to_hex(), keypair);
         }
     }
+    let keypair_for = |key: &chio_core::PublicKey| {
+        let hex = key.to_hex();
+        by_pub
+            .get(&hex)
+            .unwrap_or_else(|| panic!("no seed keypair for {hex}"))
+    };
 
-    let mut replacements: Vec<(String, String)> = Vec::new();
+    // Links are re-signed where the case expects a valid chain shape and the
+    // token where it expects a valid signature; the token signs its links.
+    let mut replacements: BTreeMap<String, String> = BTreeMap::new();
+    let mut kept: Vec<String> = Vec::new();
     for case in fixture["cases"].as_array().test_unwrap("cases array") {
-        if !case["expected"]["signature_valid"]
-            .as_bool()
-            .unwrap_or(false)
-        {
-            continue;
-        }
-        let issuer_hex = case["capability"]["issuer"].as_str().test_unwrap("issuer");
-        let keypair = by_pub
-            .get(issuer_hex)
-            .unwrap_or_else(|| panic!("no seed keypair for issuer {issuer_hex}"));
-        let token: CapabilityToken =
+        let mut token: CapabilityToken =
             serde_json::from_value(case["capability"].clone()).test_unwrap("parse capability");
-        let resigned = CapabilityToken::sign(token.body(), keypair).test_unwrap("re-sign");
-        let resigned_value = serde_json::to_value(&resigned).test_unwrap("serialize resigned");
-        let old_sig = case["capability"]["signature"]
-            .as_str()
-            .test_unwrap("old signature")
-            .to_string();
-        let new_sig = resigned_value["signature"]
-            .as_str()
-            .test_unwrap("new signature")
-            .to_string();
-        if old_sig != new_sig {
-            replacements.push((old_sig, new_sig));
+        let resign_links = case["expected"]["delegation_chain_shape_valid"]
+            .as_bool()
+            .unwrap_or(false);
+        let resign_token = case["expected"]["signature_valid"]
+            .as_bool()
+            .unwrap_or(false);
+        for link in &mut token.delegation_chain {
+            let old = link.signature.to_hex();
+            if resign_links {
+                *link = DelegationLink::sign(link.body(), keypair_for(&link.delegator))
+                    .test_unwrap("re-sign delegation link");
+                replacements.insert(old, link.signature.to_hex());
+            } else {
+                kept.push(old);
+            }
         }
+        let old = token.signature.to_hex();
+        if resign_token {
+            let resigned = CapabilityToken::sign(token.body(), keypair_for(&token.issuer))
+                .test_unwrap("re-sign capability");
+            replacements.insert(old, resigned.signature.to_hex());
+        } else {
+            kept.push(old);
+        }
+    }
+    for old in &kept {
+        assert!(
+            !replacements.contains_key(old),
+            "signature {old} is both re-signed and kept invalid"
+        );
     }
 
     let mut text = raw;
     for (old, new) in &replacements {
-        assert_eq!(
-            text.matches(old.as_str()).count(),
-            1,
-            "stored signature {old} is not unique; cannot re-bless in place"
-        );
         text = text.replace(old.as_str(), new.as_str());
     }
     fs::write(&path, text).test_unwrap("write capability fixture");
-    eprintln!(
-        "re-signed {} capability vector signatures",
-        replacements.len()
-    );
 }
 
 #[test]
