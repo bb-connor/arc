@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `979ce5e909eee6b261bbc04807c6ecb4354fe975f3e0d5a1c4baaa692adec8c3`
+- Input digest: `436d2e1353ae1a1a2b5aacc5b2df833ac4a75a3aa2c25b04d2aa8386253aa721`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1696,6 +1696,6 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `xtask/src/proof_coverage/refinement.rs`: `8b697fb04195e69b722d90598b6510a440d0da6b58f6a6fb3c3b609ba4b4d49d`
 - `xtask/src/proof_coverage/render.rs`: `5a9645aec5942b919f0aeb1ea8229b69a533e36506b6a17d4627525a13709a50`
 - `xtask/src/proof_coverage/tests/aeneas.rs`: `9f3d115d348aabc61bc09e4b0babd4236fcd73d4668f7d6f2689e91fafeeafb8`
-- `xtask/src/proof_coverage/tests/mod.rs`: `1c559e52e7e53a582413629490f42c09b310573404dbd4553c99448d8d9db35f`
+- `xtask/src/proof_coverage/tests/mod.rs`: `c03854ee723c97b900bc1983f02e20819513eeda72f67a57bb0217564b9bb365`
 - `xtask/src/proof_coverage/tests/mutation.rs`: `4d04bff81acaa684a7c8879c821ee4500a9e57c265f96db961af4bdda6e27df8`
 - `xtask/src/proof_coverage/tests/open_residual.rs`: `988b690f761b340ce9962d49d57564b64ee4437a40682e7379cbab64634975c1`
