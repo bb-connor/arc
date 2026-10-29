@@ -46,6 +46,7 @@ mod schema;
 mod serde_io;
 mod store;
 pub(crate) mod treaty;
+pub mod treaty_epoch;
 mod types;
 mod validation;
 #[cfg(feature = "work")]
