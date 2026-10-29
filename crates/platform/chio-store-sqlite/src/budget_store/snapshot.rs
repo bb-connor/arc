@@ -1,8 +1,9 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{PublicKey, Signature};
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
+use chio_core::crypto::{verify_wrapped, PublicKey, Signature};
 use chio_core::sha256_hex;
+use chio_core::signed_artifact::CHIO_CLUSTER_BUDGET_ANCHOR_V1_SCHEMA;
 use serde::{Deserialize, Serialize};
 
 const BUDGET_ANCHOR_GENESIS_DIGEST: &str =
@@ -66,12 +67,6 @@ struct AnchorChainDigestBody<'a> {
     signer_public_key: &'a str,
 }
 
-#[derive(Serialize)]
-struct AnchorAuthenticatorBody<'a> {
-    scheme: &'static str,
-    chain: &'a [SignedBudgetSnapshotAnchorCommitment],
-}
-
 pub fn budget_snapshot_anchor_set_digest(
     anchors: &[BudgetUsageRecord],
 ) -> Result<String, BudgetStoreError> {
@@ -116,24 +111,18 @@ pub fn budget_snapshot_anchor_chain_digest(
     Ok(sha256_hex(&bytes))
 }
 
-fn budget_snapshot_anchor_authenticator_body(
-    chain: &[SignedBudgetSnapshotAnchorCommitment],
-) -> Result<Vec<u8>, BudgetStoreError> {
-    canonical_json_bytes(&AnchorAuthenticatorBody {
-        scheme: "chio.cluster-budget-anchor-signature.v1",
-        chain,
-    })
-    .map_err(|error| BudgetStoreError::Invariant(error.to_string()))
-}
-
 /// The leader node's Ed25519 signature over the anchor chain, as hex. A
 /// follower verifies it under the elected leader's pinned node key.
 pub fn budget_snapshot_anchor_authenticator(
     leader_node_key: &chio_core::crypto::Keypair,
     chain: &[SignedBudgetSnapshotAnchorCommitment],
 ) -> Result<String, BudgetStoreError> {
-    let bytes = budget_snapshot_anchor_authenticator_body(chain)?;
-    Ok(leader_node_key.sign(&bytes).to_hex())
+    let canonical = CanonicalBytes::from_serializable(&chain)
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    let signature = leader_node_key
+        .sign_wrapped(CHIO_CLUSTER_BUDGET_ANCHOR_V1_SCHEMA, &canonical)
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
+    Ok(signature.to_hex())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -895,8 +884,15 @@ fn verify_budget_snapshot_anchor_provenance<'a>(
     }
     let authenticated = Signature::from_hex(&provenance.cluster_authenticator)
         .ok()
-        .zip(budget_snapshot_anchor_authenticator_body(&provenance.chain).ok())
-        .is_some_and(|(signature, body)| leader_node_key.verify_strict(&body, &signature));
+        .is_some_and(|signature| {
+            verify_wrapped(
+                leader_node_key,
+                CHIO_CLUSTER_BUDGET_ANCHOR_V1_SCHEMA,
+                &provenance.chain,
+                &signature,
+            )
+            .is_ok()
+        });
     if !authenticated {
         return Err(BudgetStoreError::Invariant(
             "budget snapshot anchor provenance cluster authentication failed".to_string(),
