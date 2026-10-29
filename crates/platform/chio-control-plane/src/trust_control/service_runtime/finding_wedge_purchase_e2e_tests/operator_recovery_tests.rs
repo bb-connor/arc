@@ -14,11 +14,21 @@ use crate::trust_control::finding_operator_filing_resolver::{
     finding_operator_bundle_artifact_indexes, FindingOperatorFilingResolver,
 };
 use crate::trust_control::finding_operator_purchase::{
-    FindingOperatorBuyerCredential, FindingOperatorPurchaseExecutor, FindingOperatorPurchaseKeys,
-    FindingOperatorPurchaseStorage,
+    decode_cached_terminal, FindingOperatorBuyerCredential, FindingOperatorPurchaseExecutor,
+    FindingOperatorPurchaseKeys, FindingOperatorPurchaseStorage,
 };
 
 const OPERATOR_PAYLOAD_KEY_BYTES: [u8; 32] = [73; 32];
+
+#[test]
+fn cached_purchase_terminal_refuses_duplicate_members() {
+    match decode_cached_terminal(br#"{"schema":"a","schema":"b"}"#) {
+        Err(FindingPurchaseExecutionError::Internal(code)) => {
+            assert_eq!(code, "urn:chio:error:attest:signed-json-invalid-input");
+        }
+        other => panic!("cached terminal with duplicate members was not refused: {other:?}"),
+    }
+}
 
 #[test]
 fn operator_filing_resolver_retains_pre_rotation_authority_policies() -> TestResult {

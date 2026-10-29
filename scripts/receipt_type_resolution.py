@@ -26,6 +26,7 @@ EXTERNAL_ROOTS = {
     "alloc": "Rust allocation library; generic arguments are resolved separately.",
     "serde": "Serialization traits cannot contain Chio receipt fields.",
     "serde_json": "JSON library types are not typed Chio receipt wrappers.",
+    "axum": "HTTP extractor types; generic arguments are resolved separately.",
 }
 
 def split_arguments(text):
