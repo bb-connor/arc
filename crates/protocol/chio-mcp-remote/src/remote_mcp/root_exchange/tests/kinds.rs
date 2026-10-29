@@ -1436,7 +1436,7 @@ fn operator_request_refusals() {
         NOW,
     )
     .unwrap_err();
-    assert_eq!(error, RootExchangeError::OperatorRequestTenantMissing);
+    assert_eq!(error, RootExchangeError::OperatorRootRequestMissingTenant);
     refusal_code(&error, OAuthErrorCode::InvalidRequest);
 
     let mut repeated = operator_body(|_| {});
@@ -1454,7 +1454,7 @@ fn operator_request_refusals() {
         (oversized, "body exceeds the size bound"),
     ] {
         let error = OperatorRootRequest::parse(&body).unwrap_err();
-        assert_eq!(error, RootExchangeError::OperatorRequestMalformed(reason));
+        assert_eq!(error, RootExchangeError::OperatorRootRequestMalformed(reason));
         refusal_code(&error, OAuthErrorCode::InvalidRequest);
     }
 

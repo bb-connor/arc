@@ -171,9 +171,11 @@ pub enum RootExchangeError {
     #[error("re-exchange client is not the client the subject token was issued to")]
     ReExchangeClientMismatch,
     #[error("operator root request is malformed: {0}")]
-    OperatorRequestMalformed(&'static str),
+    OperatorRootRequestMalformed(&'static str),
     #[error("operator root request names no tenant_value")]
-    OperatorRequestTenantMissing,
+    OperatorRootRequestMissingTenant,
+    #[error("operator root request signature does not verify under the operator key")]
+    OperatorRootRequestSignatureInvalid,
 
     #[error("root policy is out of force")]
     PolicyOutOfForce,
@@ -221,8 +223,9 @@ impl RootExchangeError {
             | Self::UnsupportedSubjectTokenType
             | Self::UnsupportedRequestedTokenType
             | Self::ClientAuthenticationAmbiguous
-            | Self::OperatorRequestMalformed(_)
-            | Self::OperatorRequestTenantMissing
+            | Self::OperatorRootRequestMalformed(_)
+            | Self::OperatorRootRequestMissingTenant
+            | Self::OperatorRootRequestSignatureInvalid
             | Self::RequestedHolderMismatch(_) => OAuthErrorCode::InvalidRequest,
             Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
             Self::ClientAssertionMissing
