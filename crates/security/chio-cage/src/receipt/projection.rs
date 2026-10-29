@@ -9,11 +9,8 @@
 //! One commitment, `metadata.cage_receipt.raw`, binds the projection to the canonical raw
 //! body: a verifier that opens it recomputes every field commitment from the opened body.
 
-use chio_core::receipt::metadata::{
-    metadata_salt_ref, MetadataCommitment, MetadataCommitter, MetadataOpenings,
-};
-use chio_core::rng::Rng;
-use serde::{Deserialize, Serialize};
+use chio_core::receipt::metadata::{metadata_salt_ref, MetadataCommitment, MetadataCommitter};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::{
     validate_digest, CageReceiptBody, CageReceiptError, CageReceiptStage,
@@ -75,7 +72,8 @@ pub struct CageExitProjection {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CageReceiptProjection {
-    /// Always `CAGE_RECEIPT_METADATA_SCHEMA`.
+    /// Always `CAGE_RECEIPT_METADATA_SCHEMA`; any other value refuses on decode.
+    #[serde(deserialize_with = "deserialize_schema")]
     pub schema: String,
     pub attempt_id: MetadataCommitment,
     pub stage: CageReceiptStage,
@@ -102,36 +100,17 @@ pub struct CageReceiptProjection {
 }
 
 impl CageReceiptProjection {
-    /// Projects `body` signed under the profile digest `policy_hash`, drawing one salt per
-    /// committed field from `rng`; returns the projection and its openings. A body that does
-    /// not validate, or whose bindings name another profile digest, refuses.
-    pub fn project(
-        body: &CageReceiptBody,
-        policy_hash: &str,
-        rng: &dyn Rng,
-    ) -> Result<(Self, MetadataOpenings), CageReceiptError> {
-        let mut committer = MetadataCommitter::project(rng);
-        let projection = Self::build(body, policy_hash, &mut committer)?;
-        Ok((projection, committer.into_openings()))
-    }
-
     /// True when this projection is the projection of `body` and `policy_hash` under
-    /// `openings` and every opening is used; false on any mismatch or missing or unused
-    /// opening.
+    /// `committer`. The receipt's other blocks share `committer`, and the caller calls
+    /// `finish` once per receipt.
     #[must_use]
-    pub fn matches(
+    pub fn matches_with(
         &self,
         body: &CageReceiptBody,
         policy_hash: &str,
-        openings: &MetadataOpenings,
+        committer: &mut MetadataCommitter<'_>,
     ) -> bool {
-        let mut committer = MetadataCommitter::verify(openings);
-        Self::build(body, policy_hash, &mut committer)
-            .and_then(|rebuilt| {
-                committer.finish()?;
-                Ok(rebuilt)
-            })
-            .is_ok_and(|rebuilt| rebuilt == *self)
+        Self::project_with(body, policy_hash, committer).is_ok_and(|rebuilt| rebuilt == *self)
     }
 
     /// The receipt's top-level `policy_hash`: the bare hex value of the profile digest
@@ -141,22 +120,26 @@ impl CageReceiptProjection {
         self.profile_digest.value().to_bare_hex()
     }
 
-    /// Opens the raw body commitment and checks that the projection is the projection of the
-    /// opened body under `openings`; returns the verified raw body.
+    /// Opens the raw body commitment through `committer` and checks that the projection is
+    /// the projection of the opened body; returns the verified raw body. The caller calls
+    /// `finish` once per receipt.
     pub fn open_raw(
         &self,
         policy_hash: &str,
-        openings: &MetadataOpenings,
+        committer: &mut MetadataCommitter<'_>,
     ) -> Result<CageReceiptBody, CageReceiptError> {
-        let opening = openings.open(&self.raw)?;
-        let body: CageReceiptBody = serde_json::from_slice(opening.value.as_bytes())?;
-        if !self.matches(&body, policy_hash, openings) {
+        let body: CageReceiptBody =
+            serde_json::from_slice(committer.open(&self.raw)?.value.as_bytes())?;
+        if !self.matches_with(&body, policy_hash, committer) {
             return Err(CageReceiptError::ContentMismatch);
         }
         Ok(body)
     }
 
-    fn build(
+    /// The projection of `body` signed under the profile digest `policy_hash`, committing
+    /// every committed field through `committer`, which the receipt's other blocks share. A
+    /// body that does not validate, or whose bindings name another profile digest, refuses.
+    pub fn project_with(
         body: &CageReceiptBody,
         policy_hash: &str,
         committer: &mut MetadataCommitter<'_>,
@@ -258,4 +241,14 @@ fn commit<T: Serialize>(
     value: &T,
 ) -> Result<MetadataCommitment, CageReceiptError> {
     Ok(committer.commit(metadata_salt_ref("cage_receipt", field)?, value)?)
+}
+
+fn deserialize_schema<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let schema = String::deserialize(deserializer)?;
+    if schema != CAGE_RECEIPT_METADATA_SCHEMA {
+        return Err(serde::de::Error::custom(
+            "cage receipt projection schema is not chio.cage.receipt-metadata.v1",
+        ));
+    }
+    Ok(schema)
 }

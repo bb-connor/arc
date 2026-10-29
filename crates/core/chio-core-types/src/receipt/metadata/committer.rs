@@ -96,6 +96,18 @@ impl<'a> MetadataCommitter<'a> {
         }
     }
 
+    /// The held opening of `commitment`, in either mode. Refuses a commitment with no held
+    /// opening or one the opening does not open.
+    pub fn open(
+        &self,
+        commitment: &MetadataCommitment,
+    ) -> Result<&MetadataOpening, MetadataCommitmentError> {
+        match &self.mode {
+            Mode::Project { openings, .. } => openings.open(commitment),
+            Mode::Verify { openings, .. } => openings.open(commitment),
+        }
+    }
+
     /// The openings a project-mode build drew. A verify-mode check draws none.
     #[must_use]
     pub fn into_openings(self) -> MetadataOpenings {

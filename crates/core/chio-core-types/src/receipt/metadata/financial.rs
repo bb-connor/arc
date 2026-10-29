@@ -6,10 +6,10 @@
 //! refuses with `MalformedFinancialMetadata`; only an absent block reads as no settlement.
 
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::fmt;
 
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::oracle::OracleConversionEvidence;
 use crate::receipt::economics::SettlementStatus;
@@ -57,21 +57,67 @@ pub enum PaymentAuthorizationErrorCode {
 
 /// The `financial` block of a denied receipt whose payment authorization stayed ambiguous.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RetainedAmbiguousWire")]
 pub struct RetainedAmbiguousFinancialBlock {
-    /// Always `true`.
+    /// Always `true`; decode refuses `false`.
     pub payment_authorization_ambiguous: bool,
     pub payment_authorization_error_code: PaymentAuthorizationErrorCode,
-    /// The durable operation id of the payment attempt.
+    /// The durable operation id of the payment attempt; decode refuses an empty reference.
     pub payment_attempt_reference: String,
 }
 
-/// The complete signed `financial` block, in one of its two shapes.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetainedAmbiguousWire {
+    payment_authorization_ambiguous: bool,
+    payment_authorization_error_code: PaymentAuthorizationErrorCode,
+    payment_attempt_reference: String,
+}
+
+impl TryFrom<RetainedAmbiguousWire> for RetainedAmbiguousFinancialBlock {
+    type Error = &'static str;
+
+    fn try_from(wire: RetainedAmbiguousWire) -> Result<Self, Self::Error> {
+        if !wire.payment_authorization_ambiguous {
+            return Err("payment_authorization_ambiguous must be true");
+        }
+        if wire.payment_attempt_reference.is_empty() {
+            return Err("payment_attempt_reference must not be empty");
+        }
+        Ok(Self {
+            payment_authorization_ambiguous: true,
+            payment_authorization_error_code: wire.payment_authorization_error_code,
+            payment_attempt_reference: wire.payment_attempt_reference,
+        })
+    }
+}
+
+/// The complete signed `financial` block, in one of its two shapes. A block carrying
+/// `payment_authorization_ambiguous` decodes only as `RetainedAmbiguous`; any other block
+/// decodes only as `Charged`.
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum FinancialBlock {
     Charged(Box<ChargedFinancialBlock>),
     RetainedAmbiguous(RetainedAmbiguousFinancialBlock),
+}
+
+impl<'de> Deserialize<'de> for FinancialBlock {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let block = serde_json::Value::deserialize(deserializer)?;
+        let retained = block
+            .as_object()
+            .is_some_and(|members| members.contains_key("payment_authorization_ambiguous"));
+        if retained {
+            RetainedAmbiguousFinancialBlock::deserialize(block)
+                .map(Self::RetainedAmbiguous)
+                .map_err(de::Error::custom)
+        } else {
+            ChargedFinancialBlock::deserialize(block)
+                .map(|charged| Self::Charged(Box::new(charged)))
+                .map_err(de::Error::custom)
+        }
+    }
 }
 
 /// What a settlement reader may act on.
@@ -89,15 +135,16 @@ pub enum FinancialSettlementProjection {
     },
 }
 
-/// A present `financial` block that is not a valid `FinancialBlock`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// A present `financial` block that is not a valid `FinancialBlock`; `detail` is the decode
+/// refusal.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MalformedFinancialMetadata {
-    pub reason: &'static str,
+    pub detail: String,
 }
 
 impl fmt::Display for MalformedFinancialMetadata {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "malformed financial metadata: {}", self.reason)
+        write!(formatter, "malformed financial metadata: {}", self.detail)
     }
 }
 
@@ -111,22 +158,11 @@ impl FinancialBlock {
         let Some(block) = metadata.and_then(|metadata| metadata.get(FINANCIAL_METADATA_KEY)) else {
             return Ok(None);
         };
-        let decoded = Self::deserialize(block).map_err(|_| MalformedFinancialMetadata {
-            reason: "the block is neither a charged nor a retained-ambiguous settlement",
-        })?;
-        if let Self::RetainedAmbiguous(retained) = &decoded {
-            if !retained.payment_authorization_ambiguous {
-                return Err(MalformedFinancialMetadata {
-                    reason: "a retained-ambiguous block must mark the authorization ambiguous",
-                });
-            }
-            if retained.payment_attempt_reference.is_empty() {
-                return Err(MalformedFinancialMetadata {
-                    reason: "retained payment requires a payment attempt reference",
-                });
-            }
-        }
-        Ok(Some(decoded))
+        Self::deserialize(block)
+            .map(Some)
+            .map_err(|error| MalformedFinancialMetadata {
+                detail: error.to_string(),
+            })
     }
 
     /// The settlement projection of this block.

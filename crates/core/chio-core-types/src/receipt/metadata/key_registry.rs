@@ -152,7 +152,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values.",
+        "Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. session_id is plaintext by design: it is the session-certificate join key and links receipts within one session only; it is agent-minted and may be low-entropy, so it is not secret.",
     ),
     spec(
         "chio_runtime",
@@ -173,7 +173,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP-Client form adds authorization_resource taken from the tool call.",
+        "Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP-Client form adds authorization_resource taken from the tool call. session_id is plaintext by design: it is the session-certificate join key and links receipts within one session only; it is agent-minted and may be low-entropy, so it is not secret.",
     ),
     spec(
         "governed_transaction_diagnostics",
@@ -460,7 +460,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "ACP-Client session and tool-call ids. authorizationResource is taken from the tool call.",
+        "ACP-Client session and tool-call ids. authorizationResource is taken from the tool call. sessionId is plaintext by design: it is the session-certificate join key and links receipts within one session only; it is agent-minted and may be low-entropy, so it is not secret.",
     ),
     spec(
         "agent_web_receipt_ref",

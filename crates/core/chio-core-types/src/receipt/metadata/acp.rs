@@ -1,10 +1,13 @@
 //! Signed metadata block `acp`: an ACP-Client session update receipt with every member
 //! committed except the session id.
 //!
-//! The session id is kept for the session certificate and compliance readers. Every other
-//! member is committed under `metadata.acp.<member>`; the authorization resource shares the
+//! The session id stays plaintext: it is the join key of the session certificate and the
+//! compliance verifier, which require it to equal `receipt_context.session_id` and
+//! `protocol_refusal.session_id` when present. It links receipts within one session, is minted
+//! by the ACP agent and may be low-entropy, so it is not secret. Every other member is
+//! committed under `metadata.acp.<member>`; the authorization resource shares the
 //! `metadata.receipt_context.authorization_resource` commitment with its `receipt_context`
-//! alias, so one value backs both locations.
+//! alias when both blocks are built through one `MetadataCommitter`.
 
 use alloc::string::String;
 
@@ -12,9 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::receipt::metadata::{
     metadata_salt_ref, MetadataCommitment, MetadataCommitmentError, MetadataCommitter,
-    MetadataOpenings,
 };
-use crate::rng::Rng;
 
 /// The raw members of one ACP-Client session update receipt.
 #[derive(Clone, Copy, Debug)]
@@ -59,28 +60,21 @@ pub struct AcpReceiptProjection {
 }
 
 impl AcpReceiptProjection {
-    /// Projects `fields`, drawing one salt per committed member from `rng`; returns the
-    /// projection and its openings.
-    pub fn project(
-        fields: &AcpReceiptFields<'_>,
-        rng: &dyn Rng,
-    ) -> Result<(Self, MetadataOpenings), MetadataCommitmentError> {
-        let mut committer = MetadataCommitter::project(rng);
-        let projection = Self::build(fields, &mut committer)?;
-        Ok((projection, committer.into_openings()))
-    }
-
-    /// True when this projection is the projection of `fields` under `openings` and every
-    /// opening is used; false on any mismatch or missing or unused opening.
+    /// True when this projection is the projection of `fields` under `committer`. The
+    /// receipt's other blocks share `committer`, and the caller calls `finish` once per
+    /// receipt.
     #[must_use]
-    pub fn matches(&self, fields: &AcpReceiptFields<'_>, openings: &MetadataOpenings) -> bool {
-        let mut committer = MetadataCommitter::verify(openings);
-        Self::build(fields, &mut committer)
-            .and_then(|rebuilt| committer.finish().map(|()| rebuilt))
-            .is_ok_and(|rebuilt| rebuilt == *self)
+    pub fn matches_with(
+        &self,
+        fields: &AcpReceiptFields<'_>,
+        committer: &mut MetadataCommitter<'_>,
+    ) -> bool {
+        Self::project_with(fields, committer).is_ok_and(|rebuilt| rebuilt == *self)
     }
 
-    fn build(
+    /// The projection of `fields`, committing every member through `committer`, which the
+    /// receipt's other blocks share.
+    pub fn project_with(
         fields: &AcpReceiptFields<'_>,
         committer: &mut MetadataCommitter<'_>,
     ) -> Result<Self, MetadataCommitmentError> {

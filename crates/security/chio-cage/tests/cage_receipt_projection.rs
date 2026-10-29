@@ -5,13 +5,15 @@ use std::cell::Cell;
 
 use chio_cage::{
     CageEnforcementFailure, CageEnforcementFailureCode, CageEnforcementRecord, CageReceiptBindings,
-    CageReceiptBody, CageReceiptProjection, EnforcementPrepared, ExecTransitionObserved,
-    ExecutionIdentity, FullyEnforcedEvidence, ObservedRulesetStatus, ProcessExitEvidence,
-    SandboxArchitecture, SeccompEnforcementStatus, ENFORCEMENT_PREPARED_SCHEMA,
-    EXEC_TRANSITION_OBSERVED_SCHEMA, NONO_PATCH_VERSION, PINNED_NONO_VERSION,
-    PINNED_SECCOMPILER_VERSION,
+    CageReceiptBody, CageReceiptError, CageReceiptProjection, EnforcementPrepared,
+    ExecTransitionObserved, ExecutionIdentity, FullyEnforcedEvidence, ObservedRulesetStatus,
+    ProcessExitEvidence, SandboxArchitecture, SeccompEnforcementStatus,
+    ENFORCEMENT_PREPARED_SCHEMA, EXEC_TRANSITION_OBSERVED_SCHEMA, NONO_PATCH_VERSION,
+    PINNED_NONO_VERSION, PINNED_SECCOMPILER_VERSION,
 };
-use chio_core::receipt::metadata::{metadata_salt_ref, MetadataOpenings, MetadataValue};
+use chio_core::receipt::metadata::{
+    metadata_salt_ref, MetadataCommitmentError, MetadataCommitter, MetadataOpenings, MetadataValue,
+};
 use chio_core::rng::{Rng, RngError};
 use chio_test_support::prelude::*;
 
@@ -107,6 +109,67 @@ fn rejected_body() -> CageReceiptBody {
     CageReceiptBody::new("attempt-reject-7f3a", None, record, 1_000, 2_000).test_unwrap()
 }
 
+fn project(
+    body: &CageReceiptBody,
+    policy_hash: &str,
+    seed: u64,
+) -> Result<(CageReceiptProjection, MetadataOpenings), CageReceiptError> {
+    let rng = rng(seed);
+    let mut committer = MetadataCommitter::project(&rng);
+    let projection = CageReceiptProjection::project_with(body, policy_hash, &mut committer)?;
+    Ok((projection, committer.into_openings()))
+}
+
+/// The single-block receipt check: rebuild under `openings`, finish once, compare.
+fn check(
+    projection: &CageReceiptProjection,
+    body: &CageReceiptBody,
+    policy_hash: &str,
+    openings: &MetadataOpenings,
+) -> Result<bool, CageReceiptError> {
+    let mut committer = MetadataCommitter::verify(openings);
+    let rebuilt = CageReceiptProjection::project_with(body, policy_hash, &mut committer)?;
+    committer.finish()?;
+    Ok(rebuilt == *projection)
+}
+
+fn open_raw(
+    projection: &CageReceiptProjection,
+    policy_hash: &str,
+    openings: &MetadataOpenings,
+) -> Result<CageReceiptBody, CageReceiptError> {
+    let mut committer = MetadataCommitter::verify(openings);
+    let body = projection.open_raw(policy_hash, &mut committer)?;
+    committer.finish()?;
+    Ok(body)
+}
+
+/// The refused commitment check of `result`, as its variant name and `salt_ref`.
+fn commitment_refusal(
+    result: Result<impl std::fmt::Debug, CageReceiptError>,
+) -> (&'static str, String) {
+    let error = match result {
+        Err(CageReceiptError::MetadataCommitment(error)) => error,
+        other => panic!("expected a metadata commitment refusal, got {other:?}"),
+    };
+    match error {
+        MetadataCommitmentError::OpeningUnavailable { salt_ref } => {
+            ("OpeningUnavailable", salt_ref.as_str().to_owned())
+        }
+        MetadataCommitmentError::MetadataCommitmentMismatch { salt_ref } => {
+            ("MetadataCommitmentMismatch", salt_ref.as_str().to_owned())
+        }
+        MetadataCommitmentError::UnusedOpening { salt_ref } => {
+            ("UnusedOpening", salt_ref.as_str().to_owned())
+        }
+        other => panic!("unexpected metadata commitment refusal {other:?}"),
+    }
+}
+
+fn refused(variant: &'static str, field: &str) -> (&'static str, String) {
+    (variant, format!("metadata.cage_receipt.{field}"))
+}
+
 fn encode(projection: &CageReceiptProjection) -> String {
     chio_core::canonical_json_string(projection).test_unwrap()
 }
@@ -114,9 +177,8 @@ fn encode(projection: &CageReceiptProjection) -> String {
 #[test]
 fn cage_projection_commits_argument_digests_and_binds_the_policy_hash() {
     let body = exited_body("attempt-exit-7f3a");
-    let (projection, openings) =
-        CageReceiptProjection::project(&body, &digest('2'), &rng(0)).test_unwrap();
-    assert!(projection.matches(&body, &digest('2'), &openings));
+    let (projection, openings) = project(&body, &digest('2'), 0).test_unwrap();
+    assert!(check(&projection, &body, &digest('2'), &openings).test_unwrap());
     let encoded = encode(&projection);
     for raw in [
         digest('2'),
@@ -152,8 +214,7 @@ fn cage_projection_commits_argument_digests_and_binds_the_policy_hash() {
 fn admitted_policy_digest_shares_the_profile_commitment_only_when_equal() {
     let mut equal = exited_body("attempt-admitted-equal");
     equal.admitted_policy_digest = Some(digest('2'));
-    let (projection, _) =
-        CageReceiptProjection::project(&equal, &digest('2'), &rng(0)).test_unwrap();
+    let (projection, _) = project(&equal, &digest('2'), 0).test_unwrap();
     assert_eq!(
         projection.admitted_policy_digest.as_ref(),
         Some(&projection.profile_digest)
@@ -161,8 +222,7 @@ fn admitted_policy_digest_shares_the_profile_commitment_only_when_equal() {
 
     let mut other = exited_body("attempt-admitted-other");
     other.admitted_policy_digest = Some(digest('9'));
-    let (projection, _) =
-        CageReceiptProjection::project(&other, &digest('2'), &rng(0)).test_unwrap();
+    let (projection, _) = project(&other, &digest('2'), 0).test_unwrap();
     let admitted = projection.admitted_policy_digest.as_ref().test_unwrap();
     assert_eq!(
         admitted.salt_ref().as_str(),
@@ -174,14 +234,31 @@ fn admitted_policy_digest_shares_the_profile_commitment_only_when_equal() {
 #[test]
 fn cage_projection_refuses_other_bodies_policy_hashes_and_openings() {
     let body = exited_body("attempt-match");
-    let (projection, openings) =
-        CageReceiptProjection::project(&body, &digest('2'), &rng(0)).test_unwrap();
-    assert!(!projection.matches(&exited_body("attempt-other"), &digest('2'), &openings));
-    assert!(!projection.matches(&body, &digest('9'), &openings));
-    assert!(!projection.matches(&body, &digest('2'), &MetadataOpenings::new()));
-    let (_, other_openings) =
-        CageReceiptProjection::project(&body, &digest('2'), &rng(1_000)).test_unwrap();
-    assert!(!projection.matches(&body, &digest('2'), &other_openings));
+    let (projection, openings) = project(&body, &digest('2'), 0).test_unwrap();
+    assert_eq!(
+        commitment_refusal(check(
+            &projection,
+            &exited_body("attempt-other"),
+            &digest('2'),
+            &openings
+        )),
+        refused("MetadataCommitmentMismatch", "attempt_id")
+    );
+    assert!(matches!(
+        check(&projection, &body, &digest('9'), &openings),
+        Err(CageReceiptError::BindingMismatch)
+    ));
+    assert_eq!(
+        commitment_refusal(check(
+            &projection,
+            &body,
+            &digest('2'),
+            &MetadataOpenings::new()
+        )),
+        refused("OpeningUnavailable", "profile_digest")
+    );
+    let (_, other_openings) = project(&body, &digest('2'), 1_000).test_unwrap();
+    assert!(!check(&projection, &body, &digest('2'), &other_openings).test_unwrap());
     let mut padded = openings.clone();
     padded
         .commit_value(
@@ -190,7 +267,10 @@ fn cage_projection_refuses_other_bodies_policy_hashes_and_openings() {
             &rng(5_000),
         )
         .test_unwrap();
-    assert!(!projection.matches(&body, &digest('2'), &padded));
+    assert_eq!(
+        commitment_refusal(check(&projection, &body, &digest('2'), &padded)),
+        refused("UnusedOpening", "unused")
+    );
 }
 
 #[test]
@@ -204,37 +284,47 @@ fn cage_projection_refuses_bindings_for_another_profile() {
     let bindings = CageReceiptBindings::from_prepared(&prepared());
     let body =
         CageReceiptBody::new("attempt-bootstrap", Some(bindings), record, 900, 1_001).test_unwrap();
-    assert!(CageReceiptProjection::project(&body, &digest('2'), &rng(0)).is_ok());
-    assert!(CageReceiptProjection::project(&body, &digest('9'), &rng(0)).is_err());
+    assert!(project(&body, &digest('2'), 0).is_ok());
+    assert!(matches!(
+        project(&body, &digest('9'), 0),
+        Err(CageReceiptError::BindingMismatch)
+    ));
+    assert!(matches!(
+        project(&body, "not-a-digest", 0),
+        Err(CageReceiptError::InvalidDigest)
+    ));
 }
 
 #[test]
 fn raw_opening_recomputes_every_field_commitment() {
     let body = exited_body("attempt-raw");
-    let (projection, openings) =
-        CageReceiptProjection::project(&body, &digest('2'), &rng(0)).test_unwrap();
+    let (projection, openings) = project(&body, &digest('2'), 0).test_unwrap();
     assert_eq!(
         projection.raw.salt_ref().as_str(),
         "metadata.cage_receipt.raw"
     );
     assert_eq!(
-        projection.open_raw(&digest('2'), &openings).test_unwrap(),
+        open_raw(&projection, &digest('2'), &openings).test_unwrap(),
         body
     );
 
     let other = exited_body("attempt-raw-other");
-    let (_, other_openings) =
-        CageReceiptProjection::project(&other, &digest('2'), &rng(9_000)).test_unwrap();
-    assert!(projection.open_raw(&digest('2'), &other_openings).is_err());
-    assert!(projection.open_raw(&digest('9'), &openings).is_err());
+    let (_, other_openings) = project(&other, &digest('2'), 9_000).test_unwrap();
+    assert_eq!(
+        commitment_refusal(open_raw(&projection, &digest('2'), &other_openings)),
+        refused("MetadataCommitmentMismatch", "raw")
+    );
+    assert!(matches!(
+        open_raw(&projection, &digest('9'), &openings),
+        Err(CageReceiptError::ContentMismatch)
+    ));
 }
 
 #[test]
 fn rejected_receipt_projects_its_closed_failure() {
     let body = rejected_body();
-    let (projection, openings) =
-        CageReceiptProjection::project(&body, &digest('2'), &rng(0)).test_unwrap();
-    assert!(projection.matches(&body, &digest('2'), &openings));
+    let (projection, openings) = project(&body, &digest('2'), 0).test_unwrap();
+    assert!(check(&projection, &body, &digest('2'), &openings).test_unwrap());
     assert!(projection.bindings.is_none());
     assert!(projection.enforcement.is_none());
     assert!(projection.exit.is_none());
@@ -243,4 +333,17 @@ fn rejected_receipt_projects_its_closed_failure() {
         Some(CageEnforcementFailureCode::InvalidPlan)
     );
     assert!(!encode(&projection).contains("attempt-reject-7f3a"));
+}
+
+#[test]
+fn cage_projection_decode_refuses_another_schema() {
+    let body = exited_body("attempt-schema");
+    let (projection, _) = project(&body, &digest('2'), 0).test_unwrap();
+    let mut value = serde_json::to_value(&projection).test_unwrap();
+    value["schema"] = serde_json::json!("chio.cage.receipt-metadata.v2");
+    let error = serde_json::from_value::<CageReceiptProjection>(value).test_unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "cage receipt projection schema is not chio.cage.receipt-metadata.v1"
+    );
 }
