@@ -331,7 +331,7 @@ attested. This preserves the integrity of cross-protocol claims.
 
 ### 8.1 Kernel-Backed ReceiptSigner
 
-The crate ships `KernelReceiptSigner`. It signs each ACP audit entry into a Chio receipt, appends the receipt to a `ReceiptStore`, and produces a Merkle checkpoint every `checkpoint_batch_size` receipts; a batch size of 0 disables checkpointing. A checkpoint failure after a committed append is recorded in `checkpoint_health()` and does not fail the signed receipt.
+The crate ships `KernelReceiptSigner`. It signs each ACP-Client audit entry into a Chio receipt, appends the receipt to a `ReceiptStore`, and produces a Merkle checkpoint every `checkpoint_batch_size` receipts; a batch size of 0 disables checkpointing. A checkpoint failure after a committed append is recorded in `checkpoint_health()` and does not fail the signed receipt.
 
 ```rust
 use std::sync::Arc;
