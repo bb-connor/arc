@@ -218,11 +218,7 @@ fn standards_and_runtime_constants_remain_in_sync() {
     .unwrap_or_else(|error| panic!("parse web3 settlement receipt standard: {error}"));
     validate_web3_settlement_execution_receipt(
         &settlement_receipt,
-        &[settlement_receipt
-            .dispatch
-            .capital_instruction
-            .signer_key
-            .clone()],
+        std::slice::from_ref(&settlement_receipt.dispatch.capital_instruction.signer_key),
     )
     .unwrap_or_else(|error| panic!("validate web3 settlement receipt standard: {error:?}"));
 

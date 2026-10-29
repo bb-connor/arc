@@ -62,7 +62,7 @@ pub use evm::{
     PreparedAuthorizedChannelMerkleReleaseV1, PreparedBondExpiry, PreparedBondImpair,
     PreparedBondLock, PreparedBondProofRoot, PreparedBondRelease, PreparedDualSignRelease,
     PreparedErc20Approval, PreparedEscrowCreate, PreparedEscrowRefund, PreparedEvmCall,
-    PreparedEvmSubmission, PreparedMerkleRelease, PreparedRootPublication,
+    PreparedEvmSubmission, PreparedMerkleRelease, PreparedRootPublication, ReversalObservation,
     SettlementAnchorContentBinding,
 };
 pub use finding_enforcement::{

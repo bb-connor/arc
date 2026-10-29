@@ -749,12 +749,15 @@ fn builds_failure_and_reversal_receipts() {
     let reversal = build_reversal_receipt(
         &dispatch,
         &sample_config().capital_authority,
-        "exec-reversed".to_string(),
-        "settlement-ref".to_string(),
-        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
-        dispatch.settlement_amount.clone(),
-        "exec-failed".to_string(),
-        true,
+        ReversalObservation {
+            execution_receipt_id: "exec-reversed".to_string(),
+            settlement_reference: "settlement-ref".to_string(),
+            tx_hash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .to_string(),
+            observed_amount: dispatch.settlement_amount.clone(),
+            reversal_of: "exec-failed".to_string(),
+            charged_back: true,
+        },
     )
     .test_unwrap();
     assert_eq!(

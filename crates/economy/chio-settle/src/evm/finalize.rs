@@ -85,16 +85,32 @@ pub fn build_failure_receipt(
     Ok(receipt)
 }
 
+/// Compensating settlement observed against an earlier execution receipt.
+#[derive(Debug, Clone)]
+pub struct ReversalObservation {
+    pub execution_receipt_id: String,
+    pub settlement_reference: String,
+    pub tx_hash: String,
+    pub observed_amount: MonetaryAmount,
+    /// Execution receipt id this reversal compensates.
+    pub reversal_of: String,
+    /// `true` projects `ChargedBack`, `false` projects `Reversed`.
+    pub charged_back: bool,
+}
+
 pub fn build_reversal_receipt(
     dispatch: &Web3SettlementDispatchArtifact,
     capital_authority: &crate::SettlementCapitalAuthority,
-    execution_receipt_id: String,
-    settlement_reference: String,
-    tx_hash: String,
-    observed_amount: MonetaryAmount,
-    reversal_of: String,
-    charged_back: bool,
+    reversal: ReversalObservation,
 ) -> Result<Web3SettlementExecutionReceiptArtifact, SettlementError> {
+    let ReversalObservation {
+        execution_receipt_id,
+        settlement_reference,
+        tx_hash,
+        observed_amount,
+        reversal_of,
+        charged_back,
+    } = reversal;
     let receipt = Web3SettlementExecutionReceiptArtifact {
         schema: CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA.to_string(),
         execution_receipt_id,
