@@ -150,6 +150,12 @@ impl SqliteRuntimeOrchestrationStore {
                     "epoch trust bundle differs from the authenticated predecessor",
                 ));
             }
+            if body.issued_at_unix_ms < previous.body().issued_at_unix_ms {
+                return Err(refusal(
+                    "treaty_epoch_update_conflict",
+                    "epoch issue time precedes the authenticated predecessor",
+                ));
+            }
         }
         check_count(&tx, "runtime_treaty_epoch_records", MAX_RECORDS, true)?;
         if head.is_none() {
