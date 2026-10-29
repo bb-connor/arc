@@ -434,6 +434,7 @@ def check_negative_registry() -> None:
         "DistributedRevocationPartitionBroken",
         "DistributedRevocationFreshnessBroken",
         "DistributedRevocationEvaluationCountWitness",
+        "DecisionEnvelopeNoFallback",
     }
     actual = {Path(entry["spec"]).stem for entry in entries}
     require(actual == expected, "negative registry must contain the exact calibrated models")

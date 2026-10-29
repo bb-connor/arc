@@ -827,6 +827,43 @@ Source file: `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs`.
 | `verify_eval_matches_reference_small` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::Schedule::evaluate` | Bounded to one fixed four-atom, two-rule canonical artifact with symbolic atom trits | Rule trits and the outcome match a strong Kleene reference, including a negated rule literal. |
 | `verify_widen_uncertainty_never_admits_single_rule` | `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs` | `chio_predicate_dag::classify`, `chio_predicate_dag::Schedule::evaluate` | Bounded to one two-atom rule of symbolic Deny or Hold polarity | Widening thresholds and removing attestation never turns a Deny or Hold outcome into Allow. |
 
+## Decision-model envelope invariants (DecisionEnvelope.tla)
+
+Source file: `formal/apalache/DecisionEnvelope.tla`, configuration
+`formal/apalache/MCDecisionEnvelope.cfg`. The model is checked with
+`scripts/check-apalache-positive.sh` at length 8. Its falsifiability evidence
+is the `DecisionEnvelopeNoFallback` entry in the negative registry.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `ChosenInFeasible` | `formal/apalache/DecisionEnvelope.tla` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::project` | Bounded to two calls over three outcomes; the fallback is any feasible member, which abstracts `feasible[0]` | Every projected outcome lies in the call's feasible envelope, whether the raw outcome was admitted or the fallback was taken. |
+| `WitnessBeforeAllow` | `formal/apalache/DecisionEnvelope.tla` | `crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs::bind_decision_model_witness` | Abstract ordering; receipt signing and persistence are outside the model | A published allow carries a decision-model witness bound to the projected outcome. |
+
+## Lean decision-model theorems (DecisionModel/)
+
+Source directory: `formal/lean4/Chio/Chio/DecisionModel/`. These bounded
+theorems model Q16.16 checked multiplication, envelope projection and strong
+Kleene evaluation of the predicate schedule. Integer widths, slice bounds and
+the bit-packed trit encoding remain Rust implementation checks covered by the
+Kani rows above.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `checked_mul_spec` | `formal/lean4/Chio/Chio/DecisionModel/Fixed.lean` | `crates/core/chio-fixed/src/q16.rs::Q16_16::checked_mul` | P3; i64 product and arithmetic shift modeled as unbounded `Int` floor division | A product that fits is exactly the floor of the exact product over 2^16. |
+| `checked_mul_none_iff` | `formal/lean4/Chio/Chio/DecisionModel/Fixed.lean` | `crates/core/chio-fixed/src/q16.rs::Q16_16::checked_mul` | P3; same integer model | Multiplication refuses exactly when the floored product leaves the i32 range. |
+| `fallback_mem` | `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::new` | P3; feasible sets modeled as nonempty lists | The fallback is a feasible member. |
+| `project_mem` | `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::project` | P3; same list model | Projection is total and always yields a feasible action. |
+| `project_admitted` | `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::project` | P3; same list model | An admitted proposal projects to itself. |
+| `project_identity_iff` | `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::project` | P3; same list model | Projection reports `Identity` exactly for an admitted proposal. |
+| `project_idem` | `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` | `crates/core/chio-decision-model/src/envelope.rs::Envelope::project` | P3; same list model | Projecting a projected action returns the same action. |
+| `kleene_and_or_monotone_info` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | P3; trits modeled as an inductive type, not bit planes | Kleene conjunction and disjunction are monotone in the information order. |
+| `evalFrom_mono` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | P3; rules modeled as a topologically ordered list | Rule values are monotone in the information order of the atoms. |
+| `outcome_allow_iff` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | P3; same rule model | The schedule allows exactly when every deny and hold rule is false. |
+| `widen_no_admit_atoms` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | P3; same rule model | Atoms that know no more never turn a non-allow outcome into allow. |
+| `classify_widen` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/thresholds.rs::classify` | P3; scores and thresholds modeled as `Int` | Raising `tau_pos`, lowering `tau_neg` or clearing attestation yields an atom that knows no more. |
+| `widen_no_admit` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/thresholds.rs::classify`, `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | P3; same threshold and rule models | Widening thresholds or clearing attestation never turns a non-allow outcome into allow. |
+| `widen_deny_to_hold_example` | `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` | `crates/guards/chio-predicate-dag/src/eval.rs::Schedule::evaluate` | n/a | Widening can move deny to hold, so the monotonicity claim covers allow only. |
+
 ## Lean recursive-delegation theorems (Capability/Delegation.lean)
 
 Source file: `formal/lean4/Chio/Chio/Capability/Delegation.lean`. Rows

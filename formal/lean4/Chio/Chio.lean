@@ -39,3 +39,6 @@ import Chio.Treaty.BridgeEquivalence
 import Chio.Treaty.BilateralAccept
 import Chio.Treaty.PredicateShape
 import Chio.Treaty.AdmissionBinding
+import Chio.DecisionModel.Fixed
+import Chio.DecisionModel.Envelope
+import Chio.DecisionModel.Kleene

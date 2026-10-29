@@ -2082,6 +2082,160 @@
       "status": "proved",
       "mapsTo": ["P3"],
       "notes": "The residual: replacing a leaf the classification compares against nothing the receiver holds leaves the modeled decision unchanged, provided the statement gate's verdict does not move. That proviso is what each residual leaf's declared shape enforces."
+    },
+    {
+      "id": "decision_model.fixed.checked_mul_spec",
+      "leanName": "Chio.DecisionModel.Fixed.checked_mul_spec",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Fixed.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Q16.16 checked multiplication returns exactly the floor of the exact product over 2^16 when it fits in a signed 32-bit pattern."
+    },
+    {
+      "id": "decision_model.fixed.checked_mul_none_iff",
+      "leanName": "Chio.DecisionModel.Fixed.checked_mul_none_iff",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Fixed.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Q16.16 checked multiplication refuses exactly when the floored product leaves the signed 32-bit range."
+    },
+    {
+      "id": "decision_model.envelope.fallback_mem",
+      "leanName": "Chio.DecisionModel.Envelope.fallback_mem",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Envelope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "An envelope's fallback is a member of its feasible set."
+    },
+    {
+      "id": "decision_model.envelope.project_mem",
+      "leanName": "Chio.DecisionModel.Envelope.project_mem",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Envelope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Projection is total and every result lies in the feasible set, whatever the proposal, including errors and empty proposals."
+    },
+    {
+      "id": "decision_model.envelope.project_admitted",
+      "leanName": "Chio.DecisionModel.Envelope.project_admitted",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Envelope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "A proposal the envelope admits projects to itself."
+    },
+    {
+      "id": "decision_model.envelope.project_identity_iff",
+      "leanName": "Chio.DecisionModel.Envelope.project_identity_iff",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Envelope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Projection reports Identity exactly when the proposal is an admitted action."
+    },
+    {
+      "id": "decision_model.envelope.project_idem",
+      "leanName": "Chio.DecisionModel.Envelope.project_idem",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Envelope.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Projecting the projected action again yields the same action."
+    },
+    {
+      "id": "decision_model.kleene.kleene_and_or_monotone_info",
+      "leanName": "Chio.DecisionModel.Kleene.kleene_and_or_monotone_info",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Kleene conjunction and disjunction are monotone in the information order: knowing less about an input never makes the output know more."
+    },
+    {
+      "id": "decision_model.kleene.evalFrom_mono",
+      "leanName": "Chio.DecisionModel.Kleene.evalFrom_mono",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Rule evaluation over the predicate schedule is monotone in the information order of its atoms."
+    },
+    {
+      "id": "decision_model.kleene.outcome_allow_iff",
+      "leanName": "Chio.DecisionModel.Kleene.outcome_allow_iff",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "The modeled schedule allows exactly when every deny and hold rule evaluates to false."
+    },
+    {
+      "id": "decision_model.kleene.widen_no_admit_atoms",
+      "leanName": "Chio.DecisionModel.Kleene.widen_no_admit_atoms",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Replacing known atoms with unknown never turns a non-allow outcome into allow."
+    },
+    {
+      "id": "decision_model.kleene.classify_widen",
+      "leanName": "Chio.DecisionModel.Kleene.classify_widen",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Raising tau_pos, lowering tau_neg or clearing attestation yields an atom that knows no more, given ordered thresholds."
+    },
+    {
+      "id": "decision_model.kleene.widen_no_admit",
+      "leanName": "Chio.DecisionModel.Kleene.widen_no_admit",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Widening the thresholds or clearing attestation never turns a non-allow outcome into allow."
+    },
+    {
+      "id": "decision_model.kleene.widen_deny_to_hold_example",
+      "leanName": "Chio.DecisionModel.Kleene.widen_deny_to_hold_example",
+      "file": "formal/lean4/Chio/Chio/DecisionModel/Kleene.lean",
+      "kind": "theorem",
+      "rootImported": true,
+      "claimClass": "bounded_model",
+      "status": "proved",
+      "mapsTo": ["P3"],
+      "notes": "Widening can move a deny to a hold, so the monotonicity claim is about allow only."
     }
   ]
 }

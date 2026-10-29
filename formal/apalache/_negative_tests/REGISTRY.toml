@@ -197,3 +197,14 @@ classification = "spec-mutation"
 length = 4
 timeout_secs = 300
 notes = "An outcome-unknown post-dispatch path releases admission and monetary state while side effects remain ambiguous."
+
+[[negative]]
+spec = "formal/apalache/_negative_tests/DecisionEnvelopeNoFallback.tla"
+cfg = "formal/apalache/_negative_tests/MCDecisionEnvelopeNoFallback.cfg"
+falsifies = "ChosenInFeasible"
+production_commit = "n/a (calibrated envelope-projection mutation)"
+runtime_test = "crates/core/chio-decision-model/tests/envelope.rs::projection_is_total_and_admitted"
+classification = "spec-mutation"
+length = 2
+timeout_secs = 300
+notes = "Projection returns the raw outcome when the envelope does not admit it, so the chosen outcome leaves the feasible set."
