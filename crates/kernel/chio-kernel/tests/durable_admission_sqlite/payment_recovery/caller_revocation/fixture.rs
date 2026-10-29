@@ -1,5 +1,5 @@
 use super::*;
-use chio_core::capability::attenuation::{delegate, scope_hash};
+use chio_core::capability::attenuation::{delegate, scope_hash, DelegationStamp};
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_kernel::revocation_store::RevocationStoreError;
 use chio_kernel::RevocationStore;
@@ -211,8 +211,10 @@ fn prepare_caller(
             &parent_subject,
             &subject.public_key(),
             chio_core_types::ScopeAttenuation::empty(),
-            now / 1_000,
-            [21; 16],
+            DelegationStamp {
+                signed_at: now / 1_000,
+                nonce: [21; 16],
+            },
         )?;
         let capability = CapabilityToken::sign(
             CapabilityTokenBody {

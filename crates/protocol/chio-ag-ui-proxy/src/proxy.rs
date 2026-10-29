@@ -22,7 +22,7 @@ mod tests {
     use crate::transport::{Transport, TransportKind};
     use chio_core::capability::{
         aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
-        attenuation::{delegate, DelegationLink, DelegationLinkBody},
+        attenuation::{delegate, DelegationLink, DelegationLinkBody, DelegationStamp},
         features::{
             CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET,
         },
@@ -462,8 +462,10 @@ mod tests {
             &root_subject,
             &delegatee.public_key(),
             Default::default(),
-            1_700_000_001,
-            [14_u8; 16],
+            DelegationStamp {
+                signed_at: 1_700_000_001,
+                nonce: [14_u8; 16],
+            },
         )?;
         let child = CapabilityToken::sign(
             CapabilityTokenBody {

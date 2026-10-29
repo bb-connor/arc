@@ -235,8 +235,10 @@ fn delegated_capability_passes_verification_and_is_denied() -> TestResult {
         &root_subject,
         &agent.public_key(),
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [7_u8; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [7_u8; 16],
+        },
     )?;
     let mut child = token_body(&issuer, &agent, "cap-recovery-delegated", inspect_scope());
     child.issued_at = now;

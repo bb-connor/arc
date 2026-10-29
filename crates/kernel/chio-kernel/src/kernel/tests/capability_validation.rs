@@ -103,8 +103,10 @@ fn hosted_aggregate_family_uses_signed_root_lineage_before_enforcement(
         &root_subject,
         &delegatee.public_key(),
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [13_u8; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [13_u8; 16],
+        },
     )?;
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -258,8 +260,10 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
         &root_subject,
         &delegatee.public_key(),
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [15_u8; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [15_u8; 16],
+        },
     )?;
     let child = CapabilityToken::sign(
         CapabilityTokenBody {

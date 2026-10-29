@@ -210,7 +210,7 @@ mod tests {
     use super::*;
 
     use crate::capability::{
-        attenuation::{delegate, Attenuation},
+        attenuation::{delegate, Attenuation, DelegationStamp},
         scope::{ChioScope, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     };
@@ -271,8 +271,10 @@ mod tests {
             &subject,
             &delegatee.public_key(),
             ScopeAttenuation::empty(),
-            1500,
-            nonce,
+            DelegationStamp {
+                signed_at: 1500,
+                nonce,
+            },
         )
         .unwrap()
     }
@@ -289,8 +291,10 @@ mod tests {
             &subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            1500,
-            [3_u8; 16],
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [3_u8; 16],
+            },
         );
         assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
     }
@@ -307,8 +311,10 @@ mod tests {
             &subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            1500,
-            [4_u8; 16],
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [4_u8; 16],
+            },
         );
         assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
     }
@@ -327,8 +333,10 @@ mod tests {
             &subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            1500,
-            [5_u8; 16],
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [5_u8; 16],
+            },
         );
         assert!(matches!(
             result,
