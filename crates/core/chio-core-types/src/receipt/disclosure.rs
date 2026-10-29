@@ -1,10 +1,12 @@
-//! The `chio.receipt-disclosure.v1` document and the commitment opener.
+//! The `chio.receipt-disclosure.v1` document, the commitment opener and the persisted opening
+//! state a receipt store reports.
 //!
 //! A disclosure is unsigned and self-verifying: each opening carries the salt of one
 //! commitment, and a verifier recomputes the commitment over its own copy of the preimage.
 //! The commitment domain comes from the commitment's position in the receipt, never from the
 //! opening.
 
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -19,6 +21,8 @@ use super::commitment::{
 };
 use crate::canonical::canonical_json_bytes;
 use crate::root_authority::SaltRef;
+#[cfg(feature = "tenant-index")]
+use crate::tenant_index::TenantBinding;
 
 pub const CHIO_RECEIPT_DISCLOSURE_SCHEMA: &str = "chio.receipt-disclosure.v1";
 pub const MAX_DISCLOSURE_OPENINGS: usize = 64;
@@ -310,4 +314,60 @@ pub fn open_commitments(
         content,
         disclosure_valid: parameters != FieldVerdict::Rejected && content != FieldVerdict::Rejected,
     }
+}
+
+/// Salts read back from a store for one receipt, holding only the requested `salt_ref`s.
+/// Each salt zeroizes on drop; `Debug` prints the receipt id and the `salt_ref`s only.
+pub struct OpenedSalts {
+    pub receipt_id: String,
+    pub salts: BTreeMap<SaltRef, Salt>,
+}
+
+impl fmt::Debug for OpenedSalts {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OpenedSalts")
+            .field("receipt_id", &self.receipt_id)
+            .field("salt_refs", &self.salts.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
+/// Why a receipt's openings cannot be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpeningStateKind {
+    Erased,
+    Unknown,
+}
+
+/// The persisted state of one receipt's openings. A store that holds no row for the
+/// receipt reports `Unknown`, never `Erased`.
+#[derive(Debug)]
+pub enum OpeningState {
+    Present(OpenedSalts),
+    Erased { erased_at: u64 },
+    Unknown,
+}
+
+/// Salt-free opening status: the only form the public status route and logs carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpeningStatus {
+    Present,
+    Erased { erased_at: u64 },
+    Unknown,
+}
+
+/// What a reader may see: the `salt_ref`s it needs and the tenant binding it is scoped to.
+#[cfg(feature = "tenant-index")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpeningReadScope {
+    pub salt_refs: Vec<SaltRef>,
+    pub tenant_binding: Option<TenantBinding>,
+}
+
+/// A first-execution check or plaintext reader found no openings for a published receipt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpeningUnavailable {
+    pub receipt_id: String,
+    pub state: OpeningStateKind,
 }

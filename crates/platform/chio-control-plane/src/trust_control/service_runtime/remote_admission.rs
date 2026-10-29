@@ -438,6 +438,41 @@ impl QualifiedAdmissionOperationStore for RemoteAdmissionAuthority {
 }
 
 impl ReceiptStore for RemoteAdmissionAuthority {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Err(ReceiptStoreError::Unsupported(
             "admission receipts must be committed through a terminal projection".to_owned(),

@@ -558,6 +558,37 @@ impl SqliteReceiptStore {
 }
 
 impl ReceiptStore for SqliteReceiptStore {
+    fn opening_status(
+        &self,
+        receipt_id: &str,
+    ) -> Result<chio_kernel::receipt_store::OpeningStatus, ReceiptStoreError> {
+        let connection = self.connection()?;
+        crate::receipt_store::openings::opening_status(&connection, receipt_id)
+    }
+
+    fn read_openings(
+        &self,
+        receipt_id: &str,
+        scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<chio_kernel::receipt_store::OpeningState, ReceiptStoreError> {
+        let connection = self.connection()?;
+        crate::receipt_store::openings::read_openings(&connection, receipt_id, scope)
+    }
+
+    fn erase_openings(&self, receipt_id: &str, erased_at: u64) -> Result<(), ReceiptStoreError> {
+        let recorded_at = self.clock.unix_millis()?.get();
+        let receipt_id = receipt_id.to_owned();
+        self.writer_handle()
+            .run_write_anchored_metadata(move |transaction| {
+                crate::receipt_store::openings::erase_openings(
+                    transaction,
+                    &receipt_id,
+                    erased_at,
+                    recorded_at,
+                )
+            })
+    }
+
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }

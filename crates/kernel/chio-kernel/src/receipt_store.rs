@@ -7,6 +7,11 @@ use chio_core::receipt::{
     lineage::{ChildRequestReceipt, ReceiptLineageStatement},
 };
 use chio_log_redact::redacted;
+
+pub use chio_core::receipt::disclosure::{
+    OpenedSalts, OpeningReadScope, OpeningState, OpeningStateKind, OpeningStatus,
+    OpeningUnavailable,
+};
 use chio_security_types::ports::OpaqueReceiptRef;
 
 use chio_core::receipt::checkpoint::KernelCheckpoint;
@@ -404,6 +409,20 @@ pub enum ReceiptStoreError {
 
     #[error("receipt commit writer is not serving after {restarts} restart(s): {last_error}")]
     WriterDead { restarts: u64, last_error: String },
+
+    #[error("receipt store identity is missing or malformed")]
+    StoreIdMissing,
+
+    #[error(
+        "receipt store identity is not bound to its own erasure watermark or immutability triggers"
+    )]
+    StoreIdChanged,
+
+    #[error("receipt opening row is corrupt: {0}")]
+    CorruptOpeningRow(String),
+
+    #[error("receipt {0} is not published in this store")]
+    ReceiptNotPublished(String),
 }
 
 /// Atomic sidecar projections supported by a receipt store.
@@ -463,6 +482,16 @@ fn receipt_writer_liveness_unknown_label() -> String {
 /// A successful append acknowledges its commit; an error does not prove non-commit.
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    /// Salt-free opening status of one receipt. A store with no row for it reports `Unknown`.
+    fn opening_status(&self, receipt_id: &str) -> Result<OpeningStatus, ReceiptStoreError>;
+    /// Salts for the requested `salt_ref`s only, within `scope`. Never returns metadata values.
+    fn read_openings(
+        &self,
+        receipt_id: &str,
+        scope: &OpeningReadScope,
+    ) -> Result<OpeningState, ReceiptStoreError>;
+    /// Replace the receipt's openings with tombstones under this store's own erasure origin.
+    fn erase_openings(&self, receipt_id: &str, erased_at: u64) -> Result<(), ReceiptStoreError>;
     /// Whether this store is an authoritative durable sink for signed native
     /// security release evidence such as cage and broker receipts.
     fn supports_native_security_receipts(&self) -> bool {
@@ -1521,6 +1550,30 @@ mod tests {
     struct AppendOnlyStore;
 
     impl ReceiptStore for AppendOnlyStore {
+        fn opening_status(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningStatus::Unknown)
+        }
+        fn read_openings(
+            &self,
+            _receipt_id: &str,
+            _scope: &crate::receipt_store::OpeningReadScope,
+        ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningState::Unknown)
+        }
+        fn erase_openings(
+            &self,
+            _receipt_id: &str,
+            _erased_at: u64,
+        ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+            Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+                "test double holds no receipt openings".to_string(),
+            ))
+        }
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
             Ok(())
         }
@@ -1546,6 +1599,30 @@ mod tests {
     }
 
     impl ReceiptStore for CountingAppendStore {
+        fn opening_status(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningStatus::Unknown)
+        }
+        fn read_openings(
+            &self,
+            _receipt_id: &str,
+            _scope: &crate::receipt_store::OpeningReadScope,
+        ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningState::Unknown)
+        }
+        fn erase_openings(
+            &self,
+            _receipt_id: &str,
+            _erased_at: u64,
+        ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+            Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+                "test double holds no receipt openings".to_string(),
+            ))
+        }
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
             self.append_calls.fetch_add(1, Ordering::SeqCst);
             Ok(())
@@ -1564,6 +1641,30 @@ mod tests {
     }
 
     impl ReceiptStore for AtomicStoreWithoutTimeout {
+        fn opening_status(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningStatus::Unknown)
+        }
+        fn read_openings(
+            &self,
+            _receipt_id: &str,
+            _scope: &crate::receipt_store::OpeningReadScope,
+        ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningState::Unknown)
+        }
+        fn erase_openings(
+            &self,
+            _receipt_id: &str,
+            _erased_at: u64,
+        ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+            Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+                "test double holds no receipt openings".to_string(),
+            ))
+        }
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
             self.append_calls.fetch_add(1, Ordering::SeqCst);
             Ok(())
@@ -1745,6 +1846,30 @@ mod tests {
     }
 
     impl ReceiptStore for FailingRetentionStore {
+        fn opening_status(
+            &self,
+            _receipt_id: &str,
+        ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningStatus::Unknown)
+        }
+        fn read_openings(
+            &self,
+            _receipt_id: &str,
+            _scope: &crate::receipt_store::OpeningReadScope,
+        ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError>
+        {
+            Ok(crate::receipt_store::OpeningState::Unknown)
+        }
+        fn erase_openings(
+            &self,
+            _receipt_id: &str,
+            _erased_at: u64,
+        ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+            Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+                "test double holds no receipt openings".to_string(),
+            ))
+        }
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
             Ok(())
         }

@@ -1518,6 +1518,41 @@ impl QualifiedAdmissionOperationStore for SqliteAdmissionOperationStore {
 }
 
 impl ReceiptStore for SqliteAdmissionOperationStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "receipt openings are held by the receipt store, not the admission store".to_string(),
+        ))
+    }
+
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "receipt openings are held by the receipt store, not the admission store".to_string(),
+        ))
+    }
+
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "receipt openings are held by the receipt store, not the admission store".to_string(),
+        ))
+    }
+
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Err(ReceiptStoreError::Unsupported(
             "receipts must be committed through an admission terminal projection".to_string(),
