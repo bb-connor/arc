@@ -43,6 +43,7 @@ pub mod crypto;
 pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
+#[cfg(feature = "tenant-index")]
 pub mod enterprise_subject;
 pub mod error;
 pub mod hashing;
@@ -72,6 +73,7 @@ pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
+#[cfg(feature = "tenant-index")]
 pub mod tenant_index;
 mod wire_text;
 

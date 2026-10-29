@@ -10,7 +10,7 @@ publish = false
 [features]
 enforcement-mutants = []
 [dependencies]
-chio-core-types = { workspace = true }
+chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false, features = ["std"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
