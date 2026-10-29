@@ -19,6 +19,7 @@ pub(crate) const WEB3_GOOD_BUNDLE: &str =
 /// documentation of how to serve it, and the fixture gate.
 const WEB3_GOOD_BUNDLE_READERS: &[&str] = &[
     "docs/superpowers/plans/2026-10-20-m1-item1-signing-wrapper.md",
+    "docs/superpowers/plans/m1-item2-census/census-fcc31d25fb.tsv",
     "examples/internet-of-agents-web3-network/README.md",
     "examples/internet-of-agents-web3-network/app/README.md",
     "examples/internet-of-agents-web3-network/app/playwright.config.ts",

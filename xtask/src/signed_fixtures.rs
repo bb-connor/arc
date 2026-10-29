@@ -427,6 +427,34 @@ pub(crate) const STEPS: &[Step] = &[
         owns: &["spec/vectors/recovery/v1/knowledge-contracts.json"],
     },
     Step {
+        name: "recovery explanation contract vectors",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-core-types",
+                "--test",
+                "recovery_explanation_contracts",
+                "--",
+                "--ignored",
+                "--exact",
+                "write_shared_vectors",
+            ],
+            &[(
+                "CHIO_EXPLANATION_VECTOR_OUT",
+                "../../../spec/vectors/recovery/v1/explanation-contracts.json",
+            )],
+        ),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-core-types",
+            "--test",
+            "recovery_explanation_contracts",
+        ]),
+        owns: &["spec/vectors/recovery/v1/explanation-contracts.json"],
+    },
+    Step {
         name: "recovery product contract vectors",
         regenerate: cargo_env(
             &[
@@ -853,6 +881,18 @@ pub(crate) const STEPS: &[Step] = &[
         owns: &[],
     },
     Step {
+        name: "signed artifact payload schemas and examples",
+        regenerate: Invocation::Program {
+            program: "python3",
+            args: &["scripts/gen-signed-artifact-schemas.py"],
+        },
+        check: Invocation::Program {
+            program: "python3",
+            args: &["scripts/gen-signed-artifact-schemas.py", "--check"],
+        },
+        owns: &["spec/schemas/signed-artifact-examples/**"],
+    },
+    Step {
         name: "bindings vector manifest",
         regenerate: Invocation::Internal(InternalGenerator::FreezeVectors),
         check: Invocation::Internal(InternalGenerator::FreezeVectors),
@@ -881,6 +921,46 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
         pattern: "spec/schemas/chio-tee-frame-v1.json",
         kind: ClosedKind::Schema,
         reason: "registered JSON Schema",
+    },
+    ClosedEntry {
+        pattern: "examples/chio-3vendor/fixtures/runtime-spine/runtime-trust-schema-only.json",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-runtime-core --test placeholder_verifier_trust_bundle \
+                               committed_placeholder_verifier_trust_bundle_is_refused",
+        },
+        reason: "schema-shape example for scripts/check-chio-runtime-spine-fixtures.sh: the \
+                 signer key and signature are repeated-byte placeholders",
+    },
+    ClosedEntry {
+        pattern: "fuzz/corpus/capability_receipt/child-request-receipt.json",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-core-types --test placeholder_child_request_receipt \
+                               committed_placeholder_child_request_receipt_is_refused",
+        },
+        reason: "fuzz seed whose all-zero signature exercises the refusal path",
+    },
+    ClosedEntry {
+        pattern: "fuzz/corpus/federation_trust_establishment/invalid-signature-envelope.json",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-federation --test placeholder_handshake_envelope \
+                               committed_placeholder_handshake_envelope_is_refused",
+        },
+        reason: "fuzz seed with an all-zero signature and no capabilities, refused at decoding",
+    },
+    ClosedEntry {
+        pattern: "docs/standards/CHIO_SETTLE_SOLANA_RELEASE_EXAMPLE.json",
+        kind: ClosedKind::Placeholder {
+            fail_closed_test: "chio-settle --test placeholder_solana_release_example \
+                               committed_placeholder_solana_release_example_is_refused",
+        },
+        reason: "illustrative Solana release document: its ed25519Signature does not verify \
+                 under the key it names and it does not decode as a prepared settlement",
+    },
+    ClosedEntry {
+        pattern: "spec/schemas/signed-artifact-schemas.json",
+        kind: ClosedKind::Schema,
+        reason: "control file of the signed artifact payload schemas; its envelope fragments \
+                 and overrides name signature members",
     },
     ClosedEntry {
         pattern: "spec/schemas/signature.v1.json",
