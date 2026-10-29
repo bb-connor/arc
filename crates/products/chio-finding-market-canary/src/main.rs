@@ -224,7 +224,6 @@ fn network_egress_contract(
         allowed_authority_set: BTreeSet::from([authority]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_NETWORK_RESPONSE_BYTES as u64,
         private_network_allowances: Default::default(),

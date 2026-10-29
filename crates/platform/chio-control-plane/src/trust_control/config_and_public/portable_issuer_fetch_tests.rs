@@ -210,7 +210,6 @@ fn allowlisted_https_issuer_plans_a_strict_remote_fetch() {
     assert_eq!(fetch.jwks_url, "https://good.example/.well-known/jwks.json");
     assert!(fetch.contract.deny_loopback);
     assert!(fetch.contract.deny_link_local);
-    assert!(fetch.contract.deny_ipv6_ula);
     assert!(fetch.contract.allowed_schemes.contains("https"));
     assert!(!fetch.contract.allowed_schemes.contains("http"));
 }

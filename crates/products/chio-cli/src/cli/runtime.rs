@@ -1414,7 +1414,7 @@ pub(crate) fn remote_mcp_auth_egress_contract(
     let mut allowed_authority_set = std::collections::BTreeSet::new();
     let mut deny_loopback = true;
     let mut deny_link_local = true;
-    let mut deny_ipv6_ula = true;
+    let mut private_network_allowances = std::collections::BTreeSet::new();
 
     for raw_url in urls {
         let parsed = url::Url::parse(raw_url).map_err(|error| {
@@ -1424,6 +1424,9 @@ pub(crate) fn remote_mcp_auth_egress_contract(
         })?;
         allowed_schemes.insert(parsed.scheme().to_ascii_lowercase());
         allowed_authority_set.insert(cli_normalized_url_authority(&parsed)?);
+        private_network_allowances.extend(
+            chio_egress_contract::PrivateNetworkAllowance::for_ipv6_ula_literal(&parsed),
+        );
 
         if let Some(host) = parsed.host() {
             match host {
@@ -1456,9 +1459,6 @@ pub(crate) fn remote_mcp_auth_egress_contract(
                     if is_cli_ipv6_unicast_link_local(&address) {
                         deny_link_local = false;
                     }
-                    if is_cli_ipv6_unique_local(&address) {
-                        deny_ipv6_ula = false;
-                    }
                 }
             }
         }
@@ -1470,10 +1470,9 @@ pub(crate) fn remote_mcp_auth_egress_contract(
         allowed_authority_set,
         deny_loopback,
         deny_link_local,
-        deny_ipv6_ula,
         max_redirect_chain: 3,
         max_response_bytes: 1024 * 1024,
-        private_network_allowances: Default::default(),
+        private_network_allowances,
     };
     contract.validate().map_err(|error| {
         CliError::cli_other_error(format!(
@@ -1502,10 +1501,6 @@ pub(crate) fn cli_normalized_url_authority(url: &url::Url) -> Result<String, Cli
 
 pub(crate) fn is_cli_ipv6_unicast_link_local(address: &std::net::Ipv6Addr) -> bool {
     (address.segments()[0] & 0xffc0) == 0xfe80
-}
-
-pub(crate) fn is_cli_ipv6_unique_local(address: &std::net::Ipv6Addr) -> bool {
-    (address.segments()[0] & 0xfe00) == 0xfc00
 }
 
 pub(crate) fn optional_secret_with_env_fallback(
@@ -1935,6 +1930,36 @@ mod runtime_local_error_domain_tests {
         assert!(contract.allowed_schemes.contains("http"));
         assert!(contract.allowed_authority_set.contains("127.0.0.1:18080"));
         assert!(!contract.deny_loopback);
+    }
+
+    #[test]
+    fn remote_mcp_auth_contract_pins_a_unique_local_auth_url() {
+        let introspection = "https://[fd12:3456:789a::7]:8443/introspect";
+        let contract = remote_mcp_auth_egress_contract(
+            "edge-ula",
+            None,
+            Some(introspection),
+            None,
+            None,
+            Some("https://keys.example.com/jwks.json"),
+        )
+        .expect("contract builds")
+        .expect("auth URLs create a contract");
+
+        let pins: Vec<_> = contract
+            .private_network_allowances
+            .iter()
+            .map(|pin| (pin.host.as_str(), pin.port, pin.cidr.to_string()))
+            .collect();
+        assert_eq!(
+            pins,
+            vec![(
+                "fd12:3456:789a::7",
+                8443,
+                "fd12:3456:789a::7/128".to_string()
+            )]
+        );
+        assert!(contract.enforce_url(introspection, 0).is_ok());
     }
 }
 

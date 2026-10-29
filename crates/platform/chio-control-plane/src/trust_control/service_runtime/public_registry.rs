@@ -165,7 +165,6 @@ fn registry_contract(endpoint: &str) -> Result<HttpEgressContract, HttpEgressErr
         allowed_authority_set: BTreeSet::from([authority]),
         deny_loopback: !loopback_http,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PUBLIC_REGISTRY_RESPONSE_BYTES,
         private_network_allowances: Default::default(),

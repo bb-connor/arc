@@ -1,8 +1,9 @@
 //! Operator-declared private network allowances.
 //!
 //! An allowance names one `host:port` and the CIDR its resolved addresses must
-//! fall inside. It is the only way a contract reaches a private address, and
-//! it never reaches link-local or cloud metadata addresses.
+//! fall inside. It is the only way a contract reaches a private or IPv6
+//! unique-local address, and it never reaches link-local or cloud metadata
+//! addresses.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -210,6 +211,36 @@ pub struct PrivateNetworkAllowance {
     #[serde(default)]
     pub scheme: AllowanceScheme,
     pub cidr: IpCidr,
+}
+
+impl PrivateNetworkAllowance {
+    /// The allowance an operator grants by naming an IPv6 unique-local
+    /// literal as an endpoint URL: that address, port and scheme only. `None`
+    /// when the URL host is not a unique-local literal or the scheme is not
+    /// `http` or `https`.
+    #[must_use]
+    pub fn for_ipv6_ula_literal(url: &Url) -> Option<Self> {
+        let Some(Host::Ipv6(address)) = url.host() else {
+            return None;
+        };
+        if address.segments()[0] & 0xfe00 != 0xfc00 {
+            return None;
+        }
+        let scheme = match url.scheme() {
+            "https" => AllowanceScheme::Https,
+            "http" => AllowanceScheme::Http,
+            _ => return None,
+        };
+        Some(Self {
+            host: address.to_string(),
+            port: url.port_or_known_default()?,
+            scheme,
+            cidr: IpCidr {
+                network: IpAddr::V6(address),
+                prefix: 128,
+            },
+        })
+    }
 }
 
 /// Why a declared allowance is refused when its contract is loaded.

@@ -29,7 +29,6 @@ fn localhost_contract(open_port: u16) -> Result<HttpEgressContract, Box<dyn std:
         ]),
         deny_loopback: false,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1024,
         private_network_allowances: BTreeSet::from([PrivateNetworkAllowance {

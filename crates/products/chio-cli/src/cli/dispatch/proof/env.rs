@@ -919,7 +919,6 @@ fn public_settlement_rpc_egress_contract(url: &str) -> Result<HttpEgressContract
         deny_loopback: cfg!(not(debug_assertions))
             || !optional_bool_from_env("CHIO_TEST_PUBLIC_SETTLEMENT_ALLOW_LOOPBACK_RPC")?,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1024 * 1024,
         private_network_allowances: Default::default(),

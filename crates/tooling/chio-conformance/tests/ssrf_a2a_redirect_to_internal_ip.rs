@@ -30,7 +30,6 @@ fn loopback_only_contract(authority: &str) -> HttpEgressContract {
         // here; the policy still denies link-local redirects below.
         deny_loopback: false,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 4,
         max_response_bytes: 64 * 1024,
         private_network_allowances: Default::default(),

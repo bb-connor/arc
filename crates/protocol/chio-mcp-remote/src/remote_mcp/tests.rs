@@ -1652,7 +1652,6 @@ async fn oidc_fetch_rejects_special_use_address_contract() {
         allowed_authority_set: std::collections::BTreeSet::from(["169.254.169.254".to_string()]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024,
         private_network_allowances: Default::default(),

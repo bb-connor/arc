@@ -13,7 +13,6 @@ fn strict_contract(authority: &str) -> HttpEgressContract {
         allowed_authority_set,
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 3,
         max_response_bytes: 1024,
         private_network_allowances: Default::default(),
@@ -340,23 +339,13 @@ fn resolved_loopback_respects_loopback_allowance() {
 }
 
 #[test]
-fn resolved_ipv6_ula_respects_ula_allowance() {
-    let contract = HttpEgressContract::permissive_for_tests("[fc00::1]:80");
-    contract
+fn resolved_ipv6_ula_is_denied_without_an_allowance() {
+    let error = HttpEgressContract::permissive_for_tests("ula.test:443")
         .enforce_resolved_address(
             "ula.test",
             SocketAddr::new(IpAddr::V6("fc00::1".parse().unwrap()), 443),
         )
-        .expect("ULA may be explicitly allowed for local test contracts");
-
-    let mut denied = contract;
-    denied.deny_ipv6_ula = true;
-    let error = denied
-        .enforce_resolved_address(
-            "ula.test",
-            SocketAddr::new(IpAddr::V6("fc00::1".parse().unwrap()), 443),
-        )
-        .expect_err("ULA should fail when the flag is enabled");
+        .expect_err("ULA needs a pinned allowance");
     assert!(matches!(error, HttpEgressError::Ipv6UlaDenied { .. }));
 }
 
@@ -466,7 +455,6 @@ fn single_endpoint_admits_only_its_own_scheme_and_authority() {
     );
     assert!(contract.deny_loopback);
     assert!(contract.deny_link_local);
-    assert!(contract.deny_ipv6_ula);
     assert_eq!(contract.max_redirect_chain, 0);
     assert_eq!(contract.max_response_bytes, 4096);
     assert_eq!(
@@ -1003,7 +991,6 @@ mod reqwest_egress_tests {
         let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
         contract.deny_loopback = true;
         contract.deny_link_local = true;
-        contract.deny_ipv6_ula = true;
 
         contract
             .validate_dispatchable_with_pinned_dns()
@@ -1018,7 +1005,6 @@ mod reqwest_egress_tests {
         let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
         contract.deny_loopback = true;
         contract.deny_link_local = true;
-        contract.deny_ipv6_ula = true;
 
         let error = contract
             .enforce_resolved_address(
@@ -1037,7 +1023,6 @@ mod reqwest_egress_tests {
         let mut contract = HttpEgressContract::permissive_for_tests("rebind.test:80");
         contract.deny_loopback = true;
         contract.deny_link_local = true;
-        contract.deny_ipv6_ula = true;
 
         for address in [
             IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
