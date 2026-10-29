@@ -109,3 +109,79 @@ fn signing_bytes(body: &SecurityEventBody) -> Result<Vec<u8>> {
     bytes.extend_from_slice(&canonical);
     Ok(bytes)
 }
+
+#[cfg(feature = "tenant-index")]
+pub use projection::SecurityEventProjection;
+
+#[cfg(feature = "tenant-index")]
+mod projection {
+    use chio_security_types::ports::{OpaqueReceiptRef, ProducerId};
+    use chio_security_types::SecurityEventBody;
+    use serde::{Deserialize, Serialize};
+
+    use crate::receipt::metadata::{
+        metadata_salt_ref, MetadataCommitment, MetadataOpenings, MetadataProjector, ProjectionError,
+    };
+    use crate::rng::Rng;
+    use crate::tenant_index::{TenantBinding, TenantIndexKeySet};
+
+    /// Signed metadata block `security_event`: the tenant as a keyed binding, the subject
+    /// as a commitment (`metadata.security_event.subject`), and the Chio receipt and
+    /// producer ids. The full body stays the receipt's content preimage.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct SecurityEventProjection {
+        pub tenant_binding: TenantBinding,
+        pub subject: MetadataCommitment,
+        pub source_receipt_id: OpaqueReceiptRef,
+        pub producer_id: ProducerId,
+    }
+
+    impl SecurityEventProjection {
+        /// Projects `body` under the active generation of `keys`, drawing the subject salt
+        /// from `rng`; returns the projection and its openings.
+        pub fn project(
+            body: &SecurityEventBody,
+            keys: &TenantIndexKeySet,
+            rng: &dyn Rng,
+        ) -> Result<(Self, MetadataOpenings), ProjectionError> {
+            let mut projector = MetadataProjector::project(keys, rng);
+            let projection = Self::build(body, &mut projector)?;
+            Ok((projection, projector.into_openings()))
+        }
+
+        /// True when this projection is the projection of `body` under `openings` and the
+        /// generation its tenant binding names; false on any mismatch, missing or unused
+        /// opening or unknown generation.
+        #[must_use]
+        pub fn matches(
+            &self,
+            body: &SecurityEventBody,
+            openings: &MetadataOpenings,
+            keys: &TenantIndexKeySet,
+        ) -> bool {
+            MetadataProjector::verify(keys, &self.tenant_binding.key_id, openings)
+                .and_then(|mut projector| {
+                    let rebuilt = Self::build(body, &mut projector)?;
+                    projector.finish()?;
+                    Ok(rebuilt)
+                })
+                .is_ok_and(|rebuilt| rebuilt == *self)
+        }
+
+        fn build(
+            body: &SecurityEventBody,
+            projector: &mut MetadataProjector<'_>,
+        ) -> Result<Self, ProjectionError> {
+            Ok(Self {
+                tenant_binding: projector.tenant_binding(body.tenant_id.as_str())?,
+                subject: projector.commit(
+                    metadata_salt_ref("security_event", "subject")?,
+                    &body.subject,
+                )?,
+                source_receipt_id: body.source_receipt_id.clone(),
+                producer_id: body.producer_id.clone(),
+            })
+        }
+    }
+}

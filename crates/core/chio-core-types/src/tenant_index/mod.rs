@@ -170,7 +170,8 @@ const fn every_domain_nul_terminated_once(domains: &[IndexDomain]) -> bool {
 const _: () = assert!(every_domain_nul_terminated_once(&IndexDomain::ALL));
 
 /// One keyed value and the key generation it was derived under.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct KeyedIndexValue {
     /// `SHA-256("chio.tenant-index-key-id.v1\0" || set key)` of the generation.
     pub key_id: Sha256Digest,
