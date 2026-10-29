@@ -205,10 +205,10 @@ pub fn verify_aggregate_invocation_budget(
     trusted_issuers: &[PublicKey],
     direct_root: Option<&CapabilityToken>,
 ) -> Result<Option<VerifiedAggregateInvocationBudget>> {
-    if !trusted_issuers.contains(&token.issuer) {
+    let Some(issuer) = trusted_issuers.iter().find(|key| **key == token.issuer) else {
         return Err(violation("aggregate capability issuer is not trusted"));
-    }
-    if !token.verify_integrity_embedded_key()? {
+    };
+    if !token.verify_signature(issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     if token.delegation_chain.is_empty() {
@@ -322,7 +322,10 @@ fn verify_descendant(
             "aggregate budget root evidence is not a direct token",
         ));
     }
-    if !root.verify_integrity_embedded_key()? {
+    let Some(root_issuer) = trusted_root_issuers.iter().find(|key| **key == root.issuer) else {
+        return Err(violation("aggregate capability root issuer is not trusted"));
+    };
+    if !root.verify_signature(root_issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     let first = token
@@ -441,7 +444,7 @@ fn verify_binding_matches_root(
     root: &CapabilityToken,
     max_invocations: u32,
 ) -> Result<()> {
-    if !binding.verify_integrity_embedded_key()? {
+    if !binding.verify_signature(&root.issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     let expected_scope_hash = scope_hash(&root.scope)?;
