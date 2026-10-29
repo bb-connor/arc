@@ -159,9 +159,12 @@ impl SignedOperatorRootRequest {
         .ok_or(RootExchangeError::OperatorRootRequestMalformed(
             "signature is not a canonical hex signature",
         ))?;
-        let request = serde_json::from_value(Value::Object(members)).map_err(|_| {
-            RootExchangeError::OperatorRootRequestMalformed("body does not have the request shape")
-        })?;
+        let request = serde_json::from_value::<OperatorRootRequest>(Value::Object(members))
+            .map_err(|_| {
+                RootExchangeError::OperatorRootRequestMalformed(
+                    "body does not have the request shape",
+                )
+            })?;
         Ok(Self { request, signature })
     }
 
