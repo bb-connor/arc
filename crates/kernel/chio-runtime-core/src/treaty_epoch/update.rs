@@ -1,5 +1,7 @@
 use super::*;
-use chio_core_types::crypto::SigningBackend;
+use chio_core_types::canonical::UntrustedJsonText;
+use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, SigningBackend};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug)]
 pub struct VerifiedTreatyEpochUpdate {
@@ -24,31 +26,104 @@ impl VerifiedTreatyEpochUpdate {
         &self.envelope.signer_key
     }
 
-    pub fn validate_active_at(&self, _now_unix_ms: u64) -> Result<(), TreatyEpochError> {
-        Err(TreatyEpochError::Stale)
+    pub fn validate_active_at(&self, now_unix_ms: u64) -> Result<(), TreatyEpochError> {
+        match self.body().status {
+            TreatyEpochStatusV1::Revoked => return Err(TreatyEpochError::Revoked),
+            TreatyEpochStatusV1::Withdrawn => return Err(TreatyEpochError::Withdrawn),
+            TreatyEpochStatusV1::Active => {}
+        }
+        if now_unix_ms < self.body().issued_at_unix_ms
+            || now_unix_ms >= self.body().expires_at_unix_ms
+        {
+            return Err(TreatyEpochError::Stale);
+        }
+        Ok(())
     }
 }
 
 pub fn verify_treaty_epoch_update(
-    _envelope: SignedTreatyEpochV1,
-    _pinned_authority: &PublicKey,
+    envelope: SignedTreatyEpochV1,
+    pinned_authority: &PublicKey,
 ) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
-    Err(TreatyEpochError::InvalidSignature)
+    validate_record(&envelope.body)?;
+    if &envelope.signer_key != pinned_authority {
+        return Err(TreatyEpochError::AuthorityMismatch);
+    }
+    let canonical =
+        canonical_json_bytes(&envelope).map_err(|_| TreatyEpochError::InvalidEncoding)?;
+    if canonical.len() > MAX_TREATY_EPOCH_BYTES {
+        return Err(TreatyEpochError::TooLarge);
+    }
+    if !envelope
+        .verify_signature()
+        .map_err(|_| TreatyEpochError::InvalidSignature)?
+    {
+        return Err(TreatyEpochError::InvalidSignature);
+    }
+    let body =
+        canonical_json_bytes(&envelope.body).map_err(|_| TreatyEpochError::InvalidEncoding)?;
+    let body_digest = AdmissionDigest::try_new("treaty_epoch_body", sha256_hex(&body))
+        .map_err(|_| TreatyEpochError::InvalidEncoding)?;
+    Ok(VerifiedTreatyEpochUpdate {
+        envelope,
+        body_digest,
+    })
 }
 
 pub fn sign_treaty_epoch_record(
-    _body: TreatyEpochRecordV1,
-    _backend: &dyn SigningBackend,
-    _pinned_authority: &PublicKey,
+    body: TreatyEpochRecordV1,
+    backend: &dyn SigningBackend,
+    pinned_authority: &PublicKey,
 ) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
-    Err(TreatyEpochError::SigningFailed)
+    validate_record(&body)?;
+    let envelope = SignedTreatyEpochV1::sign_with_backend(body, backend)
+        .map_err(|_| TreatyEpochError::SigningFailed)?;
+    verify_treaty_epoch_update(envelope, pinned_authority)
 }
 
 pub fn treaty_epoch_from_wire(
-    _bytes: &[u8],
-    _pinned_authority: &PublicKey,
+    bytes: &[u8],
+    pinned_authority: &PublicKey,
 ) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
-    Err(TreatyEpochError::InvalidEncoding)
+    if bytes.len() > MAX_TREATY_EPOCH_BYTES {
+        return Err(TreatyEpochError::TooLarge);
+    }
+    let envelope = UntrustedJsonText::from_wire(bytes, MAX_TREATY_EPOCH_BYTES)
+        .and_then(|input| input.decode_signed())
+        .map_err(|_| TreatyEpochError::InvalidEncoding)?;
+    verify_treaty_epoch_update(envelope, pinned_authority)
+}
+
+fn validate_record(body: &TreatyEpochRecordV1) -> Result<(), TreatyEpochError> {
+    if body.schema != CHIO_TREATY_EPOCH_SCHEMA {
+        return Err(TreatyEpochError::InvalidSchema);
+    }
+    if body.sequence == 0
+        || body.sequence > MAX_TREATY_EPOCH_INTEGER
+        || (body.sequence == 1) != body.previous_record_sha256.is_none()
+    {
+        return Err(TreatyEpochError::InvalidSequence);
+    }
+    if body.issued_at_unix_ms >= body.expires_at_unix_ms
+        || body.expires_at_unix_ms > MAX_TREATY_EPOCH_INTEGER
+    {
+        return Err(TreatyEpochError::InvalidInterval);
+    }
+    if !(2..=MAX_TREATY_EPOCH_PARTICIPANTS).contains(&body.participants.len()) {
+        return Err(TreatyEpochError::InvalidParticipants);
+    }
+    let mut ids = BTreeSet::new();
+    let mut keys = BTreeSet::new();
+    let mut manifests = BTreeSet::new();
+    for participant in &body.participants {
+        if !ids.insert(participant.kernel_id.as_str())
+            || !keys.insert(participant.public_key.to_hex())
+            || !manifests.insert(participant.ladder_manifest_sha256.as_str())
+        {
+            return Err(TreatyEpochError::InvalidParticipants);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -197,7 +272,28 @@ mod tests {
             body.participants[0].ladder_manifest_sha256.clone();
         cases.push((body, TreatyEpochError::InvalidParticipants));
         let mut body = valid.clone();
-        body.participants = vec![body.participants[0].clone(); MAX_TREATY_EPOCH_PARTICIPANTS + 1];
+        body.participants = (0..=MAX_TREATY_EPOCH_PARTICIPANTS)
+            .map(|index| {
+                Ok(TreatyEpochParticipantV1 {
+                    kernel_id: AdmissionIdentifier::try_new(
+                        "participant",
+                        format!("kernel.{index}"),
+                    )?,
+                    public_key: Keypair::generate().public_key(),
+                    ladder_manifest_sha256: AdmissionDigest::try_new(
+                        "ladder",
+                        format!("{index:064x}"),
+                    )?,
+                })
+            })
+            .collect::<Result<Vec<_>, chio_kernel::admission_operation::AdmissionOperationError>>(
+            )?;
+        let mut at_limit = body.clone();
+        at_limit.participants.pop();
+        verify_treaty_epoch_update(
+            SignedTreatyEpochV1::sign(at_limit, &key)?,
+            &key.public_key(),
+        )?;
         cases.push((body, TreatyEpochError::InvalidParticipants));
         for (body, expected) in cases {
             let signed = SignedTreatyEpochV1::sign(body, &key)?;
@@ -210,6 +306,12 @@ mod tests {
         let mut next = valid;
         next.sequence = 2;
         next.previous_record_sha256 = Some(AdmissionDigest::try_new("previous", "d".repeat(64))?);
+        verify_treaty_epoch_update(
+            SignedTreatyEpochV1::sign(next.clone(), &key)?,
+            &key.public_key(),
+        )?;
+        next.sequence = MAX_TREATY_EPOCH_INTEGER;
+        next.expires_at_unix_ms = MAX_TREATY_EPOCH_INTEGER;
         verify_treaty_epoch_update(SignedTreatyEpochV1::sign(next, &key)?, &key.public_key())?;
         Ok(())
     }
@@ -220,6 +322,9 @@ mod tests {
         let signed = SignedTreatyEpochV1::sign(record()?, &key)?;
         let wire = serde_json::to_string(&signed)?;
         treaty_epoch_from_wire(wire.as_bytes(), &key.public_key())?;
+        let mut at_limit = wire.as_bytes().to_vec();
+        at_limit.resize(MAX_TREATY_EPOCH_BYTES, b' ');
+        treaty_epoch_from_wire(&at_limit, &key.public_key())?;
         let duplicate = wire.replacen("\"sequence\":1", "\"sequence\":1,\"sequence\":1", 1);
         assert_ne!(wire, duplicate);
         assert!(matches!(
