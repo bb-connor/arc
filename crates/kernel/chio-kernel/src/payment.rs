@@ -988,6 +988,7 @@ fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
         | HttpEgressError::SchemeDenied { .. }
         | HttpEgressError::AuthorityDenied { .. }
         | HttpEgressError::LoopbackDenied { .. }
+        | HttpEgressError::LoopbackNameResolvedOffHost { .. }
         | HttpEgressError::LinkLocalDenied { .. }
         | HttpEgressError::Ipv6UlaDenied { .. }
         | HttpEgressError::PrivateNetworkDenied { .. }

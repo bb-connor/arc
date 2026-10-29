@@ -87,6 +87,7 @@ fn read_canonical_private_json<T: serde::de::DeserializeOwned + serde::Serialize
 pub(super) fn cmd_finding_operator_validate_hosted(
     profile_path: &Path,
     json_output: bool,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let profile: FindingHostedProfile =
         read_canonical_private_json(profile_path, MAX_HOSTED_PROFILE_BYTES, "hosted profile")?;
@@ -106,7 +107,7 @@ pub(super) fn cmd_finding_operator_validate_hosted(
         .map_err(CliError::cli_other_error)?;
     for role in FindingHostedSigningRole::ALL {
         profile
-            .load_signer(role)
+            .load_signer(role, allowances)
             .map_err(CliError::cli_other_error)?;
     }
     profile
@@ -117,7 +118,7 @@ pub(super) fn cmd_finding_operator_validate_hosted(
         .map_err(CliError::cli_other_error)?;
     #[cfg(target_os = "linux")]
     profile
-        .load_worker_executor()
+        .load_worker_executor(allowances)
         .map_err(CliError::cli_other_error)?;
 
     let report = serde_json::json!({

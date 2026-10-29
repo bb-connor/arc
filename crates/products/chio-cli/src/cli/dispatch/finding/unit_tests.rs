@@ -32,6 +32,9 @@ use chio_open_market::purchase_verification::{
 use wiremock::matchers::{body_string, header, method, path as path_matcher, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+static NONE: std::sync::LazyLock<EgressAllowanceSet> =
+    std::sync::LazyLock::new(EgressAllowanceSet::default);
+
 const GOLDEN_FINDING_RAW: &str = include_str!(
     "../../../../../../../fixtures/proof-room/finding/verified-fix-basic/finding.json"
 );
@@ -444,6 +447,7 @@ fn buy_requires_a_venue_url_and_service_token() {
         false,
         None,
         Some("token"),
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -458,6 +462,7 @@ fn buy_requires_a_venue_url_and_service_token() {
         false,
         Some("http://127.0.0.1:1"),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -521,6 +526,7 @@ fn status_requires_a_venue_url() {
         300,
         false,
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -538,7 +544,7 @@ fn finding_ids_must_be_lowercase_content_addresses() {
 
 #[test]
 fn publish_requires_a_venue_url() {
-    let error = cmd_finding_publish(Path::new("finding.json"), false, None, Some("token"))
+    let error = cmd_finding_publish(Path::new("finding.json"), false, None, Some("token"), &NONE)
         .unwrap_err()
         .to_string();
     assert!(error.contains("--control-url"), "unexpected error: {error}");
@@ -551,6 +557,7 @@ fn publish_requires_a_service_token() {
         false,
         Some("http://127.0.0.1:1"),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -565,14 +572,20 @@ fn publish_refuses_an_artifact_above_the_body_bound() {
     let dir = tempfile::tempdir().unwrap();
     let oversized = "\u{20}".repeat(FINDING_PUBLISH_MAX_BODY_BYTES + 1);
     let path = write_temp(&dir, "oversized.json", &oversized);
-    let error =
-        cmd_finding_publish(&path, false, Some("http://127.0.0.1:1"), Some("token")).unwrap_err();
+    let error = cmd_finding_publish(
+        &path,
+        false,
+        Some("http://127.0.0.1:1"),
+        Some("token"),
+        &NONE,
+    )
+    .unwrap_err();
     input_boundary::assert_too_large(error, FINDING_PUBLISH_MAX_BODY_BYTES);
 }
 
 #[test]
 fn search_requires_a_venue_url() {
-    let error = cmd_finding_search("repo:", None, None, None, false, None)
+    let error = cmd_finding_search("repo:", None, None, None, false, None, &NONE)
         .unwrap_err()
         .to_string();
     assert!(error.contains("--control-url"), "unexpected error: {error}");
@@ -587,6 +600,7 @@ fn search_rejects_a_malformed_context_digest() {
         None,
         false,
         Some("http://127.0.0.1:1"),
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -598,7 +612,7 @@ fn search_rejects_a_malformed_context_digest() {
 
 #[test]
 fn verify_requires_exactly_one_artifact_source() {
-    let error = cmd_finding_verify(None, None, None, None, None, None, true, false, None)
+    let error = cmd_finding_verify(None, None, None, None, None, None, true, false, None, &NONE)
         .unwrap_err()
         .to_string();
     assert!(
@@ -611,9 +625,20 @@ fn verify_requires_exactly_one_artifact_source() {
 fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "pretty.json", GOLDEN_FINDING_RAW);
-    let error = cmd_finding_verify(Some(&path), None, None, None, None, None, true, false, None)
-        .unwrap_err()
-        .to_string();
+    let error = cmd_finding_verify(
+        Some(&path),
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+        false,
+        None,
+        &NONE,
+    )
+    .unwrap_err()
+    .to_string();
     assert!(
         error.contains("canonical serialization"),
         "unexpected error: {error}"
@@ -624,7 +649,7 @@ fn verify_rejects_bytes_that_are_not_the_canonical_serialization() {
 fn verify_accepts_the_canonical_artifact_under_integrity_only() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    cmd_finding_verify(Some(&path), None, None, None, None, None, true, true, None).unwrap();
+    cmd_finding_verify(Some(&path), None, None, None, None, None, true, true, None, &NONE).unwrap();
 }
 
 #[test]
@@ -671,6 +696,7 @@ fn verify_caps_every_support_file_before_parsing() {
             false,
             true,
             None,
+            &NONE,
         )
         .unwrap_err();
         let _ = kind;
@@ -780,9 +806,20 @@ fn verify_resolves_bounded_signed_execution_nonce_evidence() {
 fn verify_refuses_to_call_integrity_alone_evidence_verification() {
     let dir = tempfile::tempdir().unwrap();
     let path = write_temp(&dir, "finding.json", &canonical_golden_finding());
-    let error = cmd_finding_verify(Some(&path), None, None, None, None, None, false, true, None)
-        .unwrap_err()
-        .to_string();
+    let error = cmd_finding_verify(
+        Some(&path),
+        None,
+        None,
+        None,
+        None,
+        None,
+        false,
+        true,
+        None,
+        &NONE,
+    )
+    .unwrap_err()
+    .to_string();
     assert!(
         error.contains("--trust-roots") && error.contains("--integrity-only"),
         "unexpected error: {error}"
@@ -867,6 +904,7 @@ fn verify_names_every_required_facet_it_could_not_establish() {
         false,
         false,
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -908,7 +946,7 @@ async fn publish_sends_the_artifact_bytes_verbatim_under_the_service_token() {
     let path = write_temp(&dir, "finding.json", &artifact);
     let uri = server.uri();
     tokio::task::spawn_blocking(move || {
-        cmd_finding_publish(&path, true, Some(&uri), Some("venue-token"))
+        cmd_finding_publish(&path, true, Some(&uri), Some("venue-token"), &NONE)
     })
     .await
     .unwrap()
@@ -953,6 +991,7 @@ async fn search_encodes_the_index_query_parameters() {
             Some(25),
             false,
             Some(&uri),
+            &NONE,
         )
     })
     .await
@@ -1472,6 +1511,7 @@ fn challenge_requires_a_venue_url() {
         false,
         None,
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1508,6 +1548,7 @@ fn challenge_refuses_a_class_the_document_does_not_carry() {
             false,
             Some(UNREACHABLE_VENUE),
             None,
+            &NONE,
         )
         .unwrap_err()
         .to_string();
@@ -1536,6 +1577,7 @@ fn challenge_refuses_a_venue_audit_over_a_buyer_submission() {
         false,
         Some(UNREACHABLE_VENUE),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1563,6 +1605,7 @@ fn challenge_refuses_an_audit_document_without_the_audit_flag() {
         false,
         Some(UNREACHABLE_VENUE),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1587,6 +1630,7 @@ fn challenge_refuses_a_buyer_submission_without_a_challenger_key() {
         false,
         Some(UNREACHABLE_VENUE),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1844,6 +1888,7 @@ async fn challenge_dry_run_emits_the_canonical_challenge_without_transmitting() 
             true,
             Some(&uri),
             None,
+            &NONE,
         )
     })
     .await
@@ -1870,6 +1915,7 @@ fn live_challenge_requires_service_authorization_before_contacting_the_venue() {
         false,
         Some(UNREACHABLE_VENUE),
         None,
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1896,6 +1942,7 @@ fn live_venue_audit_is_reserved_for_the_pinned_scheduler() {
         false,
         Some(UNREACHABLE_VENUE),
         Some("service-secret"),
+        &NONE,
     )
     .unwrap_err()
     .to_string();
@@ -1974,6 +2021,7 @@ async fn challenge_without_dry_run_posts_the_exact_canonical_envelope() {
             false,
             Some(&uri),
             Some("service-secret"),
+            &NONE,
         )
     })
     .await
@@ -1996,146 +2044,8 @@ async fn challenge_venue() -> MockServer {
     server
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn verify_by_id_runs_the_strict_ingress_over_the_served_bytes() {
-    if !loopback_bind_available() {
-        eprintln!("skipping finding verify transport test: loopback bind denied");
-        return;
-    }
-    let artifact = canonical_golden_finding();
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path_matcher(format!("/v1/findings/{GOLDEN_FINDING_ID}")))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "application/json")
-                .set_body_string(artifact),
-        )
-        .expect(1)
-        .mount(&server)
-        .await;
-
-    let uri = server.uri();
-    tokio::task::spawn_blocking(move || {
-        cmd_finding_verify(
-            None,
-            Some(GOLDEN_FINDING_ID),
-            None,
-            None,
-            None,
-            None,
-            true,
-            true,
-            Some(&uri),
-        )
-    })
-    .await
-    .unwrap()
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn verify_by_id_rejects_a_different_valid_artifact() {
-    if !loopback_bind_available() {
-        eprintln!("skipping finding verify transport test: loopback bind denied");
-        return;
-    }
-    let requested_id = "a".repeat(64);
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path_matcher(format!("/v1/findings/{requested_id}")))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "application/json")
-                .set_body_string(canonical_golden_finding()),
-        )
-        .expect(1)
-        .mount(&server)
-        .await;
-
-    let uri = server.uri();
-    let error = tokio::task::spawn_blocking(move || {
-        cmd_finding_verify(
-            None,
-            Some(&requested_id),
-            None,
-            None,
-            None,
-            None,
-            true,
-            true,
-            Some(&uri),
-        )
-    })
-    .await
-    .unwrap()
-    .unwrap_err()
-    .to_string();
-    assert!(
-        error.contains("venue returned finding") && error.contains("requested id"),
-        "unexpected error: {error}"
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn buy_drives_the_authenticated_live_purchase_roundtrip() {
-    if !loopback_bind_available() {
-        eprintln!("skipping finding buy transport test: loopback bind denied");
-        return;
-    }
-    let fixture = live_buy_fixture();
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path_matcher(format!("/v1/findings/{}", fixture.finding_id)))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "application/json")
-                .set_body_string(fixture.raw_finding.clone()),
-        )
-        .expect(1)
-        .mount(&server)
-        .await;
-    let request_body =
-        String::from_utf8(chio_core_types::canonical_json_bytes(&fixture.request).unwrap())
-            .unwrap();
-    let response_body =
-        String::from_utf8(chio_core_types::canonical_json_bytes(&fixture.result).unwrap()).unwrap();
-    Mock::given(method("POST"))
-        .and(path_matcher(format!(
-            "/v1/findings/{}/purchase",
-            fixture.finding_id
-        )))
-        .and(header("authorization", "Bearer venue-token"))
-        .and(header("content-type", "application/json"))
-        .and(body_string(request_body))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "application/json")
-                .set_body_string(response_body),
-        )
-        .expect(1)
-        .mount(&server)
-        .await;
-
-    let uri = server.uri();
-    let finding_id = fixture.finding_id;
-    let payer = fixture.result.payer;
-    tokio::task::spawn_blocking(move || {
-        cmd_finding_buy(
-            &finding_id,
-            400,
-            "USD",
-            Some(&payer),
-            Some(900),
-            true,
-            Some(&uri),
-            Some("venue-token"),
-        )
-    })
-    .await
-    .unwrap()
-    .unwrap();
-}
-
 #[path = "unit_tests/input_boundary.rs"]
 mod input_boundary;
+
+#[path = "unit_tests/venue_http.rs"]
+mod venue_http;

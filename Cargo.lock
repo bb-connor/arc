@@ -3944,6 +3944,7 @@ version = "0.1.0"
 dependencies = [
  "chio-control-plane",
  "chio-core-types",
+ "chio-egress-contract",
  "chio-finding-hosted-edge",
  "chio-finding-market-store-postgres",
  "clap 4.6.0",
@@ -4021,6 +4022,7 @@ version = "0.1.0"
 dependencies = [
  "chio-control-plane",
  "chio-core-types",
+ "chio-egress-contract",
  "chio-finding-hosted-edge",
  "chio-finding-market-store-postgres",
  "chio-finding-worker",
@@ -5339,10 +5341,10 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chio-core",
+ "chio-egress-contract",
  "chio-test-support",
  "serde",
  "serde_json",
- "ureq 2.12.1",
  "url",
 ]
 

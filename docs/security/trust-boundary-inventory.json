@@ -1675,7 +1675,7 @@
     "crates/trust/chio-pheromone-runtime/src/input.rs::encode::from_wire",
     "crates/trust/chio-replay-corpus/src/fixture_writer.rs::stripped_receipt::from_wire",
     "crates/trust/chio-reputation/src/input.rs::from_scope_json::from_wire",
-    "crates/trust/chio-signing-remote/src/lib.rs::read_json::from_wire",
+    "crates/trust/chio-signing-remote/src/lib.rs::decode_json::from_wire",
     "crates/trust/chio-tee-frame/src/frame.rs::parse::from_wire",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire",
     "crates/trust/chio-tee/src/runner.rs::capture::from_wire",
@@ -18699,7 +18699,7 @@
     "crates/trust/chio-pheromone-runtime/src/input.rs::encode::from_wire#1::bounds_only",
     "crates/trust/chio-replay-corpus/src/fixture_writer.rs::stripped_receipt::from_wire#1::decode_signed",
     "crates/trust/chio-reputation/src/input.rs::from_scope_json::from_wire#1::decode_signed",
-    "crates/trust/chio-signing-remote/src/lib.rs::read_json::from_wire#1::decode_external",
+    "crates/trust/chio-signing-remote/src/lib.rs::decode_json::from_wire#1::decode_external",
     "crates/trust/chio-tee-frame/src/frame.rs::parse#2::from_wire#1::decode_signed",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire#1::decode_signed",
     "crates/trust/chio-tee/src/runner.rs::capture::from_wire#1::decode_signed",
@@ -23966,7 +23966,8 @@
       "from_scope_json::original-json-reader::UntrustedJsonText"
     ],
     "crates/trust/chio-signing-remote/src/lib.rs": [
-      "read_json::original-json-reader::UntrustedJsonText",
+      "decode_json::original-json-reader::UntrustedJsonText",
+      "read_json::shared-reader::crates/trust/chio-signing-remote/src/lib.rs::decode_json",
       "send_json::shared-reader::crates/trust/chio-signing-remote/src/lib.rs::read_json",
       "sign_bytes#1::shared-reader::crates/trust/chio-signing-remote/src/lib.rs::send_json",
       "sign_bytes#2::shared-reader::crates/trust/chio-signing-remote/src/lib.rs::send_json",

@@ -385,7 +385,13 @@ pub(crate) fn run() {
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {
-            dispatch_finding(command, json_output, control_url, control_token)
+            dispatch_finding(
+                command,
+                json_output,
+                control_url,
+                control_token,
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )
         }
         Commands::Replay(args) => cmd_replay(&args),
         Commands::Lineage { command } => dispatch_lineage(command, json_output),
