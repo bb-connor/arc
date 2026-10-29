@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `6109d8f253a6d0ae265ed24eb6f02221ed7e8ee4e58ca64d81465c632bb5500c`
+- Input digest: `f12255be84e538aadbdc4875ab9baad6806bb8b8f679238896e3fd4bd2b66a73`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1676,13 +1676,13 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `fuzz/owners.toml`: `d038b734481964f5f8f817a3e13cd5ff6e38d1fb54bfc6d99305a60c700d22d6`
 - `fuzz/target-map.toml`: `c717aa1f5b7c0939baef981c1809401e344f38bb6df4f3f802a70141f2e03680`
 - `git-worktree://rust-files`: `80a10ee6d47b72218ac042b0d902024dc9b998744bd3779fed70aea86f635976`
-- `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
+- `releases.toml`: `8fb71e1482d0fdbcf4d10f60a1be8f5886cb7bf0ab461f0cc434c256ec8d8546`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
 - `scripts/check-kani-core.sh`: `c20fe64162c64891097f4c89bd4d214b0dd95fb286dc6537e0fd16b90c2b6c60`
 - `scripts/kani-mutant-killer.sh`: `18c1a7dd32c6f820b50f0c84b903385b7bff1fb9d6c8981eecf13a7e9af2124f`
 - `scripts/lib/apalache_evidence.py`: `30e037d7b6d3fc3ae8a274a22bad1fb11ff10ebe8875221c65a4d4be734cba6a`
-- `scripts/proof-mutants.py`: `4de9c2f10f254a7adea9c17172863085be0a4fb1bf7adc65e547f38f9738ddab`
+- `scripts/proof-mutants.py`: `8f8bf7bb29d88d37eb5a88f7156a4b7a8d127c0d27d0f3b5ad3b16194649e6e6`
 - `scripts/proof-mutants.sh`: `b6a8709ff3d15e8e58521ed60efda0e344733a81b1902dc314928cdedec479a7`
 - `scripts/spec-mutants.py`: `c88efd2538101fadf201214440b2500e692e842f10c613d07f4c2f49b3c37c88`
 - `tools/install-apalache.sh`: `3f50745f56521685d30d18669bddb64a4bff060b40c121b30cdbf61fe26f4cc5`
@@ -1692,10 +1692,10 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `xtask/src/proof_coverage/evidence.rs`: `ec8751942935652675bb1f1d28521a9608ee03971d561675b6af56a6e33bb7f8`
 - `xtask/src/proof_coverage/mapping.rs`: `cf72384d07577da7523b64cef8683ec3ba0741eece022bfb78c7929d4133fd52`
 - `xtask/src/proof_coverage/mutation_inputs.rs`: `72d9da42443b427139d7f5e5e8ea5ed8eb5539eb47dd050da870fede40dad2cf`
-- `xtask/src/proof_coverage/mutation_reports.rs`: `92dc5724bd98f97ffca22e8db0d0df61ef02ad504df654b308ab18af8cab412b`
+- `xtask/src/proof_coverage/mutation_reports.rs`: `a0cb36aa753138105deee6b56e5e28d5d421518576dcaf020f294eab6206c66f`
 - `xtask/src/proof_coverage/refinement.rs`: `8b697fb04195e69b722d90598b6510a440d0da6b58f6a6fb3c3b609ba4b4d49d`
 - `xtask/src/proof_coverage/render.rs`: `5a9645aec5942b919f0aeb1ea8229b69a533e36506b6a17d4627525a13709a50`
 - `xtask/src/proof_coverage/tests/aeneas.rs`: `9f3d115d348aabc61bc09e4b0babd4236fcd73d4668f7d6f2689e91fafeeafb8`
 - `xtask/src/proof_coverage/tests/mod.rs`: `1c559e52e7e53a582413629490f42c09b310573404dbd4553c99448d8d9db35f`
-- `xtask/src/proof_coverage/tests/mutation.rs`: `ded4477041bff9ed81da3ba346e96f48b0a8728d2f4d6bf5211cb4d535c113f3`
+- `xtask/src/proof_coverage/tests/mutation.rs`: `4d04bff81acaa684a7c8879c821ee4500a9e57c265f96db961af4bdda6e27df8`
 - `xtask/src/proof_coverage/tests/open_residual.rs`: `988b690f761b340ce9962d49d57564b64ee4437a40682e7379cbab64634975c1`
