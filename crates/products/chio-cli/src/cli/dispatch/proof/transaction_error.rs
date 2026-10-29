@@ -436,7 +436,8 @@ pub(super) fn map_runtime_proof_error(error: chio_runtime_core::ChioRuntimeError
         | Error::DuplicateAdmissionBundle
         | Error::Store(_)
         | Error::Io(_)
-        | Error::Sqlite(_) => &TRANSACTION_RUNTIME_PROOF_REJECTED,
+        | Error::Sqlite(_)
+        | Error::DurableWrite { .. } => &TRANSACTION_RUNTIME_PROOF_REJECTED,
     };
     CliError::registry_error(spec, format!("proof verify: {error}"))
 }

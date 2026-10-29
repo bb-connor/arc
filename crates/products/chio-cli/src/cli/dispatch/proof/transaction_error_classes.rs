@@ -537,7 +537,8 @@ fn expected_runtime(error: &chio_runtime_core::ChioRuntimeError) -> i32 {
         | E::DuplicateAdmissionBundle
         | E::Store(_)
         | E::Io(_)
-        | E::Sqlite(_) => REQUIRED,
+        | E::Sqlite(_)
+        | E::DurableWrite { .. } => REQUIRED,
     }
 }
 
@@ -568,6 +569,11 @@ fn every_runtime_proof_variant_has_its_exit_class() {
         E::DuplicateAdmissionBundle,
         E::Store(text()),
         E::Io(std::io::Error::other("io")),
+        E::Sqlite(rusqlite::Error::QueryReturnedNoRows),
+        E::DurableWrite {
+            write: chio_runtime_core::RuntimeAdmissionWrite::TrustFloor,
+            source: rusqlite::Error::QueryReturnedNoRows,
+        },
         E::Json(json_error()),
         E::Canonical(text()),
     ]);
