@@ -30,7 +30,8 @@ pub(super) fn check_count(
 }
 
 pub(super) fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>, ChioRuntimeError> {
-    let bytes = chio_core_types::crypto::canonical_json_bytes(value)?;
+    let bytes = chio_core_types::crypto::canonical_json_bytes(value)
+        .map_err(|error| ChioRuntimeError::Canonical(error.to_string()))?;
     if bytes.len() > MAX_TREATY_EPOCH_BYTES {
         return Err(refusal(
             "treaty_epoch_invalid",

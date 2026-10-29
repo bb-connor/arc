@@ -9,7 +9,7 @@ use chio_kernel::admission_operation::RuntimeSourceQualificationV1;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Authorization {
     binding: RuntimeTreatyAuthorizationBinding,
-    source_qualification: RuntimeSourceQualificationV1,
+    source_qualification: Vec<u8>,
     epoch_sequence: u64,
     authorized_at_unix_ms: u64,
 }
@@ -145,7 +145,7 @@ impl SqliteRuntimeOrchestrationStore {
         matches_scope(&update, binding)?;
         if let Some(retained) = load_authorization(tx, binding)? {
             if retained.binding != *binding
-                || retained.source_qualification != *request.source_qualification()
+                || retained.source_qualification != request.source_qualification().canonical_bytes()
                 || retained.epoch_sequence != update.body().sequence
             {
                 return Err(refusal(
@@ -166,7 +166,7 @@ impl SqliteRuntimeOrchestrationStore {
         )?;
         let record = Authorization {
             binding: binding.clone(),
-            source_qualification: request.source_qualification().clone(),
+            source_qualification: request.source_qualification().canonical_bytes().to_vec(),
             epoch_sequence: update.body().sequence,
             authorized_at_unix_ms: now,
         };
@@ -219,7 +219,15 @@ impl SqliteRuntimeOrchestrationStore {
                 "retained treaty authorization differs from original claim",
             ));
         }
-        self.verify_authorization_context(&tx, binding, &retained.source_qualification)?;
+        let source =
+            RuntimeSourceQualificationV1::from_canonical_bytes(&retained.source_qualification)
+                .map_err(|_| {
+                    refusal(
+                        "treaty_epoch_authorization_mismatch",
+                        "retained source qualification is malformed",
+                    )
+                })?;
+        self.verify_authorization_context(&tx, binding, &source)?;
         let treaty = AdmissionIdentifier::try_new("treaty_id", &binding.scope().treaty_id)
             .map_err(|_| {
                 refusal(
