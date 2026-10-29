@@ -1,13 +1,16 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
+use chio_core_types::CanonicalBytes;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::super::error::TransactionPassportError;
 use super::super::ids::{
     POLICY_ACTIVATION_RECEIPT_SCHEMA_ID, RUNTIME_ATTACK_SIMULATION_REPORT_SCHEMA_ID,
-    RUNTIME_CHAOS_RUN_REPORT_SCHEMA_ID, RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID,
+    RUNTIME_CHAOS_RUN_REPORT_SCHEMA_ID, RUNTIME_EXECUTION_LEASE_SCHEMA_ID,
+    RUNTIME_REVOCATION_FRESHNESS_PROOF_SCHEMA_ID, RUNTIME_SANDBOX_ATTESTATION_SCHEMA_ID,
+    RUNTIME_TERMINAL_RECEIPT_SCHEMA_ID, RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID,
     RUNTIME_TRUSTED_TIME_PROOF_SCHEMA_ID, SWARM_BUDGET_POOL_SCHEMA_ID,
     SWARM_JOIN_RECEIPT_SCHEMA_ID, SWARM_ROUTE_PLAN_RECEIPT_SCHEMA_ID, SWARM_TASK_GRAPH_SCHEMA_ID,
 };
@@ -1670,6 +1673,235 @@ fn verify_revocation_freshness_signature(
             "revocation freshness signature invalid".to_string(),
         ))
     }
+}
+
+const RUNTIME_TRUST_ROOT_SCHEMA_ID: &str = "chio.trust.root.v1";
+
+fn signing_error(label: &str, error: impl std::fmt::Display) -> TransactionPassportError {
+    TransactionPassportError::RuntimeSecurityClaimFailed(format!("{label} signing failed: {error}"))
+}
+
+fn typed<T: serde::de::DeserializeOwned>(value: &serde_json::Value) -> Option<T> {
+    serde_json::from_value(value.clone()).ok()
+}
+
+fn without_signature<T: Serialize>(
+    artifact: &T,
+    label: &str,
+) -> Result<serde_json::Value, TransactionPassportError> {
+    let mut body = serde_json::to_value(artifact).map_err(|error| signing_error(label, error))?;
+    body.as_object_mut()
+        .ok_or_else(|| signing_error(label, "body is not an object"))?
+        .remove("signature");
+    Ok(body)
+}
+
+fn wrapped_signature<T: Serialize>(
+    key: &Keypair,
+    schema_id: &str,
+    body: &T,
+    label: &str,
+) -> Result<String, TransactionPassportError> {
+    let canonical =
+        CanonicalBytes::from_serializable(body).map_err(|error| signing_error(label, error))?;
+    key.sign_wrapped(schema_id, &canonical)
+        .map(|signature| signature.to_hex())
+        .map_err(|error| signing_error(label, error))
+}
+
+/// Signs a runtime-security artifact through the signing wrapper, exactly as
+/// its verifier checks it, with the key in `keys` its signer identity names,
+/// and writes the hex signature into `value`. Returns `false` when `value` is
+/// not a runtime-signed artifact (no `signature` member, another schema, or
+/// a shape the runtime verifier would not parse); fails when no key in
+/// `keys` matches.
+pub fn sign_runtime_security_artifact(
+    value: &mut serde_json::Value,
+    keys: &[Keypair],
+) -> Result<bool, TransactionPassportError> {
+    if value.get("signature").is_none() {
+        return Ok(false);
+    }
+    let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) else {
+        return Ok(false);
+    };
+    let (label, signer, signature_schema, body): (&str, String, &str, serde_json::Value) =
+        match schema {
+            RUNTIME_TRUST_ROOT_SCHEMA_ID => {
+                let Some(root) = typed::<RuntimeTrustRoot>(value) else {
+                    return Ok(false);
+                };
+                let body = without_signature(&root, "runtime trust root")?;
+                let authority = root
+                    .authority
+                    .ok_or_else(|| signing_error("runtime trust root", "authority missing"))?;
+                (
+                    "runtime trust root",
+                    authority,
+                    RUNTIME_TRUST_ROOT_SCHEMA_ID,
+                    body,
+                )
+            }
+            RUNTIME_EXECUTION_LEASE_SCHEMA_ID => {
+                let Some(lease) = typed::<RuntimeExecutionLease>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(execution_lease_signature_body(&lease))
+                    .map_err(|error| signing_error("execution lease", error))?;
+                (
+                    "execution lease",
+                    lease.issuer,
+                    RUNTIME_EXECUTION_LEASE_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            SWARM_TASK_GRAPH_SCHEMA_ID => {
+                let Some(graph) = typed::<RuntimeTaskGraph>(value) else {
+                    return Ok(false);
+                };
+                let body = without_signature(&graph, "task graph")?;
+                ("task graph", graph.issuer, SWARM_TASK_GRAPH_SCHEMA_ID, body)
+            }
+            SWARM_JOIN_RECEIPT_SCHEMA_ID => {
+                let Some(receipt) = typed::<RuntimeJoinReceipt>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(join_receipt_signature_body(&receipt)?)
+                    .map_err(|error| signing_error("join receipt", error))?;
+                (
+                    "join receipt",
+                    receipt.issuer,
+                    SWARM_JOIN_RECEIPT_SCHEMA_ID,
+                    body,
+                )
+            }
+            SWARM_ROUTE_PLAN_RECEIPT_SCHEMA_ID => {
+                let Some(plan) = typed::<RuntimeRoutePlanReceipt>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(route_plan_receipt_signature_body(&plan))
+                    .map_err(|error| signing_error("route plan receipt", error))?;
+                (
+                    "route plan receipt",
+                    plan.issuer,
+                    SWARM_ROUTE_PLAN_RECEIPT_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            POLICY_ACTIVATION_RECEIPT_SCHEMA_ID => {
+                let Some(receipt) = typed::<RuntimePolicyActivationReceipt>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(policy_activation_receipt_signature_body(&receipt))
+                    .map_err(|error| signing_error("policy activation", error))?;
+                (
+                    "policy activation",
+                    receipt.issuer,
+                    POLICY_ACTIVATION_RECEIPT_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_ATTACK_SIMULATION_REPORT_SCHEMA_ID => {
+                let Some(report) = typed::<RuntimeAttackSimulationReport>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(attack_simulation_report_signature_body(&report))
+                    .map_err(|error| signing_error("attack simulation", error))?;
+                (
+                    "attack simulation",
+                    report.issuer,
+                    RUNTIME_ATTACK_SIMULATION_REPORT_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_CHAOS_RUN_REPORT_SCHEMA_ID => {
+                let Some(report) = typed::<RuntimeChaosRunReport>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(chaos_run_report_signature_body(&report))
+                    .map_err(|error| signing_error("chaos run", error))?;
+                (
+                    "chaos run",
+                    report.issuer,
+                    RUNTIME_CHAOS_RUN_REPORT_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_REVOCATION_FRESHNESS_PROOF_SCHEMA_ID => {
+                let Some(proof) = typed::<RuntimeRevocationFreshnessProof>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(revocation_freshness_signature_body(&proof))
+                    .map_err(|error| signing_error("revocation freshness", error))?;
+                (
+                    "revocation freshness",
+                    proof.oracle_id,
+                    RUNTIME_REVOCATION_FRESHNESS_PROOF_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_SANDBOX_ATTESTATION_SCHEMA_ID => {
+                let Some(sandbox) = typed::<RuntimeSandboxAttestation>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(sandbox_attestation_signature_body(&sandbox))
+                    .map_err(|error| signing_error("sandbox attestation", error))?;
+                (
+                    "sandbox attestation",
+                    sandbox.attester,
+                    RUNTIME_SANDBOX_ATTESTATION_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID => {
+                let Some(ack) = typed::<RuntimeToolServerAck>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(tool_server_ack_signature_body(&ack))
+                    .map_err(|error| signing_error("tool-server ack", error))?;
+                (
+                    "tool-server ack",
+                    ack.tool_server_id,
+                    RUNTIME_TOOL_SERVER_ACK_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_TRUSTED_TIME_PROOF_SCHEMA_ID => {
+                let Some(proof) = typed::<RuntimeTrustedTimeProof>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(trusted_time_proof_signature_body(&proof))
+                    .map_err(|error| signing_error("trusted time", error))?;
+                (
+                    "trusted time",
+                    proof.issuer,
+                    RUNTIME_TRUSTED_TIME_PROOF_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            RUNTIME_TERMINAL_RECEIPT_SCHEMA_ID => {
+                let Some(receipt) = typed::<RuntimeTerminalReceipt>(value) else {
+                    return Ok(false);
+                };
+                let body = serde_json::to_value(terminal_receipt_signature_body(&receipt))
+                    .map_err(|error| signing_error("terminal receipt", error))?;
+                (
+                    "terminal receipt",
+                    receipt.kernel_key,
+                    RUNTIME_TERMINAL_RECEIPT_SIGNATURE_SCHEMA,
+                    body,
+                )
+            }
+            _ => return Ok(false),
+        };
+    let public_key = self_certifying_public_key(&signer, "runtime artifact signer")?;
+    let key = keys
+        .iter()
+        .find(|key| key.public_key() == public_key)
+        .ok_or_else(|| signing_error(label, format!("no fixture key for signer {signer}")))?;
+    let signature = wrapped_signature(key, signature_schema, &body, label)?;
+    value["signature"] = serde_json::Value::String(signature);
+    Ok(true)
 }
 
 fn self_certifying_public_key(

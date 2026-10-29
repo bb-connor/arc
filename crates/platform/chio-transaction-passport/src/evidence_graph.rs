@@ -1146,16 +1146,40 @@ fn trust_root_signer_identity(
     Ok(key_id.to_string())
 }
 
-/// Signing-wrapper schema id of the artifact a signed evidence role carries.
-fn signed_role_wrapper_schema(role: EvidenceNodeRole) -> Option<&'static str> {
+const CAPABILITY_ROLE_SCHEMAS: &[&str] = &[
+    "chio.capability.proof.v1",
+    "chio.proof.first-run.capability-proof.v1",
+];
+const TRUST_ROOT_ROLE_SCHEMAS: &[&str] =
+    &["chio.trust.root.v1", "chio.proof.first-run.trust-roots.v1"];
+const GUARD_DECISION_ROLE_SCHEMAS: &[&str] = &[
+    "chio.guard.decision.v1",
+    "chio.proof.first-run.guard-report.v1",
+];
+const RECEIPT_ROLE_SCHEMAS: &[&str] =
+    &[chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA];
+
+/// Schemas of the artifacts that carry a signed minimal governed action
+/// role. Each artifact is signed through the signing wrapper under its own
+/// `schema`.
+pub const SIGNED_EVIDENCE_ROLE_SCHEMAS: &[&str] = &[
+    "chio.capability.proof.v1",
+    "chio.proof.first-run.capability-proof.v1",
+    "chio.trust.root.v1",
+    "chio.proof.first-run.trust-roots.v1",
+    "chio.guard.decision.v1",
+    "chio.proof.first-run.guard-report.v1",
+    chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
+];
+
+/// Schemas an artifact may carry for a signed evidence role.
+fn signed_role_wrapper_schemas(role: EvidenceNodeRole) -> &'static [&'static str] {
     match role {
-        EvidenceNodeRole::Capability => Some("chio.capability.proof.v1"),
-        EvidenceNodeRole::TrustRoot => Some("chio.trust.root.v1"),
-        EvidenceNodeRole::GuardDecision => Some("chio.guard.decision.v1"),
-        EvidenceNodeRole::Receipt => {
-            Some(chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA)
-        }
-        _ => None,
+        EvidenceNodeRole::Capability => CAPABILITY_ROLE_SCHEMAS,
+        EvidenceNodeRole::TrustRoot => TRUST_ROOT_ROLE_SCHEMAS,
+        EvidenceNodeRole::GuardDecision => GUARD_DECISION_ROLE_SCHEMAS,
+        EvidenceNodeRole::Receipt => RECEIPT_ROLE_SCHEMAS,
+        _ => &[],
     }
 }
 
@@ -1184,14 +1208,23 @@ fn verify_signed_role_artifact(
         minimal_governed_action_binding_error(format!("{label} artifact must be an object"))
     })?;
     object.remove("signature");
-    let schema_id = signed_role_wrapper_schema(role).ok_or_else(|| {
-        minimal_governed_action_binding_error(format!("{label} role is not a signed artifact"))
-    })?;
-    if object.get("schema").and_then(serde_json::Value::as_str) != Some(schema_id) {
+    let schemas = signed_role_wrapper_schemas(role);
+    if schemas.is_empty() {
         return Err(minimal_governed_action_binding_error(format!(
-            "{label} schema is not {schema_id}"
+            "{label} role is not a signed artifact"
         )));
     }
+    let schema_id = object
+        .get("schema")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|schema| schemas.iter().copied().find(|known| *known == schema))
+        .ok_or_else(|| {
+            let expected = match schemas {
+                [only] => (*only).to_string(),
+                _ => format!("one of {}", schemas.join(", ")),
+            };
+            minimal_governed_action_binding_error(format!("{label} schema is not {expected}"))
+        })?;
     let verified =
         chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &artifact, &signature)
             .is_ok();

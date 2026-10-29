@@ -75,8 +75,6 @@ const SOLANA_MEMO_PROGRAM_ID: &str = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcH
 const PUBLIC_SETTLEMENT_REORGED_INDEPENDENT_CHAIN_HEAD_JSON: &str =
     "{\"chain_id\":\"eip155:8453\",\"observed_block_number\":12345678,\"observed_block_hash\":\"0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"latest_block_number\":12345701}";
 const CHIO_WEB3_CONTRACT_PACKAGE_PATH: &str = "docs/standards/CHIO_WEB3_CONTRACT_PACKAGE.json";
-const RUNTIME_TOOL_SERVER_SIGNATURE_SEED: [u8; 32] = [45; 32];
-const RUNTIME_JOIN_RECEIPT_SIGNATURE_SEED: [u8; 32] = [46; 32];
 const DISCLOSURE_AGENT_WEB_BBS_KEY_MATERIAL: &[u8] = b"chio-proof-disclosure-agent-web-bbs-key";
 const DISCLOSURE_AGENT_WEB_BBS_KEY_INFO: &[u8] = b"chio-proof-disclosure-agent-web";
 const DISCLOSURE_AGENT_WEB_BBS_NONCE: &[u8] = b"nonce-disclosure-agent-web";
@@ -362,6 +360,7 @@ fn materialize_proof_fixture(
     {
         remove_generated_negative_catalog(out)?;
     }
+    normalize_runtime_security_signatures(descriptor, out)?;
     normalize_enterprise_risk_lifecycle_replay(descriptor, out)?;
     normalize_enterprise_claim_payout_capital_instructions(descriptor, out)?;
     normalize_enterprise_preobserved_capital_instruction(descriptor, out)?;
@@ -370,11 +369,12 @@ fn materialize_proof_fixture(
     normalize_enterprise_export_verifier_report_ref(descriptor, out)?;
     normalize_enterprise_telemetry_passport_mismatch(descriptor, out)?;
     normalize_disclosure_lineage_bbs_material(descriptor, out)?;
-    normalize_runtime_join_receipt_signature(descriptor, out)?;
     normalize_runtime_reused_nonce_fixture(descriptor, out)?;
+    normalize_commerce_signatures(out)?;
     normalize_agent_web_fixture_material(descriptor, out)?;
     normalize_commerce_mandate_projection_edges(out)?;
     normalize_commerce_order_passport_binding(descriptor, out)?;
+    normalize_runtime_swarm_static_baseline(descriptor, out)?;
     generate_minimal_receipt_evidence(descriptor, out)?;
     normalize_declared_evidence_graph_node_ids(descriptor, out)?;
     if descriptor.kind != "negative-transaction-passport" {
@@ -684,52 +684,418 @@ fn normalize_runtime_reused_nonce_fixture(
     Ok(())
 }
 
-fn normalize_runtime_join_receipt_signature(
+/// Every fixture signer: the committed fixtures sign only with keys whose
+/// seed is one byte repeated.
+fn fixture_signers() -> Vec<Keypair> {
+    (0..=u8::MAX)
+        .map(|byte| Keypair::from_seed(&[byte; 32]))
+        .collect()
+}
+
+/// Passes after which re-signing and digest rebinding must have settled.
+const MAX_RESIGN_PASSES: usize = 8;
+
+/// Re-signs every runtime-security and swarm-authority artifact under `out`
+/// through the signing wrapper with the seed key its signer identity names,
+/// nested ones first. A stale signature on an artifact both verifiers read
+/// (task graph, route plan, join receipt) takes the swarm-authority domain
+/// in `swarm-authority/` fixtures and the runtime-security domain elsewhere.
+/// Every digest string that named a rewritten file, by file bytes or by
+/// canonical JSON, moves to the rewritten one until nothing changes.
+fn normalize_runtime_security_signatures(
     descriptor: &ProofFixtureDescriptor,
     out: &Path,
 ) -> Result<(), CliError> {
-    if !installed_fixture_path(descriptor).starts_with("runtime-security/") {
+    if !out.is_dir() {
         return Ok(());
     }
-    let join_receipt_path = out.join("join-receipt.json");
-    if !join_receipt_path.is_file() {
-        return Ok(());
+    let swarm_domain = installed_fixture_path(descriptor).starts_with("swarm-authority/");
+    let signers = fixture_signers();
+    let json_paths: Vec<PathBuf> = crate::input::collection::paths(out)?
+        .into_iter()
+        .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("json"))
+        .collect();
+    let mut moved: BTreeMap<String, String> = BTreeMap::new();
+    for _ in 0..MAX_RESIGN_PASSES {
+        let mut changed = false;
+        for path in &json_paths {
+            let original = read_json_value(path)?;
+            let mut value = original.clone();
+            sign_fixture_values(&mut value, &signers, swarm_domain, path)?;
+            rebind_digests(&mut value, &moved);
+            if value != original {
+                let previous_file = sha256_file(path)?;
+                write_json_line_file(path, &value)?;
+                record_move(&mut moved, previous_file, sha256_file(path)?);
+                record_move(&mut moved, canonical_sha256(&original)?, canonical_sha256(&value)?);
+                changed = true;
+            }
+        }
+        if !changed {
+            return Ok(());
+        }
     }
-    let mut join_receipt = read_json_value(&join_receipt_path)?;
-    if join_receipt
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        != Some("chio.swarm.join-receipt.v1")
-    {
-        return Ok(());
-    }
-    sign_runtime_join_receipt(&mut join_receipt)?;
-    write_json_line_file(&join_receipt_path, &join_receipt)
+    Err(CliError::cli_other_error(format!(
+        "fixture signatures under {} did not settle in {MAX_RESIGN_PASSES} passes",
+        out.display()
+    )))
 }
 
-fn sign_runtime_join_receipt(join_receipt: &mut serde_json::Value) -> Result<(), CliError> {
-    let keypair = Keypair::from_seed(&RUNTIME_JOIN_RECEIPT_SIGNATURE_SEED);
-    let public_key = keypair.public_key().to_hex();
-    join_receipt["issuer"] = serde_json::Value::String(format!("did:chio:{public_key}"));
-    let signature = runtime_join_receipt_signature(join_receipt, &keypair)?;
-    join_receipt["signature"] = serde_json::Value::String(signature);
+fn canonical_sha256(value: &serde_json::Value) -> Result<String, CliError> {
+    let canonical = chio_core_types::canonical_json_bytes(value).map_err(|error| {
+        CliError::cli_other_error(format!("fixture canonicalization failed: {error}"))
+    })?;
+    Ok(chio_core::sha256_hex(&canonical))
+}
+
+/// Maps `previous` and every digest that already led to it onto `current`.
+/// A digest already mapped keeps its first target, so a file whose bytes are
+/// its canonical JSON follows its file digest.
+fn record_move(moved: &mut BTreeMap<String, String>, previous: String, current: String) {
+    if previous == current || moved.contains_key(&previous) {
+        return;
+    }
+    for target in moved.values_mut() {
+        if *target == previous {
+            target.clone_from(&current);
+        }
+    }
+    moved.insert(previous, current);
+}
+
+fn rebind_digests(value: &mut serde_json::Value, moved: &BTreeMap<String, String>) {
+    match value {
+        serde_json::Value::String(text) => {
+            if let Some(current) = moved.get(text.as_str()) {
+                text.clone_from(current);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                rebind_digests(item, moved);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            for child in object.values_mut() {
+                rebind_digests(child, moved);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// `value` re-signed through the signing wrapper when it carries a signed
+/// evidence role `schema` and a bare hex `signature` that a fixture key made
+/// over its other members, wrapped or not. A signature no fixture key made
+/// stays as it is. `None` otherwise.
+fn evidence_role_signed(
+    value: &serde_json::Value,
+    signers: &[Keypair],
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) else {
+        return Ok(None);
+    };
+    if !chio_transaction_passport::SIGNED_EVIDENCE_ROLE_SCHEMAS.contains(&schema) {
+        return Ok(None);
+    }
+    let Some(Ok(signature)) = value
+        .get("signature")
+        .and_then(serde_json::Value::as_str)
+        .map(chio_core::Signature::from_hex)
+    else {
+        return Ok(None);
+    };
+    let mut payload = value.clone();
+    if let Some(object) = payload.as_object_mut() {
+        object.remove("signature");
+    }
+    let Some(key) = signers.iter().find(|key| {
+        let public_key = key.public_key();
+        chio_core_types::crypto::verify_wrapped(&public_key, schema, &payload, &signature).is_ok()
+    }) else {
+        return Ok(None);
+    };
+    let signature =
+        fixture_wrapped_signature(key, schema, &payload).map_err(|error| error.to_string())?;
+    let mut signed = value.clone();
+    signed["signature"] = serde_json::Value::String(signature.to_hex());
+    Ok(Some(signed))
+}
+
+/// Re-signs a crypto context report that names the disclosure lineage
+/// fixture signer through the typed report signer.
+fn crypto_context_report_signed(
+    value: &serde_json::Value,
+) -> Result<Option<serde_json::Value>, String> {
+    let lineage_key = Keypair::from_seed(&DISCLOSURE_LINEAGE_SIGNATURE_SEED)
+        .public_key()
+        .to_hex();
+    let names_lineage_key = value
+        .get("signature")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|signature| signature.strip_prefix("sig-ed25519:"))
+        .and_then(|reference| reference.split_once(':'))
+        .is_some_and(|(key_hex, _)| key_hex == lineage_key);
+    if !names_lineage_key {
+        return Ok(None);
+    }
+    let mut resigned = value.clone();
+    sign_disclosure_crypto_report_json(&mut resigned).map_err(|error| error.to_string())?;
+    Ok((resigned != *value).then_some(resigned))
+}
+
+/// `value` re-signed when it is a trust-market or risk artifact whose inline
+/// `sig-ed25519:<key>:<signature>` covers its other members under its
+/// `schema` and `<key>` is a fixture key, or a crypto context report signed by
+/// the disclosure lineage fixture key. `None` otherwise.
+fn inline_signed(
+    value: &serde_json::Value,
+    signers: &[Keypair],
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) else {
+        return Ok(None);
+    };
+    if schema == chio_selective_disclosure::DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1 {
+        return crypto_context_report_signed(value);
+    }
+    if !is_trust_market_signed_artifact_schema(schema) {
+        return Ok(None);
+    }
+    let Some(key_hex) = value
+        .get("signature")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|signature| signature.strip_prefix("sig-ed25519:"))
+        .and_then(|reference| reference.split_once(':'))
+        .map(|(key_hex, _)| key_hex)
+    else {
+        return Ok(None);
+    };
+    let Some(key) = signers
+        .iter()
+        .find(|key| key.public_key().to_hex() == key_hex)
+    else {
+        return Ok(None);
+    };
+    let mut payload = value.clone();
+    if let Some(object) = payload.as_object_mut() {
+        object.remove("signature");
+    }
+    let signature =
+        fixture_wrapped_signature(key, schema, &payload).map_err(|error| error.to_string())?;
+    let mut signed = value.clone();
+    signed["signature"] = serde_json::Value::String(format!(
+        "sig-ed25519:{key_hex}:{}",
+        signature.to_hex()
+    ));
+    Ok(Some(signed))
+}
+
+fn sign_fixture_values(
+    value: &mut serde_json::Value,
+    signers: &[Keypair],
+    swarm_domain: bool,
+    path: &Path,
+) -> Result<(), CliError> {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                sign_fixture_values(item, signers, swarm_domain, path)?;
+            }
+        }
+        serde_json::Value::Object(object) => {
+            for child in object.values_mut() {
+                sign_fixture_values(child, signers, swarm_domain, path)?;
+            }
+        }
+        _ => return Ok(()),
+    }
+    let fail = |error: String| {
+        CliError::cli_other_error(format!("fixture {} signing failed: {error}", path.display()))
+    };
+    let mut runtime = value.clone();
+    let runtime_signed =
+        chio_transaction_passport::sign_runtime_security_artifact(&mut runtime, signers)
+            .map_err(|error| fail(error.to_string()))?;
+    let swarm = swarm_signed(value, signers).map_err(fail)?;
+    match (runtime_signed, swarm) {
+        (false, None) => {
+            if let Some(signed) = export_envelope_signed(value, signers).map_err(fail)? {
+                *value = signed;
+            } else if let Some(signed) = inline_signed(value, signers).map_err(fail)? {
+                *value = signed;
+            } else if let Some(signed) = evidence_role_signed(value, signers).map_err(fail)? {
+                *value = signed;
+            }
+        }
+        (true, None) => *value = runtime,
+        (false, Some(swarm)) => *value = swarm,
+        (true, Some(swarm)) => {
+            if runtime != *value && swarm != *value {
+                *value = if swarm_domain { swarm } else { runtime };
+            }
+        }
+    }
     Ok(())
 }
 
-fn runtime_join_receipt_signature(
-    join_receipt: &serde_json::Value,
-    keypair: &Keypair,
-) -> Result<String, CliError> {
-    let mut body = join_receipt.clone();
-    let object = body.as_object_mut().ok_or_else(|| {
-        CliError::cli_other_error("runtime join receipt signature body invalid".to_string())
-    })?;
-    object.remove("signature");
-    Ok(fixture_wrapped_signature(keypair, "chio.swarm.join-receipt.v1", &body)
-        .map_err(|error| {
-            CliError::cli_other_error(format!("runtime join receipt signing failed: {error}"))
-        })?
-        .to_hex())
+/// Envelope members that name the signer key.
+const ENVELOPE_SIGNER_KEYS: &[&str] = &["signerKey", "signer_key"];
+/// Payload members that name the signer key when the envelope does not.
+const PAYLOAD_SIGNER_KEYS: &[&str] = &["chio_public_key", "chioPublicKey"];
+
+/// `value` signed as a payload envelope: one payload object whose `schema`
+/// is a registered wrapper id, a `signature`, and at most a signer key
+/// member, signed over the payload under that id. `None` when `value` is not
+/// such an envelope.
+fn export_envelope_signed(
+    value: &serde_json::Value,
+    signers: &[Keypair],
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(object) = value.as_object() else {
+        return Ok(None);
+    };
+    if !object.contains_key("signature") {
+        return Ok(None);
+    }
+    let mut payload = None;
+    for (name, member) in object {
+        if name == "signature" || ENVELOPE_SIGNER_KEYS.contains(&name.as_str()) {
+            continue;
+        }
+        if payload.is_some() {
+            return Ok(None);
+        }
+        payload = Some(member);
+    }
+    let Some(payload) = payload else {
+        return Ok(None);
+    };
+    let Some(schema) = payload.get("schema").and_then(serde_json::Value::as_str) else {
+        return Ok(None);
+    };
+    if !chio_core_types::KNOWN_SIGNED_ARTIFACT_SCHEMAS.contains(&schema) {
+        return Ok(None);
+    }
+    let Some(signer) = ENVELOPE_SIGNER_KEYS
+        .iter()
+        .find_map(|name| object.get(*name))
+        .or_else(|| PAYLOAD_SIGNER_KEYS.iter().find_map(|name| payload.get(*name)))
+    else {
+        return Ok(None);
+    };
+    let signer_key: chio_core_types::PublicKey = serde_json::from_value(signer.clone())
+        .map_err(|error| format!("envelope signer key invalid: {error}"))?;
+    let key = signers
+        .iter()
+        .find(|key| key.public_key() == signer_key)
+        .ok_or_else(|| format!("no fixture key for envelope signer {}", signer_key.to_hex()))?;
+    let canonical =
+        chio_core_types::CanonicalBytes::from_serializable(payload).map_err(|error| error.to_string())?;
+    let signature = key
+        .sign_wrapped(schema, &canonical)
+        .map_err(|error| error.to_string())?;
+    let mut signed = value.clone();
+    signed["signature"] = serde_json::Value::String(signature.to_hex());
+    Ok(Some(signed))
+}
+
+fn swarm_artifact<T: serde::de::DeserializeOwned>(value: &serde_json::Value) -> Option<T> {
+    serde_json::from_value(value.clone()).ok()
+}
+
+fn sign_with_any<T>(
+    signers: &[Keypair],
+    label: &str,
+    sign: impl Fn(&Keypair) -> Result<T, chio_swarm_authority::SwarmAuthorityError>,
+) -> Result<T, String> {
+    signers
+        .iter()
+        .find_map(|key| sign(key).ok())
+        .ok_or_else(|| format!("no fixture key signs this {label}"))
+}
+
+/// `value` signed as a swarm-authority artifact, or `None` when it is not
+/// one.
+fn swarm_signed(
+    value: &serde_json::Value,
+    signers: &[Keypair],
+) -> Result<Option<serde_json::Value>, String> {
+    use chio_swarm_authority as swarm;
+    let Some(schema) = value.get("schema").and_then(serde_json::Value::as_str) else {
+        return Ok(None);
+    };
+    let signature = match schema {
+        swarm::CHIO_SWARM_TASK_GRAPH_SCHEMA => {
+            let Some(graph) = swarm_artifact::<swarm::SwarmTaskGraph>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "task graph", |key| swarm::sign_swarm_task_graph(&graph, key))?
+        }
+        swarm::CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA => {
+            let Some(plan) = swarm_artifact::<swarm::SwarmRoutePlanReceipt>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "route plan", |key| {
+                swarm::sign_swarm_route_plan_receipt(&plan, key)
+            })?
+        }
+        swarm::CHIO_SWARM_JOIN_RECEIPT_SCHEMA => {
+            let Some(receipt) = swarm_artifact::<swarm::SwarmJoinReceipt>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "join receipt", |key| {
+                swarm::sign_swarm_join_receipt(&receipt, key)
+            })?
+        }
+        swarm::CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA => {
+            let Some(token) = swarm_artifact::<swarm::SwarmContinuationToken>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "continuation token", |key| {
+                swarm::sign_swarm_continuation_token(&token, key)
+            })?
+        }
+        swarm::CHIO_SWARM_REVOCATION_EPOCH_SCHEMA => {
+            let Some(epoch) = swarm_artifact::<swarm::SwarmRevocationEpoch>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "revocation epoch", |key| {
+                swarm::sign_swarm_revocation_epoch(&epoch, key)
+            })?
+        }
+        swarm::CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA => {
+            let Some(receipt) = swarm_artifact::<swarm::SwarmTerminalGraphReceipt>(value) else {
+                return Ok(None);
+            };
+            sign_with_any(signers, "terminal graph receipt", |key| {
+                swarm::sign_swarm_terminal_graph_receipt(&receipt, key)
+            })?
+        }
+        swarm::CHIO_SWARM_DELEGATION_WITNESS_CHAIN_SCHEMA => {
+            let Some(mut chain) = swarm_artifact::<swarm::SwarmDelegationWitnessChain>(value)
+            else {
+                return Ok(None);
+            };
+            for index in 0..chain.hops.len() {
+                let Some(hop) = chain.hops.get(index).cloned() else {
+                    continue;
+                };
+                let signature = sign_with_any(signers, "witness hop", |key| {
+                    swarm::sign_swarm_delegation_witness_hop(&chain, &hop, key)
+                })?;
+                if let Some(hop) = chain.hops.get_mut(index) {
+                    hop.witness_signature = signature;
+                }
+            }
+            return serde_json::to_value(&chain)
+                .map(Some)
+                .map_err(|error| error.to_string());
+        }
+        _ => return Ok(None),
+    };
+    let mut signed = value.clone();
+    signed["signature"] = serde_json::Value::String(signature);
+    Ok(Some(signed))
 }
 
 fn normalize_runtime_reused_nonce_bundle(
@@ -742,7 +1108,15 @@ fn normalize_runtime_reused_nonce_bundle(
     let mut replay_ack = read_json_value(&source_ack_path)?;
     replay_ack["ack_id"] = serde_json::Value::String("ack-runtime-replay".to_string());
     replay_ack["issued_at"] = serde_json::Value::String("2026-06-10T00:00:03Z".to_string());
-    replay_ack["signature"] = serde_json::Value::String(sign_runtime_tool_server_ack(&replay_ack)?);
+    chio_transaction_passport::sign_runtime_security_artifact(
+        &mut replay_ack,
+        &fixture_signers(),
+    )
+    .map_err(|error| {
+        CliError::cli_other_error(format!(
+            "runtime tool-server acknowledgement signing failed: {error}"
+        ))
+    })?;
     write_json_line_file(&replay_ack_path, &replay_ack)?;
 
     let replay_sha256 = sha256_file(&replay_ack_path)?;
@@ -787,30 +1161,6 @@ fn normalize_runtime_reused_nonce_bundle(
     }
     write_json_line_file(evidence_graph_path, &evidence_graph)?;
     Ok(())
-}
-
-fn sign_runtime_tool_server_ack(ack: &serde_json::Value) -> Result<String, CliError> {
-    let keypair = Keypair::from_seed(&RUNTIME_TOOL_SERVER_SIGNATURE_SEED);
-    let body = serde_json::json!({
-        "schema": "chio.runtime.tool-server-ack-signature.v1",
-        "ackId": ack["ack_id"],
-        "leaseId": ack["lease_id"],
-        "toolServerId": ack["tool_server_id"],
-        "toolInstanceId": ack["tool_instance_id"],
-        "sandboxAttestationRef": ack["sandbox_attestation_ref"],
-        "nonce": ack["nonce"],
-        "terminalStatus": ack["terminal_status"],
-        "issuedAt": ack["issued_at"],
-    });
-    Ok(
-        fixture_wrapped_signature(&keypair, "chio.runtime.tool-server-ack-signature.v1", &body)
-            .map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "runtime tool-server acknowledgement signing failed: {error}"
-                ))
-            })?
-            .to_hex(),
-    )
 }
 
 fn proof_fixture_expected_failure(
@@ -1237,6 +1587,7 @@ pub(super) fn copy_proof_fixture(fixture_id: &str, out: &Path) -> Result<(), Cli
     } else {
         copy_embedded_fixture(installed_fixture_path(&descriptor), out)?;
     }
+    normalize_runtime_security_signatures(&descriptor, out)?;
     normalize_enterprise_risk_lifecycle_replay(&descriptor, out)?;
     normalize_enterprise_claim_payout_capital_instructions(&descriptor, out)?;
     normalize_enterprise_preobserved_capital_instruction(&descriptor, out)?;
@@ -1245,11 +1596,12 @@ pub(super) fn copy_proof_fixture(fixture_id: &str, out: &Path) -> Result<(), Cli
     normalize_enterprise_export_verifier_report_ref(&descriptor, out)?;
     normalize_enterprise_telemetry_passport_mismatch(&descriptor, out)?;
     normalize_disclosure_lineage_bbs_material(&descriptor, out)?;
-    normalize_runtime_join_receipt_signature(&descriptor, out)?;
     normalize_runtime_reused_nonce_fixture(&descriptor, out)?;
+    normalize_commerce_signatures(out)?;
     normalize_agent_web_fixture_material(&descriptor, out)?;
     normalize_commerce_mandate_projection_edges(out)?;
     normalize_commerce_order_passport_binding(&descriptor, out)?;
+    normalize_runtime_swarm_static_baseline(&descriptor, out)?;
     normalize_declared_evidence_graph_node_ids(&descriptor, out)?;
     if descriptor.kind != "negative-transaction-passport" {
         refresh_proof_room_bundle_source_reports(out)?;
@@ -1639,6 +1991,83 @@ fn add_public_stage_settlement_trust_market_refs(
     )?);
     sign_public_settlement_proof_bundle(&mut settlement_proof, &settlement_proof_path)?;
     write_json_line_file(&settlement_proof_path, &settlement_proof)
+}
+
+/// Re-signs the provider trust artifacts and payment lifecycle of every
+/// commerce bundle under `out` through the signing wrapper, and moves each
+/// order-context digest that named the previous bytes to the new ones.
+fn normalize_commerce_signatures(out: &Path) -> Result<(), CliError> {
+    let mut order_context_paths = Vec::new();
+    collect_named_file_paths(out, "order-context.json", &mut order_context_paths)?;
+    for order_context_path in order_context_paths {
+        let Some(bundle) = order_context_path.parent() else {
+            continue;
+        };
+        let mut order_context = read_json_value(&order_context_path)?;
+        let original = order_context.clone();
+        for (file, digest_field) in [
+            ("provider-passport.json", "provider_passport_sha256"),
+            ("reputation-snapshot.json", "reputation_snapshot_sha256"),
+            ("federation-trust-bundle.json", "federation_trust_bundle_sha256"),
+            ("payment-lifecycle.json", "payment_lifecycle_sha256"),
+        ] {
+            let path = bundle.join(file);
+            if !path.is_file() {
+                continue;
+            }
+            let previous = sha256_file(&path)?;
+            if file == "payment-lifecycle.json" {
+                let mut payment_lifecycle = read_json_value(&path)?;
+                sign_fixture_commerce_payment_lifecycle(&mut payment_lifecycle)?;
+                write_json_line_file(&path, &payment_lifecycle)?;
+            } else {
+                sign_fixture_commerce_provider_trust_artifact(&path)?;
+            }
+            let current = sha256_file(&path)?;
+            if order_context.get(digest_field).and_then(serde_json::Value::as_str)
+                == Some(previous.as_str())
+            {
+                order_context[digest_field] = serde_json::Value::String(current);
+            }
+        }
+        if order_context != original {
+            let previous = sha256_file(&order_context_path)?;
+            write_json_line_file(&order_context_path, &order_context)?;
+            let current = sha256_file(&order_context_path)?;
+            rebind_order_context_digests(bundle, &previous, &current)?;
+        }
+    }
+    Ok(())
+}
+
+/// Payment members that carry the digest of the order context they pay for.
+const ORDER_CONTEXT_DIGEST_FIELDS: &[&str] = &["order_context_digest", "transaction_context_digest"];
+
+/// Rewrites every top-level order context digest member that named the
+/// `previous` digest in the JSON files beside an order context.
+fn rebind_order_context_digests(
+    bundle: &Path,
+    previous: &str,
+    current: &str,
+) -> Result<(), CliError> {
+    for entry in fs::read_dir(bundle)? {
+        let path = entry?.path();
+        if !path.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let mut value = read_json_value(&path)?;
+        let mut changed = false;
+        for field in ORDER_CONTEXT_DIGEST_FIELDS {
+            if value.get(*field).and_then(serde_json::Value::as_str) == Some(previous) {
+                value[*field] = serde_json::Value::String(current.to_string());
+                changed = true;
+            }
+        }
+        if changed {
+            write_json_line_file(&path, &value)?;
+        }
+    }
+    Ok(())
 }
 
 fn normalize_commerce_order_passport_binding(
@@ -2297,6 +2726,68 @@ fn create_private_runtime_swarm_directory(path: &Path) -> Result<(), CliError> {
     }
     builder.create(path)?;
     Ok(())
+}
+
+/// Fixture whose `proof-package.json` and `verifier-report.json` are the
+/// static baseline the recursive runtime swarm loopback must reproduce.
+const RUNTIME_SWARM_STATIC_BASELINE_FIXTURE: &str = "swarm-authority/valid-recursive-delegation";
+/// Loopback runs allowed for the static baseline to reach parity. The first
+/// run may draw a fresh selective disclosure proof; the next reuses it.
+const RUNTIME_SWARM_BASELINE_PASSES: usize = 3;
+
+/// Rewrites the static proof package and verifier report of the recursive
+/// delegation fixture to what the runtime loopback produces, one run at a
+/// time, until a run accepts them. A run is adopted only when its parity
+/// report lists no semantic mismatch, so only encodings and signatures move.
+fn normalize_runtime_swarm_static_baseline(
+    descriptor: &ProofFixtureDescriptor,
+    out: &Path,
+) -> Result<(), CliError> {
+    if installed_fixture_path(descriptor) != RUNTIME_SWARM_STATIC_BASELINE_FIXTURE {
+        return Ok(());
+    }
+    let package_path = out.join("proof-package.json");
+    let report_path = out.join("verifier-report.json");
+    for _ in 0..RUNTIME_SWARM_BASELINE_PASSES {
+        let work = tempfile::tempdir()?;
+        let scenario_path = work.path().join("scenario.json");
+        write_executable_runtime_swarm_scenario(&scenario_path)?;
+        let out_dir = work.path().join("out");
+        let run = chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts(
+            &scenario_path,
+            &work.path().join("store"),
+            RUNTIME_SWARM_LOOPBACK_NOW_UNIX_MS,
+            &out_dir,
+            &crate::input::read_text(&package_path)?,
+            &crate::input::read_text(&report_path)?,
+        );
+        let Err(error) = run else {
+            return Ok(());
+        };
+        let parity: serde_json::Value =
+            match crate::input::read_text(out_dir.join("runtime-proof-parity-report.json")) {
+                Ok(text) => serde_json::from_str(&text)?,
+                Err(_) => {
+                    return Err(CliError::cli_other_error(format!(
+                        "proof fixture runtime baseline loopback failed: {error}"
+                    )))
+                }
+            };
+        let semantic_match = parity
+            .get("mismatches")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(Vec::is_empty);
+        if !semantic_match {
+            return Err(CliError::cli_other_error(format!(
+                "proof fixture runtime baseline diverges semantically: {error}"
+            )));
+        }
+        fs::write(&package_path, crate::input::read(out_dir.join("proof-package.json"))?)?;
+        fs::write(&report_path, crate::input::read(out_dir.join("verifier-report.json"))?)?;
+    }
+    Err(CliError::cli_other_error(format!(
+        "proof fixture runtime baseline did not reach parity in {RUNTIME_SWARM_BASELINE_PASSES} runs"
+    )))
 }
 
 fn runtime_swarm_loopback_temp_root() -> Result<PathBuf, CliError> {
@@ -4522,8 +5013,8 @@ fn normalize_enterprise_risk_lifecycle_replay(
     for risk_report_path in risk_report_paths {
         let mut risk_report = read_json_value(&risk_report_path)?;
         let policy_id = risk_policy_id_for_report(&risk_report);
-        let mut changed = ensure_enterprise_risk_policy_binding(&mut risk_report, &policy_id);
-        changed |= ensure_enterprise_risk_financial_invariants(&mut risk_report);
+        ensure_enterprise_risk_policy_binding(&mut risk_report, &policy_id);
+        ensure_enterprise_risk_financial_invariants(&mut risk_report);
         if risk_report
             .get("facility_lifecycle")
             .and_then(serde_json::Value::as_array)
@@ -4553,17 +5044,14 @@ fn normalize_enterprise_risk_lifecycle_replay(
             if !lifecycle.is_empty() {
                 risk_report["facility_lifecycle"] = serde_json::Value::Array(lifecycle);
                 ensure_enterprise_risk_policy_binding(&mut risk_report, &policy_id);
-                changed = true;
             }
         }
-        if changed {
-            if is_trust_market_fixture {
-                sign_trust_market_artifact(&mut risk_report)?;
-            } else {
-                sign_enterprise_risk_comptroller_report(&mut risk_report)?;
-            }
-            write_json_line_file(&risk_report_path, &risk_report)?;
+        if is_trust_market_fixture {
+            sign_trust_market_artifact(&mut risk_report)?;
+        } else {
+            sign_enterprise_risk_comptroller_report(&mut risk_report)?;
         }
+        write_json_line_file(&risk_report_path, &risk_report)?;
         if risk_report_path.file_name().and_then(|name| name.to_str())
             == Some("risk-comptroller-report.json")
         {

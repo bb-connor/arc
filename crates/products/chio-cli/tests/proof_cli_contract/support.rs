@@ -1029,10 +1029,15 @@ fn authorize_transaction_trust_root_subject(bundle: &Path, subject: &str) {
             .as_object_mut()
             .test_expect("trust root is object");
         object.remove("signature");
+        let schema = object
+            .get("schema")
+            .and_then(serde_json::Value::as_str)
+            .test_expect("trust root schema")
+            .to_string();
         let keypair = Keypair::from_seed(&[54u8; 32]);
         let signature = keypair
             .sign_wrapped(
-                "chio.proof.first-run.trust-roots.v1",
+                &schema,
                 &chio_core::canonical::CanonicalBytes::from_serializable(&trust_root)
                     .test_expect("canonical signing body"),
             )

@@ -1,18 +1,1 @@
-{
-  "actual_verifier_report_digest": "93ed4c438078237a7ab6c7ea9c2e78ede8b39023b996267092dcae72a02b7f32",
-  "attack_class": "confused-deputy-route-metadata",
-  "chaos_knobs": [
-    "route_metadata"
-  ],
-  "expected_denial_claim": "claim.runtime.route_plan_bound",
-  "fixture_path": "runtime-security/confused-deputy-route-metadata",
-  "issuer": "did:chio:5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca",
-  "runtime_receipt_refs": [
-    "receipt-runtime-valid"
-  ],
-  "scenario_id": "attack-confused-deputy-route-metadata",
-  "schema": "chio.runtime.attack-simulation-report.v1",
-  "signature": "6ac284fce7c1f7e3863e819de24bdd26de91e234a0e90c6003f216a402b484c435a26d97614d5ef6c739293d474f509f8720cc9190ee8e10cbf17e62141eee01",
-  "simulator_version_digest": "7b507c9dd41316c67a49d7eb5c33730b7e01843ea2c0d1d495cae1f8a08679d3",
-  "status": "passed"
-}
+{"actual_verifier_report_digest":"93ed4c438078237a7ab6c7ea9c2e78ede8b39023b996267092dcae72a02b7f32","attack_class":"confused-deputy-route-metadata","chaos_knobs":["route_metadata"],"expected_denial_claim":"claim.runtime.route_plan_bound","fixture_path":"runtime-security/confused-deputy-route-metadata","issuer":"did:chio:5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca","runtime_receipt_refs":["receipt-runtime-valid"],"scenario_id":"attack-confused-deputy-route-metadata","schema":"chio.runtime.attack-simulation-report.v1","signature":"44abdbb27f252ec6ef0836528ea3face09ff3fc71834b2caede5167635cda8ee26663951ecf28a93175c6d34e91afc86f8bd1ed1fa09c5010f25c825545ea102","simulator_version_digest":"7b507c9dd41316c67a49d7eb5c33730b7e01843ea2c0d1d495cae1f8a08679d3","status":"passed"}

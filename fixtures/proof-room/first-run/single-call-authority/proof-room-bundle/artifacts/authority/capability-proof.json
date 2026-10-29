@@ -1,14 +1,1 @@
-{
-  "capability_id": "cap-first-run-single-call",
-  "expires_at": "2026-06-10T00:05:00Z",
-  "id": "capability-proof-single-call-authority",
-  "issuer": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-  "nonce": "nonce-first-run-single-call",
-  "not_before": "2026-06-10T00:00:00Z",
-  "policy_digest": "3f562106e60d01c801571ab725ce3d9c8f5cf35451ae9e5d08c1fff1bf005bfe",
-  "schema": "chio.proof.first-run.capability-proof.v1",
-  "scope": "tool:demo.echo:invoke",
-  "signature": "79775f92c780fde9bdc58aeea6bb6bcda5dcb08ecc2b81a42fd5b4fa0e057878562e4acae2ea785be560f3f51e43af73d2ae6280ca74903bf0bd89bfa25ac004",
-  "subject": "did:chio:agent-first-run",
-  "trust_root_ref": "trust-roots-single-call-authority"
-}
+{"capability_id":"cap-first-run-single-call","expires_at":"2026-06-10T00:05:00Z","id":"capability-proof-single-call-authority","issuer":"did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c","nonce":"nonce-first-run-single-call","not_before":"2026-06-10T00:00:00Z","policy_digest":"3f562106e60d01c801571ab725ce3d9c8f5cf35451ae9e5d08c1fff1bf005bfe","schema":"chio.proof.first-run.capability-proof.v1","scope":"tool:demo.echo:invoke","signature":"36d8631523299e713c4a1c3f870ae90d5fbfb08f7e7be1aecbd147ba31735a8d18e1aa780b401be0764a1c480c1f457e6107f70c7618f363a65b615be5bf050d","subject":"did:chio:agent-first-run","trust_root_ref":"trust-roots-single-call-authority"}

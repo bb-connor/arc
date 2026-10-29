@@ -34,7 +34,7 @@ use serde_json::{json, Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const FINDING_ID: &str = "2e1b8eabe5efb8027edac0d529ed5d16efa1d73429e6cbb619a6008152ae37c5";
+const FINDING_ID: &str = "2a4390a50f8f23ad44ccc89296d4bfeeeee3326ebfd004f80933ecfcce02b250";
 const STATUS_FEED_ID: &str = "finding-status/test";
 const RETRACTED_FINDING_ID: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
