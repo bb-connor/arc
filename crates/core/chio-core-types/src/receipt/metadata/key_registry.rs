@@ -171,10 +171,10 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
     spec(
         "caller_delivery",
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         Some("chio.authenticated-caller-observation.v1"),
-        "Authenticated caller observation report and authorization digests, executor and claim identity and times; no raw output. Read by the kernel's return-context, terminal and replay paths.",
+        "Authenticated caller observation; no raw output. authorization_digest, the executor id, key and epoch, claim_id and the two execution times are executor or operator values that no reader needs in plaintext. Read by the kernel's terminal return-context conflict check. Target form: schema and report_digest, a digest over the executor-signed report, stay plaintext for that check; authorization_digest, executor, claim_id and both execution times become commitments.",
     ),
     spec(
         "protocol_refusal",
@@ -187,10 +187,10 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
     spec(
         "chio_runtime",
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         None,
-        "Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit.",
+        "Runtime admission and kernel runtime evidence. The admission bundle's admission, workflow, grant and lease ids are deterministic over plan, capability and caller values, its trust and verification-context digests are unsalted over provisioned artifacts, and the route, payment-unwind and treaty members carry plan, rail and treaty values. The only key a runtime-admission hook writes. Target form: accepted, identity_disposition, retryable_after_resume, post_effect_fault, operation_owned_replay.reference and verified_swarm_request_binding.capability_sha256 stay plaintext for the runtime-admission hook, refusal replay, the stop contract (8.3) and the CLI call, nonce, custody and run-evidence verifiers; the bundle ids and digests, the reserved and retained lease ids, the route metadata, the other request-binding members, the payment-unwind ids, the treaty DSSE references and the unread flags and dispositions become commitments.",
     ),
     spec(
         super::SESSION_ANCHOR_METADATA_KEY,
@@ -259,18 +259,18 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
     spec(
         "finding_purchase_replay_snapshot",
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         None,
-        "Admission-verified purchase binding and status proof frozen for terminal replay. Read by the kernel's purchase gate and replay paths.",
+        "Admission-verified purchase binding and status proof frozen for terminal replay. finding_id is an unsalted digest of the provider's finding body, payload_sha256 is the unsalted payload digest, and listing_id, the payload media type, the expected status feed id, the accepted price and the feed, epoch, root and operator-configuration members of the status proof are provider, configuration or low-entropy values. Read by the kernel's purchase gate on replay. Target form: schema, payer_key_hex, reservation_id, purchase_intent_id, authoritative_payment_operation_id, the accepted-bid and venue-admission envelope digests, status_epoch_artifact_sha256, proof_sha256 and non_inclusion_checked_at stay plaintext; finding_id, listing_id, payload_sha256, payload_media_type, expected_status_feed_id, accepted_price and the other status-proof members become commitments.",
     ),
     spec(
         "finding_recovery_replay_snapshot",
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         None,
-        "Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths.",
+        "Durable recovery binding and the live-status floor admitted before dispatch. original_capability_id is the issuer's token id, and finding_id, listing_id, payload_sha256, expected_status_feed_id and the status-proof members are as in finding_purchase_replay_snapshot. Read by the kernel's recovery gate and terminal status revalidation. Target form: schema, request_binding_sha256, recovery_id, purchase_key, original_delivery_receipt_id, original_subject_key_hex, status_epoch_artifact_sha256, proof_sha256 and non_inclusion_checked_at stay plaintext; original_capability_id, finding_id, listing_id, payload_sha256, expected_status_feed_id and the other status-proof members become commitments.",
     ),
     spec(
         DECISION_MODEL_WITNESS_METADATA_KEY,
@@ -299,10 +299,10 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
     spec(
         "threshold_approval",
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         None,
-        "Threshold approval proposal id and hash, deadline and state for a pending call. The CLI response verifier reads the state.",
+        "Threshold approval marker for a pending call. proposal_id, proposal_hash and proposal_deadline have no reader that needs them in plaintext; the full proposal is the response output, covered by the content commitment. Read by the CLI response verifier (state). Target form: state stays plaintext; proposal_id, proposal_hash and proposal_deadline become commitments.",
     ),
     spec(
         "memory_provenance",
