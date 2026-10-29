@@ -1,32 +1,28 @@
 {
   "schema": "chio.runtime.proof-regeneration-input.v1",
   "runId": "runtime-loopback-1",
-  "evidenceManifestSha256": "947af692a44672a38c4e51f6d4fed00ef0b0894af43e817f5cf13570332ae5ae",
-  "workflowRunReportSha256": "6b0e664509e9f38d16ef8207304eedddaac643f2efdd65d0a13817b7917bcc82",
-  "admissionReportSha256": "7f584e52af89d84647fc79e4b471cf14183ca2395571c306aee41306917bd953",
-  "trustBundleSha256": "db181d228ff48991c4be20eb83b3bc98f4fc97c3bcfda046c4ef713399a13e48",
+  "evidenceManifestSha256": "415fb0c72b9c611faf26ad19fce1ad2dc96a61738913631cd8a8ad4165dcb9ed",
+  "workflowRunReportSha256": "fdd6bc959bc70258fd317a94acf497e2dff3f1ad5d29b9e19eda5ca34e720329",
+  "trustBundleSha256": "32f6e8402970734e1837e60d7b3af51746c28ac58084682db102b649db6c1d63",
   "verificationContextSha256": "4758a93f2dbc16256105ce6d47a4efdd39d477733dcb2a5e80075a3e1aaddcce",
   "sourceRecords": [
     {
       "stepIndex": 0,
-      "admissionReportSha256": "15b6814b2fd721ee3e3ffcd4dbf4c116666b494afdc9d0dbec925162c4b2c266",
-      "toolReceiptSha256": "7098c4fb97c8b3665e2cdb8c3380bc977c30febefd247b7e40ecaa780ae140d7",
-      "bilateralDsseSha256": "30fd171fdbe6f218f152afaf2115793d4fc9fd89488c3a4ac945206d1e4ce883",
-      "workflowStepSha256": "453384ebc87290ba9e31d80ef3b515292621ad2f7716f4b4ffca469147ca6bf4"
+      "toolReceiptSha256": "5c697fe3b4cf982ff1e23ec5486b5e99ad131d133082e58b62faadbaa7b8b960",
+      "bilateralDsseSha256": "8d267b1ad67870f0427605b116e56746369b8d9b0764e61a87fd1c31d29d1ab1",
+      "workflowStepSha256": "da7367a3c4c33d151700d2587596ffecc3eeef74d2161973ffb6281d390089e6"
     },
     {
       "stepIndex": 1,
-      "admissionReportSha256": "99c18bed827350310fe2cfc9ff7486c31a1235b026eefc4f0d7c592ba4bb50b6",
-      "toolReceiptSha256": "ce752000cd2fd5b916446f5b80f1ee252d90122e01e5f6d7d2436ffabe7a3bf7",
-      "bilateralDsseSha256": "fb02c49d0e779eba9a1dc23792943c26c7f0452fcdf520224867a76b717625d8",
-      "workflowStepSha256": "1c2655dc561fe0244707dc4c5b3093729cda8aed3bf94596576e2e0ebd5324f5"
+      "toolReceiptSha256": "6a41e9ecba8dcb96a380627ddf024084aea5ae0170e5c735268ae42f470891c0",
+      "bilateralDsseSha256": "d01a3b797cece3d92fe3030e11872626136e8d7fc752b33ec9a1786dbb3512fb",
+      "workflowStepSha256": "1cf19fae17bd1b005959efdc06b679e2a53ae7a22cb09ef86c0022e27803787b"
     },
     {
       "stepIndex": 2,
-      "admissionReportSha256": "7f584e52af89d84647fc79e4b471cf14183ca2395571c306aee41306917bd953",
-      "toolReceiptSha256": "e1818823d2aa9ac729c8db9fb59bd994c7a36ce3c97032988d7c4010b971a534",
-      "bilateralDsseSha256": "1fb840b081100002399a45e581496916c23ed21a2f43079d3b1d0416a523b488",
-      "workflowStepSha256": "0b4c36d1d3e7442156c1eb5dbe166d5417f1290d520e6bc86057b4ce818f1794"
+      "toolReceiptSha256": "0f807495c65fae2d6794d7b4e196b3ba6a46842b8f8e8207e5682a77bfe97903",
+      "bilateralDsseSha256": "099001e3734d0ba748af80c9993b4bee0102a71b754af66129c694fbfbbbc567",
+      "workflowStepSha256": "f8e631d501e838a72f08b3f0d55fdd488400380e0f1681b96d212584474337f0"
     }
   ]
 }

@@ -4593,6 +4593,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.treaty-epoch.v1",
+      "schema_id": "chio.treaty-epoch.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a3429b07d6fea56f746e6a3d32bb681727e74e28a2ef22def25473dd19fd1f75015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.tripwire-observation-receipt-body.v1",
       "schema_id": "chio.tripwire-observation-receipt-body.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e382def192b1ad7f2d1cbfc47ce8af55071900cb3035ed8e08d8a7f81ac92ae5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"

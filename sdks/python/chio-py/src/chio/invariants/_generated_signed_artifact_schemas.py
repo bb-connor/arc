@@ -426,6 +426,7 @@ KNOWN_SIGNED_ARTIFACT_SCHEMAS: frozenset[str] = frozenset(
         "chio.transaction.verifier-report.v1",
         "chio.transparency.inclusion-proof.v1",
         "chio.transparency.receipt-inclusion-proof.v1",
+        "chio.treaty-epoch.v1",
         "chio.trust.key-state.v1",
         "chio.trust.passport-revocation-root.v1",
         "chio.trust.reputation-import-report.v1",

@@ -2282,6 +2282,12 @@
       "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
     },
     {
+      "schema": "chio.treaty-epoch.v1",
+      "artifactKind": "treaty_epoch",
+      "introducedBy": "treaty-epoch-commit-v1",
+      "schemaFile": "spec/schemas/chio-runtime/v1/treaty-epoch.schema.json"
+    },
+    {
       "schema": "chio.active-response-artifact-authority-attestation.v1",
       "artifactKind": "active_response_artifact_authority_attestation",
       "introducedBy": "signing-wrapper-v1",
@@ -4379,12 +4385,6 @@
       "introducedBy": "transaction-passport-v1",
       "schemaFile": "spec/schemas/chio-transaction/v1/transaction-passport.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/transaction/transaction-passport-body.schema.json"
-    },
-    {
-      "schema": "chio.treaty-epoch.v1",
-      "artifactKind": "treaty_epoch",
-      "introducedBy": "treaty-epoch-commit-v1",
-      "schemaFile": "spec/schemas/chio-runtime/v1/treaty-epoch.schema.json"
     },
     {
       "schema": "chio.trust.passport-revocation-root.v1",
