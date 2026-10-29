@@ -226,6 +226,46 @@ async fn trust_control_metrics_rejects_unauthenticated_request() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
+async fn get_route(
+    path: &str,
+    token: Option<&str>,
+) -> Result<(StatusCode, Vec<u8>), Box<dyn std::error::Error>> {
+    use tower::ServiceExt;
+
+    let mut request = axum::http::Request::builder().method("GET").uri(path);
+    if let Some(token) = token {
+        request = request.header(AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let response = super::build_router(metrics_state("service-secret"))
+        .oneshot(request.body(axum::body::Body::empty())?)
+        .await?;
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    Ok((status, body.to_vec()))
+}
+
+/// The egress allowance digest is operator data: an anonymous read is refused
+/// exactly as an anonymous metrics scrape is, and a caller holding
+/// `metrics:read` reads the digest of the set this node dials under.
+#[tokio::test]
+async fn egress_allowance_digest_requires_an_operator_credential(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let anonymous = get_route(EGRESS_ALLOWANCES_PATH, None).await?;
+    assert_eq!(anonymous.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anonymous, get_route("/metrics", None).await?);
+
+    let (status, body) = get_route(EGRESS_ALLOWANCES_PATH, Some("service-secret")).await?;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    let body: serde_json::Value = serde_json::from_slice(&body)?;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "egressAllowanceDigest": chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
+        })
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn authority_key_log_sync_requires_service_auth_and_a_keyring() {
     let state = metrics_state("service-secret");

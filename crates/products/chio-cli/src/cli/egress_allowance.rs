@@ -71,81 +71,87 @@ pub(crate) fn load(path: Option<&Path>) -> Result<Arc<EgressAllowanceSet>, CliEr
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
+    use std::error::Error;
+
+    use chio_egress_contract::HttpEgressError;
+
     use super::*;
-    use crate::cli_entrypoint_support::parse_cli;
 
-    fn refusal(args: &[&str]) -> Result<(), EgressAllowanceFlagRefused> {
-        let argv = ["chio", "--egress-allowance-file", "egress.toml"]
-            .into_iter()
-            .chain(args.iter().copied());
-        let cli = parse_cli(argv).expect("argv parses");
-        refuse_unconsumed(&cli.command, cli.egress_allowance_file.as_deref())
+    const TOKEN: &str = "egress-allowance-token";
+
+    fn egress_refusal(error: &CliError) -> Option<HttpEgressError> {
+        let mut current: Option<&(dyn Error + 'static)> = Some(error);
+        while let Some(cause) = current {
+            if let Some(refusal) = cause.downcast_ref::<HttpEgressError>() {
+                return Some(refusal.clone());
+            }
+            current = cause.source();
+        }
+        None
+    }
+
+    /// A loopback port with no listener, so a dial is refused at once.
+    fn closed_port() -> u16 {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        listener.local_addr().expect("address").port()
+    }
+
+    fn revoke_and_status(control_url: &str, egress: &EgressAllowanceSet) -> [CliError; 2] {
+        [
+            crate::cmd_trust_revoke("cap-1", false, None, Some(control_url), Some(TOKEN), egress)
+                .expect_err("no control plane answers"),
+            crate::cmd_trust_status("cap-1", false, None, Some(control_url), Some(TOKEN), egress)
+                .expect_err("no control plane answers"),
+        ]
     }
 
     #[test]
-    fn consuming_commands_accept_the_flag() {
-        for args in [
-            &["trust", "serve", "--access-config", "access.toml"][..],
-            &["trust", "config", "check", "--access-config", "access.toml"],
-            &["start"],
-            &["api", "protect", "--upstream", "http://127.0.0.1:9"],
-            &["mcp", "wrap", "--server-id", "fs", "--", "true"],
-            &["finding", "operator", "serve", "--profile", "profile.json"],
-        ] {
-            assert_eq!(refusal(args), Ok(()), "{args:?}");
+    fn trust_commands_dial_under_the_loaded_allowance_file() {
+        let directory = tempfile::tempdir().expect("dir");
+        let port = closed_port();
+        let path = directory.path().join("egress.toml");
+        std::fs::write(
+            &path,
+            format!("[[allow]]\nhost = \"localhost\"\nport = {port}\ncidr = \"10.20.0.0/24\"\n"),
+        )
+        .expect("write");
+        let control_url = format!("https://localhost:{port}");
+
+        let listed = load(Some(&path)).expect("valid allowance file");
+        for error in revoke_and_status(&control_url, &listed) {
+            assert!(
+                matches!(
+                    egress_refusal(&error),
+                    Some(HttpEgressError::PrivateNetworkAllowanceMismatch { ref host, port: pinned, address })
+                        if host == "localhost" && pinned == port && address.is_loopback()
+                ),
+                "{error}"
+            );
+        }
+
+        let unlisted = load(None).expect("no file");
+        for error in revoke_and_status(&control_url, &unlisted) {
+            assert_eq!(egress_refusal(&error), None, "{error}");
         }
     }
 
     #[test]
-    fn other_commands_refuse_the_flag() {
-        for args in [
-            &["run", "--policy", "policy.yaml", "--", "true"][..],
-            &["trust", "revoke", "--capability-id", "cap-1"],
-            &["trust", "status", "--capability-id", "cap-1"],
-            &["finding", "operator", "tick", "--profile", "profile.json"],
-            &[
-                "mcp",
-                "serve",
-                "--policy",
-                "policy.yaml",
-                "--server-id",
-                "fs",
-                "--cage-policy",
-                "cage.json",
-                "--cage-policy-signer",
-                "signer.pub",
-                "--",
-                "true",
-            ],
-            &[
-                "trust",
-                "config",
-                "credential",
-                "--deployment",
-                "dep-a",
-                "--secret-env",
-                "CHIO_SECRET",
-                "--id",
-                "entry",
-                "--role",
-                "operator",
-            ],
-            &["init", "scaffold"],
-        ] {
-            assert_eq!(refusal(args), Err(EgressAllowanceFlagRefused), "{args:?}");
+    fn a_private_control_url_outside_the_file_is_refused_before_dialing() {
+        let unlisted = load(None).expect("no file");
+        for error in revoke_and_status("https://10.20.0.5:8443", &unlisted) {
+            assert_eq!(
+                egress_refusal(&error),
+                Some(HttpEgressError::PrivateNetworkDenied {
+                    host: "10.20.0.5".to_string()
+                }),
+                "{error}"
+            );
         }
-    }
-
-    #[test]
-    fn without_the_flag_no_command_is_refused() {
-        let cli = parse_cli(["chio", "trust", "status", "--capability-id", "cap-1"])
-            .expect("argv parses");
-        assert_eq!(refuse_unconsumed(&cli.command, None), Ok(()));
     }
 
     #[test]
     fn absent_file_means_no_allowance() {
-        assert_eq!(*load(None).expect("no file"), EgressAllowanceSet::default());
+        assert!(load(None).expect("no file").entries().is_empty());
     }
 
     #[test]

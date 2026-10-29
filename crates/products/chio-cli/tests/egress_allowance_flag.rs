@@ -7,11 +7,6 @@ use chio_egress_contract::{
     private_network_allowance_digest, EgressAllowanceSet, PrivateNetworkAllowanceError,
 };
 
-const REFUSAL: &str = "error [urn:chio:error:cli:other]: --egress-allowance-file is refused: \
-                       this command does not consume the egress allowance set; it is accepted \
-                       only by trust serve, trust config check, start, api protect, mcp wrap and \
-                       finding operator serve";
-
 const VALID_ALLOWANCES: &str =
     "[[allow]]\nhost = \"control.vpc.internal\"\nport = 9443\ncidr = \"10.20.0.0/24\"\n";
 
@@ -34,10 +29,12 @@ fn write(directory: &Path, name: &str, text: &str) -> PathBuf {
     path
 }
 
-fn chio(allowances: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_chio"))
-        .arg("--egress-allowance-file")
-        .arg(allowances)
+fn chio(allowances: Option<&Path>, args: &[&str]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
+    if let Some(allowances) = allowances {
+        command.arg("--egress-allowance-file").arg(allowances);
+    }
+    command
         .args(args)
         .env("CHIO_EGRESS_FLAG_SECRET", "flag-secret")
         .output()
@@ -45,17 +42,36 @@ fn chio(allowances: &Path, args: &[&str]) -> Output {
 }
 
 #[test]
-fn commands_that_do_not_consume_the_allowance_set_refuse_the_flag() {
-    let directory = scratch("refused");
-    let allowances = write(&directory, "egress.toml", VALID_ALLOWANCES);
+fn every_command_loads_the_allowance_file_before_it_runs() {
+    let directory = scratch("loaded");
+    let allowances = write(&directory, "egress.toml", RESERVED_ALLOWANCES);
+    let access = directory.join("access.toml");
+    let access = access.to_str().expect("utf8 path");
+    let profile = directory.join("profile.json");
+    let profile = profile.to_str().expect("utf8 path");
     let missing = directory.join("missing.yaml");
     let missing = missing.to_str().expect("utf8 path");
     let init_target = directory.join("scaffold");
     let init_target = init_target.to_str().expect("utf8 path");
-    let cases: [&[&str]; 6] = [
+    let loader_refusal = format!(
+        "error [urn:chio:error:cli:other]: {}",
+        PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
+            cidr: "169.254.0.0/16".to_string(),
+            reserved: "169.254.0.0/16".to_string(),
+        }
+    );
+    let cases: [&[&str]; 13] = [
+        &["trust", "serve", "--access-config", access],
+        &["trust", "config", "check", "--access-config", access],
+        &["start", "--listen", "127.0.0.1:0"],
+        &["api", "protect", "--upstream", "http://127.0.0.1:9"],
+        &["mcp", "wrap", "--server-id", "fs", "--", "true"],
+        &["finding", "operator", "serve", "--profile", profile],
+        &["finding", "operator", "tick", "--profile", missing],
         &["run", "--policy", missing, "--", "true"],
         &["trust", "revoke", "--capability-id", "cap-1"],
         &["trust", "status", "--capability-id", "cap-1"],
+        &["receipt", "list"],
         &[
             "trust",
             "config",
@@ -69,59 +85,10 @@ fn commands_that_do_not_consume_the_allowance_set_refuse_the_flag() {
             "--role",
             "operator",
         ],
-        &["finding", "operator", "tick", "--profile", missing],
         &["init", init_target],
     ];
     for args in cases {
-        let output = chio(&allowances, args);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert_eq!(output.status.code(), Some(1), "{args:?}: {stderr}");
-        assert_eq!(stderr.lines().next(), Some(REFUSAL), "{args:?}: {stderr}");
-        assert!(output.stdout.is_empty(), "{args:?}: stdout was written");
-    }
-    assert!(
-        !Path::new(init_target).exists(),
-        "init ran before the refusal"
-    );
-    let _ = std::fs::remove_dir_all(&directory);
-}
-
-#[test]
-fn a_refused_command_refuses_before_reading_the_allowance_file() {
-    let directory = scratch("refused-before-load");
-    let allowances = write(&directory, "egress.toml", RESERVED_ALLOWANCES);
-    let output = chio(&allowances, &["trust", "revoke", "--capability-id", "cap-1"]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(1), "{stderr}");
-    assert_eq!(stderr.lines().next(), Some(REFUSAL), "{stderr}");
-    let _ = std::fs::remove_dir_all(&directory);
-}
-
-#[test]
-fn consuming_commands_accept_the_flag_and_load_the_file() {
-    let directory = scratch("consumed");
-    let allowances = write(&directory, "egress.toml", RESERVED_ALLOWANCES);
-    let access = directory.join("access.toml");
-    let access = access.to_str().expect("utf8 path");
-    let profile = directory.join("profile.json");
-    let profile = profile.to_str().expect("utf8 path");
-    let loader_refusal = format!(
-        "error [urn:chio:error:cli:other]: {}",
-        PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
-            cidr: "169.254.0.0/16".to_string(),
-            reserved: "169.254.0.0/16".to_string(),
-        }
-    );
-    let cases: [&[&str]; 6] = [
-        &["trust", "serve", "--access-config", access],
-        &["trust", "config", "check", "--access-config", access],
-        &["start", "--listen", "127.0.0.1:0"],
-        &["api", "protect", "--upstream", "http://127.0.0.1:9"],
-        &["mcp", "wrap", "--server-id", "fs", "--", "true"],
-        &["finding", "operator", "serve", "--profile", profile],
-    ];
-    for args in cases {
-        let output = chio(&allowances, args);
+        let output = chio(Some(&allowances), args);
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(output.status.code(), Some(1), "{args:?}: {stderr}");
         assert_eq!(
@@ -129,6 +96,58 @@ fn consuming_commands_accept_the_flag_and_load_the_file() {
             Some(loader_refusal.as_str()),
             "{args:?}: {stderr}"
         );
+        assert!(output.stdout.is_empty(), "{args:?}: stdout was written");
+    }
+    assert!(
+        !Path::new(init_target).exists(),
+        "init ran before the allowance file was refused"
+    );
+    let _ = std::fs::remove_dir_all(&directory);
+}
+
+const EGRESS_REFUSED: &str = "trust-control egress refused by the HttpEgressContract";
+const TRANSPORT_FAILED: &str = "trust control service transport failed";
+
+/// A loopback port with no listener, so a dial is refused at once.
+fn closed_port() -> u16 {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    listener.local_addr().expect("address").port()
+}
+
+#[test]
+fn control_plane_commands_dial_under_the_allowance_file() {
+    let directory = scratch("dialed");
+    let port = closed_port();
+    let allowances = write(
+        &directory,
+        "egress.toml",
+        &format!("[[allow]]\nhost = \"localhost\"\nport = {port}\ncidr = \"10.20.0.0/24\"\n"),
+    );
+    let control_url = format!("https://localhost:{port}");
+    let control = [
+        "--control-url",
+        control_url.as_str(),
+        "--control-token",
+        "egress-flag-token",
+    ];
+    let commands: [&[&str]; 3] = [
+        &["trust", "revoke", "--capability-id", "cap-1"],
+        &["trust", "status", "--capability-id", "cap-1"],
+        &["receipt", "list"],
+    ];
+    for command in commands {
+        let args: Vec<&str> = control.iter().chain(command).copied().collect();
+
+        let pinned = chio(Some(&allowances), &args);
+        let stderr = String::from_utf8_lossy(&pinned.stderr);
+        assert_eq!(pinned.status.code(), Some(1), "{command:?}: {stderr}");
+        assert!(stderr.contains(EGRESS_REFUSED), "{command:?}: {stderr}");
+
+        let unpinned = chio(None, &args);
+        let stderr = String::from_utf8_lossy(&unpinned.stderr);
+        assert_eq!(unpinned.status.code(), Some(1), "{command:?}: {stderr}");
+        assert!(!stderr.contains(EGRESS_REFUSED), "{command:?}: {stderr}");
+        assert!(stderr.contains(TRANSPORT_FAILED), "{command:?}: {stderr}");
     }
     let _ = std::fs::remove_dir_all(&directory);
 }
@@ -150,7 +169,7 @@ fn trust_config_check_reports_the_digest_of_the_consumed_allowance_file() {
     );
     let access = access.to_str().expect("utf8 path");
     let output = chio(
-        &allowances,
+        Some(&allowances),
         &["trust", "config", "check", "--access-config", access],
     );
     let stderr = String::from_utf8_lossy(&output.stderr);

@@ -1,13 +1,18 @@
 use std::error::Error;
-use std::net::{IpAddr, Ipv4Addr, TcpListener, UdpSocket};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use chio_egress_contract::{EgressAllowanceSet, HttpEgressError, PrivateNetworkAllowance};
+use chio_egress_contract::{
+    ContractLookup, EgressAllowanceSet, HttpEgressError, PrivateNetworkAllowance,
+};
 
-use super::factory::{build_client, build_cluster_peer_client, MixedLoopbackControlEndpoints};
+use super::factory::{
+    build_client, build_client_with_lookup, build_cluster_peer_client, control_client_contract,
+    MixedLoopbackControlEndpoints,
+};
 use crate::trust_control::caller_credentials::tests as credentials;
 use crate::trust_control::caller_credentials::{TrustAccess, TrustAccessConfig};
 use crate::CliError;
@@ -73,20 +78,6 @@ fn allowance_set(host: &str, port: u16, cidr: &str) -> EgressAllowanceSet {
     .expect("valid allowance set")
 }
 
-/// A private IPv4 address of this host, the source address it uses toward a
-/// private destination. A host with no private interface cannot run the
-/// allowed-dial tests.
-fn local_private_ipv4() -> Ipv4Addr {
-    let probe = UdpSocket::bind("0.0.0.0:0").expect("bind probe");
-    probe
-        .connect("10.255.255.254:9")
-        .expect("route to a private address");
-    match probe.local_addr().expect("probe address").ip() {
-        IpAddr::V4(address) if address.is_private() => address,
-        other => panic!("this host has no private IPv4 interface (routed source {other})"),
-    }
-}
-
 /// Accept connections on `listener` until `stop`, counting each.
 fn count_accepts(listener: TcpListener, stop: Arc<AtomicBool>) -> JoinHandle<usize> {
     listener.set_nonblocking(true).expect("nonblocking");
@@ -108,52 +99,95 @@ fn count_accepts(listener: TcpListener, stop: Arc<AtomicBool>) -> JoinHandle<usi
     })
 }
 
-#[test]
-fn allowed_private_control_endpoint_is_dialed() {
-    let address = local_private_ipv4();
-    let listener = TcpListener::bind((address, 0)).expect("bind private listener");
-    let port = listener.local_addr().expect("listener address").port();
-    let stop = Arc::new(AtomicBool::new(false));
-    let accepts = count_accepts(listener, Arc::clone(&stop));
-    let client = build_client(
-        &format!("https://{address}:{port}"),
-        TOKEN,
-        &allowance_set(&address.to_string(), port, &format!("{address}/32")),
-    )
-    .expect("an allowed private control endpoint is admitted");
-    let error = client
-        .authority_status()
-        .expect_err("the listener does not speak TLS");
-    stop.store(true, Ordering::SeqCst);
-    assert_eq!(accepts.join().expect("listener"), 1, "{error}");
-    assert_eq!(egress_refusal(&error), None, "{error}");
+const PRIVATE_HOST: &str = "control.vpc.internal";
+const PRIVATE_PORT: u16 = 8443;
+
+/// Answers every lookup with `address`, counting the lookups.
+fn answering(address: IpAddr, lookups: &Arc<AtomicUsize>) -> ContractLookup {
+    let lookups = Arc::clone(lookups);
+    ContractLookup::new(move |_host: &str, port: u16| {
+        lookups.fetch_add(1, Ordering::SeqCst);
+        Ok(vec![SocketAddr::new(address, port)])
+    })
+}
+
+fn private_control_url() -> String {
+    format!("https://{PRIVATE_HOST}:{PRIVATE_PORT}")
 }
 
 #[test]
-fn private_control_endpoint_without_its_allowance_is_never_dialed() {
-    let address = local_private_ipv4();
-    let listener = TcpListener::bind((address, 0)).expect("bind private listener");
-    let port = listener.local_addr().expect("listener address").port();
-    let stop = Arc::new(AtomicBool::new(false));
-    let accepts = count_accepts(listener, Arc::clone(&stop));
-    let other_port = if port == u16::MAX { port - 1 } else { port + 1 };
+fn allowed_private_control_endpoint_resolves_inside_its_allowance() {
+    let allowances = allowance_set(PRIVATE_HOST, PRIVATE_PORT, "10.20.0.0/24");
+    let contract = control_client_contract(&[private_control_url()], &allowances)
+        .expect("an allowed private control endpoint is admitted");
+    contract
+        .enforce_resolved_address(
+            PRIVATE_HOST,
+            SocketAddr::from(([10, 20, 0, 5], PRIVATE_PORT)),
+        )
+        .expect("an answer inside the allowance is dialed");
+    assert_eq!(
+        contract.enforce_resolved_address(
+            PRIVATE_HOST,
+            SocketAddr::from(([10, 30, 0, 5], PRIVATE_PORT))
+        ),
+        Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host: PRIVATE_HOST.to_string(),
+            port: PRIVATE_PORT,
+            address: IpAddr::from([10, 30, 0, 5]),
+        })
+    );
+}
+
+#[test]
+fn private_answer_outside_its_allowance_is_never_dialed() {
+    let lookups = Arc::new(AtomicUsize::new(0));
+    let client = build_client_with_lookup(
+        &private_control_url(),
+        TOKEN,
+        &allowance_set(PRIVATE_HOST, PRIVATE_PORT, "10.20.0.0/24"),
+        answering(IpAddr::from([10, 30, 0, 5]), &lookups),
+    )
+    .expect("the endpoint passes construction");
+    let error = client
+        .authority_status()
+        .expect_err("the answer lies outside the allowance");
+    assert_eq!(
+        egress_refusal(&error),
+        Some(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host: PRIVATE_HOST.to_string(),
+            port: PRIVATE_PORT,
+            address: IpAddr::from([10, 30, 0, 5]),
+        })
+    );
+    assert_eq!(lookups.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn private_answer_without_its_allowance_is_never_dialed() {
     for allowances in [
         EgressAllowanceSet::default(),
-        allowance_set(&address.to_string(), other_port, &format!("{address}/32")),
+        allowance_set(PRIVATE_HOST, PRIVATE_PORT + 1, "10.20.0.0/24"),
     ] {
-        let Err(error) = build_client(&format!("https://{address}:{port}"), TOKEN, &allowances)
-        else {
-            panic!("an unlisted private control endpoint must be refused");
-        };
+        let lookups = Arc::new(AtomicUsize::new(0));
+        let client = build_client_with_lookup(
+            &private_control_url(),
+            TOKEN,
+            &allowances,
+            answering(IpAddr::from([10, 20, 0, 5]), &lookups),
+        )
+        .expect("a DNS endpoint passes construction");
+        let error = client
+            .authority_status()
+            .expect_err("an unlisted private answer is refused");
         assert_eq!(
             egress_refusal(&error),
             Some(HttpEgressError::PrivateNetworkDenied {
-                host: address.to_string()
+                host: format!("{PRIVATE_HOST} resolved to 10.20.0.5"),
             })
         );
+        assert_eq!(lookups.load(Ordering::SeqCst), 1);
     }
-    stop.store(true, Ordering::SeqCst);
-    assert_eq!(accepts.join().expect("listener"), 0);
 }
 
 fn access_with_peer_at(internal_url: &str) -> Arc<TrustAccess> {

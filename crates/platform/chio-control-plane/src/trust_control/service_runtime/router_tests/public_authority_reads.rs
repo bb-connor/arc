@@ -988,15 +988,11 @@ mod adjacent_registry_races;
 mod issuer_authority_binding;
 
 #[tokio::test]
-async fn health_reports_the_egress_allowance_digest() -> TestResult {
+async fn health_omits_the_egress_allowance_digest() -> TestResult {
     let (fixture, _authority_db) = PublicAuthorityFixture::provisioned()?;
     let (status, body) = fixture.get(HEALTH_PATH).await?;
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     let body: serde_json::Value = serde_json::from_slice(&body)?;
-    assert_eq!(
-        body["egressAllowanceDigest"],
-        chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
-        "{body}"
-    );
+    assert_eq!(body.get("egressAllowanceDigest"), None, "{body}");
     Ok(())
 }
