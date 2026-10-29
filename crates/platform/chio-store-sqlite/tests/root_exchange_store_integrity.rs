@@ -200,6 +200,47 @@ fn erased_tombstones_and_roots_refuse_deletion() -> TestResult {
     Ok(())
 }
 
+/// A raw REPLACE over an opening, present or erased, which would bypass the
+/// UPDATE and DELETE guards with recursive triggers off.
+fn replace_opening(fixture: &support::Fixture, at: u64) -> TestResult<i32> {
+    let raw = fixture.raw()?;
+    refusal_code(raw.execute(
+        &format!(
+            "INSERT OR REPLACE INTO root_exchange_openings VALUES
+             ('cap-1', 'anchor.sub', 'present', x'{}', {at})",
+            hex(0x01)
+        ),
+        [],
+    ))
+}
+
+#[test]
+fn replace_cannot_substitute_or_restore_an_opening() -> TestResult {
+    let Env {
+        fixture,
+        owner,
+        store,
+        ..
+    } = minted_env()?;
+    drop(store);
+    drop(owner);
+    assert_eq!(
+        replace_opening(&fixture, NOW + 1)?,
+        ffi::SQLITE_CONSTRAINT_TRIGGER
+    );
+    let owner = fixture.open()?;
+    let store = owner.root_exchange_store();
+    let fence = store.mutation_fence();
+    store.erase_root_openings("cap-1", &fence, fixture.at(support::ms(NOW + 2)))?;
+    drop(store);
+    drop(owner);
+    assert_eq!(
+        replace_opening(&fixture, NOW + 3)?,
+        ffi::SQLITE_CONSTRAINT_TRIGGER
+    );
+    Ok(())
+}
+
 #[test]
 fn retained_bytes_mutated_under_their_digest_refuse_open() -> TestResult {
     let cases = [
