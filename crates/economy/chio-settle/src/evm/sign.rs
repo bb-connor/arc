@@ -7,8 +7,17 @@ pub(super) fn ensure_instruction_ready(
     instruction: &SignedCapitalExecutionInstruction,
     beneficiary_address: &str,
 ) -> Result<(), SettlementError> {
+    let capital_key = config
+        .capital_authority
+        .trusted_member(&instruction.signer_key)
+        .ok_or_else(|| {
+            SettlementError::Verification(
+                "capital execution instruction signer is not a trusted settlement capital authority key"
+                    .to_string(),
+            )
+        })?;
     let verified = instruction
-        .verify_signature(&instruction.signer_key)
+        .verify_signature(capital_key)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(
