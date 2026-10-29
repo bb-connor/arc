@@ -1,7 +1,7 @@
 {
   "launch_policy_signers": {
-    "erin-probe": "743075cb108d7670bb329fb3fd8923845cb0cb8cf25da4c3c8effff2eadae6aa",
-    "frank-probe": "36df2b5bda98784d2abb0068199e32da3019a2796c48d33d0e469c3c10bf036f"
+    "erin-probe": "de4e6332a749cf653dadff75dac47f9cfcfc0a36620d066943f8ed8f0400460b",
+    "frank-probe": "5f5e1413a5a68cef1cf1c6fd84988ed49af2b89d08254932059718c1d2556212"
   },
-  "runtime_id": "0e012e00-be6e-4013-8207-5a2cc5bb629c"
+  "runtime_id": "11925ba5-04d5-48e3-a41c-bc02d00c2c7e"
 }
