@@ -12,53 +12,57 @@ const STRICT_SOURCES: [&str; 4] = [
     "src/capability/token.rs",
 ];
 
-const ITEM_KEYWORDS: [&str; 6] = [
-    "pub struct ",
-    "pub(crate) struct ",
-    "struct ",
-    "pub enum ",
-    "pub(crate) enum ",
-    "enum ",
-];
-
+/// Name of the struct or enum declared on `line`, under any visibility.
 fn item_name(line: &str) -> Option<String> {
-    ITEM_KEYWORDS.iter().find_map(|keyword| {
-        let rest = line.strip_prefix(keyword)?;
-        let name: String = rest
-            .chars()
-            .take_while(|character| character.is_alphanumeric() || *character == '_')
-            .collect();
-        (!name.is_empty()).then_some(name)
-    })
+    let mut rest = line;
+    if let Some(after) = rest.strip_prefix("pub(") {
+        rest = after.split_once(')')?.1.trim_start();
+    } else if let Some(after) = rest.strip_prefix("pub ") {
+        rest = after.trim_start();
+    }
+    let rest = rest
+        .strip_prefix("struct ")
+        .or_else(|| rest.strip_prefix("enum "))?;
+    let name: String = rest
+        .chars()
+        .take_while(|character| character.is_alphanumeric() || *character == '_')
+        .collect();
+    (!name.is_empty()).then_some(name)
 }
 
-/// Types in `source` that derive `Deserialize` and flatten a member.
+/// Types in `source` whose attributes (including `cfg_attr`) derive `Deserialize`
+/// and that flatten a member.
 fn flattened_deserialize_types(source: &str) -> Vec<String> {
     let mut found = Vec::new();
-    let mut derive = String::new();
-    let mut in_derive = false;
+    let mut attributes = String::new();
+    let mut depth = 0usize;
     let mut current: Option<String> = None;
     for line in source.lines().map(str::trim) {
-        if line.starts_with("#[derive(") || in_derive {
-            if !in_derive {
-                derive.clear();
+        if depth > 0 || line.starts_with("#[") {
+            attributes.push_str(line);
+            for character in line.chars() {
+                match character {
+                    '[' => depth += 1,
+                    ']' => depth = depth.saturating_sub(1),
+                    _ => {}
+                }
             }
-            derive.push_str(line);
-            in_derive = !line.contains(")]");
+            if depth == 0 && attributes.contains("serde(flatten") {
+                if let Some(name) = &current {
+                    if !found.contains(name) {
+                        found.push(name.clone());
+                    }
+                }
+            }
+            continue;
+        }
+        if line.is_empty() || line.starts_with("//") {
             continue;
         }
         if let Some(name) = item_name(line) {
-            current = derive.contains("Deserialize").then_some(name);
-            derive.clear();
-            continue;
+            current = attributes.contains("Deserialize").then_some(name);
         }
-        if line.contains("serde(flatten") {
-            if let Some(name) = &current {
-                if !found.contains(name) {
-                    found.push(name.clone());
-                }
-            }
-        }
+        attributes.clear();
     }
     found
 }
@@ -120,6 +124,24 @@ fn the_gate_reports_a_flattened_deserialized_type_only() {
             #[serde(flatten)]
             pub body: &'a Body,
         }
+
+        #[derive(serde::Deserialize)]
+        pub(super) struct ParentVisible {
+            #[serde(flatten)]
+            body: Body,
+        }
+
+        #[derive(Debug)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        pub(in crate::receipt) enum Conditional {
+            Variant {
+                #[serde(flatten)]
+                body: Body,
+            },
+        }
     "#;
-    assert_eq!(flattened_deserialize_types(source), ["Padded", "Multiline"]);
+    assert_eq!(
+        flattened_deserialize_types(source),
+        ["Padded", "Multiline", "ParentVisible", "Conditional"]
+    );
 }
