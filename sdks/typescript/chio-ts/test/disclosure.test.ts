@@ -25,13 +25,23 @@ interface CommittedCase {
   preimages: { parameters_canonical: string; content_preimage_hex: string };
 }
 
+// Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32 bytes.
+// Every other vector decodes.
+const decodeRefused = new Set(["salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"]);
+
 test("openCommitments reproduces the committed-receipt vectors", async () => {
   const text = await readFile(resolve(repoRoot, "tests/bindings/vectors/receipt/committed/v1.json"), "utf8");
   const cases = (JSON.parse(text) as { cases: CommittedCase[] }).cases;
-  assert.ok(cases.some((entry) => entry.id === "salt_noncanonical_tail"));
+  const ids = new Set(cases.map((entry) => entry.id));
+  for (const id of decodeRefused) {
+    assert.ok(ids.has(id), id);
+  }
   for (const entry of cases) {
     let report: OpeningReport;
-    try {
+    if (decodeRefused.has(entry.id)) {
+      assert.throws(() => parseReceiptDisclosure(entry.disclosure), ChioInvariantError, entry.id);
+      report = { parameters: "rejected", content: "rejected", disclosure_valid: false };
+    } else {
       report = openCommitments(
         entry.receipt.id,
         entry.receipt.action.parameter_commitment,
@@ -40,9 +50,6 @@ test("openCommitments reproduces the committed-receipt vectors", async () => {
         JSON.parse(entry.preimages.parameters_canonical),
         Buffer.from(entry.preimages.content_preimage_hex, "hex"),
       );
-    } catch (error) {
-      assert.ok(error instanceof ChioInvariantError, entry.id);
-      report = { parameters: "rejected", content: "rejected", disclosure_valid: false };
     }
     assert.equal(report.parameters, entry.expected.parameters, entry.id);
     assert.equal(report.content, entry.expected.content, entry.id);

@@ -8,11 +8,15 @@ use chio_core_types::receipt::commitment::{
 };
 use chio_core_types::receipt::disclosure::{
     open_commitments, DisclosureSchema, FieldVerdict, Opening, OpeningReport, ReceiptDisclosure,
-    CHIO_RECEIPT_DISCLOSURE_SCHEMA,
+    SaltWireError, CHIO_RECEIPT_DISCLOSURE_SCHEMA,
 };
 use chio_core_types::root_authority::SaltRef;
 use chio_test_support::prelude::*;
 use serde_json::{json, Value};
+
+/// Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32
+/// bytes. Every other vector decodes.
+const DECODE_REFUSED: [&str; 3] = ["salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"];
 
 const RECEIPT_ID: &str = "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33";
 
@@ -462,6 +466,7 @@ fn opener_reproduces_committed_vectors() {
     let vectors = read_json("tests/bindings/vectors/receipt/committed/v1.json");
     let cases = vectors["cases"].as_array().test_unwrap();
     let mut opened = 0;
+    let mut refused = 0;
     for case in cases {
         let id = case["id"].as_str().test_unwrap();
         let receipt = &case["receipt"];
@@ -488,16 +493,21 @@ fn opener_reproduces_committed_vectors() {
             (None, true) => ContentPreimage::Empty,
         };
         assert_eq!(own_output.to_bytes().test_unwrap(), preimage, "{id}");
-        let actual = match serde_json::from_value::<ReceiptDisclosure>(case["disclosure"].clone()) {
-            Ok(document) => open_commitments(
+        let decoded = serde_json::from_value::<ReceiptDisclosure>(case["disclosure"].clone());
+        let actual = if DECODE_REFUSED.contains(&id) {
+            let error = decoded.test_unwrap_err().to_string();
+            assert!(error.contains(&SaltWireError.to_string()), "{id}: {error}");
+            refused += 1;
+            report(FieldVerdict::Rejected, FieldVerdict::Rejected, false)
+        } else {
+            open_commitments(
                 receipt["id"].as_str().test_unwrap(),
                 &params,
                 &content,
-                &document,
+                &decoded.test_unwrap(),
                 Some(&own_parameters),
                 Some(own_output),
-            ),
-            Err(_) => report(FieldVerdict::Rejected, FieldVerdict::Rejected, false),
+            )
         };
         let expected = &case["expected"];
         assert_eq!(
@@ -520,7 +530,5 @@ fn opener_reproduces_committed_vectors() {
         opened += 1;
     }
     assert_eq!(opened, cases.len());
-    assert!(cases
-        .iter()
-        .any(|case| case["id"] == "salt_noncanonical_tail"));
+    assert_eq!(refused, DECODE_REFUSED.len());
 }
