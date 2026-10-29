@@ -188,7 +188,7 @@ pub struct MeteredBillingContext {
 
 /// Delegated call-chain context bound into a governed request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GovernedCallChainContext {
     /// Stable identifier for the delegated transaction or call chain.
     pub chain_id: String,
