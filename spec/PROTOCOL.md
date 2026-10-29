@@ -4374,6 +4374,47 @@ packets may bind budget references, but they do not claim settlement. A buyer
 packet is accepted only when the packet hashes match verified lineage and the
 lineage remains verified rather than asserted.
 
+Treaty execution authority uses `chio.treaty-epoch.v1`, signed through
+`SignedExportEnvelope<TreatyEpochRecordV1>`. The scope's
+`revocationEpochSha256` commits the canonical epoch body, excluding the
+envelope and the scope itself. An operator provisions an immutable signer pin
+for each verifier and treaty; peer input cannot choose or replace that pin.
+Signed updates append history and advance the current head with an exact
+predecessor and sequence compare-and-swap.
+Participants and `trustBundleSha256` are fixed for a treaty id. An update
+whose participants or trust bundle digest differ from its authenticated
+predecessor is refused with `treaty_epoch_binding_mismatch`; rotating either
+requires a new treaty id.
+A revoked or withdrawn treaty epoch is reactivated only by a higher-sequence
+update signed under the same pin, and participants and the trust bundle stay
+fixed through every status change. An update whose `issuedAtUnixMs` is below
+its predecessor's is refused with `treaty_epoch_update_conflict`.
+
+Fresh admission compares the authenticated active epoch, retains authorization
+for the exact operation claim, plan, request binding and phase, and applies any
+trust-floor update in one runtime-source transaction. The epoch check is
+required when no floor update exists. The earlier destination claim remains a
+separate fenced transaction and is released on refusal. Historical replay
+verifies its retained signed epoch and authorization without requiring that
+epoch to remain current. A nonce-preflight authorization never substitutes for
+a fresh dispatch authorization after revocation.
+
+| Treaty epoch v1 bound | Limit |
+| --- | ---: |
+| `MAX_TREATY_EPOCH_BYTES`, original and canonical signed input | 1,048,576 bytes |
+| `MAX_TREATY_EPOCH_PARTICIPANTS`, aligned participant tuples | 64 |
+| `MAX_TREATY_EPOCH_INTEGER`, sequence and timestamps | 9,007,199,254,740,991 |
+| `MAX_TREATY_EPOCH_AUTHORITIES`, pins and current heads | 128 each |
+| `MAX_TREATY_EPOCH_RECORDS`, retained signed epochs | 4,096 |
+| `MAX_TREATY_EPOCH_AUTHORIZATIONS`, retained operation authorizations | 65,536 |
+
+Byte and table-count bounds are checked before decoding. Excess capacity,
+malformed storage, missing authority, stale epochs, revoked or withdrawn
+status, and conflicting retained authorization fail closed. Physical source
+qualification rejects copied or replaced databases. These checks do not detect
+an in-place restore of an older valid database image preserving physical
+identity; an external monotonic witness is a separate requirement.
+
 Chio treaty-to-buyer review adds a local buyer-facing loop over the
 treaty-bound evidence. A buyer review package binds the buyer packet, admission
 report, continuation, lineage bundle, bilateral invocation, workflow receipt,

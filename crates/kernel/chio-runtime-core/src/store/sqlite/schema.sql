@@ -101,3 +101,45 @@ BEGIN SELECT RAISE(ABORT, 'runtime source qualification is immutable'); END;
 CREATE TRIGGER runtime_source_qualification_no_delete
 BEFORE DELETE ON runtime_source_qualification
 BEGIN SELECT RAISE(ABORT, 'runtime source qualification is immutable'); END;
+
+CREATE TABLE runtime_treaty_epoch_pins (
+    authority_id TEXT PRIMARY KEY NOT NULL,
+    canonical_bytes BLOB NOT NULL CHECK (typeof(canonical_bytes) = 'blob' AND length(canonical_bytes) BETWEEN 1 AND 1048576)
+);
+CREATE TABLE runtime_treaty_epoch_records (
+    authority_id TEXT NOT NULL,
+    record_digest TEXT NOT NULL,
+    sequence INTEGER NOT NULL CHECK (typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 9007199254740991),
+    canonical_bytes BLOB NOT NULL CHECK (typeof(canonical_bytes) = 'blob' AND length(canonical_bytes) BETWEEN 1 AND 1048576),
+    PRIMARY KEY (authority_id, record_digest),
+    UNIQUE (authority_id, sequence)
+);
+CREATE TABLE runtime_treaty_epoch_heads (
+    authority_id TEXT PRIMARY KEY NOT NULL,
+    record_digest TEXT NOT NULL
+);
+CREATE TABLE runtime_treaty_authorizations (
+    claim_id TEXT PRIMARY KEY NOT NULL,
+    canonical_bytes BLOB NOT NULL CHECK (typeof(canonical_bytes) = 'blob' AND length(canonical_bytes) BETWEEN 1 AND 1048576)
+);
+CREATE TRIGGER runtime_treaty_epoch_pins_no_update BEFORE UPDATE ON runtime_treaty_epoch_pins
+BEGIN SELECT RAISE(ABORT, 'treaty epoch authority pin is immutable'); END;
+CREATE TRIGGER runtime_treaty_epoch_pins_no_delete BEFORE DELETE ON runtime_treaty_epoch_pins
+BEGIN SELECT RAISE(ABORT, 'treaty epoch authority pin is immutable'); END;
+CREATE TRIGGER runtime_treaty_epoch_records_no_update BEFORE UPDATE ON runtime_treaty_epoch_records
+BEGIN SELECT RAISE(ABORT, 'treaty epoch history is immutable'); END;
+CREATE TRIGGER runtime_treaty_epoch_records_no_delete BEFORE DELETE ON runtime_treaty_epoch_records
+BEGIN SELECT RAISE(ABORT, 'treaty epoch history is immutable'); END;
+CREATE TRIGGER runtime_treaty_authorizations_no_update BEFORE UPDATE ON runtime_treaty_authorizations
+BEGIN SELECT RAISE(ABORT, 'treaty authorization is immutable'); END;
+CREATE TRIGGER runtime_treaty_authorizations_no_delete BEFORE DELETE ON runtime_treaty_authorizations
+BEGIN SELECT RAISE(ABORT, 'treaty authorization is immutable'); END;
+CREATE TRIGGER runtime_treaty_epoch_pins_no_replace BEFORE INSERT ON runtime_treaty_epoch_pins
+WHEN EXISTS (SELECT 1 FROM runtime_treaty_epoch_pins WHERE authority_id = NEW.authority_id)
+BEGIN SELECT RAISE(ABORT, 'treaty epoch authority pin is immutable'); END;
+CREATE TRIGGER runtime_treaty_epoch_records_no_replace BEFORE INSERT ON runtime_treaty_epoch_records
+WHEN EXISTS (SELECT 1 FROM runtime_treaty_epoch_records WHERE authority_id = NEW.authority_id AND (record_digest = NEW.record_digest OR sequence = NEW.sequence))
+BEGIN SELECT RAISE(ABORT, 'treaty epoch history is immutable'); END;
+CREATE TRIGGER runtime_treaty_authorizations_no_replace BEFORE INSERT ON runtime_treaty_authorizations
+WHEN EXISTS (SELECT 1 FROM runtime_treaty_authorizations WHERE claim_id = NEW.claim_id)
+BEGIN SELECT RAISE(ABORT, 'treaty authorization is immutable'); END;

@@ -110,6 +110,26 @@ impl TrustFloorFailingAdmissionStore {
 }
 
 impl RuntimeAdmissionStore for TrustFloorFailingAdmissionStore {
+    fn commit_runtime_admission_authority(
+        &self,
+        _: &crate::RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support atomic treaty authority".into(),
+        })
+    }
+
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        _: &crate::RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support retained treaty authorization".into(),
+        })
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -283,7 +303,9 @@ fn strict_runtime_trust_input_binds_bundle_and_signer() -> Result<(), Box<dyn st
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
 
     assert!(accepted.accepted);
@@ -319,7 +341,9 @@ fn strict_runtime_trust_input_binds_profile_verifier() -> Result<(), Box<dyn std
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
 
     assert!(!rejected.accepted);
@@ -369,7 +393,7 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
         .and_then(|preparation| match preparation {
             RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
             RuntimeAdmissionPreparation::Prepared(prepared) => {
-                prepared.commit_operation_owned(&store)
+                prepared.commit_operation_owned(&store, None)
             }
         })?;
         assert!(accepted.accepted);
@@ -396,7 +420,9 @@ fn runtime_trust_floor_rejects_rollback_after_restart() -> Result<(), Box<dyn st
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
 
     assert!(!rejected.accepted);
@@ -437,7 +463,9 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_advancing_state(
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
     assert!(accepted.accepted);
 
@@ -462,7 +490,9 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_advancing_state(
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
 
     assert!(!rejected.accepted);
@@ -486,7 +516,9 @@ fn runtime_trust_floor_rejects_same_version_conflict_without_advancing_state(
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
     assert!(retry_after_rejection.accepted, "{retry_after_rejection:#?}");
     Ok(())
@@ -518,7 +550,9 @@ fn runtime_trust_floor_commit_propagates_store_error() -> Result<(), Box<dyn std
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     });
     match failed {
         Ok(report) => panic!("expected injected trust-floor store failure, got {report:#?}"),
@@ -569,7 +603,7 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
         .and_then(|preparation| match preparation {
             RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
             RuntimeAdmissionPreparation::Prepared(prepared) => {
-                prepared.commit_operation_owned(&layered_store)
+                prepared.commit_operation_owned(&layered_store, None)
             }
         })?;
         assert!(accepted.accepted);
@@ -621,7 +655,7 @@ fn layered_store_keeps_trust_floor_separate_from_admission_state(
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
         RuntimeAdmissionPreparation::Prepared(prepared) => {
-            prepared.commit_operation_owned(&layered_store)
+            prepared.commit_operation_owned(&layered_store, None)
         }
     })?;
 
@@ -725,7 +759,9 @@ fn strict_runtime_trust_input_rejects_bundle_hash_mismatch(
     })
     .and_then(|preparation| match preparation {
         RuntimeAdmissionPreparation::Rejected(report) => Ok(report),
-        RuntimeAdmissionPreparation::Prepared(prepared) => prepared.commit_operation_owned(&store),
+        RuntimeAdmissionPreparation::Prepared(prepared) => {
+            prepared.commit_operation_owned(&store, None)
+        }
     })?;
 
     assert!(!rejected.accepted);

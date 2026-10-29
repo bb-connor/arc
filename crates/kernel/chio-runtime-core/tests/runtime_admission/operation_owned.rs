@@ -103,8 +103,10 @@ impl Fixture {
             _directory.path().join("locks"),
             chio_test_support::clock::clock(),
         )?;
-        let source =
-            SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            _directory.path().join("runtime.sqlite3"),
+            chio_test_support::clock::clock(),
+        )?;
         Ok(Self {
             _directory,
             authority,
@@ -157,8 +159,10 @@ impl Fixture {
             &locks,
             chio_test_support::clock::clock(),
         )?;
-        let source =
-            SqliteRuntimeOrchestrationStore::open(directory.path().join("runtime.sqlite3"))?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            directory.path().join("runtime.sqlite3"),
+            chio_test_support::clock::clock(),
+        )?;
         let request = prepare(&source, &authority)?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();
@@ -204,7 +208,10 @@ impl Fixture {
         let (trust, keys, report, policy, weights) = inputs;
         Ok(ChioRuntimeAdmissionHook::new(
             profile(),
-            SqliteRuntimeOrchestrationStore::open(self._directory.path().join("runtime.sqlite3"))?,
+            SqliteRuntimeOrchestrationStore::open_with_clock(
+                self._directory.path().join("runtime.sqlite3"),
+                chio_test_support::clock::clock(),
+            )?,
             self.binding.clone(),
         )
         .with_runtime_trust_input(trust, keys)

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-runtime/v1/treaty-epoch.schema.json",
+  "title": "Chio Treaty Epoch",
+  "description": "Canonical signed epoch body. Original and canonical signed envelopes are each bounded to 1048576 bytes before acceptance. Identifiers additionally require at most 512 UTF-8 bytes, no control characters and no surrounding whitespace. The verifier enforces unique participant identities and keys, predecessor sequence, and a nonempty validity interval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verifierId",
+    "treatyId",
+    "sequence",
+    "previousRecordSha256",
+    "status",
+    "participants",
+    "trustBundleSha256",
+    "issuedAtUnixMs",
+    "expiresAtUnixMs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.treaty-epoch.v1"
+    },
+    "verifierId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "treatyId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "previousRecordSha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "revoked",
+        "withdrawn"
+      ]
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kernelId",
+          "publicKey",
+          "ladderManifestSha256"
+        ],
+        "properties": {
+          "kernelId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "publicKey": {
+            "type": "string",
+            "pattern": "^([0-9a-f]{64}|p256:04[0-9a-f]{128}|p384:04[0-9a-f]{192}|hybrid:[0-9a-f]{64}:[0-9a-f]{3904}:ed25519\\+mldsa65|hybrid:p256:04[0-9a-f]{128}:[0-9a-f]{3904}:p256\\+mldsa65|hybrid:p384:04[0-9a-f]{192}:[0-9a-f]{3904}:p384\\+mldsa65)$"
+          },
+          "ladderManifestSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "trustBundleSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "expiresAtUnixMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sequence": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "previousRecordSha256": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "previousRecordSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

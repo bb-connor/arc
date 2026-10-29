@@ -440,12 +440,15 @@ pub(crate) fn execute_runtime_loopback_step(
                 "Chio runtime loopback hook store update: {error}"
             ))
         })?;
+    let epoch_backend =
+        chio_core_types::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(&[1_u8; 32]));
     let chio_treaty = if step.request.origin_kernel_id.is_some() {
         Some(insert_runtime_loopback_treaty_context(
             &hook_store,
             step_index,
             step,
             &vendor_key,
+            &epoch_backend,
             &arguments,
         )?)
     } else {

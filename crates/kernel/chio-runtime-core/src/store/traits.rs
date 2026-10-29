@@ -9,6 +9,16 @@ fn unsupported_runtime_trust_floor_store() -> ChioRuntimeError {
 }
 
 pub trait RuntimeAdmissionStore: Send + Sync {
+    fn commit_runtime_admission_authority(
+        &self,
+        request: &RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError>;
+
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        binding: &RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError>;
+
     fn verify_operation_owned_runtime_source(
         &self,
         _expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
@@ -128,6 +138,26 @@ impl<'a> LayeredRuntimeAdmissionStore<'a> {
 }
 
 impl RuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
+    fn commit_runtime_admission_authority(
+        &self,
+        _: &crate::RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support atomic treaty authority".into(),
+        })
+    }
+
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        _: &crate::RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support retained treaty authorization".into(),
+        })
+    }
+
     fn bundle(
         &self,
         admission_id: &str,

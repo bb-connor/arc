@@ -275,7 +275,7 @@ fn trust_floor_commit_panic_refuses_and_preserves_monotonic_floor() -> TestResul
         return Err("valid evidence did not prepare".into());
     };
     assert_eq!(observer.trust_floor_writes(), 0);
-    let report = prepared.core.commit_operation_owned(&observer)?;
+    let report = prepared.core.commit_operation_owned(&observer, None)?;
     assert!(!report.accepted);
     assert_eq!(
         report.failure_code.as_deref(),
