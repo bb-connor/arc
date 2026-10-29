@@ -801,6 +801,40 @@ mod tests {
         }
     }
 
+    #[test]
+    fn remote_signer_admits_only_the_private_endpoints_an_allowance_pins() {
+        let keypair = Keypair::from_seed(&[41_u8; 32]);
+        let key =
+            || RemoteSigningKey::new("finding-listing", 1, keypair.public_key()).test_unwrap();
+        let allowances = EgressAllowanceSet::new([chio_egress_contract::PrivateNetworkAllowance {
+            host: "10.0.0.7".to_string(),
+            port: 8200,
+            cidr: "10.0.0.7/32".parse().test_unwrap(),
+        }])
+        .test_unwrap();
+        let timeout = Duration::from_secs(1);
+        VaultTransitSigningBackend::new("https://10.0.0.7:8200", "transit", key(), "token")
+            .and_then(|backend| backend.with_egress(timeout, &allowances))
+            .test_unwrap();
+        HttpSigningBackend::new("https://10.0.0.7:8200", key(), "token")
+            .and_then(|backend| backend.with_egress(timeout, &allowances))
+            .test_unwrap();
+        for url in ["https://10.0.0.8:8200", "https://10.0.0.7:8201"] {
+            assert!(
+                VaultTransitSigningBackend::new(url, "transit", key(), "token")
+                    .and_then(|backend| backend.with_egress(timeout, &allowances))
+                    .is_err(),
+                "{url}"
+            );
+            assert!(
+                HttpSigningBackend::new(url, key(), "token")
+                    .and_then(|backend| backend.with_egress(timeout, &allowances))
+                    .is_err(),
+                "{url}"
+            );
+        }
+    }
+
     fn spawn_json_server(
         body: serde_json::Value,
     ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
