@@ -330,3 +330,23 @@ async fn store_failures_map_to_the_fixed_unavailable_bodies() -> TestResult {
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn authentication_precedes_reading_the_revocation_body() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let state = state(config(directory.path())?)?;
+    let oversize = vec![b'{'; 64 * 1024];
+    for bearer in [None, Some("wrong-token")] {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/admin/revocations")
+            .header(CONTENT_TYPE, "application/json");
+        if let Some(bearer) = bearer {
+            request = request.header(AUTHORIZATION, format!("Bearer {bearer}"));
+        }
+        let (status, body) = send(&state, request.body(Body::from(oversize.clone()))?).await?;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{bearer:?}: {body}");
+        assert_ne!(body, INVALID, "{bearer:?}");
+    }
+    Ok(())
+}

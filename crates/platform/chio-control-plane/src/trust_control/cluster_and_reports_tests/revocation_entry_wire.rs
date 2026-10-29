@@ -62,12 +62,13 @@ async fn revoke_capability_returns_the_entry_and_its_reason() {
     let target = RevocationTarget::capability("cap-wire-1").test_unwrap();
     assert_eq!(first["entry"]["entry_id"], target.id().to_string());
     assert_eq!(first["entry"]["reason"], "credential_compromise");
-    assert_eq!(first["newlyRevoked"], true);
-    assert_eq!(first["rootsRevoked"], 1);
-    assert!(first.get("capabilityId").is_none(), "{first}");
+    assert_eq!(first["newly_revoked"], true);
+    assert_eq!(first["roots_revoked"], 1);
+    assert_eq!(first["roots_matched"], 1);
+    assert!(first.get("newlyRevoked").is_none(), "{first}");
     let (status, again) = revoke(&state, "cap-wire-1", RevocationReason::OperatorRequest).await;
     assert_eq!(status, StatusCode::OK, "{again}");
-    assert_eq!(again["newlyRevoked"], false);
+    assert_eq!(again["newly_revoked"], false);
     assert_eq!(again["entry"], first["entry"]);
 }
 
@@ -164,5 +165,139 @@ async fn malformed_revocation_queries_answer_the_fixed_body() {
                 json!({"error": "invalid revocation request"})
             )
         );
+    }
+}
+
+fn revocation_router(state: &TrustServiceState) -> axum::Router {
+    axum::Router::new()
+        .route(
+            REVOCATIONS_PATH,
+            get(handle_list_revocations).post(handle_revoke_capability),
+        )
+        .with_state(state.clone())
+}
+
+async fn raw(
+    state: &TrustServiceState,
+    method: &str,
+    uri: &str,
+    bearer: Option<&str>,
+    body: &str,
+) -> (StatusCode, Value) {
+    use tower::ServiceExt;
+    let mut request = axum::http::Request::builder().method(method).uri(uri);
+    if let Some(bearer) = bearer {
+        request = request.header(AUTHORIZATION, format!("Bearer {bearer}"));
+    }
+    if !body.is_empty() {
+        request = request.header(axum::http::header::CONTENT_TYPE, "application/json");
+    }
+    let response = revocation_router(state)
+        .oneshot(
+            request
+                .body(axum::body::Body::from(body.to_string()))
+                .test_unwrap(),
+        )
+        .await
+        .test_unwrap();
+    json_body(response).await
+}
+
+#[tokio::test]
+async fn authentication_precedes_every_revocation_extractor() {
+    let state = leader();
+    for (method, uri, body) in [
+        ("GET", format!("{REVOCATIONS_PATH}?limit=x"), ""),
+        ("GET", format!("{REVOCATIONS_PATH}?unknown=1"), ""),
+        (
+            "POST",
+            REVOCATIONS_PATH.to_string(),
+            "{\"capability_id\": \"cap\", \"reason\": \"bogus\"}",
+        ),
+    ] {
+        for bearer in [None, Some("wrong-token")] {
+            let (status, body) = raw(&state, method, &uri, bearer, body).await;
+            assert_eq!(
+                status,
+                StatusCode::UNAUTHORIZED,
+                "{method} {uri} {bearer:?}: {body}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn malformed_raw_revocation_requests_answer_the_fixed_body() {
+    let state = leader();
+    let fixed = json!({"error": INVALID_REVOCATION_REQUEST});
+    for (method, uri, body) in [
+        ("GET", format!("{REVOCATIONS_PATH}?limit=x"), ""),
+        ("GET", format!("{REVOCATIONS_PATH}?unknown=1"), ""),
+        ("GET", format!("{REVOCATIONS_PATH}?kind=not_a_kind"), ""),
+        ("GET", format!("{REVOCATIONS_PATH}?capabilityId=cap"), ""),
+        (
+            "POST",
+            REVOCATIONS_PATH.to_string(),
+            "{\"capability_id\": \"cap\", \"reason\": \"bogus\"}",
+        ),
+        (
+            "POST",
+            REVOCATIONS_PATH.to_string(),
+            "{\"capability_id\": \"cap\"}",
+        ),
+        (
+            "POST",
+            REVOCATIONS_PATH.to_string(),
+            "{\"capabilityId\": \"cap\", \"reason\": \"operator_request\"}",
+        ),
+        ("POST", REVOCATIONS_PATH.to_string(), "not json"),
+    ] {
+        let (status, response) = raw(&state, method, &uri, Some("token"), body).await;
+        assert_eq!(
+            (status, &response),
+            (StatusCode::BAD_REQUEST, &fixed),
+            "{method} {uri} {body}"
+        );
+    }
+    let (status, response) = raw(
+        &state,
+        "GET",
+        &format!("{REVOCATIONS_PATH}?capability_id=cap-raw-1"),
+        Some("token"),
+        "",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{response}");
+    assert_eq!(response["capability_id"], "cap-raw-1");
+}
+
+#[test]
+fn revocation_store_failures_map_to_fixed_bodies() {
+    use chio_kernel::RevocationStoreError as R;
+    let restart = "revocation outcome unknown; restart the provider, then retry the same request";
+    for (error, expected) in [
+        (
+            R::Sync("/private/path".into()),
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "revocation store unavailable",
+            ),
+        ),
+        (
+            R::Fenced {
+                expected_epoch: 1,
+                actual_epoch: None,
+            },
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "revocation store unavailable",
+            ),
+        ),
+        (
+            R::OutcomeUnknown("/private/path".into()),
+            (StatusCode::SERVICE_UNAVAILABLE, restart),
+        ),
+    ] {
+        assert_eq!(revocation_store_failure(&error), expected, "{error}");
     }
 }

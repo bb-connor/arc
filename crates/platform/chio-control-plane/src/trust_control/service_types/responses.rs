@@ -283,6 +283,17 @@ pub struct RevocationEntryPageItem {
     pub entry: chio_core_types::root_authority::RevocationEntry,
 }
 
+/// The status and fixed body for a revocation store error.
+#[must_use]
+pub fn revocation_store_failure(
+    _error: &chio_kernel::RevocationStoreError,
+) -> (axum::http::StatusCode, &'static str) {
+    (
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        "revocation store unavailable",
+    )
+}
+
 /// The fixed refusal for a malformed revocation request or query.
 pub const INVALID_REVOCATION_REQUEST: &str = "invalid revocation request";
 pub const DEFAULT_REVOCATION_PAGE: usize = 100;
