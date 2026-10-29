@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use super::egress::probe_get;
+use super::egress::{is_policy_refusal, probe_get};
 use super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 const REGISTRY_ENV: &str = "CHIO_GUARD_REGISTRY";
@@ -125,11 +125,22 @@ impl Probe for OciProbe {
                     .with_context("registry", registry)
                 }
             }
+            Err(err) if is_policy_refusal(&err) => ProbeReport::fail(
+                self.name(),
+                ProbeSeverity::Warning,
+                "urn:chio:error:cli:doctor-oci-unreachable",
+                format!("Registry {registry} refused by the egress contract: {err}"),
+            )
+            .with_help(
+                "The doctor probe refuses link-local, private-network and special-use \
+                 targets. Reachability of such a registry is not checked.",
+            )
+            .with_context("registry", registry),
             Err(err) => ProbeReport::fail(
                 self.name(),
                 ProbeSeverity::Warning,
                 "urn:chio:error:cli:doctor-oci-unreachable",
-                format!("Registry {registry} unreachable (egress contract): {err}"),
+                format!("Registry {registry} unreachable: {err}"),
             )
             .with_context("registry", registry),
         }
@@ -186,6 +197,10 @@ mod tests {
         let probe = OciProbe::default().with_registry("http://169.254.169.254/latest/meta-data");
         let report = probe.run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Warning);
-        assert!(report.message.contains("egress"), "{}", report.message);
+        assert!(
+            report.message.contains("link-local"),
+            "{}",
+            report.message
+        );
     }
 }

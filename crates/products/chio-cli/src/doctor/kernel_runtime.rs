@@ -6,7 +6,7 @@
 //! When `CHIO_DOCTOR_SKIP_NETWORK=1` is set or no metrics URL is
 //! configured the probe returns an info-level report.
 
-use super::egress::probe_get;
+use super::egress::{is_policy_refusal, probe_get};
 use super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 /// Canonical inflight gauge exposed by `chio-tower`. Hard-coded so the
@@ -111,11 +111,21 @@ impl Probe for KernelRuntimeProbe {
                     format!("Failed to read metrics body: {err}"),
                 ),
             },
+            Err(err) if is_policy_refusal(&err) => ProbeReport::fail(
+                self.name(),
+                ProbeSeverity::Warning,
+                "urn:chio:error:cli:doctor-otel-unresolved",
+                format!("Metrics URL {url} refused by the egress contract: {err}"),
+            )
+            .with_help(
+                "The doctor probe refuses link-local, private-network and special-use \
+                 targets. The gauge is not checked.",
+            ),
             Err(err) => ProbeReport::fail(
                 self.name(),
                 ProbeSeverity::Warning,
                 "urn:chio:error:cli:doctor-otel-unresolved",
-                format!("Failed to fetch metrics from {url} (egress contract): {err}"),
+                format!("Failed to fetch metrics from {url}: {err}"),
             ),
         }
     }
@@ -165,6 +175,10 @@ mod tests {
         let probe = KernelRuntimeProbe::default().with_metrics_url("http://169.254.169.254/latest/meta-data");
         let report = probe.run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Warning);
-        assert!(report.message.contains("egress"), "{}", report.message);
+        assert!(
+            report.message.contains("link-local"),
+            "{}",
+            report.message
+        );
     }
 }

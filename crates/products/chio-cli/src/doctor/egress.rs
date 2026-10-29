@@ -16,6 +16,9 @@ use url::{Host, Url};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const PROBE_DEADLINE: Duration = Duration::from_secs(10);
+/// Ceiling on the probe response body. A registry `/v2/` answer is empty or a
+/// short JSON error, and the gauge probe reads one metrics exposition; a body
+/// above this is refused by the contract and reported as a policy refusal.
 const MAX_PROBE_BODY_BYTES: u64 = 1024 * 1024;
 
 fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
@@ -25,15 +28,19 @@ fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
         .host()
         .ok_or_else(|| HttpEgressError::InvalidContract("probe url has no host".to_string()))?;
     let loopback = match &host {
-        Host::Domain(name) => name.eq_ignore_ascii_case("localhost"),
+        Host::Domain(name) => name.trim_end_matches('.').eq_ignore_ascii_case("localhost"),
         Host::Ipv4(address) => IpAddr::V4(*address).is_loopback(),
         Host::Ipv6(address) => IpAddr::V6(*address).is_loopback(),
     };
     let authority = match (host, parsed.port()) {
         (Host::Ipv6(address), Some(port)) => format!("[{address}]:{port}"),
         (Host::Ipv6(address), None) => format!("[{address}]"),
-        (host, Some(port)) => format!("{host}:{port}").to_ascii_lowercase(),
-        (host, None) => host.to_string().to_ascii_lowercase(),
+        (Host::Domain(name), Some(port)) => {
+            format!("{}:{port}", name.trim_end_matches('.').to_ascii_lowercase())
+        }
+        (Host::Domain(name), None) => name.trim_end_matches('.').to_ascii_lowercase(),
+        (host, Some(port)) => format!("{host}:{port}"),
+        (host, None) => host.to_string(),
     };
     Ok(HttpEgressContract {
         tenant_egress_namespace: "chio-doctor".to_string(),
@@ -45,6 +52,16 @@ fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
         max_redirect_chain: 0,
         max_response_bytes: MAX_PROBE_BODY_BYTES,
     })
+}
+
+/// True when the contract refused the target, as opposed to the target being
+/// unreachable. Private and special-use addresses are always refused by the
+/// contract, so a probe of a private-network endpoint reports a refusal.
+pub(super) fn is_policy_refusal(error: &HttpEgressError) -> bool {
+    !matches!(
+        error,
+        HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. }
+    )
 }
 
 /// GET `url` under a contract that admits only its own authority.
@@ -87,5 +104,41 @@ pub(crate) mod test_support {
 
     pub(crate) fn redirect_to(location: &str) -> String {
         format!("HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_local_target_is_refused_as_link_local() {
+        assert!(matches!(
+            probe_get("http://169.254.169.254/latest/meta-data"),
+            Err(HttpEgressError::LinkLocalDenied { .. })
+        ));
+    }
+
+    #[test]
+    fn private_network_target_is_refused_as_a_policy_refusal() {
+        for url in ["http://10.0.0.5:9100/metrics", "http://100.64.0.1/"] {
+            let error = probe_get(url).expect_err("private target");
+            assert!(matches!(error, HttpEgressError::PrivateNetworkDenied { .. }));
+            assert!(is_policy_refusal(&error));
+        }
+    }
+
+    #[test]
+    fn trailing_dot_authority_matches_its_contract() {
+        let contract = probe_contract("http://localhost.:9100/metrics").unwrap();
+        assert!(!contract.deny_loopback);
+        assert!(contract.allowed_authority_set.contains("localhost:9100"));
+        let contract = probe_contract("https://registry.example.com./v2/").unwrap();
+        assert!(contract.deny_loopback);
+        assert!(contract.allowed_authority_set.contains("registry.example.com"));
+        assert!(contract
+            .enforce_url("https://registry.example.com./v2/", 0)
+            .is_ok());
     }
 }
