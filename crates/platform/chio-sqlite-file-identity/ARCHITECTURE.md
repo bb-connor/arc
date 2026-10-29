@@ -18,7 +18,9 @@ custody checks. Identity inspection does not validate ownership, permissions,
 regular file type, expected identity, or a required link count. The safe
 `custody` module supplies those owner, mode, link-count and positioned-I/O
 checks as predicates over caller-held metadata and descriptors; the rollback
-anchors in `chio-rollback-anchor` and `chio-store-sqlite` share them. It neither acquires
+anchors in `chio-rollback-anchor` and `chio-store-sqlite` share them. Because both
+anchors refuse through these predicates, `src/custody.rs` forbids unsafe code
+and carries the same production clippy deny set as those TCB crates. It neither acquires
 serving locks nor retains a descriptor beyond the call. Available space and
 write geometry are data: the crate reserves no space and grants no write
 capacity or writer authority.

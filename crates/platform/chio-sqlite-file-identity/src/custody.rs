@@ -4,6 +4,22 @@
 //! Every function refuses with [`std::io::ErrorKind::Unsupported`] off Unix,
 //! where owner and mode identity cannot be established.
 
+#![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+
 use std::fs::{File, Metadata};
 use std::io;
 
