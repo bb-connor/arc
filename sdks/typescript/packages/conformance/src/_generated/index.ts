@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: a1b76989f1d5b006f1ef3c0e609d0b111c7d0a3041042a9ff0227e6d85669f60
+// Schema SHA: 8bc4c1e402f7daec8f37f660a8baab850d36eb631417d0ba61fd8fb6d507f615
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -2178,6 +2178,20 @@ export namespace Certify_Check {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-escrow-acceptance-body.schema.json
+export namespace Commerce_CommerceEscrowAcceptanceBody {
+  export interface ChioCommerceEscrowAcceptanceSignedBody {
+    accepted_at: number;
+    buyer_subject: string;
+    order_id: string;
+    quote_sha256: string;
+    schema: "chio.commerce.escrow-acceptance.v1";
+    token_offer_id: string;
+    token_offer_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/commerce/commerce-federation-trust-bundle-body.schema.json
 export namespace Commerce_CommerceFederationTrustBundleBody {
   export interface ChioCommerceFederationTrustBundleV1SignedBody {
@@ -2305,6 +2319,23 @@ export namespace Commerce_CommerceReputationSnapshotBody {
     schema: "chio.commerce.reputation-snapshot.v1";
     score_bps: number;
     status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-reservation-receipt-body.schema.json
+export namespace Commerce_CommerceReservationReceiptBody {
+  export interface ChioCommerceReservationReceiptSignedBody {
+    depositor_account: string;
+    order_id: string;
+    receipt_id: string;
+    reserved_amount: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.commerce.reservation-receipt.v1";
+    token_offer_id: string;
+    token_offer_sha256: string;
   }
 }
 
@@ -76992,6 +77023,45 @@ export namespace TrustControl_BudgetSnapshotAnchorProvenance {
     electionTerm: number;
     committedAt: number;
     signerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/cluster-budget-anchor-body.schema.json
+export namespace TrustControl_ClusterBudgetAnchorBody {
+  export interface ChioClusterBudgetAnchorSignedBody {
+    chain: {
+      body: {
+        anchorSetDigest: string;
+        chainDigest: string;
+        commitSequence: number;
+        committedAt: number;
+        electionTerm: number;
+        leaderUrl: string;
+        previousChainDigest: string;
+        schema: string;
+        signerPublicKey: string;
+      };
+      signature: string;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/cluster-peer-request-body.schema.json
+export namespace TrustControl_ClusterPeerRequestBody {
+  export interface ChioClusterPeerRequestSignedBody {
+    bodySha256: string;
+    deployment: string;
+    issuedAt: number;
+    method: string;
+    nodeId: string;
+    nonce: string;
+    path: string;
+    query: string;
+    recipient: string;
+    scheme: string;
+    term: number | null;
   }
 }
 

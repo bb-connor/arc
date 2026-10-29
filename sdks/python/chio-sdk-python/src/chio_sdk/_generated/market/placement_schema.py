@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -320,7 +320,7 @@ class SupportBoundary93(BaseModel):
     subjectScopedOnly: bool
 
 
-class Body179(BaseModel):
+class Body180(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -339,7 +339,7 @@ class Scorecard34(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body179
+    body: Body180
     signature: str
     signerKey: str
 
@@ -357,7 +357,7 @@ class SupportBoundary94(BaseModel):
     signedScorecardAuthoritative: bool
 
 
-class Body177(BaseModel):
+class Body178(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -379,12 +379,12 @@ class RiskPackage(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body177
+    body: Body178
     signature: str
     signerKey: str
 
 
-class Body176(BaseModel):
+class Body177(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -403,7 +403,7 @@ class QuoteRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body176
+    body: Body177
     signature: str
     signerKey: str
 
@@ -442,7 +442,7 @@ class QuotedTerms(BaseModel):
     quotedPremiumAmount: QuotedPremiumAmount
 
 
-class Body175(BaseModel):
+class Body176(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -459,7 +459,7 @@ class QuoteResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body175
+    body: Body176
     signature: str
     signerKey: str
 

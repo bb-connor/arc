@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,11 +11,11 @@
 from __future__ import annotations
 
 from .join_inputs_schema import ArtifactVersionRef, OpaqueId, Parent, RecoveryDigest32, RecoveryDigest32Item, Scope, WorkDigest, WorkId, WorkJoinInputsV1
-from .request_schema import Action, Action10, Action5, Action6, Action7, Action8, Action9, Body, Body204, Body205, CatalogCursor, CatalogRef, Command, CommandRef, Commitment, DelegationRecord, DraftRef, FundingRef, GraphRecord, Handle, NewWorkItem, OpaqueId, PolicyGeneration, Preparation, PreparationRef, ProfileRef, Proposal, Proposal1, Proposal2, Proposal3, Proposal4, Proposal5, Query, Query25, Query26, Query27, Query28, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Terms, Terms29, WorkDigest, WorkId, WorkRequestV1, WorkSlotId
-from .response_schema import Acceptance, Acceptance1, Acceptance2, Acceptance3, Acceptance4, Artifact, Artifact10, Artifact11, Artifact12, Artifact8, Artifact9, ArtifactVersionRef, BilateralDelivery, BilateralDelivery1, BilateralDelivery2, BilateralDelivery3, BindingField, Body, Body208, Body209, CatalogCursor, CatalogPage, CatalogRef, CommandRef, CommandResult, Condition, Control, Decision, DelegationRecord, DraftRef, Effect, Enforcement, Execution, Execution1, Execution2, Execution3, Handle, OpaqueId, Operation, Outcome, Outcome11, Outcome13, OwnerOperationRef, PolicyGeneration, PreparationRef, Prepared, Prepared1, Prepared2, Prepared3, Profile, ProfileRef, Recovery, Recovery2, Recovery3, Recovery4, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryLink, RecoveryOperation, RefusalCode, Rejection, RejectionCode, Release, Release10, Release12, Release13, Release14, Release15, Result, Result10, Result11, Result13, Result14, Result15, Result16, Result17, Result18, Result19, Result7, Result8, Result9, ResultReference, ResultReference1, ResultReference2, ResultReference3, SafeInteger, Scope, Settlement, Settlement5, Settlement6, Settlement7, State, Value, Value11, Value12, View, WorkDigest, WorkId, WorkResponseV1, WorkSlotId
-from .work_dispatch_permit_schema import Acceptance, Body, Body217, Body218, ChioWorkDispatchPermitSignedBody, Clause, Contract, Effect, Offer, Selection, Slot
+from .request_schema import Action, Action10, Action5, Action6, Action7, Action8, Action9, Body, Body205, Body206, CatalogCursor, CatalogRef, Command, CommandRef, Commitment, DelegationRecord, DraftRef, FundingRef, GraphRecord, Handle, NewWorkItem, OpaqueId, PolicyGeneration, Preparation, PreparationRef, ProfileRef, Proposal, Proposal1, Proposal2, Proposal3, Proposal4, Proposal5, Query, Query25, Query26, Query27, Query28, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Terms, Terms29, WorkDigest, WorkId, WorkRequestV1, WorkSlotId
+from .response_schema import Acceptance, Acceptance1, Acceptance2, Acceptance3, Acceptance4, Artifact, Artifact10, Artifact11, Artifact12, Artifact8, Artifact9, ArtifactVersionRef, BilateralDelivery, BilateralDelivery1, BilateralDelivery2, BilateralDelivery3, BindingField, Body, Body209, Body210, CatalogCursor, CatalogPage, CatalogRef, CommandRef, CommandResult, Condition, Control, Decision, DelegationRecord, DraftRef, Effect, Enforcement, Execution, Execution1, Execution2, Execution3, Handle, OpaqueId, Operation, Outcome, Outcome11, Outcome13, OwnerOperationRef, PolicyGeneration, PreparationRef, Prepared, Prepared1, Prepared2, Prepared3, Profile, ProfileRef, Recovery, Recovery2, Recovery3, Recovery4, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryLink, RecoveryOperation, RefusalCode, Rejection, RejectionCode, Release, Release10, Release12, Release13, Release14, Release15, Result, Result10, Result11, Result13, Result14, Result15, Result16, Result17, Result18, Result19, Result7, Result8, Result9, ResultReference, ResultReference1, ResultReference2, ResultReference3, SafeInteger, Scope, Settlement, Settlement5, Settlement6, Settlement7, State, Value, Value11, Value12, View, WorkDigest, WorkId, WorkResponseV1, WorkSlotId
+from .work_dispatch_permit_schema import Acceptance, Body, Body218, Body219, ChioWorkDispatchPermitSignedBody, Clause, Contract, Effect, Offer, Selection, Slot
 from .work_offer_schema import Body, ChioWorkOfferSignedBody, Effect
-from .work_selection_schema import Body, Body221, ChioWorkSelectionSignedBody, Effect, Offer
+from .work_selection_schema import Body, Body222, ChioWorkSelectionSignedBody, Effect, Offer
 from .work_subdivision_schema import Acceptance, Body, Child, ChioWorkSubdivisionSignedBody, Clause, Contract, Effect
 
 __all__ = [
@@ -44,13 +44,13 @@ __all__ = [
     "BilateralDelivery3",
     "BindingField",
     "Body",
-    "Body204",
     "Body205",
-    "Body208",
+    "Body206",
     "Body209",
-    "Body217",
+    "Body210",
     "Body218",
-    "Body221",
+    "Body219",
+    "Body222",
     "CatalogCursor",
     "CatalogPage",
     "CatalogRef",

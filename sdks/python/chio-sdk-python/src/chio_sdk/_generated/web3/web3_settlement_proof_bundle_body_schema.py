@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -377,7 +377,7 @@ class Bond9(BaseModel):
     signerKey: str
 
 
-class Body216(BaseModel):
+class Body217(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -392,7 +392,7 @@ class AuthorityProof(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body216
+    body: Body217
     signature: str
     signerKey: str
 
@@ -460,7 +460,7 @@ class SupportBoundary116(BaseModel):
     externalExecutionAuthoritative: bool
 
 
-class Body215(BaseModel):
+class Body216(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -492,7 +492,7 @@ class CapitalInstruction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body215
+    body: Body216
     signature: str
     signerKey: str
 

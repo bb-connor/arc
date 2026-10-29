@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -19,7 +19,7 @@ from .exposure_ledger_schema import ChioCreditExposureLedgerSignedBody, Filters,
 from .facility_schema import ChioCreditFacilitySignedBody, CreditLimit, EvidenceRef, Filters, Finding, Prerequisites, Report, Scorecard, SupportBoundary, Terms
 from .iou_envelope_schema import ChioCreditIouEnvelopeSignedBody
 from .loss_lifecycle_schema import Amount, ChioCreditLossLifecycleSignedBody, CurrentDelinquentAmount, CurrentRecoveredAmount, CurrentReleasedReserveAmount, EventAmount, Finding, OutstandingDelinquentAmount, Query, ReleaseableReserveAmount, Report, Summary, SupportBoundary
-from .provider_risk_package_schema import Body, Body188, Certification, ChioCreditProviderRiskPackageSignedBody, CreditLimit, Exposure, FacilityReport, Filters, Filters80, Filters81, LatestFacility, Position, Prerequisites, Probation, RecentLossHistory, Reputation, RuntimeAssurance, Scorecard, Scorecard40, Summary, Summary65, Summary66, SupportBoundary, SupportBoundary102, SupportBoundary103, SupportBoundary104, Terms
+from .provider_risk_package_schema import Body, Body189, Certification, ChioCreditProviderRiskPackageSignedBody, CreditLimit, Exposure, FacilityReport, Filters, Filters80, Filters81, LatestFacility, Position, Prerequisites, Probation, RecentLossHistory, Reputation, RuntimeAssurance, Scorecard, Scorecard40, Summary, Summary65, Summary66, SupportBoundary, SupportBoundary102, SupportBoundary103, SupportBoundary104, Terms
 from .scorecard_schema import ChioCreditScorecardSignedBody, Filters, Position, Probation, Reputation, Summary, SupportBoundary
 
 __all__ = [
@@ -27,7 +27,7 @@ __all__ = [
     "AuthorityChainItem",
     "AuthorityProof",
     "Body",
-    "Body188",
+    "Body189",
     "Certification",
     "ChioCreditBondSignedBody",
     "ChioCreditCapitalAllocationSignedBody",

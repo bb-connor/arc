@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -45,7 +45,7 @@ class Offer(BaseModel):
     signer: str
 
 
-class Body218(BaseModel):
+class Body219(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -59,7 +59,7 @@ class Selection(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body218
+    body: Body219
     signature: str
     signer: str
 
@@ -103,7 +103,7 @@ class Slot(BaseModel):
     id: str
 
 
-class Body217(BaseModel):
+class Body218(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -118,5 +118,5 @@ class ChioWorkDispatchPermitSignedBody(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body217
+    body: Body218
     signer: str

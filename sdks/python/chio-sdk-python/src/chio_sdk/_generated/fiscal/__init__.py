@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,21 +10,21 @@
 
 from __future__ import annotations
 
-from .fiscal_activation_body_schema import Approval, Body, Body164, Ceiling, ChioFiscalActivationV1SignedBody, Params, SuccessorSchedule, Target
+from .fiscal_activation_body_schema import Approval, Body, Body165, Ceiling, ChioFiscalActivationV1SignedBody, Params, SuccessorSchedule, Target
 from .fiscal_approval_body_schema import ChioFiscalApprovalV1SignedBody
 from .fiscal_charter_body_schema import ChioFiscalCharterV1SignedBody, SignerSetItem
 from .fiscal_consumer_readiness_body_schema import ChioFiscalConsumerReadinessV1SignedBody
 from .fiscal_continuity_checkpoint_body_schema import Active, ChioFiscalContinuityCheckpointV1SignedBody, Domain, LastKnownGood, StagedTransition
 from .fiscal_proposal_admission_body_schema import ChioFiscalProposalAdmissionV1SignedBody
-from .fiscal_proposal_body_schema import Body, Body166, BondRequirement, Candidate, Ceiling, ChioFiscalProposalV1SignedBody, DisputeFee, FeeSchedule, MarketParticipationFee, Params, PublicationFee, RequiredAmount, Scope, SignerSetItem, Successor, Target
+from .fiscal_proposal_body_schema import Body, Body167, BondRequirement, Candidate, Ceiling, ChioFiscalProposalV1SignedBody, DisputeFee, FeeSchedule, MarketParticipationFee, Params, PublicationFee, RequiredAmount, Scope, SignerSetItem, Successor, Target
 from .fiscal_schedule_body_schema import BondRequirement, Ceiling, ChioFiscalScheduleV1SignedBody, DisputeFee, FeeSchedule, MarketParticipationFee, Params, PublicationFee, RequiredAmount, Scope
 
 __all__ = [
     "Active",
     "Approval",
     "Body",
-    "Body164",
-    "Body166",
+    "Body165",
+    "Body167",
     "BondRequirement",
     "Candidate",
     "Ceiling",

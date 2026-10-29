@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -363,7 +363,7 @@ class Preparation(BaseModel):
     proposal: Proposal | Proposal1 | Proposal2 | Proposal3 | Proposal4 | Proposal5
 
 
-class Body204(BaseModel):
+class Body205(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -390,7 +390,7 @@ class Command(BaseModel):
     action: Action | Action5 | Action6 | Action7 | Action8 | Action9 | Action10
 
 
-class Body205(BaseModel):
+class Body206(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -404,4 +404,4 @@ class WorkRequestV1(BaseModel):
     )
     schema_: Literal["chio.work.request.v1"] = Field(..., alias="schema")
     version: Literal[1]
-    body: Body204 | Body205 | Body
+    body: Body205 | Body206 | Body

@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: e5fbaf4c2ab7fc303cdb723cab7f8c289a09a3219460d4ee18cfcef5085c8658
+// Schema content SHA-256: b2a55ecd2e0767541bb01f4288d5035d84d7fc126d213e552b5ece742fc06f03
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -230,6 +230,11 @@ const (
 	CertifyCheckSchemaChioCertifyCheckV1 CertifyCheckSchema = "chio.certify.check.v1"
 )
 
+// Defines values for CommerceCommerceEscrowAcceptanceBodySchema.
+const (
+	CommerceCommerceEscrowAcceptanceBodySchemaChioCommerceEscrowAcceptanceV1 CommerceCommerceEscrowAcceptanceBodySchema = "chio.commerce.escrow-acceptance.v1"
+)
+
 // Defines values for CommerceCommerceFederationTrustBundleBodySchema.
 const (
 	CommerceCommerceFederationTrustBundleBodySchemaChioCommerceFederationTrustBundleV1 CommerceCommerceFederationTrustBundleBodySchema = "chio.commerce.federation-trust-bundle.v1"
@@ -258,6 +263,11 @@ const (
 // Defines values for CommerceCommerceReputationSnapshotBodySchema.
 const (
 	CommerceCommerceReputationSnapshotBodySchemaChioCommerceReputationSnapshotV1 CommerceCommerceReputationSnapshotBodySchema = "chio.commerce.reputation-snapshot.v1"
+)
+
+// Defines values for CommerceCommerceReservationReceiptBodySchema.
+const (
+	CommerceCommerceReservationReceiptBodySchemaChioCommerceReservationReceiptV1 CommerceCommerceReservationReceiptBodySchema = "chio.commerce.reservation-receipt.v1"
 )
 
 // Defines values for CommerceCommerceSlaCommitmentBodySchema.
@@ -7631,6 +7641,20 @@ type CertifyCheck struct {
 // CertifyCheckSchema defines model for CertifyCheck.Schema.
 type CertifyCheckSchema string
 
+// CommerceCommerceEscrowAcceptanceBody defines model for CommerceCommerceEscrowAcceptanceBody.
+type CommerceCommerceEscrowAcceptanceBody struct {
+	AcceptedAt       int64                                      `json:"accepted_at"`
+	BuyerSubject     string                                     `json:"buyer_subject"`
+	OrderId          string                                     `json:"order_id"`
+	QuoteSha256      string                                     `json:"quote_sha256"`
+	Schema           CommerceCommerceEscrowAcceptanceBodySchema `json:"schema"`
+	TokenOfferId     string                                     `json:"token_offer_id"`
+	TokenOfferSha256 string                                     `json:"token_offer_sha256"`
+}
+
+// CommerceCommerceEscrowAcceptanceBodySchema defines model for CommerceCommerceEscrowAcceptanceBody.Schema.
+type CommerceCommerceEscrowAcceptanceBodySchema string
+
 // CommerceCommerceFederationTrustBundleBody defines model for CommerceCommerceFederationTrustBundleBody.
 type CommerceCommerceFederationTrustBundleBody struct {
 	Id              string                                          `json:"id"`
@@ -7761,6 +7785,23 @@ type CommerceCommerceReputationSnapshotBody struct {
 
 // CommerceCommerceReputationSnapshotBodySchema defines model for CommerceCommerceReputationSnapshotBody.Schema.
 type CommerceCommerceReputationSnapshotBodySchema string
+
+// CommerceCommerceReservationReceiptBody defines model for CommerceCommerceReservationReceiptBody.
+type CommerceCommerceReservationReceiptBody struct {
+	DepositorAccount string `json:"depositor_account"`
+	OrderId          string `json:"order_id"`
+	ReceiptId        string `json:"receipt_id"`
+	ReservedAmount   struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"reserved_amount"`
+	Schema           CommerceCommerceReservationReceiptBodySchema `json:"schema"`
+	TokenOfferId     string                                       `json:"token_offer_id"`
+	TokenOfferSha256 string                                       `json:"token_offer_sha256"`
+}
+
+// CommerceCommerceReservationReceiptBodySchema defines model for CommerceCommerceReservationReceiptBody.Schema.
+type CommerceCommerceReservationReceiptBodySchema string
 
 // CommerceCommerceSlaCommitmentBody defines model for CommerceCommerceSlaCommitmentBody.
 type CommerceCommerceSlaCommitmentBody struct {
@@ -38188,6 +38229,39 @@ type TrustControlBudgetSnapshotAnchorProvenanceDigest = string
 type TrustControlBudgetSnapshotAnchorProvenanceSignedCommitment struct {
 	Body      TrustControlBudgetSnapshotAnchorProvenanceCommitment `json:"body"`
 	Signature string                                               `json:"signature"`
+}
+
+// TrustControlClusterBudgetAnchorBody defines model for TrustControlClusterBudgetAnchorBody.
+type TrustControlClusterBudgetAnchorBody struct {
+	Chain []struct {
+		Body struct {
+			AnchorSetDigest     string `json:"anchorSetDigest"`
+			ChainDigest         string `json:"chainDigest"`
+			CommitSequence      int64  `json:"commitSequence"`
+			CommittedAt         int64  `json:"committedAt"`
+			ElectionTerm        int64  `json:"electionTerm"`
+			LeaderUrl           string `json:"leaderUrl"`
+			PreviousChainDigest string `json:"previousChainDigest"`
+			Schema              string `json:"schema"`
+			SignerPublicKey     string `json:"signerPublicKey"`
+		} `json:"body"`
+		Signature string `json:"signature"`
+	} `json:"chain"`
+}
+
+// TrustControlClusterPeerRequestBody defines model for TrustControlClusterPeerRequestBody.
+type TrustControlClusterPeerRequestBody struct {
+	BodySha256 string `json:"bodySha256"`
+	Deployment string `json:"deployment"`
+	IssuedAt   int64  `json:"issuedAt"`
+	Method     string `json:"method"`
+	NodeId     string `json:"nodeId"`
+	Nonce      string `json:"nonce"`
+	Path       string `json:"path"`
+	Query      string `json:"query"`
+	Recipient  string `json:"recipient"`
+	Scheme     string `json:"scheme"`
+	Term       *int64 `json:"term"`
 }
 
 // TrustControlHeartbeat One trust-control heartbeat used to refresh a held authority lease before it expires. The heartbeat names the lease being refreshed (`leaseId` plus `leaseEpoch`), the leader URL claiming continued ownership, and the unix-millisecond observation timestamp at which the heartbeat was issued. The contract is anchored by `spec/PROTOCOL.md` section 9 (the `/v1/internal/cluster/status` cluster lease lifecycle). Wire field names are camelCase to match the lease projection.

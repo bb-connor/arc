@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -813,7 +813,7 @@ class Operation20(BaseModel):
     version: int
 
 
-class Body202(BaseModel):
+class Body203(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -832,7 +832,7 @@ class Checkpoint(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body202
+    body: Body203
     signature: str
 
 
@@ -1072,7 +1072,7 @@ class Response2(BaseModel):
     trigger_finding_receipt_id: str
 
 
-class Body203(BaseModel):
+class Body204(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -1091,7 +1091,7 @@ class ActiveDefenseBody(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body203
+    body: Body204
     kind: str
 
 
@@ -1819,7 +1819,7 @@ class Metadata(BaseModel):
     route: Route | None = None
 
 
-class Body196(BaseModel):
+class Body197(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -1847,5 +1847,5 @@ class ChioReceiptV1SignedBody(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body196
+    body: Body197
     id: str

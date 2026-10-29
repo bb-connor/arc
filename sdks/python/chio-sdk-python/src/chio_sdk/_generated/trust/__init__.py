@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
+# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from .agent_passport_presentation_response_schema import ActivityRatio, AverageUtilization, BoundaryPressure, BudgetReductionRate, CancellationRate, Challenge, ChioAgentPassportPresentationResponseSignedBody, CompletionRate, CompositeScore, Credential, CredentialSubject, DelegationHygiene, DenyRatio, Evidence, FitScore, HistoryDepth, IncidentCorrelation, IncompletionRate, LeastPrivilege, Metrics, Passport, Policy, PolicyRef, Proof, Query, Reliability, ResourceStewardship, ScopeReductionRate, Score, Score2, Score3, Specialization, TtlReductionRate
 from .financial_agent_passport_presentation_challenge_body_schema import ChioFinancialAgentPassportPresentationChallengeV1SignedBody, Selector
-from .financial_agent_passport_presentation_response_schema import ActivityRatio, AverageUtilization, Body, Body160, BoundaryPressure, BudgetReductionRate, CancellationRate, Challenge, ChioFinancialAgentPassportPresentationResponseSignedBody, CompletionRate, CompositeScore, Credential, Credential1, CredentialSubject, DelegationHygiene, DenyRatio, Evidence, FitScore, HistoryDepth, IncidentCorrelation, IncompletionRate, Leaf, LeastPrivilege, MembershipProof, Metrics, Presentation, Proof, Proof5, Query, Reliability, ResourceStewardship, ScopeReductionRate, Score, Score8, Score9, Selector, SourceManifest, Specialization, TtlReductionRate
+from .financial_agent_passport_presentation_response_schema import ActivityRatio, AverageUtilization, Body, Body161, BoundaryPressure, BudgetReductionRate, CancellationRate, Challenge, ChioFinancialAgentPassportPresentationResponseSignedBody, CompletionRate, CompositeScore, Credential, Credential1, CredentialSubject, DelegationHygiene, DenyRatio, Evidence, FitScore, HistoryDepth, IncidentCorrelation, IncompletionRate, Leaf, LeastPrivilege, MembershipProof, Metrics, Presentation, Proof, Proof5, Query, Reliability, ResourceStewardship, ScopeReductionRate, Score, Score8, Score9, Selector, SourceManifest, Specialization, TtlReductionRate
 from .financial_agent_passport_source_manifest_body_schema import ChioFinancialAgentPassportSourceManifestV1SignedBody
 from .fincred_premium_history_body_schema import Artifact, AuditPathItem, Body, ChioFincredPremiumHistoryV1SignedBody, Claims, CommittedLeaf, CredentialSubject, Evidence, IndexProof, Leaf, LowerBoundary, QueryKey, QuotedAmount, SourceCompletenessAttestation, SourceDisclosure, UpperBoundary, Window
 from .fincred_settlement_reliability_body_schema import Artifact, AuditPathItem, Body, ChioFincredSettlementReliabilityV1SignedBody, Claims, CommittedLeaf, CredentialSubject, Evidence, IndexProof, IndexProof2, IndexProof3, Leaf, Leaf3, Leaf4, LeafProof, LeafProof1, LowerBoundary, LowerBoundary2, QueryKey, QueryKey2, QueryKey3, Role, SourceArtifactDigest, SourceCompletenessAttestation, SourceDisclosure, SourceEvidenceClass, SourceFamily, UpperBoundary, UpperBoundary2, Window, Window5
@@ -41,7 +41,7 @@ __all__ = [
     "AuditPathItem",
     "AverageUtilization",
     "Body",
-    "Body160",
+    "Body161",
     "BoundaryPressure",
     "BudgetReductionRate",
     "CancellationRate",
