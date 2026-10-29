@@ -1024,6 +1024,8 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
 ///   an omitted child share as a no-op.
 /// * The requested `child_expires_at` is greater than the parent's
 ///   `expires_at` (rejected as an [`Error::AttenuationViolation`]).
+/// * The parent token's signature does not verify under
+///   `trusted_parent_issuer`, or its carried issuer is a different key.
 /// * `delegator_keypair.public_key() != parent.subject` (the mint helper
 ///   is fail-closed: only the parent capability's bound subject may
 ///   delegate further).
@@ -1036,6 +1038,7 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
 /// must opt in explicitly.
 pub fn delegate(
     parent: &CapabilityToken,
+    _trusted_parent_issuer: &PublicKey,
     child_scope: &ChioScope,
     delegator_keypair: &Keypair,
     delegatee: &PublicKey,

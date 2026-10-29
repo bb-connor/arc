@@ -98,6 +98,7 @@ fn hosted_aggregate_family_uses_signed_root_lineage_before_enforcement(
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
@@ -252,6 +253,7 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let child_scope = make_scope(vec![child_grant]);
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),

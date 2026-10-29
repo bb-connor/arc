@@ -302,6 +302,7 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
     .map_err(|error| CapabilityError::Internal(error.to_string()))?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &ChioScope::default(),
         &root_subject,
         &delegatee.public_key(),
@@ -424,6 +425,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
     let child_scope = cumulative_scope(false, cumulative_constraint(Some(binding)));
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),

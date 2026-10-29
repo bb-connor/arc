@@ -457,6 +457,7 @@ mod tests {
         let child_scope = cumulative_ag_ui_scope(false, 80, Some(binding));
         let receipt = delegate(
             &root,
+            &root.issuer,
             &child_scope,
             &root_subject,
             &delegatee.public_key(),
