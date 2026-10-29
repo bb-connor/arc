@@ -85,6 +85,13 @@ fn frost_registered_signed_artifacts_are_runtime_supported() {
             ),
         ),
         (
+            "chio.frost.dkg-package.v1",
+            (
+                "frost_dkg_package",
+                "spec/schemas/chio-wire/v1/frost/dkg-package.schema.json",
+            ),
+        ),
+        (
             "chio.frost.dkg-round2-sealed.v1",
             (
                 "frost_dkg_round2_sealed",
