@@ -68,14 +68,14 @@
 - Every function in `root_authority` and the resolver takes time as a parameter (spec 10.1); `scripts/check-security-clocks.py` passes.
 - Every new decoder gets a trust-boundary inventory entry with its contract and reader evidence; `scripts/check-trust-boundaries.py` returns 0 at each PR head.
 - `docs/formal/COVERAGE.md` is regenerated as the last commit of each PR.
-- Signed fixtures regenerate only through `cargo xtask gen signed-fixtures`, at the integrated base.
+- Signed fixtures regenerate only through `cargo xtask gen signed-fixtures` (`xtask/src/signed_fixtures.rs`, added by item 1 #1837), at the integrated base; `cargo xtask gen signed-fixtures --check` passes at each PR head.
 
 ## PR slicing and order
 
 | PR | Title | Signs | Depends on | Size |
 |---|---|---|---|---|
 | Part 1 | #1706 `feat(core-types): root-authority wire types, root policy load rules and root consistency checks` | no | merged `c87bf753f1` | done |
-| 3a | `feat(core-types): capability presentation, chain digest and the strict-decoding gate` | no | `main` (may land before item 1) | S, 1-2 |
+| 3a | `feat(core-types): capability presentation, chain digest and the strict-decoding gate` | no | `main` (may land before item 1; spec 13.3 amendment) | S, 1-2 |
 | 3b | `feat(core-types): root_anchor in the signed capability body and the depth-0 AnchoredTrustRoot` | adds a signed member; unanchored bytes unchanged | item 1 #1837 merged; 3a | M, 4-5 |
 | 3c | `feat(kernel): fill the receipt authority block from the verified anchored capability` | changes anchored receipts only | 3b; item 2 F merged | S, 2 |
 
@@ -91,7 +91,7 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
 
 ### Task 1: Capability presentation, chain digest, strict-decoding gate (PR 3a)
 
-**Files:** `crates/core/chio-core-types/src/root_authority/presentation.rs` (new), `root_authority/chain.rs` (new), `root_authority/mod.rs`, `tests/root_authority_presentation.rs` (new), `tests/strict_serde_gate.rs` (new), `docs/security/trust-boundary-inventory.json`.
+**Files:** `crates/core/chio-core-types/src/root_authority/presentation.rs` (new; holds `CapabilityPresentation` and `chain_digest`), `root_authority/mod.rs`, `tests/root_authority_presentation.rs` (new), `tests/strict_serde_gate.rs` (new), `tests/root_authority_examples.rs`, `docs/security/trust-boundary-inventory.json`, `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md` (sections 10.1, 10.2 and 13.3).
 
 - [ ] **RED:**
   - `presentation_decodes_the_schema_examples` (valid example round-trips; every `invalid/presentation.*` example refuses with its pinned reason);
@@ -102,6 +102,10 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
   - `strict_types_never_flatten_on_deserialize` (passes on `main`, fails on a planted fixture in the test's own input set).
 - [ ] **Implement:** `CapabilityPresentation { schema, leaf: CapabilityToken, ancestors: Vec<CapabilityToken>, delegation_context: Option<DelegationContext> }` with `deny_unknown_fields` and the exact-string schema guard; `chain_digest(&[CapabilityToken]) -> Result<Sha256Digest, Error>`; the gate test.
 - [ ] Inventory entry for the presentation decoder; trust-boundaries rc 0.
+- [ ] **Spec amendment (same PR, docs commit):**
+  - 10.1: `root_authority` lists `CapabilityPresentation` with `chain_digest`;
+  - 10.2: the `chain_digest` helper bullet is replaced by "`chain_digest` lives in `chio-core-types` `root_authority` (section 10.1) so the `no_std` verifiers reuse it" (O3);
+  - 13.3 step 3: the ordering amendment under Cross-plan amendments.
 
 ### Task 2: `root_anchor` in the signed body (PR 3b, commit group 1)
 
@@ -115,7 +119,7 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
   - `delegate_copies_root_anchor_byte_for_byte`;
   - `consistency_reads_the_anchor_from_the_root_body` and `consistency_refuses_an_unanchored_root` (new `RootConsistencyError::NotAnchored`);
   - `prepared_anchored_root_body_carries_its_anchor` (item 4 part 1 caller).
-- [ ] **Implement:** the `Option<RootAnchor>` member; `delegate` copies the parent's anchor; delete `RootConsistencyInput.anchor` and `PreparedAnchoredRoot.anchor` with every caller; set `root_anchor: None` at every unanchored literal in one mechanical commit; schema member referencing `root_authority/root-anchor.schema.json`; regenerate the generated types, the registry digests and the lock.
+- [ ] **Implement:** the `Option<RootAnchor>` member; `delegate` copies the parent's anchor; delete `RootConsistencyInput.anchor` and `PreparedAnchoredRoot.anchor` with every caller; set `root_anchor: None` at every unanchored literal (F12, 357 sites) in its own mechanical commit, separate from every logic commit, so review reads the logic diff alone (O2); schema member referencing `root_authority/root-anchor.schema.json`; regenerate the generated types, the registry digests and the lock.
 
 ### Task 3: `AnchoredTrustRoot`, depth 0 (PR 3b, commit group 2)
 
@@ -140,13 +144,20 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
 
 ### Task 4: Vectors and SDK verifiers (PR 3b, commit group 3)
 
-**Files:** `tests/bindings/vectors/capability/anchored-root/v1.json` (new), `tests/bindings/vectors/MANIFEST.sha256`, the generator under `scripts/` that emits signed vectors, the F13 SDK decoders and their tests.
+**Files:** `tests/bindings/vectors/capability/anchored-root/v1.json` (new), `tests/bindings/vectors/MANIFEST.sha256`, `xtask/src/signed_fixtures.rs` (a new owner entry for the anchored-root vector file, emitted by `cargo xtask gen signed-fixtures`), the F13 SDK decoders and their tests.
 
 - [ ] **RED:** SDK tests in TypeScript, Python and Go that load the new vector file and fail on the missing member.
 - [ ] **Vectors:**
   - one valid anchored root per M1 kind;
   - one negative per Task 3 rule, with the expected error class;
-  - padding negatives with a valid signature over the padded body: `root_anchor`, the delegation context (`anchor`, `exchange`, a commitment, `claims`) and the presentation envelope (spec 11.2 l.1157).
+  - padding negatives with a valid signature over the padded body (spec 11.2 l.1157, G18), one each for:
+    - `root_anchor`;
+    - the delegation context: `anchor`, `exchange`, a commitment, `claims`;
+    - the presentation envelope;
+    - the root policy: a rule, its `match`, a `disclosure.tools` entry (re-signed with the root policy signer);
+    - an IdP key snapshot key (re-signed with the snapshot signer);
+    - the provider identity projection (re-signed by its issuer).
+  - Each signed padding negative refuses at strict decode before any signature check, and the vector records the refusal class. The part 1 unsigned schema examples (F3) stay as decoding cases.
 - [ ] **Implement:** each SDK decodes `root_anchor` strictly (unknown member and unknown kind refuse) and copies it unchanged on re-encode; each runs the vector file.
 
 ### Task 5: Receipt `authority` (PR 3c)
@@ -160,7 +171,7 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
   - `authority_holder_matches_the_delegation_context`;
   - `anchored_receipt_with_tenant_id_refuses_signing` (item 2 F's T27 refusal reached from a real anchored capability);
   - `unanchored_capability_receipt_has_no_authority`.
-- [ ] **Implement:** fill `ReceiptAuthority` from `AdmittedRoot`; add receipt vectors with an `authority` block and its `authority.root_anchor` padding negative, unless F's vectors already carry them.
+- [ ] **Implement:** fill `ReceiptAuthority` from `AdmittedRoot`; add receipt vectors with an `authority` block and its signed `authority` and `authority.root_anchor` padding negatives (spec 11.2 receipt list). Task 0 for 3c records which of these item 2 F already emits; 3c adds the rest through `cargo xtask gen signed-fixtures`.
 
 ## Vectors and schemas touched
 
@@ -171,26 +182,27 @@ Downstream: item 4 PR E and `RootExchange::issue` need 3b; item 6 6b needs 3b (a
 | `tests/bindings/vectors/capability/anchored-root/v1.json` | 3b | new: allow per M1 kind, 8.2 negatives, signed padding negatives |
 | `tests/bindings/vectors/MANIFEST.sha256` | 3b, 3c | new and changed lines |
 | Capability signed fixtures | 3b | none for unanchored tokens (Decision 1); anchored roots are new files |
-| `tests/bindings/vectors/receipt/` | 3c | added `authority` cases if F does not carry them |
+| `tests/bindings/vectors/receipt/` | 3c | `authority` cases and signed `authority` padding negatives that F does not already emit |
 | `docs/security/trust-boundary-inventory.json` | 3a, 3b | presentation decoder; capability body decoder contract gains `root_anchor` |
 
-## Open decisions (OWNER)
+## Owner rulings (recorded 2026-10-29)
 
-| # | Question | Default |
+| # | Question | Ruling |
 |---|---|---|
-| O1 | Does 3b need a D17 byte-change window? It adds a signed member but leaves every unanchored token's bytes unchanged. | No D17 window; the PR body pins `unanchored_token_bytes_are_unchanged`. |
-| O2 | The 357 `CapabilityTokenBody { .. }` literals (87 outside tests) gain `root_anchor: None`. | Edit every literal in one mechanical commit. No `Default` derive or builder that hides the member. |
-| O3 | Where does `chain_digest` live? Spec 10.2 names kernel-core; `chio-bundle-verify` and the wasm verifier need it without kernel-core. | `chio-core-types::root_authority::chain`; amend spec 10.2 in 3a. |
-| O4 | Where does `CapabilityPresentation` live, and who owns it? No plan owns the Rust type; items 4 and 6 consume it. | Item 3 PR 3a, under `root_authority` (spec 10.1). |
-| O5 | Who fills the receipt `authority` block? Item 2's Open Question 3 default says item 3. | Item 3 PR 3c, after F. |
-| O6 | Is the provider identity check (G17) inside the resolver? | The resolver compares the digest its caller read for this request; item 4 owns the per-request registry read. |
+| O1 | Does 3b need a D17 byte-change window? It adds a signed member but leaves every unanchored token's bytes unchanged. | APPROVED: no D17 window. Chio is unshipped and has one format. The PR body pins `unanchored_token_bytes_are_unchanged`. |
+| O2 | The 357 `CapabilityTokenBody { .. }` literals (87 outside tests) gain `root_anchor: None`. | APPROVED: edit every literal; no `Default` derive or builder that hides the member. The literal edits are their own commit, separate from the logic commits. |
+| O3 | Where does `chain_digest` live? Spec 10.2 names kernel-core; `chio-bundle-verify` and the wasm verifier need it without kernel-core. | APPROVED: `chio-core-types::root_authority`; the spec 10.2 amendment ships in 3a, in the same PR. |
+| O4 | Where does `CapabilityPresentation` live, and who owns it? No plan owns the Rust type; items 4 and 6 consume it. | APPROVED: item 3 PR 3a, under `root_authority` (spec 10.1). |
+| O5 | Who fills the receipt `authority` block? Item 2's Open Question 3 default says item 3. | APPROVED: item 3 PR 3c, after F. |
+| O6 | Is the provider identity check (G17) inside the resolver? | APPROVED: the resolver compares the digest its caller read for this request; item 4 owns the per-request registry read. |
 
 ## Cross-plan amendments
 
 - Item 2 Open Question 3: names PR 3c as the PR that fills `authority`.
 - Item 4: `RootExchange::issue` and PR E cite PR 3b; `PreparedAnchoredRoot.anchor` is deleted in 3b, which item 4's PR A to C rebase onto.
 - Item 6 6b: depends on 3b, and on 3c for receipt `authority` checks.
-- Spec 10.2: `chain_digest` moves to `chio-core-types` if O3 keeps its default.
+- Spec 10.1 and 10.2 (O3, shipped in 3a): `CapabilityPresentation` and `chain_digest` live in `chio-core-types` `root_authority`; 10.2 no longer lists a kernel-core `chain_digest` helper.
+- Spec 13.3 step 3 (shipped in 3a): "Anchored-root types and resolver (item 3), in three PRs: 3a (presentation, chain digest, strict-decoding gate) signs nothing and may land before item 1; 3b (`root_anchor` in the signed body, `AnchoredTrustRoot`) lands after item 1; 3c (receipt `authority`) lands after item 2."
 
 ## Spec traceability
 
