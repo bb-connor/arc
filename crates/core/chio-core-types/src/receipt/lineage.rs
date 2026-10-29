@@ -202,6 +202,7 @@ impl ChildRequestReceipt {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)?;
         self.verify_signature_against(pinned)
     }
 
@@ -227,6 +228,8 @@ impl ChildRequestReceipt {
         pinned: &PublicKey,
         floor: ReceiptCryptoFloor,
     ) -> core::result::Result<bool, ReceiptFloorVerifyError> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)
+            .map_err(ReceiptFloorVerifyError::Crypto)?;
         ensure_receipt_signature_algorithm_allowed(
             pinned.algorithm(),
             self.signature.algorithm(),
@@ -424,6 +427,7 @@ impl ReceiptLineageStatement {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)?;
         ensure_schema_matches(
             &self.schema,
             CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,

@@ -163,6 +163,7 @@ impl DelegationLink {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.delegator, pinned)?;
         if let Some(marker) = self.aggregate_budget.as_ref() {
             marker.validate()?;
         }

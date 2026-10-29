@@ -210,6 +210,7 @@ impl SessionAnchor {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)?;
         ensure_schema_matches(&self.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(

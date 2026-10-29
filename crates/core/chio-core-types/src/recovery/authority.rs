@@ -76,6 +76,7 @@ macro_rules! signed_authority {
             /// Verify the signature under `pinned`, a key the caller trusts. A carried
             /// signer key that differs from `pinned` is refused before the signature check.
             pub fn verify_signature(&self, pinned: &$crate::crypto::PublicKey) -> Result<bool> {
+                $crate::crypto::ensure_pinned_signer(&self.authority_key, pinned)?;
                 ($validate)(&self.body)?;
                 $crate::crypto::wrapped_verdict($crate::crypto::verify_wrapped(
                     pinned,
