@@ -285,7 +285,9 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     ));
     assert!(matches!(
         router.sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 2})),
-        Err(chio_keyring::KeyringError::StateInvariant("stale signing epoch"))
+        Err(chio_keyring::KeyringError::StateInvariant(
+            "stale signing epoch"
+        ))
     ));
 
     router
@@ -296,7 +298,9 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
         .test_unwrap();
     assert!(matches!(
         router.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 3})),
-        Err(chio_keyring::KeyringError::StateInvariant("stale signing epoch"))
+        Err(chio_keyring::KeyringError::StateInvariant(
+            "stale signing epoch"
+        ))
     ));
     let second = router
         .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 4}))
