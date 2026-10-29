@@ -3,8 +3,8 @@
 //! the address-class policy.
 use super::ContractDnsResolver;
 use crate::{
-    client_builder_with_contract, send_with_contract, HttpEgressContract, HttpEgressError,
-    PrivateNetworkAllowance,
+    client_builder_with_contract, send_with_contract, AllowanceScheme, HttpEgressContract,
+    HttpEgressError, PrivateNetworkAllowance,
 };
 use reqwest::dns::{Name, Resolve};
 use std::collections::BTreeSet;
@@ -35,6 +35,7 @@ fn localhost_contract(open_port: u16) -> Result<HttpEgressContract, Box<dyn std:
         private_network_allowances: BTreeSet::from([PrivateNetworkAllowance {
             host: "localhost".to_string(),
             port: PINNED_PORT,
+            scheme: AllowanceScheme::Https,
             cidr: "10.20.0.0/24".parse()?,
         }]),
     })

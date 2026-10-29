@@ -3274,13 +3274,19 @@ before any byte leaves the substrate. The contract carries:
 - a `max_redirect_chain` ceiling that bounds redirect hop count,
 - a `max_response_bytes` ceiling that bounds the observed response body, and
 - `private_network_allowances`, empty by default: each entry pins one
-  `host:port` of the authority set to a CIDR.
+  `host:port` of the authority set to a scheme and a CIDR.
 
 An allowance is the only way a contract reaches a private address. Its CIDR
 MUST lie inside 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 or
 fc00::/7, MUST be at least a /16 (IPv4) or /48 (IPv6), and MUST NOT intersect
-link-local or the metadata ranges 100.100.100.200/32 and fd00:ec2::/32. A
-contract with any allowance MUST allow only `https`. When a pinned host
+link-local or the metadata ranges 100.100.100.200/32 and fd00:ec2::/32. Each
+entry carries a `scheme` of `https` (the default) or `http`, and the contract
+MUST allow that scheme. A bare authority stands for the default port of the
+entry's scheme. A pinned host is dialed only under the scheme its entry
+names: `http` to a host whose entry names `https`, or `https` to a host whose
+entry names `http`, is refused (`PrivateNetworkAllowanceSchemeMismatch`).
+Plaintext reaches a private address only through an entry that names `http`.
+When a pinned host
 resolves, every address in the answer, public or private, MUST lie inside the
 CIDR, or the request is refused. Cloud metadata addresses (169.254.169.254,
 100.100.100.200, fd00:ec2::/32) are refused for every contract: by their
@@ -3300,6 +3306,8 @@ Reject scenarios (each surfaced as a structured `HttpEgressError`):
 - cloud metadata target that the address-class flags would admit rejected
   (`ReservedAddressDenied`),
 - pinned host resolved outside its allowance (`PrivateNetworkAllowanceMismatch`),
+- pinned host dialed under a scheme its allowance does not name
+  (`PrivateNetworkAllowanceSchemeMismatch`),
 - invalid allowance at load (`InvalidAllowance`),
 - redirect chain exceeds the contract ceiling (`RedirectLimitExceeded`),
 - response body exceeds the contract ceiling (`ResponseTooLarge`),

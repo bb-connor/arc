@@ -14,8 +14,8 @@ use url::{Host, Url};
 
 mod allowance;
 pub use allowance::{
-    private_network_allowance_digest, EgressAllowanceSet, IpCidr, PrivateNetworkAllowance,
-    PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
+    private_network_allowance_digest, AllowanceScheme, EgressAllowanceSet, IpCidr,
+    PrivateNetworkAllowance, PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
     MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX, PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
 };
 
@@ -108,6 +108,12 @@ pub enum HttpEgressError {
         host: String,
         port: u16,
         address: IpAddr,
+    },
+    #[error("{scheme} is not the scheme of the private network allowance for {host}:{port}")]
+    PrivateNetworkAllowanceSchemeMismatch {
+        host: String,
+        port: u16,
+        scheme: String,
     },
     #[error("cloud metadata egress target denied: {host}")]
     ReservedAddressDenied { host: String },
@@ -207,20 +213,27 @@ impl HttpEgressContract {
     }
 
     /// Replace this contract's allowances with the entries of `allowances`
-    /// that pin one of its authorities. A bare authority stands for port 443,
-    /// the only scheme an allowance permits. The result is checked when the
-    /// contract is prepared.
+    /// that pin one of its authorities under one of its schemes. A bare
+    /// authority stands for the default port of the scheme. The result is
+    /// checked when the contract is prepared.
     #[must_use]
     pub fn with_private_network_allowances(mut self, allowances: &EgressAllowanceSet) -> Self {
         let mut pinned = BTreeSet::new();
-        for authority in &self.allowed_authority_set {
-            let Ok(url) = Url::parse(&format!("https://{authority}/")) else {
-                continue;
-            };
-            let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
-                continue;
-            };
-            pinned.extend(allowances.for_endpoint(host, port));
+        for scheme in &self.allowed_schemes {
+            for authority in &self.allowed_authority_set {
+                let Ok(url) = Url::parse(&format!("{scheme}://{authority}/")) else {
+                    continue;
+                };
+                let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+                    continue;
+                };
+                pinned.extend(
+                    allowances
+                        .for_endpoint(host, port)
+                        .into_iter()
+                        .filter(|entry| entry.scheme.as_str() == scheme),
+                );
+            }
         }
         self.private_network_allowances = pinned;
         self
@@ -276,6 +289,29 @@ impl HttpEgressContract {
             });
         }
         Ok(())
+    }
+
+    /// A host pinned for this port is dialed only under the scheme its
+    /// allowance names.
+    fn enforce_allowance_scheme(&self, url: &Url, scheme: &str) -> Result<(), HttpEgressError> {
+        let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+            return Ok(());
+        };
+        let host = allowance::allowance_host(host);
+        match self
+            .private_network_allowances
+            .iter()
+            .find(|entry| entry.host == host && entry.port == port)
+        {
+            Some(pin) if pin.scheme.as_str() != scheme => {
+                Err(HttpEgressError::PrivateNetworkAllowanceSchemeMismatch {
+                    host,
+                    port,
+                    scheme: scheme.to_string(),
+                })
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Enforce the contract on one address `host` resolved to. The port
@@ -476,6 +512,7 @@ impl PreparedHttpEgressContract {
         }
 
         let host = url.host().ok_or(HttpEgressError::MissingAuthority)?;
+        self.contract.enforce_allowance_scheme(&url, &scheme)?;
         self.contract
             .enforce_host_class(&host, url.port_or_known_default())?;
 

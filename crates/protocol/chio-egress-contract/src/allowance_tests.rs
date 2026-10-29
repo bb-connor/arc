@@ -1,6 +1,6 @@
 use super::{
-    private_network_allowance_digest, EgressAllowanceSet, HttpEgressContract, HttpEgressError,
-    IpCidr, PrivateNetworkAllowance, PrivateNetworkAllowanceError,
+    private_network_allowance_digest, AllowanceScheme, EgressAllowanceSet, HttpEgressContract,
+    HttpEgressError, IpCidr, PrivateNetworkAllowance, PrivateNetworkAllowanceError,
     EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
 };
 use std::collections::BTreeSet;
@@ -16,8 +16,21 @@ fn allowance(host: &str, port: u16, network: &str) -> PrivateNetworkAllowance {
     PrivateNetworkAllowance {
         host: host.to_string(),
         port,
+        scheme: AllowanceScheme::Https,
         cidr: cidr(network),
     }
+}
+
+fn http_allowance(host: &str, port: u16, network: &str) -> PrivateNetworkAllowance {
+    PrivateNetworkAllowance {
+        scheme: AllowanceScheme::Http,
+        ..allowance(host, port, network)
+    }
+}
+
+fn dual_scheme(mut contract: HttpEgressContract) -> HttpEgressContract {
+    contract.allowed_schemes.insert("http".to_string());
+    contract
 }
 
 fn vpc_contract(allowances: &[PrivateNetworkAllowance]) -> HttpEgressContract {
@@ -286,15 +299,147 @@ fn cidr_outside_the_private_ranges_is_refused_at_load() {
 }
 
 #[test]
-fn allowance_requires_https_only_contract() {
-    let mut contract = facilitator_contract();
-    contract.allowed_schemes.insert("http".to_string());
+fn http_is_refused_for_an_allowance_that_does_not_name_it() {
+    let contract = dual_scheme(facilitator_contract())
+        .prepare()
+        .expect("contract");
+    contract
+        .enforce_url(&format!("https://{FACILITATOR}:8443/pay"), 0)
+        .expect("https is the default scheme");
+    assert_eq!(
+        contract.enforce_url(&format!("http://{FACILITATOR}:8443/pay"), 0),
+        Err(HttpEgressError::PrivateNetworkAllowanceSchemeMismatch {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+            scheme: "http".to_string(),
+        })
+    );
+}
+
+#[test]
+fn named_http_is_admitted_only_on_its_pinned_host_port_and_cidr() {
+    let contract = dual_scheme(vpc_contract(&[http_allowance(
+        FACILITATOR,
+        8443,
+        "10.20.0.0/24",
+    )]));
+    let prepared = contract.prepare().expect("contract");
+    prepared
+        .enforce_url(&format!("http://{FACILITATOR}:8443/pay"), 0)
+        .expect("named http on its pinned host and port");
+    assert_eq!(resolved(&contract, FACILITATOR, "10.20.0.5", 8443), Ok(()));
+    assert_eq!(
+        resolved(&contract, FACILITATOR, "10.21.0.5", 8443),
+        Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+            address: "10.21.0.5".parse().expect("ip"),
+        })
+    );
+    assert_eq!(
+        prepared.enforce_url(&format!("https://{FACILITATOR}:8443/pay"), 0),
+        Err(HttpEgressError::PrivateNetworkAllowanceSchemeMismatch {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+            scheme: "https".to_string(),
+        })
+    );
+    assert_eq!(
+        prepared.enforce_url(&format!("http://{FACILITATOR}:9443/pay"), 0),
+        Err(HttpEgressError::AuthorityDenied {
+            authority: format!("{FACILITATOR}:9443"),
+        })
+    );
+    assert_eq!(
+        prepared.enforce_url("http://10.0.4.7:8443/pay", 0),
+        Err(HttpEgressError::PrivateNetworkDenied {
+            host: "10.0.4.7".to_string(),
+        })
+    );
+}
+
+#[test]
+fn allowance_scheme_must_be_allowed_by_the_contract() {
+    let contract = vpc_contract(&[http_allowance(FACILITATOR, 8443, "10.20.0.0/24")]);
     assert_eq!(
         contract.validate(),
         Err(HttpEgressError::InvalidAllowance(
-            PrivateNetworkAllowanceError::PlaintextScheme
+            PrivateNetworkAllowanceError::SchemeNotAllowed {
+                host: FACILITATOR.to_string(),
+                port: 8443,
+                scheme: "http".to_string(),
+            }
         ))
     );
+}
+
+#[test]
+fn bare_authority_admits_the_default_port_of_the_allowance_scheme() {
+    let mut contract = dual_scheme(vpc_contract(&[http_allowance(
+        "public.example",
+        80,
+        "10.30.0.0/24",
+    )]));
+    contract
+        .validate()
+        .expect("a bare authority stands for port 80 over http");
+    contract.private_network_allowances =
+        BTreeSet::from([http_allowance("public.example", 443, "10.30.0.0/24")]);
+    assert_eq!(
+        contract.validate(),
+        Err(HttpEgressError::InvalidAllowance(
+            PrivateNetworkAllowanceError::HostNotInAuthoritySet {
+                host: "public.example".to_string(),
+                port: 443,
+            }
+        ))
+    );
+}
+
+#[test]
+fn contract_takes_the_http_entries_of_its_own_authorities() {
+    let set =
+        EgressAllowanceSet::new([http_allowance(FACILITATOR, 8443, "10.20.0.0/24")]).expect("set");
+    let contract = dual_scheme(vpc_contract(&[])).with_private_network_allowances(&set);
+    assert_eq!(
+        contract.private_network_allowances,
+        BTreeSet::from([http_allowance(FACILITATOR, 8443, "10.20.0.0/24")])
+    );
+    contract
+        .validate()
+        .expect("http entry admitted by its contract");
+}
+
+#[test]
+fn allowance_scheme_is_part_of_the_digest() {
+    let https = BTreeSet::from([allowance(FACILITATOR, 8443, "10.20.0.0/24")]);
+    let http = BTreeSet::from([http_allowance(FACILITATOR, 8443, "10.20.0.0/24")]);
+    assert_ne!(
+        private_network_allowance_digest(&https).expect("digest"),
+        private_network_allowance_digest(&http).expect("digest")
+    );
+}
+
+#[test]
+fn allowance_scheme_defaults_to_https_and_rejects_unknown_values() {
+    let named: PrivateNetworkAllowance = serde_json::from_value(serde_json::json!({
+        "host": FACILITATOR,
+        "port": 8443,
+        "scheme": "http",
+        "cidr": "10.20.0.0/24"
+    }))
+    .expect("named scheme");
+    assert_eq!(named, http_allowance(FACILITATOR, 8443, "10.20.0.0/24"));
+    for scheme in ["ftp", "HTTP", ""] {
+        let error = serde_json::from_value::<PrivateNetworkAllowance>(serde_json::json!({
+            "host": FACILITATOR,
+            "port": 8443,
+            "scheme": scheme,
+            "cidr": "10.20.0.0/24"
+        }))
+        .expect_err("unknown scheme");
+        assert!(error.to_string().contains("unknown variant"), "{error}");
+    }
 }
 
 #[test]

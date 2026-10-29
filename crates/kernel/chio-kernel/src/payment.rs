@@ -992,6 +992,7 @@ fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
         | HttpEgressError::Ipv6UlaDenied { .. }
         | HttpEgressError::PrivateNetworkDenied { .. }
         | HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
+        | HttpEgressError::PrivateNetworkAllowanceSchemeMismatch { .. }
         | HttpEgressError::ReservedAddressDenied { .. }
         | HttpEgressError::RedirectLimitExceeded { .. } => {
             PaymentError::RailError("payment rail egress denied".to_owned())

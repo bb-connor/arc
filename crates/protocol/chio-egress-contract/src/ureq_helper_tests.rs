@@ -459,6 +459,7 @@ fn vpc_agent(allowances: &[(&str, u16, &str)]) -> BlockingContractAgent {
             .map(|(host, port, cidr)| crate::PrivateNetworkAllowance {
                 host: (*host).to_string(),
                 port: *port,
+                scheme: crate::AllowanceScheme::Https,
                 cidr: cidr.parse().expect("cidr"),
             })
             .collect(),

@@ -1,4 +1,4 @@
-use chio_egress_contract::{EgressAllowanceSet, PrivateNetworkAllowance};
+use chio_egress_contract::{AllowanceScheme, EgressAllowanceSet, PrivateNetworkAllowance};
 
 use crate::payment::{
     AcpPaymentAdapter, PaymentAdapter, PaymentError, PaymentJournalRecord, PaymentJournalState,
@@ -38,6 +38,7 @@ fn vpc_rail() -> AcpPaymentAdapter {
             &EgressAllowanceSet::new([PrivateNetworkAllowance {
                 host: "facilitator.vpc.internal".to_owned(),
                 port: 8443,
+                scheme: AllowanceScheme::Https,
                 cidr: "10.20.0.0/24".parse().expect("cidr"),
             }])
             .expect("valid allowance set"),
@@ -160,6 +161,7 @@ fn vpc_rail_on(cidr: &str) -> AcpPaymentAdapter {
             &EgressAllowanceSet::new([PrivateNetworkAllowance {
                 host: "facilitator.vpc.internal".to_owned(),
                 port: 8443,
+                scheme: AllowanceScheme::Https,
                 cidr: cidr.parse().expect("cidr"),
             }])
             .expect("valid allowance set"),

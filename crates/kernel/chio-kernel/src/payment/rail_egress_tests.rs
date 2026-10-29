@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_egress_contract::{
-    private_network_allowance_digest, EgressAllowanceSet, PrivateNetworkAllowance,
+    private_network_allowance_digest, AllowanceScheme, EgressAllowanceSet, PrivateNetworkAllowance,
     PrivateNetworkAllowanceError,
 };
 use chio_security_types::clock::FixedClock;
@@ -20,6 +20,7 @@ fn allowance(host: &str, port: u16, cidr: &str) -> PrivateNetworkAllowance {
     PrivateNetworkAllowance {
         host: host.to_owned(),
         port,
+        scheme: AllowanceScheme::Https,
         cidr: cidr.parse().expect("cidr"),
     }
 }
@@ -133,13 +134,31 @@ fn rail_takes_only_its_own_allowance() {
 }
 
 #[test]
-fn plaintext_rail_cannot_carry_an_allowance() {
-    let allowances = set(&[allowance("localhost", 8080, "10.20.0.0/24")]);
-    let error = AcpPaymentAdapter::new("http://localhost:8080")
-        .with_private_network_allowances(&allowances)
-        .expect_err("http rail with an allowance");
+fn rail_allowance_must_name_the_scheme_of_the_rail() {
+    let http_entry = set(&[PrivateNetworkAllowance {
+        scheme: AllowanceScheme::Http,
+        ..allowance("facilitator.vpc.internal", 8443, "10.20.0.0/24")
+    }]);
+    let https_rail = AcpPaymentAdapter::new("https://facilitator.vpc.internal:8443")
+        .with_private_network_allowances(&http_entry)
+        .expect_err("https rail with an http-only allowance");
     assert!(
-        is_rail_error(&error, "payment rail egress allowance is invalid"),
+        is_rail_error(&https_rail, "payment rail egress allowance is invalid"),
+        "{https_rail:?}"
+    );
+}
+
+#[test]
+fn plaintext_rail_stays_loopback_only_whatever_the_allowance() {
+    let http_entry = set(&[PrivateNetworkAllowance {
+        scheme: AllowanceScheme::Http,
+        ..allowance("facilitator.vpc.internal", 8080, "10.20.0.0/24")
+    }]);
+    let error = AcpPaymentAdapter::new("http://facilitator.vpc.internal:8080")
+        .with_private_network_allowances(&http_entry)
+        .expect_err("plaintext private rail");
+    assert!(
+        is_rail_error(&error, "payment rail URL is invalid"),
         "{error:?}"
     );
 }

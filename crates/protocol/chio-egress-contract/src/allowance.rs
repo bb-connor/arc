@@ -168,8 +168,38 @@ impl<'de> Deserialize<'de> for IpCidr {
     }
 }
 
-/// One declared private destination: requests to `host:port` may resolve
-/// only into `cidr`.
+/// URL scheme an allowance admits. Plaintext is admitted only by an entry
+/// that names it.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum AllowanceScheme {
+    #[default]
+    Https,
+    Http,
+}
+
+impl AllowanceScheme {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Https => "https",
+            Self::Http => "http",
+        }
+    }
+
+    #[must_use]
+    pub const fn default_port(self) -> u16 {
+        match self {
+            Self::Https => 443,
+            Self::Http => 80,
+        }
+    }
+}
+
+/// One declared private destination: `scheme` requests to `host:port` may
+/// resolve only into `cidr`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PrivateNetworkAllowance {
@@ -177,6 +207,8 @@ pub struct PrivateNetworkAllowance {
     /// without brackets).
     pub host: String,
     pub port: u16,
+    #[serde(default)]
+    pub scheme: AllowanceScheme,
     pub cidr: IpCidr,
 }
 
@@ -205,8 +237,12 @@ pub enum PrivateNetworkAllowanceError {
     CidrIncludesReservedAddress { cidr: String, reserved: String },
     #[error("allowance for IP literal {host} must declare exactly {host}")]
     LiteralHostCidrMismatch { host: String, cidr: String },
-    #[error("a contract with private network allowances must allow only https")]
-    PlaintextScheme,
+    #[error("allowance for {host}:{port} names {scheme}, which the contract does not allow")]
+    SchemeNotAllowed {
+        host: String,
+        port: u16,
+        scheme: String,
+    },
     #[error("more than one allowance declares {host}:{port}")]
     DuplicateAllowance { host: String, port: u16 },
 }
@@ -266,12 +302,16 @@ pub(crate) fn validate_allowances(
     if allowances.is_empty() {
         return Ok(());
     }
-    if allowed_schemes.iter().any(|scheme| scheme != "https") {
-        return Err(PrivateNetworkAllowanceError::PlaintextScheme);
-    }
     let mut seen = BTreeSet::new();
     for allowance in allowances {
         validate_allowance(allowance)?;
+        if !allowed_schemes.contains(allowance.scheme.as_str()) {
+            return Err(PrivateNetworkAllowanceError::SchemeNotAllowed {
+                host: allowance.host.clone(),
+                port: allowance.port,
+                scheme: allowance.scheme.as_str().to_string(),
+            });
+        }
         if !seen.insert((allowance.host.as_str(), allowance.port)) {
             return Err(PrivateNetworkAllowanceError::DuplicateAllowance {
                 host: allowance.host.clone(),
@@ -284,7 +324,8 @@ pub(crate) fn validate_allowances(
         };
         let admitted = allowed_authority_set
             .contains(&format!("{authority_host}:{}", allowance.port))
-            || (allowance.port == 443 && allowed_authority_set.contains(&authority_host));
+            || (allowance.port == allowance.scheme.default_port()
+                && allowed_authority_set.contains(&authority_host));
         if !admitted {
             return Err(PrivateNetworkAllowanceError::HostNotInAuthoritySet {
                 host: allowance.host.clone(),
