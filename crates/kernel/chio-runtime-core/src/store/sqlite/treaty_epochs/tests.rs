@@ -289,3 +289,142 @@ fn authority_table_limits_refuse_before_unrelated_rows_are_decoded() -> TestResu
     }
     Ok(())
 }
+
+#[test]
+fn operator_pin_and_epoch_compare_exchange_refuse_replacement() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    let fixture = Fixture::new()?;
+    fixture.install()?;
+    fixture.install()?;
+    assert_eq!(
+        fixture
+            .store
+            .provision_treaty_epoch_authority(
+                id("verifier")?,
+                id("treaty")?,
+                Keypair::generate().public_key(),
+            )
+            .err()
+            .ok_or("operator pin replaced")?
+            .code(),
+        "treaty_epoch_authority_mismatch"
+    );
+    let mut body = fixture.update.body().clone();
+    body.sequence = 2;
+    body.previous_record_sha256 = Some(fixture.update.body_digest().clone());
+    let next = sign_treaty_epoch_record(body, &fixture.backend, &fixture.backend.public_key()?)?;
+    assert_eq!(
+        fixture
+            .store
+            .apply_treaty_epoch_update(None, &next)
+            .err()
+            .ok_or("missing CAS predecessor accepted")?
+            .code(),
+        "treaty_epoch_update_conflict"
+    );
+    fixture.store.commit_runtime_authority(&fixture.request)?;
+    fixture
+        .store
+        .apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next)?;
+    fixture
+        .store
+        .apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next)?;
+    assert_eq!(
+        fixture
+            .store
+            .commit_runtime_authority(&fixture.request)
+            .err()
+            .ok_or("stale scope accepted")?
+            .code(),
+        "treaty_epoch_stale"
+    );
+    fixture.store.verify_retained_treaty_authorization(
+        fixture.request.treaty().ok_or("treaty request")?.binding(),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn current_commit_uses_source_clock_and_historical_replay_keeps_original_time() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    let fixture = Fixture::new()?;
+    fixture.install()?;
+    fixture.store.commit_runtime_authority(&fixture.request)?;
+    let reopened = SqliteRuntimeOrchestrationStore::open_with_clock(
+        fixture._directory.path().join("source.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
+    let _expired = chio_test_support::clock::scope_unix_secs(1100);
+    assert_eq!(
+        reopened
+            .commit_runtime_authority(&fixture.request)
+            .err()
+            .ok_or("prepared time overrode source clock")?
+            .code(),
+        "treaty_epoch_expired"
+    );
+    reopened.verify_retained_treaty_authorization(
+        fixture.request.treaty().ok_or("treaty request")?.binding(),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn selected_pin_storage_refuses_non_blob_empty_and_oversized_values() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    for value in [
+        rusqlite::types::Value::Text("a".repeat(MAX_TREATY_EPOCH_BYTES + 1)),
+        rusqlite::types::Value::Blob(Vec::new()),
+        rusqlite::types::Value::Blob(vec![b' '; MAX_TREATY_EPOCH_BYTES + 1]),
+    ] {
+        let fixture = Fixture::new()?;
+        let key = authority_id(&id("verifier")?, &id("treaty")?)?;
+        fixture.store.lock_connection()?.execute(
+            "INSERT INTO runtime_treaty_epoch_pins (authority_id, canonical_bytes) VALUES (?1, ?2)",
+            params![key, value],
+        )?;
+        assert_eq!(
+            fixture
+                .store
+                .commit_runtime_authority(&fixture.request)
+                .err()
+                .ok_or("invalid stored pin accepted")?
+                .code(),
+            "treaty_epoch_invalid"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn independently_committed_revocation_precedes_prepared_authority_commit() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    let fixture = Fixture::new()?;
+    fixture.install()?;
+    let updater = SqliteRuntimeOrchestrationStore::open_with_clock(
+        fixture._directory.path().join("source.sqlite3"),
+        chio_test_support::clock::clock(),
+    )?;
+    let mut body = fixture.update.body().clone();
+    body.sequence = 2;
+    body.previous_record_sha256 = Some(fixture.update.body_digest().clone());
+    body.status = TreatyEpochStatusV1::Withdrawn;
+    let next = sign_treaty_epoch_record(body, &fixture.backend, &fixture.backend.public_key()?)?;
+    updater.apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next)?;
+    assert_eq!(
+        fixture
+            .store
+            .commit_runtime_authority(&fixture.request)
+            .err()
+            .ok_or("prepared request bypassed committed withdrawal")?
+            .code(),
+        "treaty_withdrawn"
+    );
+    let count: i64 = fixture.store.lock_connection()?.query_row(
+        "SELECT COUNT(*) FROM runtime_treaty_authorizations",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(count, 0);
+    Ok(())
+}
