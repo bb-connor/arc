@@ -48,11 +48,11 @@ impl Backend {
     fn revoke(&self, id: &str) -> Result<bool, Failure> {
         match self {
             Self::Remote(client) => {
-                let response = client.revoke_capability(id)?;
-                if response.capability_id != id || !response.revoked {
-                    return Err(Failure::InvalidConfirmation);
-                }
-                Ok(response.newly_revoked)
+                let response = client.revoke_capability(
+                    id,
+                    chio_core::root_authority::RevocationReason::OperatorRequest,
+                )?;
+                Ok(response.roots_revoked > 0)
             }
             Self::Local(store) => {
                 let target = chio_core::root_authority::RevocationTarget::capability(id)
@@ -69,18 +69,7 @@ impl Backend {
     }
     fn readback(&self, id: &str) -> Result<bool, Failure> {
         match self {
-            Self::Remote(client) => {
-                let response = client.list_revocations(&RevocationQuery {
-                    after: None,
-                    kind: None,
-                    capability_id: Some(id.to_owned()),
-                    limit: Some(1),
-                })?;
-                if !response.configured || response.capability_id.as_deref() != Some(id) {
-                    return Err(Failure::InvalidConfirmation);
-                }
-                response.revoked.ok_or(Failure::InvalidConfirmation)
-            }
+            Self::Remote(client) => Ok(client.revocation_status(id)?.revoked),
             Self::Local(store) => Ok(store.is_revoked(id)?),
         }
     }

@@ -975,27 +975,6 @@ pub(crate) fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::Cl
     report_clock().unix_millis().map(|now| now.as_secs())
 }
 
-pub(crate) fn revocation_list_response(
-    capability_id: Option<String>,
-    revoked: Option<bool>,
-    revocations: Vec<RevocationRecord>,
-) -> RevocationListResponse {
-    RevocationListResponse {
-        configured: true,
-        backend: "sqlite".to_string(),
-        capability_id,
-        revoked,
-        count: revocations.len(),
-        revocations: revocations
-            .into_iter()
-            .map(|entry| RevocationRecordView {
-                capability_id: entry.capability_id,
-                revoked_at: entry.revoked_at,
-            })
-            .collect(),
-    }
-}
-
 pub(crate) fn list_limit(requested: Option<usize>) -> usize {
     requested
         .unwrap_or(DEFAULT_LIST_LIMIT)

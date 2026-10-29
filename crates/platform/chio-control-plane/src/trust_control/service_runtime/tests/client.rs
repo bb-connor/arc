@@ -164,12 +164,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 25);
     let client = build_client(&server.url, "secret").test_expect("build client");
 
-    let _ = client.list_revocations(&RevocationQuery {
-        after: None,
-        kind: None,
-        capability_id: Some("cap-1".to_string()),
-        limit: Some(2),
-    });
+    let _ = client.revocation_status("cap-1");
     let _ = client.list_tool_receipts(&ToolReceiptQuery {
         receipt_id: None,
         capability_id: Some("cap-2".to_string()),
@@ -372,7 +367,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         &requests[0],
         "GET",
         REVOCATIONS_PATH,
-        &["capabilityId=cap-1", "limit=2"],
+        &["capabilityId=cap-1"],
     );
     assert_bearer_request(
         &requests[1],

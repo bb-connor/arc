@@ -101,8 +101,19 @@ async fn mock_write(State(backend): State<Arc<Backend>>, Json(body): Json<Value>
         return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
     }
     let newly_revoked = backend.revoked.lock().unwrap().insert(id.into());
-    Json(json!({"capabilityId": id, "revoked": true, "newlyRevoked": newly_revoked}))
-        .into_response()
+    let entry = chio_core::root_authority::RevocationEntry::new(
+        &chio_core::root_authority::RevocationTarget::capability(id).unwrap(),
+        1_792_234_800,
+        chio_core::root_authority::RevocationReason::OperatorRequest,
+    )
+    .unwrap();
+    Json(json!({
+        "entry": entry,
+        "newlyRevoked": newly_revoked,
+        "rootsMatched": 1,
+        "rootsRevoked": u64::from(newly_revoked),
+    }))
+    .into_response()
 }
 
 async fn mock_read(
@@ -115,7 +126,12 @@ async fn mock_read(
     let id = query.get("capabilityId").cloned().unwrap_or_default();
     let revoked =
         backend.mode.load(Ordering::SeqCst) != 3 && backend.revoked.lock().unwrap().contains(&id);
-    Json(json!({"configured": true, "backend": "test", "capabilityId": id, "revoked": revoked, "count": 0, "revocations": []})).into_response()
+    let entry_id = revoked.then(|| {
+        chio_core::root_authority::RevocationTarget::capability(&id)
+            .unwrap()
+            .id()
+    });
+    Json(json!({"capability_id": id, "revoked": revoked, "entry_id": entry_id})).into_response()
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

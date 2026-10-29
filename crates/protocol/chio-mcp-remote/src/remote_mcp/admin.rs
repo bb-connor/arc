@@ -512,18 +512,19 @@ async fn handle_admin_revocations(
         Ok(client) => client,
         Err(response) => return response,
     } {
-        let (capability_id, limit) = match &listing {
-            RevocationListing::Capability(capability_id) => (Some(capability_id.clone()), 1),
-            RevocationListing::Page { limit, .. } => (None, *limit),
-        };
-        return match client.list_revocations(&RevocationQuery {
-            after: None,
-            kind: None,
-            capability_id,
-            limit: Some(limit),
-        }) {
-            Ok(response) => Json(response).into_response(),
-            Err(error) => admin_backend_failure(error),
+        return match listing {
+            RevocationListing::Capability(capability_id) => {
+                match client.revocation_status(&capability_id) {
+                    Ok(response) => Json(response).into_response(),
+                    Err(error) => admin_backend_failure(error),
+                }
+            }
+            RevocationListing::Page { after, limit, kind } => {
+                match client.list_revocation_entries(after, limit, kind) {
+                    Ok(response) => Json(response).into_response(),
+                    Err(error) => admin_backend_failure(error),
+                }
+            }
         };
     }
     let store = match open_revocation_store(&state) {
@@ -588,8 +589,15 @@ async fn handle_admin_revoke_capability(
         Ok(client) => client,
         Err(response) => return response,
     } {
-        return match client.revoke_capability(&capability_id) {
-            Ok(response) => Json(response).into_response(),
+        return match client.revoke_capability(&capability_id, reason) {
+            Ok(response) => Json(json!({
+                "reason_conflict": response.entry.reason != reason,
+                "entry": response.entry,
+                "newly_revoked": response.newly_revoked,
+                "roots_matched": response.roots_matched,
+                "roots_revoked": response.roots_revoked,
+            }))
+            .into_response(),
             Err(error) => admin_backend_failure(error),
         };
     }
@@ -995,18 +1003,13 @@ fn load_session_revocation_status(
             .iter()
             .map(|capability| {
                 client
-                    .list_revocations(&RevocationQuery {
-                        after: None,
-                        kind: None,
-                        capability_id: Some(capability.id.clone()),
-                        limit: Some(1),
-                    })
+                    .revocation_status(&capability.id)
                     .map(|response| {
                         json!({
                             "capabilityId": capability.id,
                             "issuerPublicKey": capability.issuer_public_key,
                             "subjectPublicKey": capability.subject_public_key,
-                            "revoked": response.revoked.unwrap_or(false),
+                            "revoked": response.revoked,
                         })
                     })
                     .map_err(admin_backend_failure)
