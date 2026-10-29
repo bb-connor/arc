@@ -17,6 +17,10 @@ struct Materials {
 }
 
 fn issue_materials() -> Materials {
+    issue_materials_naming("127.0.0.1")
+}
+
+fn issue_materials_naming(server_name: &str) -> Materials {
     let mut root = CertificateParams::new(Vec::<String>::new()).expect("root params");
     root.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     root.distinguished_name = DistinguishedName::new();
@@ -25,7 +29,7 @@ fn issue_materials() -> Materials {
     let root_key = KeyPair::generate().expect("root key");
     let root = root.self_signed(&root_key).expect("root");
 
-    let mut server = CertificateParams::new(vec!["127.0.0.1".to_string()]).expect("server");
+    let mut server = CertificateParams::new(vec![server_name.to_string()]).expect("server");
     server.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
     let server_key = KeyPair::generate().expect("server key");
     let server = server
@@ -214,11 +218,29 @@ fn malformed_tls_material_is_refused_at_construction() {
         cert_chain_pem: &materials.client_chain_pem,
         private_key_pem: "not a key",
     };
-    assert!(BlockingContractTls::from_pem(
-        std::slice::from_ref(&materials.root_pem),
-        Some(identity)
-    )
-    .expect_err("no PEM key")
-    .to_string()
-    .starts_with("failed to parse mutual TLS client private key"));
+    assert_eq!(
+        BlockingContractTls::from_pem(std::slice::from_ref(&materials.root_pem), Some(identity))
+            .expect_err("no PEM key")
+            .to_string(),
+        "failed to parse mutual TLS client private key"
+    );
+}
+
+#[test]
+fn an_agent_refuses_a_trusted_certificate_issued_for_another_name() {
+    let materials = issue_materials_naming("wrong.example");
+    let (authority, server) = serve_tls_once(server_config(&materials, false));
+    let tls = BlockingContractTls::from_pem(std::slice::from_ref(&materials.root_pem), None)
+        .expect("tls");
+    let refusal = tls_agent(&authority)
+        .with_tls(tls)
+        .get(&format!("https://{authority}/"))
+        .expect("allowed")
+        .call()
+        .expect_err("a certificate for another name is refused");
+    assert!(
+        matches!(refusal, HttpEgressError::Transport(_)),
+        "{refusal:?}"
+    );
+    assert!(!server.join().expect("server"));
 }
