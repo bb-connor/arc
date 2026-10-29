@@ -34,5 +34,19 @@ export {
   verifyUtf8MessageEd25519,
 } from "./signing.ts";
 export type { CanonicalJsonSignature, Utf8MessageSignature } from "./signing.ts";
+export {
+  decodeSalt,
+  openCommitments,
+  parseReceiptDisclosure,
+  parseReceiptDisclosureJson,
+  RECEIPT_DISCLOSURE_SCHEMA,
+} from "./disclosure.ts";
+export type {
+  DisclosureOpening,
+  FieldVerdict,
+  OpeningReport,
+  ReceiptCommitment,
+  ReceiptDisclosure,
+} from "./disclosure.ts";
 export { ChioInvariantError, parseJsonText } from "./errors.ts";
 export type { ChioInvariantErrorCode } from "./errors.ts";

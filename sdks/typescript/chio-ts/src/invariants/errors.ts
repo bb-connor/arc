@@ -3,7 +3,8 @@ export type ChioInvariantErrorCode =
   | "canonical_json"
   | "invalid_hex"
   | "invalid_public_key"
-  | "invalid_signature";
+  | "invalid_signature"
+  | "disclosure";
 
 export class ChioInvariantError extends Error {
   readonly code: ChioInvariantErrorCode;
