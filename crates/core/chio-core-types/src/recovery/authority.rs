@@ -73,16 +73,22 @@ macro_rules! signed_authority {
                     signature: signed.signature,
                 })
             }
-            /// Verifies integrity under the embedded key; the caller must bind that key
-            /// to a trusted source before acting on the result.
-            pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+            /// Verify the signature under `pinned`, a key the caller trusts. A carried
+            /// signer key that differs from `pinned` is refused before the signature check.
+            pub fn verify_signature(&self, pinned: &$crate::crypto::PublicKey) -> Result<bool> {
                 ($validate)(&self.body)?;
                 $crate::crypto::wrapped_verdict($crate::crypto::verify_wrapped(
-                    &self.authority_key,
+                    pinned,
                     $schema,
                     &self.body,
                     &self.signature,
                 ))
+            }
+
+            /// Verifies integrity under the embedded key; the caller must bind that key
+            /// to a trusted source before acting on the result.
+            pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+                self.verify_signature(&self.authority_key)
             }
             pub const fn body(&self) -> &$body {
                 &self.body

@@ -144,9 +144,9 @@ impl CumulativeApprovalRootBinding {
         Ok(Self { body, signature })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
         if self.body.schema != CUMULATIVE_APPROVAL_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported cumulative approval root schema {}",
@@ -154,11 +154,17 @@ impl CumulativeApprovalRootBinding {
             )));
         }
         wrapped_verdict(verify_wrapped(
-            &self.body.root_issuer,
+            pinned,
             CUMULATIVE_APPROVAL_ROOT_SCHEMA,
             &self.body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.body.root_issuer)
     }
 
     pub fn digest(&self) -> Result<String> {
