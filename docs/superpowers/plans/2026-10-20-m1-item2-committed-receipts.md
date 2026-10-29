@@ -501,8 +501,8 @@ DDL (fresh-only v1; catalog validation refuses any other layout with an exact er
 
 ```sql
 CREATE TABLE receipt_openings (
-  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
-  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
   state TEXT NOT NULL CHECK (typeof(state) = 'text' AND instr(state, char(0)) = 0 AND state IN ('present', 'erased')),
   salt BLOB,
   state_at INTEGER NOT NULL CHECK (typeof(state_at) = 'integer' AND state_at >= 0),
@@ -511,23 +511,23 @@ CREATE TABLE receipt_openings (
 ) WITHOUT ROWID;
 CREATE TABLE receipt_store_identity (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-  store_id TEXT NOT NULL CHECK (typeof(store_id) = 'text' AND instr(store_id, char(0)) = 0 AND length(CAST(store_id AS BLOB)) = 32 AND store_id NOT GLOB '*[^0-9a-f]*')
+  store_id TEXT NOT NULL CHECK (typeof(store_id) = 'text' AND instr(store_id, char(0)) = 0 AND length(store_id) = 32 AND store_id NOT GLOB '*[^0-9a-f]*')
 );
 CREATE TRIGGER receipt_store_identity_no_replace BEFORE INSERT ON receipt_store_identity WHEN EXISTS (SELECT 1 FROM receipt_store_identity) BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TRIGGER receipt_store_identity_no_update BEFORE UPDATE ON receipt_store_identity BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TRIGGER receipt_store_identity_no_delete BEFORE DELETE ON receipt_store_identity BEGIN SELECT RAISE(ABORT, 'receipt store id is immutable'); END;
 CREATE TABLE receipt_opening_erasures (
   openings_seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
-  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(origin_store_id) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   origin_openings_seq INTEGER NOT NULL CHECK (typeof(origin_openings_seq) = 'integer' AND origin_openings_seq >= 1),
   erased_at INTEGER NOT NULL CHECK (typeof(erased_at) = 'integer' AND erased_at >= 0),
   UNIQUE (origin_store_id, origin_openings_seq)
 );
 CREATE INDEX receipt_opening_erasures_by_receipt ON receipt_opening_erasures (receipt_id);
 CREATE TABLE receipt_erasure_facts (
-  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
-  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(origin_store_id) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   origin_openings_seq INTEGER NOT NULL CHECK (typeof(origin_openings_seq) = 'integer' AND origin_openings_seq >= 1),
   erased_at INTEGER NOT NULL CHECK (typeof(erased_at) = 'integer' AND erased_at >= 0),
   recorded_at INTEGER NOT NULL CHECK (typeof(recorded_at) = 'integer' AND recorded_at >= 0),
@@ -539,15 +539,15 @@ CREATE TRIGGER receipt_erasure_facts_only_marks_conflict BEFORE UPDATE ON receip
 CREATE TRIGGER receipt_erasure_facts_no_delete BEFORE DELETE ON receipt_erasure_facts BEGIN SELECT RAISE(ABORT, 'receipt erasure fact is permanent'); END;
 CREATE TABLE replication_quarantine_erasures (
   quarantine_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(origin_store_id) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   origin_openings_seq INTEGER NOT NULL CHECK (typeof(origin_openings_seq) = 'integer' AND origin_openings_seq >= 1),
   reason TEXT NOT NULL CHECK (typeof(reason) = 'text' AND reason IN ('erasure_event_conflict', 'erasure_event_conflict_own_origin')),
   hold TEXT NOT NULL CHECK (typeof(hold) = 'text' AND hold IN ('below_watermark', 'origin_frozen', 'own_origin')),
-  stored_receipt_id TEXT CHECK (stored_receipt_id IS NULL OR (typeof(stored_receipt_id) = 'text' AND instr(stored_receipt_id, char(0)) = 0 AND length(CAST(stored_receipt_id AS BLOB)) = 64 AND stored_receipt_id NOT GLOB '*[^0-9a-f]*')),
+  stored_receipt_id TEXT CHECK (stored_receipt_id IS NULL OR (typeof(stored_receipt_id) = 'text' AND instr(stored_receipt_id, char(0)) = 0 AND length(stored_receipt_id) = 64 AND stored_receipt_id NOT GLOB '*[^0-9a-f]*')),
   stored_erased_at INTEGER CHECK (stored_erased_at IS NULL OR (typeof(stored_erased_at) = 'integer' AND stored_erased_at >= 0)),
-  incoming_receipt_id TEXT NOT NULL CHECK (typeof(incoming_receipt_id) = 'text' AND instr(incoming_receipt_id, char(0)) = 0 AND length(CAST(incoming_receipt_id AS BLOB)) = 64 AND incoming_receipt_id NOT GLOB '*[^0-9a-f]*'),
+  incoming_receipt_id TEXT NOT NULL CHECK (typeof(incoming_receipt_id) = 'text' AND instr(incoming_receipt_id, char(0)) = 0 AND length(incoming_receipt_id) = 64 AND incoming_receipt_id NOT GLOB '*[^0-9a-f]*'),
   incoming_erased_at INTEGER NOT NULL CHECK (typeof(incoming_erased_at) = 'integer' AND incoming_erased_at >= 0),
-  source_node_id TEXT NOT NULL CHECK (typeof(source_node_id) = 'text' AND instr(source_node_id, char(0)) = 0 AND length(CAST(source_node_id AS BLOB)) BETWEEN 1 AND 2048),
+  source_node_id TEXT NOT NULL CHECK (typeof(source_node_id) = 'text' AND instr(source_node_id, char(0)) = 0 AND length(source_node_id) BETWEEN 1 AND 2048 AND octet_length(source_node_id) <= 8192),
   recorded_at INTEGER NOT NULL CHECK (typeof(recorded_at) = 'integer' AND recorded_at >= 0),
   resolved_at INTEGER CHECK (resolved_at IS NULL OR (typeof(resolved_at) = 'integer' AND resolved_at >= recorded_at)),
   CHECK ((hold = 'own_origin') = (reason = 'erasure_event_conflict_own_origin')),
@@ -560,20 +560,20 @@ CREATE TRIGGER replication_quarantine_erasures_own_store_is_own_origin BEFORE IN
 CREATE TRIGGER replication_quarantine_erasures_monotone BEFORE UPDATE ON replication_quarantine_erasures WHEN OLD.resolved_at IS NOT NULL OR NEW.quarantine_id IS NOT OLD.quarantine_id OR NEW.origin_store_id IS NOT OLD.origin_store_id OR NEW.origin_openings_seq IS NOT OLD.origin_openings_seq OR NEW.reason IS NOT OLD.reason OR NEW.stored_receipt_id IS NOT OLD.stored_receipt_id OR NEW.stored_erased_at IS NOT OLD.stored_erased_at OR NEW.incoming_receipt_id IS NOT OLD.incoming_receipt_id OR NEW.incoming_erased_at IS NOT OLD.incoming_erased_at OR NEW.source_node_id IS NOT OLD.source_node_id OR NEW.recorded_at IS NOT OLD.recorded_at OR NOT ((OLD.hold = 'below_watermark' AND NEW.hold = 'origin_frozen' AND NEW.resolved_at IS NULL) OR (NEW.hold IS OLD.hold AND NEW.resolved_at IS NOT NULL)) BEGIN SELECT RAISE(ABORT, 'erasure conflict record is permanent'); END;
 CREATE TRIGGER replication_quarantine_erasures_no_delete BEFORE DELETE ON replication_quarantine_erasures BEGIN SELECT RAISE(ABORT, 'erasure conflict record is permanent'); END;
 CREATE TABLE receipt_openings_watermarks (
-  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(origin_store_id) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   applied_through INTEGER NOT NULL CHECK (typeof(applied_through) = 'integer' AND applied_through >= 0),
   gc_horizon INTEGER NOT NULL CHECK (typeof(gc_horizon) = 'integer' AND gc_horizon >= 0),
   CHECK (gc_horizon <= applied_through),
   PRIMARY KEY (origin_store_id)
 ) WITHOUT ROWID;
 CREATE TABLE receipt_openings_member_watermarks (
-  member_node_id TEXT NOT NULL CHECK (typeof(member_node_id) = 'text' AND instr(member_node_id, char(0)) = 0 AND length(CAST(member_node_id AS BLOB)) BETWEEN 1 AND 2048),
-  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(CAST(origin_store_id AS BLOB)) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
+  member_node_id TEXT NOT NULL CHECK (typeof(member_node_id) = 'text' AND instr(member_node_id, char(0)) = 0 AND length(member_node_id) BETWEEN 1 AND 2048 AND octet_length(member_node_id) <= 8192),
+  origin_store_id TEXT NOT NULL CHECK (typeof(origin_store_id) = 'text' AND instr(origin_store_id, char(0)) = 0 AND length(origin_store_id) = 32 AND origin_store_id NOT GLOB '*[^0-9a-f]*'),
   applied_through INTEGER NOT NULL CHECK (typeof(applied_through) = 'integer' AND applied_through >= 0),
   PRIMARY KEY (member_node_id, origin_store_id)
 ) WITHOUT ROWID;
 CREATE TABLE receipt_openings_peer_cursors (
-  peer_node_id TEXT NOT NULL CHECK (typeof(peer_node_id) = 'text' AND instr(peer_node_id, char(0)) = 0 AND length(CAST(peer_node_id AS BLOB)) BETWEEN 1 AND 2048),
+  peer_node_id TEXT NOT NULL CHECK (typeof(peer_node_id) = 'text' AND instr(peer_node_id, char(0)) = 0 AND length(peer_node_id) BETWEEN 1 AND 2048 AND octet_length(peer_node_id) <= 8192),
   after_openings_seq INTEGER NOT NULL CHECK (typeof(after_openings_seq) = 'integer' AND after_openings_seq >= 0),
   PRIMARY KEY (peer_node_id)
 ) WITHOUT ROWID;
@@ -581,7 +581,7 @@ CREATE TABLE receipt_openings_peer_cursors (
 
 `receipt_openings` holds the current state of each salt. `receipt_store_identity` holds the store id: one row, 32 lowercase hex. Three triggers keep it immutable: `receipt_store_identity_no_replace` refuses any INSERT once the row exists, which covers INSERT OR REPLACE and REPLACE (SQLite fires no delete trigger for their implicit delete while `recursive_triggers` is off, and the receipt store's connections leave it off), and `receipt_store_identity_no_update` and `receipt_store_identity_no_delete` refuse UPDATE and DELETE. This is the no-replace pattern of `admission_operation_dpop_replay.sql`. `receipt_opening_erasures` is the erasure log the openings stream pages, one row per erase event (a receipt erased by two stores has two rows, one per origin). `receipt_erasure_facts` is the receipt-wide erasure fact: one row per erased receipt, written by every applied erasure, normal or conflicted, with the first erasure's origin pair and `erased_at`, the local `recorded_at` and `conflicted` (INTEGER 0 or 1). Its three triggers refuse a second INSERT (INSERT OR REPLACE and REPLACE included), any DELETE, and any UPDATE other than setting `conflicted` from 0 to 1, so a fact is never replaced, cleared or collected. `replication_quarantine_erasures` holds one row per conflicting erasure event (`UNIQUE` on the origin pair and the incoming `receipt_id` and `erased_at`): `reason` and `hold` (a CHECK ties hold `own_origin` to reason `erasure_event_conflict_own_origin`), the stored event (NULL when its log row was collected), the incoming event, the source node id, `recorded_at` and `resolved_at`. Its triggers refuse a replacing INSERT, an INSERT with a hold other than `own_origin` for a conflict whose origin is this store's own id (from `receipt_store_identity`), any DELETE, and any UPDATE other than the two allowed changes on an unresolved row: raising `hold` from `below_watermark` to `origin_frozen` with `resolved_at` left NULL, and setting `resolved_at` once with `hold` unchanged. A hold is therefore never weakened, a resolved row never changes, a resolution is never undone, and a plain hold can never name the store's own origin; the partial index serves the hold derivation over unresolved rows. `openings_seq` is local and ordered; `(origin_store_id, origin_openings_seq)` is global and unique. `receipt_openings_watermarks` holds, per origin store, the contiguous applied watermark and the durable GC horizon, and the table-level check keeps the horizon at or below the watermark. `receipt_openings_member_watermarks` holds each configured cluster member's last reported watermark per origin store, the input of the horizon. `receipt_openings_peer_cursors` holds the `openings_seq` this node has applied from each source. Origin columns hold store ids and decode through the Rust `StoreId` type (32 lowercase hex); member and peer columns hold P-f's normalized cluster `node_id` and decode through P-f's `normalize_cluster_url`. A row that fails its decoder refuses with `ReceiptStoreError::CorruptOpeningRow`.
 
-Every text key column also carries `instr(col, char(0)) = 0`, and the length checks measure bytes (`length(CAST(col AS BLOB))`), because SQLite's `length()` and `GLOB` stop at an embedded NUL, so `'params' || char(0) || 'BAD'` would otherwise pass the grammar (Root-2 r3). The state check has two explicit branches (Root-2 r2 request 1): present means `typeof(salt) = 'blob'` and `length(salt) = 32`; erased means `salt IS NULL`. The `salt` column has BLOB affinity, so SQLite performs no type conversion and a TEXT or INTEGER value reaches the check as itself. The `salt_ref` check is #1706's grammar `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$` with at most 64 characters, written as GLOB clauses: the first character is a lowercase letter, every character is in `[a-z0-9_.]`, no empty segment (`..`) and no trailing `.`. Delegation-context claim salts (`anchor.claims.*`) fit without a later table change. The same grammar is enforced at the Rust boundary: every write takes a `SaltRef` (decoded through #1706's checked constructor) and every read decodes the column through that constructor, refusing a row that fails it with `ReceiptStoreError::CorruptOpeningRow`. Writer custody and fencing follow the existing serving writer.
+Every text key column also carries `instr(col, char(0)) = 0`, because SQLite's `length()` and `GLOB` stop at an embedded NUL, so `'params' || char(0) || 'BAD'` would otherwise pass the grammar (Root-2 r3). Length checks count characters (`length(col)`), never encoded bytes: `length(col)` doubles under a UTF-16 database encoding, so a UTF-16 store could not write its own store id. Hex ids and `salt_ref` are ASCII by their GLOB grammar, so the character count is exact in every encoding. The free-text node ids carry at most 2048 characters plus an `octet_length(col) <= 8192` ceiling (four bytes per character), which also refuses a UTF-8 value stretched with continuation bytes. The state check has two explicit branches (Root-2 r2 request 1): present means `typeof(salt) = 'blob'` and `length(salt) = 32`; erased means `salt IS NULL`. The `salt` column has BLOB affinity, so SQLite performs no type conversion and a TEXT or INTEGER value reaches the check as itself. The `salt_ref` check is #1706's grammar `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$` with at most 64 characters, written as GLOB clauses: the first character is a lowercase letter, every character is in `[a-z0-9_.]`, no empty segment (`..`) and no trailing `.`. Delegation-context claim salts (`anchor.claims.*`) fit without a later table change. The same grammar is enforced at the Rust boundary: every write takes a `SaltRef` (decoded through #1706's checked constructor) and every read decodes the column through that constructor, refusing a row that fails it with `ReceiptStoreError::CorruptOpeningRow`. Writer custody and fencing follow the existing serving writer.
 
 The DDL was checked with `/usr/bin/sqlite3` 3.51.0 (the Mac CLI; ws2 has no sqlite3 binary), not with cargo. The probe (`docs/superpowers/plans/m1-item2-census/ddl-probe/{ddl.sql,probe.py,probe-result.json}`, run as `python3 -I probe.py /usr/bin/sqlite3 ddl.sql`; `probe-result.json` sha256 `ae492067bda708189dcf4c57df49312374b67caa0978693bc5ba2532ad3d48f1`) runs 28 INSERT cases and 6 UPDATE cases against a seeded present row of `receipt_openings`, and 91 cases on the store identity, the erasure log, the erasure facts, the erasure conflicts and the watermark and cursor tables. The six INSERT OR REPLACE, REPLACE and second-INSERT cases on the store identity each set `recursive_triggers` (three off, three on), print the setting, and after the refusal assert that the identity row and both watermark rows are unchanged; the refused second-INSERT, INSERT OR REPLACE (`recursive_triggers` off and on), UPDATE and DELETE cases on the erasure facts assert that the stored fact is unchanged, and the refused duplicate, INSERT OR REPLACE (`recursive_triggers` off and on), hold UPDATE and DELETE cases on the erasure conflicts assert that the stored conflict row is unchanged. The escalation, downgrade and other-column UPDATE cases on the erasure conflicts each run with `recursive_triggers` off and on and assert the resulting hold. All 125 behaved as expected:
 
@@ -1530,8 +1530,8 @@ Status: proposed amendment to the merged plan, written against Root-2's decision
 
 ```sql
 CREATE TABLE receipt_metadata_values (
-  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
-  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(salt_ref) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
   state TEXT NOT NULL CHECK (typeof(state) = 'text' AND instr(state, char(0)) = 0 AND state IN ('present', 'erased')),
   value TEXT,
   state_at INTEGER NOT NULL CHECK (typeof(state_at) = 'integer' AND state_at >= 0),
