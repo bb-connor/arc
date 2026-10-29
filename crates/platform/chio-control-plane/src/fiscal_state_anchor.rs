@@ -1,10 +1,9 @@
 use std::fmt;
-use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{system_lookup, ContractLookup};
 use chio_fiscal::{
     FiscalCharterRegistry, FiscalGenesisPolicy, FiscalStateAnchor, FiscalStateAnchorError,
     SignedFiscalContinuityCheckpoint, VerifiedFiscalContinuityAdvance,
@@ -48,8 +47,6 @@ pub enum FiscalStateAnchorConfigError {
     InvalidTimeout,
     #[error("fiscal anchor policy or charter registry is invalid: {0}")]
     InvalidPins(String),
-    #[error("failed to build fiscal anchor HTTP client: {0}")]
-    HttpClient(String),
     #[error("invalid fiscal anchor HTTP egress contract: {0}")]
     InvalidEgressContract(String),
 }
@@ -100,36 +97,33 @@ trait FiscalStateAnchorTransport: Send + Sync {
 }
 
 struct HttpsFiscalStateAnchorTransport {
-    client: reqwest::blocking::Client,
+    http: crate::anchor_egress::AnchorClient,
     base_url: String,
-    bearer_token: Arc<str>,
-    egress_contract: HttpEgressContract,
 }
 
 impl HttpsFiscalStateAnchorTransport {
     fn new(config: &RemoteFiscalStateAnchorConfig) -> Result<Self, FiscalStateAnchorConfigError> {
+        Self::with_lookup(config, system_lookup())
+    }
+
+    fn with_lookup(
+        config: &RemoteFiscalStateAnchorConfig,
+        lookup: ContractLookup,
+    ) -> Result<Self, FiscalStateAnchorConfigError> {
         let endpoint = url::Url::parse(&config.base_url)
             .map_err(|error| FiscalStateAnchorConfigError::InvalidUrl(error.to_string()))?;
-        let egress_contract = crate::anchor_egress::strict_https_contract(
+        let http = crate::anchor_egress::AnchorClient::new(
             &endpoint,
             "control-plane.fiscal-state-anchor",
             crate::integer::count(FISCAL_STATE_TRANSPORT_LIMIT),
+            &config.bearer_token,
+            config.timeout,
+            lookup,
         )
         .map_err(FiscalStateAnchorConfigError::InvalidEgressContract)?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
-        // denies redirects and proxies, and each request is contract-preflighted.
-        let client = reqwest::blocking::Client::builder()
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .timeout(config.timeout)
-            .build()
-            .map_err(|error| FiscalStateAnchorConfigError::HttpClient(error.to_string()))?;
         Ok(Self {
-            client,
+            http,
             base_url: config.base_url.trim_end_matches('/').to_owned(),
-            bearer_token: Arc::from(config.bearer_token.as_str()),
-            egress_contract,
         })
     }
 }
@@ -140,36 +134,9 @@ impl FiscalStateAnchorTransport for HttpsFiscalStateAnchorTransport {
             return Err(FiscalStateAnchorError::Unavailable);
         }
         let endpoint = format!("{}{path}", self.base_url);
-        self.egress_contract
-            .enforce_url_with_dns(&endpoint, 0)
-            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        let response = self
-            .client
-            .post(endpoint)
-            .bearer_auth(self.bearer_token.as_ref())
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(body.to_vec())
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
-            // enforced immediately above for this exact URL.
-            .send()
-            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        if !response.status().is_success() {
-            return Err(FiscalStateAnchorError::Unavailable);
-        }
-        if let Some(length) = response.content_length() {
-            self.egress_contract
-                .enforce_response_bytes(length)
-                .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        }
-        let mut body = Vec::new();
-        response
-            .take(crate::integer::count(FISCAL_STATE_TRANSPORT_LIMIT) + 1)
-            .read_to_end(&mut body)
-            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        self.egress_contract
-            .enforce_response_bytes(crate::integer::count(body.len()))
-            .map_err(|_| FiscalStateAnchorError::Unavailable)?;
-        Ok(body)
+        self.http
+            .post_json(&endpoint, body)
+            .map_err(|_| FiscalStateAnchorError::Unavailable)
     }
 }
 
@@ -362,6 +329,22 @@ mod tests {
             policy,
             charters: FiscalCharterRegistry::new(vec![charter])?,
         })
+    }
+
+    #[test]
+    fn anchor_name_answering_loopback_is_refused_before_connecting() -> TestResult {
+        use crate::anchor_egress::test_support::{answer_with, SilentListener};
+
+        let listener = SilentListener::bind()?;
+        let transport =
+            HttpsFiscalStateAnchorTransport::with_lookup(&config()?, answer_with(listener.addr()))?;
+
+        assert!(matches!(
+            transport.post(FISCAL_STATE_READ_PATH, b"{}"),
+            Err(FiscalStateAnchorError::Unavailable)
+        ));
+        assert!(!listener.connected()?);
+        Ok(())
     }
 
     #[test]

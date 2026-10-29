@@ -89,7 +89,6 @@ hex = { workspace = true }
 subtle = "2.6"
 futures-util = "0.3"
 axum = "0.8"
-reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
 ureq = { version = "2.10", features = ["json"] }
 serde_urlencoded = "0.7"
 percent-encoding = "2"
@@ -120,6 +119,7 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
+reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
