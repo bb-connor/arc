@@ -492,7 +492,7 @@ fn execute_tool_call_runtime_admission_denies_before_tool_server_dispatch() {
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
 
     assert!(result.denied);
-    assert!(result.content.contains("openai runtime admission denied"));
+    assert_eq!(result.content, "Error: Runtime admission denied");
     assert_eq!(
         result
             .receipt
@@ -1301,4 +1301,56 @@ fn execute_tool_call_with_object_result() {
     let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
     assert!(result.content.contains("72"));
+}
+
+const PRIVATE_DETAIL: &str = "/srv/chio/tenant-7/private-key.json Bearer secret-token";
+
+struct DetailGuard;
+
+impl chio_kernel::Guard for DetailGuard {
+    fn name(&self) -> &str {
+        "detail-guard"
+    }
+
+    fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+        chio_kernel::GuardEvidenceDeclaration::SAFE
+    }
+
+    fn evaluate(
+        &self,
+        _ctx: &chio_kernel::GuardContext,
+    ) -> Result<chio_kernel::GuardDecision, KernelError> {
+        Err(KernelError::GuardDenied(PRIVATE_DETAIL.to_string()))
+    }
+}
+
+#[test]
+fn guard_denial_projects_only_its_family_text() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(CountingToolServer {
+        invocations: Arc::clone(&invocations),
+    }));
+    kernel.add_guard(Box::new(DetailGuard));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+
+    assert!(result.denied);
+    assert_eq!(result.content, "Error: Request denied by policy guard");
+    let receipt = serde_json::to_string(result.receipt.as_ref().unwrap()).unwrap();
+    assert!(
+        receipt.contains(PRIVATE_DETAIL),
+        "receipt lost the denial detail: {receipt}"
+    );
+    let mut client = serde_json::to_value(&result).unwrap();
+    client["receipt"] = Value::Null;
+    let client = client.to_string();
+    assert!(
+        !client.contains(PRIVATE_DETAIL),
+        "denial detail reached a client field: {client}"
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
