@@ -1984,8 +1984,8 @@ fn public_settlement_proof_rejects_untrusted_capital_signer() {
 
     assert!(matches!(
         verify_public_settlement_proof(&bundle, &trust),
-        Err(Web3ContractError::SettlementSignatureInvalid(message))
-            if message == "capital instruction signer is not a trusted capital authority key"
+        Err(Web3ContractError::InvalidProof(message))
+            if message == "public settlement capital signer key is not trusted"
     ));
 }
 

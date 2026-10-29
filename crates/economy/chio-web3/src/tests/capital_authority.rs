@@ -21,8 +21,15 @@ fn bond_signed_by(signer: &Keypair) -> crate::credit::SignedCreditBond {
 
 fn signer_refusal(result: Result<(), Web3ContractError>) -> String {
     match result {
-        Err(Web3ContractError::SettlementSignatureInvalid(message)) => message,
-        other => panic!("expected a signer refusal, got {other:?}"),
+        Err(Web3ContractError::InvalidSettlement(message)) => message,
+        other => panic!("expected an untrusted signer refusal, got {other:?}"),
+    }
+}
+
+fn public_proof_refusal(bundle: &PublicSettlementProofBundle) -> String {
+    match verify_sample_public_settlement_proof(bundle) {
+        Err(Web3ContractError::InvalidProof(message)) => message,
+        other => panic!("expected a public proof claim rejection, got {other:?}"),
     }
 }
 
@@ -122,8 +129,32 @@ fn public_settlement_proof_refuses_a_bond_signed_outside_the_capital_authority()
     let mut bundle = sample_public_settlement_proof_bundle();
     bundle.settlement_receipt.dispatch.bond = Some(bond_signed_by(&outside_keypair()));
 
+    assert_eq!(
+        public_proof_refusal(&bundle),
+        "public settlement bond signer key is not trusted"
+    );
+}
+
+#[test]
+fn public_settlement_proof_refuses_an_instruction_signed_outside_the_capital_authority() {
+    let mut bundle = sample_public_settlement_proof_bundle();
+    resign_instruction(&mut bundle.settlement_receipt.dispatch, &outside_keypair());
+
+    assert_eq!(
+        public_proof_refusal(&bundle),
+        "public settlement capital signer key is not trusted"
+    );
+}
+
+#[test]
+fn public_settlement_proof_refuses_an_empty_capital_authority() {
+    let bundle = sample_public_settlement_proof_bundle();
+    let mut trust = sample_public_settlement_verifier_trust();
+    trust.trusted_capital_signer_keys.clear();
+
     assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::SettlementSignatureInvalid(message)) if message == BOND_REFUSAL
+        verify_public_settlement_proof(&bundle, &trust),
+        Err(Web3ContractError::InvalidProof(message))
+            if message == "trusted public settlement capital signer keys missing"
     ));
 }

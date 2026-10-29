@@ -649,6 +649,19 @@ mod tests {
             &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
             30,
         );
+        for untrusted_capital_signer in [
+            "public settlement capital signer key is not trusted",
+            "public settlement bond signer key is not trusted",
+            "trusted public settlement capital signer keys missing",
+        ] {
+            assert_typed(
+                map_public_settlement_proof_error(chio_web3::error::Web3ContractError::InvalidProof(
+                    untrusted_capital_signer.to_string(),
+                )),
+                &TRANSACTION_CLAIM_REJECTED,
+                10,
+            );
+        }
         assert_typed(
             map_public_settlement_proof_error(chio_web3::error::Web3ContractError::InvalidProof(
                 "public settlement independent head missing".to_string(),
