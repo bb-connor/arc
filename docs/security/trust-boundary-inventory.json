@@ -124,9 +124,11 @@
     "crates/kernel/chio-runtime-core/src/store/json.rs",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs",
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs",
     "crates/kernel/chio-runtime-core/src/store/trust_floor.rs",
     "crates/kernel/chio-runtime-core/src/treaty.rs",
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs",
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs",
     "crates/platform/chio-agent-web-interop/src/artifacts.rs",
     "crates/platform/chio-agent-web-interop/src/evidence.rs",
@@ -1282,11 +1284,13 @@
     "crates/kernel/chio-runtime-core/src/store/json_file.rs::read_json_store::from_wire",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs::bundle::from_wire",
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs::treaty_runtime_artifact::from_wire",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs::decode::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::governance_ladder_manifest_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::ladder_intersection_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_bundle_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_statement_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire",
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire::from_wire",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire",
     "crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_parity_report::from_wire",
@@ -16862,6 +16866,16 @@
       "contract": "Public approval configuration is read with a 64 KiB file limit and duplicate-aware strict signed JSON; unknown DTO fields reject. The tenant and explicit approver roster are installed into the kernel only with durable admission and an already activated replay-source binding. Loading never provisions or activates replay authority and never implicitly trusts receipt or capability keys.",
       "migrations": [],
       "retained_typed_conversions": []
+    },
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs": {
+      "contract": "Original epoch envelope bytes are bounded at 1 MiB before strict signed JSON decoding. The decoded record is separately checked against the independently configured authority, schema, exact signature, participant and integer bounds. Authenticity alone does not authorize current admission; the source transaction checks freshness, status and current head.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs": {
+      "contract": "Selected pin and authorization BLOBs are type and byte bounded in SQL before materialization, then strictly decoded with a 1 MiB original-input bound. Table counts precede decoding. Signed epoch records additionally verify the operator pin, signed body digest and stored identity/sequence. Mutable heads accept only bounded lowercase hex text under UTF-8 or UTF-16. Parsing is not authentication or rollback detection.",
+      "migrations": [],
+      "retained_typed_conversions": []
     }
   },
   "reviewed_acp_boundaries": {
@@ -18298,11 +18312,13 @@
     "crates/kernel/chio-runtime-core/src/store/json_file.rs::read_json_store::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs::bundle::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs::treaty_runtime_artifact::from_wire#1::decode_signed",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs::decode::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::governance_ladder_manifest_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::ladder_intersection_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_bundle_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_statement_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire#1::decode_signed",
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire#1::decode_document",
     "crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_parity_report::from_wire#1::decode_signed",
@@ -24229,6 +24245,17 @@
     ],
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture_runtime_check.rs": [
       "verify_committed_runtime_fixture::shared-reader::crates/trust/chio-attest-buyer/src/api.rs::verify_proof_package_json"
+    ],
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs.rs": [
+      "apply_treaty_epoch_update::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
+    ],
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs": [
+      "treaty_epoch_from_wire::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs": [
+      "decode::original-json-reader::UntrustedJsonText",
+      "load_pin::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs::decode",
+      "load_record::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
     ]
   },
   "retired_direct_readers": {
