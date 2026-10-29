@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn treaty_epoch_missing_refuses_before_authority_commit() -> TestResult {
+fn treaty_epoch_unavailable_refuses_before_authority_commit() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
     let kernel = fixture.kernel(fixture.hook()?)?;
@@ -17,7 +17,7 @@ fn treaty_epoch_missing_refuses_before_authority_commit() -> TestResult {
         .ok_or("denial metadata")?;
     assert_eq!(
         metadata["chio_runtime"]["failure_code"],
-        "treaty_epoch_missing"
+        "treaty_epoch_unavailable"
     );
     assert!(response.receipt.verify_signature()?);
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);

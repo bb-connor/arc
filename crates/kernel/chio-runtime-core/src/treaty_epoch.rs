@@ -12,6 +12,9 @@ pub use update::{
 pub const CHIO_TREATY_EPOCH_SCHEMA: &str = "chio.treaty-epoch.v1";
 pub const MAX_TREATY_EPOCH_BYTES: usize = 1024 * 1024;
 pub const MAX_TREATY_EPOCH_PARTICIPANTS: usize = 64;
+pub const MAX_TREATY_EPOCH_AUTHORITIES: usize = 128;
+pub const MAX_TREATY_EPOCH_RECORDS: usize = 4096;
+pub const MAX_TREATY_EPOCH_AUTHORIZATIONS: usize = 65536;
 pub const MAX_TREATY_EPOCH_INTEGER: u64 = (1_u64 << 53) - 1;
 
 pub type SignedTreatyEpochV1 = SignedExportEnvelope<TreatyEpochRecordV1>;

@@ -1,3 +1,4 @@
+use chio_runtime_core::{RuntimeAdmissionAuthorityCommit, RuntimeTreatyAuthorizationBinding};
 use serde::Serialize;
 mod source_qualification;
 use std::{fmt, path::Path};
@@ -11,6 +12,15 @@ use crate::{
 };
 
 pub trait ChioRuntimeAdmissionStore: Send + Sync {
+    fn commit_runtime_admission_authority(
+        &self,
+        request: &RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError>;
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        binding: &RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError>;
+
     fn verify_operation_owned_runtime_source(
         &self,
         _expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
@@ -82,6 +92,29 @@ impl InMemoryRuntimeAdmissionStore {
 }
 
 impl ChioRuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
+    fn commit_runtime_admission_authority(
+        &self,
+        request: &RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(
+            chio_runtime_core::RuntimeAdmissionStore::commit_runtime_admission_authority(
+                &self.inner,
+                request,
+            ),
+        )
+    }
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        binding: &RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(
+            chio_runtime_core::RuntimeAdmissionStore::verify_retained_runtime_treaty_authorization(
+                &self.inner,
+                binding,
+            ),
+        )
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -462,6 +495,13 @@ impl SqliteRuntimeOrchestrationStore {
 macro_rules! impl_chio_runtime_admission_store_for_inner {
     ($type:ty) => {
         impl ChioRuntimeAdmissionStore for $type {
+    fn commit_runtime_admission_authority(&self, request: &RuntimeAdmissionAuthorityCommit) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::commit_runtime_admission_authority(&self.inner, request))
+    }
+    fn verify_retained_runtime_treaty_authorization(&self, binding: &RuntimeTreatyAuthorizationBinding) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::verify_retained_runtime_treaty_authorization(&self.inner, binding))
+    }
+
             fn verify_operation_owned_runtime_source(
                 &self,
                 expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
@@ -546,6 +586,25 @@ impl_chio_runtime_admission_store_for_inner!(JsonRuntimeAdmissionStore);
 impl_chio_runtime_admission_store_for_inner!(SqliteRuntimeOrchestrationStore);
 
 impl ChioRuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
+    fn commit_runtime_admission_authority(
+        &self,
+        _: &RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(Err(RuntimeCoreError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "layered stores cannot commit atomic treaty authority".into(),
+        }))
+    }
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        _: &RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(Err(RuntimeCoreError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "layered stores cannot verify retained treaty authority".into(),
+        }))
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -635,6 +694,22 @@ pub(crate) struct RuntimeCoreAdmissionStoreAdapter<'a> {
 }
 
 impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapter<'_> {
+    fn commit_runtime_admission_authority(
+        &self,
+        request: &RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), RuntimeCoreError> {
+        unwrap_runtime(self.inner.commit_runtime_admission_authority(request))
+    }
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        binding: &RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), RuntimeCoreError> {
+        unwrap_runtime(
+            self.inner
+                .verify_retained_runtime_treaty_authorization(binding),
+        )
+    }
+
     fn verify_operation_owned_runtime_source(
         &self,
         expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,

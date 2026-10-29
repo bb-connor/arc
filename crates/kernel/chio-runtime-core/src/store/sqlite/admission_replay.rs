@@ -43,6 +43,20 @@ impl SqliteRuntimeOrchestrationStore {
 }
 
 impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
+    fn commit_runtime_admission_authority(
+        &self,
+        request: &crate::RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        self.commit_runtime_authority(request)
+    }
+
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        binding: &crate::RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        self.verify_retained_treaty_authorization(binding)
+    }
+
     fn verify_operation_owned_runtime_source(
         &self,
         expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,

@@ -45,7 +45,7 @@ impl SqliteRuntimeOrchestrationStore {
         Ok(identity)
     }
 
-    fn load_source_qualification(
+    pub(super) fn load_source_qualification(
         &self,
         connection: &Connection,
     ) -> Result<Option<RuntimeSourceQualificationV1>, ChioRuntimeError> {
