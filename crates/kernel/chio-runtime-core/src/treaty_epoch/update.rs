@@ -55,7 +55,7 @@ pub fn verify_treaty_epoch_update(
         return Err(TreatyEpochError::TooLarge);
     }
     if !envelope
-        .verify_signature()
+        .verify_signature(pinned_authority)
         .map_err(|_| TreatyEpochError::InvalidSignature)?
     {
         return Err(TreatyEpochError::InvalidSignature);
@@ -186,7 +186,7 @@ mod tests {
         let valid = SignedTreatyEpochV1::sign(body.clone(), &authority)?;
         verify_treaty_epoch_update(valid.clone(), &authority.public_key())?;
         let forged = SignedTreatyEpochV1::sign(body, &attacker)?;
-        assert!(forged.verify_signature()?);
+        assert!(forged.verify_signature(&attacker.public_key())?);
         assert!(matches!(
             verify_treaty_epoch_update(forged, &authority.public_key()),
             Err(TreatyEpochError::AuthorityMismatch)
@@ -195,6 +195,22 @@ mod tests {
         altered.body.expires_at_unix_ms = 201;
         assert!(matches!(
             verify_treaty_epoch_update(altered, &authority.public_key()),
+            Err(TreatyEpochError::InvalidSignature)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn signature_over_the_bare_canonical_body_is_refused() -> TestResult {
+        let authority = Keypair::generate();
+        let body = record()?;
+        let mut bare = SignedTreatyEpochV1::sign(body.clone(), &authority)?;
+        bare.signature = authority.sign_exempt(
+            chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+            &chio_core_types::crypto::canonical_json_bytes(&body)?,
+        );
+        assert!(matches!(
+            verify_treaty_epoch_update(bare, &authority.public_key()),
             Err(TreatyEpochError::InvalidSignature)
         ));
         Ok(())
@@ -299,7 +315,7 @@ mod tests {
         cases.push((body, TreatyEpochError::InvalidParticipants));
         for (body, expected) in cases {
             let signed = SignedTreatyEpochV1::sign(body, &key)?;
-            assert!(signed.verify_signature()?);
+            assert!(signed.verify_signature(&key.public_key())?);
             assert!(matches!(
                 verify_treaty_epoch_update(signed, &key.public_key()),
                 Err(error) if error == expected

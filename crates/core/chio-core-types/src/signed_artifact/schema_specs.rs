@@ -1766,6 +1766,10 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("trace_observation", "signing-wrapper-v1")),
     ),
     (
+        "chio.treaty-epoch.v1",
+        Some(("treaty_epoch", "treaty-epoch-commit-v1")),
+    ),
+    (
         "chio.trust.passport-revocation-root.v1",
         Some((
             "trust_passport_revocation_root",

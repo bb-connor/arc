@@ -19,7 +19,7 @@ fn treaty_epoch_unavailable_refuses_before_authority_commit() -> TestResult {
         metadata["chio_runtime"]["failure_code"],
         "treaty_epoch_unavailable"
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
     assert!(fixture
         .inner
