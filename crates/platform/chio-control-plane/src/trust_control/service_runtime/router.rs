@@ -729,6 +729,7 @@ fn route_authorizer(state: &TrustServiceState, listener: Listener) -> Arc<RouteA
         listener,
         Arc::clone(&state.config.access),
         Arc::clone(&state.finding_challenge_clock),
+        state.peer_nonces.clone(),
     ))
 }
 

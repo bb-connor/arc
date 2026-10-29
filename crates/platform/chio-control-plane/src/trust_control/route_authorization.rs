@@ -366,7 +366,7 @@ pub struct RouteAuthorizer {
     listener: Listener,
     access: Arc<TrustAccess>,
     clock: Arc<dyn Clock>,
-    nonces: PeerNonceCache,
+    nonces: Option<Arc<PeerNonceCache>>,
     rules: HashMap<(RouteMethod, &'static str), &'static RouteRule>,
 }
 
@@ -382,22 +382,14 @@ impl std::fmt::Debug for RouteAuthorizer {
 }
 
 impl RouteAuthorizer {
-    /// The peer nonce cache starts at the receiver time read here, so a peer
-    /// request issued at or before that time plus
-    /// `CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS` refuses as stale.
+    /// Every listener of one receiver shares `nonces`. A receiver without a
+    /// peer nonce cache refuses every peer route.
     #[must_use]
-    pub fn new(listener: Listener, access: Arc<TrustAccess>, clock: Arc<dyn Clock>) -> Self {
-        let nonces = PeerNonceCache::new(unix_secs(clock.as_ref()), access.peers().iter().count());
-        Self::with_nonce_cache(listener, access, clock, nonces)
-    }
-
-    /// As [`RouteAuthorizer::new`], with the given peer nonce cache.
-    #[must_use]
-    pub fn with_nonce_cache(
+    pub fn new(
         listener: Listener,
         access: Arc<TrustAccess>,
         clock: Arc<dyn Clock>,
-        nonces: PeerNonceCache,
+        nonces: Option<Arc<PeerNonceCache>>,
     ) -> Self {
         let rules = ROUTE_TABLE
             .iter()
@@ -511,6 +503,10 @@ impl RouteAuthorizer {
     ) -> Result<AuthenticatedPeer, PeerAuthError> {
         self.precheck_peer(headers)?;
         let scope = rule.scope.ok_or(PeerAuthError::Unauthenticated)?;
+        let nonces = self
+            .nonces
+            .as_deref()
+            .ok_or(PeerAuthError::PeerReplayStoreUnavailable)?;
         let now = unix_secs(self.clock.as_ref()).ok_or(PeerAuthError::ClockUnavailable)?;
         let target = PeerRequestTarget {
             method: method.as_str(),
@@ -520,7 +516,7 @@ impl RouteAuthorizer {
         };
         self.access
             .peers()
-            .verify(headers, &target, now, scope, &self.nonces)
+            .verify(headers, &target, now, scope, nonces)
     }
 
     /// The checks a peer row runs before its body is read: no bearer
@@ -532,6 +528,42 @@ impl RouteAuthorizer {
         self.access.peers().precheck(headers)
     }
 }
+
+/// Open the peer nonce cache every listener of this receiver shares, on the
+/// configured cluster peer replay database. A receiver without pinned peers
+/// and without that database has none; a receiver with pinned peers refuses
+/// to start without it.
+pub(crate) fn open_peer_nonce_cache(
+    config: &TrustServiceConfig,
+    clock: &dyn Clock,
+) -> Result<Option<Arc<PeerNonceCache>>, CliError> {
+    let Some(path) = config.cluster_peer_replay_db_path.as_deref() else {
+        if config.is_clustered() {
+            return Err(CliError::cli_other_error(
+                CLUSTER_PEER_REPLAY_DB_REQUIRED.to_string(),
+            ));
+        }
+        return Ok(None);
+    };
+    let refused = |error: chio_store_sqlite::ClusterPeerReplayStoreError| {
+        CliError::cli_other_error(format!(
+            "failed to open trust-control cluster peer replay store: {error}"
+        ))
+    };
+    let store = chio_store_sqlite::SqliteClusterPeerReplayStore::open(path).map_err(refused)?;
+    PeerNonceCache::open(
+        Arc::new(store),
+        unix_secs(clock),
+        config.access.peers().iter().count(),
+    )
+    .map(|cache| Some(Arc::new(cache)))
+    .map_err(refused)
+}
+
+/// Startup refusal for a receiver with pinned cluster peers and no cluster
+/// peer replay database.
+pub(crate) const CLUSTER_PEER_REPLAY_DB_REQUIRED: &str =
+    "clustered trust control requires --cluster-peer-replay-db";
 
 fn unix_secs(clock: &dyn Clock) -> Option<i64> {
     clock

@@ -1620,6 +1620,7 @@ mod config_and_public_tests {
             authority_keyring_config_path: None,
             authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
+            cluster_peer_replay_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
             enterprise_providers_file: None,

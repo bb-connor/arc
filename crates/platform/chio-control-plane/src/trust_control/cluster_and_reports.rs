@@ -84,6 +84,20 @@ mod cluster_and_reports_tests {
         let receipt_store =
             service_runtime::open_service_receipt_store(config.receipt_db_path.as_deref())
                 .test_unwrap();
+        // A served test peer is a receiver whose nonce cache predates every
+        // request of the scenario, so only the freshness window applies even
+        // when its clock is set ahead of the signers'.
+        let peer_nonces = config.cluster_peer_replay_db_path.as_deref().map(|path| {
+            let store = chio_store_sqlite::SqliteClusterPeerReplayStore::open(path).test_unwrap();
+            Arc::new(
+                crate::trust_control::caller_credentials::PeerNonceCache::open(
+                    Arc::new(store),
+                    Some(0),
+                    config.access.peers().iter().count(),
+                )
+                .test_unwrap(),
+            )
+        });
         let state = TrustServiceState {
             finding_challenge_clock,
             config,
@@ -104,6 +118,7 @@ mod cluster_and_reports_tests {
                 FederationAdmissionRateLimiter::default(),
             )),
             cluster,
+            peer_nonces,
             cluster_progress,
             leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
             authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -141,20 +156,15 @@ mod cluster_and_reports_tests {
         public: axum::Router<TrustServiceState>,
         internal: axum::Router<TrustServiceState>,
     ) -> axum::Router {
-        use crate::trust_control::caller_credentials::PeerNonceCache;
         use crate::trust_control::route_authorization::{
             authorize_route, Listener, RouteAuthorizer,
         };
-        // A served test peer is a receiver whose nonce cache predates every
-        // request of the scenario, so only the freshness window applies even
-        // when its clock is set ahead of the signers'.
         let authorizer = |listener| {
-            let pinned_peers = state.config.access.peers().iter().count();
-            Arc::new(RouteAuthorizer::with_nonce_cache(
+            Arc::new(RouteAuthorizer::new(
                 listener,
                 Arc::clone(&state.config.access),
                 Arc::clone(&state.finding_challenge_clock),
-                PeerNonceCache::new(Some(0), pinned_peers),
+                state.peer_nonces.clone(),
             ))
         };
         public

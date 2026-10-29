@@ -55,6 +55,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         authority_keyring_config_path: None,
         authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
+        cluster_peer_replay_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
         enterprise_providers_file: None,
@@ -98,6 +99,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
             FederationAdmissionRateLimiter::default(),
         )),
         cluster: None,
+        peer_nonces: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -1087,3 +1089,126 @@ mod tenant_scoped_routes_tests;
 
 #[path = "router_tests/registry_revocation_capacity.rs"]
 mod registry_revocation_capacity;
+
+fn clustered_state_with_peer_nonces() -> TrustServiceState {
+    let mut state = metrics_state("service-secret");
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut state.config,
+        "service-secret",
+        "http://127.0.0.1:3200",
+        &["http://127.0.0.1:3300"],
+    );
+    state.peer_nonces = crate::trust_control::route_authorization::open_peer_nonce_cache(
+        &state.config,
+        &chio_security_types::clock::FixedClock::new(0),
+    )
+    .test_unwrap();
+    state
+}
+
+fn status_request_headers(issued_at: i64) -> HeaderMap {
+    use crate::trust_control::caller_credentials::tests::{
+        signed_peer_headers_for, test_node_keypair,
+    };
+    use crate::trust_control::caller_credentials::PeerRequestTarget;
+    signed_peer_headers_for(
+        &test_node_keypair("http://127.0.0.1:3300"),
+        "http://127.0.0.1:3300",
+        "http://127.0.0.1:3200",
+        &PeerRequestTarget {
+            method: "GET",
+            path: INTERNAL_CLUSTER_STATUS_PATH,
+            query: "",
+            body: b"",
+        },
+        issued_at,
+        None,
+    )
+}
+
+fn authorize_status(
+    authorizer: &crate::trust_control::route_authorization::RouteAuthorizer,
+    headers: &HeaderMap,
+) -> Result<(), StatusCode> {
+    authorizer
+        .authorize(
+            &axum::http::Method::GET,
+            Some(INTERNAL_CLUSTER_STATUS_PATH),
+            INTERNAL_CLUSTER_STATUS_PATH,
+            "",
+            headers,
+            b"",
+        )
+        .map(|_| ())
+        .map_err(|response| response.status())
+}
+
+#[test]
+fn every_listener_authorizer_shares_the_peer_nonce_cache() {
+    use crate::trust_control::route_authorization::Listener;
+    let state = clustered_state_with_peer_nonces();
+    let now = state
+        .finding_challenge_clock
+        .unix_millis()
+        .test_unwrap()
+        .as_secs();
+    let headers = status_request_headers(i64::try_from(now).test_unwrap());
+    let public = super::route_authorizer(&state, Listener::Public);
+    let internal = super::route_authorizer(&state, Listener::Internal);
+    assert_eq!(
+        authorize_status(&public, &headers),
+        Err(StatusCode::NOT_FOUND)
+    );
+    authorize_status(&internal, &headers).test_unwrap();
+    let rebuilt = super::route_authorizer(&state, Listener::Internal);
+    assert_eq!(
+        authorize_status(&rebuilt, &headers),
+        Err(StatusCode::UNAUTHORIZED)
+    );
+}
+
+#[test]
+fn clustered_startup_refuses_without_a_readable_peer_replay_database() {
+    let clock = chio_security_types::clock::FixedClock::new(0);
+    let mut state = metrics_state("service-secret");
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut state.config,
+        "service-secret",
+        "http://127.0.0.1:3200",
+        &["http://127.0.0.1:3300"],
+    );
+    let path = state
+        .config
+        .cluster_peer_replay_db_path
+        .clone()
+        .test_unwrap();
+    state.config.cluster_peer_replay_db_path = None;
+    let missing =
+        crate::trust_control::route_authorization::open_peer_nonce_cache(&state.config, &clock)
+            .test_unwrap_err();
+    assert_eq!(
+        missing.to_string(),
+        CliError::cli_other_error("clustered trust control requires --cluster-peer-replay-db")
+            .to_string()
+    );
+    std::fs::write(&path, b"not a sqlite database").test_unwrap();
+    state.config.cluster_peer_replay_db_path = Some(path);
+    let corrupt =
+        crate::trust_control::route_authorization::open_peer_nonce_cache(&state.config, &clock)
+            .test_unwrap_err();
+    assert!(
+        corrupt
+            .to_string()
+            .contains("failed to open trust-control cluster peer replay store"),
+        "{corrupt}"
+    );
+    assert!(metrics_state("service-secret").peer_nonces.is_none());
+    assert!(
+        crate::trust_control::route_authorization::open_peer_nonce_cache(
+            &metrics_state("service-secret").config,
+            &clock,
+        )
+        .test_unwrap()
+        .is_none()
+    );
+}

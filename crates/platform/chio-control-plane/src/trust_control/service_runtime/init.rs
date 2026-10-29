@@ -206,6 +206,10 @@ async fn serve_async_inner(
         Arc::new(chio_security_types::clock::SystemClock);
     provision_service_authority(&config, finding_challenge_clock.clone())?;
     let cluster = build_cluster_state(&config, local_addr, finding_challenge_clock.clone())?;
+    let peer_nonces = super::super::route_authorization::open_peer_nonce_cache(
+        &config,
+        finding_challenge_clock.as_ref(),
+    )?;
     let receipt_store = match anchored_receipt_store {
         Some(store) => Some(store),
         None => {
@@ -270,6 +274,7 @@ async fn serve_async_inner(
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         federation_admission_rate_limiter,
         cluster,
+        peer_nonces,
         cluster_progress,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(LEADER_FORWARD_PERMITS)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),
@@ -587,6 +592,7 @@ mod windows_authority_tests {
             authority_keyring_config_path: None,
             authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
+            cluster_peer_replay_db_path: None,
             joint_authority_db_path: Some(database.clone()),
             fiscal_runtime: None,
             enterprise_providers_file: None,

@@ -7,13 +7,14 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::net::SocketAddr;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use chio_core::crypto::{Keypair, PublicKey, SigningAlgorithm};
 use chio_core::{canonical_json_bytes, Signature};
+use chio_store_sqlite::{ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -40,8 +41,9 @@ pub const CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS: i64 = 60;
 ///
 /// Clock-skew contract: a peer clock may lead the receiver clock by at most
 /// this many seconds. A request from a peer leading by more is refused as
-/// stale. A restarted receiver refuses every request issued at or before its
-/// start plus this lead.
+/// stale. A receiver refuses a request from a peer it has no stored
+/// high-water mark for when the request is issued at or before its start plus
+/// this lead.
 pub const CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS: i64 = 5;
 
 /// Header carrying the lowercase hex SHA-256 of the request body (of the
@@ -1037,11 +1039,13 @@ impl ClusterPeerPins {
     ///    a bad signature does (`BadSignature`);
     /// 3. the signed body digest equals the SHA-256 of the received body
     ///    (`BodyMismatch`);
-    /// 4. the issue time is inside the nonce cache's acceptance window
-    ///    (`Stale`);
+    /// 4. the issue time is inside the nonce cache's acceptance window and
+    ///    above the peer's restart floor (`Stale`);
     /// 5. the peer holds `required_scope` (`MissingScope`);
     /// 6. the nonce has not been used by this node inside the window
-    ///    (`ReplayedNonce`), and is then remembered until the window closes.
+    ///    (`ReplayedNonce`), the peer's durable high-water mark covers the
+    ///    issue time (`PeerReplayStoreUnavailable` when it cannot be
+    ///    advanced), and the nonce is then remembered until the window closes.
     pub fn verify(
         &self,
         headers: &HeaderMap,
@@ -1089,7 +1093,7 @@ impl ClusterPeerPins {
         ) {
             return Err(PeerAuthError::BodyMismatch);
         }
-        nonces.check_fresh(issued_at, now_secs)?;
+        nonces.check_fresh(&node_id, issued_at, now_secs)?;
         if !peer.scopes.contains(&required_scope) {
             return Err(PeerAuthError::MissingScope(required_scope));
         }
@@ -1157,33 +1161,30 @@ fn is_lowercase_hex_32(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-/// Remembers each `(node id, nonce)` an accepted peer request used, and
-/// decides which issue times are fresh.
+/// Remembers each `(node id, nonce)` an accepted peer request used, decides
+/// which issue times are fresh, and keeps every peer's durable `issued_at`
+/// high-water mark.
 ///
-/// The acceptance window is `[earliest, high_water + MAX_LEAD]`, where
-/// `high_water` is the highest receiver time the cache has observed,
-/// `earliest = max(start + MAX_LEAD + 1, high_water - MAX_AGE)` and `start`
-/// is the receiver time at which the cache began remembering nonces. Both
-/// bounds only rise. An entry is pruned only once its issue time is below
-/// `earliest`, so every request the window admits is checked against every
-/// nonce that request could reuse, and a backward clock step never reopens a
-/// pruned nonce.
+/// The acceptance window is `[high_water - MAX_AGE, high_water + MAX_LEAD]`,
+/// where `high_water` is the highest receiver time the cache has observed.
+/// Both bounds only rise. An entry is pruned only once its issue time is below
+/// the lower bound, so every request the window admits is checked against
+/// every nonce that request could reuse, and a backward clock step never
+/// reopens a pruned nonce.
 ///
-/// Restart invariant: while the earlier cache's final `high_water` is at or
-/// below this cache's `start`, this cache admits no request that an earlier
-/// cache on the same receiver accepted. An earlier cache accepted only issue
-/// times at or below its own `high_water + MAX_LEAD`, and this cache refuses
-/// every issue time at or below `start + MAX_LEAD`, including a request issued
-/// in the restart second and a future-dated request an earlier cache accepted.
-/// The precondition is an operational assumption: the receiver clock does not
-/// step backward across a restart. Nonces are not durable, so a backward step
-/// can readmit a request the earlier cache accepted.
+/// Each peer also has a restart floor, fixed when the cache opens: the
+/// peer's stored high-water mark, or `start + MAX_LEAD` for a peer without
+/// one, where `start` is the receiver time the cache opened at. A request
+/// issued at or below its peer's floor is refused. Before a request is
+/// admitted, its peer's stored mark is raised to its issue time whenever the
+/// issue time is above it, and a store that cannot be raised refuses the
+/// request. Every request an earlier process on the same store accepted is
+/// therefore at or below its peer's floor, whatever the receiver clock reads
+/// after a restart. A peer without a stored mark keeps the clock-based bound:
+/// a missing or reset store never admits more than that bound does.
 ///
-/// The cost falls on new requests after a restart. A peer whose clock matches
-/// the receiver is refused for the first `MAX_LEAD + 1` seconds. A peer that
-/// leads by `L <= MAX_LEAD` seconds is admitted `L` seconds sooner, from
-/// `start + 1` at `L = MAX_LEAD` with `issued_at = start + MAX_LEAD + 1`. A
-/// peer that lags by `L` seconds is refused for `L` seconds more.
+/// Within one process the floor stays fixed, and distinct nonces issued in
+/// the same second are admitted; the stored mark only rises.
 ///
 /// The cache holds at most `CLUSTER_PEER_NONCE_CACHE_CAPACITY` entries and
 /// each pinned peer at most an equal share of them. A full cache or a full
@@ -1191,6 +1192,7 @@ fn is_lowercase_hex_32(value: &str) -> bool {
 #[derive(Debug)]
 pub struct PeerNonceCache {
     state: Mutex<NonceState>,
+    store: Arc<SqliteClusterPeerReplayStore>,
     capacity: usize,
     per_peer_capacity: usize,
 }
@@ -1199,6 +1201,8 @@ pub struct PeerNonceCache {
 struct NonceState {
     start: Option<i64>,
     high_water: i64,
+    floors: HashMap<String, i64>,
+    stored: HashMap<String, i64>,
     seen: HashSet<(String, String)>,
     by_expiry: BTreeSet<(i64, String, String)>,
     per_peer: HashMap<String, usize>,
@@ -1206,23 +1210,23 @@ struct NonceState {
 
 impl NonceState {
     /// Fold `now_secs` into the high-water time and return the inclusive
-    /// acceptance window, pruning every entry below its lower bound. The
-    /// window is empty until the receiver time passes `start + MAX_LEAD`.
-    fn observe(&mut self, now_secs: i64) -> (i64, i64) {
+    /// acceptance window for `node_id`, pruning every entry below the window.
+    fn observe(&mut self, node_id: &str, now_secs: i64) -> (i64, i64) {
         self.high_water = self.high_water.max(now_secs);
         let start = *self.start.get_or_insert(now_secs);
-        let earliest = start
-            .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS)
-            .saturating_add(1)
-            .max(
-                self.high_water
-                    .saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS),
-            );
+        let window_start = self
+            .high_water
+            .saturating_sub(CLUSTER_PEER_SIGNATURE_MAX_AGE_SECS);
+        let floor = self
+            .floors
+            .get(node_id)
+            .copied()
+            .unwrap_or_else(|| start.saturating_add(CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS));
         let latest = self
             .high_water
             .saturating_add(CLUSTER_PEER_SIGNATURE_MAX_LEAD_SECS);
         while let Some((issued_at, _, _)) = self.by_expiry.first() {
-            if *issued_at >= earliest {
+            if *issued_at >= window_start {
                 break;
             }
             if let Some((_, node, nonce)) = self.by_expiry.pop_first() {
@@ -1235,41 +1239,63 @@ impl NonceState {
                 self.seen.remove(&(node, nonce));
             }
         }
-        (earliest, latest)
+        (window_start.max(floor.saturating_add(1)), latest)
     }
 }
 
 impl PeerNonceCache {
-    /// A cache for a receiver pinning `pinned_peers` peers. `start_secs` is
-    /// the receiver time the cache starts at; when the receiver clock cannot
-    /// be read at construction, the first observed time becomes the start.
-    #[must_use]
-    pub fn new(start_secs: Option<i64>, pinned_peers: usize) -> Self {
-        Self::with_capacity(start_secs, pinned_peers, CLUSTER_PEER_NONCE_CACHE_CAPACITY)
+    /// A cache for a receiver pinning `pinned_peers` peers, holding every
+    /// peer high-water mark in `store`. `start_secs` is the receiver time the
+    /// cache starts at; when the receiver clock cannot be read at
+    /// construction, the first observed time becomes the start.
+    pub fn open(
+        store: Arc<SqliteClusterPeerReplayStore>,
+        start_secs: Option<i64>,
+        pinned_peers: usize,
+    ) -> Result<Self, ClusterPeerReplayStoreError> {
+        Self::with_capacity(
+            store,
+            start_secs,
+            pinned_peers,
+            CLUSTER_PEER_NONCE_CACHE_CAPACITY,
+        )
     }
 
-    /// As [`PeerNonceCache::new`], holding at most `capacity` entries.
-    #[must_use]
-    pub fn with_capacity(start_secs: Option<i64>, pinned_peers: usize, capacity: usize) -> Self {
-        Self {
+    /// As [`PeerNonceCache::open`], holding at most `capacity` entries.
+    pub fn with_capacity(
+        store: Arc<SqliteClusterPeerReplayStore>,
+        start_secs: Option<i64>,
+        pinned_peers: usize,
+        capacity: usize,
+    ) -> Result<Self, ClusterPeerReplayStoreError> {
+        let floors: HashMap<String, i64> = store.high_waters()?.into_iter().collect();
+        Ok(Self {
             state: Mutex::new(NonceState {
                 start: start_secs,
                 high_water: start_secs.unwrap_or(i64::MIN),
+                stored: floors.clone(),
+                floors,
                 seen: HashSet::new(),
                 by_expiry: BTreeSet::new(),
                 per_peer: HashMap::new(),
             }),
+            store,
             capacity,
             per_peer_capacity: capacity / pinned_peers.max(1),
-        }
+        })
     }
 
-    fn check_fresh(&self, issued_at: i64, now_secs: i64) -> Result<(), PeerAuthError> {
+    fn check_fresh(
+        &self,
+        node_id: &str,
+        issued_at: i64,
+        now_secs: i64,
+    ) -> Result<(), PeerAuthError> {
         let mut state = self
             .state
             .lock()
             .map_err(|_| PeerAuthError::ReplayCacheUnavailable)?;
-        let (earliest, latest) = state.observe(now_secs);
+        let (earliest, latest) = state.observe(node_id, now_secs);
         if issued_at < earliest || issued_at > latest {
             return Err(PeerAuthError::Stale);
         }
@@ -1287,7 +1313,7 @@ impl PeerNonceCache {
             .state
             .lock()
             .map_err(|_| PeerAuthError::ReplayCacheUnavailable)?;
-        let (earliest, latest) = state.observe(now_secs);
+        let (earliest, latest) = state.observe(node_id, now_secs);
         if issued_at < earliest || issued_at > latest {
             return Err(PeerAuthError::Stale);
         }
@@ -1300,6 +1326,16 @@ impl PeerNonceCache {
         }
         if state.per_peer.get(node_id).copied().unwrap_or(0) >= self.per_peer_capacity {
             return Err(PeerAuthError::PeerNonceQuotaExhausted);
+        }
+        if state
+            .stored
+            .get(node_id)
+            .is_none_or(|stored| issued_at > *stored)
+        {
+            self.store
+                .advance(node_id, issued_at)
+                .map_err(|_| PeerAuthError::PeerReplayStoreUnavailable)?;
+            state.stored.insert(key.0.clone(), issued_at);
         }
         *state.per_peer.entry(key.0.clone()).or_insert(0) += 1;
         state
@@ -1433,6 +1469,8 @@ pub enum PeerAuthError {
     ReplayCacheUnavailable,
     #[error("cluster peer has no nonce capacity left in the replay cache")]
     PeerNonceQuotaExhausted,
+    #[error("cluster peer replay high-water store is unavailable")]
+    PeerReplayStoreUnavailable,
     #[error("receiver clock is unavailable for cluster peer authentication")]
     ClockUnavailable,
     #[error("cluster peer signature is outside the freshness window")]
@@ -1450,6 +1488,7 @@ impl PeerAuthError {
             PeerAuthError::MissingScope(_) => StatusCode::FORBIDDEN,
             PeerAuthError::ReplayCacheUnavailable
             | PeerAuthError::PeerNonceQuotaExhausted
+            | PeerAuthError::PeerReplayStoreUnavailable
             | PeerAuthError::ClockUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             PeerAuthError::Unauthenticated
             | PeerAuthError::BadSignature

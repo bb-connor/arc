@@ -4855,6 +4855,29 @@ surface, claim or dispute adjudication beyond the documented liability-market
 surface, or theorem-prover completion beyond the boundary and assumptions
 defined in Section 5.4.
 
+### 9.2 Cluster Peer Request Freshness
+
+A trust-control node authenticates each cluster peer request with the
+`chio.cluster.peer-signature.v1` Ed25519 signature from the key pinned for the
+sender's node id. The signature covers the deployment, the recipient and sender
+node ids, the method, path and query, the SHA-256 of the body, a single-use
+32-byte nonce, the integer `issuedAt` (Unix seconds) and the sender's term.
+
+The receiver MUST refuse a peer request whose `issuedAt` is more than 60
+seconds behind or more than 5 seconds ahead of the highest receiver time it has
+observed, and a request whose `(node id, nonce)` it has already accepted inside
+that window.
+
+Each receiver MUST keep a durable per-peer high-water mark: the highest
+`issuedAt` it has accepted from that peer. `issuedAt` from one peer is
+monotonic across receiver restarts: after a restart the receiver MUST refuse
+every request issued at or before its peer's stored mark, whatever its clock
+reads. The receiver MUST raise the stored mark to a request's `issuedAt` before
+the request has any effect, and MUST refuse the request when the mark cannot be
+read or raised. Within one receiver process, distinct nonces with the same
+`issuedAt` are admitted. For a peer without a stored mark the receiver MUST
+refuse every request issued at or before its start time plus 5 seconds.
+
 ## 10. Portable Trust And Federation
 
 ### 10.1 Agent Passport

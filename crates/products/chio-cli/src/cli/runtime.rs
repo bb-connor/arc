@@ -1591,6 +1591,7 @@ pub(crate) fn cmd_trust_serve(
     allow_local_peer_urls: bool,
     certification_public_metadata_ttl_seconds: u64,
     cluster_sync_interval_ms: u64,
+    cluster_peer_replay_db_path: Option<&Path>,
     authority_replication_max_future_skew_seconds: u64,
     roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
@@ -1643,6 +1644,7 @@ pub(crate) fn cmd_trust_serve(
         authority_keyring_receipt_anchor_root: authority_keyring_receipt_anchor_root
             .map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        cluster_peer_replay_db_path: cluster_peer_replay_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         fiscal_runtime,
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),

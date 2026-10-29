@@ -84,6 +84,9 @@ pub struct TrustServiceConfig {
     /// Private receipt rollback anchors on a separate filesystem device.
     pub authority_keyring_receipt_anchor_root: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
+    /// Per-peer `issued_at` high-water marks of accepted cluster peer
+    /// requests. Required whenever cluster peers are pinned.
+    pub cluster_peer_replay_db_path: Option<PathBuf>,
     pub joint_authority_db_path: Option<PathBuf>,
     pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
     pub enterprise_providers_file: Option<PathBuf>,
@@ -241,6 +244,11 @@ impl TrustServiceConfig {
                     .to_string(),
             ));
         }
+        if self.is_clustered() && self.cluster_peer_replay_db_path.is_none() {
+            return Err(CliError::cli_other_error(
+                super::super::route_authorization::CLUSTER_PEER_REPLAY_DB_REQUIRED.to_string(),
+            ));
+        }
         if self.joint_authority_db_path.is_some() && self.is_clustered() {
             return Err(CliError::cli_other_error(
                 "a local joint authority database cannot run with peer cluster replication"
@@ -281,6 +289,10 @@ impl TrustServiceConfig {
                 self.authority_db_path.as_deref(),
             ),
             ("budget database", self.budget_db_path.as_deref()),
+            (
+                "cluster peer replay database",
+                self.cluster_peer_replay_db_path.as_deref(),
+            ),
             (
                 "verifier challenge database",
                 self.verifier_challenge_db_path.as_deref(),
@@ -337,6 +349,7 @@ mod service_config_tests {
             authority_keyring_config_path: None,
             authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
+            cluster_peer_replay_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
             enterprise_providers_file: None,
@@ -511,6 +524,48 @@ mod service_config_tests {
                 "a local joint authority database cannot run with peer cluster replication"
             )
             .to_string()
+        );
+    }
+
+    #[test]
+    fn trust_service_config_requires_a_peer_replay_database_when_clustered() {
+        let mut config = base_config();
+        set_test_peers(
+            &mut config,
+            "https://self.example",
+            &["https://peer.example"],
+        );
+        config.cluster_peer_replay_db_path = None;
+
+        let error = config
+            .validate()
+            .test_expect_err("clustered node without a peer replay database must fail");
+
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error("clustered trust control requires --cluster-peer-replay-db")
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn trust_service_config_rejects_a_peer_replay_database_alias() {
+        let mut config = base_config();
+        set_test_peers(
+            &mut config,
+            "https://self.example",
+            &["https://peer.example"],
+        );
+        config.budget_db_path = Some(PathBuf::from("replay.sqlite3"));
+        config.cluster_peer_replay_db_path = Some(PathBuf::from("./replay.sqlite3"));
+
+        let error = config
+            .validate()
+            .test_expect_err("peer replay database must not alias the budget store");
+
+        assert!(
+            error.to_string().contains("cluster peer replay database"),
+            "{error}"
         );
     }
 
