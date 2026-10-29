@@ -312,6 +312,9 @@ fn error_status(status: u16) -> AdapterError {
 fn map_egress_error(error: HttpEgressError) -> AdapterError {
     match error {
         HttpEgressError::Transport(failure) => AdapterError::Remote(failure.to_string()),
+        resolution @ HttpEgressError::DnsResolutionFailed { .. } => {
+            AdapterError::Remote(resolution.to_string())
+        }
         HttpEgressError::ResponseTooLarge { .. } => {
             AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {error}"))
         }
