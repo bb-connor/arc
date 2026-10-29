@@ -271,8 +271,9 @@ admits exactly its endpoints, follows no redirects, and refuses private,
 loopback, link-local, unique-local and cloud metadata addresses. Loopback is
 admitted only when every endpoint in the list is a loopback literal; a list that
 names a loopback literal beside any other endpoint is refused at construction.
-Link-local and metadata addresses are refused at construction and at connect. A refusal aborts the request; only a transport
-failure moves the client to its next endpoint.
+Link-local and metadata addresses are refused at construction and at connect.
+A refusal aborts the request; only a transport failure moves the client to its
+next endpoint.
 
 A peer or control plane on a private network (for example inside a VPC) is
 reached only through an operator allowance. Declare it in the file named by the

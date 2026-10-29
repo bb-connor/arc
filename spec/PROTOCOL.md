@@ -3585,8 +3585,9 @@ contract: a contract refusal aborts the request, and only a transport or
 name-resolution failure moves a client to its next endpoint. A trust-control
 client admits loopback only when every endpoint in its list is a loopback
 literal; a list that names a loopback literal beside any other endpoint MUST be
-refused at construction, so a DNS name in the list never reaches loopback. Trust-control reports the set's digest as `egressAllowanceDigest` in
-its health document and in `chio trust config check`; the digest is not signed.
+refused at construction, so a DNS name in the list never reaches loopback.
+Trust-control reports the set's digest as `egressAllowanceDigest` in its health
+document and in `chio trust config check`; the digest is not signed.
 
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
 
