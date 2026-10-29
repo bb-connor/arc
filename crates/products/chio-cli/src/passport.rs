@@ -219,6 +219,7 @@ pub(crate) struct PassportPolicyCreateArgs<'a> {
     pub json_output: bool,
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
+    pub egress: &'a EgressAllowanceSet,
 }
 
 pub(crate) struct PassportChallengeCreateArgs<'a> {
@@ -234,6 +235,7 @@ pub(crate) struct PassportChallengeCreateArgs<'a> {
     pub json_output: bool,
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
+    pub egress: &'a EgressAllowanceSet,
 }
 
 pub(crate) struct PassportOid4vpRequestCreateArgs<'a> {
@@ -249,6 +251,7 @@ pub(crate) struct PassportOid4vpRequestCreateArgs<'a> {
     pub json_output: bool,
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
+    pub egress: &'a EgressAllowanceSet,
 }
 
 pub(crate) struct PassportOid4vpRespondArgs<'a> {
@@ -354,12 +357,11 @@ fn resolve_passport_lifecycle(
     control_url: Option<&str>,
     _control_token: Option<&str>,
     required: bool,
+    egress: &EgressAllowanceSet,
 ) -> Result<Option<PassportLifecycleResolution>, CliError> {
     if let Some(url) = control_url {
-        let client = crate::trust_control::service_runtime::client::build_public_client(
-            url,
-            &EgressAllowanceSet::default(),
-        )?;
+        let client =
+            crate::trust_control::service_runtime::client::build_public_client(url, egress)?;
         let passport_id = passport_artifact_id(passport).map_err(|error| {
             CliError::policy_error(format!("failed to derive passport artifact id: {error}"))
         })?;
@@ -778,6 +780,7 @@ pub(crate) fn cmd_passport_verify(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let now = crate::input::time::seconds_or(at)?;
@@ -790,6 +793,7 @@ pub(crate) fn cmd_passport_verify(
         control_url,
         control_token,
         false,
+        egress,
     )?;
     let (enterprise_provenance_count, enterprise_provider_ids) =
         summarize_enterprise_provenance(&verification.enterprise_identity_provenance);
@@ -843,6 +847,7 @@ pub(crate) fn cmd_passport_evaluate(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let policy = load_passport_verifier_policy(policy_path)?;
@@ -861,6 +866,7 @@ pub(crate) fn cmd_passport_evaluate(
         control_url,
         control_token,
         policy.require_active_lifecycle,
+        egress,
     )?;
     apply_passport_lifecycle_to_evaluation(&mut evaluation, lifecycle);
 
@@ -991,12 +997,10 @@ pub(crate) fn cmd_passport_issuance_metadata(
     json_output: bool,
     control_url: Option<&str>,
     _control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let metadata = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(
-            url,
-            &EgressAllowanceSet::default(),
-        )?
+        crate::trust_control::service_runtime::client::build_public_client(url, egress)?
         .passport_issuer_metadata()?
     } else {
         local_passport_issuer_metadata(
@@ -1038,15 +1042,12 @@ pub(crate) fn cmd_passport_issuance_offer_create(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let record = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
+        crate::trust_control::service_runtime::client::build_client(url, token, egress)?
         .create_passport_issuance_offer(
             &crate::trust_control::CreatePassportIssuanceOfferRequest {
                 passport,
@@ -1107,6 +1108,7 @@ pub(crate) fn cmd_passport_issuance_token_redeem(
     json_output: bool,
     control_url: Option<&str>,
     _control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let offer = load_oid4vci_offer(offer_path)?;
     let request = Oid4vciTokenRequest {
@@ -1114,10 +1116,7 @@ pub(crate) fn cmd_passport_issuance_token_redeem(
         pre_authorized_code: offer.pre_authorized_code()?.to_string(),
     };
     let token = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(
-            url,
-            &EgressAllowanceSet::default(),
-        )?
+        crate::trust_control::service_runtime::client::build_public_client(url, egress)?
         .redeem_passport_issuance_token(&request)?
     } else {
         let metadata = default_oid4vci_passport_issuer_metadata_with_status_distribution(
@@ -1160,14 +1159,12 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
     json_output: bool,
     control_url: Option<&str>,
     _control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let offer = load_oid4vci_offer(offer_path)?;
     let token = load_oid4vci_token(token_path)?;
     let metadata = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(
-            url,
-            &EgressAllowanceSet::default(),
-        )?
+        crate::trust_control::service_runtime::client::build_public_client(url, egress)?
         .passport_issuer_metadata()?
     } else {
         local_passport_issuer_metadata(&offer.credential_issuer, signing_seed_file, None, None)?
@@ -1195,10 +1192,7 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
             .unwrap_or_default(),
     };
     let response = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(
-            url,
-            &EgressAllowanceSet::default(),
-        )?
+        crate::trust_control::service_runtime::client::build_public_client(url, egress)?
         .redeem_passport_issuance_credential(&token.access_token, &request)?
     } else {
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
@@ -1389,6 +1383,7 @@ mod passport_error_classification_tests {
             json_output: false,
             control_url: None,
             control_token: None,
+            egress: &EgressAllowanceSet::default(),
         })
         .unwrap_err();
 

@@ -1,4 +1,3 @@
-use chio_egress_contract::EgressAllowanceSet;
 use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
@@ -537,7 +536,7 @@ pub(super) fn kernel_with_clock(
             None,
             issuance,
             assurance,
-            &EgressAllowanceSet::default(),
+            &crate::egress_allowance::none(),
         )?;
     }
     Ok(KernelAssembly {

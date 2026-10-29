@@ -5,63 +5,18 @@ use std::sync::Arc;
 
 use chio_egress_contract::EgressAllowanceSet;
 
-use crate::{
-    ApiCommands, CliError, Commands, FindingCommands, FindingOperatorCommands, McpCommands,
-    TrustCommands, TrustConfigCommands,
-};
+use crate::CliError;
 
-const CONSUMING_COMMANDS: &str =
-    "trust serve, trust config check, start, api protect, mcp wrap and finding operator serve";
-
-/// `--egress-allowance-file` named on a command that does not thread the
-/// allowance set into the egress contracts it dials.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error(
-    "--egress-allowance-file is refused: this command does not consume the egress allowance \
-     set; it is accepted only by {}",
-    CONSUMING_COMMANDS
-)]
-pub(crate) struct EgressAllowanceFlagRefused;
-
-/// The commands that consume the allowance set.
-fn consumes_egress_allowances(command: &Commands) -> bool {
-    matches!(
-        command,
-        Commands::Trust {
-            command: TrustCommands::Serve { .. }
-                | TrustCommands::Config {
-                    command: TrustConfigCommands::Check { .. },
-                },
-        } | Commands::Start { .. }
-            | Commands::Api {
-                command: ApiCommands::Protect { .. },
-            }
-            | Commands::Mcp {
-                command: McpCommands::Wrap(_),
-            }
-            | Commands::Finding {
-                command: FindingCommands::Operator {
-                    command: FindingOperatorCommands::Serve { .. },
-                },
-            }
-    )
-}
-
-/// Refuse the flag on every command outside the consuming set.
-pub(crate) fn refuse_unconsumed(
-    command: &Commands,
-    path: Option<&Path>,
-) -> Result<(), EgressAllowanceFlagRefused> {
-    if path.is_some() && !consumes_egress_allowances(command) {
-        return Err(EgressAllowanceFlagRefused);
-    }
-    Ok(())
+/// The empty allowance set: every private-network egress target is denied.
+/// The single production source of an empty set.
+pub(crate) fn none() -> Arc<EgressAllowanceSet> {
+    Arc::new(EgressAllowanceSet::default())
 }
 
 /// Load the allowance file once. No file means no allowance.
 pub(crate) fn load(path: Option<&Path>) -> Result<Arc<EgressAllowanceSet>, CliError> {
     match path {
-        None => Ok(Arc::new(EgressAllowanceSet::default())),
+        None => Ok(none()),
         Some(path) => EgressAllowanceSet::load_file(path)
             .map(Arc::new)
             .map_err(|error| CliError::cli_other_error(error.to_string())),

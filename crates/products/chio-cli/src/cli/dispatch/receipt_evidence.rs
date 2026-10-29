@@ -9,6 +9,7 @@ pub(crate) fn dispatch_receipt(
     receipt_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         ReceiptCommands::Verify {
@@ -77,6 +78,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
+                    egress,
             },
         ),
         ReceiptCommands::Health => cmd_receipt_health(QueryBackend {
@@ -84,6 +86,7 @@ pub(crate) fn dispatch_receipt(
             receipt_db_path: receipt_db.as_deref(),
             control_url: control_url.as_deref(),
             control_token: control_token.as_deref(),
+                egress,
         }),
         ReceiptCommands::Audit { repair } => cmd_receipt_audit(
             repair,
@@ -92,6 +95,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
+                    egress,
             },
         ),
         ReceiptCommands::Retention { command } => match command {
@@ -102,6 +106,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                        egress,
                 },
             ),
         },
@@ -112,6 +117,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
+                    egress,
             },
         ),
         ReceiptCommands::Checkpoint { command } => match command {
@@ -122,6 +128,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                        egress,
                 },
             ),
             ReceiptCheckpointCommands::Create {
@@ -135,6 +142,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                        egress,
                 },
             ),
         },
@@ -163,6 +171,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
+                    egress,
             },
         ),
     }
@@ -175,7 +184,15 @@ pub(crate) fn dispatch_evidence(
     receipt_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
+    let control = control_url
+        .as_deref()
+        .map(|url| evidence_export::TrustControlTarget {
+            url,
+            token: control_token.as_deref(),
+            allowances: egress,
+        });
     match command {
         EvidenceCommands::Export {
             output,
@@ -204,8 +221,7 @@ pub(crate) fn dispatch_evidence(
                 federation_policy.as_deref(),
                 require_proofs,
                 receipt_db.as_deref(),
-                control_url.as_deref(),
-                control_token.as_deref(),
+                control,
                 &signing_key,
             )
         }
@@ -227,8 +243,7 @@ pub(crate) fn dispatch_evidence(
                     evidence_export::cmd_evidence_import(
                         &input,
                         receipt_db.as_deref(),
-                        control_url.as_deref(),
-                        control_token.as_deref(),
+                            control,
                         json_output,
                         &trust,
                     )

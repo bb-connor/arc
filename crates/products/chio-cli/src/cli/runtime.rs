@@ -50,6 +50,7 @@ fn open_cli_durable_admission_runtime(
     control_url: Option<&str>,
     control_internal_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<Option<DurableAdmissionRuntime>, CliError> {
     let maintenance = chio_control_plane::TerminalPayloadMaintenanceConfig::from_env()?;
     if maintenance.is_some() {
@@ -90,7 +91,8 @@ fn open_cli_durable_admission_runtime(
         (_, Some(identity_path), Some(url)) => {
             let token = require_control_token(control_token)?;
             let internal_url = require_control_internal_url(control_internal_url)?;
-            DurableAdmissionRuntime::open_remote(identity_path, url, internal_url, token, &EgressAllowanceSet::default()).map(Some)
+            DurableAdmissionRuntime::open_remote(identity_path, url, internal_url, token, egress)
+                .map(Some)
         }
         _ => open_durable_admission_runtime(mode, admission_db_path),
     }?;
@@ -133,6 +135,7 @@ pub(crate) fn cmd_run(
     control_url: Option<&str>,
     control_internal_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
@@ -151,6 +154,7 @@ pub(crate) fn cmd_run(
         control_url,
         control_internal_url,
         control_token,
+        egress,
     )?;
 
     info!(
@@ -166,9 +170,21 @@ pub(crate) fn cmd_run(
         .map(DurableAdmissionRuntime::kernel_keypair)
         .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+    configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        egress,
+    )?;
     if durable_admission.is_none() {
-        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+        configure_revocation_store(
+            &mut kernel,
+            revocation_db_path,
+            control_url,
+            control_token,
+            egress,
+        )?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(
@@ -187,10 +203,16 @@ pub(crate) fn cmd_run(
         control_token,
         issuance_policy,
         runtime_assurance_policy,
-        &EgressAllowanceSet::default(),
+        egress,
     )?;
     if durable_admission.is_none() {
-        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+        configure_budget_store(
+            &mut kernel,
+            budget_db_path,
+            control_url,
+            control_token,
+            egress,
+        )?;
     }
 
     let session_agent_id = agent_pk.to_hex();
@@ -383,6 +405,7 @@ pub(crate) struct McpEdgeStores<'a> {
     pub durable_admission: Option<&'a DurableAdmissionRuntime>,
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
+    pub egress: &'a EgressAllowanceSet,
 }
 
 /// Build the kernel that backs the long-running `chio mcp serve` edge.
@@ -410,7 +433,7 @@ pub(crate) fn build_mcp_edge_kernel(
         stores.receipt_db_path,
         stores.control_url,
         stores.control_token,
-        &EgressAllowanceSet::default(),
+        stores.egress,
     )?;
     if stores.durable_admission.is_none() {
         configure_revocation_store(
@@ -418,7 +441,7 @@ pub(crate) fn build_mcp_edge_kernel(
             stores.revocation_db_path,
             stores.control_url,
             stores.control_token,
-            &EgressAllowanceSet::default(),
+            stores.egress,
         )?;
     }
     attach_durable_admission_runtime(
@@ -437,7 +460,7 @@ pub(crate) fn build_mcp_edge_kernel(
         stores.control_token,
         issuance_policy,
         runtime_assurance_policy,
-        &EgressAllowanceSet::default(),
+        stores.egress,
     )?;
     if stores.durable_admission.is_none() {
         configure_budget_store(
@@ -445,7 +468,7 @@ pub(crate) fn build_mcp_edge_kernel(
             stores.budget_db_path,
             stores.control_url,
             stores.control_token,
-            &EgressAllowanceSet::default(),
+            stores.egress,
         )?;
     }
     Ok(kernel)
@@ -759,6 +782,7 @@ pub(crate) fn cmd_check(
     control_url: Option<&str>,
     control_internal_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     let check_output = validate_check_mode(&loaded_policy, mode, output_fixture)?;
@@ -777,6 +801,7 @@ pub(crate) fn cmd_check(
         control_url,
         control_internal_url,
         control_token,
+        egress,
     )?;
 
     let kernel_kp = durable_admission
@@ -784,9 +809,21 @@ pub(crate) fn cmd_check(
         .map(DurableAdmissionRuntime::kernel_keypair)
         .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+    configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        egress,
+    )?;
     if durable_admission.is_none() {
-        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+        configure_revocation_store(
+            &mut kernel,
+            revocation_db_path,
+            control_url,
+            control_token,
+            egress,
+        )?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(
@@ -805,10 +842,16 @@ pub(crate) fn cmd_check(
         control_token,
         issuance_policy,
         runtime_assurance_policy,
-        &EgressAllowanceSet::default(),
+        egress,
     )?;
     if durable_admission.is_none() {
-        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token, &EgressAllowanceSet::default())?;
+        configure_budget_store(
+            &mut kernel,
+            budget_db_path,
+            control_url,
+            control_token,
+            egress,
+        )?;
     }
 
     kernel.register_tool_server(Box::new(CheckToolServer {
@@ -1055,6 +1098,7 @@ pub(crate) fn cmd_mcp_serve(
     control_url: Option<&str>,
     control_internal_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     // Resolve `--preset` to a materialized YAML on disk so the rest
     // of the plumbing can use `load_policy` unchanged. Keeping the
@@ -1133,6 +1177,7 @@ pub(crate) fn cmd_mcp_serve(
         control_url,
         control_internal_url,
         control_token,
+        egress,
     )?;
 
     info!(
@@ -1161,6 +1206,7 @@ pub(crate) fn cmd_mcp_serve(
             durable_admission: durable_admission.as_ref(),
             control_url,
             control_token,
+            egress,
         },
     )?;
 
@@ -1295,6 +1341,7 @@ pub(crate) fn cmd_mcp_serve_http(
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
+    egress: &Arc<EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(&transport, listen)?;
@@ -1393,6 +1440,7 @@ pub(crate) fn cmd_mcp_serve_http(
         wrapped_command: wrapped_cmd.clone(),
         wrapped_args: wrapped_args.to_vec(),
         egress_contract,
+        egress_allowances: Arc::clone(egress),
     })
 }
 
@@ -1600,18 +1648,15 @@ pub(crate) fn cmd_trust_revoke(
     revocation_db_path: Option<&std::path::Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let (newly_revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            \&EgressAllowanceSet::default(),
-        )?
-        .revoke_capability(
-            capability_id,
-            chio_core_types::root_authority::RevocationReason::OperatorRequest,
-        )?;
+        let response = trust_control::service_runtime::client::build_client(url, token, egress)?
+            .revoke_capability(
+                capability_id,
+                chio_core_types::root_authority::RevocationReason::OperatorRequest,
+            )?;
         (response.roots_revoked > 0, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
@@ -1646,16 +1691,13 @@ pub(crate) fn cmd_trust_status(
     revocation_db_path: Option<&std::path::Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let (revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let revoked = trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            \&EgressAllowanceSet::default(),
-        )?
-        .revocation_status(capability_id)?
-        .revoked;
+        let revoked = trust_control::service_runtime::client::build_client(url, token, egress)?
+            .revocation_status(capability_id)?
+            .revoked;
         (revoked, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;

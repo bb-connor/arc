@@ -16,7 +16,7 @@ pub(crate) fn cmd_mcp_wrap(
     egress: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<(), CliError> {
     if let Some(fixture) = args.e2e_fixture.as_ref() {
-        return cmd_mcp_wrap_e2e_fixture(args, fixture);
+        return cmd_mcp_wrap_e2e_fixture(args, fixture, egress);
     }
 
     if let Some(ide) = args.emit_config.as_ref() {

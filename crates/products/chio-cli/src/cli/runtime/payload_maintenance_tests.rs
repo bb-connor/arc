@@ -23,6 +23,7 @@ fn terminal_payload_maintenance_environment_starts_actual_owner_or_reports_missi
             None,
             None,
             None,
+            &chio_egress_contract::EgressAllowanceSet::default(),
         )?
         .ok_or("missing fixture runtime")?;
         if scenario == "configured" {
@@ -125,6 +126,7 @@ fn terminal_payload_maintenance_environment_refuses_before_opening_authority(
             remote,
             remote.map(|_| "https://operator.example.test:8941"),
             Some("test-control-token"),
+            &chio_egress_contract::EgressAllowanceSet::default(),
         );
         let error = match result {
             Ok(_) => panic!("maintenance configuration must refuse scenario {scenario} before opening authority"),

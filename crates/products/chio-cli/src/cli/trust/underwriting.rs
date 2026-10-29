@@ -63,12 +63,8 @@ pub(crate) fn cmd_trust_underwriting_input_export(
 
     let input = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .underwriting_policy_input(&query)?
+        trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
+            .underwriting_policy_input(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -137,12 +133,8 @@ pub(crate) fn cmd_trust_underwriting_decision_evaluate(
 
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .underwriting_decision(&query)?
+        trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
+            .underwriting_decision(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -199,12 +191,8 @@ pub(crate) fn cmd_trust_underwriting_decision_simulate(
 
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .simulate_underwriting_decision(&request)?
+        trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
+            .simulate_underwriting_decision(&request)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -330,12 +318,8 @@ pub(crate) fn cmd_trust_underwriting_decision_issue(
 
     let decision = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .issue_underwriting_decision(&request)?
+        trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
+            .issue_underwriting_decision(&request)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -405,12 +389,8 @@ pub(crate) fn cmd_trust_underwriting_decision_list(
 
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .list_underwriting_decisions(&query)?
+        trust_control::service_runtime::client::build_client(url, token, backend.egress)?
+            .list_underwriting_decisions(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -457,6 +437,7 @@ pub(crate) fn cmd_trust_underwriting_appeal_create(
     receipt_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let request = chio_kernel::UnderwritingAppealCreateRequest {
         decision_id: decision_id.to_string(),
@@ -466,12 +447,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_create(
     };
     let record = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .create_underwriting_appeal(&request)?
+        trust_control::service_runtime::client::build_client(url, token, egress)?
+            .create_underwriting_appeal(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -507,12 +484,8 @@ pub(crate) fn cmd_trust_underwriting_appeal_resolve(
     };
     let record = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
-        trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .resolve_underwriting_appeal(&request)?
+        trust_control::service_runtime::client::build_client(url, token, backend.egress)?
+            .resolve_underwriting_appeal(&request)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(

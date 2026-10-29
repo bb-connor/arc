@@ -487,6 +487,15 @@ pub fn cmd_evidence_federation_policy_create(
     Ok(())
 }
 
+/// A trust-control service and the operator egress allowances its client
+/// dials under.
+#[derive(Clone, Copy)]
+pub struct TrustControlTarget<'a> {
+    pub url: &'a str,
+    pub token: Option<&'a str>,
+    pub allowances: &'a EgressAllowanceSet,
+}
+
 pub fn cmd_evidence_export(
     output: &Path,
     capability_id: Option<&str>,
@@ -499,8 +508,7 @@ pub fn cmd_evidence_export(
     federation_policy_file: Option<&Path>,
     require_proofs: bool,
     receipt_db: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    control: Option<TrustControlTarget<'_>>,
     signing_key: &chio_core::Keypair,
 ) -> Result<(), CliError> {
     if admin_all && tenant.is_some() {
@@ -528,7 +536,7 @@ pub fn cmd_evidence_export(
             .transpose()?,
     )?;
 
-    let response = match (receipt_db, control_url) {
+    let response = match (receipt_db, control) {
         (Some(_), Some(_)) => {
             return Err(CliError::attest_error(
                 "use either --receipt-db or --control-url for evidence export, not both"
@@ -546,12 +554,12 @@ pub fn cmd_evidence_export(
                 federation_policy: prepared.federation_policy,
             }
         }
-        (None, Some(control_url)) => {
-            let token = super::require_control_token(control_token)?;
+        (None, Some(control)) => {
+            let token = super::require_control_token(control.token)?;
             let client = crate::trust_control::service_runtime::client::build_client(
-                control_url,
+                control.url,
                 token,
-                &EgressAllowanceSet::default(),
+                control.allowances,
             )?;
             client.export_evidence(&RemoteEvidenceExportRequest {
                 query: prepared.query,
@@ -665,8 +673,7 @@ fn verify_evidence_bundle(
 pub fn cmd_evidence_import(
     input: &Path,
     receipt_db: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    control: Option<TrustControlTarget<'_>>,
     json_output: bool,
     trust: &VerifierTrust,
 ) -> Result<(), CliError> {
@@ -675,7 +682,7 @@ pub fn cmd_evidence_import(
     let package = verified.package.package;
     let share_import = build_federated_share_import(&package)?;
 
-    let share = match (receipt_db, control_url) {
+    let share = match (receipt_db, control) {
         (Some(_), Some(_)) => {
             return Err(CliError::attest_error(
                 "use either --receipt-db or --control-url for evidence import, not both"
@@ -686,12 +693,12 @@ pub fn cmd_evidence_import(
             let store = SqliteReceiptStore::open(receipt_db)?;
             store.import_federated_evidence_share(&share_import)?
         }
-        (None, Some(control_url)) => {
-            let token = super::require_control_token(control_token)?;
+        (None, Some(control)) => {
+            let token = super::require_control_token(control.token)?;
             let client = crate::trust_control::service_runtime::client::build_client(
-                control_url,
+                control.url,
                 token,
-                &EgressAllowanceSet::default(),
+                control.allowances,
             )?;
             client
                 .import_evidence(&RemoteEvidenceImportRequest {

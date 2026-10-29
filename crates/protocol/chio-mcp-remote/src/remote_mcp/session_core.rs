@@ -215,6 +215,9 @@ pub struct RemoteServeHttpConfig {
     pub control_authority_public_key: Option<PublicKey>,
     /// Exact trusted capability-authority key set expected from trust-control.
     pub control_authority_trusted_public_keys: Vec<PublicKey>,
+    /// Operator egress allowances every trust-control client of this server
+    /// dials under.
+    pub egress_allowances: Arc<chio_egress_contract::EgressAllowanceSet>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,

@@ -191,15 +191,6 @@ fn init_redacted_tracing() {
 pub(crate) fn run() {
     let cli = Cli::parse();
     let json_output = cli.json_output();
-    if let Err(refusal) = crate::egress_allowance::refuse_unconsumed(
-        &cli.command,
-        cli.egress_allowance_file.as_deref(),
-    ) {
-        let mut stderr = std::io::stderr();
-        let error = CliError::cli_other_error(refusal.to_string());
-        let _ = write_cli_error(&mut stderr, &error, json_output);
-        std::process::exit(1);
-    }
     let receipt_db = cli.receipt_db.clone();
     let revocation_db = cli.revocation_db.clone();
     let authority_seed_file = cli.authority_seed_file.clone();
@@ -258,6 +249,7 @@ pub(crate) fn run() {
             control_url.as_deref(),
             control_internal_url.as_deref(),
             control_token.as_deref(),
+            &egress,
         ),
         Commands::Check {
             policy,
@@ -283,6 +275,7 @@ pub(crate) fn run() {
             control_url.as_deref(),
             control_internal_url.as_deref(),
             control_token.as_deref(),
+            &egress,
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
         Commands::Policy { command } => dispatch_policy(command, json_output),
@@ -325,14 +318,24 @@ pub(crate) fn run() {
             control_token,
             &egress,
         ),
-        Commands::Receipt { command } => {
-            dispatch_receipt(command, json_output, receipt_db, control_url, control_token)
-        }
-        Commands::Evidence { command } => {
-            dispatch_evidence(command, json_output, receipt_db, control_url, control_token)
-        }
+        Commands::Receipt { command } => dispatch_receipt(
+            command,
+            json_output,
+            receipt_db,
+            control_url,
+            control_token,
+            &egress,
+        ),
+        Commands::Evidence { command } => dispatch_evidence(
+            command,
+            json_output,
+            receipt_db,
+            control_url,
+            control_token,
+            &egress,
+        ),
         Commands::Certify { command } => {
-            dispatch_certify(command, json_output, control_url, control_token)
+            dispatch_certify(command, json_output, control_url, control_token, &egress)
         }
         Commands::Did { command } => dispatch_did(command, json_output),
         Commands::Passport { command } => dispatch_passport(
@@ -342,6 +345,7 @@ pub(crate) fn run() {
             budget_db,
             control_url,
             control_token,
+            &egress,
         ),
         Commands::Proof { command } => dispatch_proof(command, json_output),
         Commands::Commerce { command } => dispatch_commerce(command, json_output),
@@ -355,9 +359,10 @@ pub(crate) fn run() {
             authority_seed_file,
             control_url,
             control_token,
+            &egress,
         ),
         Commands::Guard { command } => {
-            dispatch_guard(command, json_output, control_url, control_token)
+            dispatch_guard(command, json_output, control_url, control_token, &egress)
         }
         Commands::Conformance { command } => dispatch_conformance(command),
         Commands::Federation { command } => dispatch_chio_federation_command(command),

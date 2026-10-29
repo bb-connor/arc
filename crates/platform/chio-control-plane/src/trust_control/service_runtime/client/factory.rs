@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use chio_egress_contract::{
-    BlockingContractAgent, EgressAllowanceSet, HttpEgressContract, HttpEgressError,
+    system_lookup, BlockingContractAgent, ContractLookup, EgressAllowanceSet, HttpEgressContract,
+    HttpEgressError,
 };
 use chio_errors::_generated::error_codes::POLICY_DECISION_DENIED;
 
@@ -18,6 +19,25 @@ pub fn build_client(
         control_url,
         control_token,
         allowances,
+        system_lookup(),
+        None,
+        ControlClientAuthKind::Service,
+    )
+}
+
+/// As [`build_client`], resolving names through `lookup`.
+#[cfg(test)]
+pub(super) fn build_client_with_lookup(
+    control_url: &str,
+    control_token: &str,
+    allowances: &EgressAllowanceSet,
+    lookup: ContractLookup,
+) -> Result<TrustControlClient, CliError> {
+    build_client_with_cluster_peer(
+        control_url,
+        control_token,
+        allowances,
+        lookup,
         None,
         ControlClientAuthKind::Service,
     )
@@ -31,6 +51,7 @@ pub fn build_public_client(
         control_url,
         "",
         allowances,
+        system_lookup(),
         None,
         ControlClientAuthKind::Public,
     )
@@ -52,6 +73,7 @@ pub(crate) fn build_cluster_peer_client(
         &peer.internal_url,
         "",
         allowances,
+        system_lookup(),
         Some(ClusterPeerClientAuth {
             access: Arc::clone(access),
             recipient: Arc::<str>::from(recipient),
@@ -102,6 +124,7 @@ fn build_client_with_cluster_peer(
     control_url: &str,
     control_token: &str,
     allowances: &EgressAllowanceSet,
+    lookup: ContractLookup,
     cluster_peer_auth: Option<ClusterPeerClientAuth>,
     auth_kind: ControlClientAuthKind,
 ) -> Result<TrustControlClient, CliError> {
@@ -123,8 +146,13 @@ fn build_client_with_cluster_peer(
     for endpoint in &endpoints {
         contract.enforce_url(endpoint, 0).map_err(egress_refusal)?;
     }
-    let http = BlockingContractAgent::new(&contract, CONTROL_HTTP_TIMEOUT, CONTROL_HTTP_TIMEOUT)
-        .map_err(egress_refusal)?;
+    let http = BlockingContractAgent::with_lookup(
+        &contract,
+        CONTROL_HTTP_TIMEOUT,
+        CONTROL_HTTP_TIMEOUT,
+        lookup,
+    )
+    .map_err(egress_refusal)?;
     Ok(TrustControlClient {
         endpoints: Arc::new(endpoints),
         preferred_index: Arc::new(Mutex::new(0)),
@@ -139,7 +167,7 @@ fn build_client_with_cluster_peer(
 /// peer response ceiling, and the operator allowances that pin one of its
 /// endpoints. A list mixing a loopback literal with any other endpoint is
 /// refused.
-fn control_client_contract(
+pub(super) fn control_client_contract(
     endpoints: &[String],
     allowances: &EgressAllowanceSet,
 ) -> Result<HttpEgressContract, CliError> {

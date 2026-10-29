@@ -1,5 +1,4 @@
 use super::*;
-use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::ReceiptReadContext;
 use subtle::ConstantTimeEq;
 
@@ -827,7 +826,11 @@ fn control_client(
             "remote trust admin requires --control-token when --control-url is configured",
         ));
     };
-    trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())
+    trust_control::service_runtime::client::build_client(
+        url,
+        token,
+        &state.factory.config.egress_allowances,
+    )
         .map(Some)
         .map_err(admin_backend_failure)
 }

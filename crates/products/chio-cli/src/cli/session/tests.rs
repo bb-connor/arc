@@ -555,6 +555,7 @@ fn mcp_edge_kernel(policy: &policy::ChioPolicy, _kernel_kp: &Keypair) -> (ChioKe
             durable_admission: Some(&durable_admission),
             control_url: None,
             control_token: None,
+            egress: &chio_egress_contract::EgressAllowanceSet::default(),
         },
     )
     .expect("build mcp edge kernel");

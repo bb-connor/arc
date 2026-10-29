@@ -898,6 +898,7 @@ impl chio_mcp_adapter::edge::McpTransport for FixtureMcpTransport {
 pub(crate) fn cmd_mcp_wrap_e2e_fixture(
     _args: &McpWrapArgs,
     path: &std::path::Path,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let raw = crate::input::read_text(path)
         .map_err(|e| CliError::cli_io_error(format!("failed to read e2e fixture {path:?}: {e}")))?;
@@ -943,7 +944,7 @@ pub(crate) fn cmd_mcp_wrap_e2e_fixture(
             env!("CARGO_PKG_VERSION"),
             Box::new(transport),
             &gate.allowed,
-            &EgressAllowanceSet::default(),
+            egress,
         )?;
         run_wrap_with_gate(
             &mediated,

@@ -1,4 +1,3 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
 
 impl RemoteSessionFactory {
@@ -124,7 +123,7 @@ impl RemoteSessionFactory {
                     control_url,
                     control_internal_url,
                     control_token,
-                    &EgressAllowanceSet::default(),
+                    &config.egress_allowances,
                 )?)
             }
             (mode, None) => {
@@ -279,7 +278,7 @@ impl RemoteSessionFactory {
                 current,
                 self.config.control_authority_trusted_public_keys.clone(),
                 kernel.authority_clock(),
-                &EgressAllowanceSet::default(),
+                &self.config.egress_allowances,
             )?);
             return Ok(());
         }
@@ -294,7 +293,7 @@ impl RemoteSessionFactory {
             None,
             issuance_policy,
             runtime_assurance_policy,
-            &EgressAllowanceSet::default(),
+            &self.config.egress_allowances,
         )
     }
 
@@ -436,7 +435,7 @@ impl RemoteSessionFactory {
             self.config.receipt_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
-            &EgressAllowanceSet::default(),
+            &self.config.egress_allowances,
         )?;
         if self.durable_admission.is_none() {
             configure_revocation_store(
@@ -444,7 +443,7 @@ impl RemoteSessionFactory {
                 self.config.revocation_db_path.as_deref(),
                 self.config.control_url.as_deref(),
                 self.config.control_token.as_deref(),
-                &EgressAllowanceSet::default(),
+                &self.config.egress_allowances,
             )?;
         }
         self.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
@@ -463,7 +462,7 @@ impl RemoteSessionFactory {
                 self.config.budget_db_path.as_deref(),
                 self.config.control_url.as_deref(),
                 self.config.control_token.as_deref(),
-                &EgressAllowanceSet::default(),
+                &self.config.egress_allowances,
             )?;
         }
         if let Some(resource_provider) = upstream_server.resource_provider() {
@@ -646,7 +645,7 @@ impl RemoteSessionFactory {
             self.config.receipt_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
-            &EgressAllowanceSet::default(),
+            &self.config.egress_allowances,
         )?;
         if self.durable_admission.is_none() {
             configure_revocation_store(
@@ -654,7 +653,7 @@ impl RemoteSessionFactory {
                 self.config.revocation_db_path.as_deref(),
                 self.config.control_url.as_deref(),
                 self.config.control_token.as_deref(),
-                &EgressAllowanceSet::default(),
+                &self.config.egress_allowances,
             )?;
         }
         self.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
@@ -673,7 +672,7 @@ impl RemoteSessionFactory {
                 self.config.budget_db_path.as_deref(),
                 self.config.control_url.as_deref(),
                 self.config.control_token.as_deref(),
-                &EgressAllowanceSet::default(),
+                &self.config.egress_allowances,
             )?;
         }
         if let Some(resource_provider) = upstream_server.resource_provider() {

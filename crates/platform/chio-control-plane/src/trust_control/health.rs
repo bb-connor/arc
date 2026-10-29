@@ -5,7 +5,29 @@ use super::*;
 pub(super) fn install_health_routes(
     router: Router<TrustServiceState>,
 ) -> Router<TrustServiceState> {
-    router.route(HEALTH_PATH, get(handle_health))
+    router
+        .route(HEALTH_PATH, get(handle_health))
+        .route(EGRESS_ALLOWANCES_PATH, get(handle_egress_allowances))
+}
+
+/// The digest of the operator egress allowance set this node dials under.
+/// The set names private network destinations, so the route requires a caller
+/// credential with `metrics:read`.
+async fn handle_egress_allowances(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) =
+        super::report_validation::validate_caller(&headers, &state.config, Scope::MetricsRead)
+    {
+        return response;
+    }
+    match chio_egress_contract::private_network_allowance_digest(
+        state.config.egress_allowances.entries(),
+    ) {
+        Ok(digest) => Json(json!({ "egressAllowanceDigest": digest })).into_response(),
+        Err(error) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    }
 }
 
 async fn handle_health(State(state): State<TrustServiceState>) -> Response {
@@ -17,12 +39,6 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         .or_else(|| cluster_self_url(&state));
     let federation = match trust_federation_health_snapshot(&state) {
         Ok(snapshot) => snapshot,
-        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
-    };
-    let egress_allowance_digest = match chio_egress_contract::private_network_allowance_digest(
-        state.config.egress_allowances.entries(),
-    ) {
-        Ok(digest) => digest,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     };
     let authority = trust_authority_health_snapshot(&state).await;
@@ -45,7 +61,6 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
             "receiptQuerySnapshot": super::receipt_query_service::health(&state).await,
             "federation": federation,
             "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
-            "egressAllowanceDigest": egress_allowance_digest,
         })),
     )
         .into_response()

@@ -262,6 +262,7 @@ pub fn cmd_certify_registry_search(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let query = CertificationMarketplaceSearchQuery {
         filters: CertificationPublicSearchQuery {
@@ -274,12 +275,8 @@ pub fn cmd_certify_registry_search(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .search_certification_marketplace(&query)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .search_certification_marketplace(&query)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -321,6 +318,7 @@ pub fn cmd_certify_registry_transparency(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let query = CertificationMarketplaceTransparencyQuery {
         filters: CertificationTransparencyQuery {
@@ -330,12 +328,8 @@ pub fn cmd_certify_registry_transparency(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .certification_marketplace_transparency(&query)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .certification_marketplace_transparency(&query)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -373,6 +367,7 @@ pub fn cmd_certify_registry_consume(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let request = CertificationConsumptionRequest {
         tool_server_id: tool_server_id.to_string(),
@@ -382,12 +377,8 @@ pub fn cmd_certify_registry_consume(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .consume_certification_marketplace(&request)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .consume_certification_marketplace(&request)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -419,6 +410,7 @@ pub fn cmd_certify_registry_dispute(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let request = CertificationDisputeRequest {
         state: parse_dispute_state(state)?,
@@ -427,12 +419,8 @@ pub fn cmd_certify_registry_dispute(
     };
     let entry = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(
-            url,
-            token,
-            &EgressAllowanceSet::default(),
-        )?
-        .dispute_certification(artifact_id, &request)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .dispute_certification(artifact_id, &request)?
     } else {
         let path = certification_registry_file.ok_or_else(|| {
             CliError::attest_error(
