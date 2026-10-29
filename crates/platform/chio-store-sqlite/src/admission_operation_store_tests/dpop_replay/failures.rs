@@ -137,16 +137,18 @@ fn destination_write_cutpoints_rollback_rows_events_and_global_commits() -> Anch
 }
 
 #[test]
-fn owner_wide_migration_guard_rejects_concurrent_import_without_source_access() -> AnchoredTestResult
-{
+fn owner_wide_installation_guard_refuses_concurrent_import_without_source_access(
+) -> AnchoredTestResult {
     let fixture = fixture_real_time();
     let source = Source::new(&fixture, false)?;
     let expected = pin(&fixture, &source)?;
-    let guard = fixture
-        .store
-        .serving_owner
-        .begin_replay_source_migration()?;
-    assert!(import(&fixture, &source, &expected).is_err());
+    let guard = fixture.store.serving_owner.begin_source_installation()?;
+    assert_eq!(
+        import(&fixture, &source, &expected),
+        Err(AdmissionOperationStoreError::Invariant(
+            "invalid sqlite authority store: source installation is already in progress".into(),
+        ))
+    );
     assert_eq!(source.calls(), ["preview"]);
     assert_eq!(counts(&fixture), [0, 1, 1]);
     drop(guard);

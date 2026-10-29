@@ -16,7 +16,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<RuntimeSourceRecordV1, AdmissionOperationStoreError> {
         let _installation = self
             .serving_owner
-            .begin_replay_source_migration()
+            .begin_source_installation()
             .map_err(map_owner_error)?;
         let previous = {
             let mut connection = self.connection()?;

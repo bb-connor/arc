@@ -205,7 +205,7 @@ fn reentrant_source_installation_refuses_without_destination_mutation() {
     assert_eq!(
         install(&fixture, &source),
         Err(AdmissionOperationStoreError::Invariant(
-            "invalid sqlite authority store: replay source migration is already in progress".into(),
+            "invalid sqlite authority store: source installation is already in progress".into(),
         ))
     );
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);

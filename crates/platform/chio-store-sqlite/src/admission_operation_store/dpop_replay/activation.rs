@@ -20,9 +20,9 @@ impl SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<DpopReplayMigrationRecordV1, AdmissionOperationStoreError> {
-        let _migration = self
+        let _installation = self
             .serving_owner
-            .begin_replay_source_migration()
+            .begin_source_installation()
             .map_err(map_owner_error)?;
         let expected = self
             .load_dpop_replay_migration(authority.dpop_authority_id(), fence, trusted_now_unix_ms)?
