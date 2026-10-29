@@ -1,5 +1,6 @@
 //! Actual native fixture bytes shared with the Python and TypeScript bindings.
 use chio_core_types::recovery::*;
+use chio_core_types::{canonical_json_bytes, Keypair};
 use chio_security_types::recovery::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -7,12 +8,14 @@ use serde_json::Value;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 const CORPUS: &str =
     include_str!("../../../../spec/vectors/recovery/v1/explanation-contracts.json");
-#[derive(Deserialize)]
+/// Seed of the advisory authority that signs every signed vector.
+const ADVISORY_AUTHORITY_SEED: [u8; 32] = [52; 32];
+#[derive(Deserialize, Serialize)]
 struct Corpus {
     format_version: u8,
     vectors: Vec<Vector>,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct Vector {
     name: String,
     contract: String,
@@ -107,5 +110,87 @@ fn recovery_shared_closed_wire_and_signature_corpus() -> Result {
             vector.name
         );
     }
+    Ok(())
+}
+
+fn wire_of(value: &Value) -> Result<String> {
+    Ok(String::from_utf8(canonical_json_bytes(value)?)?)
+}
+
+fn signed_wire<T, S>(
+    corpus: &Corpus,
+    unsigned: &str,
+    sign: impl Fn(T, &Keypair) -> chio_core_types::Result<S>,
+) -> Result<Value>
+where
+    T: serde::de::DeserializeOwned + Serialize,
+    S: Serialize,
+{
+    let positive = corpus
+        .vectors
+        .iter()
+        .find(|vector| vector.name == format!("{unsigned}-positive"))
+        .ok_or("unsigned positive vector")?;
+    let body = decode_contract::<T>(positive.wire.as_bytes())?;
+    let key = Keypair::from_seed(&ADVISORY_AUTHORITY_SEED);
+    Ok(serde_json::to_value(sign(body, &key)?)?)
+}
+
+/// The signed vectors are derived from the unsigned positive and
+/// unknown-version vectors of the same contract; every other vector is input.
+fn shared_vectors() -> Result<Corpus> {
+    let mut corpus: Corpus = serde_json::from_str(CORPUS)?;
+    let report = signed_wire(&corpus, "report", SignedRecoveryExplanationReportV1::sign)?;
+    let view = signed_wire(&corpus, "view", SignedRecoveryExplanationViewV1::sign)?;
+    let unknown_version_body = |unsigned: &str| -> Result<Value> {
+        let vector = corpus
+            .vectors
+            .iter()
+            .find(|vector| vector.name == format!("{unsigned}-unknown-version"))
+            .ok_or("unsigned unknown-version vector")?;
+        Ok(serde_json::from_str(&vector.wire)?)
+    };
+    let report_unknown_version = unknown_version_body("report")?;
+    let view_unknown_version = unknown_version_body("view")?;
+    for vector in &mut corpus.vectors {
+        let (positive, unknown_version) = match vector.contract.as_str() {
+            "signed_report" => (&report, &report_unknown_version),
+            "signed_view" => (&view, &view_unknown_version),
+            _ => continue,
+        };
+        let mut wire = positive.clone();
+        let mutation = vector
+            .name
+            .strip_prefix(&format!("{}-", vector.contract))
+            .ok_or("signed vector name")?;
+        match mutation {
+            "positive" => {}
+            "unknown-field" => wire["unknown"] = Value::String("private-canary".to_string()),
+            "unknown-version" => wire["body"] = unknown_version.clone(),
+            "wrong-signature" => wire["signature"] = Value::String("0".repeat(128)),
+            _ => return Err(format!("unknown signed vector {}", vector.name).into()),
+        }
+        vector.wire = wire_of(&wire)?;
+    }
+    Ok(corpus)
+}
+
+fn corpus_bytes(corpus: &Corpus) -> Result<String> {
+    Ok(serde_json::to_string_pretty(corpus)? + "\n")
+}
+
+#[test]
+fn signed_vectors_match_the_generator_output() -> Result {
+    assert_eq!(corpus_bytes(&shared_vectors()?)?, CORPUS);
+    Ok(())
+}
+
+#[test]
+#[ignore = "explicit regeneration of the shared native explanation contract corpus"]
+fn write_shared_vectors() -> Result {
+    let path = std::path::PathBuf::from(
+        std::env::var_os("CHIO_EXPLANATION_VECTOR_OUT").ok_or("explicit vector output required")?,
+    );
+    std::fs::write(path, corpus_bytes(&shared_vectors()?)?)?;
     Ok(())
 }
