@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chio_control_plane::trust_control::finding_hosted_profile::FindingHostedProfile;
 use chio_core_types::canonical_json_bytes;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_finding_hosted_edge::{
     HostedCircuitBreaker, HostedCircuitBreakerConfig, HostedDependency, HostedReadiness,
 };
@@ -133,7 +134,7 @@ async fn run(args: Args) -> Result<(), DaemonError> {
     require_trusted_ca(Path::new(&profile.database.ca_certificate_path))?;
 
     let executor = profile
-        .load_worker_executor()
+        .load_worker_executor(&EgressAllowanceSet::default())
         .map_err(|_| DaemonError::Custody)?;
     executor.preflight_host().map_err(|_| DaemonError::Host)?;
     let store = connect_store(&profile).await?;

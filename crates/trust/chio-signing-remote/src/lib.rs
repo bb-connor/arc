@@ -29,8 +29,6 @@ const HTTP_SIGN_RESPONSE_SCHEMA: &str = "chio.signing.http-response.v1";
 const HTTP_KEY_RESPONSE_SCHEMA: &str = "chio.signing.http-key.v1";
 const MAX_SIGNING_MESSAGE_BYTES: usize = 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 64 * 1024;
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-
 #[derive(Clone)]
 struct RemoteSecret(Arc<str>);
 
@@ -124,30 +122,23 @@ impl fmt::Debug for HttpSigningBackend {
 }
 
 impl HttpSigningBackend {
+    /// Bound every request by `timeout` and admit only the private signer
+    /// endpoint `allowances` pins.
     pub fn new(
         base_url: impl Into<String>,
         key: RemoteSigningKey,
         bearer_token: impl Into<String>,
+        timeout: Duration,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self> {
         let base_url = validate_base_url(&base_url.into())?;
-        let http = signer_agent(&base_url, DEFAULT_TIMEOUT, &EgressAllowanceSet::default())?;
+        let http = signer_agent(&base_url, timeout, allowances)?;
         Ok(Self {
             base_url,
             key,
             bearer_token: RemoteSecret::new(bearer_token)?,
             http,
         })
-    }
-
-    /// Bound every request by `timeout` and admit the private signer
-    /// endpoints `allowances` pins.
-    pub fn with_egress(
-        mut self,
-        timeout: Duration,
-        allowances: &EgressAllowanceSet,
-    ) -> Result<Self> {
-        self.http = signer_agent(&self.base_url, timeout, allowances)?;
-        Ok(self)
     }
 
     fn sign_endpoint(&self) -> String {
@@ -290,15 +281,19 @@ impl fmt::Debug for VaultTransitSigningBackend {
 }
 
 impl VaultTransitSigningBackend {
+    /// Bound every request by `timeout` and admit only the private Vault
+    /// endpoint `allowances` pins.
     pub fn new(
         base_url: impl Into<String>,
         mount: impl Into<String>,
         key: RemoteSigningKey,
         token: impl Into<String>,
+        timeout: Duration,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Self> {
         let base_url = validate_base_url(&base_url.into())?;
         let mount = validate_path_segment(&mount.into(), "Vault Transit mount")?;
-        let http = signer_agent(&base_url, DEFAULT_TIMEOUT, &EgressAllowanceSet::default())?;
+        let http = signer_agent(&base_url, timeout, allowances)?;
         Ok(Self {
             base_url,
             mount,
@@ -316,17 +311,6 @@ impl VaultTransitSigningBackend {
             return Err(signing_error("Vault namespace is invalid"));
         }
         self.namespace = Some(namespace);
-        Ok(self)
-    }
-
-    /// Bound every request by `timeout` and admit the private Vault
-    /// endpoints `allowances` pins.
-    pub fn with_egress(
-        mut self,
-        timeout: Duration,
-        allowances: &EgressAllowanceSet,
-    ) -> Result<Self> {
-        self.http = signer_agent(&self.base_url, timeout, allowances)?;
         Ok(self)
     }
 
@@ -573,6 +557,8 @@ mod tests {
 
     use super::*;
 
+    const TIMEOUT: Duration = Duration::from_secs(5);
+
     #[test]
     fn generic_http_signer_verifies_exact_bytes_and_binding() {
         let keypair = Keypair::from_seed(&[31_u8; 32]);
@@ -598,6 +584,8 @@ mod tests {
             base_url,
             RemoteSigningKey::new("finding-listing", 7, keypair.public_key()).test_unwrap(),
             "remote-secret",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -638,6 +626,8 @@ mod tests {
             base_url,
             RemoteSigningKey::new("finding-venue", 2, keypair.public_key()).test_unwrap(),
             "remote-secret",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -659,6 +649,8 @@ mod tests {
             base_url,
             RemoteSigningKey::new("finding-status", 4, keypair.public_key()).test_unwrap(),
             "remote-secret",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -683,6 +675,8 @@ mod tests {
             base_url,
             RemoteSigningKey::new("finding-status", 4, keypair.public_key()).test_unwrap(),
             "remote-secret",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -712,6 +706,8 @@ mod tests {
             "transit",
             RemoteSigningKey::new("finding-status", 4, keypair.public_key()).test_unwrap(),
             "vault-token",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -766,6 +762,8 @@ mod tests {
             "transit",
             RemoteSigningKey::new("finding-audit", 9, configured.public_key()).test_unwrap(),
             "vault-token",
+            TIMEOUT,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap();
 
@@ -777,7 +775,14 @@ mod tests {
     fn production_remote_signer_requires_https() {
         let keypair = Keypair::from_seed(&[36_u8; 32]);
         let key = RemoteSigningKey::new("finding-listing", 1, keypair.public_key()).test_unwrap();
-        assert!(HttpSigningBackend::new("http://example.com", key, "token").is_err());
+        assert!(HttpSigningBackend::new(
+            "http://example.com",
+            key,
+            "token",
+            TIMEOUT,
+            &EgressAllowanceSet::default()
+        )
+        .is_err());
     }
 
     #[test]
@@ -790,12 +795,14 @@ mod tests {
             "https://10.0.0.7:8200",
             "https://[fd00::7]",
         ] {
+            let none = EgressAllowanceSet::default();
             assert!(
-                HttpSigningBackend::new(url, key(), "token").is_err(),
+                HttpSigningBackend::new(url, key(), "token", TIMEOUT, &none).is_err(),
                 "{url}"
             );
             assert!(
-                VaultTransitSigningBackend::new(url, "transit", key(), "token").is_err(),
+                VaultTransitSigningBackend::new(url, "transit", key(), "token", TIMEOUT, &none)
+                    .is_err(),
                 "{url}"
             );
         }
@@ -812,26 +819,15 @@ mod tests {
             cidr: "10.0.0.7/32".parse().test_unwrap(),
         }])
         .test_unwrap();
-        let timeout = Duration::from_secs(1);
-        VaultTransitSigningBackend::new("https://10.0.0.7:8200", "transit", key(), "token")
-            .and_then(|backend| backend.with_egress(timeout, &allowances))
-            .test_unwrap();
-        HttpSigningBackend::new("https://10.0.0.7:8200", key(), "token")
-            .and_then(|backend| backend.with_egress(timeout, &allowances))
-            .test_unwrap();
+        let vault = |url| {
+            VaultTransitSigningBackend::new(url, "transit", key(), "token", TIMEOUT, &allowances)
+        };
+        let http = |url| HttpSigningBackend::new(url, key(), "token", TIMEOUT, &allowances);
+        vault("https://10.0.0.7:8200").test_unwrap();
+        http("https://10.0.0.7:8200").test_unwrap();
         for url in ["https://10.0.0.8:8200", "https://10.0.0.7:8201"] {
-            assert!(
-                VaultTransitSigningBackend::new(url, "transit", key(), "token")
-                    .and_then(|backend| backend.with_egress(timeout, &allowances))
-                    .is_err(),
-                "{url}"
-            );
-            assert!(
-                HttpSigningBackend::new(url, key(), "token")
-                    .and_then(|backend| backend.with_egress(timeout, &allowances))
-                    .is_err(),
-                "{url}"
-            );
+            assert!(vault(url).is_err(), "{url}");
+            assert!(http(url).is_err(), "{url}");
         }
     }
 

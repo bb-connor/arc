@@ -97,7 +97,7 @@ pub(crate) fn dispatch_finding(
                 cmd_finding_operator_tick(&profile, json_output, allowances)
             }
             FindingOperatorCommands::ValidateHosted { profile } => {
-                cmd_finding_operator_validate_hosted(&profile, json_output)
+                cmd_finding_operator_validate_hosted(&profile, json_output, allowances)
             }
             FindingOperatorCommands::EvaluateCanary {
                 profile,

@@ -14,6 +14,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_core::{PublicKey, SigningAlgorithm, SigningBackend};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_finding_hosted_edge::{
     HostedAuthMethod, HostedAuthenticatorConfig, HostedTenantAuthPolicy, HostedTlsConfig,
     HostedTlsState, HostedTrustedProxy, HostedTrustedProxyConfig, StaticApiKeyPepper,
@@ -520,6 +521,7 @@ impl FindingHostedProfile {
     pub fn load_signer(
         &self,
         role: FindingHostedSigningRole,
+        allowances: &EgressAllowanceSet,
     ) -> Result<Arc<dyn SigningBackend>, String> {
         self.validate()?;
         let signer = self
@@ -543,13 +545,9 @@ impl FindingHostedProfile {
                     base_url,
                     key,
                     read_secret_environment(bearer_token_env)?,
+                    timeout,
+                    allowances,
                 )
-                .and_then(|backend| {
-                    backend.with_egress(
-                        timeout,
-                        &chio_egress_contract::EgressAllowanceSet::default(),
-                    )
-                })
                 .map_err(|_| "remote HTTP signer configuration is invalid".to_owned())?;
                 backend
                     .verify_key()
@@ -567,6 +565,8 @@ impl FindingHostedProfile {
                     mount,
                     key,
                     read_secret_environment(token_env)?,
+                    timeout,
+                    allowances,
                 )
                 .map_err(|_| "Vault Transit signer configuration is invalid".to_owned())?;
                 if let Some(namespace) = namespace {
@@ -574,12 +574,6 @@ impl FindingHostedProfile {
                         .with_namespace(namespace)
                         .map_err(|_| "Vault Transit namespace is invalid".to_owned())?;
                 }
-                backend = backend
-                    .with_egress(
-                        timeout,
-                        &chio_egress_contract::EgressAllowanceSet::default(),
-                    )
-                    .map_err(|_| "Vault Transit signer configuration is invalid".to_owned())?;
                 backend
                     .verify_key()
                     .map_err(|_| "Vault Transit signer preflight failed".to_owned())?;
@@ -590,9 +584,12 @@ impl FindingHostedProfile {
 
     /// Build the bounded Firecracker worker after validating the full profile.
     #[cfg(target_os = "linux")]
-    pub fn load_worker_executor(&self) -> Result<FirecrackerExecutor, String> {
+    pub fn load_worker_executor(
+        &self,
+        allowances: &EgressAllowanceSet,
+    ) -> Result<FirecrackerExecutor, String> {
         self.validate()?;
-        let signer = self.load_signer(FindingHostedSigningRole::Worker)?;
+        let signer = self.load_signer(FindingHostedSigningRole::Worker, allowances)?;
         FirecrackerExecutor::new(
             FirecrackerWorkerConfig {
                 worker_binary: self.worker.worker_binary.clone().into(),

@@ -12,6 +12,7 @@ use chio_control_plane::trust_control::finding_hosted_profile::{
 };
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::{canonical_json_bytes_from_str, PublicKey};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_finding_hosted_edge::{
     serve_hosted_market_loopback_with_shutdown, HostedAuthenticator, HostedEdgeMetrics,
     HostedHttpServerConfig, HostedHttpServerState, HostedReleaseIdentity,
@@ -213,7 +214,10 @@ async fn run_replication_checks(
         .await
         .map_err(|error| ServerError::Replication(error.to_string()))?;
     let signer = profile
-        .load_signer(FindingHostedSigningRole::AuthorityStatus)
+        .load_signer(
+            FindingHostedSigningRole::AuthorityStatus,
+            &EgressAllowanceSet::default(),
+        )
         .map_err(ServerError::Replication)?;
     let initial = write_replication_checks(profile, &replicator, signer.clone()).await?;
     let Some(interval_secs) = interval_secs else {
