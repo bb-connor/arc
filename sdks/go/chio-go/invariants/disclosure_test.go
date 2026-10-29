@@ -2,6 +2,7 @@ package invariants_test
 
 import (
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,8 @@ func loadCommittedCases(t *testing.T) []committedCase {
 	return document.Cases
 }
 
+const saltWireError = "salt is not the canonical b64u form of 32 bytes"
+
 // decodeRefusedCases are the committed vectors whose disclosure carries a salt outside the
 // canonical b64u form of 32 bytes. Every other vector decodes.
 var decodeRefusedCases = map[string]bool{
@@ -64,6 +67,10 @@ func TestOpenCommitmentsReproducesCommittedVectors(t *testing.T) {
 		}
 		report := invariants.OpeningReport{Parameters: invariants.FieldRejected, Content: invariants.FieldRejected}
 		if err != nil {
+			var invariantError *invariants.InvariantError
+			if !errors.As(err, &invariantError) || invariantError.Code != "disclosure" || invariantError.Message != saltWireError {
+				t.Fatalf("%s: decode refused with %v, expected the salt wire error", vector.ID, err)
+			}
 			refused++
 		} else {
 			report = invariants.OpenCommitments(

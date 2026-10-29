@@ -19,6 +19,7 @@ REJECTED_ALL = {"content": "rejected", "disclosure_valid": False, "parameters": 
 # Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32 bytes.
 # Every other vector decodes.
 DECODE_REFUSED = {"salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"}
+SALT_WIRE_ERROR = "salt is not the canonical b64u form of 32 bytes"
 
 
 class DisclosureTests(unittest.TestCase):
@@ -28,8 +29,10 @@ class DisclosureTests(unittest.TestCase):
         for case in cases:
             receipt = case["receipt"]
             if case["id"] in DECODE_REFUSED:
-                with self.assertRaises(ChioInvariantError, msg=case["id"]):
+                with self.assertRaises(ChioInvariantError, msg=case["id"]) as refusal:
                     parse_receipt_disclosure(case["disclosure"])
+                self.assertEqual(refusal.exception.code, "disclosure", case["id"])
+                self.assertEqual(str(refusal.exception), SALT_WIRE_ERROR, case["id"])
                 report = dict(REJECTED_ALL)
             else:
                 report = open_commitments(

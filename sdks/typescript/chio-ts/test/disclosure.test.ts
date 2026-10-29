@@ -28,6 +28,7 @@ interface CommittedCase {
 // Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32 bytes.
 // Every other vector decodes.
 const decodeRefused = new Set(["salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"]);
+const saltWireError = "salt is not the canonical b64u form of 32 bytes";
 
 test("openCommitments reproduces the committed-receipt vectors", async () => {
   const text = await readFile(resolve(repoRoot, "tests/bindings/vectors/receipt/committed/v1.json"), "utf8");
@@ -39,7 +40,12 @@ test("openCommitments reproduces the committed-receipt vectors", async () => {
   for (const entry of cases) {
     let report: OpeningReport;
     if (decodeRefused.has(entry.id)) {
-      assert.throws(() => parseReceiptDisclosure(entry.disclosure), ChioInvariantError, entry.id);
+      assert.throws(
+        () => parseReceiptDisclosure(entry.disclosure),
+        (error: unknown) =>
+          error instanceof ChioInvariantError && error.code === "disclosure" && error.message === saltWireError,
+        entry.id,
+      );
       report = { parameters: "rejected", content: "rejected", disclosure_valid: false };
     } else {
       report = openCommitments(
