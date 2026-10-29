@@ -137,12 +137,12 @@ efbd0040190fb0871831e606c581f8a66db79d8e2bb836745a70051306956070
 
 ## Ed25519 Signatures {#vectors-signing}
 
-In each case the message is the canonical form of the JSON input, and
-the signature is an Ed25519 signature {{RFC8032}} over the UTF-8 octets
-of that message.
+In each case the signature is an Ed25519 signature {{RFC8032}} over the
+signing wrapper ({{signing-wrapper}}) of the canonical form of the JSON
+input under the schema id of the case.
 
 The following case is `signing/v1.json` case
-`valid_canonical_json_message` from the Chio binding vector corpus. The
+`valid_wrapped_json_message` from the Chio binding vector corpus. The
 input is:
 {: keepWithNext="true"}
 
@@ -150,13 +150,25 @@ input is:
 {"z":1,"a":2}
 ~~~
 
-Its canonical form, which is the message, is:
+Its canonical form is:
 {: keepWithNext="true"}
 
 ~~~ json
 {"a":2,"z":1}
 ~~~
 
+The signing wrapper of the canonical form under the schema id
+`chio.receipt.v1` is these 88 octets, in hex:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e76310030a0a0cb00102ac64808\
+db450924b39544cc41b773e6d2b7f0d899021a6c2ae1c2985c5ba6f7d2a55e768f92\
+490ca09388e95bc4cccb9fdf11b15f4d42f93e73
+~~~
+
 The Ed25519 public key is:
 {: keepWithNext="true"}
 
@@ -170,27 +182,39 @@ The signature is:
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-0b656434a9cf4f1d2f5cd0a2e008d69789251ecde8373781ee24d22f36abe53abf9f\
-d51ee04df5c090143a5d49e14324a2d52f628472f02719bd405d2567590e
+f2ae2e1de317ecd0b73d822e527642282965a7b72904e0dde67ca53e324860c67398\
+8a1e690dc0a73acef7d1e08348566af7af01cf7ca3c08901b1618c02e50e
 ~~~
 
 Verification is expected to succeed.
 
 The following case is `signing/v1.json` case
-`tampered_canonical_json_message` from the Chio binding vector corpus.
-It reuses the signature of case `valid_canonical_json_message` for a
-message whose value of `z` differs. The input is:
+`tampered_wrapped_json_message` from the Chio binding vector corpus. It
+reuses the signature of case `valid_wrapped_json_message` for a message
+whose value of `z` differs. The input is:
 {: keepWithNext="true"}
 
 ~~~ json
 {"z":2,"a":2}
 ~~~
 
-Its canonical form, which is the message, is:
+Its canonical form is:
 {: keepWithNext="true"}
 
 ~~~ json
 {"a":2,"z":2}
+~~~
+
+The signing wrapper of the canonical form under the schema id
+`chio.receipt.v1` is these 88 octets, in hex:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e76310030a0a0cb00102ac64808\
+db450924b39544cc41b773e6d2b7f0d899021a6c2ae1800990570eb5beee61ae3dab\
+26f990a9fab09bc6c4a8a65f164bdb7b8e9c5d76
 ~~~
 
 The Ed25519 public key is:
@@ -206,20 +230,68 @@ The signature is:
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-0b656434a9cf4f1d2f5cd0a2e008d69789251ecde8373781ee24d22f36abe53abf9f\
-d51ee04df5c090143a5d49e14324a2d52f628472f02719bd405d2567590e
+f2ae2e1de317ecd0b73d822e527642282965a7b72904e0dde67ca53e324860c67398\
+8a1e690dc0a73acef7d1e08348566af7af01cf7ca3c08901b1618c02e50e
+~~~
+
+Verification is expected to fail.
+
+The following case is `signing/v1.json` case `substituted_schema_id`
+from the Chio binding vector corpus. It reuses the signature and message
+of case `valid_wrapped_json_message` under another schema id. The input
+is:
+{: keepWithNext="true"}
+
+~~~ json
+{"z":1,"a":2}
+~~~
+
+Its canonical form is:
+{: keepWithNext="true"}
+
+~~~ json
+{"a":2,"z":1}
+~~~
+
+The signing wrapper of the canonical form under the schema id
+`chio.capability.v1` is these 88 octets, in hex:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e7631005d8d33c3d56ece64cca5\
+a6fa61a763d04ce26ebfd9235ec1f75e81b28a6a535fc2985c5ba6f7d2a55e768f92\
+490ca09388e95bc4cccb9fdf11b15f4d42f93e73
+~~~
+
+The Ed25519 public key is:
+{: keepWithNext="true"}
+
+~~~
+fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618
+~~~
+
+The signature is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+f2ae2e1de317ecd0b73d822e527642282965a7b72904e0dde67ca53e324860c67398\
+8a1e690dc0a73acef7d1e08348566af7af01cf7ca3c08901b1618c02e50e
 ~~~
 
 Verification is expected to fail.
 
 ## Capability Token Verification {#vectors-capability}
 
-Each case gives the signing input of a token, the value of its
-`signature` member, the Unix time at which the token is verified, and
-the result that verification is expected to produce. The signing input
-is the canonical form of the token without its `signature` member,
-including its member `"schema":"chio.capability.v1"`, as in
-{{example-capability}}. It is the
+Each case gives the signing body of a token, its signing wrapper under
+the schema id `chio.capability.v1`, the value of its `signature` member,
+the Unix time at which the token is verified, and the result that
+verification is expected to produce. The signing body is the canonical
+form of the token without its `signature` member, including its member
+`"schema":"chio.capability.v1"`, as in {{example-capability}}. It is the
 `capability_signing_body_canonical_json` value of the case.
 
 The expected result covers the signature of the token, the signatures,
@@ -232,7 +304,7 @@ The following case is `capability/v1.json` case
 `valid_delegated_capability` from the Chio binding vector corpus. Its
 signature verifies, its delegation link verifies, and the verification
 time falls within its validity period. Its final delegatee is not its
-subject, so full verification rejects it. Its signing input is:
+subject, so full verification rejects it. Its signing body is:
 {: keepWithNext="true"}
 
 ~~~ json
@@ -243,9 +315,9 @@ subject, so full verification rejects it. Its signing input is:
 "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",\
 "delegator":\
 "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
-"signature":"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc62024\
-59c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b86\
-5be00","timestamp":1710000250}],"expires_at":1710000800,"id":\
+"signature":"c76b203b6fc0defbbadee97399d5ab4e1ff3fcc9ece8feaf0ec594d\
+1c55d0d5ffe7c9a375695e049fe7c3ec3105c669ee1bc9937cffbd5f526fd9669c8c\
+add01","timestamp":1710000250}],"expires_at":1710000800,"id":\
 "cap-bindings-valid","issued_at":1710000200,"issuer":\
 "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",\
 "schema":"chio.capability.v1","scope":{"grants":[{"constraints":\
@@ -255,14 +327,25 @@ subject, so full verification rejects it. Its signing input is:
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"}
 ~~~
 
+Its signing wrapper is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e7631005d8d33c3d56ece64cca5\
+a6fa61a763d04ce26ebfd9235ec1f75e81b28a6a535f780e709fe51d7b1a83237ab8\
+5327477ee99ff906a6cf8f8822952e25cd352ed9
+~~~
+
 The value of the `signature` member is:
 {: keepWithNext="true"}
 
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-a16f5a447da2a5dbd840e44c7c1a5093474e4a1b9826ae80ca85f197b18e8ad05607\
-745ac9e0ff063db7b49ff4da637b630cf10d55c1ef1e64fb5c27d81ed505
+b27fe85e65d1ad63e44f268e0213fbc68c33e3e77fe33f16696630467096b8d70639\
+b15cf6e20d8a53782311d286051584f258e58d5e13a6f796166bda954d0c
 ~~~
 
 Verification at Unix time 1710000400 is expected to produce:
@@ -279,7 +362,7 @@ Verification at Unix time 1710000400 is expected to produce:
 
 The following case is `capability/v1.json` case `expired_capability`
 from the Chio binding vector corpus. Its signature verifies, and it
-expired at 1710000100, before the verification time. Its signing input
+expired at 1710000100, before the verification time. Its signing body
 is:
 {: keepWithNext="true"}
 
@@ -296,14 +379,25 @@ is:
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"}
 ~~~
 
+Its signing wrapper is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e7631005d8d33c3d56ece64cca5\
+a6fa61a763d04ce26ebfd9235ec1f75e81b28a6a535f91d5a61c8dd6bf456e674026\
+2865e2c75be1687e7edd2dd6e8689d4a0cccf32f
+~~~
+
 The value of the `signature` member is:
 {: keepWithNext="true"}
 
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-d4f16e2dc56f829a047cf339e7139c0ceb859045f4854b746bdecf6901fb493a1088\
-bab6456d2c39b38cc955f84041ebd22d8636bf4cfc45e838423b868de509
+972dd504920dbd8bacdc75a48c1e49f882b9fa154b2683674ddf791f7fba34e54e66\
+bebbadb9affdf58f6127c9374be379d770123d2b6a93671ec86c16ea330f
 ~~~
 
 Verification at Unix time 1710000400 is expected to produce:
@@ -321,7 +415,7 @@ Verification at Unix time 1710000400 is expected to produce:
 The following case is `capability/v1.json` case
 `broken_delegation_chain_signature` from the Chio binding vector corpus.
 Its signature verifies, and the signature of its delegation link does
-not. Its signing input is:
+not. Its signing body is:
 {: keepWithNext="true"}
 
 ~~~ json
@@ -344,14 +438,25 @@ not. Its signing input is:
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"}
 ~~~
 
+Its signing wrapper is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e7631005d8d33c3d56ece64cca5\
+a6fa61a763d04ce26ebfd9235ec1f75e81b28a6a535fde390c726ab7f60e895388d4\
+43fb50623c54b89aa76327ac7fa9c0c1f6d280e0
+~~~
+
 The value of the `signature` member is:
 {: keepWithNext="true"}
 
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-76466629cbe01ac3915bb67af0ff4fa591aec42d8a8f72e7c36731b7b1596cfb39e3\
-a82dfc467dd2ed61c7ba7a5e728016d82b1702cbac5b8cc94719b99d0c08
+c9f6927713d2f2289cfbf5507b008e7b17b88ad74b4ce9f8b5e71da2419fc2afc963\
+9a233a046e8b908e997b7f94f3e8c55cc77b12a9410d525ea43a600b530a
 ~~~
 
 Verification at Unix time 1710000400 is expected to produce:
@@ -368,18 +473,19 @@ Verification at Unix time 1710000400 is expected to produce:
 
 ## Receipt Verification {#vectors-receipt}
 
-Each case gives the signing input of a receipt, the value of its
-`signature` member, and the result that verification is expected to
-produce. The signing input is the canonical form of a JSON object with
-two members: `body`, which is the receipt without its `id` and
-`signature` members, and `id`, which is the SHA-256 digest of the
-canonical form of `body`, in lowercase hex, as in {{example-receipt}}.
-The `receipt_body_canonical_json` value of each case is the canonical
-form of the receipt without its `signature` member.
+Each case gives the signing body of a receipt, its signing wrapper under
+the schema id `chio.receipt.v1`, the value of its `signature` member,
+and the result that verification is expected to produce. The signing
+body is the canonical form of a JSON object with two members: `body`,
+which is the receipt without its `id` and `signature` members, and `id`,
+which is the SHA-256 digest of the canonical form of `body`, in
+lowercase hex, as in {{example-receipt}}. The
+`receipt_body_canonical_json` value of each case is the canonical form
+of the receipt without its `signature` member.
 
 The following case is `receipt/v1.json` case `allow_receipt` from the
 Chio binding vector corpus. It records an allow decision. Its signing
-input is:
+body is:
 {: keepWithNext="true"}
 
 ~~~ json
@@ -404,14 +510,25 @@ input is:
 "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea"}
 ~~~
 
+Its signing wrapper is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e76310030a0a0cb00102ac64808\
+db450924b39544cc41b773e6d2b7f0d899021a6c2ae16d0752cbe80e4a4f8204063c\
+d20e9a17bbcb5c5ce16d3ea122fd05cfe80365ee
+~~~
+
 The value of the `signature` member is:
 {: keepWithNext="true"}
 
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-276a4c59dbc5e0c4fbd47beefa33515d207e8f516aca296afee2cb95a443bb18d310\
-31cae0b69943e7a930be03b2e0a60156e5a26e732e888e32d4653d059f03
+67e3bfef7a6f3da592811e088d396f3186fbc1533632b273fbd3a2f6ce60eb099418\
+d256853398661d802d179ea869acb584bed757681f501f2c40fd4fde790a
 ~~~
 
 With no trusted signers configured, verification is expected to produce:
@@ -439,7 +556,7 @@ With no trusted signers configured, verification is expected to produce:
 
 The following case is `receipt/v1.json` case `deny_receipt` from the
 Chio binding vector corpus. It records a deny decision by the guard
-`ForbiddenPathGuard` for the path `/etc/shadow`. Its signing input is:
+`ForbiddenPathGuard` for the path `/etc/shadow`. Its signing body is:
 {: keepWithNext="true"}
 
 ~~~ json
@@ -464,14 +581,25 @@ Chio binding vector corpus. It records a deny decision by the guard
 "56d5644db5c53d0bb837bf615a60e541724858757aee1b8259a25816b75bb682"}
 ~~~
 
+Its signing wrapper is:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e76310030a0a0cb00102ac64808\
+db450924b39544cc41b773e6d2b7f0d899021a6c2ae1db46cf3bbd040d678b4ba94c\
+f9036efac42c2fbc1442a619c9acb12095c72857
+~~~
+
 The value of the `signature` member is:
 {: keepWithNext="true"}
 
 ~~~
 =============== NOTE: '\' line wrapping per RFC 8792 ================
 
-e3778cd741746bf1295ed45d5ffa4d311dd7076d4e8d7c009bdf3283e88e693cc9cd\
-19bb07d2f65d8306e04d1c58bdcbc1753d79af4a7c2234758b5dbf8a1c06
+d3b96d12fb74aa7f05c46adc2d62942caa5f92a65716ba79e9f3b6c6179f54e5221e\
+7531beb9bb17fcbf8ab6a409c994caba1158d904054d371386117b8e7008
 ~~~
 
 With no trusted signers configured, verification is expected to produce:

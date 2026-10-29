@@ -471,12 +471,26 @@ def without(obj: Dict[str, Any], *names: str) -> Dict[str, Any]:
 
 
 CAPABILITY_SCHEMA = "chio.capability.v1"
+RECEIPT_SCHEMA = "chio.receipt.v1"
 SCHEMA_MEMBER = '"schema":"%s"' % CAPABILITY_SCHEMA
+WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
+WRAPPER_LENGTH = 88
 
 
-def capability_signing_input(token: Dict[str, Any]) -> str:
-    """The canonical JSON that a capability issuer signs: the token without its
-    signature and algorithm members."""
+def signing_wrapper(schema_id: str, canonical_body: bytes) -> bytes:
+    """The 88 octets that every Chio signature covers ({{signing-wrapper}})."""
+    wrapper = (
+        WRAPPER_PREFIX
+        + hashlib.sha256(schema_id.encode("utf-8")).digest()
+        + hashlib.sha256(canonical_body).digest()
+    )
+    _require(len(wrapper) == WRAPPER_LENGTH, "the signing wrapper is not %d octets" % WRAPPER_LENGTH)
+    return wrapper
+
+
+def capability_signing_body(token: Dict[str, Any]) -> str:
+    """The canonical JSON whose signing wrapper a capability issuer signs: the
+    token without its signature and algorithm members."""
     _require(token.get("schema") == CAPABILITY_SCHEMA, "capability token %s lacks schema %s" % (token.get("id"), CAPABILITY_SCHEMA))
     return canonicalize(without(token, "signature", "algorithm"))
 
@@ -490,18 +504,19 @@ def receipt_body(receipt: Dict[str, Any]) -> Dict[str, Any]:
     return {name: value for name, value in body.items() if value is not None}
 
 
-def receipt_signing_input(receipt: Dict[str, Any]) -> str:
-    """The canonical JSON that a kernel signs: the body and its content-addressed id."""
+def receipt_signing_body(receipt: Dict[str, Any]) -> str:
+    """The canonical JSON whose signing wrapper a kernel signs: the body and its
+    content-addressed id."""
     return canonicalize({"id": receipt["id"], "body": receipt_body(receipt)})
 
 
-def check_capability_signing_input(case: Dict[str, Any]) -> str:
-    """Return the signing input of a capability case after checking how it relates to the corpus."""
-    signing_input = capability_signing_input(case["capability"])
-    members = loads_strict(signing_input)
+def check_capability_signing_body(case: Dict[str, Any]) -> str:
+    """Return the signing body of a capability case after checking how it relates to the corpus."""
+    signing_body = capability_signing_body(case["capability"])
+    members = loads_strict(signing_body)
     _require(
-        signing_input == case["capability_signing_body_canonical_json"],
-        "the signing input of %s is not capability_signing_body_canonical_json" % case["id"],
+        signing_body == case["capability_signing_body_canonical_json"],
+        "the signing body of %s is not capability_signing_body_canonical_json" % case["id"],
     )
     names = list(members)
     at = names.index("schema")
@@ -509,11 +524,11 @@ def check_capability_signing_input(case: Dict[str, Any]) -> str:
         names[at - 1 : at + 2] == ["issuer", "schema", "scope"],
         "schema no longer sorts between issuer and scope in %s" % case["id"],
     )
-    return signing_input
+    return signing_body
 
 
-def check_receipt_signing_input(case: Dict[str, Any]) -> str:
-    """Return the signing input of a receipt case after checking how it relates to the corpus."""
+def check_receipt_signing_body(case: Dict[str, Any]) -> str:
+    """Return the signing body of a receipt case after checking how it relates to the corpus."""
     receipt = case["receipt"]
     _require(
         canonicalize(without(receipt, "signature")) == case["receipt_body_canonical_json"],
@@ -523,7 +538,7 @@ def check_receipt_signing_input(case: Dict[str, Any]) -> str:
         hashlib.sha256(canonical_bytes(receipt_body(receipt))).hexdigest() == receipt["id"],
         "%s: id is not the digest of the canonical body" % case["id"],
     )
-    return receipt_signing_input(receipt)
+    return receipt_signing_body(receipt)
 
 
 # ---------------------------------------------------------------------------
@@ -577,8 +592,8 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
         "%s no longer has no delegation chain and one grant" % cap_id,
     )
     _require(rec_case["expected"]["decision"] == "allow", "%s is not an allow receipt" % rec_id)
-    cap_signing = check_capability_signing_input(cap_case)
-    rec_signing = check_receipt_signing_input(rec_case)
+    cap_signing = check_capability_signing_body(cap_case)
+    rec_signing = check_receipt_signing_body(rec_case)
     _require(
         hashlib.sha256(canonical_bytes(rec["action"]["parameters"])).hexdigest()
         == rec["action"]["parameter_hash"],
@@ -613,13 +628,18 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
     )
     f.block(pretty(cap), "json", indent=4)
     f.para(
-        "The signing input of the token is its canonical form without the `signature` member. "
-        "The member `%s` sorts between `issuer` and `scope`. The signing input is the "
+        "The signing body of the token is its canonical form without the `signature` member. "
+        "The member `%s` sorts between `issuer` and `scope`. The signing body is the "
         "`capability_signing_body_canonical_json` value of the case:" % SCHEMA_MEMBER
     )
     f.block(cap_signing, "json")
     f.para(
-        "The `signature` member is an Ed25519 signature over these octets that verifies under the "
+        "The signing wrapper ({{signing-wrapper}}) of this body under the schema id `%s` is "
+        "these %d octets, in hex:" % (CAPABILITY_SCHEMA, WRAPPER_LENGTH)
+    )
+    f.block(signing_wrapper(CAPABILITY_SCHEMA, cap_signing.encode("utf-8")).hex())
+    f.para(
+        "The `signature` member is an Ed25519 signature over the wrapper that verifies under the "
         "key in `issuer`."
     )
 
@@ -654,15 +674,20 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
     )
     f.block(pretty(rec), "json", indent=4)
     f.para(
-        "The signing input of the receipt is the canonical form of a JSON object with two "
+        "The signing body of the receipt is the canonical form of a JSON object with two "
         "members: `body`, which is the receipt without its `id` and `signature` members, and "
         "`id`, which is the SHA-256 digest of the canonical form of `body`, in lowercase hex. The "
         "`receipt_body_canonical_json` value of the case is the canonical form of the receipt "
-        "without its `signature` member. The signing input is:"
+        "without its `signature` member. The signing body is:"
     )
     f.block(rec_signing, "json")
     f.para(
-        "The `signature` member is an Ed25519 signature over these octets that verifies under the "
+        "The signing wrapper ({{signing-wrapper}}) of this body under the schema id `%s` is "
+        "these %d octets, in hex:" % (RECEIPT_SCHEMA, WRAPPER_LENGTH)
+    )
+    f.block(signing_wrapper(RECEIPT_SCHEMA, rec_signing.encode("utf-8")).hex())
+    f.para(
+        "The `signature` member is an Ed25519 signature over the wrapper that verifies under the "
         "key in `kernel_key`. The `parameter_hash` member of `action` is the SHA-256 digest of the "
         "canonical form of its `parameters` member, in the same encoding."
     )
@@ -695,8 +720,13 @@ def _canonical_case(f: Fragment, corpus: Corpus, case_id: str, what: str) -> Non
 def _signing_case(f: Fragment, case: Dict[str, Any], note: str = "") -> None:
     f.para("%s%s The input is:" % (provenance("signing", case["id"]), note))
     f.block(case["input_json"], "json")
-    f.para("Its canonical form, which is the message, is:")
+    f.para("Its canonical form is:")
     f.block(case["canonical_json"], "json")
+    f.para(
+        "The signing wrapper of the canonical form under the schema id `%s` is these %d octets, "
+        "in hex:" % (case["schema_id"], WRAPPER_LENGTH)
+    )
+    f.block(signing_wrapper(case["schema_id"], case["canonical_json"].encode("utf-8")).hex())
     f.para("The Ed25519 public key is:")
     f.block(case["public_key_hex"])
     f.para("The signature is:")
@@ -710,8 +740,11 @@ def _capability_case(f: Fragment, corpus: Corpus, case_id: str, outcome: str, wh
         case["expected"] == CAPABILITY_OUTCOMES[outcome],
         "capability/v1.json case %s no longer has the %s outcome" % (case_id, outcome),
     )
-    f.para("%s %s Its signing input is:" % (provenance("capability", case_id), what))
-    f.block(check_capability_signing_input(case), "json")
+    signing_body = check_capability_signing_body(case)
+    f.para("%s %s Its signing body is:" % (provenance("capability", case_id), what))
+    f.block(signing_body, "json")
+    f.para("Its signing wrapper is:")
+    f.block(signing_wrapper(CAPABILITY_SCHEMA, signing_body.encode("utf-8")).hex())
     f.para("The value of the `signature` member is:")
     f.block(case["capability"]["signature"])
     f.para("Verification at Unix time %d is expected to produce:" % case["verify_at"])
@@ -720,8 +753,11 @@ def _capability_case(f: Fragment, corpus: Corpus, case_id: str, outcome: str, wh
 
 def _receipt_case(f: Fragment, corpus: Corpus, case_id: str, what: str) -> None:
     case = corpus.case("receipt", case_id)
-    f.para("%s %s Its signing input is:" % (provenance("receipt", case_id), what))
-    f.block(check_receipt_signing_input(case), "json")
+    signing_body = check_receipt_signing_body(case)
+    f.para("%s %s Its signing body is:" % (provenance("receipt", case_id), what))
+    f.block(signing_body, "json")
+    f.para("Its signing wrapper is:")
+    f.block(signing_wrapper(RECEIPT_SCHEMA, signing_body.encode("utf-8")).hex())
     f.para("The value of the `signature` member is:")
     f.block(case["receipt"]["signature"])
     f.para("With no trusted signers configured, verification is expected to produce:")
@@ -800,24 +836,33 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
 
     f.heading("Ed25519 Signatures", "vectors-signing")
     f.para(
-        "In each case the message is the canonical form of the JSON input, and the signature is "
-        "an Ed25519 signature {{RFC8032}} over the UTF-8 octets of that message."
+        "In each case the signature is an Ed25519 signature {{RFC8032}} over the signing wrapper "
+        "({{signing-wrapper}}) of the canonical form of the JSON input under the schema id of the "
+        "case."
     )
-    valid = corpus.case("signing", "valid_canonical_json_message", "json_cases")
-    tampered = corpus.case("signing", "tampered_canonical_json_message", "json_cases")
-    for case in (valid, tampered):
+    valid = corpus.case("signing", "valid_wrapped_json_message", "json_cases")
+    tampered = corpus.case("signing", "tampered_wrapped_json_message", "json_cases")
+    substituted = corpus.case("signing", "substituted_schema_id", "json_cases")
+    for case in (valid, tampered, substituted):
         _require(
             canonicalize(loads_strict(case["input_json"])) == case["canonical_json"],
             "the canonicalizer disagrees with signing/v1.json case %s" % case["id"],
         )
-    _require(valid["expected_verify"] is True, "signing/v1.json case valid_canonical_json_message changed")
+        _require(
+            case["signature_hex"] == valid["signature_hex"]
+            and case["public_key_hex"] == valid["public_key_hex"],
+            "signing/v1.json case %s no longer reuses the signature of the valid case" % case["id"],
+        )
+    _require(valid["expected_verify"] is True, "signing/v1.json case valid_wrapped_json_message changed")
     _require(
-        tampered["expected_verify"] is False, "signing/v1.json case tampered_canonical_json_message changed"
+        tampered["expected_verify"] is False and tampered["schema_id"] == valid["schema_id"],
+        "signing/v1.json case tampered_wrapped_json_message changed",
     )
     _require(
-        tampered["signature_hex"] == valid["signature_hex"]
-        and tampered["public_key_hex"] == valid["public_key_hex"],
-        "the tampered signing case no longer reuses the signature of the valid case",
+        substituted["expected_verify"] is False
+        and substituted["canonical_json"] == valid["canonical_json"]
+        and substituted["schema_id"] != valid["schema_id"],
+        "signing/v1.json case substituted_schema_id changed",
     )
     _signing_case(f, valid)
     _signing_case(
@@ -826,15 +871,20 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
         " It reuses the signature of case `%s` for a message whose value of `z` differs."
         % valid["id"],
     )
+    _signing_case(
+        f,
+        substituted,
+        " It reuses the signature and message of case `%s` under another schema id." % valid["id"],
+    )
 
     f.heading("Capability Token Verification", "vectors-capability")
     f.para(
-        "Each case gives the signing input of a token, the value of its `signature` member, the "
-        "Unix time at which the token is verified, and the result that verification is expected "
-        "to produce. The signing input is the canonical form of the token without its `signature` "
-        "member, including its member `%s`, as in {{example-capability}}. It is the "
-        "`capability_signing_body_canonical_json` value of the case."
-        % SCHEMA_MEMBER
+        "Each case gives the signing body of a token, its signing wrapper under the schema id "
+        "`%s`, the value of its `signature` member, the Unix time at which the token is verified, "
+        "and the result that verification is expected to produce. The signing body is the "
+        "canonical form of the token without its `signature` member, including its member `%s`, "
+        "as in {{example-capability}}. It is the `capability_signing_body_canonical_json` value "
+        "of the case." % (CAPABILITY_SCHEMA, SCHEMA_MEMBER)
     )
     f.para(
         "The expected result covers the signature of the token, the signatures, key connectivity, "
@@ -875,12 +925,14 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
 
     f.heading("Receipt Verification", "vectors-receipt")
     f.para(
-        "Each case gives the signing input of a receipt, the value of its `signature` member, and "
-        "the result that verification is expected to produce. The signing input is the canonical "
+        "Each case gives the signing body of a receipt, its signing wrapper under the schema id "
+        "`%s`, the value of its `signature` member, and the result that verification is expected "
+        "to produce. The signing body is the canonical "
         "form of a JSON object with two members: `body`, which is the receipt without its `id` "
         "and `signature` members, and `id`, which is the SHA-256 digest of the canonical form of "
         "`body`, in lowercase hex, as in {{example-receipt}}. The `receipt_body_canonical_json` "
         "value of each case is the canonical form of the receipt without its `signature` member."
+        % RECEIPT_SCHEMA
     )
     allow = corpus.case("receipt", "allow_receipt")
     deny = corpus.case("receipt", "deny_receipt")
