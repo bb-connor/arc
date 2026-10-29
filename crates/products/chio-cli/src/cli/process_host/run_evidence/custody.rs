@@ -7,7 +7,7 @@ use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantDisposition, RuntimeParticipantPhase, MAX_RUNTIME_PARTICIPANT_EPISODES,
 };
 use chio_kernel::admission_operation::{
-    AdmissionOperationId, AdmissionOperationState, RuntimeReplayParticipantKind,
+    AdmissionOperationId, AdmissionOperationState, RuntimeParticipantKind,
 };
 
 use super::*;
@@ -155,7 +155,7 @@ pub(super) fn verify(
         "continuation custody prepared plan differs from signed receipt",
     )?;
     require(
-        resources[0].kind() == RuntimeReplayParticipantKind::SwarmContinuation
+        resources[0].kind() == RuntimeParticipantKind::SwarmContinuation
             && resources[0].resource_id().as_str() == token.token_id
             && resources[0].artifact_digest().as_str() == hash(token)?,
         "continuation custody does not retain the issued single-use token",

@@ -348,7 +348,6 @@ fn verify_buyer_attestation_review_package_internal(
     let runtime_step = match verify_buyer_review_runtime_reports(BuyerReviewRuntimeReportContext {
         runtime_run_report: &runtime_run_report,
         proof_regeneration_report: &proof_regeneration_report,
-        packet: &packet,
         bilateral: &bilateral,
         proof_package: &proof_package,
         workflow_receipt: &workflow_receipt,

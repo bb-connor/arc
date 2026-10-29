@@ -3,7 +3,7 @@
 
 use super::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationId, AdmissionOperationStoreError,
-    RuntimeReplayParticipantKind,
+    RuntimeParticipantKind,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,23 +53,21 @@ impl RuntimeDispatchValidity {
     }
 }
 
-/// Trusted configuration data identifying one imported source generation. This
-/// value is not activation evidence, an operation lease or a claim authority.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeParticipantAuthorityBindingV1 {
     runtime_authority_id: AdmissionIdentifier,
-    expectation_id: AdmissionIdentifier,
+    qualification_id: AdmissionIdentifier,
 }
 
 impl RuntimeParticipantAuthorityBindingV1 {
     pub fn new(
         runtime_authority_id: AdmissionIdentifier,
-        expectation_id: AdmissionIdentifier,
+        qualification_id: AdmissionIdentifier,
     ) -> Self {
         Self {
             runtime_authority_id,
-            expectation_id,
+            qualification_id,
         }
     }
 
@@ -77,8 +75,8 @@ impl RuntimeParticipantAuthorityBindingV1 {
         &self.runtime_authority_id
     }
 
-    pub fn expectation_id(&self) -> &AdmissionIdentifier {
-        &self.expectation_id
+    pub fn qualification_id(&self) -> &AdmissionIdentifier {
+        &self.qualification_id
     }
 }
 
@@ -158,14 +156,14 @@ impl RuntimeParticipantClaimEvidenceV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeParticipantResourceV1 {
-    kind: RuntimeReplayParticipantKind,
+    kind: RuntimeParticipantKind,
     resource_id: AdmissionIdentifier,
     artifact_digest: AdmissionDigest,
 }
 
 impl RuntimeParticipantResourceV1 {
     pub fn new(
-        kind: RuntimeReplayParticipantKind,
+        kind: RuntimeParticipantKind,
         resource_id: AdmissionIdentifier,
         artifact_digest: AdmissionDigest,
     ) -> Self {
@@ -176,7 +174,7 @@ impl RuntimeParticipantResourceV1 {
         }
     }
 
-    pub fn kind(&self) -> RuntimeReplayParticipantKind {
+    pub fn kind(&self) -> RuntimeParticipantKind {
         self.kind
     }
 
@@ -201,7 +199,7 @@ impl RuntimeParticipantResourceV1 {
 pub struct RuntimeParticipantClaimIntentV1 {
     episode_id: AdmissionIdentifier,
     runtime_authority_id: AdmissionIdentifier,
-    expectation_id: AdmissionIdentifier,
+    qualification_id: AdmissionIdentifier,
     request_binding_hash: AdmissionDigest,
     grant_index: u32,
     phase: RuntimeParticipantPhase,
@@ -229,7 +227,7 @@ impl std::fmt::Debug for RuntimeParticipantClaimIntentV1 {
 pub struct RuntimeParticipantClaimIntentInput {
     pub episode_id: AdmissionIdentifier,
     pub runtime_authority_id: AdmissionIdentifier,
-    pub expectation_id: AdmissionIdentifier,
+    pub qualification_id: AdmissionIdentifier,
     pub request_binding_hash: AdmissionDigest,
     pub grant_index: u32,
     pub phase: RuntimeParticipantPhase,
@@ -252,7 +250,7 @@ impl RuntimeParticipantClaimIntentV1 {
         let intent = Self {
             episode_id: input.episode_id,
             runtime_authority_id: input.runtime_authority_id,
-            expectation_id: input.expectation_id,
+            qualification_id: input.qualification_id,
             request_binding_hash: input.request_binding_hash,
             grant_index: input.grant_index,
             phase: input.phase,
@@ -286,8 +284,8 @@ impl RuntimeParticipantClaimIntentV1 {
         &self.runtime_authority_id
     }
 
-    pub fn expectation_id(&self) -> &AdmissionIdentifier {
-        &self.expectation_id
+    pub fn qualification_id(&self) -> &AdmissionIdentifier {
+        &self.qualification_id
     }
 
     pub fn request_binding_hash(&self) -> &AdmissionDigest {

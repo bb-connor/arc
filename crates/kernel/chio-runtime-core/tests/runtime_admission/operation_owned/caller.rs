@@ -103,14 +103,17 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
         .ok_or("retained runtime history")?;
     assert_eq!(current, operation);
     assert_eq!(history.len(), 2);
-    assert_eq!(
-        history[0].disposition,
-        RuntimeParticipantDisposition::ReleasedBeforeDispatch
-    );
-    assert_eq!(
-        history[1].disposition,
-        RuntimeParticipantDisposition::RetainedAfterDispatchCommit
-    );
+    let released = history
+        .iter()
+        .find(|entry| entry.disposition == RuntimeParticipantDisposition::ReleasedBeforeDispatch)
+        .ok_or("released preflight claim")?;
+    let retained = history
+        .iter()
+        .find(|entry| {
+            entry.disposition == RuntimeParticipantDisposition::RetainedAfterDispatchCommit
+        })
+        .ok_or("retained dispatch claim")?;
+    assert_ne!(released.reference, retained.reference);
     let frame = store
         .load_caller_dispatch_context(operation.binding().operation_id(), &fence, NOW)?
         .ok_or("caller frame")?;
@@ -119,16 +122,16 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
     let selected = &payload["participant_custody"]["runtime"];
     assert_eq!(
         selected["episode_id"],
-        serde_json::to_value(history[1].reference.episode_id())?
+        serde_json::to_value(retained.reference.episode_id())?
     );
     assert_eq!(
         selected["claim_digest"],
-        serde_json::to_value(history[1].reference.claim_digest())?
+        serde_json::to_value(retained.reference.claim_digest())?
     );
     let expected_intent = sha256_hex(&canonical_json_bytes(&(
         "chio.caller-claim-intent.v1",
         "runtime",
-        &history[1].intent,
+        &retained.intent,
     ))?);
     assert_eq!(selected["intent_digest"], expected_intent);
     let expected_episodes: Vec<_> = history.iter().map(|claim| {

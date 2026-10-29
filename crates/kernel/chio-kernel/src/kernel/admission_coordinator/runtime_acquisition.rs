@@ -23,7 +23,7 @@ pub struct RuntimeParticipantClaimAuthority<'a> {
     kernel: &'a ChioKernel,
     admission: RefCell<&'a mut DurableToolAdmission>,
     binding: RuntimeParticipantAuthorityBindingV1,
-    source_snapshot: crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+    source_qualification: crate::admission_operation::RuntimeSourceQualificationV1,
     episode_id: AdmissionIdentifier,
     request_binding_hash: AdmissionDigest,
     grant_index: u32,
@@ -50,8 +50,10 @@ impl RuntimeParticipantClaimAuthority<'_> {
     }
     /// Expected source evidence from the qualified activation record, not from
     /// request metadata. The runtime must verify its actual backend against it.
-    pub fn source_snapshot(&self) -> &crate::admission_operation::RuntimeReplaySourceSnapshotV1 {
-        &self.source_snapshot
+    pub fn source_qualification(
+        &self,
+    ) -> &crate::admission_operation::RuntimeSourceQualificationV1 {
+        &self.source_qualification
     }
     pub fn episode_id(&self) -> &AdmissionIdentifier {
         &self.episode_id
@@ -88,7 +90,7 @@ impl RuntimeParticipantClaimAuthority<'_> {
         let intent = RuntimeParticipantClaimIntentV1::new(RuntimeParticipantClaimIntentInput {
             episode_id: self.episode_id.clone(),
             runtime_authority_id: self.binding.runtime_authority_id().clone(),
-            expectation_id: self.binding.expectation_id().clone(),
+            qualification_id: self.binding.qualification_id().clone(),
             request_binding_hash: self.request_binding_hash.clone(),
             grant_index: self.grant_index,
             phase: self.phase,
@@ -111,9 +113,9 @@ impl RuntimeParticipantClaimAuthority<'_> {
         let source = store_call("activation", || {
             runtime
                 .store
-                .load_runtime_participant_activation(&self.binding, &runtime.fence, now)
+                .load_runtime_source_qualification(&self.binding, &runtime.fence, now)
         })?;
-        if source != self.source_snapshot {
+        if source != self.source_qualification {
             return Err(acquisition_error(
                 "runtime activation source changed during preparation",
             ));
@@ -262,7 +264,7 @@ impl ChioKernel {
         if usize::try_from(live.intent.grant_index()).ok() != Some(grant_index)
             || live.intent.phase() != RuntimeParticipantPhase::Dispatch
             || live.intent.runtime_authority_id() != binding.runtime_authority_id()
-            || live.intent.expectation_id() != binding.expectation_id()
+            || live.intent.qualification_id() != binding.qualification_id()
         {
             return Err(acquisition_error(
                 "native runtime claim selected another grant or phase",
@@ -318,7 +320,7 @@ impl ChioKernel {
         &self,
         context: &RuntimeAdmissionRevalidationContext<'_>,
         binding: &RuntimeParticipantAuthorityBindingV1,
-    ) -> Result<crate::admission_operation::RuntimeReplaySourceSnapshotV1, KernelError> {
+    ) -> Result<crate::admission_operation::RuntimeSourceQualificationV1, KernelError> {
         let runtime = self.durable_runtime()?;
         let source = {
             let _mutation_guard = runtime.lock_mutations()?;
@@ -326,7 +328,7 @@ impl ChioKernel {
             store_call("activation", || {
                 runtime
                     .store
-                    .load_runtime_participant_activation(binding, &runtime.fence, now)
+                    .load_runtime_source_qualification(binding, &runtime.fence, now)
             })?
         };
         if source.runtime_authority_id() != binding.runtime_authority_id().as_str()
@@ -414,13 +416,13 @@ impl ChioKernel {
             ));
         }
         let runtime = self.durable_runtime()?;
-        let source_snapshot = {
+        let source_qualification = {
             let _mutation_guard = runtime.lock_mutations()?;
             let now = runtime.refresh_trusted_time(context.now_unix_ms)?;
             let source = store_call("activation", || {
                 runtime
                     .store
-                    .load_runtime_participant_activation(binding, &runtime.fence, now)
+                    .load_runtime_source_qualification(binding, &runtime.fence, now)
             })?;
             if source.runtime_authority_id() != binding.runtime_authority_id().as_str()
                 || source.destination_authority_id() != runtime.fence.store_uuid
@@ -440,10 +442,10 @@ impl ChioKernel {
             request_binding_hash: admission.operation.binding().request_binding_hash().clone(),
             admission: RefCell::new(admission),
             binding: binding.clone(),
-            source_snapshot,
+            source_qualification,
             episode_id: AdmissionIdentifier::try_new(
                 "runtime_episode_id",
-                uuid::Uuid::now_v7().to_string(),
+                self.next_runtime_episode_id()?,
             )?,
             grant_index,
             phase,
@@ -457,6 +459,24 @@ impl ChioKernel {
         }))
         .unwrap_or_else(|_| Err(acquisition_error("operation-owned runtime hook panicked")));
         authority.finish(result)
+    }
+}
+
+impl ChioKernel {
+    fn next_runtime_episode_id(&self) -> Result<String, KernelError> {
+        let now = self.trusted_now_millis()?.get();
+        if now >= 1_u64 << 48 {
+            return Err(acquisition_error(
+                "runtime episode clock exceeds UUIDv7 timestamp range",
+            ));
+        }
+        if let Some(id) = crate::receipt_support::next_fixed_runtime_episode_id()? {
+            return Ok(id);
+        }
+        let nanos = u32::try_from((now % 1000) * 1_000_000)
+            .map_err(|_| acquisition_error("runtime episode clock nanoseconds overflow"))?;
+        let timestamp = uuid::Timestamp::from_unix(uuid::NoContext, now / 1000, nanos);
+        Ok(uuid::Uuid::new_v7(timestamp).to_string())
     }
 }
 

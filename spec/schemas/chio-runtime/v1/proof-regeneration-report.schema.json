@@ -68,17 +68,12 @@
       "additionalProperties": false,
       "required": [
         "stepIndex",
-        "admissionReportSha256",
         "toolReceiptSha256",
         "bilateralDsseSha256",
         "workflowStepSha256"
       ],
       "properties": {
         "stepIndex": { "type": "integer", "minimum": 0 },
-        "admissionReportSha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
         "toolReceiptSha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"

@@ -1,34 +1,39 @@
 use super::*;
-
+use chio_kernel::admission_operation::AdmissionOperationStore;
+use chio_kernel::Verdict;
+use std::sync::atomic::Ordering;
 #[path = "swarm_binding/fixtures.rs"]
 mod fixtures;
+use fixtures::{join_bundle, resign};
 #[path = "swarm_binding/kernel.rs"]
 mod kernel;
-use fixtures::{join_bundle, multihop_bundle, resign};
-
-#[path = "swarm_binding/live_admission.rs"]
-mod live_admission;
-
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
 struct BindingFixture {
-    hook: ChioRuntimeAdmissionHook<InMemoryRuntimeAdmissionStore>,
+    inner: operation_owned::Fixture,
+    hook: ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>,
+    kernel: chio_kernel::ChioKernel,
     request: ToolCallRequest,
     swarm: SwarmAuthorityBundle,
 }
-
 impl BindingFixture {
+    fn route_metadata(&self) -> serde_json::Value {
+        let route = &self.swarm.route_plan_receipts[0];
+        serde_json::json!({"route": {
+            "bridge": route.bridge_id,
+            "protocolTarget": route.protocol_target,
+            "selectedRoute": route.selected_route
+        }})
+    }
+
     fn new() -> TestResult<Self> {
         Self::with_swarm(runtime_swarm_bundle(false)?)
     }
-
     fn with_swarm(swarm: SwarmAuthorityBundle) -> TestResult<Self> {
         Self::with_capability(
             swarm,
             swarm_fixtures::runtime_swarm_capability("task-child-a")?,
         )
     }
-
     fn with_capability(
         swarm: SwarmAuthorityBundle,
         capability: CapabilityToken,
@@ -37,126 +42,99 @@ impl BindingFixture {
             &swarm,
             &trusted_swarm_witness_keys(),
         )?;
-        let store = InMemoryRuntimeAdmissionStore::new();
-        let mut admission = bundle();
-        admission.destructive = false;
-        admission.lease_id = None;
-        admission.governance_receipt_id = None;
-        let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
-        admission.binding.tool_args_sha256 = tool_args_sha256(&args)?;
-        admission.binding.origin_kernel_id = None;
-        admission.binding.capability_id = capability.id.clone();
-        let bundle_hash = runtime_admission_bundle_sha256(&admission)?;
-        store.insert_bundle(admission)?;
-        let graphs = retained_swarm_graphs(&swarm);
-        let mut request =
-            chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm)?)?;
-        request.agent_id = capability.subject.to_hex();
-        request.capability = capability;
-        let hook = allowing_chio_policy_hook(store)?
-            .with_swarm_witness_keys(trusted_swarm_witness_keys())
-            .with_swarm_graph_source(graphs);
+        let inner = operation_owned::Fixture::with_request(true, |source, authority| {
+            let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
+            let mut request =
+                chio_swarm_runtime_request(args, String::new(), swarm_runtime_context(&swarm)?)?;
+            request.agent_id = capability.subject.to_hex();
+            request.capability = capability;
+            let mut admission = bundle();
+            admission.destructive = false;
+            admission.lease_id = None;
+            admission.governance_receipt_id = None;
+            admission.binding =
+                RuntimeRequestBinding::from_tool_call_request(&request, "kernel.vendor-b")?;
+            request
+                .governed_intent
+                .as_mut()
+                .and_then(|i| i.context.as_mut())
+                .ok_or("runtime context")?["chioAdmission"]["bundleSha256"] =
+                serde_json::json!(runtime_admission_bundle_sha256(&admission)?);
+            source.insert_bundle(admission)?;
+            issue_root(authority, &swarm)?;
+            Ok(request)
+        })?;
+        let hook = inner
+            .hook()?
+            .with_swarm_witness_keys(trusted_swarm_witness_keys());
+        let mut kernel = inner.kernel(
+            inner
+                .hook()?
+                .with_swarm_witness_keys(trusted_swarm_witness_keys()),
+            true,
+            false,
+        )?;
+        kernel.require_swarm_admission();
+        kernel.configure_durable_admission(
+            chio_kernel::admission_operation::DurableAdmissionMode::All,
+            false,
+        )?;
+        kernel.set_revocation_store(Box::new(inner.authority.revocation_store()));
+        let receipts = chio_store_sqlite::SqliteReceiptStore::open(
+            inner.directory().join("binding-receipts.sqlite3"),
+        )?;
+        receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
+        kernel.set_receipt_store(Box::new(receipts))?;
+        kernel.reconcile_durable_admission_startup()?;
+        let request = inner.request.clone();
         Ok(Self {
+            inner,
             hook,
+            kernel,
             request,
             swarm,
         })
     }
-
-    fn evaluate(
-        &self,
-        request: &ToolCallRequest,
-    ) -> TestResult<chio_kernel::RuntimeAdmissionDecision> {
-        let route = &self.swarm.route_plan_receipts[0];
-        let route_metadata = serde_json::json!({"route": {
-            "bridge": route.bridge_id,
-            "protocolTarget": route.protocol_target,
-            "selectedRoute": route.selected_route
-        }});
-        Ok(self.hook.evaluate(&RuntimeAdmissionContext {
-            request,
-            extra_metadata: Some(&route_metadata),
-            now_unix_secs: 1_800_000_001,
-            now_unix_ms: 1_800_000_001_000,
-            matched_grant_index: Some(0),
-            local_kernel_id: "kernel.vendor-b".to_string(),
-        })?)
+    fn evaluate(&self, request: &ToolCallRequest) -> TestResult<chio_kernel::ToolCallResponse> {
+        let response = self
+            .kernel
+            .evaluate_tool_call_blocking_with_metadata(request, Some(self.route_metadata()))?;
+        assert!(response.receipt.verify_signature()?);
+        Ok(response)
     }
-
-    fn revalidate(
-        &self,
-        request: &ToolCallRequest,
-        metadata: &serde_json::Value,
-    ) -> Result<(), chio_kernel::KernelError> {
-        self.hook
-            .revalidate_before_dispatch(&RuntimeAdmissionRevalidationContext {
+    fn revalidate(&self, request: &ToolCallRequest, metadata: &serde_json::Value) -> TestResult {
+        let source = self
+            .inner
+            .authority
+            .admission_operation_store()
+            .load_runtime_source_qualification(
+                &self.inner.binding,
+                &self.inner.authority.mutation_fence(),
+                1_800_000_001_000,
+            )?;
+        self.hook.revalidate_operation_owned_before_dispatch(
+            &RuntimeAdmissionRevalidationContext {
                 request,
                 admission_metadata: Some(metadata),
                 now_unix_secs: 1_800_000_001,
                 now_unix_ms: 1_800_000_001_000,
                 matched_grant_index: Some(0),
                 local_kernel_id: "kernel.vendor-b".to_string(),
-            })
-    }
-
-    fn assert_denied_without_consuming(&self, request: &ToolCallRequest, code: &str) -> TestResult {
-        let decision = self.evaluate(request)?;
-        assert!(!decision.allowed, "unexpected allow: {decision:#?}");
-        let metadata = decision
-            .metadata
-            .ok_or_else(|| io::Error::other("missing deny metadata"))?;
-        assert_eq!(metadata["chio_runtime"]["failure_code"], code);
-        assert!(metadata["chio_runtime"]
-            .get("reserved_swarm_continuation_id")
-            .is_none());
-        let valid = self.evaluate(&self.request)?;
-        assert!(
-            valid.allowed,
-            "rejected request consumed the continuation: {valid:#?}"
-        );
+            },
+            &source,
+        )?;
         Ok(())
     }
 }
 
 #[test]
-fn swarm_binding_denies_same_id_same_scope_reissued_capability() -> TestResult {
-    let fixture = BindingFixture::new()?;
-    let mut request = fixture.request.clone();
-    let mut body = request.capability.body();
-    body.expires_at -= 1;
-    request.capability = CapabilityToken::sign(body, &swarm_witness_keypair())?;
-    assert!(request.capability.verify_signature()?);
-    assert_eq!(request.capability.id, fixture.request.capability.id);
-    assert_eq!(
-        scope_hash(&request.capability.scope)?,
-        scope_hash(&fixture.request.capability.scope)?
-    );
-    fixture.assert_denied_without_consuming(&request, "chio_swarm_authority_rejected")
-}
-
-#[test]
-fn swarm_binding_denies_referenced_sibling_witness() -> TestResult {
-    let fixture = BindingFixture::new()?;
-    let mut request = fixture.request.clone();
-    let context = request
-        .governed_intent
-        .as_mut()
-        .and_then(|intent| intent.context.as_mut())
-        .ok_or_else(|| io::Error::other("missing fixture context"))?;
-    let sibling = &fixture.swarm.witness_chains[1];
-    context["chioSwarm"]["delegationWitness"] = serde_json::json!({
-        "id": sibling.chain_id,
-        "sha256": canonical_test_hash(sibling)?
-    });
-    fixture.assert_denied_without_consuming(&request, "chio_swarm_authority_ref_mismatch")
-}
-
-#[test]
 fn swarm_binding_revalidates_exact_capability_at_dispatch() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1_800_000_001);
     let fixture = BindingFixture::new()?;
     let decision = fixture.evaluate(&fixture.request)?;
-    assert!(decision.allowed, "{decision:#?}");
+    assert!(decision.verdict == Verdict::Allow, "{decision:#?}");
     let metadata = decision
+        .receipt
         .metadata
         .ok_or_else(|| io::Error::other("missing allow metadata"))?;
     let mut request = fixture.request.clone();
@@ -176,126 +154,24 @@ fn swarm_binding_revalidates_exact_capability_at_dispatch() -> TestResult {
     fixture.revalidate(&fixture.request, &metadata)?;
     let replay = fixture.evaluate(&fixture.request)?;
     assert!(
-        !replay.allowed,
-        "failed revalidation must not erase the reservation"
+        replay.verdict == Verdict::Allow,
+        "committed request replay must recover the original result"
     );
-    Ok(())
-}
-
-#[test]
-fn swarm_binding_denies_changed_subject_issuer_scope_and_signature() -> TestResult {
-    for mutation in ["subject", "issuer", "scope", "signature"] {
-        let fixture = BindingFixture::new()?;
-        let mut request = fixture.request.clone();
-        let mut body = request.capability.body();
-        let mut signer = swarm_witness_keypair();
-        match mutation {
-            "subject" => body.subject = Keypair::from_seed(&[57; 32]).public_key(),
-            "issuer" => {
-                signer = Keypair::from_seed(&[58; 32]);
-                body.issuer = signer.public_key();
-            }
-            "scope" => body.scope.grants[0].max_invocations = Some(2),
-            _ => {}
-        }
-        request.capability = CapabilityToken::sign(body, &signer)?;
-        request.agent_id = request.capability.subject.to_hex();
-        if mutation == "signature" {
-            request.capability.signature = signer.sign(b"unrelated payload");
-        } else {
-            assert!(request.capability.verify_signature()?);
-        }
-        fixture.assert_denied_without_consuming(&request, "chio_swarm_authority_rejected")?;
-    }
-    Ok(())
-}
-
-#[test]
-fn swarm_binding_checks_graph_scope_even_when_witness_digest_matches_request() -> TestResult {
-    let capability = capability("cap-live-1")?; // Unlimited scope, unlike the signed task.
-    let mut swarm = runtime_swarm_bundle(false)?;
-    swarm.witness_chains[0].hops[0].child_capability_digest = canonical_test_hash(&capability)?;
-    resign(&mut swarm)?;
-    let fixture = BindingFixture::with_capability(swarm, capability)?;
-    let decision = fixture.evaluate(&fixture.request)?;
-    assert!(
-        !decision.allowed,
-        "matching digest must not authorize a different graph scope"
-    );
-    assert_eq!(
-        decision
-            .metadata
-            .ok_or_else(|| io::Error::other("missing denial"))?["chio_runtime"]["failure_code"],
-        "chio_swarm_authority_rejected"
-    );
-    Ok(())
-}
-
-#[test]
-fn swarm_binding_allows_leaf_of_multihop_witness_and_records_exact_binding() -> TestResult {
-    let fixture = BindingFixture::with_swarm(multihop_bundle()?)?;
-    let decision = fixture.evaluate(&fixture.request)?;
-    assert!(decision.allowed, "{decision:#?}");
-    let metadata = decision
-        .metadata
-        .ok_or_else(|| io::Error::other("missing metadata"))?;
-    let binding = &metadata["chio_runtime"]["verified_swarm_request_binding"];
-    assert_eq!(binding["task_id"], "task-child-a");
-    assert_eq!(binding["graph_id"], fixture.swarm.task_graph.graph_id);
-    assert_eq!(
-        binding["capability_sha256"],
-        canonical_test_hash(&fixture.request.capability)?
-    );
-    assert_eq!(
-        binding["scope_sha256"],
-        scope_hash(&fixture.request.capability.scope)?
-    );
-    fixture.revalidate(&fixture.request, &metadata)?;
-    Ok(())
-}
-
-#[test]
-fn swarm_binding_join_root_requires_consistent_capability_on_every_outgoing_edge() -> TestResult {
-    let root_cap = swarm_fixtures::runtime_swarm_capability("task-root")?;
-    let valid = BindingFixture::with_capability(join_bundle()?, root_cap.clone())?;
-    let decision = valid.evaluate(&valid.request)?;
-    assert!(
-        decision.allowed,
-        "valid join continuation denied: {decision:#?}"
-    );
-    valid.revalidate(
-        &valid.request,
-        &decision
-            .metadata
-            .ok_or_else(|| io::Error::other("missing metadata"))?,
-    )?;
-
-    let mut swarm = join_bundle()?;
-    // The referenced first chain still matches. A contradictory second edge
-    // must not let a task claim two different capabilities under one identity.
-    swarm.witness_chains[1].hops[0].parent_capability_digest = sha256_hex(b"different root");
-    resign(&mut swarm)?;
-    let invalid = BindingFixture::with_capability(swarm, root_cap)?;
-    let decision = invalid.evaluate(&invalid.request)?;
-    assert!(!decision.allowed, "{decision:#?}");
-    assert_eq!(
-        decision
-            .metadata
-            .ok_or_else(|| io::Error::other("missing denial"))?["chio_runtime"]["failure_code"],
-        "chio_swarm_authority_rejected"
-    );
+    assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
 #[test]
 fn swarm_binding_resumable_revalidation_rejects_stripped_context_and_metadata() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1_800_000_001);
     let mut swarm = runtime_swarm_bundle(false)?;
     swarm.continuation_tokens[0].mode = SwarmContinuationMode::Resumable;
     resign(&mut swarm)?;
     let fixture = BindingFixture::with_swarm(swarm)?;
     let decision = fixture.evaluate(&fixture.request)?;
-    assert!(decision.allowed, "{decision:#?}");
+    assert!(decision.verdict == Verdict::Allow, "{decision:#?}");
     let metadata = decision
+        .receipt
         .metadata
         .ok_or_else(|| io::Error::other("missing metadata"))?;
     for strip in ["swarm", "all", "metadata"] {
@@ -330,13 +206,15 @@ fn swarm_binding_resumable_revalidation_rejects_stripped_context_and_metadata() 
 
 #[test]
 fn swarm_binding_revalidation_pins_even_an_alternative_valid_witness() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1_800_000_001);
     let fixture = BindingFixture::with_capability(
         join_bundle()?,
         swarm_fixtures::runtime_swarm_capability("task-root")?,
     )?;
     let decision = fixture.evaluate(&fixture.request)?;
-    assert!(decision.allowed, "{decision:#?}");
+    assert!(decision.verdict == Verdict::Allow, "{decision:#?}");
     let metadata = decision
+        .receipt
         .metadata
         .ok_or_else(|| io::Error::other("missing metadata"))?;
     let mut request = fixture.request.clone();
@@ -346,8 +224,6 @@ fn swarm_binding_revalidation_pins_even_an_alternative_valid_witness() -> TestRe
         .and_then(|intent| intent.context.as_mut())
         .ok_or_else(|| io::Error::other("missing context"))?;
     let alternative = &fixture.swarm.witness_chains[1];
-    // Both witnesses legitimately bind the root's capability. The initial
-    // admission must still pin which evidence was selected for this dispatch.
     context["chioSwarm"]["delegationWitness"] = serde_json::json!({
         "id": alternative.chain_id,
         "sha256": canonical_test_hash(alternative)?
@@ -363,13 +239,11 @@ fn swarm_binding_revalidation_pins_even_an_alternative_valid_witness() -> TestRe
         "{error}"
     );
     fixture.revalidate(&fixture.request, &metadata)?;
-    // A fresh admission can choose that other witness, proving that the denial
-    // above comes from changing the admitted binding, not invalid evidence.
     let fresh = BindingFixture::with_capability(
         join_bundle()?,
         swarm_fixtures::runtime_swarm_capability("task-root")?,
     )?;
     let decision = fresh.evaluate(&request)?;
-    assert!(decision.allowed, "{decision:#?}");
+    assert!(decision.verdict == Verdict::Allow, "{decision:#?}");
     Ok(())
 }

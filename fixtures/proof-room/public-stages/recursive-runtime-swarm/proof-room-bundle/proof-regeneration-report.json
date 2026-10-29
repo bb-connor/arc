@@ -3,30 +3,27 @@
   "runId": "runtime-loopback-1",
   "accepted": true,
   "generatedAtUnixMs": 1800000001000,
-  "proofPackageSha256": "e11b80f1aaf9b829a97147725172e310b60356210f90778d9ff8e3318e7fa2a2",
-  "verifierReportSha256": "caad492a9cc6b6ee213514e76c9104b0c1ad4df29e593c96b978a90b3b66923a",
-  "workflowReceiptSha256": "719496ea5284cb087e72997ec98ba72a955711443a2233f6cb90ca187ffac46c",
+  "proofPackageSha256": "c40db2ec70dcc5ffec157c4084c99299db1f3f6f82f144ee0f12ceff785e2497",
+  "verifierReportSha256": "b8393713314184a8666d0411e842f2ec0131b8b9fb3898d75dade3e9515ec755",
+  "workflowReceiptSha256": "4a2a68cc8d0ee051b6930390d0cd00a109a0a4f018a1181597920ca5fece7c89",
   "sourceRecords": [
     {
       "stepIndex": 0,
-      "admissionReportSha256": "15b6814b2fd721ee3e3ffcd4dbf4c116666b494afdc9d0dbec925162c4b2c266",
-      "toolReceiptSha256": "5a7c325c655c39a247adb66b987a7ac22c943535c272101e89866f016c2d22e3",
-      "bilateralDsseSha256": "edd563ba5cf52f5cf79d3c7bd1593514a73c6b4c642a6e86ffde4aca06006a8a",
-      "workflowStepSha256": "22f67addbc2aa92ccb9a0ad147b1df64526e1bf04863a0c6dfef76539c571473"
+      "toolReceiptSha256": "ce73cf17406ccdb979aa3a78dd337a2c6fc3ea19a5297b4bf5282332538877a0",
+      "bilateralDsseSha256": "8ced14baf403a311ec5be60dcf035b20bace01b0eaa4a713dcff15aa845b5a46",
+      "workflowStepSha256": "f89dd97c8c5eb6e8329e896911d8714b533fee87234691edfb5a0aa2bf2ffeaa"
     },
     {
       "stepIndex": 1,
-      "admissionReportSha256": "99c18bed827350310fe2cfc9ff7486c31a1235b026eefc4f0d7c592ba4bb50b6",
-      "toolReceiptSha256": "8c2f14aed2f7936bdfe33afcb29888891da6a608fdf1ff9393ed275dd7e52903",
-      "bilateralDsseSha256": "0d56e0d12d6f7bb711c62a149927f15494163d5b30e5f73329b21487b4aeff8a",
-      "workflowStepSha256": "71ae62116ad3803299ec3b327c741526f4b14c5517fbc93d0aa71a3ad66dce4e"
+      "toolReceiptSha256": "26f2755f30e22cc74f7ce1678f6d61cc6eda51f9dc5be48a47ba75f04cca2617",
+      "bilateralDsseSha256": "a74fa0e7768fc9aa986648fe14f379826d2dc26618bdda39cd835a6382bceb7a",
+      "workflowStepSha256": "ebc2d9edfb63f45158fb86d69e7bfadae0adf81492b7401f086cb8d29cf5bf65"
     },
     {
       "stepIndex": 2,
-      "admissionReportSha256": "d727635632be421438095255cafbf988ad0adc04bb4b0e77ba408dbe86be7eba",
-      "toolReceiptSha256": "1a7ca339cf6005e38284cd6bcdd5ed1f5d524ef962ee606025f96e8d6230d7f1",
-      "bilateralDsseSha256": "2b5f7d7ad763b712fee3d983c47cd1e82c0214c1063cc91ddff5ee57ed5b5b78",
-      "workflowStepSha256": "e738eee5a43f51d6335f5c3cba81848cd0c31baeed32bd0ce95e079ac11d6bb5"
+      "toolReceiptSha256": "9313836647f2ddb7100e3d10b93e3128af38bc6eaac8a0523ab6267001c94d73",
+      "bilateralDsseSha256": "2041463551de3bb92e3839cce564f2678f770e6f63031170b6f8eb02a49dfe01",
+      "workflowStepSha256": "8615d0d37e6a832eb23d26cf846fdb1caa6fb957f9c41e5cbee70a7b270cbc03"
     }
   ],
   "checks": [

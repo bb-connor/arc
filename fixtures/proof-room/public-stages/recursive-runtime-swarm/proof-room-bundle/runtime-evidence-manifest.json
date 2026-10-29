@@ -2,31 +2,31 @@
   "schema": "chio.runtime.evidence-manifest.v1",
   "runId": "runtime-loopback-1",
   "generatedAtUnixMs": 1800000001000,
-  "workflowRunReportSha256": "eab43e061b7dbc9400c61c9b51f6da32fb1a0bd3c80bf7b1918ca59d230364c7",
-  "proofRegenerationReportSha256": "09ad4164b43fbf745d065f15c311848f8b60b02978ce1404cd5b404fb2bac458",
+  "workflowRunReportSha256": "87fa58f99e678018c70b8b2dfa2d5956a17903a89d4ace669676eab16af1e51c",
+  "proofRegenerationReportSha256": "0c967b44a93336cb763ae0a799af00a50c404bd2b09839803b34542aef6b92e3",
   "entries": [
     {
-      "role": "admission_report",
-      "path": "runtime-admission-report-1.json",
-      "sha256": "57f90e281bfb7d9a7da5e88c34274e487af0875a9dd98568664efb99fbfe26f2",
-      "byteCount": 4182
+      "role": "admission_receipt",
+      "path": "runtime-admission-receipt-1.json",
+      "sha256": "720ee628e25194e6e4fd5cc8e4d3378cef801885235c976ec118469e7e859f75",
+      "byteCount": 8631
     },
     {
-      "role": "admission_report",
-      "path": "runtime-admission-report-2.json",
-      "sha256": "e0c7cdecb549bfd4b0511b566234b9ff0f1a032609f87e74ffcf3afba9988f7b",
-      "byteCount": 4181
+      "role": "admission_receipt",
+      "path": "runtime-admission-receipt-2.json",
+      "sha256": "650594de60109e6de8732b3a6ddaa2fd1681f7d1fe1d793f5323f7be7d5feb0b",
+      "byteCount": 8615
     },
     {
-      "role": "admission_report",
-      "path": "runtime-admission-report-3.json",
-      "sha256": "ba9f360f0b0fa57d5d174f39b743252fe05b7d5d4fcedb3d1a2ceee42ea8f985",
-      "byteCount": 4303
+      "role": "admission_receipt",
+      "path": "runtime-admission-receipt-3.json",
+      "sha256": "67bfe615e855a5efb5102115f3dda3ec035be4f7602cbd20033eba36450488bf",
+      "byteCount": 8956
     },
     {
       "role": "verifier_trust_bundle",
       "path": "verifier-trust-bundle.json",
-      "sha256": "66ea666c2f9419a72167ff2498ea5fb777eee0815338924b0633c340c2ee38ec",
+      "sha256": "9300f2462947baa8dd6f3b366ed585152f88bd4f3e3fb027f198009c8752f8da",
       "byteCount": 5170
     },
     {
@@ -38,73 +38,73 @@
     {
       "role": "verifier_report",
       "path": "verifier-report.json",
-      "sha256": "fd8205b9887e6f49b39231e6e99085b29cdd925229af728ca88c86f642a1c376",
+      "sha256": "539b31d6f0ab3e0c38f3d28b62b84a998337abe4e10b5a10f2b1e5cce0d12267",
       "byteCount": 1660
     },
     {
       "role": "workflow_receipt",
       "path": "workflow-receipt.json",
-      "sha256": "ef9ce609c354cc543d4e02339ae7fc75d3ca626eff619333402092e5c9ce3993",
+      "sha256": "dac7064e4ef212ebfadfb86cf5177d40f26b878857f967cfe683cf42c9fc1f3b",
       "byteCount": 3667
     },
     {
       "role": "tool_receipt",
       "path": "tool-receipt-1.json",
-      "sha256": "a3e0dafdbc1491aec47df174303aa553c120bb096b8ff71c4a8866f2b0eabb71",
-      "byteCount": 8020
+      "sha256": "720ee628e25194e6e4fd5cc8e4d3378cef801885235c976ec118469e7e859f75",
+      "byteCount": 8631
     },
     {
       "role": "bilateral_dsse",
       "path": "bilateral-dsse-1.json",
-      "sha256": "e071600a8cfafd15b46a5fc0289b7660c549fa2a86e4f8f774667be411c31a28",
+      "sha256": "26e7606d724a60e7a569512944551979456d4b973866148103eb9ddfe51bee97",
       "byteCount": 2679
     },
     {
       "role": "workflow_step",
       "path": "workflow-step-1.json",
-      "sha256": "95692bd7b4fdce2b7d2a88aa08e22a0e7d78afbf1a755008c17a775bc19124c3",
+      "sha256": "577258e5b1d591584f54ca63c7d484af5b02590c6026c0ff7f5bf19918c6c61c",
       "byteCount": 545
     },
     {
       "role": "tool_receipt",
       "path": "tool-receipt-2.json",
-      "sha256": "b0230c13af7454ccd8f357843f104ec143305b5f3f9f8f0209c561554994cdad",
-      "byteCount": 8004
+      "sha256": "650594de60109e6de8732b3a6ddaa2fd1681f7d1fe1d793f5323f7be7d5feb0b",
+      "byteCount": 8615
     },
     {
       "role": "bilateral_dsse",
       "path": "bilateral-dsse-2.json",
-      "sha256": "c42d66acf7e3e972d5262bc85ce31d46a1e5ad7b30356f569e5a455a1fda2a26",
+      "sha256": "59bc9f539291cb4e9dac6a24be6d268fcabef8c0e434b91d55c479055968c295",
       "byteCount": 2671
     },
     {
       "role": "workflow_step",
       "path": "workflow-step-2.json",
-      "sha256": "a1c8a6fcef85d44cc22e86578e7cb289efb5cdc8c3f4d96f2934db8f8ed10775",
+      "sha256": "5b128f40f2574c3542c16ca9d5ebe9c763727adcac9c5cb016c8c469515fa79c",
       "byteCount": 637
     },
     {
       "role": "tool_receipt",
       "path": "tool-receipt-3.json",
-      "sha256": "371d8081555c8a367e5bb42096cc1897a57e1f0782e82ef614650e64e6895105",
-      "byteCount": 8364
+      "sha256": "67bfe615e855a5efb5102115f3dda3ec035be4f7602cbd20033eba36450488bf",
+      "byteCount": 8956
     },
     {
       "role": "bilateral_dsse",
       "path": "bilateral-dsse-3.json",
-      "sha256": "5869f3c1ea8f8bb088acb9a9cd3b0119220e51b630375f65e04da38a81e5cd73",
+      "sha256": "ab4454013b78a86113c3e02f03d2728dcc913ce6f155b750e882267fa15223b6",
       "byteCount": 4455
     },
     {
       "role": "workflow_step",
       "path": "workflow-step-3.json",
-      "sha256": "7d79cc300a0a6c3e9f7ffed96d3ad57e91ff69f1d0e2960bb613418266975061",
+      "sha256": "080049c1af3a79fe44fffe3cbb7ecf9d7aa814dfc058b82d9301733e892906e8",
       "byteCount": 723
     },
     {
       "role": "cross_boundary_admission_report",
       "path": "cross-boundary-admission-report.json",
-      "sha256": "bbbf833f5f1948c20d6c50ffa5e43c38d979a2f081a828369f6ed79b55fc2ba4",
+      "sha256": "90f62239598cd62cf24c2ff8dda3ddd29f055cf8ad000e51d66533bd841b6acf",
       "byteCount": 1295
     },
     {
@@ -116,62 +116,62 @@
     {
       "role": "receipt_lineage_statement",
       "path": "receipt-lineage-statement.json",
-      "sha256": "9f14c20acc73fe8f7904a2ae4cbf1fbe9081d572da510a022186b95ab32e7ecb",
+      "sha256": "95d6a828e83c696f02f5e394ab4272b12e96f0796181115e28dacc53256316a7",
       "byteCount": 611
     },
     {
       "role": "receipt_lineage_bundle",
       "path": "receipt-lineage-bundle.json",
-      "sha256": "b432991e61545f6cdc4f80339ba8666941ecbff72c67237d4929f25e73bd6ef8",
+      "sha256": "1c46c0057e91470ae5c24c48ecd9df043e65598598792ea0e468441ae7dfdd47",
       "byteCount": 979
     },
     {
       "role": "bilateral_invocation",
       "path": "bilateral-invocation.json",
-      "sha256": "1a78907a0d72673afa07e41d062aa7ec7bb89bf6e343fbafda70015db3c1680f",
+      "sha256": "26f19f02a7149e62d4c6786c593ac71473b650c706f7621931abec705a93ba21",
       "byteCount": 1026
     },
     {
       "role": "bilateral_dsse_envelope",
       "path": "bilateral-dsse-envelope.json",
-      "sha256": "5869f3c1ea8f8bb088acb9a9cd3b0119220e51b630375f65e04da38a81e5cd73",
+      "sha256": "ab4454013b78a86113c3e02f03d2728dcc913ce6f155b750e882267fa15223b6",
       "byteCount": 4455
     },
     {
       "role": "proof_package",
       "path": "proof-package.json",
-      "sha256": "0632c863723c3c9af15c64f734a0adcdaad5990bb5ff4b7a41fd46385b635d39",
-      "byteCount": 52665
+      "sha256": "29665b4102ae65ea19c855f75369f7fc2ef1e862f626e04d156f59f82e175bab",
+      "byteCount": 54599
     },
     {
       "role": "buyer_attestation_packet",
       "path": "buyer-attestation-packet.json",
-      "sha256": "9789aec0465819a66583c5bcd55b3a30eb7fd74c9bb3a456ecd06418c9ecf9d6",
+      "sha256": "5f31c86d3c1ae8c3ad12e515995c1ffae37217ab1a21c499a4c63184462f2f56",
       "byteCount": 1249
     },
     {
       "role": "proof_regeneration_report",
       "path": "proof-regeneration-report.json",
-      "sha256": "e01268aff74b70c5fcd17045174488aebebb9e5519cff43a472c923d97f67a67",
-      "byteCount": 2015
+      "sha256": "b8996ca2373be118adcb672e2842ed7109e624f0ad9c5fd5e5bc856630238677",
+      "byteCount": 1718
     },
     {
       "role": "proof_parity_report",
       "path": "runtime-proof-parity-report.json",
-      "sha256": "f7d0a03d4c19c336b2b883f8f6938301bd4199d6a48ebef02afc83140f99b96d",
+      "sha256": "c73e0d6841b0d2db5a397407049fe7727cc1fd241adbf30f36fd55f5009512ea",
       "byteCount": 1036
     },
     {
       "role": "runtime_run_report",
       "path": "runtime-run-report.json",
-      "sha256": "61994a29f04e9c61691efef726928d3bf5b77b0b7c23e29964eca717e8501897",
-      "byteCount": 3985
+      "sha256": "329c3ae7298e0c8af69fbde999478b12c7bd5b3a24914dd906408c9f9da3b3bf",
+      "byteCount": 3596
     },
     {
       "role": "workflow_run_report",
       "path": "workflow-run-report.json",
-      "sha256": "61994a29f04e9c61691efef726928d3bf5b77b0b7c23e29964eca717e8501897",
-      "byteCount": 3985
+      "sha256": "329c3ae7298e0c8af69fbde999478b12c7bd5b3a24914dd906408c9f9da3b3bf",
+      "byteCount": 3596
     }
   ]
 }

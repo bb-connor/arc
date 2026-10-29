@@ -1,8 +1,8 @@
-use chio_core_types::crypto::Keypair;
-use chio_runtime_core::{
+use super::runtime_api::{
     GovernanceLadderActionClass, GovernanceLadderManifest, TreatyScope,
     CHIO_GOVERNANCE_LADDER_MANIFEST_SCHEMA, CHIO_TREATY_SCOPE_SCHEMA,
 };
+use chio_core_types::crypto::Keypair;
 
 pub fn treaty_action_class(
     mode: &str,

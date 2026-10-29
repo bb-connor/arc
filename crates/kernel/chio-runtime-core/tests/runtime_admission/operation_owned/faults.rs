@@ -10,7 +10,7 @@ pub(super) enum Fault {
     Deny,
     Panic,
     SecondClaim,
-    SourceBarrier,
+    SourcePathMoved,
     Park(Arc<AtomicU64>),
 }
 
@@ -94,13 +94,10 @@ impl RuntimeAdmissionHook for FaultHook {
                     .is_err());
                 Ok(decision)
             }
-            Fault::SourceBarrier => {
-                let raw = rusqlite::Connection::open(&self.source_path).map_err(|error| {
-                    KernelError::Internal(format!("fixture source open: {error}"))
-                })?;
-                raw.execute_batch("DROP TRIGGER runtime_replay_source_lease_no_insert")
+            Fault::SourcePathMoved => {
+                std::fs::rename(&self.source_path, self.source_path.with_extension("moved"))
                     .map_err(|error| {
-                        KernelError::Internal(format!("fixture barrier removal: {error}"))
+                        KernelError::Internal(format!("fixture source move: {error}"))
                     })?;
                 Ok(decision)
             }
@@ -110,7 +107,7 @@ impl RuntimeAdmissionHook for FaultHook {
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         self.inner
             .revalidate_operation_owned_before_dispatch(context, source)
@@ -171,8 +168,8 @@ fn owned_allow_without_claim_or_after_second_attempt_never_dispatches() -> TestR
 #[test]
 fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
-    for fault in [Fault::Deny, Fault::Panic, Fault::SourceBarrier] {
-        let removes_barrier = matches!(fault, Fault::SourceBarrier);
+    for fault in [Fault::Deny, Fault::Panic, Fault::SourcePathMoved] {
+        let moves_source = matches!(fault, Fault::SourcePathMoved);
         let fixture = Fixture::new(true)?;
         let kernel = fixture.kernel(
             FaultHook {
@@ -192,17 +189,9 @@ fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestR
             history[0].disposition,
             RuntimeParticipantDisposition::ReleasedBeforeDispatch
         );
-        if removes_barrier {
-            let raw =
-                rusqlite::Connection::open(fixture._directory.path().join("runtime.sqlite3"))?;
-            let count: i64 = raw.query_row(
-                "SELECT count(*) FROM sqlite_schema WHERE type = 'trigger' AND name = 'runtime_replay_source_lease_no_insert'",
-                [], |row| row.get(0),
-            )?;
-            assert_eq!(
-                count, 0,
-                "the fixture must actually remove the source barrier"
-            );
+        if moves_source {
+            assert!(!fixture._directory.path().join("runtime.sqlite3").exists());
+            assert!(fixture._directory.path().join("runtime.moved").is_file());
         }
         // A monotonic trust-floor update is not replay custody and is not rolled back.
         assert!(fixture
@@ -218,9 +207,10 @@ fn owned_denial_panic_and_changed_source_release_exact_physical_claim() -> TestR
 fn real_trust_floor_write_failure_denies_and_releases_the_prior_claim() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
+    let hook = fixture.hook()?;
     let raw = rusqlite::Connection::open(fixture._directory.path().join("runtime.sqlite3"))?;
     raw.execute_batch("CREATE TRIGGER injected_floor_failure BEFORE INSERT ON runtime_trust_floors BEGIN SELECT RAISE(ABORT, 'injected trust floor write failure'); END;")?;
-    let kernel = fixture.kernel(fixture.hook()?, true, false)?;
+    let kernel = fixture.kernel(hook, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

@@ -35,68 +35,65 @@ fn combined_owned_competitor_cannot_steal_a_parked_claim_and_release_allows_a_fr
         fixture.inner._directory.path().join("runtime.sqlite3"),
         faults::Fault::Park(polls.clone()),
     ))?;
-    let first = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?
-        .block_on(async {
-            let mut admitted = Box::pin(kernel.evaluate_tool_call_with_metadata(
-                &fixture.inner.request,
-                Some(swarm_route_metadata()),
-            ));
-            std::future::poll_fn(|cx| {
-                let result = admitted.as_mut().poll(cx);
-                assert!(result.is_pending(), "parked owner finished: {result:?}");
-                if polls.load(Ordering::SeqCst) > 0 {
-                    std::task::Poll::Ready(())
-                } else {
-                    std::task::Poll::Pending
-                }
-            })
-            .await;
-            let history = faults::history(&fixture.inner)?;
-            assert_eq!(history.len(), 1);
-            assert_eq!(history[0].intent.resources().len(), 3);
-            assert_eq!(
-                history[0].disposition,
-                RuntimeParticipantDisposition::ReservedBeforeDispatch
-            );
-            let denied = kernel
-                .evaluate_tool_call_with_metadata(&competitor, Some(swarm_route_metadata()))
-                .await?;
-            assert_eq!(denied.verdict, Verdict::Deny, "{denied:#?}");
-            assert!(
-                denied
-                    .reason
-                    .as_deref()
-                    .is_some_and(|reason| reason.contains(
-                        "runtime participant resource is already reserved or historically spent"
-                    )),
-                "competitor must reach the physical replay conflict: {denied:#?}"
-            );
-            assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
-            assert_eq!(
-                fixture.history(&history[0].reference)?.1,
-                history,
-                "a competing denial must not release the admitted owner's resources"
-            );
-            let raw = rusqlite::Connection::open(
-                fixture.inner._directory.path().join("authority.sqlite3"),
-            )?;
-            let claims: i64 = raw.query_row(
-                "SELECT count(*) FROM runtime_replay_claim_episodes",
-                [],
-                |row| row.get(0),
-            )?;
-            assert_eq!(claims, 1, "competitor cannot leave a partial claim");
-            let state: String = raw.query_row(
-                "SELECT state FROM admission_operations WHERE request_id = ?1",
-                [&competitor.request_id],
-                |row| row.get(0),
-            )?;
-            assert_eq!(state, "compensated_before_dispatch");
-            drop(admitted);
-            Ok::<_, Box<dyn std::error::Error>>(history[0].reference.clone())
-        })?;
+    let first =
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+            .block_on(async {
+                let mut admitted = Box::pin(kernel.evaluate_tool_call_with_metadata(
+                    &fixture.inner.request,
+                    Some(swarm_route_metadata()),
+                ));
+                std::future::poll_fn(|cx| {
+                    let result = admitted.as_mut().poll(cx);
+                    assert!(result.is_pending(), "parked owner finished: {result:?}");
+                    if polls.load(Ordering::SeqCst) > 0 {
+                        std::task::Poll::Ready(())
+                    } else {
+                        std::task::Poll::Pending
+                    }
+                })
+                .await;
+                let history = faults::history(&fixture.inner)?;
+                assert_eq!(history.len(), 1);
+                assert_eq!(history[0].intent.resources().len(), 3);
+                assert_eq!(
+                    history[0].disposition,
+                    RuntimeParticipantDisposition::ReservedBeforeDispatch
+                );
+                let denied = kernel
+                    .evaluate_tool_call_with_metadata(&competitor, Some(swarm_route_metadata()))
+                    .await?;
+                assert_eq!(denied.verdict, Verdict::Deny, "{denied:#?}");
+                assert!(
+                    denied.reason.as_deref().is_some_and(|reason| reason
+                        .contains("runtime participant resource is already reserved")),
+                    "competitor must reach the physical replay conflict: {denied:#?}"
+                );
+                assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
+                assert_eq!(
+                    fixture.history(&history[0].reference)?.1,
+                    history,
+                    "a competing denial must not release the admitted owner's resources"
+                );
+                let raw = rusqlite::Connection::open(
+                    fixture.inner._directory.path().join("authority.sqlite3"),
+                )?;
+                let claims: i64 = raw.query_row(
+                    "SELECT count(*) FROM runtime_replay_claim_episodes",
+                    [],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(claims, 1, "competitor cannot leave a partial claim");
+                let state: String = raw.query_row(
+                    "SELECT state FROM admission_operations WHERE request_id = ?1",
+                    [&competitor.request_id],
+                    |row| row.get(0),
+                )?;
+                assert_eq!(state, "compensated_before_dispatch");
+                drop(admitted);
+                Ok::<_, Box<dyn std::error::Error>>(history[0].reference.clone())
+            })?;
     assert_eq!(
         fixture.history(&first)?.1[0].disposition,
         RuntimeParticipantDisposition::ReleasedBeforeDispatch

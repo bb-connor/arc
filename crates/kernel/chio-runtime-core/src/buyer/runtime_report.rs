@@ -4,9 +4,9 @@ use crate::buyer::proof_package::{
 };
 use crate::hash::canonical_sha256;
 use crate::types::{
-    BilateralInvocation, BuyerAttestationPacket, BuyerAttestationReviewArtifactRef,
-    RuntimeEvidenceManifest, RuntimeProofRegenerationInput, RuntimeProofRegenerationReport,
-    RuntimeStepEvidence, RuntimeWorkflowRunReport,
+    BilateralInvocation, BuyerAttestationReviewArtifactRef, RuntimeEvidenceManifest,
+    RuntimeProofRegenerationInput, RuntimeProofRegenerationReport, RuntimeStepEvidence,
+    RuntimeWorkflowRunReport,
 };
 use crate::validation::{
     validate_runtime_evidence_manifest, validate_runtime_proof_regeneration_input,
@@ -16,7 +16,6 @@ use crate::validation::{
 pub(super) struct BuyerReviewRuntimeReportContext<'a> {
     pub(super) runtime_run_report: &'a RuntimeWorkflowRunReport,
     pub(super) proof_regeneration_report: &'a RuntimeProofRegenerationReport,
-    pub(super) packet: &'a BuyerAttestationPacket,
     pub(super) bilateral: &'a BilateralInvocation,
     pub(super) proof_package: &'a serde_json::Value,
     pub(super) workflow_receipt: &'a serde_json::Value,
@@ -37,7 +36,6 @@ pub(super) fn verify_buyer_review_runtime_reports(
     let BuyerReviewRuntimeReportContext {
         runtime_run_report,
         proof_regeneration_report,
-        packet,
         bilateral,
         proof_package,
         workflow_receipt,
@@ -81,10 +79,6 @@ pub(super) fn verify_buyer_review_runtime_reports(
         || proof_regeneration_input.evidence_manifest_sha256 != manifest_sha256
         || proof_regeneration_input.workflow_run_report_sha256 != runtime_run_sha256
         || proof_regeneration_input.source_records != proof_regeneration_report.source_records
-        || runtime_run_report.admission_report_sha256
-            != packet.cross_boundary_admission_report_sha256
-        || proof_regeneration_input.admission_report_sha256
-            != packet.cross_boundary_admission_report_sha256
         || proof_regeneration_input.trust_bundle_sha256 != trust_bundle_sha256
         || proof_regeneration_input.verification_context_sha256 != verification_context_sha256
         || proof_regeneration_report.proof_package_sha256.as_deref() != Some(proof_sha256)
@@ -104,8 +98,7 @@ pub(super) fn verify_buyer_review_runtime_reports(
     if step.lease_id.is_none() || step.governance_receipt_id.is_none() {
         return Err("chio_buyer_review_runtime_report_mismatch");
     }
-    if step.admission_report_sha256 != packet.cross_boundary_admission_report_sha256
-        || step.tool_receipt_sha256 != bilateral.remote_receipt_sha256
+    if step.tool_receipt_sha256 != bilateral.remote_receipt_sha256
         || step.parent_receipt_sha256.as_deref() != Some(bilateral.local_receipt_sha256.as_str())
         || step.output_sha256 != bilateral.outcome_sha256
     {
@@ -149,7 +142,6 @@ pub(super) fn verify_buyer_review_runtime_reports(
         .iter()
         .any(|record| {
             record.step_index == step.step_index
-                && record.admission_report_sha256 == step.admission_report_sha256
                 && record.tool_receipt_sha256 == step.tool_receipt_sha256
                 && record.bilateral_dsse_sha256 == step.bilateral_dsse_sha256
                 && record.workflow_step_sha256 == step.workflow_step_sha256

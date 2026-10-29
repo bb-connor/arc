@@ -24,27 +24,6 @@ pub(super) fn resign(swarm: &mut SwarmAuthorityBundle) -> TestResult {
     Ok(())
 }
 
-pub(super) fn multihop_bundle() -> TestResult<SwarmAuthorityBundle> {
-    let mut swarm = runtime_swarm_bundle(false)?;
-    swarm.task_graph.multi_hop_witness_chains = true;
-    let chain = &mut swarm.witness_chains[0];
-    let intermediate_scope = runtime_swarm_scope(2);
-    let intermediate_digest = sha256_hex(b"intermediate capability");
-    let mut first = chain.hops[0].clone();
-    first.child_scope_hash = scope_hash(&intermediate_scope)?;
-    first.child_capability_digest = intermediate_digest.clone();
-    first.scope_subset_proof =
-        compute_attenuation_witness(&runtime_swarm_scope(3), &intermediate_scope)?;
-    let mut last = chain.hops[0].clone();
-    last.parent_scope_hash = scope_hash(&intermediate_scope)?;
-    last.parent_capability_digest = intermediate_digest;
-    last.scope_subset_proof =
-        compute_attenuation_witness(&intermediate_scope, &runtime_swarm_scope(1))?;
-    chain.hops = vec![first, last];
-    resign(&mut swarm)?;
-    Ok(swarm)
-}
-
 pub(super) fn join_bundle() -> TestResult<SwarmAuthorityBundle> {
     let mut swarm = runtime_swarm_bundle(false)?;
     let root = &mut swarm.task_graph.nodes[0];

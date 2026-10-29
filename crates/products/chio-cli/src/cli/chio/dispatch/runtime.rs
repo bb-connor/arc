@@ -1,5 +1,3 @@
-#[path = "runtime/admission.rs"]
-mod admission;
 #[path = "runtime/io.rs"]
 mod io;
 #[path = "runtime/loopback.rs"]
@@ -14,7 +12,6 @@ mod signing;
 #[cfg(test)]
 use crate::CliError;
 
-pub(crate) use admission::{cmd_chio_runtime_admit, cmd_chio_runtime_pheromone_evaluate};
 pub(crate) use io::validate_runtime_relative_path;
 pub(crate) use loopback::cmd_chio_runtime_run_loopback;
 pub(crate) use ops::{
@@ -200,7 +197,6 @@ mod chio_orchestration_cli_tests {
             canonical_sha256_json(&verifier_report, "test verifier report hash")?;
         let source_record = chio_runtime::RuntimeProofSourceRecord {
             step_index: 0,
-            admission_report_sha256: fixed_hash('1'),
             tool_receipt_sha256: fixed_hash('2'),
             bilateral_dsse_sha256: fixed_hash('3'),
             workflow_step_sha256: fixed_hash('4'),
@@ -224,13 +220,11 @@ mod chio_orchestration_cli_tests {
             accepted: true,
             failure_code: None,
             generated_at_unix_ms,
-            admission_report_sha256: fixed_hash('6'),
             evidence_paths: vec!["proof-package.json".to_string()],
             step_evidence: vec![chio_runtime::RuntimeStepEvidence {
                 schema: chio_runtime::CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
                 step_index: 0,
                 admission_id: "adm-runtime-cli-0".to_string(),
-                admission_report_sha256: source_record.admission_report_sha256.clone(),
                 tool_receipt_id: format!("receipt-{run_id}"),
                 tool_receipt_sha256: source_record.tool_receipt_sha256.clone(),
                 output_sha256: fixed_hash('7'),
@@ -275,7 +269,6 @@ mod chio_orchestration_cli_tests {
         fs::create_dir_all(dir)?;
         let source_record = chio_runtime::RuntimeProofSourceRecord {
             step_index: 0,
-            admission_report_sha256: fixed_hash('1'),
             tool_receipt_sha256: fixed_hash('2'),
             bilateral_dsse_sha256: fixed_hash('3'),
             workflow_step_sha256: fixed_hash('4'),
@@ -300,13 +293,11 @@ mod chio_orchestration_cli_tests {
             accepted: true,
             failure_code: None,
             generated_at_unix_ms,
-            admission_report_sha256: fixed_hash('6'),
             evidence_paths: vec!["proof-regeneration-report.json".to_string()],
             step_evidence: vec![chio_runtime::RuntimeStepEvidence {
                 schema: chio_runtime::CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
                 step_index: 0,
                 admission_id: "adm-runtime-cli-0".to_string(),
-                admission_report_sha256: source_record.admission_report_sha256,
                 tool_receipt_id: format!("receipt-{run_id}"),
                 tool_receipt_sha256: source_record.tool_receipt_sha256,
                 output_sha256: fixed_hash('7'),

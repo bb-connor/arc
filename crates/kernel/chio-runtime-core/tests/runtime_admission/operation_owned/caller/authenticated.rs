@@ -36,14 +36,18 @@ fn authenticated_caller_report_uses_original_runtime_claim_after_lease_expiry() 
         .load_runtime_participant_history(id, &fixture.authority.mutation_fence(), NOW)?
         .ok_or("runtime custody")?;
     assert_eq!(history.len(), 2);
-    assert_eq!(
-        history[0].disposition,
-        RuntimeParticipantDisposition::ReleasedBeforeDispatch
-    );
-    assert_eq!(
-        history[1].disposition,
-        RuntimeParticipantDisposition::RetainedAfterDispatchCommit
-    );
+    for expected in [
+        RuntimeParticipantDisposition::ReleasedBeforeDispatch,
+        RuntimeParticipantDisposition::RetainedAfterDispatchCommit,
+    ] {
+        assert_eq!(
+            history
+                .iter()
+                .filter(|entry| entry.disposition == expected)
+                .count(),
+            1
+        );
+    }
     let report = SignedCallerDeliveryReportV1::sign(
         CallerDeliveryReportBodyV1 {
             schema: CALLER_DELIVERY_REPORT_SCHEMA.into(),

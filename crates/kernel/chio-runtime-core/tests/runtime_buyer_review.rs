@@ -1,3 +1,6 @@
+#[path = "runtime_buyer_review/packet_admission.rs"]
+mod packet_admission;
+
 use chio_core_types::crypto::Keypair;
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
@@ -902,7 +905,6 @@ fn buyer_review_sources_with_strict_dsse_and_verifier(
         .unwrap_or_else(|| "gov-receipt-1".to_string());
     let source_record = RuntimeProofSourceRecord {
         step_index,
-        admission_report_sha256: packet.cross_boundary_admission_report_sha256.clone(),
         tool_receipt_sha256: bilateral.remote_receipt_sha256.clone(),
         bilateral_dsse_sha256: bilateral_dsse_sha256.clone(),
         workflow_step_sha256,
@@ -928,7 +930,6 @@ fn buyer_review_sources_with_strict_dsse_and_verifier(
         accepted: true,
         failure_code: None,
         generated_at_unix_ms: review_generated_at_unix_ms,
-        admission_report_sha256: packet.cross_boundary_admission_report_sha256.clone(),
         evidence_paths: vec![
             "bilateral-dsse-envelope.json".to_string(),
             "proof-regeneration-report.json".to_string(),
@@ -937,7 +938,6 @@ fn buyer_review_sources_with_strict_dsse_and_verifier(
             schema: CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
             step_index,
             admission_id: admission.treaty_id.clone(),
-            admission_report_sha256: packet.cross_boundary_admission_report_sha256.clone(),
             tool_receipt_id,
             tool_receipt_sha256: bilateral.remote_receipt_sha256.clone(),
             output_sha256: bilateral.outcome_sha256.clone(),
@@ -993,7 +993,6 @@ fn buyer_review_sources_with_strict_dsse_and_verifier(
         run_id: "run-live-1".to_string(),
         evidence_manifest_sha256: runtime_evidence_manifest_sha256,
         workflow_run_report_sha256: runtime_run_report_sha256,
-        admission_report_sha256: packet.cross_boundary_admission_report_sha256.clone(),
         trust_bundle_sha256: verifier_trust_bundle_sha256,
         verification_context_sha256: chio_core_types::crypto::sha256_hex(
             &chio_core_types::crypto::canonical_json_bytes(&verification_context)?,

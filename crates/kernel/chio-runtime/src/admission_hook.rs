@@ -12,15 +12,17 @@ pub struct ChioRuntimeAdmissionHook<S> {
     runtime_peer_weights: Option<SignedRuntimePeerWeights>,
     swarm_witness_keys: Vec<chio_core_types::PublicKey>,
     swarm_graphs: Option<std::sync::Arc<IssuedSwarmGraphs>>,
-    fixed_now_unix_ms: Option<u64>,
-    operation_owned_binding: Option<
+    operation_owned_binding:
         chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
-    >,
 }
 
 impl<S> ChioRuntimeAdmissionHook<S> {
     #[must_use]
-    pub fn new(profile: RuntimeAdmissionProfile, store: S) -> Self {
+    pub fn new(
+        profile: RuntimeAdmissionProfile,
+        store: S,
+        binding: chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
+    ) -> Self {
         Self {
             profile,
             store,
@@ -31,18 +33,8 @@ impl<S> ChioRuntimeAdmissionHook<S> {
             runtime_peer_weights: None,
             swarm_witness_keys: Vec::new(),
             swarm_graphs: None,
-            fixed_now_unix_ms: None,
-            operation_owned_binding: None,
+            operation_owned_binding: binding,
         }
-    }
-
-    #[must_use]
-    pub fn with_operation_owned_runtime_replay(
-        mut self,
-        binding: chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
-    ) -> Self {
-        self.operation_owned_binding = Some(binding);
-        self
     }
 
     #[must_use]
@@ -91,12 +83,6 @@ impl<S> ChioRuntimeAdmissionHook<S> {
         self
     }
 
-    #[must_use]
-    pub fn with_fixed_now_unix_ms(mut self, now_unix_ms: u64) -> Self {
-        self.fixed_now_unix_ms = Some(now_unix_ms);
-        self
-    }
-
     fn core_hook(
         &self,
     ) -> chio_runtime_core::ChioRuntimeAdmissionHook<RuntimeCoreAdmissionStoreAdapter<'_>>
@@ -106,6 +92,7 @@ impl<S> ChioRuntimeAdmissionHook<S> {
         let mut hook = chio_runtime_core::ChioRuntimeAdmissionHook::new(
             self.profile.clone(),
             RuntimeCoreAdmissionStoreAdapter { inner: &self.store },
+            self.operation_owned_binding.clone(),
         );
         if let Some(runtime_trust_input) = &self.runtime_trust_input {
             hook = hook.with_runtime_trust_input(
@@ -125,12 +112,6 @@ impl<S> ChioRuntimeAdmissionHook<S> {
         if let Some(graphs) = &self.swarm_graphs {
             hook = hook.with_swarm_graph_source(graphs.clone());
         }
-        if let Some(binding) = &self.operation_owned_binding {
-            hook = hook.with_operation_owned_runtime_replay(binding.clone());
-        }
-        if let Some(now_unix_ms) = self.fixed_now_unix_ms {
-            hook = hook.with_fixed_now_unix_ms(now_unix_ms);
-        }
         hook
     }
 }
@@ -146,7 +127,7 @@ where
     fn runtime_participant_binding(
         &self,
     ) -> Option<&chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1>{
-        self.operation_owned_binding.as_ref()
+        Some(&self.operation_owned_binding)
     }
 
     fn evaluate_operation_owned(
@@ -164,7 +145,7 @@ where
     fn revalidate_reserved_operation(
         &self,
         context: &chio_kernel::RuntimeAdmissionContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         claim: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimHistoryV1,
     ) -> Result<chio_kernel::RuntimeAdmissionDecision, chio_kernel::KernelError> {
         chio_kernel::RuntimeAdmissionHook::revalidate_reserved_operation(
@@ -207,7 +188,7 @@ where
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &chio_kernel::RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), chio_kernel::KernelError> {
         chio_kernel::RuntimeAdmissionHook::revalidate_operation_owned_before_dispatch(
             &self.core_hook(),
@@ -219,7 +200,7 @@ where
     fn revalidate_operation_owned_for_native_capture(
         &self,
         context: &chio_kernel::RuntimeAdmissionRevalidationContext<'_>,
-        source: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        source: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
         intent: &chio_kernel::admission_operation::runtime_participant::RuntimeParticipantClaimIntentV1,
     ) -> Result<
         chio_kernel::admission_operation::runtime_participant::RuntimeDispatchValidity,

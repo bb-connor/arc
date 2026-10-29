@@ -60,13 +60,11 @@ fn runtime_workflow_report_requires_structured_step_evidence(
         accepted: true,
         failure_code: None,
         generated_at_unix_ms: 1_800_000_001_000,
-        admission_report_sha256: "1".repeat(64),
         evidence_paths: vec!["runtime-admission-report-1.json".to_string()],
         step_evidence: vec![RuntimeStepEvidence {
             schema: "chio.runtime.step-evidence.v1".to_string(),
             step_index: 0,
             admission_id: "adm-live-1".to_string(),
-            admission_report_sha256: "1".repeat(64),
             tool_receipt_id: "receipt-live-1".to_string(),
             tool_receipt_sha256: "2".repeat(64),
             output_sha256: "3".repeat(64),
@@ -97,13 +95,11 @@ fn runtime_workflow_report_rejects_unsafe_evidence_paths() -> Result<(), Box<dyn
         accepted: true,
         failure_code: None,
         generated_at_unix_ms: 1_800_000_001_000,
-        admission_report_sha256: "1".repeat(64),
         evidence_paths: vec!["../runtime-admission-report-1.json".to_string()],
         step_evidence: vec![RuntimeStepEvidence {
             schema: CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
             step_index: 0,
             admission_id: "adm-live-1".to_string(),
-            admission_report_sha256: "1".repeat(64),
             tool_receipt_id: "receipt-live-1".to_string(),
             tool_receipt_sha256: "2".repeat(64),
             output_sha256: "3".repeat(64),
@@ -139,7 +135,6 @@ fn runtime_workflow_report_rejects_placeholder_success_path(
         accepted: true,
         failure_code: None,
         generated_at_unix_ms: 1_800_000_001_000,
-        admission_report_sha256: "1".repeat(64),
         evidence_paths: vec!["regenerated-proof-package.json".to_string()],
         step_evidence: Vec::new(),
         proof_regeneration_report_sha256: None,
@@ -174,7 +169,6 @@ fn proof_regeneration_report_records_bound_runtime_artifacts(
         workflow_receipt_sha256: Some("c".repeat(64)),
         source_records: vec![RuntimeProofSourceRecord {
             step_index: 0,
-            admission_report_sha256: "1".repeat(64),
             tool_receipt_sha256: "2".repeat(64),
             bilateral_dsse_sha256: "3".repeat(64),
             workflow_step_sha256: "4".repeat(64),
@@ -193,7 +187,6 @@ fn proof_regeneration_report_records_bound_runtime_artifacts(
 fn runtime_proof_regeneration_contracts_bind_evidence() -> Result<(), Box<dyn std::error::Error>> {
     let source_record = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "1".repeat(64),
         tool_receipt_sha256: "2".repeat(64),
         bilateral_dsse_sha256: "3".repeat(64),
         workflow_step_sha256: "4".repeat(64),
@@ -216,7 +209,6 @@ fn runtime_proof_regeneration_contracts_bind_evidence() -> Result<(), Box<dyn st
         run_id: "runtime-loopback-7-3".to_string(),
         evidence_manifest_sha256: "8".repeat(64),
         workflow_run_report_sha256: "5".repeat(64),
-        admission_report_sha256: "9".repeat(64),
         trust_bundle_sha256: "a".repeat(64),
         verification_context_sha256: "b".repeat(64),
         source_records: vec![source_record.clone()],
@@ -341,7 +333,6 @@ fn runtime_proof_regeneration_artifacts(
     let workflow_receipt_bytes = serde_json::to_vec(&workflow_receipt)?;
     let source_record = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "1".repeat(64),
         tool_receipt_sha256: "2".repeat(64),
         bilateral_dsse_sha256: "3".repeat(64),
         workflow_step_sha256: "4".repeat(64),
@@ -365,13 +356,11 @@ fn runtime_proof_regeneration_artifacts(
         accepted: true,
         failure_code: None,
         generated_at_unix_ms: 1_800_000_001_000,
-        admission_report_sha256: "1".repeat(64),
         evidence_paths: vec!["proof-regeneration-report.json".to_string()],
         step_evidence: vec![RuntimeStepEvidence {
             schema: CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
             step_index: 0,
             admission_id: "admission-runtime-loopback".to_string(),
-            admission_report_sha256: "1".repeat(64),
             tool_receipt_id: "receipt-runtime-loopback".to_string(),
             tool_receipt_sha256: "2".repeat(64),
             output_sha256: "5".repeat(64),
@@ -429,7 +418,6 @@ fn runtime_proof_regeneration_artifacts(
         run_id: proof_input_run_id.to_string(),
         evidence_manifest_sha256: manifest_sha256,
         workflow_run_report_sha256: workflow_report_sha256,
-        admission_report_sha256: "1".repeat(64),
         trust_bundle_sha256: "6".repeat(64),
         verification_context_sha256: "7".repeat(64),
         source_records: vec![source_record],
@@ -513,7 +501,6 @@ fn runtime_orchestration_contracts_validate_status_and_run_report(
             admission_id: "adm-loopback-1".to_string(),
             state: "proof_accepted".to_string(),
             destructive: false,
-            admission_report_sha256: Some("5".repeat(64)),
             tool_receipt_sha256: Some("6".repeat(64)),
             lease_id: None,
         }],
@@ -528,7 +515,6 @@ fn runtime_orchestration_contracts_validate_status_and_run_report(
         store_backend: "sqlite".to_string(),
         store_path_sha256: "7".repeat(64),
         run_counts: std::collections::BTreeMap::from([("proof_accepted".to_string(), 1)]),
-        consumed_lease_count: 1,
         trust_floor_count: 1,
         latest_failure_code: None,
         evidence_sink_healthy: true,
@@ -579,7 +565,6 @@ fn runtime_orchestration_run_report_rejects_inconsistent_outcome(
             admission_id: "adm-loopback-1".to_string(),
             state: "proof_accepted".to_string(),
             destructive: false,
-            admission_report_sha256: Some("7".repeat(64)),
             tool_receipt_sha256: Some("8".repeat(64)),
             lease_id: None,
         }],
@@ -670,7 +655,6 @@ fn runtime_proof_drift_report_rejects_manifest_hash_change(
     candidate_manifest.entries[0].sha256 = "4".repeat(64);
     let source = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "5".repeat(64),
         tool_receipt_sha256: "6".repeat(64),
         bilateral_dsse_sha256: "7".repeat(64),
         workflow_step_sha256: "8".repeat(64),
@@ -755,7 +739,6 @@ fn runtime_proof_drift_report_normalizes_runtime_and_proof_report_artifacts(
         candidate_manifest.entries[3].sha256.clone();
     let source = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "a".repeat(64),
         tool_receipt_sha256: "b".repeat(64),
         bilateral_dsse_sha256: "c".repeat(64),
         workflow_step_sha256: "d".repeat(64),
@@ -822,7 +805,6 @@ fn runtime_proof_drift_report_rejects_proof_outcome_drift() -> Result<(), Box<dy
         candidate_manifest.entries[0].sha256.clone();
     let source = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "a".repeat(64),
         tool_receipt_sha256: "b".repeat(64),
         bilateral_dsse_sha256: "c".repeat(64),
         workflow_step_sha256: "d".repeat(64),
@@ -918,7 +900,6 @@ fn runtime_proof_drift_report_rejects_workflow_report_artifact_drift(
     candidate_manifest.workflow_run_report_sha256 = candidate_manifest.entries[1].sha256.clone();
     let source = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "a".repeat(64),
         tool_receipt_sha256: "b".repeat(64),
         bilateral_dsse_sha256: "c".repeat(64),
         workflow_step_sha256: "d".repeat(64),
@@ -978,7 +959,6 @@ fn runtime_proof_drift_report_rejects_manifest_proof_run_id_mismatch(
     candidate_manifest.run_id = "runtime-candidate".to_string();
     let source = RuntimeProofSourceRecord {
         step_index: 0,
-        admission_report_sha256: "5".repeat(64),
         tool_receipt_sha256: "6".repeat(64),
         bilateral_dsse_sha256: "7".repeat(64),
         workflow_step_sha256: "8".repeat(64),
@@ -1328,7 +1308,6 @@ fn runtime_ops_recovery_drill_blocks_terminal_failure_steps(
             admission_id: "adm-terminal".to_string(),
             state: "terminal_failure".to_string(),
             destructive: false,
-            admission_report_sha256: Some("1".repeat(64)),
             tool_receipt_sha256: Some("2".repeat(64)),
             lease_id: None,
         },
@@ -1364,7 +1343,6 @@ fn runtime_ops_recovery_drill_blocks_non_contiguous_reusable_steps(
             admission_id: "adm-gap-0".to_string(),
             state: "planned".to_string(),
             destructive: false,
-            admission_report_sha256: None,
             tool_receipt_sha256: None,
             lease_id: None,
         },
@@ -1376,7 +1354,6 @@ fn runtime_ops_recovery_drill_blocks_non_contiguous_reusable_steps(
             admission_id: "adm-gap-1".to_string(),
             state: "completed".to_string(),
             destructive: false,
-            admission_report_sha256: Some("1".repeat(64)),
             tool_receipt_sha256: Some("2".repeat(64)),
             lease_id: None,
         },
@@ -1422,7 +1399,6 @@ fn runtime_ops_recovery_drill_preserves_earlier_terminal_failure_blocker(
             admission_id: "adm-terminal-0".to_string(),
             state: "terminal_failure".to_string(),
             destructive: false,
-            admission_report_sha256: Some("1".repeat(64)),
             tool_receipt_sha256: None,
             lease_id: None,
         },
@@ -1434,7 +1410,6 @@ fn runtime_ops_recovery_drill_preserves_earlier_terminal_failure_blocker(
             admission_id: "adm-terminal-1".to_string(),
             state: "completed".to_string(),
             destructive: true,
-            admission_report_sha256: Some("2".repeat(64)),
             tool_receipt_sha256: Some("3".repeat(64)),
             lease_id: Some("lease-terminal-1".to_string()),
         },

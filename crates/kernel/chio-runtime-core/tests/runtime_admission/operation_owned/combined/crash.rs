@@ -236,12 +236,9 @@ fn run_cut(cut: Cut, test: &str) -> TestResult {
     if cut.committed() {
         assert_eq!(response.verdict, Verdict::Deny, "{response:#?}");
         assert!(
-            response
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains(
-                    "runtime participant resource is already reserved or historically spent"
-                )),
+            response.reason.as_deref().is_some_and(
+                |reason| reason.contains("runtime participant resource is already reserved")
+            ),
             "fresh operation must hit retained physical custody: {response:#?}"
         );
         assert_eq!(worker::effects(path)?, cut.effects());
@@ -273,7 +270,7 @@ fn run_cut(cut: Cut, test: &str) -> TestResult {
             assert_eq!(fresh.resource_id(), old.resource_id());
             // The destructive bundle binds the new request/admission identity;
             // the treaty and swarm artifacts themselves have not changed.
-            if fresh.kind() == RuntimeReplayParticipantKind::DestructiveLease {
+            if fresh.kind() == RuntimeParticipantKind::DestructiveLease {
                 assert_ne!(fresh.artifact_digest(), old.artifact_digest());
             } else {
                 assert_eq!(fresh.artifact_digest(), old.artifact_digest());

@@ -8,13 +8,13 @@ use chio_kernel::{
     ToolCallRequest,
 };
 use chio_runtime::{
-    ChioRuntimeAdmissionHook, ChioRuntimeAdmissionStore, ChioRuntimeError,
-    InMemoryRuntimeAdmissionStore, IssuedSwarmGraphs, RuntimeAdmissionProfile,
-    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
+    ChioRuntimeAdmissionHook, ChioRuntimeError, InMemoryRuntimeAdmissionStore, IssuedSwarmGraphs,
+    RuntimeAdmissionProfile, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
+    CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
 };
 
-#[path = "runtime_boundary/replay_source.rs"]
-mod replay_source;
+#[path = "runtime_boundary/source_qualification.rs"]
+mod source_qualification;
 
 #[test]
 fn runtime_facade_exposes_chio_trust_floor_schema_and_runtime_types() {
@@ -61,7 +61,7 @@ fn runtime_admission_hook_boundary_is_chio_owned() {
 }
 
 #[test]
-fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
+fn runtime_facade_unowned_admission_and_revalidation_refuse(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -119,27 +119,41 @@ fn runtime_facade_immediate_dispatch_revalidation_is_opted_in_and_non_consuming(
             expires_at_unix_ms: 1_800_003_600_000,
         },
         InMemoryRuntimeAdmissionStore::new(),
+        uninstalled_binding()?,
     );
     assert!(hook.requires_dispatch_revalidation());
     assert!(hook.enforces_swarm_authority());
-    let decision = hook.evaluate(&RuntimeAdmissionContext {
-        request: &request,
-        extra_metadata: None,
-        now_unix_secs: 1_800_000_001,
-        now_unix_ms: 1_800_000_001_000,
-        matched_grant_index: Some(0),
-        local_kernel_id: "kernel.vendor-b".to_string(),
-    })?;
-    assert!(decision.allowed);
+    let error = hook
+        .evaluate(&RuntimeAdmissionContext {
+            request: &request,
+            extra_metadata: None,
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        })
+        .err()
+        .ok_or("unowned admission accepted")?;
+    assert!(
+        matches!(error, chio_kernel::KernelError::DurableAdmission(detail)
+        if detail == "runtime hook requires operation-owned claim authority")
+    );
 
-    hook.revalidate_before_dispatch(&RuntimeAdmissionRevalidationContext {
-        request: &request,
-        admission_metadata: decision.metadata.as_ref(),
-        now_unix_secs: 1_800_000_001,
-        now_unix_ms: 1_800_000_001_000,
-        matched_grant_index: Some(0),
-        local_kernel_id: "kernel.vendor-b".to_string(),
-    })?;
+    let error = hook
+        .revalidate_before_dispatch(&RuntimeAdmissionRevalidationContext {
+            request: &request,
+            admission_metadata: None,
+            now_unix_secs: 1_800_000_001,
+            now_unix_ms: 1_800_000_001_000,
+            matched_grant_index: Some(0),
+            local_kernel_id: "kernel.vendor-b".to_string(),
+        })
+        .err()
+        .ok_or("unqualified revalidation accepted")?;
+    assert!(
+        matches!(error, chio_kernel::KernelError::DurableAdmission(detail)
+        if detail == "runtime revalidation requires source qualification")
+    );
     Ok(())
 }
 
@@ -251,7 +265,6 @@ fn runtime_cli_helper_reexports_are_not_runtime_core_reexports() {
         "runtime_peer_weights_sha256",
         "runtime_orchestration_profile_sha256",
         "runtime_run_contract_sha256",
-        "evaluate_runtime_admission",
         "build_runtime_orchestration_plan",
     ] {
         assert!(
@@ -275,11 +288,6 @@ fn runtime_admission_store_boundary_is_chio_owned() {
             "{symbol} must not appear in the Chio runtime public boundary"
         );
     }
-
-    assert!(
-        lib.contains("pub struct ChioRuntimeAdmissionInput"),
-        "chio-runtime facade must expose ChioRuntimeAdmissionInput"
-    );
 
     for symbol in [
         "pub trait ChioRuntimeAdmissionStore",
@@ -305,11 +313,6 @@ fn runtime_admission_store_boundary_is_chio_owned() {
 #[test]
 fn runtime_admission_hook_resolves_swarm_authority_from_the_issuer(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    fn accepts_swarm_store(store: &dyn ChioRuntimeAdmissionStore) {
-        let _ = store.consume_swarm_continuation("continuation-child-a", "admission-runtime");
-        let _ = store.release_swarm_continuation("continuation-child-a", "admission-runtime");
-    }
-
     let directory = tempfile::tempdir()?;
     std::fs::set_permissions(
         directory.path(),
@@ -336,7 +339,6 @@ fn runtime_admission_hook_resolves_swarm_authority_from_the_issuer(
     );
 
     let store = InMemoryRuntimeAdmissionStore::new();
-    accepts_swarm_store(&store);
     let _hook = ChioRuntimeAdmissionHook::new(
         RuntimeAdmissionProfile {
             schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.to_string(),
@@ -347,6 +349,7 @@ fn runtime_admission_hook_resolves_swarm_authority_from_the_issuer(
             expires_at_unix_ms: 1_800_003_600_000,
         },
         store,
+        uninstalled_binding()?,
     )
     .with_swarm_witness_keys(vec![Keypair::from_seed(&[31u8; 32]).public_key()])
     .with_swarm_graphs(graphs);
@@ -362,4 +365,17 @@ fn runtime_public_store_wrappers_are_debuggable() {
     assert_debug::<chio_runtime::JsonRuntimeTrustFloorStateStore>();
     assert_debug::<chio_runtime::LayeredRuntimeAdmissionStore<'static>>();
     assert_debug::<chio_runtime::SqliteRuntimeOrchestrationStore>();
+}
+
+fn uninstalled_binding() -> Result<
+    chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
+    Box<dyn std::error::Error>,
+> {
+    use chio_kernel::admission_operation::{
+        runtime_participant::RuntimeParticipantAuthorityBindingV1, AdmissionIdentifier,
+    };
+    Ok(RuntimeParticipantAuthorityBindingV1::new(
+        AdmissionIdentifier::try_new("runtime_id", "uninstalled-runtime")?,
+        AdmissionIdentifier::try_new("qualification_id", "a".repeat(64))?,
+    ))
 }

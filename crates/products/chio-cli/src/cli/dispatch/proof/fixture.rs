@@ -25,6 +25,8 @@ mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
 #[path = "fixture_regenerate.rs"]
 mod fixture_regenerate;
+#[path = "fixture_runtime_check.rs"]
+mod fixture_runtime_check;
 #[path = "fixture_committed_disclosure.rs"]
 mod fixture_committed_disclosure;
 use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;
@@ -2259,7 +2261,7 @@ fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Resul
     let out_dir = temp_root.join("out");
     let static_package_json = crate::input::read_text(bundle.join("proof-package.json"))?;
     let static_report_json = crate::input::read_text(bundle.join("verifier-report.json"))?;
-    chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts(
+    chio_runtime_harness::generate_runtime_loopback_fixture(
         &scenario_path,
         &store_dir,
         RUNTIME_SWARM_LOOPBACK_NOW_UNIX_MS,

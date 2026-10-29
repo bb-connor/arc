@@ -2,9 +2,8 @@
 
 use super::*;
 use crate::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
-use crate::admission_operation::{AdmissionRecoveryLease, RuntimeReplaySourceSnapshotV1};
+use crate::admission_operation::{AdmissionRecoveryLease, RuntimeSourceQualificationV1};
 use crate::RuntimeParticipantClaimAuthority;
-use chio_core::canonical::canonical_json_bytes;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) enum ClaimMode {
@@ -24,32 +23,19 @@ impl TestRuntimeRecovery {
         &self,
         binding: &RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
-    ) -> Result<RuntimeReplaySourceSnapshotV1, AdmissionOperationStoreError> {
+    ) -> Result<RuntimeSourceQualificationV1, AdmissionOperationStoreError> {
         if !self.0.lock().expect("fixture").enabled {
             return Err(AdmissionOperationStoreError::Unavailable(
                 "unsupported test source".into(),
             ));
         }
-        // This is deliberately fabricated canonical data supplied by a trusted
-        // test port. It neither seals a source nor proves activation.
-        let body = serde_json::json!({
-            "schema": "chio.runtime-replay-source-seal.v1",
-            "binding": {
-                "sourceId": "test-source",
-                "runtimeAuthorityId": binding.runtime_authority_id(),
-                "destinationAuthorityId": fence.store_uuid,
-            },
-            "device": "1", "inode": "2", "linkCount": 1,
-            "barrierSha256": "b".repeat(64),
-            "markerCounts": [0, 0, 0], "markers": [],
-        });
-        let mut preimage = b"chio.runtime-replay-source-seal.v1\0".to_vec();
-        preimage.extend(canonical_json_bytes(&body).expect("canonical body"));
-        RuntimeReplaySourceSnapshotV1::from_canonical_bytes(
-            &canonical_json_bytes(&serde_json::json!({
-                "body": body, "inventorySha256": sha256_hex(&preimage),
-            }))
-            .expect("canonical snapshot"),
+        RuntimeSourceQualificationV1::new(
+            AdmissionIdentifier::try_new("source", "test-source")?,
+            binding.runtime_authority_id().clone(),
+            AdmissionIdentifier::try_new("destination", &fence.store_uuid)?,
+            1,
+            2,
+            1,
         )
     }
 
@@ -159,8 +145,15 @@ impl RuntimeAdmissionHook for ClaimingVerifier {
 }
 
 fn exercise(mode: ClaimMode, allowed: bool) {
-    let (mut kernel, request, store, invocations) =
-        durable_admission_fixture("runtime-claim-boundary");
+    exercise_at(mode, allowed, current_unix_timestamp_ms());
+}
+
+fn exercise_at(mode: ClaimMode, allowed: bool, now: u64) -> Option<String> {
+    let (mut kernel, request, store, invocations) = durable_admission_fixture_with_clock(
+        "runtime-claim-boundary",
+        vec![make_grant("durable-server", "mutate")],
+        Arc::new(chio_security_types::clock::FixedClock::from_millis(now)),
+    );
     let verifier = Arc::new(ClaimingVerifier(RuntimeParticipantAuthorityBindingV1::new(
         AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
         AdmissionIdentifier::try_new("source", "test-source").expect("source"),
@@ -180,7 +173,6 @@ fn exercise(mode: ClaimMode, allowed: bool) {
         request.model_metadata.as_ref(),
     )
     .expect("matching");
-    let now = current_unix_timestamp_ms();
     let mut admission = kernel
         .begin_durable_tool_admission(&request, &matching, now)
         .expect("begin")
@@ -228,6 +220,15 @@ fn exercise(mode: ClaimMode, allowed: bool) {
             assert_eq!(state.release_calls, usize::from(!allowed));
         }
     }
+    let episode = store
+        .runtime_recovery
+        .0
+        .lock()
+        .expect("fixture")
+        .history
+        .as_ref()
+        .and_then(|history| history.first())
+        .map(|entry| entry.intent.episode_id().as_str().to_owned());
     // A callback panic must not poison the mutation sequencer or hide custody
     // behind the old operation version. Normal recovery remains usable.
     compensate(&kernel, &store).expect("recover after hook completion");
@@ -236,6 +237,7 @@ fn exercise(mode: ClaimMode, allowed: bool) {
         AdmissionOperationState::CompensatedBeforeDispatch
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    episode
 }
 
 #[test]
@@ -576,4 +578,17 @@ fn operation_owned_deny_with_scalar_metadata_is_refused_and_released() {
         NON_OBJECT_REFUSAL,
         None,
     );
+}
+
+#[test]
+fn runtime_episode_ids_follow_injected_ids_and_fixed_clock() {
+    let now = current_unix_timestamp_ms();
+    let run = || {
+        let _ids = crate::scope_receipt_ids_for_current_thread([]);
+        let first = exercise_at(ClaimMode::Normal, true, now).expect("first episode");
+        let second = exercise_at(ClaimMode::Normal, true, now).expect("second episode");
+        assert_ne!(first, second);
+        (first, second)
+    };
+    assert_eq!(run(), run());
 }

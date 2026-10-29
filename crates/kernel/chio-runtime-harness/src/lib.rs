@@ -19,6 +19,7 @@
 mod admission_loop;
 mod buyer_closure;
 mod evidence_io;
+mod fixture_generation;
 mod kernel;
 mod proof_assembly;
 mod proof_parity;
@@ -28,14 +29,13 @@ mod treaty;
 use std::fs;
 use std::path::Path;
 
+pub use fixture_generation::generate_runtime_loopback_fixture;
+
 use admission_loop::execute_runtime_admission_loop;
 use evidence_io::read_utf8_json_file;
 use proof_assembly::{assemble_runtime_loopback_outputs, StaticProofBaseline};
 #[cfg(test)]
-use proof_assembly::{
-    runtime_admission_report_sha256_for_workflow, step_admission_binding,
-    validate_step_admission_binding_counts,
-};
+use proof_assembly::{step_admission_binding, validate_step_admission_binding_counts};
 use scenario::{normalize_runtime_loopback_steps, RuntimeLoopbackScenario};
 
 const RUNTIME_LOOPBACK_AUTHORITY_STORE_UUID: &str = "018bcfe5-6800-7000-8000-000000000001";
@@ -74,8 +74,11 @@ pub fn run_runtime_loopback_scenario(
         store_dir,
         now_unix_ms,
         out_dir,
-        static_package,
-        static_report,
+        StaticProofBaseline {
+            package: static_package,
+            report: static_report,
+        },
+        false,
     )
 }
 
@@ -101,8 +104,11 @@ pub fn run_runtime_loopback_scenario_with_static_artifacts(
         store_dir,
         now_unix_ms,
         out_dir,
-        static_package,
-        static_report,
+        StaticProofBaseline {
+            package: static_package,
+            report: static_report,
+        },
+        false,
     )
 }
 
@@ -111,8 +117,8 @@ fn run_runtime_loopback_scenario_with_static_baseline(
     store_dir: &Path,
     now_unix_ms: u64,
     out_dir: &Path,
-    static_package: chio_attest_buyer_core::proof_package::ChioProofPackage,
-    static_report: chio_attest_buyer_core::report::VerifierReport,
+    static_baseline: StaticProofBaseline,
+    generate_fixture: bool,
 ) -> Result<(), RuntimeLoopbackError> {
     // Deterministic fixture runs share one artificial store and lease identity.
     // Keep their process-local operation ownership disjoint even when callers
@@ -155,13 +161,6 @@ fn run_runtime_loopback_scenario_with_static_baseline(
             out_dir.display()
         ))
     })?;
-    let store_path = store_dir.join("admission-store.json");
-    let store =
-        chio_runtime_core::JsonRuntimeAdmissionStore::open(&store_path).map_err(|error| {
-            RuntimeLoopbackError::message(format!(
-                "Chio runtime loopback admission store open: {error}"
-            ))
-        })?;
     let authority_path = store_dir.join("kernel-authority.sqlite3");
     let authority_lock_root = store_dir.join("kernel-authority-locks");
     create_private_directory(&authority_lock_root).map_err(|error| {
@@ -226,25 +225,27 @@ fn run_runtime_loopback_scenario_with_static_baseline(
             ))
         })?;
 
-    let admission = execute_runtime_admission_loop(
-        &steps,
-        &store,
-        &authority,
-        &receipt_store,
-        now_unix_ms,
-        out_dir,
-    )?;
-    assemble_runtime_loopback_outputs(
-        &run_id,
-        &steps,
-        out_dir,
-        now_unix_ms,
-        admission,
-        StaticProofBaseline {
-            package: static_package,
-            report: static_report,
-        },
-    )
+    let admission =
+        execute_runtime_admission_loop(&steps, &authority, &receipt_store, now_unix_ms, out_dir)?;
+    if generate_fixture {
+        fixture_generation::assemble_qualified_fixture(
+            &run_id,
+            &steps,
+            out_dir,
+            now_unix_ms,
+            admission,
+            static_baseline,
+        )
+    } else {
+        assemble_runtime_loopback_outputs(
+            &run_id,
+            &steps,
+            out_dir,
+            now_unix_ms,
+            admission,
+            static_baseline,
+        )
+    }
 }
 
 fn create_private_directory(path: &Path) -> std::io::Result<()> {
@@ -311,13 +312,13 @@ mod windows_authority_tests {
 #[cfg(test)]
 mod tests {
     use super::{
-        run_runtime_loopback_scenario, runtime_admission_report_sha256_for_workflow,
-        step_admission_binding, validate_step_admission_binding_counts,
+        run_runtime_loopback_scenario, step_admission_binding,
+        validate_step_admission_binding_counts,
     };
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_root(label: &str) -> Result<PathBuf, crate::RuntimeLoopbackError> {
+    pub(super) fn temp_root(label: &str) -> Result<PathBuf, crate::RuntimeLoopbackError> {
         let duration = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|error| {
@@ -347,7 +348,7 @@ mod tests {
         })
     }
 
-    fn write_executable_scenario(
+    pub(super) fn write_executable_scenario(
         source: &Path,
         destination: &Path,
     ) -> Result<(), crate::RuntimeLoopbackError> {
@@ -483,20 +484,8 @@ mod tests {
     }
 
     #[test]
-    fn step_admission_binding_rejects_more_workflow_steps_than_admission_hashes() {
-        let error = match validate_step_admission_binding_counts(2, 1, 2) {
-            Ok(()) => panic!("accepted mismatched workflow/admission hash counts"),
-            Err(error) => error,
-        };
-
-        assert!(error
-            .to_string()
-            .contains("workflow step count 2 did not match admission report hash count 1"));
-    }
-
-    #[test]
     fn step_admission_binding_rejects_more_workflow_steps_than_admission_ids() {
-        let error = match validate_step_admission_binding_counts(2, 2, 1) {
+        let error = match validate_step_admission_binding_counts(2, 1) {
             Ok(()) => panic!("accepted mismatched workflow/admission id counts"),
             Err(error) => error,
         };
@@ -509,38 +498,11 @@ mod tests {
     #[test]
     fn step_admission_binding_uses_exact_index_without_fallback(
     ) -> Result<(), crate::RuntimeLoopbackError> {
-        let hashes = ["hash-a".to_string(), "hash-b".to_string()];
         let ids = ["admission-a".to_string(), "admission-b".to_string()];
 
-        let binding = step_admission_binding(1, &hashes, &ids)?;
+        let binding = step_admission_binding(1, &ids)?;
 
-        assert_eq!(binding.admission_report_sha256, "hash-b");
-        assert_eq!(binding.admission_id, "admission-b");
-        Ok(())
-    }
-
-    #[test]
-    fn runtime_workflow_admission_hash_uses_report_hash_without_rehashing(
-    ) -> Result<(), crate::RuntimeLoopbackError> {
-        let admission_hash = "a".repeat(64);
-        let selected = runtime_admission_report_sha256_for_workflow(
-            None,
-            std::slice::from_ref(&admission_hash),
-            None,
-        )?;
-
-        assert_eq!(selected, admission_hash);
-        assert_ne!(selected, chio_core::sha256_hex(admission_hash.as_bytes()));
-        Ok(())
-    }
-
-    #[test]
-    fn runtime_workflow_admission_hash_uses_terminal_denial_hash(
-    ) -> Result<(), crate::RuntimeLoopbackError> {
-        let denied_hash = "b".repeat(64);
-        let selected = runtime_admission_report_sha256_for_workflow(None, &[], Some(&denied_hash))?;
-
-        assert_eq!(selected, denied_hash);
+        assert_eq!(binding, "admission-b");
         Ok(())
     }
 
