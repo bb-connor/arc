@@ -597,3 +597,45 @@ fn forwarded_session_anchor_metadata_is_refused_at_signing() {
     );
     assert!(kernel.receipt_log().is_empty());
 }
+
+/// A parent carrying a valid session anchor block whose signature covers the
+/// bare canonical body instead of the signing wrapper is refused before the
+/// block is read.
+#[test]
+fn persisted_parent_signed_without_the_wrapper_is_refused() {
+    let (kernel, agent) = echo_kernel();
+    let session_id = open_anchored_session(&kernel, &agent);
+    let anchor = session_anchor_of(&kernel, &session_id);
+    let metadata = Some(serde_json::json!({ "session_anchor": anchor_block(&anchor) }));
+    let mut parent = signed_parent(&kernel.config.keypair, Decision::Allow, metadata.clone());
+    let bare_body = chio_core::canonical::canonical_json_bytes(&parent_body(
+        kernel.config.keypair.public_key(),
+        Decision::Allow,
+        metadata,
+    ))
+    .unwrap();
+    parent.signature = kernel
+        .config
+        .keypair
+        .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, &bare_body);
+    let response = continue_from_persisted_parent(Continuation {
+        kernel: &kernel,
+        token_signer: &kernel.config.keypair,
+        agent: &agent,
+        capability: delegate_capability(&kernel, &agent),
+        parent: &parent,
+        token_anchor: anchor,
+        parent_receipt_hash: Some(receipt_hash(&parent)),
+    });
+    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.starts_with(&format!(
+                "{DENIED}governed call_chain parent receipt failed signature verification"
+            ))),
+        "{:?}",
+        response.reason
+    );
+}
