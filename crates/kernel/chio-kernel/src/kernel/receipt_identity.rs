@@ -35,7 +35,7 @@ pub(super) fn with_identity_disposition(
         IdentityDisposition::Terminal => "terminal",
     };
     runtime.insert(
-        "identity_disposition".into(),
+        crate::kernel::runtime_field::IDENTITY_DISPOSITION.into(),
         Value::String(disposition.into()),
     );
     metadata.insert("chio_runtime".into(), Value::Object(runtime));

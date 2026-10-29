@@ -148,8 +148,8 @@ impl ChioKernel {
             Some(serde_json::json!({
                 "receipt_context": { "request_namespace_digest": binding.namespace, "evaluation_id": binding.evaluation_id },
                 "chio_runtime": {
-                    "evaluation_started_at": input.evaluation_started_at,
-                    "post_effect_fault": { "step": "drop", "code": "CHIO-KERNEL-POST-EFFECT-DROP", "original_receipt_id": null }
+                    (crate::kernel::runtime_field::EVALUATION_STARTED_AT): input.evaluation_started_at,
+                    (crate::kernel::runtime_field::POST_EFFECT_FAULT): { "step": "drop", "code": "CHIO-KERNEL-POST-EFFECT-DROP", "original_receipt_id": null }
                 }
             })),
         );
@@ -237,7 +237,8 @@ impl PreparedFaultReceipt {
             .body
             .metadata
             .as_ref()
-            .and_then(|metadata| metadata.pointer("/chio_runtime/post_effect_fault"))
+            .and_then(|metadata| metadata.get("chio_runtime"))
+            .and_then(|runtime| runtime.get(crate::kernel::runtime_field::POST_EFFECT_FAULT))
             .and_then(serde_json::Value::as_object)
             .cloned()
             .unwrap_or_default();
@@ -245,7 +246,7 @@ impl PreparedFaultReceipt {
         self.body.metadata = merge_metadata_objects(
             self.body.metadata.take(),
             Some(serde_json::json!({
-                "chio_runtime": { "post_effect_fault": fault }
+                "chio_runtime": { (crate::kernel::runtime_field::POST_EFFECT_FAULT): fault }
             })),
         );
     }

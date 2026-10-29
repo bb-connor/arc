@@ -474,8 +474,8 @@ impl<'a> PostEffectObligation<'a> {
                 fault.body.metadata.take(),
                 Some(serde_json::json!({
                     "chio_runtime": {
-                        "dispatch_credential_retention_outcome_unknown": true,
-                        "payment_credential_disposition": "retention_outcome_unknown"
+                        (crate::kernel::runtime_field::DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN): true,
+                        (crate::kernel::runtime_field::PAYMENT_CREDENTIAL_DISPOSITION): "retention_outcome_unknown"
                     }
                 })),
             );
@@ -483,7 +483,7 @@ impl<'a> PostEffectObligation<'a> {
         fault.body.metadata = merge_metadata_objects(
             fault.body.metadata.take(),
             Some(serde_json::json!({
-                "chio_runtime": { "post_effect_fault": { "step": step, "code": code,
+                "chio_runtime": { (crate::kernel::runtime_field::POST_EFFECT_FAULT): { "step": step, "code": code,
                     "original_receipt_id": original.as_ref().map(|identity| identity.id.as_str()) } }
             })),
         );

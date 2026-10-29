@@ -1483,15 +1483,15 @@ impl ChioKernel {
             for (source, target) in [
                 (
                     "reserved_destructive_lease_id",
-                    "retained_destructive_lease_id",
+                    crate::kernel::runtime_field::RETAINED_DESTRUCTIVE_LEASE_ID,
                 ),
                 (
                     "reserved_treaty_continuation_id",
-                    "retained_treaty_continuation_id",
+                    crate::kernel::runtime_field::RETAINED_TREATY_CONTINUATION_ID,
                 ),
                 (
                     "reserved_swarm_continuation_id",
-                    "retained_swarm_continuation_id",
+                    crate::kernel::runtime_field::RETAINED_SWARM_CONTINUATION_ID,
                 ),
             ] {
                 if let Some(id) = runtime
@@ -1510,7 +1510,7 @@ impl ChioKernel {
                 return metadata;
             }
             retained.insert(
-                "reservations_retained_fail_closed".to_string(),
+                crate::kernel::runtime_field::RESERVATIONS_RETAINED_FAIL_CLOSED.to_string(),
                 serde_json::Value::Bool(true),
             );
         }
@@ -1552,7 +1552,7 @@ impl ChioKernel {
                         Some(serde_json::json!({
                             "chio_runtime": {
                                 "reservation_release_failed": true,
-                                "reservation_retained": true
+                                (crate::kernel::runtime_field::RESERVATION_RETAINED): true
                             }
                         })),
                     ),
