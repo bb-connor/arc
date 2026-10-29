@@ -489,6 +489,11 @@ fn valid_text(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::finding_enforcement::remote_http_tests::{
+        ok_json, plaintext_client, rotating_lookup, serve, METADATA,
+    };
+    use chio_egress_contract::ContractLookup;
+    use std::sync::atomic::Ordering;
 
     fn observation() -> FindingBondObservationRecheck {
         FindingBondObservationRecheck {
@@ -524,6 +529,70 @@ mod tests {
         invalid.operator_key_epoch = 1;
         invalid.operator_key_hash = "0xABC".to_owned();
         assert!(!valid_observation(&invalid));
+    }
+
+    #[test]
+    fn transport_resolves_and_checks_the_observer_name_for_each_post() -> Result<(), String> {
+        let (served, server) = serve(vec![ok_json("{}")])?;
+        let metadata = METADATA.parse().map_err(|_| "address")?;
+        let (lookup, lookups) = rotating_lookup(served, metadata);
+        let transport = HttpsFindingBondObservationTransport {
+            http: plaintext_client("observer.example", lookup)?,
+        };
+
+        let body = transport
+            .post(FindingBondObservationOperation::Observe, b"{}")
+            .map_err(|error| error.to_string())?;
+        let refused = transport.post(FindingBondObservationOperation::ObserveReconciliation, b"{}");
+
+        assert_eq!(body, b"{}");
+        assert!(
+            matches!(
+                &refused,
+                Err(SettlementError::Verification(message))
+                    if message == "remote bond observation egress refused: link-local egress target denied: observer.example resolved to 169.254.169.254"
+            ),
+            "{refused:?}"
+        );
+        assert_eq!(lookups.load(Ordering::SeqCst), 2);
+        let request = server
+            .join()
+            .map_err(|_| "server panicked")?
+            .concat()
+            .to_ascii_lowercase();
+        assert!(
+            request.starts_with("post /v1/finding-bond-observations/observe "),
+            "{request}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_observer_refuses_a_loopback_answer() -> Result<(), String> {
+        let config = RemoteFindingBondObservationSourceConfig::new(
+            "https://observer.example/api",
+            "token",
+            "tenant:one",
+            Duration::from_secs(5),
+        )
+        .map_err(|error| error.to_string())?;
+        let loopback = ContractLookup::new(|_host: &str, port: u16| {
+            Ok(vec![std::net::SocketAddr::from(([127, 0, 0, 1], port))])
+        });
+        let transport = HttpsFindingBondObservationTransport::with_lookup(config, loopback)
+            .map_err(|error| error.to_string())?;
+
+        let refused = transport.post(FindingBondObservationOperation::Observe, b"{}");
+
+        assert!(
+            matches!(
+                &refused,
+                Err(SettlementError::Verification(message))
+                    if message == "remote bond observation egress refused: loopback egress target denied: observer.example resolved to 127.0.0.1"
+            ),
+            "{refused:?}"
+        );
+        Ok(())
     }
 
     #[test]

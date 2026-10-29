@@ -30,6 +30,8 @@ mod reconcile;
 mod verify;
 
 #[cfg(test)]
+mod remote_http_tests;
+#[cfg(test)]
 mod tests;
 
 pub use observation_source::{

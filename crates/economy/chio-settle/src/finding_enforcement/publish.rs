@@ -532,8 +532,13 @@ pub fn reobserve_finding_impairment_for_reconciliation(
 #[cfg(test)]
 mod remote_tests {
     use super::*;
+    use crate::finding_enforcement::remote_http_tests::{
+        ok_json, plaintext_client, rotating_lookup, serve, METADATA,
+    };
     use crate::{FindingImpairmentDestination, FindingVaultRejection, StoredImpairmentTransaction};
     use chio_core::capability::scope::MonetaryAmount;
+    use chio_egress_contract::ContractLookup;
+    use std::sync::atomic::Ordering;
 
     struct OversizedTransport;
 
@@ -732,6 +737,70 @@ mod remote_tests {
             Duration::from_secs(5),
         )
         .is_ok());
+    }
+
+    #[test]
+    fn transport_resolves_and_checks_the_publisher_name_for_each_post() -> Result<(), String> {
+        let (served, server) = serve(vec![ok_json("{}")])?;
+        let metadata = METADATA.parse().map_err(|_| "address")?;
+        let (lookup, lookups) = rotating_lookup(served, metadata);
+        let transport = HttpsFindingImpairmentTransport {
+            http: plaintext_client("publisher.example", lookup)?,
+        };
+
+        let body = transport
+            .post(FindingImpairmentPublisherOperation::Dispatch, b"{}")
+            .map_err(|error| error.to_string())?;
+        let refused = transport.post(FindingImpairmentPublisherOperation::Observe, b"{}");
+
+        assert_eq!(body, b"{}");
+        assert!(
+            matches!(
+                &refused,
+                Err(FindingImpairmentPublishError::Permanent(message))
+                    if message == "link-local egress target denied: publisher.example resolved to 169.254.169.254"
+            ),
+            "{refused:?}"
+        );
+        assert_eq!(lookups.load(Ordering::SeqCst), 2);
+        let request = server
+            .join()
+            .map_err(|_| "server panicked")?
+            .concat()
+            .to_ascii_lowercase();
+        assert!(
+            request.starts_with("post /v1/finding-impairments/dispatch "),
+            "{request}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_publisher_refuses_a_loopback_answer() -> Result<(), String> {
+        let config = RemoteFindingImpairmentPublisherConfig::new(
+            "https://publisher.example/api",
+            "token",
+            "tenant:one",
+            Duration::from_secs(5),
+        )
+        .map_err(|error| error.to_string())?;
+        let loopback = ContractLookup::new(|_host: &str, port: u16| {
+            Ok(vec![std::net::SocketAddr::from(([127, 0, 0, 1], port))])
+        });
+        let transport = HttpsFindingImpairmentTransport::with_lookup(config, loopback)
+            .map_err(|error| error.to_string())?;
+
+        let refused = transport.post(FindingImpairmentPublisherOperation::Dispatch, b"{}");
+
+        assert!(
+            matches!(
+                &refused,
+                Err(FindingImpairmentPublishError::Permanent(message))
+                    if message == "loopback egress target denied: publisher.example resolved to 127.0.0.1"
+            ),
+            "{refused:?}"
+        );
+        Ok(())
     }
 
     #[test]
