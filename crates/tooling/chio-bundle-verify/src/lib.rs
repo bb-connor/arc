@@ -12,6 +12,8 @@
 //!
 //! The crate reads no clock and opens no network or database connection.
 
+#![forbid(unsafe_code)]
+
 pub mod error;
 pub mod federation;
 pub mod package;
