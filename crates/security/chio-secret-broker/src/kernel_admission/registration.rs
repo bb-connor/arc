@@ -282,12 +282,13 @@ mod tests {
             inner: Arc::new(Ed25519Backend::new(Keypair::from_seed(&[35; 32]))),
             key: original.public_key(),
         };
-        assert!(changed
-            .sign_bytes_with_identity(SigningMessage::exempt(
+        assert!(matches!(
+            changed.sign_bytes_with_identity(SigningMessage::exempt(
                 ExemptFormat::JwsSigningInput,
                 b"original registration",
-            ))
-            .is_err());
+            )),
+            Err(chio_core_types::Error::InvalidPublicKey(_))
+        ));
         Ok(())
     }
 }

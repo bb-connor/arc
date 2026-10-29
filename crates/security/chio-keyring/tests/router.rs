@@ -283,9 +283,10 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
         corrupted_evidence.verify(&ready.old.public_key().test_unwrap()),
         Err(chio_keyring::KeyringError::InvalidSignature)
     ));
-    assert!(router
-        .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 2}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 2})),
+        Err(chio_keyring::KeyringError::StateInvariant("stale signing epoch"))
+    ));
 
     router
         .activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
@@ -293,9 +294,10 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     router
         .activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
         .test_unwrap();
-    assert!(router
-        .sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 3}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 3})),
+        Err(chio_keyring::KeyringError::StateInvariant("stale signing epoch"))
+    ));
     let second = router
         .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 4}))
         .test_unwrap();
@@ -574,9 +576,10 @@ fn failed_durable_anchor_never_returns_signature_evidence() {
         )
         .test_unwrap();
 
-    assert!(router
-        .sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"must": "persist"}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"must": "persist"})),
+        Err(chio_keyring::KeyringError::Storage(_))
+    ));
     assert!(ready
         .store
         .load_artifact_signatures()
@@ -830,12 +833,13 @@ fn enterprise_anchor_insert_failure_rolls_back_the_artifact_signature() {
         )
         .test_unwrap();
 
-    assert!(router
-        .sign_wrapped_with_identity(
+    assert!(matches!(
+        router.sign_wrapped_with_identity(
             ARTIFACT_SCHEMA,
             &artifact_body("signature and anchor must commit together")
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::Storage(_))
+    ));
     assert!(ready
         .store
         .load_artifact_signatures()
