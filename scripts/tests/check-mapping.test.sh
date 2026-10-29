@@ -12,9 +12,7 @@ mkdir -p \
   "${fixture_root}/.loom" \
   "${fixture_root}/scripts" \
   "${fixture_root}/formal/tla" \
-  "${fixture_root}/formal/apalache" \
-  "${fixture_root}/crates/kernel/chio-kernel-core/src" \
-  "${fixture_root}/crates/economy/chio-open-market/src"
+  "${fixture_root}/formal/apalache"
 cp "${REPO_ROOT}/scripts/check-mapping.sh" "${fixture_root}/scripts/check-mapping.sh"
 if [[ "$(grep -Ec 'LC_ALL=C comm -(13|23)' "${fixture_root}/scripts/check-mapping.sh")" -ne 4 ]]; then
   echo "check-mapping must run all sorted-set comparisons under the C locale" >&2
@@ -82,10 +80,28 @@ printf '%s\n' \
   '---- MODULE PostAdmissionDropGuard ----' \
   '========================================' \
   > "${fixture_root}/formal/apalache/PostAdmissionDropGuard.tla"
-printf '%s\n' '// No Kani harnesses in this fixture.' \
-  > "${fixture_root}/crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs"
-printf '%s\n' '// No Kani harnesses in this fixture.' \
-  > "${fixture_root}/crates/economy/chio-open-market/src/kani_public_harnesses.rs"
+kani_sources=()
+while IFS= read -r kani_source; do
+  kani_sources+=("${kani_source}")
+done < <(
+  awk '
+    /^kani_sources=\($/ { inside = 1; next }
+    inside && /^\)$/ { exit }
+    inside {
+      line = $0
+      gsub(/^[[:space:]]*"|"[[:space:]]*$/, "", line)
+      print line
+    }
+  ' "${fixture_root}/scripts/check-mapping.sh"
+)
+if [[ " ${kani_sources[*]} " != *" crates/economy/chio-open-market/src/kani_public_harnesses.rs "* ]]; then
+  echo "check-mapping kani_sources must list the open-market harness file" >&2
+  exit 1
+fi
+for kani_source in "${kani_sources[@]}"; do
+  mkdir -p "${fixture_root}/$(dirname "${kani_source}")"
+  printf '%s\n' '// No Kani harnesses in this fixture.' > "${fixture_root}/${kani_source}"
+done
 printf '%s\n' '# fixture manifest' > "${fixture_root}/.loom/harnesses.toml"
 printf '%s\n' '# fixture manifest' > "${fixture_root}/.dst/harnesses.toml"
 printf '%s\n' \
