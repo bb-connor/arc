@@ -245,3 +245,44 @@ fn native_fixture_responses_include_governed_receipt_metadata() {
         .and_then(|value| value.get("governed_transaction"))
         .is_some());
 }
+
+#[test]
+fn http_scenario_does_not_follow_a_redirect_to_another_authority() {
+    use crate::redirect_stub::{ok_empty, redirect_to, serve};
+    let scenario = load_native_scenarios_from_dir(
+        crate::default_repo_root().join("tests/conformance/native/scenarios"),
+    )
+    .expect("load native scenarios")
+    .into_iter()
+    .find(|scenario| scenario.driver == NativeDriver::Http)
+    .expect("an http scenario");
+    let target = serve(ok_empty());
+    let origin = serve(redirect_to(&format!("http://127.0.0.1:{}/", target.port)));
+    let mut options = default_native_run_options();
+    options.http_base_url = Some(format!("http://127.0.0.1:{}", origin.port));
+    let outcome = execute_http_scenario(&scenario, &options);
+    assert!(
+        outcome.is_err(),
+        "a redirect answer is not a fixture response"
+    );
+    assert_eq!(origin.requests().len(), 1);
+    assert!(target.requests().is_empty());
+}
+
+#[test]
+fn http_scenario_refuses_a_link_local_base_url_without_dialing() {
+    let scenario = load_native_scenarios_from_dir(
+        crate::default_repo_root().join("tests/conformance/native/scenarios"),
+    )
+    .expect("load native scenarios")
+    .into_iter()
+    .find(|scenario| scenario.driver == NativeDriver::Http)
+    .expect("an http scenario");
+    let mut options = default_native_run_options();
+    options.http_base_url = Some("http://169.254.169.254".to_string());
+    let error = match execute_http_scenario(&scenario, &options) {
+        Err(error) => error,
+        Ok(_) => panic!("a link-local base url must be refused"),
+    };
+    assert!(error.to_string().contains("link-local"), "{error}");
+}

@@ -72,6 +72,7 @@ chio-bbs = [
 public_entrypoint = true
 
 [dependencies]
+chio-egress-contract = { workspace = true, features = ["ureq-egress"] }
 chio-core = { package = "chio-core-types", version = "0.1.0", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
 chio-trace-validate = { workspace = true }
@@ -82,7 +83,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = "0.8"
-reqwest = { workspace = true, features = ["blocking", "form", "query", "rustls"] }
 tiny_http = "0.12"
 tempfile = { workspace = true }
 chio-selective-disclosure = { version = "=0.1.0", path = "../../trust/chio-selective-disclosure", default-features = false, optional = true }
@@ -121,6 +121,7 @@ name = "verdict_matrix_cross_language"
 path = "verdict_matrix/tests/verdict_matrix_cross_language.rs"
 
 [dev-dependencies]
+reqwest = { workspace = true, features = ["blocking", "form", "query", "rustls"] }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 # verdict-matrix test targets (deployment_shape_smoke, diff_oracle_self_test)
 # compile verdict_matrix/src/diff_oracle.rs, which parses the error registry as YAML.
@@ -183,7 +184,6 @@ chio-adversarial-suite = { workspace = true }
 # chio-siem SplunkHecExporter, chio-siem DatadogExporter, chio-link
 # PythHermesClient, chio-openapi-mcp-bridge OpenApiMcpBridge,
 # chio-a2a-adapter A2aAdapter).
-chio-egress-contract = { workspace = true }
 chio-siem = { workspace = true }
 chio-link = { workspace = true }
 chio-openapi-mcp-bridge = { workspace = true }

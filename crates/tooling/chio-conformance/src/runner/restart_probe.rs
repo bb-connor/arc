@@ -1,13 +1,13 @@
 //! Restart conformance uses bounded JSON and SSE response readers.
 
 use std::collections::BTreeMap;
-use std::io::Read;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use chio_core::canonical::UntrustedJsonText;
-use reqwest::blocking::{Client, Response};
-use reqwest::StatusCode;
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractStream as Response, HttpEgressContract, HttpEgressError,
+};
 use serde_json::{json, Value};
 
 use super::{ConformanceRunOptions, RunnerError};
@@ -31,7 +31,7 @@ struct SseEvent {
 }
 
 struct Probe {
-    client: Client,
+    agent: BlockingContractAgent,
     endpoint: String,
     token: String,
     timeout: Duration,
@@ -39,27 +39,30 @@ struct Probe {
 
 impl Probe {
     fn post(&self, session: Option<&str>, body: &Value) -> Result<Response, String> {
+        let payload = serde_json::to_vec(body).map_err(|error| error.to_string())?;
         let mut request = self
-            .client
+            .agent
             .post(&self.endpoint)
-            .timeout(self.timeout)
-            .bearer_auth(&self.token)
+            .map_err(request_error)?
+            .deadline(self.timeout)
+            .body_limit(MAX_RESPONSE_BYTES as u64)
+            .header("authorization", &format!("Bearer {}", self.token))
+            .header("connection", "close")
             .header("accept", "application/json, text/event-stream")
-            .header("content-type", "application/json")
-            .json(body);
+            .header("content-type", "application/json");
         if let Some(session) = session {
             request = request
                 .header("mcp-session-id", session)
                 .header("mcp-protocol-version", PROTOCOL_VERSION);
         }
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback restart probe,
-        // outside substrate tool egress.
-        request.send().map_err(request_error)
+        request
+            .send_bytes_streaming(&payload)
+            .map_err(request_error)
     }
 
     fn rpc(&self, session: &str, body: &Value) -> Result<Vec<SseEvent>, String> {
         let response = self.post(Some(session), body)?;
-        if response.status() != StatusCode::OK {
+        if response.status() != 200 {
             return Err(format!("{} answered {}", body["method"], response.status()));
         }
         parse_sse(&read_response(response)?)
@@ -73,13 +76,11 @@ impl Probe {
                 "capabilities": {},
                 "clientInfo": {"name": PEER_LABEL, "version": "0.1.0"}}}),
         )?;
-        if !response.status().is_success() {
+        if !(200..300).contains(&response.status()) {
             return Err(format!("initialize answered {}", response.status()));
         }
         let session = response
-            .headers()
-            .get("mcp-session-id")
-            .and_then(|value| value.to_str().ok())
+            .header("mcp-session-id")
             .map(str::to_owned)
             .ok_or("initialize returned no MCP-Session-Id")?;
         validate_initialize(response)?;
@@ -87,7 +88,7 @@ impl Probe {
             Some(&session),
             &json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
         )?;
-        if initialized.status() != StatusCode::ACCEPTED {
+        if initialized.status() != 202 {
             return Err(format!(
                 "notifications/initialized answered {}",
                 initialized.status()
@@ -122,28 +123,26 @@ impl Probe {
             .collect())
     }
 
-    fn replay_status(&self, session: &str, cursor: &str) -> Result<StatusCode, String> {
-        self.client
+    fn replay_status(&self, session: &str, cursor: &str) -> Result<u16, String> {
+        self.agent
             .get(&self.endpoint)
-            .timeout(self.timeout)
-            .bearer_auth(&self.token)
+            .map_err(request_error)?
+            .deadline(self.timeout)
+            .header("authorization", &format!("Bearer {}", self.token))
+            .header("connection", "close")
             .header("accept", "text/event-stream")
             .header("mcp-session-id", session)
             .header("mcp-protocol-version", PROTOCOL_VERSION)
             .header("last-event-id", cursor)
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback restart probe,
-            // outside substrate tool egress.
-            .send()
-            .map(|response| response.status())
+            .call_streaming()
+            .map(|stream| stream.status())
             .map_err(request_error)
     }
 }
 
 fn validate_initialize(response: Response) -> Result<(), String> {
     let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
+        .header("content-type")
         .and_then(|value| value.split(';').next())
         .unwrap_or("")
         .trim();
@@ -152,7 +151,7 @@ fn validate_initialize(response: Response) -> Result<(), String> {
     if !is_sse && !is_json {
         return Err("initialize returned an unsupported content type".to_owned());
     }
-    if is_sse && response.status() != StatusCode::OK {
+    if is_sse && response.status() != 200 {
         return Err(format!("initialize answered {}", response.status()));
     }
     let body = read_response(response)?;
@@ -185,8 +184,30 @@ fn validate_initialize(response: Response) -> Result<(), String> {
     Ok(())
 }
 
-fn request_error(error: reqwest::Error) -> String {
-    if error.is_timeout() {
+fn is_timeout(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut cause = Some(error);
+    while let Some(error) = cause {
+        if error.downcast_ref::<std::io::Error>().is_some_and(|io| {
+            matches!(
+                io.kind(),
+                std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+            )
+        }) {
+            return true;
+        }
+        cause = error.source();
+    }
+    false
+}
+
+fn too_large() -> String {
+    format!("restart probe response exceeds {MAX_RESPONSE_BYTES} bytes")
+}
+
+fn request_error(error: HttpEgressError) -> String {
+    if matches!(error, HttpEgressError::ResponseTooLarge { .. }) {
+        too_large()
+    } else if is_timeout(&error) {
         "restart probe request timed out".to_owned()
     } else {
         error.to_string()
@@ -194,26 +215,24 @@ fn request_error(error: reqwest::Error) -> String {
 }
 
 fn read_response(response: Response) -> Result<String, String> {
+    use std::io::Read as _;
     let mut bytes = Vec::new();
     response
-        .take(MAX_RESPONSE_BYTES as u64 + 1)
+        .into_body()
         .read_to_end(&mut bytes)
         .map_err(|error| {
             if error
                 .get_ref()
-                .and_then(|cause| cause.downcast_ref::<reqwest::Error>())
-                .is_some_and(reqwest::Error::is_timeout)
+                .and_then(|cause| cause.downcast_ref::<HttpEgressError>())
+                .is_some_and(|cause| matches!(cause, HttpEgressError::ResponseTooLarge { .. }))
             {
+                too_large()
+            } else if is_timeout(&error) {
                 "restart probe response timed out".to_owned()
             } else {
                 "restart probe response could not be read".to_owned()
             }
         })?;
-    if bytes.len() > MAX_RESPONSE_BYTES {
-        return Err(format!(
-            "restart probe response exceeds {MAX_RESPONSE_BYTES} bytes"
-        ));
-    }
     String::from_utf8(bytes).map_err(|_| "restart probe response is not UTF-8".to_owned())
 }
 
@@ -316,11 +335,15 @@ pub(super) fn run(
     restart: impl FnOnce() -> Result<(), RunnerError>,
 ) -> Result<Vec<ScenarioResult>, RunnerError> {
     let started = Instant::now();
+    let endpoint = format!("http://{listen}/mcp");
+    let contract = HttpEgressContract::for_configured_url(
+        "chio-conformance-restart-probe",
+        &endpoint,
+        MAX_RESPONSE_BYTES as u64,
+    )?;
     let probe = Probe {
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the probe targets the loopback
-        // server the conformance runner launched, not substrate tool egress.
-        client: Client::new(),
-        endpoint: format!("http://{listen}/mcp"),
+        agent: BlockingContractAgent::new(&contract, REQUEST_TIMEOUT, REQUEST_TIMEOUT)?,
+        endpoint,
         token: options.auth_token.clone(),
         timeout: REQUEST_TIMEOUT,
     };
@@ -346,7 +369,7 @@ pub(super) fn run(
     restart()?;
 
     let replay = probe.replay_status(&session, &cursor).and_then(|status| {
-        if status == StatusCode::CONFLICT {
+        if status == 409 {
             Ok(())
         } else {
             Err(format!(

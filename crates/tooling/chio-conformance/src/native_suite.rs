@@ -22,6 +22,7 @@ use chio_core::receipt::{
     governance::GovernedTransactionReceiptMetadata, kinds::BoundaryClass, kinds::ReceiptKind,
     kinds::RedactionMode, kinds::ToolOrigin, metadata::GuardEvidence,
 };
+use chio_egress_contract::{BlockingContractAgent, HttpEgressContract};
 use chio_kernel::dpop::authority::DpopReplayAuthority;
 use chio_kernel::dpop::{verify_dpop_proof_stateless, DpopProof, DpopProofBody};
 use chio_kernel::transport::{read_frame, write_frame, TransportError};
@@ -33,7 +34,6 @@ use chio_kernel::{
 };
 use chio_store_sqlite::SqliteReceiptStore;
 use chio_trace_validate::{RuntimeTraceMutation, RuntimeTraceRecorder};
-use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 const NATIVE_TRACE_OBSERVER_KEY: &str =
@@ -739,31 +739,32 @@ fn execute_http_scenario(
             format!("/{path}")
         }
     );
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the native conformance HTTP
-    // driver targets a caller-supplied harness endpoint, not production
-    // substrate tool egress.
-    let client = Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
-    let response = client
-        .post(&url)
-        .json(&NativeFixtureRequest {
-            scenario_id: scenario.id.clone(),
-            request,
+    let body = serde_json::to_vec(&NativeFixtureRequest {
+        scenario_id: scenario.id.clone(),
+        request,
+    })
+    .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
+    let contract = HttpEgressContract::for_configured_url(
+        "chio-native-conformance",
+        &url,
+        MAX_HTTP_RESPONSE_BYTES,
+    )
+    .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
+    let response = BlockingContractAgent::new(&contract, HTTP_TIMEOUT, HTTP_TIMEOUT)
+        .and_then(|agent| {
+            agent
+                .post(&url)?
+                .header("content-type", "application/json")
+                .send_bytes(&body)
         })
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: native conformance harness
-        // dispatch, outside substrate tool egress.
-        .send()
         .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
-    if !response.status().is_success() {
+    if !(200..300).contains(&response.status()) {
         return Err(NativeSuiteError::Http(format!(
             "unexpected status {} from {url}",
             response.status()
         )));
     }
-    let response: NativeFixtureResponse = response
-        .json()
+    let response: NativeFixtureResponse = serde_json::from_slice(response.body())
         .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
     let terminal_receipt =
         terminal_response(&response.messages).map(|(_, receipt)| receipt.clone());
@@ -1038,6 +1039,9 @@ impl ToolServerConnection for NativeTraceEchoServer {
         Ok(arguments)
     }
 }
+
+const HTTP_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_HTTP_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
 
 /// The kernel transport frame limit.
 const MAX_KERNEL_FRAME_BYTES: usize = 16 * 1024 * 1024;

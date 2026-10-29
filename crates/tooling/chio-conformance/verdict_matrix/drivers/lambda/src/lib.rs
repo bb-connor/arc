@@ -32,6 +32,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use chio_egress_contract::{BlockingContractAgent, HttpEgressContract};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use url::form_urlencoded::byte_serialize;
@@ -48,6 +49,7 @@ const REASON_NONE: &str = "urn:chio:error:none";
 const REASON_KERNEL_INTERNAL: &str = "urn:chio:error:kernel:internal-error";
 const EVALUATE_PATH: &str = "/chio/evaluate";
 const DEFAULT_TIMEOUT_SECS: u64 = 5;
+const MAX_RESPONSE_BYTES: u64 = 16 * 1024 * 1024;
 /// Synthetic request timestamp (unix seconds). The verdict-matrix corpus
 /// is time-invariant, so a fixed value keeps relayed requests deterministic.
 const REQUEST_TIMESTAMP_SECS: u64 = 1_700_000_000;
@@ -219,7 +221,7 @@ pub fn run_driver(scenario_root: &Path, sidecar_url: Option<&str>) -> Result<Dri
             }
         }
         Some(base_url) => {
-            let client = build_client()?;
+            let client = build_client(&base_url)?;
             for scenario in scenarios {
                 if let Some(reason) = sidecar_unsupported_reason(&scenario) {
                     outcomes.push(ScenarioOutcome {
@@ -254,32 +256,42 @@ pub fn run_driver(scenario_root: &Path, sidecar_url: Option<&str>) -> Result<Dri
     })
 }
 
-fn build_client() -> Result<reqwest::blocking::Client, String> {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: verdict-matrix conformance
-    // driver targets an operator-supplied sidecar URL via env var, outside
-    // production substrate egress policy.
-    reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
-        .build()
+fn build_client(base_url: &str) -> Result<BlockingContractAgent, String> {
+    let timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECS);
+    let contract = HttpEgressContract::for_configured_url(
+        "chio-verdict-matrix-lambda",
+        base_url,
+        MAX_RESPONSE_BYTES,
+    )
+    .map_err(|err| format!("sidecar URL rejected: {err}"))?;
+    BlockingContractAgent::new(&contract, timeout, timeout)
         .map_err(|err| format!("failed to build HTTP client: {err}"))
 }
 
 fn evaluate_scenario(
-    client: &reqwest::blocking::Client,
+    client: &BlockingContractAgent,
     base_url: &str,
     scenario: &Scenario,
 ) -> ScenarioOutcome {
     let expected = scenario.expected.clone().normalized();
     let request_body = scenario_to_http_request(scenario);
     let url = format!("{base_url}{EVALUATE_PATH}");
-    let response = match client
-        .post(&url)
-        .header("content-type", "application/json")
-        .header("x-chio-capability", capability_token_for(scenario))
-        .json(&request_body)
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
-        .send()
-    {
+    let payload = match serde_json::to_vec(&request_body) {
+        Ok(payload) => payload,
+        Err(err) => {
+            return fail(
+                scenario.id.clone(),
+                expected,
+                format!("failed to encode sidecar request: {err}"),
+            );
+        }
+    };
+    let response = match client.post(&url).and_then(|request| {
+        request
+            .header("content-type", "application/json")
+            .header("x-chio-capability", &capability_token_for(scenario))
+            .send_bytes(&payload)
+    }) {
         Ok(response) => response,
         Err(err) => {
             return fail(
@@ -289,16 +301,15 @@ fn evaluate_scenario(
             );
         }
     };
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().unwrap_or_default();
+    if !(200..300).contains(&response.status()) {
+        let body = String::from_utf8_lossy(response.body());
         return fail(
             scenario.id.clone(),
             expected,
-            format!("sidecar returned {status}: {body}"),
+            format!("sidecar returned {}: {body}", response.status()),
         );
     }
-    let value = match response.json::<Value>() {
+    let value = match serde_json::from_slice::<Value>(response.body()) {
         Ok(value) => value,
         Err(err) => {
             return fail(
@@ -750,5 +761,55 @@ mod tests {
             request.get("tool_name").and_then(Value::as_str),
             Some("terminal/create")
         );
+    }
+
+    fn one_shot_server(response: String) -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{Read, Write};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let hits = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = std::sync::Arc::clone(&hits);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                counter.fetch_add(1, Ordering::SeqCst);
+                let mut buffer = [0u8; 8192];
+                let _ = stream.read(&mut buffer);
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        (port, hits)
+    }
+
+    #[test]
+    fn sidecar_redirect_to_another_authority_is_not_dialed() {
+        use std::sync::atomic::Ordering;
+        let root = resolve_scenario_root().unwrap();
+        let (target_port, target_hits) = one_shot_server(
+            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".to_string(),
+        );
+        let (origin_port, origin_hits) = one_shot_server(format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{target_port}/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        ));
+        let report = run_driver(&root, Some(&format!("http://127.0.0.1:{origin_port}"))).unwrap();
+        assert_eq!(report.passed, 0);
+        assert!(origin_hits.load(Ordering::SeqCst) > 0);
+        assert_eq!(target_hits.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn link_local_sidecar_is_refused_without_dialing() {
+        let root = resolve_scenario_root().unwrap();
+        let report = run_driver(&root, Some("http://169.254.169.254")).unwrap();
+        assert_eq!(report.passed, 0);
+        assert!(report
+            .outcomes
+            .iter()
+            .filter(|outcome| outcome.status == "fail")
+            .all(|outcome| outcome
+                .diagnostic
+                .as_deref()
+                .is_some_and(|text| text.contains("link-local"))));
     }
 }

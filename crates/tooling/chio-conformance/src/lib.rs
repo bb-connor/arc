@@ -12,6 +12,8 @@ mod load;
 mod model;
 mod native_suite;
 pub mod peers;
+#[cfg(test)]
+mod redirect_stub;
 mod report;
 mod runner;
 

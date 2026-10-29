@@ -141,6 +141,9 @@ pub enum RunnerError {
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("restart probe egress contract: {0}")]
+    Egress(#[from] chio_egress_contract::HttpEgressError),
+
     #[error("failed to spawn process `{command}`: {source}")]
     Spawn {
         command: String,

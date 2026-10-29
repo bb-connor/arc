@@ -3,12 +3,24 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use chio_egress_contract::{BlockingContractAgent, HttpEgressContract};
 use chio_test_support::plain::TestResultOk;
-use reqwest::blocking::Client;
 use serde_json::json;
 use tiny_http::{Header, Response, Server};
 
-use super::{parse_sse, Probe, SseEvent};
+use super::{parse_sse, Probe, SseEvent, MAX_RESPONSE_BYTES};
+
+fn fixture_agent(address: &impl std::fmt::Display) -> BlockingContractAgent {
+    let url = format!("http://{address}/mcp");
+    let contract = HttpEgressContract::for_configured_url(
+        "restart-probe-fixture",
+        &url,
+        MAX_RESPONSE_BYTES as u64,
+    )
+    .test_expect("fixture contract");
+    BlockingContractAgent::new(&contract, Duration::from_secs(3), Duration::from_secs(3))
+        .test_expect("fixture agent")
+}
 
 const RESPONSE_LIMIT: usize = 8 * 1024 * 1024;
 
@@ -29,10 +41,7 @@ fn rpc_response(body: Vec<u8>) -> Result<Vec<SseEvent>, String> {
         request.respond(response)
     });
     let probe = Probe {
-        client: Client::builder()
-            .no_proxy()
-            .build()
-            .test_expect("fixture client"),
+        agent: fixture_agent(&address),
         endpoint: format!("http://{address}/mcp"),
         token: "restart-probe-fixture".to_owned(),
         timeout: Duration::from_secs(3),
@@ -223,10 +232,7 @@ fn rpc_deadline_covers_a_trickling_response_body() {
             .test_expect("complete chunked response");
     });
     let probe = Probe {
-        client: Client::builder()
-            .no_proxy()
-            .build()
-            .test_expect("fixture client"),
+        agent: fixture_agent(&address),
         endpoint: format!("http://{address}/mcp"),
         token: "restart-probe-fixture".to_owned(),
         timeout: Duration::from_secs(1),
@@ -255,10 +261,7 @@ fn replay_deadline_refuses_a_stalled_response() {
         let _ = request.respond(Response::empty(409));
     });
     let probe = Probe {
-        client: Client::builder()
-            .no_proxy()
-            .build()
-            .test_expect("fixture client"),
+        agent: fixture_agent(&address),
         endpoint: format!("http://{address}/mcp"),
         token: "restart-probe-fixture".to_owned(),
         timeout: Duration::from_secs(1),
@@ -295,14 +298,7 @@ fn rpc_refuses_a_truncated_http_body_without_reporting_a_timeout() {
         wire.flush().test_expect("flush truncated response");
     });
     let probe = Probe {
-        client: Client::builder()
-            .no_proxy()
-            .default_headers(reqwest::header::HeaderMap::from_iter([(
-                reqwest::header::CONNECTION,
-                reqwest::header::HeaderValue::from_static("close"),
-            )]))
-            .build()
-            .test_expect("fixture client"),
+        agent: fixture_agent(&address),
         endpoint: format!("http://{address}/mcp"),
         token: "restart-probe-fixture".to_owned(),
         timeout: Duration::from_secs(3),
@@ -363,10 +359,7 @@ fn initialize_response(
         }
     });
     let probe = Probe {
-        client: Client::builder()
-            .no_proxy()
-            .build()
-            .test_expect("fixture client"),
+        agent: fixture_agent(&address),
         endpoint: format!("http://{address}/mcp"),
         token: "restart-probe-fixture".to_owned(),
         timeout: Duration::from_secs(3),
@@ -407,7 +400,7 @@ fn initialize_refuses_unsuccessful_http_status() {
         500,
         "application/json",
         INITIALIZE_RESULT,
-        "initialize answered 500 Internal Server Error",
+        "initialize answered 500",
     );
 }
 
@@ -564,12 +557,7 @@ fn initialize_accepts_successful_json_status() {
 #[test]
 fn initialize_refuses_non_ok_sse_status() {
     let body = format!("data: {INITIALIZE_RESULT}\n\n");
-    assert_initialize_refused(
-        201,
-        "text/event-stream",
-        &body,
-        "initialize answered 201 Created",
-    );
+    assert_initialize_refused(201, "text/event-stream", &body, "initialize answered 201");
 }
 
 #[test]
@@ -603,4 +591,46 @@ fn initialize_refuses_malformed_sse_after_result() {
         &body,
         "urn:chio:error:attest:signed-json-invalid-input",
     );
+}
+
+use std::net::SocketAddr;
+
+use super::{run, ConformanceRunOptions};
+use crate::model::ResultStatus;
+use crate::redirect_stub::{ok_empty, redirect_to, serve};
+
+fn options() -> ConformanceRunOptions {
+    let mut options = crate::default_run_options();
+    options.auth_token = "restart-probe-secret".to_string();
+    options
+}
+
+#[test]
+fn a_redirect_to_another_authority_is_not_dialed_and_the_token_stays() {
+    let target = serve(ok_empty());
+    let origin = serve(redirect_to(&format!(
+        "http://127.0.0.1:{}/mcp",
+        target.port
+    )));
+    let listen: SocketAddr = format!("127.0.0.1:{}", origin.port).parse().unwrap();
+    let _ = run(&options(), listen, || Ok(()));
+    assert!(!origin.requests().is_empty());
+    assert!(origin
+        .requests()
+        .iter()
+        .all(|request| request.contains("restart-probe-secret")));
+    assert!(target.requests().is_empty());
+}
+
+#[test]
+fn a_link_local_listen_address_is_refused_without_dialing() {
+    let listen: SocketAddr = "169.254.169.254:80".parse().unwrap();
+    let results = run(&options(), listen, || Ok(())).expect("results");
+    assert!(results.iter().all(|result| {
+        result.status == ResultStatus::Fail
+            && result
+                .failure_message
+                .as_deref()
+                .is_some_and(|message| message.contains("link-local"))
+    }));
 }
