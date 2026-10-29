@@ -2,17 +2,15 @@
 
 use std::sync::Arc;
 
-use chio_core::crypto::{sign_wrapped_for_identity, PublicKey, SigningBackend};
-use chio_core::root_authority::idp_key_snapshot::IdpKeySnapshotSigningBody;
 use chio_core::root_authority::{
-    EnterpriseProviderIdentity, HttpsUrl, IdpKeySnapshot, IdpKeySnapshotFields, Jwk, JwsAlgorithm,
-    KeySnapshotSource, ProviderRecordKind, RootAuthorityShapeError, Uri,
-    CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+    EnterpriseProviderIdentity, HttpsUrl, IdpKeySnapshot, Jwk, JwsAlgorithm, KeySnapshotSource,
+    ProviderRecordKind, RootAuthorityShapeError, Uri,
 };
 use tokio::sync::Mutex;
 
 use super::document::{admit_jwks_document, admit_keys, key_supports, JwksDocumentError};
 use super::fetch::{JwksFetchError, JwksFetcher};
+use crate::root_exchange::signer::ExchangeSigner;
 
 pub const DEFAULT_MIN_FETCH_INTERVAL_SECS: u64 = 60;
 pub const DEFAULT_SCHEDULED_REFRESH_SECS: u64 = 900;
@@ -74,49 +72,6 @@ impl Default for RefreshPolicy {
             min_fetch_interval_secs: DEFAULT_MIN_FETCH_INTERVAL_SECS,
             scheduled_refresh_secs: DEFAULT_SCHEDULED_REFRESH_SECS,
         }
-    }
-}
-
-/// The exchange signing backend and the exchange key it must sign as.
-#[derive(Clone)]
-pub struct ExchangeSigner {
-    pub backend: Arc<dyn SigningBackend>,
-    pub key: PublicKey,
-}
-
-impl ExchangeSigner {
-    /// Sign a `chio.idp-key-snapshot.v1` over `keys` as observed at `observed_at`.
-    fn sign_snapshot(
-        &self,
-        issuer: &Uri,
-        source: &KeySnapshotSource,
-        keys: Vec<Jwk>,
-        observed_at: u64,
-    ) -> Result<IdpKeySnapshot, KeyResolutionError> {
-        let (outcome, _) = sign_wrapped_for_identity(
-            self.backend.as_ref(),
-            &self.key,
-            CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
-            &IdpKeySnapshotSigningBody {
-                schema: CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
-                issuer,
-                source,
-                keys: &keys,
-                observed_at,
-                exchange_key: &self.key,
-            },
-        )
-        .map_err(|_| SnapshotNotSigned)?;
-        IdpKeySnapshot::new(IdpKeySnapshotFields {
-            schema: CHIO_IDP_KEY_SNAPSHOT_SCHEMA.to_owned(),
-            issuer: issuer.clone(),
-            source: source.clone(),
-            keys,
-            observed_at,
-            exchange_key: self.key.clone(),
-            signature: outcome.signature,
-        })
-        .map_err(KeyResolutionError::SnapshotInvalid)
     }
 }
 
