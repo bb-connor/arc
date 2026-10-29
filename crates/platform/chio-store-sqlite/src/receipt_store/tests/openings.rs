@@ -1,6 +1,7 @@
 //! Receipt openings: the fresh-only v1 DDL refusals, the store identity, reads and erasure.
 
-use super::super::openings::RECEIPT_OPENINGS_SCHEMA;
+use super::super::openings::{seed_receipt_store_identity, RECEIPT_OPENINGS_SCHEMA};
+use chio_core::receipt::disclosure::MAX_DISCLOSURE_OPENINGS;
 use super::super::*;
 use super::support::*;
 use chio_kernel::receipt_store::{OpeningReadScope, OpeningState, OpeningStatus};
@@ -1174,6 +1175,111 @@ fn read_returns_only_requested_present_openings() -> TestResult {
         store.read_openings(&receipt_id, &missing)?,
         OpeningState::Unknown
     ));
+    Ok(())
+}
+
+fn scope_of(count: usize) -> Result<OpeningReadScope, Box<dyn std::error::Error>> {
+    Ok(OpeningReadScope {
+        salt_refs: (0..count)
+            .map(|index| salt_ref(&format!("s{index}")))
+            .collect::<Result<_, _>>()?,
+        tenant_binding: None,
+    })
+}
+
+fn add_openings(
+    store: &SqliteReceiptStore,
+    receipt_id: &str,
+    salt_refs: std::ops::Range<usize>,
+) -> Result<(), ReceiptStoreError> {
+    let id = receipt_id.to_owned();
+    store
+        .writer_handle()
+        .run_write_anchored_metadata(move |transaction| {
+            for index in salt_refs {
+                transaction.execute(
+                    "INSERT INTO receipt_openings VALUES (?1, ?2, 'present', zeroblob(32), 1)",
+                    rusqlite::params![id, format!("s{index}")],
+                )?;
+            }
+            Ok(())
+        })
+}
+
+#[test]
+fn read_refuses_an_empty_scope() -> TestResult {
+    let (_dir, path) = chio_test_support::temp_sqlite_path("chio-openings-empty-scope");
+    let (store, receipt_id) = store_with_openings(&path)?;
+    let error = store
+        .read_openings(&receipt_id, &scope_of(0)?)
+        .err()
+        .ok_or("an empty scope read as an answer")?;
+    assert!(matches!(error, ReceiptStoreError::ReadBoundary(_)), "{error:?}");
+    Ok(())
+}
+
+#[test]
+fn read_refuses_a_scope_above_the_opening_cap() -> TestResult {
+    let (_dir, path) = chio_test_support::temp_sqlite_path("chio-openings-wide-scope");
+    let (store, receipt_id) = store_with_openings(&path)?;
+    assert!(matches!(
+        store.read_openings(&receipt_id, &scope_of(MAX_DISCLOSURE_OPENINGS)?)?,
+        OpeningState::Unknown
+    ));
+    let error = store
+        .read_openings(&receipt_id, &scope_of(MAX_DISCLOSURE_OPENINGS + 1)?)
+        .err()
+        .ok_or("a scope above the opening cap was read")?;
+    assert!(matches!(error, ReceiptStoreError::ReadBoundary(_)), "{error:?}");
+    Ok(())
+}
+
+#[test]
+fn opening_rows_above_the_cap_read_as_corrupt() -> TestResult {
+    let (_dir, path) = chio_test_support::temp_sqlite_path("chio-openings-row-cap");
+    let (store, receipt_id) = store_with_openings(&path)?;
+    add_openings(&store, &receipt_id, 0..MAX_DISCLOSURE_OPENINGS - 2)?;
+    assert_eq!(store.opening_status(&receipt_id)?, OpeningStatus::Present);
+    add_openings(
+        &store,
+        &receipt_id,
+        MAX_DISCLOSURE_OPENINGS - 2..MAX_DISCLOSURE_OPENINGS - 1,
+    )?;
+    let status = store
+        .opening_status(&receipt_id)
+        .err()
+        .ok_or("openings above the cap reported a status")?;
+    assert!(
+        matches!(status, ReceiptStoreError::CorruptOpeningRow(_)),
+        "{status:?}"
+    );
+    let read = store
+        .read_openings(&receipt_id, &scope_of(1)?)
+        .err()
+        .ok_or("openings above the cap were read")?;
+    assert!(
+        matches!(read, ReceiptStoreError::CorruptOpeningRow(_)),
+        "{read:?}"
+    );
+    Ok(())
+}
+
+struct FailingRng;
+
+impl chio_core::rng::Rng for FailingRng {
+    fn fill_bytes(&self, _dest: &mut [u8]) -> Result<(), chio_core::rng::RngError> {
+        Err(chio_core::rng::RngError("entropy source unavailable"))
+    }
+}
+
+#[test]
+fn identity_draw_failure_is_an_entropy_fault_not_a_conflict() -> TestResult {
+    let mut connection = bare()?;
+    let transaction = connection.transaction()?;
+    let error = seed_receipt_store_identity(&transaction, &FailingRng)
+        .err()
+        .ok_or("a failed draw seeded a store identity")?;
+    assert!(matches!(error, ReceiptStoreError::Io(_)), "{error:?}");
     Ok(())
 }
 
