@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 
 use chio_core_types::receipt::metadata::{
     check_internal_receipt_metadata, metadata_key_spec, reserved_receipt_metadata_keys,
-    EvidenceDisclosure, GuardEvidenceDeclaration, MetadataDisclosure, MetadataKeyOrigin,
-    MetadataKeySpec, RECEIPT_METADATA_KEYS,
+    EvidenceDisclosure, GuardEvidenceDeclaration, MetadataDisclosure, MetadataForm,
+    MetadataKeyOrigin, MetadataKeySpec, RECEIPT_METADATA_KEYS,
 };
 use serde_json::json;
 
@@ -27,6 +27,7 @@ enum CensusOutcome {
 
 use CensusOutcome::{AwaitingProjection, Registered};
 use MetadataDisclosure::{CommittedSafe, Unsafe};
+use MetadataForm::{Commitments, Plaintext, Projection, Removed};
 use MetadataKeyOrigin::{CallerOrHook, ChioInternal};
 
 const CENSUS: &[(&str, CensusOutcome)] = &[
@@ -129,6 +130,16 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("agent_web_receipt_ref", Registered(ChioInternal, Unsafe)),
     ("parent_receipt_ids", Registered(ChioInternal, Unsafe)),
     ("batch_witness", Registered(ChioInternal, Unsafe)),
+    ("active_defense", Registered(ChioInternal, CommittedSafe)),
+    (
+        "response_simulation",
+        Registered(ChioInternal, CommittedSafe),
+    ),
+    ("security_event", Registered(ChioInternal, CommittedSafe)),
+    ("cage_receipt", Registered(ChioInternal, Unsafe)),
+    ("guard_error", Registered(ChioInternal, CommittedSafe)),
+    ("refusal", Registered(ChioInternal, CommittedSafe)),
+    ("cancellation", Registered(ChioInternal, CommittedSafe)),
     ("native_launch", Registered(CallerOrHook, Unsafe)),
     ("provenance", Registered(CallerOrHook, Unsafe)),
     ("chio_process", Registered(CallerOrHook, Unsafe)),
@@ -140,7 +151,6 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("active_defense_body", AwaitingProjection),
     ("response_simulation_report", AwaitingProjection),
     ("security_event_projection", AwaitingProjection),
-    ("cage_receipt", AwaitingProjection),
     ("schema", AwaitingProjection),
 ];
 
@@ -217,13 +227,111 @@ fn signing_path_and_projection_keys_are_reserved() {
 }
 
 /// A caller or hook value is committed by default, so no caller-origin key
-/// reads as committed-safe.
+/// reads as committed-safe, and receipt assembly drops every one.
 #[test]
 fn caller_origin_keys_are_unsafe() {
     for spec in RECEIPT_METADATA_KEYS {
         if spec.origin == CallerOrHook {
             assert_eq!(spec.disclosure, Unsafe, "{}", spec.key);
+            assert_eq!(spec.form, Removed, "{}", spec.key);
         }
+    }
+}
+
+/// Keys whose production writer emits the registered form today. A key joins
+/// this list in the commit that changes its writer to the registered form.
+const WRITER_EMITS_REGISTERED_FORM: &[&str] = &[
+    "budget_authority",
+    "caller_delivery",
+    "chio_runtime",
+    "session_anchor",
+    "finding_delivery",
+    "finding_recovery",
+    "finding_purchase_replay_snapshot",
+    "finding_recovery_replay_snapshot",
+    "decision_model_witness",
+    "threshold_approval",
+    "execution_nonce",
+    "active_response_terminal_evidence",
+    "chio_http_status_scope",
+    "chio_decision_receipt_id",
+    "chio_kernel_receipt_id",
+    "occurred_at_unix_ms",
+    "active_defense",
+    "response_simulation",
+    "security_event",
+    "guard_error",
+    "refusal",
+    "cancellation",
+];
+
+/// `disclosure` never claims more than the current writer emits: a
+/// committed-safe key has a retained form and a writer that already emits it,
+/// and a key whose target form is removal stays unsafe.
+#[test]
+fn committed_safe_disclosure_never_outruns_the_writer() {
+    for spec in RECEIPT_METADATA_KEYS {
+        if spec.disclosure == CommittedSafe {
+            assert_ne!(spec.form, Removed, "{}", spec.key);
+            assert!(
+                WRITER_EMITS_REGISTERED_FORM.contains(&spec.key),
+                "{} is committed-safe but its writer does not emit the registered form",
+                spec.key
+            );
+        }
+    }
+    for key in WRITER_EMITS_REGISTERED_FORM {
+        assert!(metadata_key_spec(key).is_some(), "{key} is unregistered");
+    }
+}
+
+/// The projection and detail keys are signer-written, so caller metadata
+/// naming one is refused, and each carries its registered form.
+#[test]
+fn projection_and_detail_keys_are_registered_in_their_forms() {
+    for (key, disclosure, form) in [
+        ("active_defense", CommittedSafe, Projection),
+        ("response_simulation", CommittedSafe, Projection),
+        ("security_event", CommittedSafe, Projection),
+        ("cage_receipt", Unsafe, Projection),
+        ("guard_error", CommittedSafe, Commitments),
+        ("refusal", CommittedSafe, Commitments),
+        ("cancellation", CommittedSafe, Commitments),
+    ] {
+        let spec = metadata_key_spec(key).unwrap_or_else(|| panic!("{key} is unregistered"));
+        assert_eq!(
+            (spec.origin, spec.disclosure, spec.form),
+            (ChioInternal, disclosure, form),
+            "{key}"
+        );
+        assert!(reserved_receipt_metadata_keys().any(|reserved| reserved == key));
+    }
+    assert_eq!(
+        metadata_key_spec("cage_receipt").and_then(|spec| spec.schema),
+        Some("chio.cage.receipt-metadata.v1")
+    );
+}
+
+/// The cage producer still writes the raw cage receipt body under
+/// `cage_receipt`, so the key refuses until the producer writes the projection.
+#[test]
+fn raw_cage_receipt_block_refuses_until_projected() {
+    let error = check_internal_receipt_metadata(&json!({ "cage_receipt": {} }))
+        .expect_err("the raw cage block must refuse");
+    assert_eq!(
+        error.to_string(),
+        "canonical JSON error: receipt metadata key \"cage_receipt\" is not committed-safe"
+    );
+}
+
+/// Every form appears in the registry.
+#[test]
+fn every_form_is_used() {
+    for form in [Plaintext, Projection, Commitments, Removed] {
+        assert!(
+            RECEIPT_METADATA_KEYS.iter().any(|spec| spec.form == form),
+            "{form:?}"
+        );
     }
 }
 
@@ -294,12 +402,18 @@ fn render_row(spec: &MetadataKeySpec) -> String {
         CommittedSafe => "committed-safe",
         Unsafe => "unsafe",
     };
+    let form = match spec.form {
+        Plaintext => "plaintext",
+        Projection => "projection",
+        Commitments => "commitments",
+        Removed => "removed",
+    };
     let schema = spec
         .schema
         .map(|schema| format!("`{schema}`"))
         .unwrap_or_default();
     format!(
-        "| `{}` | {origin} | {disclosure} | {schema} | {} |",
+        "| `{}` | {origin} | {disclosure} | {form} | {schema} | {} |",
         spec.key, spec.reason
     )
 }
@@ -308,8 +422,8 @@ fn render_row(spec: &MetadataKeySpec) -> String {
 #[test]
 fn protocol_key_table_renders_the_registry() {
     let mut expected = vec![
-        "| Key | Origin | Disclosure | Schema | Contents and audit |".to_string(),
-        "|-----|--------|------------|--------|--------------------|".to_string(),
+        "| Key | Origin | Disclosure | Form | Schema | Contents and audit |".to_string(),
+        "|-----|--------|------------|------|--------|--------------------|".to_string(),
     ];
     expected.extend(RECEIPT_METADATA_KEYS.iter().map(render_row));
 
