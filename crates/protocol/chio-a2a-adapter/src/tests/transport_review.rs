@@ -284,3 +284,19 @@ fn an_endless_json_body_is_cut_off_at_the_protocol_ceiling() {
         "the client read {written} bytes past a 16 MiB JSON ceiling"
     );
 }
+
+#[test]
+fn a_dial_time_resolution_failure_is_a_remote_failure_not_an_invalid_url() {
+    let failure = map_egress_error(HttpEgressError::DnsResolutionFailed {
+        host: "agent.example".to_string(),
+        details: "no record".to_string(),
+    });
+    assert!(matches!(failure, AdapterError::Remote(_)), "{failure:?}");
+    let refusal = map_egress_error(HttpEgressError::LoopbackDenied {
+        host: "localhost".to_string(),
+    });
+    assert!(
+        matches!(refusal, AdapterError::InvalidUrl(_)),
+        "{refusal:?}"
+    );
+}
