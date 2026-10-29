@@ -2347,7 +2347,11 @@ mod tests {
         assert_eq!(task["status"]["state"].as_str(), Some("TASK_STATE_FAILED"));
         assert_eq!(
             task["status"]["message"]["parts"][0]["text"].as_str(),
-            Some("a2a edge runtime admission denied")
+            Some("Runtime admission denied")
+        );
+        assert_eq!(
+            task["metadata"]["chio"]["denialCode"].as_str(),
+            Some("runtime_admission_denied")
         );
         assert_eq!(
             task["metadata"]

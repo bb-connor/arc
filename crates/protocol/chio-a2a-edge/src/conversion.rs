@@ -116,7 +116,7 @@ pub(super) fn task_response_from_orchestrated(
         KernelVerdict::Deny => TaskResponse {
             id: task_id,
             status: TaskStatus::Failed,
-            status_message: response.reason,
+            status_message: response.client_reason(),
             message: None,
             metadata: receipt_metadata,
         },
