@@ -216,7 +216,10 @@ pub enum FieldVerdict {
 
 /// `disclosure_valid` is false exactly when the document is tampered disclosure: a structural
 /// fault or any field `Rejected`. A reader accepts a disclosure only when it is true. An absent
-/// opening or an absent own preimage leaves its field `Unverifiable`.
+/// opening or an absent own preimage leaves its field `Unverifiable`. The report covers only
+/// the parameter and content commitments: the delegation-context anchor commitments
+/// (`anchor_subject`, `anchor_tenant`) are outside it, and a disclosure that opens them is
+/// accepted only after they are judged separately.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpeningReport {
     pub parameters: FieldVerdict,

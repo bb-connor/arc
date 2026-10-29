@@ -47,6 +47,9 @@ type ReceiptDisclosure struct {
 }
 
 // OpeningReport is false in DisclosureValid exactly when the document is tampered disclosure.
+// It covers only the parameter and content commitments: the delegation-context anchor
+// commitments (anchor_subject, anchor_tenant) are outside it, and a disclosure that opens them
+// is accepted only after they are judged separately.
 type OpeningReport struct {
 	Parameters      FieldVerdict `json:"parameters"`
 	Content         FieldVerdict `json:"content"`

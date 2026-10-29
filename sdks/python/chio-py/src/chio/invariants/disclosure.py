@@ -139,7 +139,10 @@ def open_commitments(
     """Open a receipt's parameter and content commitments over the caller's own arguments and
     content preimage; a payload never supplies a preimage. An absent own preimage leaves that
     field unverifiable. A document for another receipt, a repeated salt_ref or a salt shared by
-    two openings rejects every field; any rejected field marks the disclosure invalid."""
+    two openings rejects every field; any rejected field marks the disclosure invalid. The report
+    covers only the parameter and content commitments: the delegation-context anchor commitments
+    (anchor_subject, anchor_tenant) are outside it, and a disclosure that opens them is accepted
+    only after they are judged separately."""
     if not _structurally_valid(receipt_id, disclosure):
         return {"content": REJECTED, "disclosure_valid": False, "parameters": REJECTED}
     if own_parameters is None:
