@@ -8,9 +8,9 @@ use chio_core::root_authority::{EnterpriseProviderIdentity, JwsAlgorithm};
 
 use super::fetch::JwksFetcher;
 use super::source::{
-    ExchangeSigner, IdpKeySourceError, KeyResolutionError, KeySnapshotSink, PinnedIdpKeys,
-    RefreshPolicy,
+    IdpKeySourceError, KeyResolutionError, KeySnapshotSink, PinnedIdpKeys, RefreshPolicy,
 };
+use crate::root_exchange::signer::ExchangeSigner;
 use crate::root_exchange::{IdpKey, IdpKeyLookup, RootExchangeError};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

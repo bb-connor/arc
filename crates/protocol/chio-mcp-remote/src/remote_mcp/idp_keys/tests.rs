@@ -16,6 +16,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::*;
+use crate::root_exchange::signer::ExchangeSigner;
 use crate::root_exchange::{IdpKeyLookup, RootExchangeError};
 
 const ISSUER: &str = "https://idp.example";
@@ -124,10 +125,7 @@ fn exchange_key() -> PublicKey {
 }
 
 fn signer_as(backend: Keypair, key: PublicKey) -> ExchangeSigner {
-    ExchangeSigner {
-        backend: Arc::new(Ed25519Backend::new(backend)),
-        key,
-    }
+    ExchangeSigner::seed_file_backend(Arc::new(Ed25519Backend::new(backend)), key)
 }
 
 fn harness_for(identity: &EnterpriseProviderIdentity) -> Result<Harness, IdpKeySourceError> {
@@ -993,10 +991,7 @@ async fn failed_refresh_refuses_known_keys_until_recovery(path: RefreshFailure) 
     });
     let harness = harness_signed_by(
         &identity(Some(JWKS_URL), None),
-        ExchangeSigner {
-            backend: backend.clone(),
-            key: exchange_key(),
-        },
+        ExchangeSigner::seed_file_backend(backend.clone(), exchange_key()),
     )
     .unwrap();
     harness.fetcher.push(Ok(jwks(&[rsa_key("k1", 2048)])));

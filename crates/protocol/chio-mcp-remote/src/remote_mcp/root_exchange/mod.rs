@@ -31,6 +31,7 @@ pub mod key_lookup;
 pub mod kinds;
 pub mod provider;
 pub mod replay;
+pub mod signer;
 #[cfg(test)]
 mod tests;
 

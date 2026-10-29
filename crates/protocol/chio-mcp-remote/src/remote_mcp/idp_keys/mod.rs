@@ -27,8 +27,8 @@ pub use document::{admit_jwks_document, JwksDocumentError};
 pub use fetch::{ContractJwksFetcher, JwksFetchError, JwksFetcher};
 pub use lookup::{IdpKeySources, IdpKeySourcesError};
 pub use source::{
-    ExchangeSigner, IdpKeySourceError, KeyResolutionError, KeySnapshotSink, PinnedIdpKeys,
-    RefreshPolicy, RefreshPolicyError, ResolvedIdpKey, SnapshotNotRecorded, SnapshotNotSigned,
+    IdpKeySourceError, KeyResolutionError, KeySnapshotSink, PinnedIdpKeys, RefreshPolicy,
+    RefreshPolicyError, ResolvedIdpKey, SnapshotNotRecorded, SnapshotNotSigned,
     DEFAULT_MIN_FETCH_INTERVAL_SECS, DEFAULT_SCHEDULED_REFRESH_SECS,
 };
 
