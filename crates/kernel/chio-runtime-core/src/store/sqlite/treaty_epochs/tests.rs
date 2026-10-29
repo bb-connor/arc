@@ -266,3 +266,26 @@ fn floor_cas_failure_rolls_back_treaty_authorization() -> TestResult {
     assert_eq!(count, 0);
     Ok(())
 }
+
+#[test]
+fn authority_table_limits_refuse_before_unrelated_rows_are_decoded() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    for (table, limit, insert) in [
+        ("runtime_treaty_epoch_pins", MAX_PINS, "INSERT INTO runtime_treaty_epoch_pins SELECT printf('other-%d', n), x'00' FROM counts"),
+        ("runtime_treaty_epoch_heads", MAX_PINS, "INSERT INTO runtime_treaty_epoch_heads SELECT printf('other-%d', n), 'invalid-unselected-digest' FROM counts"),
+        ("runtime_treaty_epoch_records", MAX_RECORDS, "INSERT INTO runtime_treaty_epoch_records SELECT printf('other-%d', n), printf('%064x', n), 1, x'00' FROM counts"),
+        ("runtime_treaty_authorizations", MAX_AUTHORIZATIONS, "INSERT INTO runtime_treaty_authorizations SELECT printf('other-%d', n), x'00' FROM counts"),
+    ] {
+        let fixture = Fixture::new()?;
+        fixture.install()?;
+        fixture.store.commit_runtime_authority(&fixture.request)?;
+        let limit = i64::try_from(limit)?;
+        let fill = format!("WITH RECURSIVE counts(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM counts WHERE n < ?1) {insert}");
+        fixture.store.lock_connection()?.execute(&fill, params![limit - 1])?;
+        fixture.store.commit_runtime_authority(&fixture.request)?;
+        let overflow = format!("WITH counts(n) AS (SELECT ?1) {insert}");
+        fixture.store.lock_connection()?.execute(&overflow, params![limit])?;
+        assert_eq!(fixture.store.commit_runtime_authority(&fixture.request).err().ok_or("over-limit authority accepted")?.code(), "treaty_epoch_capacity", "{table}");
+    }
+    Ok(())
+}

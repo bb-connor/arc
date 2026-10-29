@@ -91,6 +91,25 @@ impl SqliteRuntimeOrchestrationStore {
         let key = authority_id(&body.verifier_id, &body.treaty_id)?;
         let head = load_head(&tx, &key)?;
         check_count(&tx, "runtime_treaty_epoch_records", MAX_RECORDS, false)?;
+        let previous = head
+            .as_ref()
+            .map(|digest| load_record(&tx, &pin, digest))
+            .transpose()?;
+        let maximum: Option<i64> = tx
+            .query_row(
+                "SELECT MAX(sequence) FROM runtime_treaty_epoch_records WHERE authority_id = ?1",
+                params![key],
+                |r| r.get(0),
+            )
+            .map_err(sqlite_error)?;
+        if maximum.and_then(|n| u64::try_from(n).ok())
+            != previous.as_ref().map(|v| v.body().sequence)
+        {
+            return Err(refusal(
+                "treaty_epoch_invalid",
+                "epoch head does not identify latest retained history",
+            ));
+        }
         if head.as_ref() == Some(update.body_digest()) {
             let retained = load_record(&tx, &pin, update.body_digest())?;
             if encode(retained.envelope())? != bytes
@@ -109,10 +128,6 @@ impl SqliteRuntimeOrchestrationStore {
                 "epoch predecessor differs from current head",
             ));
         }
-        let previous = head
-            .as_ref()
-            .map(|digest| load_record(&tx, &pin, digest))
-            .transpose()?;
         let expected_sequence = previous
             .as_ref()
             .map_or(Some(1), |old| old.body().sequence.checked_add(1));
@@ -120,21 +135,6 @@ impl SqliteRuntimeOrchestrationStore {
             return Err(refusal(
                 "treaty_epoch_update_conflict",
                 "epoch sequence does not advance current head",
-            ));
-        }
-        let maximum: Option<i64> = tx
-            .query_row(
-                "SELECT MAX(sequence) FROM runtime_treaty_epoch_records WHERE authority_id = ?1",
-                params![key],
-                |r| r.get(0),
-            )
-            .map_err(sqlite_error)?;
-        if maximum.and_then(|n| u64::try_from(n).ok())
-            != previous.as_ref().map(|v| v.body().sequence)
-        {
-            return Err(refusal(
-                "treaty_epoch_invalid",
-                "epoch head does not identify latest retained history",
             ));
         }
         check_count(&tx, "runtime_treaty_epoch_records", MAX_RECORDS, true)?;

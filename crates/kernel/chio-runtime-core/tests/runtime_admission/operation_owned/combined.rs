@@ -13,6 +13,9 @@ use chio_store_sqlite::SqliteReceiptStore;
 #[path = "combined/authority_commit.rs"]
 mod authority_commit;
 
+#[path = "combined/treaty_epoch.rs"]
+mod treaty_epoch;
+
 #[path = "combined/lifecycle.rs"]
 mod lifecycle;
 
