@@ -243,3 +243,64 @@ fn contract_refusal_at_connect_aborts_without_failover() {
         "a contract refusal must not fail over to the next endpoint"
     );
 }
+
+fn innermost_cause(error: &CliError) -> String {
+    let mut current: &(dyn Error + 'static) = error;
+    while let Some(cause) = current.source() {
+        current = cause;
+    }
+    current.to_string()
+}
+
+#[test]
+fn loopback_literal_beside_another_endpoint_is_refused_at_construction() {
+    for (control_url, loopback, other) in [
+        (
+            "https://control.example:9443,http://127.0.0.1:8940",
+            "127.0.0.1:8940",
+            "control.example:9443",
+        ),
+        (
+            "https://localhost:8940,https://control.example",
+            "localhost:8940",
+            "control.example",
+        ),
+        (
+            "http://[::1]:8940,https://10.20.0.5:8443",
+            "[::1]:8940",
+            "10.20.0.5:8443",
+        ),
+    ] {
+        let Err(error) = build_client(
+            control_url,
+            TOKEN,
+            &allowance_set("10.20.0.5", 8443, "10.20.0.5/32"),
+        ) else {
+            panic!("mixed endpoint list {control_url} was accepted");
+        };
+        assert_eq!(
+            error.report().message,
+            "trust-control endpoints mix loopback and non-loopback hosts",
+            "{control_url}"
+        );
+        assert_eq!(
+            innermost_cause(&error),
+            format!(
+                "control endpoints mix loopback `{loopback}` with non-loopback `{other}`; \
+                 a client dials loopback literals only or no loopback at all"
+            ),
+            "{control_url}"
+        );
+    }
+}
+
+#[test]
+fn endpoint_lists_on_one_side_of_loopback_are_accepted() {
+    for control_url in [
+        "http://127.0.0.1:8940,https://localhost:8941,http://[::1]:8942",
+        "https://control.example:9443,https://control-b.example:9443",
+    ] {
+        build_client(control_url, TOKEN, &EgressAllowanceSet::default())
+            .unwrap_or_else(|error| panic!("{control_url} was refused: {error}"));
+    }
+}
