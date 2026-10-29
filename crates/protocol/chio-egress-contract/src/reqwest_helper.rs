@@ -501,3 +501,7 @@ mod producer_tests {
 #[cfg(test)]
 #[path = "tests/single_attempt.rs"]
 mod single_attempt_tests;
+
+#[cfg(test)]
+#[path = "tests/resolver_refusal.rs"]
+mod resolver_refusal_tests;
