@@ -62,7 +62,8 @@ fn load_authorization(
         false,
     )?;
     read_blob(tx, "SELECT CASE WHEN typeof(canonical_bytes) = 'blob' AND length(canonical_bytes) BETWEEN 1 AND 1048576 THEN canonical_bytes END FROM runtime_treaty_authorizations WHERE claim_id = ?1", params![claim_id(binding)?])?
-        .map(|bytes| decode(&bytes)).transpose()
+        .map(|bytes| decode::<Authorization>(&bytes))
+        .transpose()
 }
 
 impl SqliteRuntimeOrchestrationStore {
