@@ -39,6 +39,7 @@ name = "ureq_proxy_env"
 required-features = ["ureq-egress"]
 
 [dev-dependencies]
+serde_json = { workspace = true }
 rcgen = "0.13"
 reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

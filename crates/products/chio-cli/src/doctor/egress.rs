@@ -72,7 +72,6 @@ pub(crate) mod test_support {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -87,8 +86,10 @@ mod tests {
     #[test]
     fn private_network_target_is_admitted_by_the_contract() {
         for url in ["http://10.0.0.5:9100/metrics", "http://100.64.0.1/"] {
-            let contract =
-                HttpEgressContract::for_configured_url("chio-doctor", url, 64).unwrap();
+            let Ok(contract) = HttpEgressContract::for_configured_url("chio-doctor", url, 64)
+            else {
+                panic!("contract for {url}");
+            };
             assert!(contract.enforce_url(url, 0).is_ok(), "{url}");
         }
     }

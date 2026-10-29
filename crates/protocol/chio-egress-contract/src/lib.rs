@@ -34,10 +34,12 @@ pub struct HttpEgressContract {
     pub deny_link_local: bool,
     /// Reject IPv6 unique-local address literals.
     pub deny_ipv6_ula: bool,
-    /// Admit private and special-use addresses (RFC 1918, CGNAT and the like)
-    /// for the authorities this contract allows. Loopback, link-local and
-    /// IPv6 unique-local addresses stay governed by their own flags.
-    #[serde(default)]
+    /// Admit RFC 1918 and CGNAT (100.64.0.0/10) addresses for the authorities
+    /// this contract allows. Every other special-use range stays refused, and
+    /// loopback, link-local and IPv6 unique-local addresses stay governed by
+    /// their own flags. Never read from configuration: only
+    /// [`HttpEgressContract::for_configured_url`] sets it.
+    #[serde(skip)]
     pub allow_private_network: bool,
     /// Maximum redirect hop count accepted for a request chain.
     pub max_redirect_chain: u8,
@@ -103,6 +105,12 @@ impl HttpEgressContract {
     /// addresses are always refused. Loopback and IPv6 unique-local addresses
     /// are refused unless the configured host is itself one, so a public name
     /// cannot resolve onto the local host or a local network segment.
+    ///
+    /// Trust assumption: a configured named host may resolve to an RFC 1918 or
+    /// CGNAT address because the operator named that exact host. A name that
+    /// an untrusted party controls must not be passed here. Metadata, NAT64,
+    /// 6to4, Teredo, IPv4-compatible, multicast and reserved ranges are
+    /// refused whatever the name resolves to.
     pub fn for_configured_url(
         tenant_egress_namespace: &str,
         url: &str,
@@ -322,10 +330,13 @@ impl HttpEgressContract {
                 }
                 Ok(())
             }
-            IpAddressClass::PrivateOrSpecialUse => {
+            IpAddressClass::PrivateNetwork => {
                 if self.allow_private_network {
                     return Ok(());
                 }
+                Err(HttpEgressError::PrivateNetworkDenied { host })
+            }
+            IpAddressClass::PrivateOrSpecialUse => {
                 Err(HttpEgressError::PrivateNetworkDenied { host })
             }
         }
@@ -625,6 +636,7 @@ enum IpAddressClass {
     Global,
     Loopback,
     LinkLocal,
+    PrivateNetwork,
     Ipv6Ula,
     PrivateOrSpecialUse,
 }
@@ -636,10 +648,18 @@ fn classify_ipv4_address(address: &Ipv4Addr) -> IpAddressClass {
     if address.is_link_local() {
         return IpAddressClass::LinkLocal;
     }
+    if address.is_private() || is_ipv4_cgnat(address) {
+        return IpAddressClass::PrivateNetwork;
+    }
     if is_ipv4_private_or_special_use(address) {
         return IpAddressClass::PrivateOrSpecialUse;
     }
     IpAddressClass::Global
+}
+
+fn is_ipv4_cgnat(address: &Ipv4Addr) -> bool {
+    let octets = address.octets();
+    octets[0] == 100 && (64..=127).contains(&octets[1])
 }
 
 fn classify_ipv6_address(address: &Ipv6Addr) -> IpAddressClass {

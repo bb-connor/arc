@@ -1038,3 +1038,87 @@ fn private_network_stays_refused_unless_the_contract_admits_it() {
         Err(HttpEgressError::PrivateNetworkDenied { .. })
     ));
 }
+
+fn configured_named_contract() -> HttpEgressContract {
+    HttpEgressContract::for_configured_url("t", "https://bridge.example.com/x", 64)
+        .expect("contract")
+}
+
+#[test]
+fn configured_named_host_resolving_to_private_ranges_is_admitted() {
+    let contract = configured_named_contract();
+    for address in [
+        "10.1.2.3",
+        "172.16.0.1",
+        "172.31.255.255",
+        "192.168.1.1",
+        "100.64.0.1",
+        "100.127.255.255",
+    ] {
+        let address: IpAddr = address.parse().expect("address");
+        assert!(
+            contract
+                .enforce_resolved_ip("bridge.example.com", address)
+                .is_ok(),
+            "{address}"
+        );
+    }
+}
+
+#[test]
+fn configured_named_host_resolving_to_special_use_ranges_is_refused() {
+    let contract = configured_named_contract();
+    for address in [
+        "0.0.0.1",
+        "::",
+        "64:ff9b::a9fe:a9fe",
+        "::7f00:1",
+        "2002:a9fe:a9fe::1",
+        "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+        "224.0.0.1",
+        "ff02::1",
+        "240.0.0.1",
+        "255.255.255.255",
+    ] {
+        let address: IpAddr = address.parse().expect("address");
+        assert!(
+            matches!(
+                contract.enforce_resolved_ip("bridge.example.com", address),
+                Err(HttpEgressError::PrivateNetworkDenied { .. })
+            ),
+            "{address}"
+        );
+    }
+}
+
+#[test]
+fn configured_named_host_still_refuses_link_local_and_loopback_answers() {
+    let contract = configured_named_contract();
+    for address in ["169.254.169.254", "fe80::1"] {
+        let address: IpAddr = address.parse().expect("address");
+        assert!(matches!(
+            contract.enforce_resolved_ip("bridge.example.com", address),
+            Err(HttpEgressError::LinkLocalDenied { .. })
+        ));
+    }
+    for address in ["127.0.0.1", "::1"] {
+        let address: IpAddr = address.parse().expect("address");
+        assert!(matches!(
+            contract.enforce_resolved_ip("bridge.example.com", address),
+            Err(HttpEgressError::LoopbackDenied { .. })
+        ));
+    }
+}
+
+#[test]
+fn operator_config_cannot_set_allow_private_network() {
+    let mut value = serde_json::to_value(strict_contract("api.example.com")).expect("value");
+    value["allow_private_network"] = serde_json::Value::Bool(true);
+    let contract: HttpEgressContract = serde_json::from_value(value).expect("deserialize");
+    assert!(!contract.allow_private_network);
+    assert!(!serde_json::to_value(&contract)
+        .expect("value")
+        .as_object()
+        .expect("object")
+        .contains_key("allow_private_network"));
+}
