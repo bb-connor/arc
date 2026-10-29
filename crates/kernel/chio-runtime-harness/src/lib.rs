@@ -665,28 +665,55 @@ mod tests {
         let scenario = root.join("scenario.json");
         write_executable_scenario(&fixture_scenario, &scenario)?;
 
+        let mut parity_reports = Vec::new();
         for suffix in ["a", "b"] {
-            run_runtime_loopback_scenario(
+            let out_dir = root.join(format!("out-{suffix}"));
+            let error = match run_runtime_loopback_scenario(
                 &scenario,
                 &root.join(format!("store-{suffix}")),
                 1_766_000_001_000,
-                &root.join(format!("out-{suffix}")),
-            )?;
+                &out_dir,
+            ) {
+                Ok(()) => {
+                    panic!("source-bound runtime evidence matched a static baseline byte for byte")
+                }
+                Err(error) => error,
+            };
+            assert_eq!(
+                error.to_string(),
+                "Chio runtime loopback rejected request: runtime_proof_semantic_parity_mismatch; \
+                 mismatched fields: []; proof package hash match: false; \
+                 verifier report hash match: false"
+            );
+            let verifier_report = read_json(&out_dir.join("verifier-report.json"))?;
+            assert_eq!(
+                verifier_report
+                    .get("accepted")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            let parity = read_json(&out_dir.join("runtime-proof-parity-report.json"))?;
+            assert_eq!(parity.get("mismatches"), Some(&serde_json::json!([])));
+            assert!(parity
+                .get("comparedFields")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|fields| !fields.is_empty()));
+            parity_reports.push(parity);
+        }
+        for field in [
+            "comparedFields",
+            "staticProofPackageSha256",
+            "staticVerifierReportSha256",
+        ] {
+            assert_eq!(parity_reports[0].get(field), parity_reports[1].get(field));
         }
 
-        let mut first = read_json(&root.join("out-a/proof-package.json"))?;
-        let mut second = read_json(&root.join("out-b/proof-package.json"))?;
-        for package in [&mut first, &mut second] {
-            let proof_bytes = package
-                .pointer_mut("/selectiveDisclosureProof/proof_bytes_hex")
-                .ok_or_else(|| {
-                    crate::RuntimeLoopbackError::message(
-                        "runtime proof package omitted BBS proof bytes",
-                    )
-                })?;
-            *proof_bytes = serde_json::Value::Null;
-        }
-        assert_eq!(first, second);
+        std::fs::remove_dir_all(&root).map_err(|error| {
+            crate::RuntimeLoopbackError::message(format!(
+                "failed to remove runtime loopback temp output {}: {error}",
+                root.display()
+            ))
+        })?;
         Ok(())
     }
 }
