@@ -8,6 +8,7 @@ use super::store_artifacts::{load_bilateral_invocation_artifact, load_treaty_art
 use super::treaty_ref::TreatyReference;
 
 pub(super) struct VerifiedTreatyReference {
+    pub(super) treaty_scope: TreatyScope,
     pub(super) valid_until_unix_ms: u64,
     pub(super) continuation_artifact_digest: Option<String>,
     pub(super) evidence_digest: String,
@@ -279,6 +280,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 .as_ref()
                 .map(|(continuation, _)| continuation.continuation_id.clone()),
             federation_treaty_material: federation_treaty_material.map(|(material, _)| material),
+            treaty_scope,
         })
     } else {
         rejected(
