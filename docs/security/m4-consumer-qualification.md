@@ -501,7 +501,7 @@ without inventing new admission wiring. M6/M7 receive the same support ledger.
 ## Verification recipes and evidence discipline
 
 Start with `umask 022`, disabled core dumps for deliberate abort tests, the pinned
-Rust 1.94.1 toolchain and required WASM/SDK/C++ prerequisites. Use one Cargo
+Rust 1.95.0 toolchain and required WASM/SDK/C++ prerequisites. Use one Cargo
 compilation owner and an explicit build-job limit appropriate to host memory/disk.
 Use `--locked`; use cached/offline resolution when available, never alter lockfiles
 merely to work around a missing tool. Isolated stores and single test-thread
