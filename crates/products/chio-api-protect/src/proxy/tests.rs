@@ -593,6 +593,24 @@ async fn evaluation_error_response_surfaces_pending_approval_state() {
 }
 
 #[tokio::test]
+async fn evaluation_error_response_withholds_kernel_detail() {
+    let detail = "durable admission failed: /var/lib/chio/admission.sqlite3 is locked";
+    let response = evaluation_error_response(&ProtectError::from(
+        chio_http_core::HttpAuthorityError::Kernel(detail.to_string()),
+    ));
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let body = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let text = std::str::from_utf8(&body).test_unwrap();
+    assert!(!text.contains("admission"), "{text}");
+    let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
+    assert_eq!(json["error"], "chio_evaluation_failed");
+    assert_eq!(json["message"], "request evaluation failed");
+}
+
+#[tokio::test]
 async fn approval_routes_are_handled_before_proxy_catch_all() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let (approval, subject, approver) = pending_approval_request("ap-route-1");
