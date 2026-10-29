@@ -301,7 +301,12 @@ pub fn validate_web3_settlement_dispatch(
             ))
         })?;
     if let Some(bond) = dispatch.bond.as_ref() {
-        let signature_valid = bond.verify_signature(&bond.signer_key).map_err(|error| {
+        let bond_key = trusted_capital_member(
+            capital_authority,
+            &bond.signer_key,
+            "credit bond signer is not a trusted capital authority key",
+        )?;
+        let signature_valid = bond.verify_signature(bond_key).map_err(|error| {
             Web3ContractError::settlement_signature_invalid(format!(
                 "credit bond signature verification failed: {error}"
             ))
