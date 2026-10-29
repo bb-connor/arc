@@ -151,11 +151,16 @@ pub type SignedWeb3SettlementExecutionReceipt =
 
 pub fn validate_web3_settlement_dispatch(
     dispatch: &Web3SettlementDispatchArtifact,
-    _capital_authority: &[PublicKey],
+    capital_authority: &[PublicKey],
 ) -> Result<(), Web3ContractError> {
     if dispatch.schema != CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA {
         return Err(Web3ContractError::UnsupportedSchema(
             dispatch.schema.clone(),
+        ));
+    }
+    if capital_authority.is_empty() {
+        return Err(Web3ContractError::invalid_settlement(
+            "web3 settlement capital authority must name at least one trusted key",
         ));
     }
     for field in [
@@ -218,9 +223,14 @@ pub fn validate_web3_settlement_dispatch(
             dispatch.capital_instruction.body.schema.clone(),
         ));
     }
+    let instruction_key = trusted_capital_member(
+        capital_authority,
+        &dispatch.capital_instruction.signer_key,
+        "capital instruction signer is not a trusted capital authority key",
+    )?;
     let signature_valid = dispatch
         .capital_instruction
-        .verify_signature(&dispatch.capital_instruction.signer_key)
+        .verify_signature(instruction_key)
         .map_err(|error| {
             Web3ContractError::settlement_signature_invalid(format!(
                 "capital instruction signature verification failed: {error}"
@@ -308,6 +318,17 @@ pub fn validate_web3_settlement_dispatch(
         }
     }
     Ok(())
+}
+
+fn trusted_capital_member<'a>(
+    capital_authority: &'a [PublicKey],
+    signer_key: &PublicKey,
+    refusal: &'static str,
+) -> Result<&'a PublicKey, Web3ContractError> {
+    capital_authority
+        .iter()
+        .find(|member| *member == signer_key)
+        .ok_or_else(|| Web3ContractError::settlement_signature_invalid(refusal))
 }
 
 pub fn validate_web3_settlement_execution_receipt(

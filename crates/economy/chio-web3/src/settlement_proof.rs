@@ -1002,16 +1002,6 @@ fn validate_public_settlement_trust(
     bundle: &PublicSettlementProofBundle,
     trust: &PublicSettlementVerifierTrust,
 ) -> Result<(), Web3ContractError> {
-    require_trusted_public_settlement_key(
-        "capital signer",
-        &bundle
-            .settlement_receipt
-            .dispatch
-            .capital_instruction
-            .signer_key,
-        &trust.trusted_capital_signer_keys,
-    )?;
-
     let chain_anchor = required_chain_anchor(bundle)?;
     let anchor_proof = bundle
         .settlement_receipt

@@ -14,7 +14,7 @@ crates/economy/chio-market/src/settlement.rs	validate	2	SELF-KEY-PIN-ECONOMY	pin
 crates/economy/chio-open-market/src/bidding.rs	accept	3	SELF-KEY-PIN-ECONOMY	pin the accept signer to a configured trusted key set
 crates/economy/chio-web3/src/anchors.rs	verify_anchor_inclusion_proof	1	SELF-KEY-PIN-ECONOMY	pin the verify_anchor_inclusion_proof signer to a configured trusted key set
 crates/economy/chio-web3/src/anchors.rs	verify_checkpoint_statement	1	SELF-KEY-PIN-ECONOMY	pin the verify_checkpoint_statement signer to a configured trusted key set
-crates/economy/chio-web3/src/settlement.rs	validate_web3_settlement_dispatch	2	SELF-KEY-PIN-ECONOMY	pin the validate_web3_settlement_dispatch signer to a configured trusted key set
+crates/economy/chio-web3/src/settlement.rs	validate_web3_settlement_dispatch	1	SELF-KEY-PIN-ECONOMY	pin the validate_web3_settlement_dispatch signer to a configured trusted key set
 crates/platform/chio-control-plane/src/certify/verify.rs	verify_signed_certification_check	1	SELF-KEY-PIN-PLATFORM	pin the verify_signed_certification_check signer to a configured trusted key set
 crates/platform/chio-control-plane/src/evidence_export.rs	verify_federation_policy	1	SELF-KEY-PIN-PLATFORM	pin the verify_federation_policy signer to a configured trusted key set
 crates/platform/chio-control-plane/src/federation_policy.rs	verify_federation_admission_policy_record	1	SELF-KEY-PIN-PLATFORM	pin the verify_federation_admission_policy_record signer to a configured trusted key set
