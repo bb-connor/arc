@@ -62,6 +62,10 @@ impl PaymentRailEgress {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures assert on constructed values and fail the test on a bad fixture."
+)]
 #[path = "rail_egress_tests.rs"]
 mod tests;

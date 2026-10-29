@@ -95,6 +95,10 @@ impl ChioKernel {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures assert on constructed values and fail the test on a bad fixture."
+)]
 #[path = "payment_amount_tests.rs"]
 mod tests;
