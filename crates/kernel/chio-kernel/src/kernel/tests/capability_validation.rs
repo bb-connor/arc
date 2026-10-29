@@ -365,7 +365,10 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let mismatch_error = mismatch_kernel
         .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
         .expect_err("mismatched cumulative root lineage must fail closed");
-    assert!(mismatch_error.contains("does not originate from the authenticated root"));
+    assert!(
+        mismatch_error.contains("delegation root inputs name different parent subjects"),
+        "{mismatch_error}"
+    );
     let mut mismatch_request = make_request(
         "req-hosted-cumulative-mismatched",
         &child,
@@ -377,7 +380,7 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     assert_eq!(mismatch_response.verdict, Verdict::Deny);
     let mismatch_reason = mismatch_response.reason.as_deref().unwrap_or_default();
     assert!(
-        mismatch_reason.contains("does not originate from the authenticated root"),
+        mismatch_reason.contains("delegation root inputs name different parent subjects"),
         "{mismatch_reason}"
     );
 

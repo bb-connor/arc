@@ -53,6 +53,7 @@ pub const CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID: i32 = 30;
 pub const CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH: i32 = 31;
 pub const CHIO_FFI_ERROR_SIGNATURE_REJECTED: i32 = 32;
 pub const CHIO_FFI_ERROR_SIGNER_KEY_MISMATCH: i32 = 33;
+pub const CHIO_FFI_ERROR_DELEGATION_ROOT_UNRESOLVED: i32 = 34;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -149,6 +150,7 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::SignatureAlgorithmMismatch => CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH,
         ErrorCode::SignatureRejected => CHIO_FFI_ERROR_SIGNATURE_REJECTED,
         ErrorCode::SignerKeyMismatch => CHIO_FFI_ERROR_SIGNER_KEY_MISMATCH,
+        ErrorCode::DelegationRootUnresolved => CHIO_FFI_ERROR_DELEGATION_ROOT_UNRESOLVED,
         ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
         ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
         ErrorCode::InvalidToolName => CHIO_FFI_ERROR_INVALID_TOOL_NAME,
@@ -338,15 +340,27 @@ pub extern "C" fn chio_verify_wrapped_json(
     })
 }
 
+/// `root_delegator_hex` is the subject key of the parent capability the
+/// delegation chain starts from. Pass NULL only for a token with an empty
+/// delegation chain; a delegated token without it is refused.
 #[no_mangle]
 pub extern "C" fn chio_verify_capability_json(
     input_json: *const c_char,
+    root_delegator_hex: *const c_char,
     now_secs: u64,
     max_delegation_depth: u32,
 ) -> ChioFfiResult {
     let input = match read_c_str(input_json, "input_json") {
         Ok(value) => value,
         Err(result) => return result,
+    };
+    let root_delegator = if root_delegator_hex.is_null() {
+        None
+    } else {
+        match read_c_str(root_delegator_hex, "root_delegator_hex") {
+            Ok(value) => Some(value),
+            Err(result) => return result,
+        }
     };
     let max_depth = if max_delegation_depth == CHIO_FFI_NO_MAX_DELEGATION_DEPTH {
         None
@@ -355,7 +369,10 @@ pub extern "C" fn chio_verify_capability_json(
     };
     run_ffi(|| {
         json(&chio_binding_helpers::verify_capability_json(
-            input, now_secs, max_depth,
+            input,
+            root_delegator,
+            now_secs,
+            max_depth,
         )?)
     })
 }

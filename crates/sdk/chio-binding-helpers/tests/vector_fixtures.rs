@@ -332,10 +332,11 @@ fn capability_case_value(
     id: &str,
     description: &str,
     capability: &CapabilityToken,
+    root_delegator: Option<&chio_core::PublicKey>,
     verify_at: u64,
     verification: CapabilityVerification,
 ) -> Value {
-    json!({
+    let mut case = json!({
         "id": id,
         "description": description,
         "verify_at": verify_at,
@@ -347,7 +348,11 @@ fn capability_case_value(
             "time_valid": verification.time_valid,
             "time_status": verification.time_status,
         }
-    })
+    });
+    if let (Some(root), Some(object)) = (root_delegator, case.as_object_mut()) {
+        object.insert("root_delegator_hex".to_string(), json!(root.to_hex()));
+    }
+    case
 }
 
 fn capability_cases() -> Vec<Value> {
@@ -370,8 +375,13 @@ fn capability_cases() -> Vec<Value> {
     )
     .test_unwrap("valid capability");
     let valid_verify_at = 1710000400;
-    let valid_verification = verify_capability(&valid_capability, valid_verify_at, Some(4))
-        .test_unwrap("valid capability verification");
+    let valid_verification = verify_capability(
+        &valid_capability,
+        Some(&issuer.public_key()),
+        valid_verify_at,
+        Some(4),
+    )
+    .test_unwrap("valid capability verification");
 
     let expired_capability = CapabilityToken::sign(
         base_capability_body(
@@ -386,8 +396,9 @@ fn capability_cases() -> Vec<Value> {
     )
     .test_unwrap("expired capability");
     let expired_verify_at = 1710000400;
-    let expired_verification = verify_capability(&expired_capability, expired_verify_at, Some(4))
-        .test_unwrap("expired capability verification");
+    let expired_verification =
+        verify_capability(&expired_capability, None, expired_verify_at, Some(4))
+            .test_unwrap("expired capability verification");
 
     let not_yet_valid_capability = CapabilityToken::sign(
         base_capability_body(
@@ -402,9 +413,13 @@ fn capability_cases() -> Vec<Value> {
     )
     .test_unwrap("not yet valid capability");
     let not_yet_valid_verify_at = 1710000400;
-    let not_yet_valid_verification =
-        verify_capability(&not_yet_valid_capability, not_yet_valid_verify_at, Some(4))
-            .test_unwrap("not yet valid capability verification");
+    let not_yet_valid_verification = verify_capability(
+        &not_yet_valid_capability,
+        None,
+        not_yet_valid_verify_at,
+        Some(4),
+    )
+    .test_unwrap("not yet valid capability verification");
 
     let mut tampered_capability = CapabilityToken::sign(
         base_capability_body(
@@ -421,7 +436,7 @@ fn capability_cases() -> Vec<Value> {
     tampered_capability.scope.grants[0].tool_name = "file_write".to_string();
     let tampered_verify_at = 1710000400;
     let tampered_verification =
-        verify_capability(&tampered_capability, tampered_verify_at, Some(4))
+        verify_capability(&tampered_capability, None, tampered_verify_at, Some(4))
             .test_unwrap("tampered capability verification");
 
     let mut invalid_delegation_link =
@@ -440,15 +455,20 @@ fn capability_cases() -> Vec<Value> {
     )
     .test_unwrap("broken chain capability");
     let broken_chain_verify_at = 1710000400;
-    let broken_chain_verification =
-        verify_capability(&broken_chain_capability, broken_chain_verify_at, Some(4))
-            .test_unwrap("broken chain capability verification");
+    let broken_chain_verification = verify_capability(
+        &broken_chain_capability,
+        Some(&issuer.public_key()),
+        broken_chain_verify_at,
+        Some(4),
+    )
+    .test_unwrap("broken chain capability verification");
 
     vec![
         capability_case_value(
             "valid_delegated_capability",
             "Capability is signed correctly, valid at the verification time, and carries a valid delegation link.",
             &valid_capability,
+            Some(&issuer.public_key()),
             valid_verify_at,
             valid_verification,
         ),
@@ -456,6 +476,7 @@ fn capability_cases() -> Vec<Value> {
             "expired_capability",
             "Capability signature is valid, but the token is expired at verification time.",
             &expired_capability,
+            None,
             expired_verify_at,
             expired_verification,
         ),
@@ -463,6 +484,7 @@ fn capability_cases() -> Vec<Value> {
             "not_yet_valid_capability",
             "Capability signature is valid, but the token is not yet valid at verification time.",
             &not_yet_valid_capability,
+            None,
             not_yet_valid_verify_at,
             not_yet_valid_verification,
         ),
@@ -470,6 +492,7 @@ fn capability_cases() -> Vec<Value> {
             "tampered_capability_signature",
             "Capability payload was modified after signing, so signature verification fails.",
             &tampered_capability,
+            None,
             tampered_verify_at,
             tampered_verification,
         ),
@@ -477,6 +500,7 @@ fn capability_cases() -> Vec<Value> {
             "broken_delegation_chain_signature",
             "Capability was signed after embedding a delegation link whose own signature no longer matches.",
             &broken_chain_capability,
+            Some(&issuer.public_key()),
             broken_chain_verify_at,
             broken_chain_verification,
         ),
@@ -1349,13 +1373,18 @@ fn capability_fixture_cases_round_trip_through_public_api() {
             case["id"]
         );
         let verify_at = case["verify_at"].as_u64().test_unwrap("verify_at");
+        let root_delegator = case
+            .get("root_delegator_hex")
+            .and_then(Value::as_str)
+            .map(|hex| chio_core::PublicKey::from_hex(hex).test_unwrap("root_delegator_hex"));
         let expected: CapabilityVerification = serde_json::from_value(case["expected"].clone())
             .test_unwrap("parse capability expectation");
 
         // Depth-agnostic verification: every consumer in the cross-language
         // matrix (chio-go, chio-py, chio-ts) runs this exact assertion.
         let actual_no_depth =
-            verify_capability(&capability, verify_at, None).test_unwrap("verify capability case");
+            verify_capability(&capability, root_delegator.as_ref(), verify_at, None)
+                .test_unwrap("verify capability case");
         assert_eq!(
             actual_no_depth, expected,
             "capability case {} (no max depth)",
@@ -1377,8 +1406,13 @@ fn capability_fixture_cases_round_trip_through_public_api() {
             let depth_expected: CapabilityVerification =
                 serde_json::from_value(depth_expected_value)
                     .test_unwrap("parse depth-aware capability expectation");
-            let actual_with_depth = verify_capability(&capability, verify_at, Some(max_depth))
-                .test_unwrap("verify capability case (max depth)");
+            let actual_with_depth = verify_capability(
+                &capability,
+                root_delegator.as_ref(),
+                verify_at,
+                Some(max_depth),
+            )
+            .test_unwrap("verify capability case (max depth)");
             assert_eq!(
                 actual_with_depth, depth_expected,
                 "capability case {} (max_delegation_depth={})",

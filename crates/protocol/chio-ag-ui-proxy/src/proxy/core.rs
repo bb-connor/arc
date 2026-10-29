@@ -200,10 +200,14 @@ impl AgUiProxy {
             trust_roots.get(&issuer.to_hex()).cloned()
         };
         let mut verify_only_budgets = NoopBudgetRegistry;
-        let direct_root = capability
-            .delegation_chain
-            .first()
+        let root_parent = capability.delegation_chain.first();
+        let direct_root = root_parent
             .and_then(|link| self.config.capability_family_roots.get(&link.capability_id));
+        let root_delegator = root_parent.and_then(|link| {
+            self.config
+                .delegation_parent_subjects
+                .get(&link.capability_id)
+        });
         if let Err(error) = verify_capability_full_with_root(
             capability,
             &self.config.trusted_issuers,
@@ -212,6 +216,7 @@ impl AgUiProxy {
             CapabilityFeatureContext {
                 peer: &self.config.peer_capabilities,
                 direct_root,
+                root_delegator,
             },
             &trust_resolver,
             &mut verify_only_budgets,

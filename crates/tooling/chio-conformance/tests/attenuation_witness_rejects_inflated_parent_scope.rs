@@ -115,6 +115,7 @@ fn attenuated_token_with_inflated_parent_scope_hash_is_rejected() {
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         &trust_root,
+        None,
     )
     .expect_err("chain-binding must reject inflated parent_scope_hash");
 
@@ -179,6 +180,7 @@ fn attenuated_token_with_honest_trust_root_parent_scope_hash_verifies() {
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         &trust_root,
+        None,
     )
     .expect("honest attenuated token must verify under the trust-root binding");
 

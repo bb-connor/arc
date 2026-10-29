@@ -473,7 +473,7 @@ fn cumulative_approval_verifier_rejects_unrelated_root_evidence() -> TestResult 
         token_body(
             "cap-other",
             &issuer.public_key(),
-            &Keypair::generate().public_key(),
+            &root_subject.public_key(),
             tool_scope(true, Some(100)),
         ),
         &issuer,

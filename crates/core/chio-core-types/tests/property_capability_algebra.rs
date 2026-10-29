@@ -353,7 +353,7 @@ proptest! {
             chain.push(link);
         }
 
-        let result = validate_delegation_chain(&chain, Some(max_depth));
+        let result = validate_delegation_chain(&chain, &keypairs[0].public_key(), Some(max_depth));
         if result.is_ok() {
             prop_assert!(
                 chain_len <= max_depth,

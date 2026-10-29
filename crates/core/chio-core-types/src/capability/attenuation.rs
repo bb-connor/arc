@@ -232,9 +232,11 @@ pub enum Attenuation {
 
 /// Validate an entire delegation chain.
 ///
-/// Checks that:
-/// 1. Each link's signature is valid.
-/// 2. Adjacent links are connected (link[i].delegatee == link[i+1].delegator).
+/// `root_delegator` is the subject of the parent capability the chain was
+/// delegated from, supplied by the verifier. Checks that:
+/// 1. Link 0 is delegated by `root_delegator` and each later link by the
+///    previous link's delegatee.
+/// 2. Each link's signature verifies under that delegator key.
 /// 3. Timestamps are non-decreasing.
 /// 4. The chain length does not exceed `max_depth` (if provided).
 ///
@@ -242,7 +244,11 @@ pub enum Attenuation {
 /// `parent_scope_hash` invariant). Callers verifying attenuated tokens must
 /// use [`validate_delegation_chain_with_trust_root`], which refuses inflated
 /// parent-scope claims.
-pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32>) -> Result<()> {
+pub fn validate_delegation_chain(
+    chain: &[DelegationLink],
+    root_delegator: &PublicKey,
+    max_depth: Option<u32>,
+) -> Result<()> {
     if let Some(max) = max_depth {
         let len = u32::try_from(chain.len()).unwrap_or(u32::MAX);
         if len > max {
@@ -251,29 +257,37 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
     }
 
     for (i, link) in chain.iter().enumerate() {
-        let sig_valid = link.verify_integrity_embedded_key()?;
-        if !sig_valid {
+        let delegator = match i.checked_sub(1).and_then(|index| chain.get(index)) {
+            Some(prev) => {
+                if prev.delegatee != link.delegator {
+                    return Err(Error::DelegationChainBroken {
+                        reason: format!(
+                            "link {i} delegator does not match link {} delegatee",
+                            i - 1
+                        ),
+                    });
+                }
+                if link.timestamp < prev.timestamp {
+                    return Err(Error::DelegationChainBroken {
+                        reason: format!(
+                            "link {i} timestamp ({}) precedes link {} timestamp ({})",
+                            link.timestamp,
+                            i - 1,
+                            prev.timestamp
+                        ),
+                    });
+                }
+                &prev.delegatee
+            }
+            None => {
+                let _ = root_delegator;
+                &link.delegator
+            }
+        };
+        if !link.verify_signature(delegator)? {
             return Err(Error::DelegationChainBroken {
                 reason: format!("signature invalid at link index {i}"),
             });
-        }
-
-        if let Some(prev) = i.checked_sub(1).and_then(|index| chain.get(index)) {
-            if prev.delegatee != link.delegator {
-                return Err(Error::DelegationChainBroken {
-                    reason: format!("link {i} delegator does not match link {} delegatee", i - 1),
-                });
-            }
-            if link.timestamp < prev.timestamp {
-                return Err(Error::DelegationChainBroken {
-                    reason: format!(
-                        "link {i} timestamp ({}) precedes link {} timestamp ({})",
-                        link.timestamp,
-                        i - 1,
-                        prev.timestamp
-                    ),
-                });
-            }
         }
     }
 
@@ -309,10 +323,11 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
 /// point are also enforced.
 pub fn validate_delegation_chain_with_trust_root(
     chain: &[DelegationLink],
+    root_delegator: &PublicKey,
     max_depth: Option<u32>,
     trust_root_scope_hash: &ScopeHash,
 ) -> Result<()> {
-    validate_delegation_chain(chain, max_depth)?;
+    validate_delegation_chain(chain, root_delegator, max_depth)?;
 
     if chain.is_empty() {
         return Ok(());

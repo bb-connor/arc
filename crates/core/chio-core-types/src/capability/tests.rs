@@ -630,7 +630,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
     // The leaf-token signature still verifies and the chain links still
     // validate independently.
     assert!(token.verify_integrity_embedded_key().unwrap());
-    assert!(validate_delegation_chain(&token.delegation_chain, None).is_ok());
+    assert!(validate_delegation_chain(&token.delegation_chain, &issuer.public_key(), None).is_ok());
 
     // The chain-binding entry point is a no-op for non-attenuated tokens.
     token
@@ -740,7 +740,7 @@ fn delegation_chain_valid() {
     let link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 100);
     let link2 = make_signed_link("cap-b", &kp_b, &kp_c.public_key(), 200);
 
-    assert!(validate_delegation_chain(&[link1, link2], None).is_ok());
+    assert!(validate_delegation_chain(&[link1, link2], &kp_a.public_key(), None).is_ok());
 }
 
 #[test]
@@ -754,7 +754,7 @@ fn delegation_chain_broken_connectivity() {
     let link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 100);
     let link2 = make_signed_link("cap-c", &kp_c, &kp_d.public_key(), 200);
 
-    let err = validate_delegation_chain(&[link1, link2], None).unwrap_err();
+    let err = validate_delegation_chain(&[link1, link2], &kp_a.public_key(), None).unwrap_err();
     assert!(err.to_string().contains("does not match"));
 }
 
@@ -767,7 +767,7 @@ fn delegation_chain_non_monotonic_timestamps() {
     let link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 200);
     let link2 = make_signed_link("cap-b", &kp_b, &kp_c.public_key(), 100); // earlier!
 
-    let err = validate_delegation_chain(&[link1, link2], None).unwrap_err();
+    let err = validate_delegation_chain(&[link1, link2], &kp_a.public_key(), None).unwrap_err();
     assert!(err.to_string().contains("precedes"));
 }
 
@@ -780,7 +780,7 @@ fn delegation_chain_exceeds_depth() {
     let link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 100);
     let link2 = make_signed_link("cap-b", &kp_b, &kp_c.public_key(), 200);
 
-    let err = validate_delegation_chain(&[link1, link2], Some(1)).unwrap_err();
+    let err = validate_delegation_chain(&[link1, link2], &kp_a.public_key(), Some(1)).unwrap_err();
     assert!(err.to_string().contains("exceeds maximum"));
 }
 
@@ -794,7 +794,34 @@ fn delegation_chain_invalid_signature() {
     // Tamper: change the delegatee after signing
     link1.delegatee = kp_c.public_key();
 
-    let err = validate_delegation_chain(&[link1], None).unwrap_err();
+    let err = validate_delegation_chain(&[link1], &kp_a.public_key(), None).unwrap_err();
+    assert!(err.to_string().contains("signature invalid"));
+}
+
+#[test]
+fn delegation_chain_refuses_a_root_link_from_another_delegator() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let kp_c = Keypair::generate();
+
+    let link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 100);
+    let link2 = make_signed_link("cap-b", &kp_b, &kp_c.public_key(), 200);
+
+    let err = validate_delegation_chain(&[link1, link2], &kp_c.public_key(), None).unwrap_err();
+    assert!(matches!(err, Error::DelegationChainBroken { .. }));
+    assert!(err.to_string().contains("parent capability subject"));
+}
+
+#[test]
+fn delegation_chain_refuses_a_root_link_relabelled_to_the_parent_subject() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let kp_c = Keypair::generate();
+
+    let mut link1 = make_signed_link("cap-a", &kp_a, &kp_b.public_key(), 100);
+    link1.delegator = kp_c.public_key();
+
+    let err = validate_delegation_chain(&[link1], &kp_c.public_key(), None).unwrap_err();
     assert!(err.to_string().contains("signature invalid"));
 }
 

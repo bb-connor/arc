@@ -375,6 +375,7 @@ fn evaluate_browser_scenario(scenario: &VerdictScenario) -> DriverOutcome {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: Default::default(),
         parent_budget_snapshots: Vec::new(),
     };

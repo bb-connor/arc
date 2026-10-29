@@ -342,14 +342,14 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
     };
     assert!(mobile_mismatch
         .to_string()
-        .contains("does not originate from the authenticated root"));
+        .contains("link 0 delegator does not match the parent capability subject"));
     let (status, error_code, output) = cpp_verify_capability(&mismatch_request)?;
     assert_eq!(status, chio_cpp_kernel_ffi::CHIO_KERNEL_FFI_STATUS_ERROR);
     assert_eq!(
         error_code,
         chio_cpp_kernel_ffi::CHIO_KERNEL_FFI_ERROR_INVALID_CAPABILITY
     );
-    assert!(output.contains("does not originate from the authenticated root"));
+    assert!(output.contains("link 0 delegator does not match the parent capability subject"));
 
     let evaluation_request = serde_json::json!({
         "capability": child,
@@ -408,7 +408,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         (None, "direct-root"),
         (
             Some(&wrong_root),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let request = verify_request(supplied_root);
@@ -445,7 +445,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         (
             "mismatched",
             Some(&wrong_root),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let evaluation_request = serde_json::json!({

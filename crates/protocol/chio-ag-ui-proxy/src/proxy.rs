@@ -29,7 +29,7 @@ mod tests {
         scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     };
-    use chio_core::crypto::Keypair;
+    use chio_core::crypto::{Keypair, PublicKey};
     use std::collections::BTreeMap;
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -298,6 +298,10 @@ mod tests {
         .unwrap()
     }
 
+    fn parent_subjects(issuer: &Keypair, parent_id: &str) -> BTreeMap<String, PublicKey> {
+        BTreeMap::from([(parent_id.to_string(), issuer.public_key())])
+    }
+
     fn parent_budget_snapshot(parent_id: &str) -> ParentBudgetSnapshot {
         ParentBudgetSnapshot {
             parent_token_id: parent_id.to_string(),
@@ -337,6 +341,7 @@ mod tests {
         let proxy = AgUiProxy::new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent-invalid"),
                 parent_budget_snapshots: vec![ParentBudgetSnapshot {
                     parent_token_id: "cap-parent-invalid".to_string(),
                     parent_share_bps: 10_001,
@@ -856,6 +861,7 @@ mod tests {
         let proxy = AgUiProxy::try_new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
                 parent_budget_snapshots: vec![parent_budget_snapshot("cap-parent")],
                 ..Default::default()
             },
@@ -876,6 +882,36 @@ mod tests {
         assert!(receipt.allowed);
         assert_eq!(transport.events_forwarded, 1);
         assert_eq!(receipt.capability_id, "cap-child");
+    }
+
+    #[test]
+    fn restricted_event_refuses_delegated_capability_without_parent_subject() {
+        let issuer = Keypair::generate();
+        let proxy = AgUiProxy::try_new(
+            AgUiProxyConfig {
+                trusted_issuers: vec![issuer.public_key()],
+                parent_budget_snapshots: vec![parent_budget_snapshot("cap-parent")],
+                ..Default::default()
+            },
+            Keypair::generate(),
+        )
+        .unwrap();
+        let event = make_event(EventClassification::Submit);
+        let cap = make_delegated_scoped_capability(&issuer, "submit", "cap-child", "cap-parent");
+        let mut transport = Transport::new(
+            TransportKind::WebSocket,
+            "ws-delegated-no-parent-subject".to_string(),
+            "agent-1".to_string(),
+        );
+
+        let (decision, receipt) = proxy.evaluate(&event, Some(&cap), &mut transport).unwrap();
+
+        assert!(matches!(decision, ProxyDecision::Block { .. }));
+        assert!(!receipt.allowed);
+        assert!(receipt
+            .denial_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("no verifier-supplied root delegator")));
     }
 
     #[test]
@@ -913,7 +949,14 @@ mod tests {
     #[test]
     fn restricted_event_accepts_delegated_capability_after_runtime_parent_registration() {
         let issuer = Keypair::generate();
-        let proxy = proxy_with_trusted_issuer(&issuer);
+        let proxy = AgUiProxy::new(
+            AgUiProxyConfig {
+                trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
+                ..Default::default()
+            },
+            Keypair::generate(),
+        );
         proxy
             .register_parent_budget("cap-parent", 10_000)
             .expect("register parent budget");
@@ -938,6 +981,7 @@ mod tests {
         let proxy = AgUiProxy::try_new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
                 parent_budget_snapshots: vec![parent_budget_snapshot("cap-parent")],
                 ..Default::default()
             },
@@ -998,6 +1042,7 @@ mod tests {
         let proxy = AgUiProxy::try_new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
                 parent_budget_snapshots: vec![parent_budget_snapshot("cap-parent")],
                 ..Default::default()
             },
@@ -1068,6 +1113,7 @@ mod tests {
         let proxy = AgUiProxy::try_new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
                 parent_budget_snapshots: vec![parent_budget_snapshot("cap-parent")],
                 ..Default::default()
             },
@@ -1148,6 +1194,7 @@ mod tests {
         let proxy = AgUiProxy::try_new(
             AgUiProxyConfig {
                 trusted_issuers: vec![issuer.public_key()],
+                delegation_parent_subjects: parent_subjects(&issuer, "cap-parent"),
                 parent_budget_snapshots: vec![oversubscribed_budget_snapshot("cap-parent")],
                 ..Default::default()
             },
