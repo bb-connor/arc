@@ -1042,7 +1042,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `src/capability/anchor.rs` (new) [M1]: `RootAnchor`, `AnchorKind`.
 - `src/capability/token.rs` [M1]: delete the unsigned `algorithm` member in item 1 (G19), with the receipt's and the other optional `algorithm` members in `chio-core-types` and `chio-credit`; `root_anchor` on `CapabilityTokenBody` and the signing body in item 3. Regenerate `_generated/chio_wire_v1.rs`.
 - `src/capability/scope.rs` [M3]: `MonetaryAmount.currency` becomes `asset: Asset`. Every caller changes in the same PR.
-- `src/root_authority/` (new) [M1]: `DelegationContext`, `RootPolicy` (anchor and disclosure rules), `EnterpriseProviderIdentity` (the projection and its digest, G17), `IdpKeySnapshot`, `CapabilityPresentation`, `VerifierTrust`, `RevocationRequest` [M2], the pure root-policy matcher, scope projection, the section 7.1 binding checks and disclosure-policy check, `no_std + alloc` compatible so `chio-verify` and wasm verifiers reuse them. Every function takes time as a parameter; none reads a clock. Every type decodes strictly (G18), with a padding negative test per struct and per union variant.
+- `src/root_authority/` (new) [M1]: `DelegationContext`, `RootPolicy` (anchor and disclosure rules), `EnterpriseProviderIdentity` (the projection and its digest, G17), `IdpKeySnapshot`, `CapabilityPresentation` with `chain_digest`, `VerifierTrust`, `RevocationRequest` [M2], the pure root-policy matcher, scope projection, the section 7.1 binding checks and disclosure-policy check, `no_std + alloc` compatible so `chio-verify` and wasm verifiers reuse them. Every function takes time as a parameter; none reads a clock. Every type decodes strictly (G18), with a padding negative test per struct and per union variant.
 - `src/receipt/decision.rs`, `src/receipt/body.rs` [M1]: commitments, inline fields, `disclosure`, `authority`, the `tenant_id` exclusion; `enforcement` [M2]; `settlement` [M3].
 - `src/receipt/kinds.rs` [M1, M2]: delete `RedactionMode` [M1]; add `PdpDecision`, `PreventExternal`, `Delegated` [M2].
 - `src/receipt/disclosure.rs` (new) [M1]: `Commitment`, `ReceiptDisclosure`, open and verify.
@@ -1054,7 +1054,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 - `src/receipts.rs`: the signer takes the parameter and content preimages, draws salts from the host `Rng`, computes both commitments inside its trust boundary, applies the disclosure policy, and returns the signed receipt with its openings. `ContentHashMismatch` becomes `ContentCommitmentMismatch` with the same recompute-before-sign rule. Delete `sign_receipt_relaying_trusted_body`.
 - `src/capability_verify.rs`: `AnchoredTrustRoot`, a `TrustRootResolver` that derives the W1.1 trust-root scope hash from the pinned root policy and the delegation context, checks `root_anchor` equality down the chain, the section 7.1 bindings, `expires_at <= assertion_exp`, and exchange-key membership. Depth beyond 0 enabled in M2.
-- `chain_digest` helper.
+- `chain_digest` lives in `chio-core-types` `root_authority` (section 10.1) so the `no_std` verifiers reuse it.
 
 ### 10.3 Other receipt producers [M1]
 
