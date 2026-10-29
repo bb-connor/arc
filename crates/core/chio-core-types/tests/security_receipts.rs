@@ -1079,17 +1079,18 @@ mod projection {
         "trigger_finding_receipt_id",
     ];
 
-    /// The canonical JSON of every `HIDDEN_FIELDS` value in `fixture`.
-    fn hidden_values(fixture: &Value) -> Vec<String> {
-        fn collect(value: &Value, found: &mut Vec<String>) {
+    /// The field name and canonical JSON of every `HIDDEN_FIELDS` value in `fixture`.
+    fn hidden_values(fixture: &Value) -> Vec<(String, String)> {
+        fn collect(value: &Value, found: &mut Vec<(String, String)>) {
             match value {
                 Value::Object(members) => {
                     for (name, member) in members {
                         if HIDDEN_FIELDS.contains(&name.as_str()) {
-                            found.push(
+                            found.push((
+                                name.clone(),
                                 serde_json::to_string(member)
                                     .unwrap_or_else(|error| panic!("{name}: {error}")),
-                            );
+                            ));
                         } else {
                             collect(member, found);
                         }
@@ -1118,22 +1119,23 @@ mod projection {
             .collect()
     }
 
-    /// No hidden field and no opening's raw value appears in `encoded`. A response plan
-    /// cites its trigger finding receipt among its kept prior receipt ids, so that one
-    /// committed value is visible there by contract.
+    /// No hidden field and no opening's raw value appears in `encoded`. The one exemption:
+    /// a response plan cites its trigger finding receipt among its kept prior receipt ids,
+    /// so only that plan's `trigger_finding_receipt_id` may appear there.
     fn assert_hidden(label: &str, fixture: &Value, encoded: &str, openings: &MetadataOpenings) {
+        let plan = fixture["kind"] == "response_plan";
         let kept = kept_prior_ids(fixture);
-        for raw in hidden_values(fixture) {
-            if kept.contains(&raw) && fixture["kind"] == "response_plan" {
+        for (name, raw) in hidden_values(fixture) {
+            if plan && name == "trigger_finding_receipt_id" && kept.contains(&raw) {
                 continue;
             }
-            assert!(!encoded.contains(&raw), "{label} carries {raw}");
+            assert!(!encoded.contains(&raw), "{label} carries {name} {raw}");
         }
         for (salt_ref, opening) in openings.iter() {
             let raw = String::from_utf8_lossy(opening.value.as_bytes()).into_owned();
-            if kept.contains(&raw)
-                && fixture["kind"] == "response_plan"
+            if plan
                 && salt_ref.as_str() == "metadata.active_defense.finding_receipt"
+                && kept.contains(&raw)
             {
                 continue;
             }
