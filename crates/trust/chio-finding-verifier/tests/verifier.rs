@@ -1049,6 +1049,8 @@ fn resolved_delivery_with_times(
     let tree = MerkleTree::from_leaves(std::slice::from_ref(&receipt_bytes))?;
     let prior_chain_leaf = checkpoint_chain_leaf_hash(&fx.checkpoint.body)?;
     let checkpoint_signer = keypair(23);
+    let verified_predecessor =
+        chio_kernel_core::evidence_verify::validate_checkpoint(&fx.checkpoint)?;
     let checkpoint = checkpoint_at(
         build_checkpoint_with_previous(
             2,
@@ -1056,10 +1058,7 @@ fn resolved_delivery_with_times(
             3,
             std::slice::from_ref(&receipt_bytes),
             &checkpoint_signer,
-            Some(
-                &chio_kernel_core::evidence_verify::validate_checkpoint(&fx.checkpoint)
-                    .expect("verified predecessor"),
-            ),
+            Some(&verified_predecessor),
             &[prior_chain_leaf],
         )?,
         checkpoint_time,
