@@ -437,6 +437,22 @@ mod tests {
     }
 
     #[test]
+    fn unadmitted_signer_is_refused_before_the_signature_check() {
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        let nonce = good_nonce(&kp, &receipt);
+        receipt.policy_hash = crate::sha256_hex(b"tampered");
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[Keypair::generate().public_key()], &nonce),
+            Err(NotAuthoritativeReason::SignerNotAdmitted)
+        );
+        assert_eq!(
+            is_authoritative_spend_receipt(&receipt, &[kp.public_key()], &nonce),
+            Err(NotAuthoritativeReason::ReceiptSignatureInvalid)
+        );
+    }
+
+    #[test]
     fn nonce_reserving_a_different_hold_is_rejected() {
         // The presented nonce is signed, its id links the receipt, and its call
         // binding matches, but it cryptographically reserved a DIFFERENT hold
