@@ -100,6 +100,53 @@ impl ChioKernel {
         }
     }
 
+    /// Install the session's current anchor for receipts signed in this
+    /// evaluation. No session, or a session that no longer exists, clears it,
+    /// so an evaluation never inherits another evaluation's anchor and its
+    /// receipts carry no block. Any other failed session read is an error.
+    pub(crate) fn scope_receipt_session_anchor_for_request(
+        &self,
+        request_id: &str,
+        session_id: Option<&SessionId>,
+    ) -> Result<ScopedKernelReceiptSessionAnchor, KernelError> {
+        let anchor = match session_id {
+            Some(session_id) => match self.with_session(session_id, |session| {
+                Ok(session.session_anchor().reference())
+            }) {
+                Ok(anchor) => Some(anchor),
+                Err(KernelError::UnknownSession(_)) => None,
+                Err(error) => return Err(error),
+            },
+            None => None,
+        };
+        let scope_key = receipt_evaluation_map_key(request_id);
+        let previous = match anchor {
+            Some(anchor) => self
+                .receipt_session_anchors
+                .insert(scope_key.clone(), anchor),
+            None => self
+                .receipt_session_anchors
+                .remove(&scope_key)
+                .map(|(_, previous)| previous),
+        };
+        Ok(ScopedKernelReceiptSessionAnchor {
+            scope_key,
+            anchors: Arc::clone(&self.receipt_session_anchors),
+            previous,
+        })
+    }
+
+    pub(crate) fn receipt_session_anchor_for_request(
+        &self,
+        request_id: Option<&str>,
+    ) -> Option<chio_core::session::SessionAnchorReference> {
+        request_id.and_then(|request_id| {
+            self.receipt_session_anchors
+                .get(&receipt_evaluation_map_key(request_id))
+                .map(|entry| entry.value().clone())
+        })
+    }
+
     pub(crate) fn receipt_tenant_id_for_request(&self, request_id: Option<&str>) -> Option<String> {
         request_id.and_then(|request_id| {
             let scope_key = receipt_evaluation_map_key(request_id);
@@ -380,6 +427,7 @@ impl ChioKernel {
             federation_dsse_envelopes_gauge,
             federation_artifact_store: None,
             receipt_tenant_ids: Arc::new(DashMap::new()),
+            receipt_session_anchors: Arc::new(DashMap::new()),
             receipt_federation_admissions: Arc::new(DashMap::new()),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,

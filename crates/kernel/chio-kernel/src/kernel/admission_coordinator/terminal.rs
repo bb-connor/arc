@@ -522,8 +522,12 @@ impl ChioKernel {
             .and_then(|metadata| metadata.get("financial"))
             .cloned()
             .map(|financial| serde_json::json!({ "financial": financial }));
-        let expected_non_admission_metadata =
-            merge_metadata_objects(expected_non_financial_metadata, retained_financial_metadata);
+        let retained_session_anchor_metadata =
+            retained_session_anchor_metadata(receipt.metadata.as_ref())?;
+        let expected_non_admission_metadata = merge_metadata_objects(
+            merge_metadata_objects(expected_non_financial_metadata, retained_financial_metadata),
+            retained_session_anchor_metadata,
+        );
         // Reproduce the delivery-contract and finding-delivery blocks so
         // the replayed metadata byte-matches the persisted receipt.
         let expected_non_admission_metadata =
@@ -1834,3 +1838,19 @@ fn terminal_receipt_error(error: crate::receipt_store::ReceiptStoreError) -> Ker
 #[cfg(test)]
 #[path = "terminal_tests.rs"]
 mod tests;
+
+/// The session anchor block a retained receipt was signed with, re-encoded
+/// from its strict decode so a malformed block fails the replay.
+fn retained_session_anchor_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<Option<serde_json::Value>, KernelError> {
+    use chio_core::receipt::metadata::{ReceiptSessionAnchorV1, SESSION_ANCHOR_METADATA_KEY};
+    ReceiptSessionAnchorV1::from_receipt_metadata(metadata)
+        .and_then(|block| block.map(|block| block.to_metadata_value()).transpose())
+        .map(|block| block.map(|block| serde_json::json!({ SESSION_ANCHOR_METADATA_KEY: block })))
+        .map_err(|error| {
+            KernelError::DurableAdmission(format!(
+                "retained receipt session anchor block is malformed: {error}"
+            ))
+        })
+}

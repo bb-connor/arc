@@ -1270,9 +1270,10 @@ fn live_parent_continuation_token_verifies_session_anchor() {
 /// `parent_session_anchor`.
 fn continuation_token_session_anchor_ignores_top_level_lineage_references() {
     let parent_kernel = make_kernel(make_config());
-    let mut child_config = make_config();
-    child_config.ca_public_keys.push(parent_kernel.public_key());
-    let mut child_kernel = make_kernel(child_config);
+    let mut child_kernel = make_kernel(make_config());
+    child_kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(
+        parent_kernel.config.keypair.clone(),
+    )));
     let child_kp = make_keypair();
     child_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
 
@@ -1335,10 +1336,10 @@ fn continuation_token_session_anchor_ignores_top_level_lineage_references() {
             })),
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
-            kernel_key: parent_kernel.public_key(),
+            kernel_key: child_kernel.public_key(),
             bbs_projection_version: None,
         },
-        &parent_kernel.config.keypair,
+        &child_kernel.config.keypair,
     )
     .unwrap();
     let parent_receipt_hash = chio_core::crypto::sha256_hex(
@@ -1404,7 +1405,7 @@ fn continuation_token_session_anchor_ignores_top_level_lineage_references() {
     assert_eq!(response.verdict, Verdict::Deny);
     assert_eq!(
         response.reason.as_deref(),
-        Some("governed transaction denied: governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage")
+        Some("governed transaction denied: governed call_chain continuation parent receipt carries no session anchor")
     );
 }
 

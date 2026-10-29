@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 59ffbc7d0101f6d1ea79690009d155f09b8b472206aecdcb96f71f9fd9fa652c
+// Schema content SHA-256: efa02a5da1c2ada5ab7c01dc58a5f96274d662ecf6c77f7e7b18f8ddd7535c75
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -791,6 +791,11 @@ const (
 // Defines values for ReceiptRecordDecision3Verdict.
 const (
 	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptSessionAnchorMetadataSchema.
+const (
+	ReceiptSessionAnchorMetadataSchemaChioReceiptSessionAnchorV1 ReceiptSessionAnchorMetadataSchema = "chio.receipt-session-anchor.v1"
 )
 
 // Defines values for ReceiptSettlementClosureRail.
@@ -7444,6 +7449,15 @@ type ReceiptRecordToolCallAction struct {
 	// Parameters The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).
 	Parameters interface{} `json:"parameters"`
 }
+
+// ReceiptSessionAnchorMetadata defines model for ReceiptSessionAnchorMetadata.
+type ReceiptSessionAnchorMetadata struct {
+	Schema                  ReceiptSessionAnchorMetadataSchema `json:"schema"`
+	SessionAnchorCommitment string                             `json:"session_anchor_commitment"`
+}
+
+// ReceiptSessionAnchorMetadataSchema defines model for ReceiptSessionAnchorMetadata.Schema.
+type ReceiptSessionAnchorMetadataSchema string
 
 // ReceiptSettlementClosure `chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
 type ReceiptSettlementClosure struct {

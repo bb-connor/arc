@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-181 of 602 identifier constants in the security crates are unpinned.
+181 of 603 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (65)
 

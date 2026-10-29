@@ -109,6 +109,7 @@ inclusion-proof shapes. See `receipt/README.md`.
 | `receipt/inclusion-proof.schema.json`          |    30 |
 | `receipt/lineage_statement.schema.json`        |    97 |
 | `receipt/record.schema.json`                   |   448 |
+| `receipt/session-anchor-metadata.schema.json`  |    18 |
 
 ### jsonrpc (3)
 

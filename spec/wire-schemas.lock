@@ -4535,6 +4535,11 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.receipt-session-anchor.v1"
+files = ["crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs"]
+first_seen = "f489ffca38"
+
+[[schema]]
 value = "chio.receipt.bbs_signature.v1"
 files = ["crates/core/chio-core-types/src/receipt/signing.rs"]
 first_seen = "d65bf20886"

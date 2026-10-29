@@ -118,6 +118,10 @@ impl ChioKernel {
         let _tenant_request_scope =
             self.scope_receipt_tenant_id_for_request(&request.request_id, tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+        let _session_anchor_scope = self.scope_receipt_session_anchor_for_request(
+            &request.request_id,
+            Some(&parent_context.session_id),
+        )?;
 
         let now_unix_ms = self.read_authority_time()?.get();
         let now = now_unix_ms / 1000;

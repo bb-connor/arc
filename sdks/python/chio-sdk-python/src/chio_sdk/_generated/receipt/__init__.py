@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 06789f7cc8fb9ed55f9aba55aadcbf4ec7c60d519627433209cdf916fda34f0d
+# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -18,6 +18,7 @@ from .finding_delivery_schema import ChioFindingDeliveryReceiptMetadata, Digest,
 from .inclusion_proof_schema import ChioReceiptMerkleInclusionProof
 from .lineage_statement_schema import ChioReceiptLineageStatement, EvidenceClass, RelationKind, SessionAnchorReference
 from .record_schema import ActorRef, Algorithm, BbsReceiptSignature, BoundaryClass, ChioReceiptRecord, Decision, Decision3, Decision4, Decision5, Decision6, GuardEvidence, ObservationOutcome, ReceiptKind, RedactionMode, ToolCallAction, ToolOrigin, TrustLevel
+from .session_anchor_metadata_schema import ChioReceiptSessionAnchorMetadata
 from .settlement_closure_schema import Asset, ChioSettlementClosure, Kind, Rail, RailRef, SettlementState
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "ChioReceiptLineageStatement",
     "ChioReceiptMerkleInclusionProof",
     "ChioReceiptRecord",
+    "ChioReceiptSessionAnchorMetadata",
     "ChioSettlementClosure",
     "CompensationStatus",
     "Decision",

@@ -622,6 +622,11 @@ pub struct ReceiptAttributionMetadata {
 
 mod decision_model;
 mod key_registry;
+mod session_anchor;
+
+pub use session_anchor::{
+    ReceiptSessionAnchorV1, RECEIPT_SESSION_ANCHOR_SCHEMA, SESSION_ANCHOR_METADATA_KEY,
+};
 
 pub use decision_model::{
     DecisionModelEvaluation, DecisionModelFallbackReason, DecisionModelOutcome,

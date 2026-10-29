@@ -776,6 +776,10 @@ impl ChioKernel {
         let _tenant_request_scope = self
             .scope_receipt_tenant_id_for_request(context.request_id.as_str(), tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+        let _session_anchor_scope = self.scope_receipt_session_anchor_for_request(
+            context.request_id.as_str(),
+            Some(&context.session_id),
+        )?;
 
         self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();

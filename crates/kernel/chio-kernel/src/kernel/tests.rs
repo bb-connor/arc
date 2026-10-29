@@ -198,6 +198,8 @@ mod budget_governed_fallback;
 mod budget_parent_expiry;
 #[path = "tests/constraint_variants.rs"]
 mod constraint_variants;
+#[path = "tests/continuation_session_anchor.rs"]
+mod continuation_session_anchor;
 #[path = "tests/emergency.rs"]
 mod emergency;
 #[path = "tests/inbound_authority.rs"]

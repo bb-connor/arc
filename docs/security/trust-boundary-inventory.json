@@ -2796,6 +2796,7 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -6665,6 +6666,7 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -7787,6 +7789,9 @@
     ],
     "crates/tooling/chio-bundle-verify/src/read.rs": [
       "decode_strict::from_value"
+    ],
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": [
+      "from_receipt_metadata::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -7807,7 +7812,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 1112
+          "instances": 1113
         }
       ]
     },
@@ -13286,6 +13291,22 @@
       "readers": [
         {
           "reader": "decode_strict",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
+      "readers": [
+        {
+          "reader": "from_receipt_metadata",
           "decoders": [
             "from_value"
           ],
