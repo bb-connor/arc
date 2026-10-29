@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-escrow-acceptance-body.schema.json",
+  "title": "Chio commerce escrow acceptance signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_at",
+    "buyer_subject",
+    "order_id",
+    "quote_sha256",
+    "schema",
+    "token_offer_id",
+    "token_offer_sha256"
+  ],
+  "properties": {
+    "accepted_at": {
+      "type": "integer"
+    },
+    "buyer_subject": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "quote_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.escrow-acceptance.v1"
+    },
+    "token_offer_id": {
+      "type": "string"
+    },
+    "token_offer_sha256": {
+      "type": "string"
+    }
+  }
+}

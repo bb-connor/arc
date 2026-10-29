@@ -1,0 +1,9 @@
+{
+  "accepted_at": 500,
+  "buyer_subject": "buyer:alice",
+  "order_id": "order-other",
+  "quote_sha256": "68563f30c8268c11151f561ec6fe3dc789e05b6703681c38f6ec5a2b52868980",
+  "schema": "chio.commerce.escrow-acceptance.v1",
+  "token_offer_id": "offer-token-1",
+  "token_offer_sha256": "1fabfbcb25e68b7d6e55828513b374d84755b27aa98ba5dddada2fe54bb572ba"
+}

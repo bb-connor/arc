@@ -2276,6 +2276,12 @@
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-maintenance-view.schema.json"
     },
     {
+      "schema": "chio.decision-model-witness.v1",
+      "artifactKind": "decision_model_witness",
+      "introducedBy": "decision-model-witness-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
+    },
+    {
       "schema": "chio.active-response-artifact-authority-attestation.v1",
       "artifactKind": "active_response_artifact_authority_attestation",
       "introducedBy": "signing-wrapper-v1",
@@ -2652,6 +2658,24 @@
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/economy/clearing-zero-intent-reconciliation-body.schema.json"
     },
     {
+      "schema": "chio.cluster-budget-anchor-signature.v1",
+      "artifactKind": "cluster_budget_anchor",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust-control/cluster-budget-anchor-body.schema.json"
+    },
+    {
+      "schema": "chio.cluster.peer-signature.v1",
+      "artifactKind": "cluster_peer_request",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/trust-control/cluster-peer-request-body.schema.json"
+    },
+    {
+      "schema": "chio.commerce.escrow-acceptance.v1",
+      "artifactKind": "commerce_escrow_acceptance",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/commerce/commerce-escrow-acceptance-body.schema.json"
+    },
+    {
       "schema": "chio.commerce.federation-trust-bundle.v1",
       "artifactKind": "commerce_federation_trust_bundle",
       "introducedBy": "commerce-payments-v1",
@@ -2692,6 +2716,12 @@
       "introducedBy": "commerce-payments-v1",
       "schemaFile": "spec/schemas/chio-commerce/v1/reputation-snapshot.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/commerce/commerce-reputation-snapshot-body.schema.json"
+    },
+    {
+      "schema": "chio.commerce.reservation-receipt.v1",
+      "artifactKind": "commerce_reservation_receipt",
+      "introducedBy": "signing-wrapper-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/commerce/commerce-reservation-receipt-body.schema.json"
     },
     {
       "schema": "chio.commerce.sla-commitment.v1",
@@ -2805,12 +2835,6 @@
       "introducedBy": "protocol-primitives-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root-body.schema.json"
-    },
-    {
-      "schema": "chio.decision-model-witness.v1",
-      "artifactKind": "decision_model_witness",
-      "introducedBy": "decision-model-witness-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
     },
     {
       "schema": "chio.declassification-grant.v1",

@@ -1,0 +1,18 @@
+{
+  "chain": [
+    {
+      "body": {
+        "anchorSetDigest": "6c670448e64e6a93bb1b9d660ee00bbefa66f4be13db1045dc56ec9d5086bfbc",
+        "chainDigest": "65ede349c13d1b9725e5ddb9f6059879761e8d947f5c16c1f4e2c5a56647500d",
+        "commitSequence": 1,
+        "committedAt": 10,
+        "electionTerm": 1,
+        "leaderUrl": "https://leader",
+        "previousChainDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "schema": "chio.budget-snapshot-anchor-commitment.v1",
+        "signerPublicKey": "a80b8d702e62ccb62bbb00eb3ff83df17612da54eaa28c43d8f332635ef14552"
+      },
+      "signature": "73ace06be74d3b75885cb6ee9ff9a699f83793dc18a4e94bd57b07186087636d20b2f614a27a0518fa49d0bf049f2b7080392506096b7dae2ad910905ee81503"
+    }
+  ]
+}

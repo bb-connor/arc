@@ -1215,6 +1215,24 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.cluster-budget-anchor-signature.v1",
+      "schema_id": "chio.cluster-budget-anchor-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003866bd0890482528e57f972a782df622e2fecd029748c94fb00626347d3d9c5c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.cluster.peer-signature.v1",
+      "schema_id": "chio.cluster.peer-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310027050e39cac1f0a60872bcf8053e57bed4e63812fe76d6f3ae3134d7c89aa6f0015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.commerce.escrow-acceptance.v1",
+      "schema_id": "chio.commerce.escrow-acceptance.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310029cec5a27a273d9ec5e7ffd93756a11a5cd2a52d16ec70916139b14d880afd56015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.commerce.event-log.v1",
       "schema_id": "chio.commerce.event-log.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310085e80b242e4a13068c6f3e89526a1e4e1fc1383497db6bca13062b9d9b6dc56a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1278,6 +1296,12 @@
       "id": "chio.commerce.reputation-snapshot.v1",
       "schema_id": "chio.commerce.reputation-snapshot.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a00a75a3342dc986a66edd11820bbbaf779ffb9ef90ac2e87ae35b66de34b57e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.commerce.reservation-receipt.v1",
+      "schema_id": "chio.commerce.reservation-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100851f9c951e5ab3a591898f0116d50c0d13cd83d6b5f6008fd39ca651b2c94719015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1434,6 +1458,12 @@
       "id": "chio.cumulative-approval-root.v1",
       "schema_id": "chio.cumulative-approval-root.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007eb3934caf5d6da48048bf33c3a6909eae88617f772c60ecf3c0f543a35eaf31015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.decision-model-witness.v1",
+      "schema_id": "chio.decision-model-witness.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310097f7ca61b693b7100d8148e334560178b4df420d848c898500870fc974741231015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3540,6 +3570,12 @@
       "id": "chio.public-verifier-discovery.v1",
       "schema_id": "chio.public-verifier-discovery.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c88d208058ab2dc8cd2487f52729fe2b6b3d674b34bf3f9ebbde07ee21c7467e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.receipt-session-anchor.v1",
+      "schema_id": "chio.receipt-session-anchor.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000d0164c3c9a29daca9f55f055a3c0dc6b19bdae936ea839e1d9b57155f3d524c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",

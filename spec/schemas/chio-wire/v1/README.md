@@ -123,12 +123,16 @@ Signed-artifact bodies generated from recorded examples by
 - `chio.clearing.settlement-reconciliation.v1`: `economy/clearing-settlement-reconciliation-body.schema.json`
 - `chio.clearing.zero-dispatch-proof.v1`: `economy/clearing-zero-dispatch-proof-body.schema.json`
 - `chio.clearing.zero-intent-reconciliation.v1`: `economy/clearing-zero-intent-reconciliation-body.schema.json`
+- `chio.cluster-budget-anchor-signature.v1`: `trust-control/cluster-budget-anchor-body.schema.json`
+- `chio.cluster.peer-signature.v1`: `trust-control/cluster-peer-request-body.schema.json`
+- `chio.commerce.escrow-acceptance.v1`: `commerce/commerce-escrow-acceptance-body.schema.json`
 - `chio.commerce.federation-trust-bundle.v1`: `commerce/commerce-federation-trust-bundle-body.schema.json`
 - `chio.commerce.payment-lifecycle.v1`: `commerce/commerce-payment-lifecycle-body.schema.json`
 - `chio.commerce.provider-discovery-snapshot.v1`: `commerce/commerce-provider-discovery-snapshot-body.schema.json`
 - `chio.commerce.provider-passport.v1`: `commerce/commerce-provider-passport-body.schema.json`
 - `chio.commerce.provider-selection-report.v1`: `commerce/commerce-provider-selection-report-body.schema.json`
 - `chio.commerce.reputation-snapshot.v1`: `commerce/commerce-reputation-snapshot-body.schema.json`
+- `chio.commerce.reservation-receipt.v1`: `commerce/commerce-reservation-receipt-body.schema.json`
 - `chio.commerce.sla-commitment.v1`: `commerce/commerce-sla-commitment-body.schema.json`
 - `chio.commerce.sla-performance-report.v1`: `commerce/commerce-sla-performance-report-body.schema.json`
 - `chio.compliance.certificate.v1`: `compliance/certificate.schema.json`

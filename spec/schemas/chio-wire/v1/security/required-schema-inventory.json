@@ -98,6 +98,10 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-prepare-dispatch-acknowledgement-v1.schema.json"
     },
     {
+      "file": "broker-privileged-audit-challenge-body.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-body.schema.json"
+    },
+    {
       "file": "broker-privileged-audit-challenge-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json"
     },
@@ -186,6 +190,10 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/declassification-consumption-receipt-body-v1.schema.json"
     },
     {
+      "file": "declassification-grant-body.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/declassification-grant-body.schema.json"
+    },
+    {
       "file": "declassification-grant.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/declassification-grant.schema.json"
     },
@@ -238,6 +246,10 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-body-v1.schema.json"
     },
     {
+      "file": "key-log-checkpoint-body.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/key-log-checkpoint-body.schema.json"
+    },
+    {
       "file": "key-log-checkpoint-envelope-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json"
     },
@@ -274,12 +286,20 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/key-log-witness-signature-v1.schema.json"
     },
     {
+      "file": "keyring-artifact-signature-body.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/keyring-artifact-signature-body.schema.json"
+    },
+    {
       "file": "keyring-artifact-signature-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json"
     },
     {
       "file": "lift-rollback-completion-receipt-body-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/lift-rollback-completion-receipt-body-v1.schema.json"
+    },
+    {
+      "file": "mcp-cage-launch-policy-body.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/mcp-cage-launch-policy-body.schema.json"
     },
     {
       "file": "mcp-cage-launch-policy-v1.schema.json",
@@ -322,6 +342,10 @@
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/signed-tool-manifest-v1.schema.json"
     },
     {
+      "file": "signed-watermark-envelope.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/signed-watermark-envelope.schema.json"
+    },
+    {
       "file": "tool-flow-declaration.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/tool-flow-declaration.schema.json"
     },
@@ -332,6 +356,10 @@
     {
       "file": "tripwire-observation-receipt-body-v1.schema.json",
       "schema_id": "https://chio.world/schemas/chio-wire/v1/security/tripwire-observation-receipt-body-v1.schema.json"
+    },
+    {
+      "file": "witness-statement.schema.json",
+      "schema_id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/witness-statement.schema.json"
     }
   ]
 }
