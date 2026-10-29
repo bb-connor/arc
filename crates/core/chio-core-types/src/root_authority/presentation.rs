@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::canonical::canonical_json_bytes;
 use crate::capability::token::CapabilityToken;
 use crate::error::Result;
+use crate::receipt::commitment::CHAIN_DIGEST_DOMAIN;
 
 use super::delegation_context::DelegationContext;
 use super::wire::{check_items, check_schema, validated_type, Sha256Digest};
@@ -18,9 +19,6 @@ pub const CHIO_CAPABILITY_PRESENTATION_SCHEMA: &str = "chio.capability-presentat
 
 /// Most signed ancestors one presentation carries.
 pub const MAX_PRESENTATION_ANCESTORS: usize = 16;
-
-/// Domain prefix of [`chain_digest`].
-pub const CHAIN_DIGEST_DOMAIN: &[u8] = b"chio.receipt.chain-digest.v1\0";
 
 /// The members of [`CapabilityPresentation`]; [`CapabilityPresentation::new`] validates them.
 #[derive(Debug, Clone, Serialize, Deserialize)]

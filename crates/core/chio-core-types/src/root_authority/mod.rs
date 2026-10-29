@@ -36,7 +36,7 @@ pub use idp_key_snapshot::{
 };
 pub use jwk::{Jwk, JwkCurve, JwkFields, JwkKeyType, JwkUse, JwsAlgorithm};
 pub use presentation::{
-    chain_digest, CapabilityPresentation, CapabilityPresentationFields, CHAIN_DIGEST_DOMAIN,
+    chain_digest, CapabilityPresentation, CapabilityPresentationFields,
     CHIO_CAPABILITY_PRESENTATION_SCHEMA, MAX_PRESENTATION_ANCESTORS,
 };
 pub use provider_identity::{
