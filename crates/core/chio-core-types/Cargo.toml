@@ -30,8 +30,8 @@ rand_core = { version = "0.6", default-features = false, features = ["getrandom"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ryu = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
-hkdf = { version = "0.12", default-features = false }
-hmac = { version = "0.12", default-features = false }
+hkdf = { version = "0.12", default-features = false, optional = true }
+hmac = { version = "0.12", default-features = false, optional = true }
 subtle = { version = "2", default-features = false }
 percent-encoding = { version = "2", default-features = false, features = ["alloc"] }
 url = { version = "2", default-features = false }
@@ -61,7 +61,9 @@ features = ["js"]
 rustix = { version = "1.1", default-features = false, features = ["std", "fs", "process"], optional = true }
 
 [features]
-default = ["std"]
+default = ["std", "tenant-index"]
+# The tenant index key set and the enterprise subject index built on it.
+tenant-index = ["dep:hkdf", "dep:hmac", "dep:rustix"]
 # Verify the real portable SHA-256 implementation without CPU probes or
 # architecture intrinsics. Default hashing behavior remains unchanged.
 kani = ["sha2/force-soft"]
@@ -79,9 +81,8 @@ std = [
     "url/std",
     "chio-security-types/std",
     "dep:thiserror",
-    "dep:rustix",
-    "hkdf/std",
-    "hmac/std",
+    "hkdf?/std",
+    "hmac?/std",
     "subtle/std",
 ]
 # Enables the P-256 and P-384 SigningBackend implementations backed by
@@ -93,6 +94,14 @@ pq = ["dep:fips204"]
 # no-default builds, so this feature is a no-op kept for downstream manifests
 # that enable it by name.
 delegation = []
+
+[[test]]
+name = "tenant_index"
+required-features = ["tenant-index"]
+
+[[test]]
+name = "enterprise_subject"
+required-features = ["tenant-index"]
 
 [dev-dependencies]
 chio-semantic-contracts = { path = "../../security/chio-semantic-contracts" }
