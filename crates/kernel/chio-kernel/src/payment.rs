@@ -900,6 +900,7 @@ fn payment_rail_contract(
         deny_loopback: !loopback_http,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PAYMENT_RESPONSE_BYTES,
     };

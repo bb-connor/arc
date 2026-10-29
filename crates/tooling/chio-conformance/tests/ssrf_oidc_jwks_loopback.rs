@@ -24,6 +24,7 @@ fn idp_only_contract() -> HttpEgressContract {
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 1,
         max_response_bytes: 64 * 1024,
     }
@@ -37,6 +38,7 @@ fn hermetic_loopback_idp_contract() -> HttpEgressContract {
         deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 1,
         max_response_bytes: 64 * 1024,
     }

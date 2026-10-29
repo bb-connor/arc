@@ -61,6 +61,7 @@ fn devnet_rpc_egress_contract_for_url(
         deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024 * 1024,
     };

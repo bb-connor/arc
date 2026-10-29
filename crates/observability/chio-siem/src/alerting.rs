@@ -523,6 +523,7 @@ pub(crate) fn siem_endpoint_egress_contract(
         deny_loopback,
         deny_link_local,
         deny_ipv6_ula,
+        allow_private_network: false,
         max_redirect_chain: 3,
         max_response_bytes: 1024 * 1024,
     };

@@ -543,6 +543,7 @@ fn public_settlement_rpc_egress_contract(url: &str) -> Result<HttpEgressContract
             || !optional_bool_from_env("CHIO_TEST_PUBLIC_SETTLEMENT_ALLOW_LOOPBACK_RPC")?,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: 1024 * 1024,
     };

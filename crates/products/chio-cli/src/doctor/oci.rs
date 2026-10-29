@@ -132,8 +132,8 @@ impl Probe for OciProbe {
                 format!("Registry {registry} refused by the egress contract: {err}"),
             )
             .with_help(
-                "The doctor probe refuses link-local, private-network and special-use \
-                 targets. Reachability of such a registry is not checked.",
+                "The doctor probe refuses link-local targets, and loopback or \
+                 unique-local answers for a host that is not itself local. Reachability of such a registry is not checked.",
             )
             .with_context("registry", registry),
             Err(err) => ProbeReport::fail(

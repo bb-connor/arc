@@ -20,6 +20,7 @@ fn strict_contract_excluding_link_local() -> HttpEgressContract {
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 1,
         max_response_bytes: 64 * 1024,
     }

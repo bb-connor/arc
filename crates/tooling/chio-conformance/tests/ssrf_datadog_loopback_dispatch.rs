@@ -33,6 +33,7 @@ fn loopback_contract(
         deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain,
         max_response_bytes,
     }

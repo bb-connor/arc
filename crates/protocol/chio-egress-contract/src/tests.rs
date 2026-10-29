@@ -14,6 +14,7 @@ fn strict_contract(authority: &str) -> HttpEgressContract {
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 3,
         max_response_bytes: 1024,
     }
@@ -955,4 +956,85 @@ mod reqwest_egress_tests {
         });
         addr
     }
+}
+
+#[test]
+fn configured_url_contract_admits_only_its_own_authority() {
+    let contract = HttpEgressContract::for_configured_url("t", "http://127.0.0.1:9954/x", 64)
+        .expect("contract");
+    assert!(!contract.deny_loopback);
+    assert!(contract.enforce_url("http://127.0.0.1:9954/y", 0).is_ok());
+    assert!(matches!(
+        contract.enforce_url("http://127.0.0.1:9955/y", 0),
+        Err(HttpEgressError::AuthorityDenied { .. })
+    ));
+    assert!(matches!(
+        contract.enforce_url("https://127.0.0.1:9954/y", 0),
+        Err(HttpEgressError::SchemeDenied { .. })
+    ));
+    assert!(contract.enforce_url("http://127.0.0.1:9954/y", 1).is_err());
+}
+
+#[test]
+fn configured_url_contract_admits_a_configured_private_host() {
+    for url in [
+        "http://10.0.0.5:9100/metrics",
+        "http://100.64.0.1/",
+        "http://192.168.1.10:5000/v2/",
+    ] {
+        let contract = HttpEgressContract::for_configured_url("t", url, 64).expect("contract");
+        assert!(contract.enforce_url(url, 0).is_ok(), "{url}");
+    }
+    let contract = HttpEgressContract::for_configured_url("t", "http://10.0.0.5:9100/m", 64)
+        .expect("contract");
+    assert!(matches!(
+        contract.enforce_url("http://10.0.0.6:9100/m", 0),
+        Err(HttpEgressError::AuthorityDenied { .. })
+    ));
+}
+
+#[test]
+fn configured_url_contract_still_refuses_link_local_and_foreign_loopback() {
+    let contract = HttpEgressContract::for_configured_url("t", "http://169.254.169.254/x", 64)
+        .expect("contract");
+    assert!(matches!(
+        contract.enforce_url("http://169.254.169.254/x", 0),
+        Err(HttpEgressError::LinkLocalDenied { .. })
+    ));
+    let named = HttpEgressContract::for_configured_url("t", "https://bridge.example.com/x", 64)
+        .expect("contract");
+    assert!(named.deny_loopback && named.deny_link_local && named.deny_ipv6_ula);
+    assert!(matches!(
+        named.enforce_resolved_ip("bridge.example.com", "127.0.0.1".parse().unwrap()),
+        Err(HttpEgressError::LoopbackDenied { .. })
+    ));
+    assert!(named
+        .enforce_resolved_ip("bridge.example.com", "10.1.2.3".parse().unwrap())
+        .is_ok());
+    assert!(HttpEgressContract::for_configured_url("t", "not a url", 64).is_err());
+}
+
+#[test]
+fn configured_url_contract_normalizes_a_trailing_dot_authority() {
+    let contract = HttpEgressContract::for_configured_url("t", "http://localhost.:9100/m", 64)
+        .expect("contract");
+    assert!(!contract.deny_loopback);
+    assert!(contract.allowed_authority_set.contains("localhost:9100"));
+    let named =
+        HttpEgressContract::for_configured_url("t", "https://registry.example.com./v2/", 64)
+            .expect("contract");
+    assert!(named.allowed_authority_set.contains("registry.example.com"));
+    assert!(named
+        .enforce_url("https://registry.example.com./v2/", 0)
+        .is_ok());
+}
+
+#[test]
+fn private_network_stays_refused_unless_the_contract_admits_it() {
+    let contract = strict_contract("10.0.0.5");
+    assert!(!contract.allow_private_network);
+    assert!(matches!(
+        contract.enforce_resolved_ip("10.0.0.5", "10.0.0.5".parse().unwrap()),
+        Err(HttpEgressError::PrivateNetworkDenied { .. })
+    ));
 }

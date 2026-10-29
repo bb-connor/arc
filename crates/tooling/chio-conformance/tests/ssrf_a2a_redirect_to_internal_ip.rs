@@ -31,6 +31,7 @@ fn loopback_only_contract(authority: &str) -> HttpEgressContract {
         deny_loopback: false,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 4,
         max_response_bytes: 64 * 1024,
     }

@@ -166,6 +166,7 @@ fn registry_contract(endpoint: &str) -> Result<HttpEgressContract, HttpEgressErr
         deny_loopback: !loopback_http,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PUBLIC_REGISTRY_RESPONSE_BYTES,
     };

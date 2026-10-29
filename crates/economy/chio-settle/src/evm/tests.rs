@@ -101,6 +101,7 @@ fn hostname_rpc_contract(authority: &str) -> chio_egress_contract::HttpEgressCon
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024 * 1024,
     }

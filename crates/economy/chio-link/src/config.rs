@@ -581,6 +581,7 @@ pub fn build_default_egress_contract(
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 1,
         max_response_bytes: 1 << 22,
     };
@@ -606,6 +607,7 @@ fn fail_closed_default_egress_contract(
         deny_loopback: true,
         deny_link_local: true,
         deny_ipv6_ula: true,
+        allow_private_network: false,
         max_redirect_chain: 0,
         max_response_bytes: 1,
     }

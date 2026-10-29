@@ -34,6 +34,11 @@ pub struct HttpEgressContract {
     pub deny_link_local: bool,
     /// Reject IPv6 unique-local address literals.
     pub deny_ipv6_ula: bool,
+    /// Admit private and special-use addresses (RFC 1918, CGNAT and the like)
+    /// for the authorities this contract allows. Loopback, link-local and
+    /// IPv6 unique-local addresses stay governed by their own flags.
+    #[serde(default)]
+    pub allow_private_network: bool,
     /// Maximum redirect hop count accepted for a request chain.
     pub max_redirect_chain: u8,
     /// Maximum response bytes accepted before the substrate must abort.
@@ -92,6 +97,50 @@ pub enum HttpEgressError {
 }
 
 impl HttpEgressContract {
+    /// Contract for one operator-configured URL: it admits that URL's scheme
+    /// and authority only and allows no redirect hop. The operator named the
+    /// target, so private and special-use addresses are admitted. Link-local
+    /// addresses are always refused. Loopback and IPv6 unique-local addresses
+    /// are refused unless the configured host is itself one, so a public name
+    /// cannot resolve onto the local host or a local network segment.
+    pub fn for_configured_url(
+        tenant_egress_namespace: &str,
+        url: &str,
+        max_response_bytes: u64,
+    ) -> Result<Self, HttpEgressError> {
+        let parsed = Url::parse(url).map_err(|err| HttpEgressError::InvalidUrl(err.to_string()))?;
+        let host = parsed.host().ok_or(HttpEgressError::MissingAuthority)?;
+        let (loopback, ula) = match &host {
+            Host::Domain(name) => (
+                name.trim_end_matches('.').eq_ignore_ascii_case("localhost"),
+                false,
+            ),
+            Host::Ipv4(address) => (address.is_loopback(), false),
+            Host::Ipv6(address) => (address.is_loopback(), is_ipv6_unique_local(address)),
+        };
+        let authority = match (&host, parsed.port()) {
+            (Host::Ipv6(address), Some(port)) => format!("[{address}]:{port}"),
+            (Host::Ipv6(address), None) => format!("[{address}]"),
+            (Host::Ipv4(address), Some(port)) => format!("{address}:{port}"),
+            (Host::Ipv4(address), None) => address.to_string(),
+            (Host::Domain(name), Some(port)) => {
+                format!("{}:{port}", name.trim_end_matches('.').to_ascii_lowercase())
+            }
+            (Host::Domain(name), None) => name.trim_end_matches('.').to_ascii_lowercase(),
+        };
+        Ok(Self {
+            tenant_egress_namespace: tenant_egress_namespace.to_string(),
+            allowed_schemes: BTreeSet::from([parsed.scheme().to_string()]),
+            allowed_authority_set: BTreeSet::from([authority]),
+            deny_loopback: !loopback,
+            deny_link_local: true,
+            deny_ipv6_ula: !ula,
+            allow_private_network: true,
+            max_redirect_chain: 0,
+            max_response_bytes,
+        })
+    }
+
     /// Enforce a required contract. `None` is a fail-closed denial.
     pub fn enforce_required(
         contract: Option<&Self>,
@@ -274,6 +323,9 @@ impl HttpEgressContract {
                 Ok(())
             }
             IpAddressClass::PrivateOrSpecialUse => {
+                if self.allow_private_network {
+                    return Ok(());
+                }
                 Err(HttpEgressError::PrivateNetworkDenied { host })
             }
         }
@@ -729,6 +781,7 @@ impl HttpEgressContract {
             deny_loopback: false,
             deny_link_local: false,
             deny_ipv6_ula: false,
+            allow_private_network: false,
             max_redirect_chain: 4,
             max_response_bytes: 64 * 1024 * 1024,
         }
