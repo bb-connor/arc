@@ -198,6 +198,9 @@ pub const CHIO_COMMERCE_REPUTATION_SNAPSHOT_V1_SCHEMA: &str =
 pub const CHIO_COMMERCE_FEDERATION_TRUST_BUNDLE_V1_SCHEMA: &str =
     "chio.commerce.federation-trust-bundle.v1";
 pub const CHIO_COMMERCE_ORDER_PASSPORT_V1_SCHEMA: &str = "chio.commerce.order-passport.v1";
+pub const CHIO_COMMERCE_RESERVATION_RECEIPT_V1_SCHEMA: &str =
+    "chio.commerce.reservation-receipt.v1";
+pub const CHIO_COMMERCE_ESCROW_ACCEPTANCE_V1_SCHEMA: &str = "chio.commerce.escrow-acceptance.v1";
 pub const CHIO_COMMERCE_PROVIDER_DISCOVERY_SNAPSHOT_V1_SCHEMA: &str =
     "chio.commerce.provider-discovery-snapshot.v1";
 pub const CHIO_COMMERCE_PROVIDER_SELECTION_REPORT_V1_SCHEMA: &str =
@@ -865,6 +868,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_COMMERCE_ORDER_PASSPORT_V1_SCHEMA,
         Some(("commerce_order_passport", "commerce-payments-v1")),
+    ),
+    (
+        CHIO_COMMERCE_RESERVATION_RECEIPT_V1_SCHEMA,
+        Some(("commerce_reservation_receipt", "signing-wrapper-v1")),
+    ),
+    (
+        CHIO_COMMERCE_ESCROW_ACCEPTANCE_V1_SCHEMA,
+        Some(("commerce_escrow_acceptance", "signing-wrapper-v1")),
     ),
     (
         CHIO_COMMERCE_PROVIDER_DISCOVERY_SNAPSHOT_V1_SCHEMA,
