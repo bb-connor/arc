@@ -72,3 +72,24 @@ fn a_fan_out_failure_after_the_first_root_rolls_back_everything() -> TestResult 
     assert_eq!((revocation.roots_matched, revocation.roots_revoked), (2, 2));
     Ok(())
 }
+
+#[test]
+fn an_unanswered_mint_check_carries_the_store_error() {
+    let refusal = super::targets::unavailable(RevocationStoreError::Fenced {
+        expected_epoch: 7,
+        actual_epoch: Some(8),
+    });
+    let crate::root_exchange_store::MintRevocationRefusal::Unavailable(error) = refusal else {
+        panic!("an unanswered check is unavailable, got {refusal:?}");
+    };
+    assert!(
+        matches!(
+            error.store_error(),
+            RevocationStoreError::Fenced {
+                expected_epoch: 7,
+                actual_epoch: Some(8)
+            }
+        ),
+        "{error:?}"
+    );
+}

@@ -17,7 +17,9 @@ use chio_kernel::RevocationStoreError;
 use rusqlite::{params, OptionalExtension, Transaction};
 
 use super::{commit_mutation, map_serving_owner_error, stored_entry, SqliteRevocationStore};
-use crate::root_exchange_store::{MintRevocationCheck, MintRevocationRefusal, RevocationCandidate};
+use crate::root_exchange_store::{
+    MintRevocationCheck, MintRevocationRefusal, RevocationCandidate, RevocationCheckError,
+};
 
 /// The outcome of one target revocation. `roots_matched` counts every
 /// anchored root the target matches, already revoked or not;
@@ -184,9 +186,16 @@ impl MintRevocationCheck for SqliteRevocationStore {
             Ok(Some(entry_id)) => Err(MintRevocationRefusal::Revoked {
                 entry_id: entry_id.to_string(),
             }),
-            Err(error) => Err(MintRevocationRefusal::Unavailable(error.to_string())),
+            Err(error) => Err(unavailable(error)),
         }
     }
+}
+
+/// The refusal for a mint check the store could not answer.
+pub(super) fn unavailable(error: RevocationStoreError) -> MintRevocationRefusal {
+    MintRevocationRefusal::Unavailable(RevocationCheckError::new(RevocationStoreError::Sync(
+        error.to_string(),
+    )))
 }
 
 fn check_target_tags(

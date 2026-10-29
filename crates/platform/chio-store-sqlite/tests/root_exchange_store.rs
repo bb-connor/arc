@@ -7,7 +7,8 @@ mod support;
 
 use chio_store_sqlite::root_exchange_store::{
     BearerLookup, BearerMapping, ContextOpenings, MintOutcome, MintReplayNamespace,
-    MintRequestRefusal, OpeningState, RetainedArtifact, RootExchangeStoreError as E,
+    MintRequestRefusal, OpeningState, RetainedArtifact, RevocationCheckError,
+    RootExchangeStoreError as E,
 };
 use support::{
     digest, loaded_policy, snapshot, tags, Admit, Case, Env, Failing, Kind, RevokedTenant,
@@ -138,7 +139,9 @@ fn checker_error_rolls_back_and_denies() -> TestResult {
     let case = Case::id_jag("cap-1")?;
     assert_eq!(
         env.refused(&case, &Failing, NOW)?,
-        E::RevocationCheckUnavailable("revocation store offline".into())
+        E::RevocationCheckUnavailable(RevocationCheckError::new(
+            chio_kernel::RevocationStoreError::Sync("revocation store offline".into())
+        ))
     );
     assert_eq!(
         env.minted(&case, &Admit, NOW + 1)?,

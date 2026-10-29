@@ -17,6 +17,7 @@ use chio_core::root_authority::{
 };
 use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::{sha256_hex, StoreMutationFence};
+use chio_kernel::RevocationStoreError;
 use rusqlite::{params, Transaction, TransactionBehavior};
 use serde::Serialize;
 
@@ -49,7 +50,7 @@ pub enum RootExchangeStoreError {
     #[error("anchored root is revoked by entry {entry_id}")]
     Revoked { entry_id: String },
     #[error("revocation check is unavailable: {0}")]
-    RevocationCheckUnavailable(String),
+    RevocationCheckUnavailable(RevocationCheckError),
     #[error("anchored root row missing for {capability_id}")]
     AnchoredRootMissing { capability_id: String },
     #[error("anchored root {capability_id} differs from its authorization projection")]
@@ -263,7 +264,39 @@ pub struct RevocationCandidate<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MintRevocationRefusal {
     Revoked { entry_id: String },
-    Unavailable(String),
+    Unavailable(RevocationCheckError),
+}
+
+/// The revocation store error behind an unavailable mint check, kept typed
+/// so a caller can match on the store's variant. Two errors are equal when
+/// they render the same text.
+#[derive(Debug, Clone)]
+pub struct RevocationCheckError(Arc<RevocationStoreError>);
+
+impl RevocationCheckError {
+    #[must_use]
+    pub fn new(error: RevocationStoreError) -> Self {
+        Self(Arc::new(error))
+    }
+
+    #[must_use]
+    pub fn store_error(&self) -> &RevocationStoreError {
+        &self.0
+    }
+}
+
+impl PartialEq for RevocationCheckError {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_string() == other.0.to_string()
+    }
+}
+
+impl Eq for RevocationCheckError {}
+
+impl std::fmt::Display for RevocationCheckError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
 }
 
 /// Revocation linearized with the mint: the check runs inside the mint
