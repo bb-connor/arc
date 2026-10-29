@@ -1428,3 +1428,7 @@ mod sse_mime_tests;
 #[cfg(test)]
 #[path = "http/plaintext_credential_tests.rs"]
 mod plaintext_credential_tests;
+
+#[cfg(test)]
+#[path = "http/egress_tests.rs"]
+mod egress_tests;
