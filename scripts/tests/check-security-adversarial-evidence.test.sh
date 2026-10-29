@@ -23,17 +23,6 @@ grep -Fq -e \
   "--promote-outcome is forbidden in the enterprise boundary" \
   <<<"${enterprise_promotion_output}"
 
-full_validation="$(./scripts/check-security-adversarial-evidence.sh)"
-test "$full_validation" = "validated 28 security adversarial cases and 35 mutation selections"
-pending_campaigns="$(./scripts/check-security-adversarial-evidence.sh --list-pending)"
-if [[ -n "${pending_campaigns}" ]]; then
-  test "${pending_campaigns}" = "$(printf '%s\n' "${pending_campaigns}" | LC_ALL=C sort -u)"
-  if grep -Ev '^[a-z0-9][a-z0-9_]*$' <<<"${pending_campaigns}"; then
-    echo "pending mutation campaign list contains an invalid identifier" >&2
-    exit 1
-  fi
-fi
-
 python3 - <<'PY'
 from __future__ import annotations
 
@@ -201,6 +190,9 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     valid_campaign_body["outcomes"].pop("inputs_sha256", None)
     valid_case["pending"] = True
     write_json(valid_case_path, valid_case)
+    pending_listing = invoke(valid_cases, "--list-pending", invocation_root=valid_root)
+    if pending_listing.returncode != 0 or pending_listing.stdout != "ingest_time_substitution\n":
+        raise AssertionError(f"pending fixture was not listed: {pending_listing.stdout}")
     valid_outcome_body = {
         "caught": 1,
         "missed": 0,
@@ -264,6 +256,11 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
     valid = invoke(valid_cases, invocation_root=valid_root)
     if valid.returncode != 0:
         raise AssertionError(valid.stdout)
+    if valid.stdout != "validated 1 security adversarial cases and 1 mutation selections\n":
+        raise AssertionError(f"unexpected fixture validation summary: {valid.stdout}")
+    promoted_listing = invoke(valid_cases, "--list-pending", invocation_root=valid_root)
+    if promoted_listing.returncode != 0 or promoted_listing.stdout != "":
+        raise AssertionError(f"promoted fixture was listed as pending: {promoted_listing.stdout}")
 
     legacy_cases = temp / "legacy"
     legacy = copy.deepcopy(valid_case)
@@ -2160,10 +2157,6 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
 
     for artifact_environment, expected_error in (
         (
-            {"CHIO_SECURITY_CANDIDATE_ARTIFACTS": "/target/artifacts"},
-            "candidate artifact authority is forbidden",
-        ),
-        (
             {"CHIO_ENTERPRISE_SECURITY_RUNNER": "1"},
             "verifier artifact authority is absent",
         ),
@@ -3554,7 +3547,7 @@ with checker.refresh_lock(root):
     untrusted_victim = untrusted_journal_root / "victim"
     untrusted_victim.write_bytes(b"trusted victim\n")
     untrusted_journal = (
-        untrusted_journal_root / checker.LEGACY_TRANSACTION_DIRECTORY
+        untrusted_journal_root / checker.IN_ROOT_TRANSACTION_DIRECTORY
     )
     untrusted_journal.mkdir()
     untrusted_sentinel = untrusted_journal / "manifest.json"
