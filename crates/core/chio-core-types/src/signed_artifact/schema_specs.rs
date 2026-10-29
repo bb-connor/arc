@@ -899,19 +899,19 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         crate::security_event::CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
-        Some(("signed_security_event", "signing-wrapper-v1")),
+        Some(("signed_security_event", "active-defense-v1")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_GRANT_SCHEMA,
-        Some(("recovery_grant", "signing-wrapper-v1")),
+        Some(("recovery_grant", "recovery-authority")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_AUTHORITY_COVERAGE_SCHEMA,
-        Some(("recovery_authority_coverage", "signing-wrapper-v1")),
+        Some(("recovery_signed_authority_coverage", "recovery-authority")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_PROVIDER_FINALITY_SCHEMA,
-        Some(("recovery_provider_finality", "signing-wrapper-v1")),
+        Some(("recovery_signed_provider_finality", "recovery-authority")),
     ),
     (
         crate::message::CHIO_EXECUTION_NONCE_SCHEMA,
@@ -927,11 +927,11 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         crate::recovery::CHIO_RECOVERY_EXPLANATION_REPORT_SCHEMA,
-        Some(("recovery_explanation_report", "signing-wrapper-v1")),
+        Some(("recovery_signed_explanation_report", "recovery-explanation")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_EXPLANATION_VIEW_SCHEMA,
-        Some(("recovery_explanation_view", "signing-wrapper-v1")),
+        Some(("recovery_signed_explanation_view", "recovery-explanation")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_ARTIFACT_CERTIFICATE_SCHEMA,
@@ -947,11 +947,11 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         crate::recovery::CHIO_RECOVERY_SETUP_PROBE_SCHEMA,
-        Some(("recovery_setup_probe", "signing-wrapper-v1")),
+        Some(("recovery_setup_probe", "recovery-product")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_SETUP_REPORT_SCHEMA,
-        Some(("recovery_setup_report", "signing-wrapper-v1")),
+        Some(("recovery_setup_report", "recovery-product")),
     ),
     (
         crate::recovery::CHIO_RECOVERY_SEMANTIC_PACKAGE_SCHEMA,
@@ -983,7 +983,7 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         CHIO_DPOP_PROOF_SCHEMA,
-        Some(("dpop_proof", "signing-wrapper-v1")),
+        Some(("invocation_sender_proof", "inbound-authority-ap5")),
     ),
     (
         "chio.operation_execution_nonce.v1",
@@ -1003,11 +1003,14 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.caller-dispatch-authorization.v1",
-        Some(("caller_dispatch_authorization", "signing-wrapper-v1")),
+        Some((
+            "caller_dispatch_authorization",
+            "authenticated-caller-delivery-v1",
+        )),
     ),
     (
         "chio.caller-delivery-report.v1",
-        Some(("caller_delivery_report", "signing-wrapper-v1")),
+        Some(("caller_delivery_report", "authenticated-caller-delivery-v1")),
     ),
     (
         "chio.checkpoint_statement.v1",
@@ -1053,11 +1056,14 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.key-log.checkpoint.v1",
-        Some(("key_log_checkpoint", "signing-wrapper-v1")),
+        Some(("key_log_checkpoint", "enterprise-security-execution-v1")),
     ),
     (
         "chio.key-log.activation-commit.v1",
-        Some(("key_log_activation_commit", "signing-wrapper-v1")),
+        Some((
+            "key_log_activation_commit",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.key-log.witness-statement.v1",
@@ -1065,77 +1071,119 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.key-log.enterprise-receipt.v1",
-        Some(("key_log_enterprise_receipt", "signing-wrapper-v1")),
+        Some((
+            "key_log_enterprise_receipt",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.key-log.event.v1",
-        Some(("key_log_event", "signing-wrapper-v1")),
+        Some(("key_log_event", "enterprise-security-execution-v1")),
     ),
     (
         "chio.key-log.witness-readiness.v1",
-        Some(("key_log_witness_readiness", "signing-wrapper-v1")),
+        Some((
+            "key_log_witness_readiness",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.key-log.audit-readiness.v1",
-        Some(("key_log_audit_readiness", "signing-wrapper-v1")),
+        Some((
+            "key_log_audit_readiness",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.keyring.artifact-signature.v1",
-        Some(("keyring_artifact_signature", "signing-wrapper-v1")),
+        Some((
+            "keyring_artifact_signature",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.key-log.artifact-time-anchor.v1",
-        Some(("key_log_artifact_time_anchor", "signing-wrapper-v1")),
+        Some((
+            "key_log_artifact_time_anchor",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-audit-runner-authorization.v1",
-        Some(("broker_audit_runner_authorization", "signing-wrapper-v1")),
+        Some((
+            "broker_audit_runner_authorization",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-audit-comparison.v1",
-        Some(("broker_audit_comparison", "signing-wrapper-v1")),
+        Some((
+            "broker_audit_comparison",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-authority-request.v1",
-        Some(("broker_authority_request", "signing-wrapper-v1")),
+        Some((
+            "broker_authority_request",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-authority-response.v1",
-        Some(("broker_authority_response", "signing-wrapper-v1")),
+        Some((
+            "broker_authority_response",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-capability.v1",
-        Some(("broker_capability", "signing-wrapper-v1")),
+        Some(("broker_capability", "enterprise-security-execution-v1")),
     ),
     (
         "chio.broker-privileged-audit-challenge.v1",
-        Some(("broker_privileged_audit_challenge", "signing-wrapper-v1")),
+        Some((
+            "broker_privileged_audit_challenge",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-request-proof.v1",
-        Some(("broker_request_proof", "signing-wrapper-v1")),
+        Some(("broker_request_proof", "enterprise-security-execution-v1")),
     ),
     (
         "chio.broker-admin-mutation-receipt.v1",
-        Some(("broker_admin_mutation_receipt", "signing-wrapper-v1")),
+        Some((
+            "broker_admin_mutation_receipt",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-admin-control-receipt.v1",
-        Some(("broker_admin_control_receipt", "signing-wrapper-v1")),
+        Some((
+            "broker_admin_control_receipt",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-execution-receipt.v1",
-        Some(("broker_execution_receipt", "signing-wrapper-v1")),
+        Some((
+            "broker_execution_receipt",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-execution-failure-receipt.v1",
-        Some(("broker_execution_failure_receipt", "signing-wrapper-v1")),
+        Some((
+            "broker_execution_failure_receipt",
+            "enterprise-security-execution-v1",
+        )),
     ),
     (
         "chio.broker-register-attempt-authorization.v1",
         Some((
             "broker_register_attempt_authorization",
-            "signing-wrapper-v1",
+            "enterprise-security-execution-v1",
         )),
     ),
     (
@@ -1838,23 +1886,35 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         "chio.runtime.admission-report.v1",
-        Some(("runtime_admission_report", "signing-wrapper-v1")),
+        Some((
+            "chio_runtime_admission_report",
+            "chio-runtime-admission-schema-cutover/v1",
+        )),
     ),
     (
         "chio.runtime.verifier-trust-bundle.v1",
-        Some(("runtime_verifier_trust_bundle", "signing-wrapper-v1")),
+        Some((
+            "chio_runtime_verifier_trust_bundle",
+            "chio-runtime-policy-schema-cutover/v1",
+        )),
     ),
     (
         "chio.runtime.pheromone-policy.v1",
-        Some(("runtime_pheromone_policy", "signing-wrapper-v1")),
+        Some((
+            "chio_runtime_pheromone_policy",
+            "chio-runtime-policy-schema-cutover/v1",
+        )),
     ),
     (
         "chio.runtime.peer-weights.v1",
-        Some(("runtime_peer_weights", "signing-wrapper-v1")),
+        Some((
+            "chio_runtime_peer_weights",
+            "chio-runtime-policy-schema-cutover/v1",
+        )),
     ),
     (
         "chio.pheromone.query-report.v1",
-        Some(("pheromone_query_report", "signing-wrapper-v1")),
+        Some(("chio_pheromone_query_report", "chio-pheromone-runtime/v1")),
     ),
     (
         "chio.behavioral-feed.v1",
