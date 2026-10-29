@@ -172,7 +172,7 @@ fn compensated_budget_denial_replays_original_signed_bytes() -> TestResult {
 }
 
 #[test]
-fn refusal_replay_projects_the_generic_denied_code() -> TestResult {
+fn refusal_replay_projects_the_signed_family_code() -> TestResult {
     let mut grant = make_grant("durable-server", "mutate");
     grant.max_invocations = Some(1);
     let (kernel, request, store, calls) =
@@ -185,15 +185,27 @@ fn refusal_replay_projects_the_generic_denied_code() -> TestResult {
         initial.denial_code,
         Some(crate::ClientDenialCode::BudgetExhausted)
     );
+    assert_eq!(
+        initial
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_kernel/client_denial_code"))
+            .and_then(serde_json::Value::as_str),
+        Some("budget_exhausted")
+    );
     let replay = kernel.evaluate_tool_call_blocking(&request)?;
     assert_exact_response(&initial, &replay);
-    assert_eq!(replay.denial_code, Some(crate::ClientDenialCode::Denied));
+    assert_eq!(
+        replay.denial_code,
+        Some(crate::ClientDenialCode::BudgetExhausted)
+    );
     let recovered = restarted(&kernel, &store, &calls);
     let restarted_replay = recovered.evaluate_tool_call_blocking(&request)?;
     assert_exact_response(&initial, &restarted_replay);
     assert_eq!(
         restarted_replay.denial_code,
-        Some(crate::ClientDenialCode::Denied)
+        Some(crate::ClientDenialCode::BudgetExhausted)
     );
     Ok(())
 }
