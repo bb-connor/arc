@@ -1,6 +1,11 @@
 use std::collections::BTreeSet;
+use std::sync::Arc;
+use std::time::Duration;
 
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, ContractLookup,
+    HttpEgressContract, HttpEgressError,
+};
 use url::Url;
 
 pub(crate) fn strict_https_contract(
@@ -37,6 +42,103 @@ pub(crate) fn strict_https_contract(
         .enforce_url(endpoint.as_str(), 0)
         .map_err(|error| error.to_string())?;
     Ok(contract)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum AnchorHttpError {
+    #[error(transparent)]
+    Egress(#[from] HttpEgressError),
+    #[error("anchor returned HTTP {0}")]
+    Status(u16),
+}
+
+/// Bearer-authenticated client for one operator-configured HTTPS anchor. Each
+/// request resolves the anchor name again, checks every address in that
+/// answer against the strict contract and dials only those addresses, so an
+/// anchor whose addresses rotate stays reachable. Redirects are never followed
+/// and proxy environment variables are ignored.
+#[derive(Clone)]
+pub(crate) struct AnchorClient {
+    contract: HttpEgressContract,
+    timeout: Duration,
+    lookup: ContractLookup,
+    authorization: Arc<str>,
+}
+
+impl std::fmt::Debug for AnchorClient {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AnchorClient")
+            .field("contract", &self.contract)
+            .field("timeout", &self.timeout)
+            .field("authorization", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
+impl AnchorClient {
+    /// `timeout` bounds each request from name resolution through the last
+    /// body byte.
+    pub(crate) fn new(
+        endpoint: &Url,
+        namespace: &str,
+        max_response_bytes: u64,
+        bearer_token: &str,
+        timeout: Duration,
+        lookup: ContractLookup,
+    ) -> Result<Self, String> {
+        let contract = strict_https_contract(endpoint, namespace, max_response_bytes)?;
+        Self::with_contract(contract, bearer_token, timeout, lookup)
+    }
+
+    fn with_contract(
+        contract: HttpEgressContract,
+        bearer_token: &str,
+        timeout: Duration,
+        lookup: ContractLookup,
+    ) -> Result<Self, String> {
+        let client = Self {
+            contract,
+            timeout,
+            lookup,
+            authorization: Arc::from(format!("Bearer {bearer_token}")),
+        };
+        client.agent().map_err(|error| error.to_string())?;
+        Ok(client)
+    }
+
+    /// A fresh agent, so the addresses it pins serve one request only.
+    fn agent(&self) -> Result<BlockingContractAgent, HttpEgressError> {
+        BlockingContractAgent::with_lookup(
+            &self.contract,
+            self.timeout,
+            self.timeout,
+            self.lookup.clone(),
+        )
+    }
+
+    pub(crate) fn get(&self, url: &str) -> Result<Vec<u8>, AnchorHttpError> {
+        let request = self.agent()?.get(url)?;
+        successful_body(self.authorized(request).call()?)
+    }
+
+    pub(crate) fn post_json(&self, url: &str, body: &[u8]) -> Result<Vec<u8>, AnchorHttpError> {
+        let request = self
+            .authorized(self.agent()?.post(url)?)
+            .header("Content-Type", "application/json");
+        successful_body(request.send_bytes(body)?)
+    }
+
+    fn authorized(&self, request: BlockingContractRequest) -> BlockingContractRequest {
+        request.header("Authorization", &self.authorization)
+    }
+}
+
+fn successful_body(response: BlockingContractResponse) -> Result<Vec<u8>, AnchorHttpError> {
+    if !(200..300).contains(&response.status()) {
+        return Err(AnchorHttpError::Status(response.status()));
+    }
+    Ok(response.body().to_vec())
 }
 
 #[cfg(test)]

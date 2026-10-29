@@ -1663,7 +1663,6 @@ dependencies = [
  "p384",
  "percent-encoding",
  "rand_core 0.6.4",
- "reqwest",
  "rsa",
  "rusqlite",
  "rustix",

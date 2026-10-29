@@ -1,18 +1,17 @@
-use std::io::Read;
 use std::time::Duration;
 
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{system_lookup, ContractLookup};
 use chio_federation::frost::{
     FrostAnchorError, FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotAnchor,
     FrostAuthorizationSlotAnchorWriter, FrostEpochAnchor, FrostEpochAnchorWriter,
     FrostEpochCheckpointV1, VerifiedFrostAuthorizationSlotBind, VerifiedFrostAuthorizationSlotBurn,
     VerifiedFrostAuthorizationSlotCompletion, VerifiedFrostEpochAdvance,
 };
-use reqwest::blocking::{Client, Response};
-use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use url::Url;
+
+use crate::anchor_egress::{AnchorClient, AnchorHttpError};
 
 #[path = "frost/coordinator.rs"]
 mod coordinator;
@@ -51,18 +50,14 @@ pub enum RemoteFrostAnchorConfigError {
     InvalidToken,
     #[error("FROST anchor timeout must be non-zero")]
     InvalidTimeout,
-    #[error("failed to construct FROST anchor HTTP client: {0}")]
-    Client(String),
     #[error("invalid FROST anchor HTTP egress contract: {0}")]
     InvalidEgressContract(String),
 }
 
 #[derive(Clone)]
 pub struct RemoteFrostAnchorClient {
-    client: Client,
+    http: AnchorClient,
     base_url: Url,
-    bearer_token: String,
-    egress_contract: HttpEgressContract,
 }
 
 impl std::fmt::Debug for RemoteFrostAnchorClient {
@@ -70,13 +65,20 @@ impl std::fmt::Debug for RemoteFrostAnchorClient {
         formatter
             .debug_struct("RemoteFrostAnchorClient")
             .field("base_url", &self.base_url)
-            .field("bearer_token", &"<redacted>")
-            .finish_non_exhaustive()
+            .field("http", &self.http)
+            .finish()
     }
 }
 
 impl RemoteFrostAnchorClient {
     pub fn new(config: RemoteFrostAnchorConfig) -> Result<Self, RemoteFrostAnchorConfigError> {
+        Self::with_lookup(config, system_lookup())
+    }
+
+    fn with_lookup(
+        config: RemoteFrostAnchorConfig,
+        lookup: ContractLookup,
+    ) -> Result<Self, RemoteFrostAnchorConfigError> {
         let base_url = Url::parse(&config.base_url)
             .map_err(|error| RemoteFrostAnchorConfigError::Url(error.to_string()))?;
         if base_url.scheme() != "https" {
@@ -102,27 +104,16 @@ impl RemoteFrostAnchorClient {
         if config.timeout.is_zero() {
             return Err(RemoteFrostAnchorConfigError::InvalidTimeout);
         }
-        let egress_contract = crate::anchor_egress::strict_https_contract(
+        let http = AnchorClient::new(
             &base_url,
             "control-plane.frost-anchor",
             crate::integer::count(MAX_ANCHOR_RESPONSE_BYTES),
+            &config.bearer_token,
+            config.timeout,
+            lookup,
         )
         .map_err(RemoteFrostAnchorConfigError::InvalidEgressContract)?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
-        // denies redirects and proxies, and each request is contract-preflighted.
-        let client = Client::builder()
-            .timeout(config.timeout)
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .build()
-            .map_err(|error| RemoteFrostAnchorConfigError::Client(error.to_string()))?;
-        Ok(Self {
-            client,
-            base_url,
-            bearer_token: config.bearer_token,
-            egress_contract,
-        })
+        Ok(Self { http, base_url })
     }
 
     fn endpoint(&self, segments: &[&str]) -> Result<Url, FrostAnchorError> {
@@ -137,18 +128,7 @@ impl RemoteFrostAnchorClient {
     }
 
     fn get_json<T: DeserializeOwned>(&self, url: Url) -> Result<T, FrostAnchorError> {
-        self.egress_contract
-            .enforce_url_with_dns(url.as_str(), 0)
-            .map_err(unavailable)?;
-        let response = self
-            .client
-            .request(Method::GET, url)
-            .bearer_auth(&self.bearer_token)
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
-            // enforced immediately above for this exact URL.
-            .send()
-            .map_err(unavailable)?;
-        decode_response(&self.egress_contract, response)
+        decode_response(&self.http.get(url.as_str()).map_err(anchor_error)?)
     }
 
     fn post_json<B: Serialize + ?Sized, T: DeserializeOwned>(
@@ -156,19 +136,15 @@ impl RemoteFrostAnchorClient {
         url: Url,
         body: &B,
     ) -> Result<T, FrostAnchorError> {
-        self.egress_contract
-            .enforce_url_with_dns(url.as_str(), 0)
-            .map_err(unavailable)?;
-        let response = self
-            .client
-            .request(Method::POST, url)
-            .bearer_auth(&self.bearer_token)
-            .json(body)
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
-            // enforced immediately above for this exact URL.
-            .send()
-            .map_err(unavailable)?;
-        decode_response(&self.egress_contract, response)
+        let body = serde_json::to_vec(body).map_err(|error| {
+            FrostAnchorError::Unavailable(format!("anchor request encoding failed: {error}"))
+        })?;
+        decode_response(
+            &self
+                .http
+                .post_json(url.as_str(), &body)
+                .map_err(anchor_error)?,
+        )
     }
 }
 
@@ -283,37 +259,19 @@ impl FrostAuthorizationSlotAnchorWriter for RemoteFrostAnchorClient {
     }
 }
 
-fn decode_response<T: DeserializeOwned>(
-    egress_contract: &HttpEgressContract,
-    mut response: Response,
-) -> Result<T, FrostAnchorError> {
-    let status = response.status();
-    if !status.is_success() {
-        return Err(FrostAnchorError::Unavailable(format!(
-            "anchor returned HTTP {status}"
-        )));
-    }
-    if let Some(length) = response.content_length() {
-        egress_contract
-            .enforce_response_bytes(length)
-            .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
-    }
-    let mut bytes = Vec::new();
-    response
-        .by_ref()
-        .take(crate::integer::count(MAX_ANCHOR_RESPONSE_BYTES) + 1)
-        .read_to_end(&mut bytes)
-        .map_err(unavailable)?;
-    egress_contract
-        .enforce_response_bytes(crate::integer::count(bytes.len()))
-        .map_err(|error| FrostAnchorError::InvalidResponse(error.to_string()))?;
-    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_ANCHOR_RESPONSE_BYTES)
+fn decode_response<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, FrostAnchorError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_ANCHOR_RESPONSE_BYTES)
         .and_then(|input| input.decode_signed())
         .map_err(|error| FrostAnchorError::UntrustedInput(error.into()))
 }
 
-fn unavailable(error: impl std::fmt::Display) -> FrostAnchorError {
-    FrostAnchorError::Unavailable(error.to_string())
+fn anchor_error(error: AnchorHttpError) -> FrostAnchorError {
+    match error {
+        AnchorHttpError::Egress(
+            error @ chio_egress_contract::HttpEgressError::ResponseTooLarge { .. },
+        ) => FrostAnchorError::InvalidResponse(error.to_string()),
+        error => FrostAnchorError::Unavailable(error.to_string()),
+    }
 }
 
 #[cfg(test)]
