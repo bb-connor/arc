@@ -22,7 +22,7 @@ hashes. It is an unpublished registry identity, replaced
 only by the included local registry. Patched AWS-LC bytes are never represented
 as an unchanged crates.io archive. No workspace path patches are required.
 
-The supported consumer profile is Linux x86_64, Rust 1.94.1, and the default
+The supported consumer profile is Linux x86_64, Rust 1.95.0, and the default
 features of these libraries. FIPS, post-quantum signing, other platforms and
 registry publication require separate qualification. The source code's narrower
 portable-library MSRVs do not qualify the complete SQLite/runtime closure.
