@@ -66,7 +66,14 @@ fn revoke(
     tags: &[KeyedIndexValue],
     reason: RevocationReason,
 ) -> TestResult<TargetRevocation> {
-    Ok(revocations(env).revoke_target(target, tags, reason)?)
+    Ok(
+        revocations(env).revoke_target(
+            target,
+            tags,
+            tags.first().map(|tag| &tag.key_id),
+            reason,
+        )?,
+    )
 }
 
 fn rule(rule_id: &str) -> TestResult<RevocationTarget> {
@@ -273,7 +280,12 @@ fn tag_targets_refuse_inconsistent_tags_and_other_targets_refuse_tags() -> TestR
         ),
     ] {
         let error = revocations(&env)
-            .revoke_target(target, &tags, RevocationReason::PrincipalOffboarded)
+            .revoke_target(
+                target,
+                &tags,
+                Some(&digest(KEY)),
+                RevocationReason::PrincipalOffboarded,
+            )
             .err();
         assert!(
             matches!(&error, Some(R::InvalidTargetTags(text)) if *text == refusal),
@@ -284,6 +296,7 @@ fn tag_targets_refuse_inconsistent_tags_and_other_targets_refuse_tags() -> TestR
         .revoke_target(
             &rule(ID_JAG_RULE)?,
             &[keyed(0xb1)],
+            None,
             RevocationReason::PolicyWithdrawn,
         )
         .err();
@@ -296,11 +309,66 @@ fn tag_targets_refuse_inconsistent_tags_and_other_targets_refuse_tags() -> TestR
 }
 
 #[test]
+fn a_tag_target_must_lead_with_its_active_generation() -> TestResult {
+    let env = minted(&three_roots()?)?;
+    let retired = keyed(0xb1);
+    let active = KeyedIndexValue {
+        key_id: digest(0xa2),
+        value: digest(0xd1),
+    };
+    let target = RevocationTarget::subject_tag(retired.value);
+    for (tags, active_key_id, refusal) in [
+        (
+            vec![retired, active],
+            Some(&active.key_id),
+            "the first tag is not under the active generation",
+        ),
+        (
+            vec![retired],
+            None,
+            "a tag target names its active generation",
+        ),
+    ] {
+        let error = revocations(&env)
+            .revoke_target(
+                &target,
+                &tags,
+                active_key_id,
+                RevocationReason::PrincipalOffboarded,
+            )
+            .err();
+        assert!(
+            matches!(&error, Some(R::InvalidTargetTags(text)) if *text == refusal),
+            "{error:?}"
+        );
+    }
+    let error = revocations(&env)
+        .revoke_target(
+            &rule(ID_JAG_RULE)?,
+            &[],
+            Some(&active.key_id),
+            RevocationReason::PolicyWithdrawn,
+        )
+        .err();
+    assert!(
+        matches!(&error, Some(R::InvalidTargetTags(text)) if *text == "only a tag target names an active generation"),
+        "{error:?}"
+    );
+    assert_eq!(count(&env, "SELECT COUNT(*) FROM revocation_entries")?, 0);
+    Ok(())
+}
+
+#[test]
 fn a_standalone_store_refuses_root_targets() -> TestResult {
     let directory = tempfile::tempdir()?;
     let store = SqliteRevocationStore::open(directory.path().join("revocations.db"))?;
     let error = store
-        .revoke_target(&rule(ID_JAG_RULE)?, &[], RevocationReason::PolicyWithdrawn)
+        .revoke_target(
+            &rule(ID_JAG_RULE)?,
+            &[],
+            None,
+            RevocationReason::PolicyWithdrawn,
+        )
         .err();
     assert!(
         matches!(
@@ -321,6 +389,7 @@ fn a_standalone_store_refuses_root_targets() -> TestResult {
     let capability = store.revoke_target(
         &RevocationTarget::capability("cap-1")?,
         &[],
+        None,
         RevocationReason::OperatorRequest,
     )?;
     assert_eq!((capability.roots_matched, capability.roots_revoked), (1, 1));
@@ -585,6 +654,7 @@ fn an_outside_schema_change_refuses_the_revocation_before_any_write() -> TestRes
         .revoke_target(
             &RevocationTarget::subject_tag(digest(0xb1)),
             &[keyed(0xb1)],
+            Some(&digest(KEY)),
             RevocationReason::PrincipalOffboarded,
         )
         .err();
@@ -763,7 +833,7 @@ fn revocation_and_mint_interleavings_never_leave_a_live_matching_root() -> TestR
             });
             let revocation = scope.spawn(|| {
                 barrier.wait();
-                check.revoke_target(&target, &[], RevocationReason::CredentialCompromise)
+                check.revoke_target(&target, &[], None, RevocationReason::CredentialCompromise)
             });
             (mint.join(), revocation.join())
         });

@@ -46,6 +46,7 @@ fn a_fan_out_failure_after_the_first_root_rolls_back_everything() -> TestResult 
     let failed = store.revoke_target(
         &target,
         &[subject(0xb1)],
+        Some(&digest(0xa1)),
         RevocationReason::IncidentResponse,
     );
     FAN_OUT_FAILS_AFTER.with(|limit| limit.set(None));
@@ -64,6 +65,7 @@ fn a_fan_out_failure_after_the_first_root_rolls_back_everything() -> TestResult 
     let revocation = store.revoke_target(
         &target,
         &[subject(0xb1)],
+        Some(&digest(0xa1)),
         RevocationReason::IncidentResponse,
     )?;
     assert!(revocation.newly_revoked);

@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core::root_authority::{
     RevocationCoverage, RevocationCoverageRoot, RevocationEntry, RevocationEntryId,
-    RevocationReason, RevocationTarget, RevocationTargetKind,
+    RevocationReason, RevocationTarget, RevocationTargetKind, Sha256Digest,
 };
 use chio_core::tenant_index::KeyedIndexValue;
 use chio_kernel::RevocationStoreError;
@@ -45,13 +45,15 @@ impl SqliteRevocationStore {
     /// matches revoked, expired roots included, in one IMMEDIATE transaction.
     ///
     /// `tags` is the tag of an `anchor_subject` or `tenant_tag` target under
-    /// every loaded generation, active first; the first value is the target
-    /// value. Every other kind carries no tags. A stored entry keeps its first
-    /// `revoked_at`, reason and tags.
+    /// every loaded generation, the one named by `active_key_id` first; the
+    /// first value is the target value. Every other kind carries no tags and
+    /// no active generation. A stored entry keeps its first `revoked_at`,
+    /// reason and tags.
     pub fn revoke_target(
         &self,
         target: &RevocationTarget,
         tags: &[KeyedIndexValue],
+        _active_key_id: Option<&Sha256Digest>,
         reason: RevocationReason,
     ) -> Result<TargetRevocation, RevocationStoreError> {
         check_target_tags(target, tags)?;
