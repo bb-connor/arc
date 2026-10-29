@@ -1018,3 +1018,156 @@ fn health_receipts_reject_zero_or_future_operational_state() {
         assert_rejected(scheduler, expected);
     }
 }
+
+#[cfg(feature = "tenant-index")]
+mod projection {
+    use super::*;
+    use std::cell::Cell;
+
+    use chio_core_types::receipt::metadata::MetadataOpenings;
+    use chio_core_types::rng::{Rng, RngError};
+    use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
+
+    struct CountingRng(Cell<u64>);
+
+    impl Rng for CountingRng {
+        fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+            let next = self.0.get().wrapping_add(1);
+            self.0.set(next);
+            for (index, byte) in dest.iter_mut().enumerate() {
+                let shift = (index % 8) * 8;
+                *byte = ((next >> shift) & 0xff) as u8 ^ (index as u8);
+            }
+            Ok(())
+        }
+    }
+
+    fn rng() -> CountingRng {
+        CountingRng(Cell::new(0))
+    }
+
+    fn key(fill: u8) -> TenantIndexKey {
+        TenantIndexKey::from_set_key(&[fill; 32])
+            .unwrap_or_else(|error| panic!("tenant index key: {error}"))
+    }
+
+    fn key_set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
+        TenantIndexKeySet::new(key(active), retired.iter().map(|fill| key(*fill)).collect())
+            .unwrap_or_else(|error| panic!("tenant index key set: {error}"))
+    }
+
+    fn without_first(openings: &MetadataOpenings) -> MetadataOpenings {
+        let mut rest = MetadataOpenings::new();
+        for (salt_ref, opening) in openings.iter().skip(1) {
+            rest.insert(salt_ref.clone(), opening.clone())
+                .unwrap_or_else(|error| panic!("opening: {error}"));
+        }
+        rest
+    }
+
+    /// No opening's raw value appears in the serialized projection.
+    fn assert_no_raw_value(projection: &str, openings: &MetadataOpenings) {
+        for (salt_ref, opening) in openings.iter() {
+            let raw = String::from_utf8_lossy(opening.value.as_bytes()).into_owned();
+            assert!(!projection.contains(&raw), "{salt_ref} leaks {raw}");
+        }
+    }
+
+    use chio_core_types::receipt::active_defense_projection::ActiveDefenseReceiptProjection;
+
+    #[test]
+    fn every_kind_projects_without_raw_identifiers_and_matches_its_body() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        for kind in all_kinds() {
+            let body = parse(fixture(kind));
+            let (projection, openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            assert!(
+                body.matches_projection(&projection, &openings, &keys),
+                "{kind:?}"
+            );
+            let encoded = canonical_json_string(&projection)
+                .unwrap_or_else(|error| panic!("{kind:?} encodes: {error}"));
+            assert!(
+                !encoded.contains("tenant-a"),
+                "{kind:?} carries the raw tenant"
+            );
+            assert_no_raw_value(&encoded, &openings);
+            let decoded: ActiveDefenseReceiptProjection = serde_json::from_str(&encoded)
+                .unwrap_or_else(|error| panic!("{kind:?} decodes: {error}"));
+            assert_eq!(decoded, projection, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn projection_refuses_missing_openings_other_bodies_and_unknown_generations() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        for kind in all_kinds() {
+            let body = parse(fixture(kind));
+            let (projection, openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            if !openings.is_empty() {
+                assert!(
+                    !body.matches_projection(&projection, &without_first(&openings), &keys),
+                    "{kind:?} matched without an opening"
+                );
+            }
+            let (_, other_openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            if !openings.is_empty() {
+                assert!(
+                    !body.matches_projection(&projection, &other_openings, &keys),
+                    "{kind:?} matched with another projection's openings"
+                );
+            }
+            let mut moved = fixture(kind);
+            moved["body"]["header"]["transition_id"] = json!("transition-moved-001");
+            if let Ok(other) = serde_json::from_value::<ActiveDefenseReceiptBody>(moved) {
+                assert!(
+                    !other.matches_projection(&projection, &openings, &keys),
+                    "{kind:?}"
+                );
+            }
+            assert!(
+                !body.matches_projection(&projection, &openings, &key_set(8, &[])),
+                "{kind:?} matched under an unknown generation"
+            );
+        }
+    }
+
+    #[test]
+    fn projection_signed_before_rotation_matches_under_the_retired_generation() {
+        let before = key_set(7, &[]);
+        let after = key_set(8, &[7]);
+        let body = parse(fixture(ActiveDefenseReceiptKind::ResponseCompletion));
+        let (projection, openings) = body
+            .project(&before, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert!(body.matches_projection(&projection, &openings, &after));
+        let (rotated, rotated_openings) = body
+            .project(&after, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert_ne!(
+            rotated.header().transition_id,
+            projection.header().transition_id
+        );
+        assert!(!body.matches_projection(&rotated, &rotated_openings, &before));
+    }
+
+    #[test]
+    fn projection_salt_draw_failure_refuses() {
+        struct Offline;
+        impl Rng for Offline {
+            fn fill_bytes(&self, _dest: &mut [u8]) -> Result<(), RngError> {
+                Err(RngError("offline"))
+            }
+        }
+        let body = parse(fixture(ActiveDefenseReceiptKind::FlowDenial));
+        assert!(body.project(&key_set(7, &[]), &Offline).is_err());
+    }
+}

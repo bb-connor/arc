@@ -623,6 +623,8 @@ pub struct ReceiptAttributionMetadata {
 mod commitment;
 mod decision_model;
 mod key_registry;
+#[cfg(feature = "tenant-index")]
+mod projector;
 mod session_anchor;
 
 pub use session_anchor::{
@@ -633,6 +635,9 @@ pub use commitment::{
     check_metadata_salt_ref, metadata_salt_ref, MetadataCommitment, MetadataCommitmentError,
     MetadataOpening, MetadataOpenings, MetadataValue, METADATA_SALT_REF_PREFIX,
 };
+
+#[cfg(feature = "tenant-index")]
+pub use projector::{MetadataProjector, ProjectionError};
 
 pub use decision_model::{
     DecisionModelEvaluation, DecisionModelFallbackReason, DecisionModelOutcome,

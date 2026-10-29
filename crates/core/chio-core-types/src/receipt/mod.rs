@@ -3,6 +3,8 @@
 //! Every tool invocation -- whether allowed or denied -- produces a receipt.
 //! Receipts are the immutable audit trail of the Chio protocol.
 
+#[cfg(feature = "tenant-index")]
+pub mod active_defense_projection;
 pub mod authoritative_spend;
 pub mod body;
 pub mod checkpoint;

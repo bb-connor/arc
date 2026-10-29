@@ -193,6 +193,16 @@ impl MetadataOpenings {
         rng: &dyn Rng,
     ) -> Result<MetadataCommitment, MetadataCommitmentError> {
         let value = MetadataValue::from_json(value)?;
+        self.commit_value(salt_ref, value, rng)
+    }
+
+    /// As [`Self::commit`], for a value already in canonical form.
+    pub fn commit_value(
+        &mut self,
+        salt_ref: SaltRef,
+        value: MetadataValue,
+        rng: &dyn Rng,
+    ) -> Result<MetadataCommitment, MetadataCommitmentError> {
         let salt = Salt::draw(rng).map_err(MetadataCommitmentError::Entropy)?;
         let opening = MetadataOpening { salt, value };
         let commitment = MetadataCommitment::compute(salt_ref.clone(), &opening)?;

@@ -4,6 +4,11 @@ use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core::receipt::decision::ToolCallAction;
 use chio_core::receipt::kinds::*;
 use chio_core::{canonical_json_bytes, sha256, Hash, PublicKey};
+use chio_core_types::receipt::metadata::{
+    metadata_salt_ref, MetadataCommitment, MetadataOpenings, MetadataProjector, ProjectionError,
+};
+use chio_core_types::rng::Rng;
+use chio_core_types::tenant_index::{IndexDomain, KeyedIndexValue, TenantIndexKeySet};
 use chio_security_types::ports::*;
 use chio_security_types::response_simulation::*;
 use chio_security_types::{ResponseApprovalRequirement, ResponseExecutionMode, ResponsePlan};
@@ -201,3 +206,143 @@ fn domain_hash(domain: &[u8], value: &impl Serialize) -> PortResult<Digest32> {
     bytes.extend(canonical_json_bytes(value).map_err(|_| PortError::invalid_data())?);
     Ok(Digest32::new(*sha256(&bytes).as_bytes()))
 }
+
+/// Signed metadata block `response_simulation`: the report without its plan, snapshot or
+/// evaluation. The plan, configuration and authorization digests are committed
+/// (`metadata.response_simulation.<field>`); the affected-set hash, the governed intent hash,
+/// the snapshot and evaluation digests and the evidence id are keyed under the active-defense
+/// purpose subkey. The full report stays the receipt's content preimage.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResponseSimulationProjection {
+    pub schema: String,
+    pub configuration_digest: MetadataCommitment,
+    pub plan_hash: MetadataCommitment,
+    pub policy_version: RecordId,
+    pub policy_hash: Digest32,
+    pub affected_set_hash: KeyedIndexValue,
+    pub created_at_unix_ms: u64,
+    pub expires_at_unix_ms: u64,
+    pub authorization_capability_hash: MetadataCommitment,
+    pub governed_intent_hash: KeyedIndexValue,
+    pub policy_decision_hash: MetadataCommitment,
+    pub approval_set_hash: Option<MetadataCommitment>,
+    pub authorized_at_unix_ms: u64,
+    pub snapshot_digest: KeyedIndexValue,
+    pub captured_at_unix_ms: u64,
+    pub evaluation_digest: KeyedIndexValue,
+    pub response_simulation_evidence_id: KeyedIndexValue,
+}
+
+impl ResponseSimulationReport {
+    /// Draws one salt per committed field from `rng` and derives each keyed value under the
+    /// active generation of `keys`; returns the projection and its openings.
+    pub fn project(
+        &self,
+        keys: &TenantIndexKeySet,
+        rng: &dyn Rng,
+    ) -> Result<(ResponseSimulationProjection, MetadataOpenings), SimulationProjectionError> {
+        let mut projector = MetadataProjector::project(keys, rng);
+        let projection = self.build_projection(&mut projector)?;
+        Ok((projection, projector.into_openings()))
+    }
+
+    /// True when every commitment in `projection` opens to this report with `openings` and
+    /// every keyed value derives from it under the generation the projection names; false on
+    /// any mismatch, missing opening or unknown generation.
+    #[must_use]
+    pub fn matches_projection(
+        &self,
+        projection: &ResponseSimulationProjection,
+        openings: &MetadataOpenings,
+        keys: &TenantIndexKeySet,
+    ) -> bool {
+        MetadataProjector::verify(
+            keys,
+            &projection.response_simulation_evidence_id.key_id,
+            openings,
+        )
+        .map_err(SimulationProjectionError::from)
+        .and_then(|mut projector| self.build_projection(&mut projector))
+        .is_ok_and(|rebuilt| rebuilt == *projection)
+    }
+
+    fn build_projection(
+        &self,
+        projector: &mut MetadataProjector<'_>,
+    ) -> Result<ResponseSimulationProjection, SimulationProjectionError> {
+        let salt_ref = |field: &str| {
+            metadata_salt_ref("response_simulation", field)
+                .map_err(|error| SimulationProjectionError::from(ProjectionError::from(error)))
+        };
+        let keyed = |projector: &MetadataProjector<'_>, preimage: &[u8]| {
+            projector.keyed(IndexDomain::ActiveDefenseKeyedDigest, preimage)
+        };
+        let canonical = |value: Result<Vec<u8>, chio_core::Error>| {
+            value.map_err(|_| SimulationProjectionError::Canonical)
+        };
+        let evidence_id = self
+            .evidence_id()
+            .map_err(|_| SimulationProjectionError::Canonical)?;
+        let approval_set_hash = match &self.approval_set_hash {
+            Some(hash) => Some(projector.commit(salt_ref("approval_set_hash")?, hash)?),
+            None => None,
+        };
+        Ok(ResponseSimulationProjection {
+            schema: self.schema.clone(),
+            configuration_digest: projector.commit(
+                salt_ref("configuration_digest")?,
+                &self.configuration_digest,
+            )?,
+            plan_hash: projector.commit(salt_ref("plan_hash")?, &self.plan.plan_hash)?,
+            policy_version: self.plan.policy_version.clone(),
+            policy_hash: self.plan.policy_hash,
+            affected_set_hash: keyed(projector, self.plan.affected_set_hash.as_bytes())?,
+            created_at_unix_ms: self.plan.created_at_unix_ms,
+            expires_at_unix_ms: self.plan.expires_at_unix_ms,
+            authorization_capability_hash: projector.commit(
+                salt_ref("authorization_capability_hash")?,
+                &self.authorization_capability_hash,
+            )?,
+            governed_intent_hash: keyed(projector, self.governed_intent_hash.as_bytes())?,
+            policy_decision_hash: projector.commit(
+                salt_ref("policy_decision_hash")?,
+                &self.policy_decision_hash,
+            )?,
+            approval_set_hash,
+            authorized_at_unix_ms: self.authorized_at_unix_ms,
+            snapshot_digest: keyed(projector, &canonical(canonical_json_bytes(&self.snapshot))?)?,
+            captured_at_unix_ms: self.snapshot.captured_at_unix_ms,
+            evaluation_digest: keyed(
+                projector,
+                &canonical(canonical_json_bytes(&self.evaluation))?,
+            )?,
+            response_simulation_evidence_id: keyed(projector, evidence_id.as_str().as_bytes())?,
+        })
+    }
+}
+
+/// Why a response simulation projection cannot be built.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SimulationProjectionError {
+    Projection(ProjectionError),
+    /// The report has no canonical form or evidence id.
+    Canonical,
+}
+
+impl From<ProjectionError> for SimulationProjectionError {
+    fn from(error: ProjectionError) -> Self {
+        Self::Projection(error)
+    }
+}
+
+impl std::fmt::Display for SimulationProjectionError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Projection(error) => error.fmt(formatter),
+            Self::Canonical => formatter.write_str("response simulation report is not canonical"),
+        }
+    }
+}
+
+impl std::error::Error for SimulationProjectionError {}

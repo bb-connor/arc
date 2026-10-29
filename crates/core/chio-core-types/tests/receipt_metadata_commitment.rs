@@ -253,7 +253,44 @@ fn registered_metadata_salt_refs() -> Vec<String> {
         ),
         (
             "active_defense",
-            &["action", "finding", "finding_receipt", "grant", "request"],
+            &[
+                "action",
+                "finding",
+                "grant",
+                "request",
+                "plan_hash",
+                "trigger_finding_hash",
+                "request_hash",
+                "source_label_hash",
+                "destination_label_hash",
+                "guard_evidence_hash",
+                "grant_hash",
+                "artifact_id_hash",
+                "artifact_version_hash",
+                "observation_hash",
+                "finding_hash",
+                "rule_id",
+                "rule_version_hash",
+                "group_key_hash",
+                "ordered_evidence_digests",
+                "evidence_hash",
+                "response_body_hash",
+                "claimed_watermark",
+                "dispatch_id",
+                "dispatch_plan_hash",
+                "dispatch_executor_authority",
+                "dispatch_authorization_capability_hash",
+                "dispatch_policy_decision_hash",
+                "dispatch_admission_artifact_fingerprint",
+                "dispatch_admission_operation",
+                "dispatch_approval_set_hash",
+                "dispatch_authorization_hash",
+                "effect_65535_id",
+                "effect_65535_session",
+                "effect_65535_contribution_hash",
+                "effect_65535_observed_base_version_hash",
+                "effect_65535_resulting_version_hash",
+            ],
         ),
         ("admission_operation", &["request_binding"]),
         (
@@ -382,6 +419,16 @@ fn registered_metadata_salt_refs() -> Vec<String> {
                 "revoked_capability_ids",
                 "entitlements",
                 "receipt_kind",
+            ],
+        ),
+        (
+            "response_simulation",
+            &[
+                "configuration_digest",
+                "plan_hash",
+                "authorization_capability_hash",
+                "policy_decision_hash",
+                "approval_set_hash",
             ],
         ),
         ("security_event", &["subject"]),
@@ -524,9 +571,9 @@ fn metadata_salt_refs_fit_64_bytes() {
     }
     assert_eq!(
         longest,
-        "metadata.governed_transaction.cc_receipt_lineage_statement_id"
+        "metadata.active_defense.dispatch_admission_artifact_fingerprint"
     );
-    assert_eq!(longest.len(), 61);
+    assert_eq!(longest.len(), 63);
     let mut unique = refs.clone();
     unique.sort();
     unique.dedup();
