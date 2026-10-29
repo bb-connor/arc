@@ -130,16 +130,13 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("agent_web_receipt_ref", Registered(ChioInternal, Unsafe)),
     ("parent_receipt_ids", Registered(ChioInternal, Unsafe)),
     ("batch_witness", Registered(ChioInternal, Unsafe)),
-    ("active_defense", Registered(ChioInternal, CommittedSafe)),
-    (
-        "response_simulation",
-        Registered(ChioInternal, CommittedSafe),
-    ),
-    ("security_event", Registered(ChioInternal, CommittedSafe)),
+    ("active_defense", Registered(ChioInternal, Unsafe)),
+    ("response_simulation", Registered(ChioInternal, Unsafe)),
+    ("security_event", Registered(ChioInternal, Unsafe)),
     ("cage_receipt", Registered(ChioInternal, Unsafe)),
-    ("guard_error", Registered(ChioInternal, CommittedSafe)),
-    ("refusal", Registered(ChioInternal, CommittedSafe)),
-    ("cancellation", Registered(ChioInternal, CommittedSafe)),
+    ("guard_error", Registered(ChioInternal, Unsafe)),
+    ("refusal", Registered(ChioInternal, Unsafe)),
+    ("cancellation", Registered(ChioInternal, Unsafe)),
     ("native_launch", Registered(CallerOrHook, Unsafe)),
     ("provenance", Registered(CallerOrHook, Unsafe)),
     ("chio_process", Registered(CallerOrHook, Unsafe)),
@@ -257,12 +254,6 @@ const WRITER_EMITS_REGISTERED_FORM: &[&str] = &[
     "chio_decision_receipt_id",
     "chio_kernel_receipt_id",
     "occurred_at_unix_ms",
-    "active_defense",
-    "response_simulation",
-    "security_event",
-    "guard_error",
-    "refusal",
-    "cancellation",
 ];
 
 /// `disclosure` never claims more than the current writer emits: a
@@ -286,17 +277,18 @@ fn committed_safe_disclosure_never_outruns_the_writer() {
 }
 
 /// The projection and detail keys are signer-written, so caller metadata
-/// naming one is refused, and each carries its registered form.
+/// naming one is refused, and each carries its registered form. None has a
+/// production writer yet, so each is unsafe until its writer lands.
 #[test]
 fn projection_and_detail_keys_are_registered_in_their_forms() {
     for (key, disclosure, form) in [
-        ("active_defense", CommittedSafe, Projection),
-        ("response_simulation", CommittedSafe, Projection),
-        ("security_event", CommittedSafe, Projection),
+        ("active_defense", Unsafe, Projection),
+        ("response_simulation", Unsafe, Projection),
+        ("security_event", Unsafe, Projection),
         ("cage_receipt", Unsafe, Projection),
-        ("guard_error", CommittedSafe, Commitments),
-        ("refusal", CommittedSafe, Commitments),
-        ("cancellation", CommittedSafe, Commitments),
+        ("guard_error", Unsafe, Commitments),
+        ("refusal", Unsafe, Commitments),
+        ("cancellation", Unsafe, Commitments),
     ] {
         let spec = metadata_key_spec(key).unwrap_or_else(|| panic!("{key} is unregistered"));
         assert_eq!(
@@ -322,6 +314,27 @@ fn raw_cage_receipt_block_refuses_until_projected() {
         error.to_string(),
         "canonical JSON error: receipt metadata key \"cage_receipt\" is not committed-safe"
     );
+}
+
+/// A projection or detail key with no production writer refuses in internal
+/// metadata, whatever its value.
+#[test]
+fn writerless_projection_and_detail_keys_refuse() {
+    for key in [
+        "active_defense",
+        "response_simulation",
+        "security_event",
+        "guard_error",
+        "refusal",
+        "cancellation",
+    ] {
+        let error = check_internal_receipt_metadata(&json!({ key: {} }))
+            .expect_err("a key with no production writer must refuse");
+        assert_eq!(
+            error.to_string(),
+            format!("canonical JSON error: receipt metadata key {key:?} is not committed-safe")
+        );
+    }
 }
 
 /// Every form appears in the registry.
