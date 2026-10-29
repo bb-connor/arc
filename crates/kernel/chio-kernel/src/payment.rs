@@ -41,10 +41,10 @@ pub trait PaymentAdapter: Send + Sync {
     }
 
     /// Digest of the private network allowances this rail dials under. An
-    /// adapter without HTTP egress declares none.
-    fn egress_allowance_digest(&self) -> &str {
-        EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
-    }
+    /// adapter without HTTP egress returns
+    /// [`EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST`]; one that delegates to
+    /// another adapter returns that adapter's digest.
+    fn egress_allowance_digest(&self) -> &str;
 
     /// Authorize or prepay up to `amount_units` before the tool executes.
     ///

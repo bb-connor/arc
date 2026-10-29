@@ -115,6 +115,10 @@ struct SimRailStoppedBeforeJournal {
 }
 
 impl PaymentAdapter for SimRailStoppedBeforeJournal {
+    fn egress_allowance_digest(&self) -> &str {
+        self.inner.egress_allowance_digest()
+    }
+
     fn rail_id(&self) -> &'static str {
         self.inner.rail_id()
     }

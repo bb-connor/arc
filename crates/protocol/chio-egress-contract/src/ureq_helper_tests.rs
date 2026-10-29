@@ -472,7 +472,7 @@ fn vpc_agent(allowances: &[(&str, u16, &str)]) -> BlockingContractAgent {
 }
 
 #[test]
-fn allowed_private_literal_is_dialed() {
+fn allowed_private_literal_passes_the_contract() {
     let refusal = vpc_agent(&[])
         .get("https://10.255.255.254:9/verify")
         .expect_err("unlisted private literal");
@@ -489,7 +489,7 @@ fn allowed_private_literal_is_dialed() {
         .call();
     assert!(
         matches!(outcome, Err(HttpEgressError::Transport(_))),
-        "an allowed private literal reaches the socket: {outcome:?}"
+        "an allowed private literal fails only in transport, not the contract: {outcome:?}"
     );
 }
 

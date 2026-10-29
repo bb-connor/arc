@@ -77,6 +77,10 @@ async fn nested_payment_revalidation_does_not_require_dispatch_credentials(
 }
 
 impl PaymentAdapter for MutatingPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,

@@ -419,6 +419,10 @@ impl SqliteFindingOperatorPaymentAdapter {
 }
 
 impl PaymentAdapter for SqliteFindingOperatorPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         RAIL_ID
     }

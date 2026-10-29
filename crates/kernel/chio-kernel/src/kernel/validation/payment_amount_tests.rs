@@ -101,6 +101,10 @@ impl PaymentAdapter for DelegatingRail {
         self.inner.rail_id()
     }
 
+    fn egress_allowance_digest(&self) -> &str {
+        self.inner.egress_allowance_digest()
+    }
+
     fn rail_mode(&self) -> Option<PaymentRailMode> {
         self.inner.rail_mode()
     }
@@ -169,4 +173,28 @@ fn delegating_rail_reports_its_inner_allowance_digest() {
     let expected = inner.egress_allowance_digest().to_owned();
     let wrapper = DelegatingRail { inner };
     assert_eq!(wrapper.egress_allowance_digest(), expected);
+}
+
+#[test]
+fn recovery_refuses_a_delegating_rail_whose_inner_cidr_changed() {
+    let journaled = DelegatingRail {
+        inner: vpc_rail_on("10.20.0.0/24"),
+    };
+    let journal = journal_under(journaled.egress_allowance_digest());
+    let widened = DelegatingRail {
+        inner: vpc_rail_on("10.20.0.0/23"),
+    };
+    let refusal =
+        ChioKernel::validate_durable_payment_authorization_intent(&widened, &journal, 125, "USD")
+            .expect_err("a changed inner allowance must refuse recovery");
+    assert!(
+        matches!(
+            &refusal,
+            PaymentError::RailError(message)
+                if message == "durable payment adapter does not match the persisted rail profile"
+        ),
+        "{refusal:?}"
+    );
+    ChioKernel::validate_durable_payment_authorization_intent(&journaled, &journal, 125, "USD")
+        .expect("the journaled inner allowance is unchanged");
 }

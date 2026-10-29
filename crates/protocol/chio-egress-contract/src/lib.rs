@@ -297,7 +297,10 @@ impl HttpEgressContract {
     }
 
     /// Enforce the contract on a resolved address when the resolver cannot
-    /// see the request port. A host pinned by an allowance is refused.
+    /// see the request port. A request reaches the resolver only after its
+    /// `host:port` passed the authority set, so a pinned host admitted on a
+    /// single port is checked against that port's allowance. A pinned host
+    /// admitted on more than one port is refused.
     #[cfg(feature = "reqwest-egress")]
     pub(crate) fn enforce_resolved_address_without_port(
         &self,
@@ -305,7 +308,29 @@ impl HttpEgressContract {
         address: IpAddr,
     ) -> Result<(), HttpEgressError> {
         let ip = allowance::canonical_ip(address);
-        self.enforce_address(host, None, ip, format!("{host} resolved to {ip}"))
+        let label = format!("{host} resolved to {ip}");
+        let pinned_host = allowance::allowance_host(host);
+        if !self
+            .private_network_allowances
+            .iter()
+            .any(|entry| entry.host == pinned_host)
+        {
+            return self.enforce_address(host, None, ip, label);
+        }
+        let ports = self
+            .allowed_authority_set
+            .iter()
+            .filter_map(|authority| {
+                let url = Url::parse(&format!("https://{authority}/")).ok()?;
+                (allowance::allowance_host(url.host_str()?) == pinned_host)
+                    .then(|| url.port_or_known_default())
+                    .flatten()
+            })
+            .collect::<BTreeSet<u16>>();
+        match (ports.first(), ports.len()) {
+            (Some(port), 1) => self.enforce_address(host, Some(*port), ip, label),
+            _ => Err(HttpEgressError::AllowanceRequiresPortAwareResolver { host: pinned_host }),
+        }
     }
 
     /// A host pinned by an allowance for this port must resolve inside the

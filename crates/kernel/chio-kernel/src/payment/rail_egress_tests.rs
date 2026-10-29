@@ -73,7 +73,7 @@ fn is_rail_error(error: &PaymentError, expected: &str) -> bool {
 }
 
 #[test]
-fn allowed_private_rail_is_dialed() {
+fn allowed_private_rail_passes_the_contract() {
     let error = AcpPaymentAdapter::new(BLACKHOLE_RAIL)
         .with_timeout(Duration::from_millis(300))
         .with_private_network_allowances(&blackhole_allowance())
@@ -82,7 +82,7 @@ fn allowed_private_rail_is_dialed() {
         .expect_err("nothing listens on the blackhole rail");
     assert!(
         matches!(&error, PaymentError::Unavailable(message) if message == "payment rail transport failed"),
-        "an allowed private rail reaches the socket: {error:?}"
+        "an allowed private rail fails only in transport, not the contract: {error:?}"
     );
 
     x402_at(BLACKHOLE_RAIL, &blackhole_allowance()).expect("allowed private facilitator");

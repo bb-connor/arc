@@ -1152,6 +1152,10 @@ impl TrackingPaymentAdapter {
 }
 
 impl PaymentAdapter for TrackingPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,

@@ -6,6 +6,10 @@ pub(super) struct LostPaymentAcknowledgement {
 }
 
 impl PaymentAdapter for LostPaymentAcknowledgement {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         self.adapter.rail_id()
     }
