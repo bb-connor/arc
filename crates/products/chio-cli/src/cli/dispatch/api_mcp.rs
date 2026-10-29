@@ -71,6 +71,7 @@ pub(crate) fn dispatch_mcp(
             cmd_mcp_wrap(&args)
         }
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
+        McpCommands::RootRequest { command } => dispatch_root_request(command),
         McpCommands::Serve {
             agent_public_key,
             policy,

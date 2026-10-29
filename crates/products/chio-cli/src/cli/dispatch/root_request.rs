@@ -1,14 +1,53 @@
+//! `chio mcp root-request`: the operator side of `chio_operator_key` roots.
+
+use std::io::{Read, Write as _};
+use std::path::Path;
+
+use chio_core::crypto::Ed25519Backend;
+use chio_mcp_remote::root_exchange::kinds::operator_key::{
+    OperatorRootRequest, SignedOperatorRootRequest, MAX_OPERATOR_ROOT_REQUEST_BYTES,
+};
+use chio_mcp_remote::root_exchange::RootExchangeError;
+
+use super::*;
+
+pub(super) fn dispatch_root_request(command: McpRootRequestCommands) -> Result<(), CliError> {
+    match command {
+        McpRootRequestCommands::Sign { operator_seed_file } => {
+            let signed = sign_root_request(&operator_seed_file, std::io::stdin().lock())?;
+            let mut stdout = std::io::stdout().lock();
+            stdout.write_all(&signed)?;
+            stdout.write_all(b"\n")?;
+            Ok(())
+        }
+    }
+}
+
+/// Sign the operator root request JSON read from `input` with the seed at
+/// `operator_seed_file`, returning the canonical JSON of the signed request.
+/// The seed file must already exist with private custody; a request without
+/// `tenant_value` refuses before any signing call.
+fn sign_root_request(operator_seed_file: &Path, input: impl Read) -> Result<Vec<u8>, CliError> {
+    let operator = Ed25519Backend::new(crate::load_existing_authority_keypair(operator_seed_file)?);
+    let body = crate::input::read_stream(input, MAX_OPERATOR_ROOT_REQUEST_BYTES)?;
+    let request = OperatorRootRequest::parse(&body).map_err(refused)?;
+    SignedOperatorRootRequest::sign(request, &operator)
+        .and_then(|signed| signed.to_canonical_json())
+        .map_err(refused)
+}
+
+fn refused(error: RootExchangeError) -> CliError {
+    CliError::cli_json_error(error.to_string())
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;
     use std::path::PathBuf;
 
-    use chio_core::crypto::{Keypair, PublicKey};
-    use chio_mcp_remote::root_exchange::kinds::operator_key::SignedOperatorRootRequest;
-    use chio_mcp_remote::root_exchange::RootExchangeError;
-
     use super::*;
+    use chio_core::crypto::{Keypair, PublicKey};
 
     const REQUEST: &str = r#"{
         "request_id": "req-1",
