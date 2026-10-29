@@ -53,6 +53,7 @@ assert_not_prepared_evm_submission!(PreparedBondRelease);
 assert_not_prepared_evm_submission!(PreparedBondImpair);
 assert_not_prepared_evm_submission!(PreparedBondExpiry);
 
+mod capital_authority;
 mod dual_sign;
 mod merkle_trust;
 
@@ -79,6 +80,9 @@ fn sample_config_with_rpc_url(rpc_url: String) -> SettlementChainConfig {
         policy: SettlementPolicyConfig::default(),
         kernel_authority: crate::SettlementKernelAuthority {
             trusted_keys: vec![operator_keypair().public_key()],
+        },
+        capital_authority: crate::SettlementCapitalAuthority {
+            trusted_keys: vec![instruction_keypair().public_key()],
         },
     }
 }
@@ -269,10 +273,6 @@ fn instruction_keypair() -> Keypair {
     Keypair::from_seed(&[9u8; 32])
 }
 
-fn bond_keypair() -> Keypair {
-    Keypair::from_seed(&[11u8; 32])
-}
-
 fn custodian_keypair() -> Keypair {
     Keypair::from_seed(&[13u8; 32])
 }
@@ -432,7 +432,7 @@ fn sample_credit_bond(
     collateral_units: u64,
     reserve_units: u64,
 ) -> SignedCreditBond {
-    let keypair = bond_keypair();
+    let keypair = instruction_keypair();
     SignedCreditBond::sign(
         CreditBondArtifact {
             schema: chio_core::credit::CREDIT_BOND_ARTIFACT_SCHEMA.to_string(),

@@ -6782,6 +6782,9 @@ fn settlement_config() -> Result<SettlementChainConfig, AnyError> {
         kernel_authority: SettlementKernelAuthority {
             trusted_keys: vec![keypair(7).public_key()],
         },
+        capital_authority: chio_settle::SettlementCapitalAuthority {
+            trusted_keys: vec![keypair(9).public_key()],
+        },
     })
 }
 

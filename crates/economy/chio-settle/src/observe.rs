@@ -566,6 +566,9 @@ mod tests {
             kernel_authority: crate::SettlementKernelAuthority {
                 trusted_keys: vec![chio_core::crypto::Keypair::from_seed(&[7u8; 32]).public_key()],
             },
+            capital_authority: crate::SettlementCapitalAuthority {
+                trusted_keys: vec![chio_core::crypto::Keypair::from_seed(&[9u8; 32]).public_key()],
+            },
         }
     }
 

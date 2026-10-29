@@ -44,9 +44,9 @@ pub use ccip::{
 };
 pub use config::{
     settlement_devnet_rpc_egress_contract, DevnetContracts, DevnetMocks, EvidenceSubstrateMode,
-    LocalDevnetDeployment, SettlementAmountTier, SettlementChainConfig, SettlementEvidenceConfig,
-    SettlementKernelAuthority, SettlementOracleAuthority, SettlementOracleConfig,
-    SettlementPolicyConfig,
+    LocalDevnetDeployment, SettlementAmountTier, SettlementCapitalAuthority, SettlementChainConfig,
+    SettlementEvidenceConfig, SettlementKernelAuthority, SettlementOracleAuthority,
+    SettlementOracleConfig, SettlementPolicyConfig,
 };
 pub use evm::{
     build_failure_receipt, build_reversal_receipt, confirm_transaction, estimate_call_gas,

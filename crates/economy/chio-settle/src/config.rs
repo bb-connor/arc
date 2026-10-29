@@ -230,6 +230,7 @@ pub struct SettlementChainConfig {
     pub evidence_substrate: SettlementEvidenceConfig,
     pub policy: SettlementPolicyConfig,
     pub kernel_authority: SettlementKernelAuthority,
+    pub capital_authority: SettlementCapitalAuthority,
 }
 
 /// Kernel keys whose signed receipts may authorize an escrow release.
@@ -259,25 +260,75 @@ impl TryFrom<SettlementKernelAuthorityFields> for SettlementKernelAuthority {
 
 impl SettlementKernelAuthority {
     pub fn validate(&self) -> Result<(), SettlementError> {
-        if self.trusted_keys.is_empty() {
-            return Err(SettlementError::invalid_input(
-                "settlement config kernel_authority.trusted_keys must name at least one kernel key",
-            ));
-        }
-        for (index, key) in self.trusted_keys.iter().enumerate() {
-            if self.trusted_keys[..index].contains(key) {
-                return Err(SettlementError::invalid_input(
-                    "settlement config kernel_authority.trusted_keys must not repeat a kernel key",
-                ));
-            }
-        }
-        Ok(())
+        validate_trusted_keys(&self.trusted_keys, "kernel_authority", "kernel key")
     }
 
     #[must_use]
     pub fn trusts(&self, key: &PublicKey) -> bool {
         self.trusted_keys.contains(key)
     }
+}
+
+/// Trust-control authority keys whose signed credit bonds and capital
+/// execution instructions may move settlement funds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "SettlementCapitalAuthorityFields")]
+pub struct SettlementCapitalAuthority {
+    pub trusted_keys: Vec<PublicKey>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettlementCapitalAuthorityFields {
+    trusted_keys: Vec<PublicKey>,
+}
+
+impl TryFrom<SettlementCapitalAuthorityFields> for SettlementCapitalAuthority {
+    type Error = SettlementError;
+
+    fn try_from(fields: SettlementCapitalAuthorityFields) -> Result<Self, Self::Error> {
+        let authority = Self {
+            trusted_keys: fields.trusted_keys,
+        };
+        authority.validate()?;
+        Ok(authority)
+    }
+}
+
+impl SettlementCapitalAuthority {
+    pub fn validate(&self) -> Result<(), SettlementError> {
+        validate_trusted_keys(
+            &self.trusted_keys,
+            "capital_authority",
+            "capital authority key",
+        )
+    }
+
+    /// The configured member equal to `key`, if any.
+    #[must_use]
+    pub fn trusted_member(&self, key: &PublicKey) -> Option<&PublicKey> {
+        self.trusted_keys.iter().find(|member| *member == key)
+    }
+}
+
+fn validate_trusted_keys(
+    keys: &[PublicKey],
+    member: &str,
+    noun: &str,
+) -> Result<(), SettlementError> {
+    if keys.is_empty() {
+        return Err(SettlementError::invalid_input(format!(
+            "settlement config {member}.trusted_keys must name at least one {noun}"
+        )));
+    }
+    for (index, key) in keys.iter().enumerate() {
+        if keys[..index].contains(key) {
+            return Err(SettlementError::invalid_input(format!(
+                "settlement config {member}.trusted_keys must not repeat a {noun}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 impl SettlementChainConfig {
@@ -485,6 +536,7 @@ impl LocalDevnetDeployment {
     pub fn into_chain_config(
         self,
         kernel_authority: SettlementKernelAuthority,
+        capital_authority: SettlementCapitalAuthority,
     ) -> Result<SettlementChainConfig, SettlementError> {
         kernel_authority.validate()?;
         let egress_contract = settlement_devnet_rpc_egress_contract(&self.rpc_url)?;
@@ -507,6 +559,7 @@ impl LocalDevnetDeployment {
             evidence_substrate: SettlementEvidenceConfig::default(),
             policy: SettlementPolicyConfig::default(),
             kernel_authority,
+            capital_authority,
         })
     }
 }
@@ -521,6 +574,12 @@ mod tests {
     fn sample_kernel_authority() -> SettlementKernelAuthority {
         SettlementKernelAuthority {
             trusted_keys: vec![Keypair::from_seed(&[7u8; 32]).public_key()],
+        }
+    }
+
+    fn sample_capital_authority() -> SettlementCapitalAuthority {
+        SettlementCapitalAuthority {
+            trusted_keys: vec![Keypair::from_seed(&[9u8; 32]).public_key()],
         }
     }
 
@@ -566,7 +625,67 @@ mod tests {
             evidence_substrate: SettlementEvidenceConfig::default(),
             policy: SettlementPolicyConfig::default(),
             kernel_authority: sample_kernel_authority(),
+            capital_authority: sample_capital_authority(),
         }
+    }
+
+    const EMPTY_CAPITAL_AUTHORITY: &str =
+        "invalid input: settlement config capital_authority.trusted_keys must name at least one capital authority key";
+
+    #[test]
+    fn chain_config_refuses_empty_capital_authority() {
+        let mut config = sample_chain_config();
+        config.capital_authority.trusted_keys.clear();
+
+        let error = config.validate().test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_CAPITAL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_duplicate_capital_authority_keys() {
+        let mut config = sample_chain_config();
+        let key = config.capital_authority.trusted_keys[0].clone();
+        config.capital_authority.trusted_keys.push(key);
+
+        let error = config.validate().test_unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "invalid input: settlement config capital_authority.trusted_keys must not repeat a capital authority key"
+        );
+    }
+
+    #[test]
+    fn chain_config_refuses_empty_capital_authority_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        value["capital_authority"]["trusted_keys"] = serde_json::json!([]);
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_CAPITAL_AUTHORITY);
+    }
+
+    #[test]
+    fn chain_config_refuses_absent_capital_authority_at_parse() {
+        let mut value = serde_json::to_value(sample_chain_config()).test_unwrap();
+        let removed = value
+            .as_object_mut()
+            .and_then(|object| object.remove("capital_authority"));
+        assert!(removed.is_some());
+
+        let error = serde_json::from_value::<SettlementChainConfig>(value).test_unwrap_err();
+        assert_eq!(error.to_string(), "missing field `capital_authority`");
+    }
+
+    #[test]
+    fn local_devnet_refuses_empty_capital_authority_at_load() {
+        let error = sample_deployment()
+            .into_chain_config(
+                sample_kernel_authority(),
+                SettlementCapitalAuthority {
+                    trusted_keys: Vec::new(),
+                },
+            )
+            .test_unwrap_err();
+        assert_eq!(error.to_string(), EMPTY_CAPITAL_AUTHORITY);
     }
 
     const EMPTY_KERNEL_AUTHORITY: &str =
@@ -627,9 +746,12 @@ mod tests {
     #[test]
     fn local_devnet_refuses_empty_kernel_authority_at_load() {
         let error = sample_deployment()
-            .into_chain_config(SettlementKernelAuthority {
-                trusted_keys: Vec::new(),
-            })
+            .into_chain_config(
+                SettlementKernelAuthority {
+                    trusted_keys: Vec::new(),
+                },
+                sample_capital_authority(),
+            )
             .test_unwrap_err();
         assert_eq!(error.to_string(), EMPTY_KERNEL_AUTHORITY);
     }
@@ -680,7 +802,7 @@ mod tests {
     #[test]
     fn local_devnet_maps_price_resolver_as_reference_contract() {
         let config = sample_deployment()
-            .into_chain_config(sample_kernel_authority())
+            .into_chain_config(sample_kernel_authority(), sample_capital_authority())
             .test_unwrap();
         assert_eq!(config.kernel_authority, sample_kernel_authority());
         assert_eq!(

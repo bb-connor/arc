@@ -432,17 +432,22 @@ async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_repl
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
-        trusted_keys: vec![operator_keypair.public_key()],
-    })?;
+    let instruction_key = Keypair::from_seed_hex(
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )?;
+    let config = deployment.into_chain_config(
+        chio_settle::SettlementKernelAuthority {
+            trusted_keys: vec![operator_keypair.public_key()],
+        },
+        chio_settle::SettlementCapitalAuthority {
+            trusted_keys: vec![instruction_key.public_key()],
+        },
+    )?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,
         &config.operator_address,
     );
-    let instruction_key = Keypair::from_seed_hex(
-        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    )?;
 
     let approval = prepare_erc20_approval(
         &config.settlement_token_address,
@@ -570,17 +575,22 @@ async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
-        trusted_keys: vec![operator_keypair.public_key()],
-    })?;
+    let instruction_key = Keypair::from_seed_hex(
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )?;
+    let config = deployment.into_chain_config(
+        chio_settle::SettlementKernelAuthority {
+            trusted_keys: vec![operator_keypair.public_key()],
+        },
+        chio_settle::SettlementCapitalAuthority {
+            trusted_keys: vec![instruction_key.public_key()],
+        },
+    )?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,
         &config.operator_address,
     );
-    let instruction_key = Keypair::from_seed_hex(
-        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    )?;
 
     let issued_at = latest_block_timestamp(&config.rpc_url).await?;
     let create_amount = MonetaryAmount {

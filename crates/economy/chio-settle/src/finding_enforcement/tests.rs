@@ -144,6 +144,9 @@ fn sample_config() -> SettlementChainConfig {
         kernel_authority: crate::SettlementKernelAuthority {
             trusted_keys: vec![Keypair::from_seed(&[7u8; 32]).public_key()],
         },
+        capital_authority: crate::SettlementCapitalAuthority {
+            trusted_keys: vec![Keypair::from_seed(&[9u8; 32]).public_key()],
+        },
     }
 }
 

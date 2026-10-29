@@ -754,20 +754,22 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
         .accounts
         .clone()
         .ok_or("runtime devnet accounts missing")?;
-    let config = deployment.into_chain_config(chio_settle::SettlementKernelAuthority {
-        trusted_keys: vec![operator_keypair.public_key()],
-    })?;
+    let instruction_key = Keypair::from_seed_hex(
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )?;
+    let config = deployment.into_chain_config(
+        chio_settle::SettlementKernelAuthority {
+            trusted_keys: vec![operator_keypair.public_key()],
+        },
+        chio_settle::SettlementCapitalAuthority {
+            trusted_keys: vec![instruction_key.public_key()],
+        },
+    )?;
     let binding = operator_binding(
         &operator_keypair,
         &config.chain_id,
         &config.operator_address,
     );
-    let instruction_key = Keypair::from_seed_hex(
-        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    )?;
-    let bond_key = Keypair::from_seed_hex(
-        "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    )?;
 
     let generated_at = latest_block_timestamp(&config.rpc_url).await?;
     let anchor_proof = publish_anchor_proof(
@@ -1128,7 +1130,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
     write_json(&root.join("scenarios/reorg-recovery.json"), &reorg_scenario);
 
     let impair_bond = sample_credit_bond(
-        &bond_key,
+        &instruction_key,
         "cbd-e2e-impair",
         "cfd-e2e-impair",
         generated_at,
@@ -1240,7 +1242,7 @@ async fn web3_partner_qualification_emits_integrated_recovery_bundle(
 
     let expiry_now = latest_block_timestamp(&config.rpc_url).await?;
     let expiry_bond = sample_credit_bond(
-        &bond_key,
+        &instruction_key,
         "cbd-e2e-expiry",
         "cfd-e2e-expiry",
         expiry_now,
