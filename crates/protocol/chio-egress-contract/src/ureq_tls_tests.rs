@@ -106,6 +106,10 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
                 _ => return false,
             }
         }
+        let mut body = vec![0_u8; content_length(&request)];
+        if stream.read_exact(&mut body).is_err() {
+            return false;
+        }
         stream
             .write_all(
                 b"HTTP/1.1 204 No Content\r\nX-Egress: pinned\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -113,6 +117,22 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
             .is_ok()
     });
     (authority, handle)
+}
+
+/// The request body must be read before the reply: closing a socket with unread
+/// bytes sends a reset that can reach the client before the response does.
+fn content_length(head: &[u8]) -> usize {
+    String::from_utf8_lossy(head)
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            if name.trim().eq_ignore_ascii_case("content-length") {
+                value.trim().parse().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0)
 }
 
 /// Every layer of an error, outermost first: the opaque transport class hides
