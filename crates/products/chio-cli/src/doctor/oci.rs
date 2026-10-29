@@ -12,6 +12,7 @@
 
 use std::path::PathBuf;
 
+use super::egress::probe_get;
 use super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 const REGISTRY_ENV: &str = "CHIO_GUARD_REGISTRY";
@@ -97,63 +98,40 @@ impl Probe for OciProbe {
             .with_context("registry", registry);
         }
 
-        // Best-effort reachability via reqwest blocking. Treat any
-        // failure as a warning, never a hard error: the probe is read-
-        // only and a transient network blip should not block CI.
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic OCI reachability
-        // probes target a user-configured registry and are skipped by
-        // CHIO_DOCTOR_SKIP_NETWORK, outside substrate tool egress.
-        match reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-        {
-            Ok(client) => {
-                let url = if registry.starts_with("http") {
-                    registry.clone()
+        // Best-effort reachability. Treat any failure as a warning, never a
+        // hard error: the probe is read-only and a transient network blip
+        // should not block CI.
+        let url = if registry.starts_with("http") {
+            registry.clone()
+        } else {
+            format!("https://{registry}/v2/")
+        };
+        match probe_get(&url) {
+            Ok(response) => {
+                let status = response.status();
+                if (200..300).contains(&status) || status == 401 || status == 404 {
+                    ProbeReport::ok(
+                        self.name(),
+                        format!("Registry {registry} reachable ({status})."),
+                    )
+                    .with_context("registry", registry)
                 } else {
-                    format!("https://{registry}/v2/")
-                };
-                // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic OCI reachability
-                // probe, outside substrate tool egress.
-                match client.head(&url).send() {
-                    Ok(response) => {
-                        if response.status().is_success()
-                            || response.status().as_u16() == 401
-                            || response.status().as_u16() == 404
-                        {
-                            ProbeReport::ok(
-                                self.name(),
-                                format!("Registry {registry} reachable ({}).", response.status()),
-                            )
-                            .with_context("registry", registry)
-                        } else {
-                            ProbeReport::fail(
-                                self.name(),
-                                ProbeSeverity::Warning,
-                                "urn:chio:error:cli:doctor-oci-unreachable",
-                                format!(
-                                    "Registry {registry} returned status {}.",
-                                    response.status()
-                                ),
-                            )
-                            .with_context("registry", registry)
-                        }
-                    }
-                    Err(err) => ProbeReport::fail(
+                    ProbeReport::fail(
                         self.name(),
                         ProbeSeverity::Warning,
                         "urn:chio:error:cli:doctor-oci-unreachable",
-                        format!("Registry {registry} unreachable: {err}"),
+                        format!("Registry {registry} returned status {status}."),
                     )
-                    .with_context("registry", registry),
+                    .with_context("registry", registry)
                 }
             }
             Err(err) => ProbeReport::fail(
                 self.name(),
                 ProbeSeverity::Warning,
                 "urn:chio:error:cli:doctor-oci-unreachable",
-                format!("Could not build HTTP client: {err}"),
-            ),
+                format!("Registry {registry} unreachable (egress contract): {err}"),
+            )
+            .with_context("registry", registry),
         }
     }
 }
@@ -189,5 +167,25 @@ mod tests {
             .context
             .iter()
             .any(|ctx| ctx.key == "registry" && ctx.value == "ghcr.io/example/chio"));
+    }
+
+    #[test]
+    fn redirect_to_another_authority_is_not_followed() {
+        use super::super::egress::test_support::{redirect_to, serve};
+        use std::sync::atomic::Ordering;
+        let target = serve("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string());
+        let origin = serve(redirect_to(&format!("http://127.0.0.1:{}/", target.port)));
+        let probe = OciProbe::default().with_registry(format!("http://127.0.0.1:{}/", origin.port));
+        let _ = probe.run(&ProbeConfig::default());
+        assert_eq!(origin.hits.load(Ordering::SeqCst), 1);
+        assert_eq!(target.hits.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn link_local_authority_is_refused_without_dialing() {
+        let probe = OciProbe::default().with_registry("http://169.254.169.254/latest/meta-data");
+        let report = probe.run(&ProbeConfig::default());
+        assert_eq!(report.severity, ProbeSeverity::Warning);
+        assert!(report.message.contains("egress"), "{}", report.message);
     }
 }
