@@ -659,7 +659,7 @@ pub use decision_model::{
 
 pub use key_registry::{
     check_internal_receipt_metadata, metadata_key_spec, reserved_receipt_metadata_keys,
-    MetadataDisclosure, MetadataKeyOrigin, MetadataKeySpec, RECEIPT_METADATA_KEYS,
+    MetadataDisclosure, MetadataForm, MetadataKeyOrigin, MetadataKeySpec, RECEIPT_METADATA_KEYS,
 };
 
 #[cfg(test)]
