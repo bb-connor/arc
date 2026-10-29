@@ -296,6 +296,47 @@ mod tests {
     }
 
     #[test]
+    fn delegate_refuses_the_parent_subject_as_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let parent = parent_token(&issuer, &subject);
+        let result = delegate(
+            &parent,
+            &subject.public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            1500,
+            [4_u8; 16],
+        );
+        assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
+    }
+
+    #[test]
+    fn delegate_refuses_a_parent_relabelled_to_the_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let trusted = Keypair::generate();
+        let mut parent = parent_token(&issuer, &subject);
+        parent.issuer = trusted.public_key();
+        let result = delegate(
+            &parent,
+            &trusted.public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            1500,
+            [5_u8; 16],
+        );
+        assert!(matches!(
+            result,
+            Err(crate::Error::SignatureVerificationFailed)
+        ));
+    }
+
+    #[test]
     fn receipt_canonical_bytes_round_trip() {
         let receipt = mint([1_u8; 16]);
         let bytes = receipt.canonical_bytes().unwrap();
