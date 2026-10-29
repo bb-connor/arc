@@ -400,9 +400,10 @@ pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
 
 pub use admission_operation_store::{
     CreditExposureAccountSnapshot, DpopReplayMigrationRecordV1, DurableObligationV1,
-    RuntimeSourceRecordV1, SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
-    SecurityParticipantMigrationPhase, SecurityParticipantMigrationRecord,
-    SecurityParticipantStateInitialization, SqliteAdmissionOperationStore,
+    RuntimeSourceRecordV1, RuntimeSourceRequalificationInput, SecurityParticipantEgressHistory,
+    SecurityParticipantFlowJoinHistory, SecurityParticipantMigrationPhase,
+    SecurityParticipantMigrationRecord, SecurityParticipantStateInitialization,
+    SqliteAdmissionOperationStore,
 };
 pub use agent_web_replay_store::{
     SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,

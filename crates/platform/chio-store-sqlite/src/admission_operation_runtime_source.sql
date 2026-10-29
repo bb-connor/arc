@@ -48,3 +48,44 @@ BEGIN SELECT RAISE(ABORT, 'runtime source qualification is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS runtime_source_qualifications_no_delete
 BEFORE DELETE ON runtime_source_qualifications
 BEGIN SELECT RAISE(ABORT, 'runtime source qualification is immutable'); END;
+
+CREATE TABLE IF NOT EXISTS runtime_source_supersessions (
+    prior_runtime_authority_id TEXT PRIMARY KEY NOT NULL CHECK (
+        typeof(prior_runtime_authority_id) = 'text'
+        AND octet_length(prior_runtime_authority_id) BETWEEN 1 AND 2048
+        AND instr(prior_runtime_authority_id, char(0)) = 0
+    ),
+    replacement_runtime_authority_id TEXT NOT NULL UNIQUE CHECK (
+        typeof(replacement_runtime_authority_id) = 'text'
+        AND octet_length(replacement_runtime_authority_id) BETWEEN 1 AND 2048
+        AND instr(replacement_runtime_authority_id, char(0)) = 0
+    ),
+    canonical_supersession BLOB NOT NULL CHECK (
+        typeof(canonical_supersession) = 'blob'
+        AND length(canonical_supersession) BETWEEN 1 AND 8192
+    ),
+    record_digest TEXT NOT NULL UNIQUE CHECK (
+        typeof(record_digest) = 'text' AND length(record_digest) = 64
+        AND octet_length(record_digest) <= 128 AND instr(record_digest, char(0)) = 0
+        AND record_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    CHECK (replacement_runtime_authority_id <> prior_runtime_authority_id),
+    FOREIGN KEY (prior_runtime_authority_id) REFERENCES runtime_source_qualifications(runtime_authority_id),
+    FOREIGN KEY (replacement_runtime_authority_id) REFERENCES runtime_source_qualifications(runtime_authority_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS runtime_source_supersessions_no_replace
+BEFORE INSERT ON runtime_source_supersessions
+WHEN EXISTS (SELECT 1 FROM runtime_source_supersessions
+    WHERE prior_runtime_authority_id = NEW.prior_runtime_authority_id
+       OR replacement_runtime_authority_id = NEW.replacement_runtime_authority_id
+       OR record_digest = NEW.record_digest)
+BEGIN SELECT RAISE(ABORT, 'runtime source supersession is immutable'); END;
+
+CREATE TRIGGER IF NOT EXISTS runtime_source_supersessions_no_update
+BEFORE UPDATE ON runtime_source_supersessions
+BEGIN SELECT RAISE(ABORT, 'runtime source supersession is immutable'); END;
+
+CREATE TRIGGER IF NOT EXISTS runtime_source_supersessions_no_delete
+BEFORE DELETE ON runtime_source_supersessions
+BEGIN SELECT RAISE(ABORT, 'runtime source supersession is immutable'); END;

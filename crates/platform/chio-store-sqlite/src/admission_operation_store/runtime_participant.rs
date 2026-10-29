@@ -27,9 +27,35 @@ pub(crate) fn verify_runtime_budget_selection_tx(
     grant_index: usize,
     phase: RuntimeParticipantPhase,
 ) -> Result<(), AdmissionOperationStoreError> {
+    if let Some(runtime_authority_id) =
+        live_runtime_selection(connection, operation, grant_index, phase)?
+    {
+        runtime_source::require_active_source(connection, &runtime_authority_id)?;
+    }
+    Ok(())
+}
+
+/// Validate the prepared grant and phase without requiring the source to be
+/// active. Exact replay of a committed effect uses this before acknowledging;
+/// every new effect must still pass `verify_runtime_budget_selection_tx`.
+pub(crate) fn verify_runtime_budget_selection_history_tx(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    grant_index: usize,
+    phase: RuntimeParticipantPhase,
+) -> Result<(), AdmissionOperationStoreError> {
+    live_runtime_selection(connection, operation, grant_index, phase).map(|_| ())
+}
+
+fn live_runtime_selection(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    grant_index: usize,
+    phase: RuntimeParticipantPhase,
+) -> Result<Option<AdmissionIdentifier>, AdmissionOperationStoreError> {
     verify_operation(connection, operation)?;
     if operation.runtime_participant_ledger_digest().is_none() {
-        return Ok(());
+        return Ok(None);
     }
     let episodes = records::load(connection, operation)?;
     let live = episodes
@@ -43,7 +69,7 @@ pub(crate) fn verify_runtime_budget_selection_tx(
             "budget selection differs from the runtime prepared grant or phase",
         ));
     }
-    Ok(())
+    Ok(Some(live.intent().runtime_authority_id().clone()))
 }
 
 impl SqliteAdmissionOperationStore {
@@ -140,6 +166,7 @@ impl SqliteAdmissionOperationStore {
         )?;
         ensure_no_reserved_terminal_stage(&transaction, operation.binding().operation_id())?;
         require_intent(&transaction, operation, intent)?;
+        runtime_source::require_active_source(&transaction, intent.runtime_authority_id())?;
         let episodes = records::load(&transaction, operation)?;
         if let Some(existing) = episodes
             .iter()

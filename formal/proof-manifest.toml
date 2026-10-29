@@ -2345,9 +2345,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::claim_runtime_participants", "require_intent"]
-normalized_sha256 = "b5a5084520db24dd4c6e0d429117cb708c1f2017c4f87b6447343de7dbbc61c4"
+normalized_sha256 = "70a2a7b0f49a419c63d3e52b764049efe6f378748a9b54e85dd4b0f95e36f046"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::claim_runtime_participants", sha256 = "9635d0812900bbcbb2671816e79b6f3dee12302544959e6c4700f4f47789c6eb" },
+  { symbol = "SqliteAdmissionOperationStore::claim_runtime_participants", sha256 = "a25cfacfdb5418d03eb5f3396ee2edd00d0c4dd96b250eb002c0042d9b57e565" },
   { symbol = "require_intent", sha256 = "294591c49e6d1683f7d53b0dc15ef24d54266759bd79297f57ca936f6bc12398" },
 ]
 
@@ -3089,10 +3089,10 @@ rust_symbols = [
   "SqliteBudgetStore::capture_composite_invocation_inner",
   "SqliteBudgetStore::capture_composite_invocation_with_diagnostic",
 ]
-normalized_sha256 = "89c30ab32907faea0ae21abaa744b3373affa823e385706ab727970c0037c0e8"
+normalized_sha256 = "ef220a26644e3cfb993d6c2654dd8a37c8a5f1aa8fd907bc614faf7624881add"
 symbol_sha256 = [
   { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "4d1708efe74071241d2ad37a2f00d9002c4679a84b422e7e69d624b744661126" },
-  { symbol = "SqliteBudgetStore::capture_composite_invocation_with_diagnostic", sha256 = "b43d7429dd5c0c7ad90081fbef14d50ea7b3a8307292b932ed203859df6ed34f" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_with_diagnostic", sha256 = "058473310d5c48d95ce646f217241b744e529944255c0fb99a6315f74be97be0" },
 ]
 
 [[mirror]]

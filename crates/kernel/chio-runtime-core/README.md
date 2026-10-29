@@ -12,7 +12,7 @@ Destructive leases and single-use continuations belong to the destination's oper
 
 ## Source lifetime
 
-A qualified SQLite source is bound to its opened file's device, inode and single-link identity. Copy, restore, replacement, or a remount that changes that identity refuses with `runtime_source_qualification_invalid`. Replacement requires independently provisioned new source and runtime IDs. Installed bindings cannot be deleted or superseded, and a destination exhausted at 128 installed records requires a new provisioned authority. See [Runtime source qualification](RUNTIME_SOURCE.md).
+A qualified SQLite source is bound to its opened file's device, inode and single-link identity. A copy, restore, replacement, or remount that changes that identity refuses with `runtime_source_qualification_invalid`. Fenced operator requalification supersedes an exact prior record and installs independently provisioned new source and runtime IDs. Prior bindings and claim history are retained; only the new source may authorize fresh work. The destination limits are 128 active sources, 1,024 retained supersessions and 1,152 retained qualifications. Counts are checked before decoding stored history. At the supersession limit, a new replacement refuses before source callbacks; an identical retry still verifies its retained replacement. See [Runtime source qualification](RUNTIME_SOURCE.md).
 
 Memory stores retain artifacts and trust floors for one process. JSON stores coordinate clones of one instance; independent opens require SQLite for serialized transitions. Memory and JSON stores do not qualify operation-owned runtime sources. Report generation consumes supplied evidence and observations.
 
