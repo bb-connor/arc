@@ -1038,7 +1038,7 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
 /// must opt in explicitly.
 pub fn delegate(
     parent: &CapabilityToken,
-    _trusted_parent_issuer: &PublicKey,
+    trusted_parent_issuer: &PublicKey,
     child_scope: &ChioScope,
     delegator_keypair: &Keypair,
     delegatee: &PublicKey,
@@ -1046,7 +1046,7 @@ pub fn delegate(
     signed_at: u64,
     nonce: [u8; 16],
 ) -> Result<crate::delegation_receipt::DelegationReceipt> {
-    if !parent.verify_integrity_embedded_key()? {
+    if !parent.verify_signature(trusted_parent_issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     if signed_at < parent.issued_at {
