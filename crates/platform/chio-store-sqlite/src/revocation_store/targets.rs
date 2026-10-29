@@ -81,6 +81,12 @@ impl SqliteRevocationStore {
         let matched = matching_capabilities(&transaction, target, &entry_id)?;
         let mut roots_revoked = 0_u64;
         for capability_id in &matched {
+            #[cfg(test)]
+            if FAN_OUT_FAILS_AFTER.with(std::cell::Cell::get) == Some(roots_revoked) {
+                return Err(RevocationStoreError::Sync(
+                    "injected fan-out failure".to_string(),
+                ));
+            }
             if self.mark_revoked(&transaction, capability_id, revoked_at, &entry_id)? {
                 roots_revoked += 1;
             }
