@@ -55,7 +55,7 @@ fn commands_that_do_not_consume_the_allowance_set_refuse_the_flag() {
     let cases: [&[&str]; 6] = [
         &["run", "--policy", missing, "--", "true"],
         &["trust", "revoke", "--capability-id", "cap-1"],
-        &["trust", "status"],
+        &["trust", "status", "--capability-id", "cap-1"],
         &[
             "trust",
             "config",

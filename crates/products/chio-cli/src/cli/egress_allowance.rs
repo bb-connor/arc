@@ -101,7 +101,7 @@ mod tests {
         for args in [
             &["run", "--policy", "policy.yaml", "--", "true"][..],
             &["trust", "revoke", "--capability-id", "cap-1"],
-            &["trust", "status"],
+            &["trust", "status", "--capability-id", "cap-1"],
             &["finding", "operator", "tick", "--profile", "profile.json"],
             &[
                 "mcp",
@@ -110,8 +110,25 @@ mod tests {
                 "policy.yaml",
                 "--server-id",
                 "fs",
+                "--cage-policy",
+                "cage.json",
+                "--cage-policy-signer",
+                "signer.pub",
                 "--",
                 "true",
+            ],
+            &[
+                "trust",
+                "config",
+                "credential",
+                "--deployment",
+                "dep-a",
+                "--secret-env",
+                "CHIO_SECRET",
+                "--id",
+                "entry",
+                "--role",
+                "operator",
             ],
             &["init", "scaffold"],
         ] {
@@ -121,7 +138,8 @@ mod tests {
 
     #[test]
     fn without_the_flag_no_command_is_refused() {
-        let cli = parse_cli(["chio", "trust", "status"]).expect("argv parses");
+        let cli = parse_cli(["chio", "trust", "status", "--capability-id", "cap-1"])
+            .expect("argv parses");
         assert_eq!(refuse_unconsumed(&cli.command, None), Ok(()));
     }
 
