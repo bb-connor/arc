@@ -132,13 +132,10 @@ capabilities:
         == caps["root"]["aggregate_invocation_budget"]
     )
     with sqlite3.connect(state / "swarm-runtime.db") as db:
-        try:
-            db.execute(
-                "INSERT INTO runtime_consumed_swarm_continuations VALUES ('forged', 'forged')"
-            )
-            raise AssertionError("sealed source accepted a legacy continuation write")
-        except sqlite3.IntegrityError as failure:
-            assert "sealed" in str(failure), failure
+        retired = db.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'runtime_consumed_swarm_continuations'"
+        ).fetchone()[0]
+    assert retired == 0, "swarm source retained the legacy continuation table"
 
     def effects():
         with sqlite3.connect(f"file:{state / 'mailboxes.db'}?mode=ro", uri=True) as db:
@@ -349,9 +346,9 @@ capabilities:
         assert claims[0][0] != claims[2][0], claims
         assert (
             db.execute(
-                "SELECT COUNT(*) FROM runtime_replay_migration_events"
+                "SELECT COUNT(*) FROM sqlite_master WHERE name GLOB 'runtime_replay_migration_*'"
             ).fetchone()[0]
-            == 3
+            == 0
         )
         assert (
             db.execute("SELECT COUNT(*) FROM runtime_replay_claim_releases").fetchone()[

@@ -154,7 +154,7 @@ fn retained_calls_bind_real_outcomes_and_reject_resigned_substitutions() -> Resu
                 ("/operation/history", json!([])),
                 (retained_pointer.as_str(), json!("released_before_dispatch")),
                 (
-                    "/operation/history/0/claim/intent/expectationId",
+                    "/operation/history/0/claim/intent/qualificationId",
                     json!("another-generation"),
                 ),
             ]);

@@ -213,7 +213,7 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
             "custody is not retained",
         ),
         (
-            "/results/alice/custody/history/0/claim/intent/expectationId",
+            "/results/alice/custody/history/0/claim/intent/qualificationId",
             json!("substituted-authority-generation"),
             "claim commitment differs",
         ),
