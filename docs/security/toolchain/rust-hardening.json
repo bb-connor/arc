@@ -2,7 +2,7 @@
   "unsafe_libraries": {
     "crates/core/chio-file-custody/src/lib.rs": "Inspects Darwin ACLs on borrowed live file descriptors; owns and frees the returned native ACL allocation without transferring descriptor custody.",
     "crates/kernel/chio-kernel/src/lib.rs": "Queries the host page size through libc::sysconf; the call has no pointer arguments.",
-    "crates/platform/chio-sqlite-file-identity/src/lib.rs": "Borrows the SQLite handle to query VFS file identity and converts returned C strings under the connection lock.",
+    "crates/platform/chio-sqlite-file-identity/src/lib.rs": "Borrows the SQLite handle to query VFS file identity and converts returned C strings under the connection lock. The custody module forbids unsafe code and carries the TCB clippy deny set.",
     "crates/security/chio-cage/src/lib.rs": "Linux sandbox creation, inherited descriptor adoption and ancillary descriptor transfer require libc FFI.",
     "crates/security/chio-keyring/src/lib.rs": "Queries SQLite connection file identity through C APIs with bounded ownership; descriptor ACL inspection delegates to chio-file-custody.",
     "crates/security/chio-secure-ipc/src/lib.rs": "Adopts inherited handles and queries OS file metadata and ACLs at the authenticated IPC boundary.",
