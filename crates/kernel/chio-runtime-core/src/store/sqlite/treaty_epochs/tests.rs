@@ -526,3 +526,32 @@ fn epoch_advancement_refuses_changed_participant_context() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn epoch_advancement_refuses_changed_trust_bundle() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    let fixture = Fixture::new()?;
+    fixture.install()?;
+    let mut body = fixture.update.body().clone();
+    body.sequence = 2;
+    body.previous_record_sha256 = Some(fixture.update.body_digest().clone());
+    body.trust_bundle_sha256 = digest('d')?;
+    let next = sign_treaty_epoch_record(body, &fixture.backend, &fixture.backend.public_key()?)?;
+    assert_eq!(
+        fixture
+            .store
+            .apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next)
+            .err()
+            .ok_or("changed trust context accepted")?
+            .code(),
+        "treaty_epoch_binding_mismatch"
+    );
+    fixture.store.commit_runtime_authority(&fixture.request)?;
+    let retained: i64 = fixture.store.lock_connection()?.query_row(
+        "SELECT COUNT(*) FROM runtime_treaty_epoch_records",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(retained, 1);
+    Ok(())
+}
