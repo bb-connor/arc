@@ -379,7 +379,6 @@ fn materialize_proof_fixture(
     normalize_agent_web_fixture_material(descriptor, out)?;
     normalize_commerce_mandate_projection_edges(out)?;
     normalize_commerce_order_passport_binding(descriptor, out)?;
-    normalize_runtime_swarm_static_baseline(descriptor, out)?;
     generate_minimal_receipt_evidence(descriptor, out)?;
     normalize_declared_evidence_graph_node_ids(descriptor, out)?;
     if descriptor.kind != "negative-transaction-passport" {
@@ -1094,7 +1093,6 @@ pub(super) fn copy_proof_fixture(fixture_id: &str, out: &Path) -> Result<(), Cli
     normalize_agent_web_fixture_material(&descriptor, out)?;
     normalize_commerce_mandate_projection_edges(out)?;
     normalize_commerce_order_passport_binding(&descriptor, out)?;
-    normalize_runtime_swarm_static_baseline(&descriptor, out)?;
     normalize_declared_evidence_graph_node_ids(&descriptor, out)?;
     if descriptor.kind != "negative-transaction-passport" {
         refresh_proof_room_bundle_source_reports(out)?;
@@ -2227,67 +2225,6 @@ fn create_private_runtime_swarm_directory(path: &Path) -> Result<(), CliError> {
     }
     builder.create(path)?;
     Ok(())
-}
-
-/// Fixture whose `proof-package.json` and `verifier-report.json` are the
-/// static baseline the recursive runtime swarm loopback must reproduce.
-const RUNTIME_SWARM_STATIC_BASELINE_FIXTURE: &str = "swarm-authority/valid-recursive-delegation";
-/// Loopback runs allowed for the static baseline to reach parity. The first
-/// run may draw a fresh selective disclosure proof; the next reuses it.
-const RUNTIME_SWARM_BASELINE_PASSES: usize = 3;
-
-/// Rewrites the static proof package and verifier report of the recursive
-/// delegation fixture to what the runtime loopback produces, one run at a
-/// time, until a run accepts them. A run is adopted only when its parity
-/// report lists no semantic mismatch, so only encodings and signatures move.
-fn normalize_runtime_swarm_static_baseline(
-    descriptor: &ProofFixtureDescriptor,
-    out: &Path,
-) -> Result<(), CliError> {
-    if installed_fixture_path(descriptor) != RUNTIME_SWARM_STATIC_BASELINE_FIXTURE {
-        return Ok(());
-    }
-    let package_path = out.join("proof-package.json");
-    let report_path = out.join("verifier-report.json");
-    let mut last_error = String::new();
-    for _ in 0..RUNTIME_SWARM_BASELINE_PASSES {
-        let work = tempfile::tempdir()?;
-        let scenario_path = work.path().join("scenario.json");
-        write_executable_runtime_swarm_scenario(&scenario_path)?;
-        let out_dir = work.path().join("out");
-        let run = chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts(
-            &scenario_path,
-            &work.path().join("store"),
-            RUNTIME_SWARM_LOOPBACK_NOW_UNIX_MS,
-            &out_dir,
-            &crate::input::read_text(&package_path)?,
-            &crate::input::read_text(&report_path)?,
-        );
-        let Err(error) = run else {
-            return Ok(());
-        };
-        let parity = read_json_value(&out_dir.join("runtime-proof-parity-report.json"))
-            .map_err(|_| {
-                CliError::cli_other_error(format!(
-                    "proof fixture runtime baseline loopback failed: {error}"
-                ))
-            })?;
-        let semantic_match = parity
-            .get("mismatches")
-            .and_then(serde_json::Value::as_array)
-            .is_some_and(Vec::is_empty);
-        if !semantic_match {
-            return Err(CliError::cli_other_error(format!(
-                "proof fixture runtime baseline diverges semantically: {error}"
-            )));
-        }
-        fs::write(&package_path, crate::input::read(out_dir.join("proof-package.json"))?)?;
-        fs::write(&report_path, crate::input::read(out_dir.join("verifier-report.json"))?)?;
-        last_error = error.to_string();
-    }
-    Err(CliError::cli_other_error(format!(
-        "proof fixture runtime baseline did not reach parity in {RUNTIME_SWARM_BASELINE_PASSES} runs: {last_error}"
-    )))
 }
 
 fn runtime_swarm_loopback_temp_root() -> Result<PathBuf, CliError> {
