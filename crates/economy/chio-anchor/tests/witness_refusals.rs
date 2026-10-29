@@ -13,6 +13,12 @@ use chio_core::Keypair;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn loopback_contract(endpoint: &str) -> chio_egress_contract::HttpEgressContract {
+    chio_egress_contract::HttpEgressContract::permissive_for_tests(
+        endpoint.trim_start_matches("http://"),
+    )
+}
+
 const ISSUED_AT: u64 = 1_700_000_000;
 const NOW: i64 = 1_700_000_100;
 
@@ -233,7 +239,11 @@ async fn ots_proof_committing_to_another_digest_reports_both_digests() -> TestRe
         witness_root: Hash::zero(),
         body_hash: expected,
     };
-    let client = OtsClient::new("http://127.0.0.1:9", 0)?;
+    let client = OtsClient::new(
+        "http://127.0.0.1:9",
+        &loopback_contract("http://127.0.0.1:9"),
+        0,
+    )?;
     match client.verify_inclusion(&receipt).await {
         Err(AnchorWitnessError::BodyHashMismatch { lane, batch }) => {
             assert_eq!(lane, committed.to_hex());

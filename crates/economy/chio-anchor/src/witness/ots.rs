@@ -27,6 +27,9 @@ use std::time::Duration;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use chio_core::hashing::Hash;
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 use opentimestamps::attestation::Attestation;
 use opentimestamps::ser::{Deserializer, DigestType};
 use opentimestamps::timestamp::{Step, StepData, Timestamp};
@@ -38,11 +41,13 @@ use crate::witness::{batch_body_hash, AnchorWitnessClient, AnchorWitnessError, W
 /// OpenTimestamps advisory client. `calendar_url` example:
 /// `https://alice.btc.calendar.opentimestamps.org`. The calendar's
 /// `/digest` endpoint accepts a 32-byte SHA-256 payload and returns a
-/// serialised `Timestamp`.
+/// serialised `Timestamp`. Every request, including each redirect hop,
+/// is dialed only under the client's `HttpEgressContract`.
 #[derive(Debug, Clone)]
 pub struct OtsClient {
     calendar_url: String,
-    http: reqwest::Client,
+    contract: HttpEgressContract,
+    http: ContractClient,
     /// Maximum age in seconds for the Bitcoin attestation. Receipts
     /// whose attestation is older than this are reported as
     /// `AnchorWitnessError::Stale` on `verify_inclusion`.
@@ -57,6 +62,7 @@ pub struct OtsClient {
 impl OtsClient {
     pub fn new(
         calendar_url: impl Into<String>,
+        contract: &HttpEgressContract,
         max_witness_age_seconds: i64,
     ) -> Result<Self, AnchorWitnessError> {
         let calendar_url = calendar_url.into();
@@ -70,16 +76,15 @@ impl OtsClient {
                 "max_witness_age_seconds must be non-negative".to_string(),
             ));
         }
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: OpenTimestamps calendar
-        // witness lane; HttpEgressContract is not yet threaded through
-        // OtsClient::new.
-        let http = reqwest::Client::builder()
+        let calendar_url = calendar_url.trim_end_matches('/').to_string();
+        contract.enforce_url(&format!("{calendar_url}/digest"), 0)?;
+        let http = client_builder_with_contract(contract)
             .timeout(Duration::from_secs(20))
-            .https_only(false)
             .build()
             .map_err(|error| AnchorWitnessError::Config(error.to_string()))?;
         Ok(OtsClient {
-            calendar_url: calendar_url.trim_end_matches('/').to_string(),
+            calendar_url,
+            contract: contract.clone(),
             http,
             max_witness_age_seconds,
             accept_pending_attestation: false,
@@ -103,29 +108,25 @@ impl AnchorWitnessClient for OtsClient {
         let body_hash = batch_body_hash(batch)?;
         let body_hash_bytes = body_hash.as_bytes().to_vec();
 
-        let response = self
+        let request = self
             .http
             .post(self.digest_url())
             .header("Content-Type", "application/octet-stream")
             .body(body_hash_bytes.clone())
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
-            .send()
-            .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
+            .build()
+            .map_err(AnchorWitnessError::transport)?;
+        let response = send_with_contract(&self.contract, &self.http, request).await?;
         let status = response.status();
-        let blob = response
-            .bytes()
-            .await
-            .map_err(|error| AnchorWitnessError::Network(error.to_string()))?;
+        let blob = response.body();
         if !status.is_success() {
             return Err(AnchorWitnessError::Http {
                 status: status.as_u16(),
-                body: String::from_utf8_lossy(&blob).into_owned(),
+                body: String::from_utf8_lossy(blob).into_owned(),
             });
         }
 
         // Calendar returns a raw timestamp blob (not detached file).
-        let mut deser = Deserializer::new(blob.as_ref());
+        let mut deser = Deserializer::new(blob);
         let timestamp =
             Timestamp::deserialize(&mut deser, body_hash_bytes.clone()).map_err(|error| {
                 AnchorWitnessError::Decode(format!("ots calendar timestamp parse: {error}"))
@@ -330,6 +331,12 @@ pub fn build_ots_inclusion_proof_b64(
 mod tests {
     use super::*;
 
+    fn loopback_contract(endpoint: &str) -> chio_egress_contract::HttpEgressContract {
+        chio_egress_contract::HttpEgressContract::permissive_for_tests(
+            endpoint.trim_start_matches("http://"),
+        )
+    }
+
     #[test]
     fn ots_inclusion_proof_round_trips_through_parser() {
         let payload_hash = chio_core::hashing::sha256(b"chio-anchor-batch-test");
@@ -343,13 +350,18 @@ mod tests {
 
     #[test]
     fn ots_client_rejects_blank_calendar() {
-        let err = OtsClient::new("", 60).unwrap_err();
+        let err = OtsClient::new("", &loopback_contract("http://127.0.0.1:9"), 60).unwrap_err();
         assert!(matches!(err, AnchorWitnessError::Config(_)));
     }
 
     #[test]
     fn ots_client_rejects_negative_max_age() {
-        let err = OtsClient::new("https://example.com", -1).unwrap_err();
+        let err = OtsClient::new(
+            "http://127.0.0.1:9",
+            &loopback_contract("http://127.0.0.1:9"),
+            -1,
+        )
+        .unwrap_err();
         assert!(matches!(err, AnchorWitnessError::Config(_)));
     }
 
@@ -365,7 +377,12 @@ mod tests {
             witness_root: Hash::zero(),
             body_hash: payload_hash,
         };
-        let client = OtsClient::new("http://127.0.0.1:9", 0).unwrap();
+        let client = OtsClient::new(
+            "http://127.0.0.1:9",
+            &loopback_contract("http://127.0.0.1:9"),
+            0,
+        )
+        .unwrap();
         let err = client.verify_inclusion(&receipt).await.unwrap_err();
         match err {
             AnchorWitnessError::SignatureInvalid(message) => {

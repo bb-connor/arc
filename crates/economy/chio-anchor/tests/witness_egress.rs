@@ -5,10 +5,11 @@ use std::sync::Arc;
 
 use chio_anchor::{
     build_anchor_batch, AnchorBatch, AnchorBatchWitness, AnchorBatchWitnessKind,
-    AnchorWitnessClient, OtsClient,
+    AnchorWitnessClient, AnchorWitnessError, OtsClient, RekorClient,
 };
 use chio_core::hashing::Hash;
 use chio_core::Keypair;
+use chio_egress_contract::{HttpEgressContract, HttpEgressError};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -59,15 +60,57 @@ async fn ots_publish_never_dials_a_redirect_target_outside_the_calendar() -> Tes
         })
     };
 
-    let client = OtsClient::new(calendar_url, 0)?;
+    let contract =
+        HttpEgressContract::permissive_for_tests(calendar_url.trim_start_matches("http://"));
+    let client = OtsClient::new(calendar_url, &contract, 0)?;
     let result = client.publish(&sample_batch()?).await;
     calendar_task.await??;
     elsewhere_task.abort();
 
-    assert!(result.is_err(), "{result:?}");
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                HttpEgressError::AuthorityDenied { .. }
+            ))
+        ),
+        "{result:?}"
+    );
     assert!(
         !dialed.load(Ordering::SeqCst),
         "OTS publish followed a redirect to an authority outside its calendar"
     );
+    Ok(())
+}
+
+#[test]
+fn witness_clients_refuse_endpoints_outside_their_contract() -> TestResult {
+    let contract = HttpEgressContract::permissive_for_tests("calendar.example:443");
+    assert!(matches!(
+        OtsClient::new("https://other.example", &contract, 0),
+        Err(AnchorWitnessError::Egress(
+            HttpEgressError::AuthorityDenied { .. }
+        ))
+    ));
+    assert!(matches!(
+        RekorClient::new("https://other.example", &contract, 0),
+        Err(AnchorWitnessError::Egress(
+            HttpEgressError::AuthorityDenied { .. }
+        ))
+    ));
+    let mut metadata = HttpEgressContract::permissive_for_tests("169.254.169.254:80");
+    metadata.deny_link_local = true;
+    assert!(matches!(
+        OtsClient::new("http://169.254.169.254", &metadata, 0),
+        Err(AnchorWitnessError::Egress(
+            HttpEgressError::LinkLocalDenied { .. }
+        ))
+    ));
+    assert!(matches!(
+        RekorClient::new("http://169.254.169.254", &metadata, 0),
+        Err(AnchorWitnessError::Egress(
+            HttpEgressError::LinkLocalDenied { .. }
+        ))
+    ));
     Ok(())
 }
