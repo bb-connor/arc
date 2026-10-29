@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `e8204b5f8c1682ade073837fd57012b352ff44ce2b28aa5e577c75d8a65dffa2`
+- Input digest: `0ea80208a398afb83d14a49ec64739b447868d139f7a46d7f309ceacd7700e31`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1372,7 +1372,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `audits/mutation/per-crate-configs/chio-policy.toml`: `4a0edd1a6711e51cdeaf48e71f6c94ee512612e962f9f49ee1e0ac4707f76ba3`
 - `audits/mutation/per-crate-configs/chio-weights.toml`: `8851bcc823e192ef10d705097257daf8a0ed03a466ead6c1ea11eff467e1e3ce`
 - `cargo-metadata://workspace-packages`: `2c977335fe3dc5b83a8008a759b8097d1a2688eab5da805e1042c5a4ec3c188a`
-- `crates/core/chio-core-types/Cargo.toml`: `8e83704dec27054fc5e6092bef593a458ea415962c979664b94bdb2b2fa7b340`
+- `crates/core/chio-core-types/Cargo.toml`: `876021ebcff833fe2763a48ff94ea87b648bd04dec2f51c012679a97a425f09c`
 - `crates/core/chio-core-types/src/_generated/chio_wire_v1.rs`: `b4771ff2b10a2a99ae1140f32c26febf27549c9a82e963f55f4e7c5a6dfbfb2e`
 - `crates/core/chio-core-types/src/_generated/mod.rs`: `7381c7c83a14860b6f132d386cd87d56ea0c390a866d1d0b3073aab185684990`
 - `crates/core/chio-core-types/src/canonical.rs`: `fc910cde6aec1aa6f5a60ad8818d3fb5477787fb378f3268710949b7a8dfc884`
@@ -1421,7 +1421,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/enterprise_subject.rs`: `e3058945c222fdbea62eab0cb71eb74681c1897a65c1e1f2eadae1fd2e1ca500`
 - `crates/core/chio-core-types/src/error.rs`: `a72c969efeb5806f17f0b9dd6fb1d9350945a071895f18bb439d7dde98da6406`
 - `crates/core/chio-core-types/src/hashing.rs`: `1c769a1f353950c324855e0b678adca4b0212011dc48dfdf4ef62d084baef522`
-- `crates/core/chio-core-types/src/lib.rs`: `451370a1a7fc6c97271acea0822144260a3bdaffd0cebc9f91f518fb89b7fee6`
+- `crates/core/chio-core-types/src/lib.rs`: `e23a3a4c2dbab886b5449167bf2afdc2de18227da1a5996962ea41cdfa05d74a`
 - `crates/core/chio-core-types/src/loaded_weights.rs`: `61d456695ac3931a484536f6e8c9f0c7da5b631cc82f00ba9b7837c540980d76`
 - `crates/core/chio-core-types/src/manifest.rs`: `1fb3379818513c848a93afdaa8785fc68156ec5571426ce939150a6ea98e46e9`
 - `crates/core/chio-core-types/src/merkle.rs`: `baeedab501a3ca750d5ef0894a0d098b59631b7846392a01085d888c6eaeccf0`
