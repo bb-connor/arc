@@ -1,3 +1,56 @@
+use super::*;
+use chio_core_types::crypto::SigningBackend;
+
+#[derive(Clone, Debug)]
+pub struct VerifiedTreatyEpochUpdate {
+    envelope: SignedTreatyEpochV1,
+    body_digest: AdmissionDigest,
+}
+
+impl VerifiedTreatyEpochUpdate {
+    pub fn envelope(&self) -> &SignedTreatyEpochV1 {
+        &self.envelope
+    }
+
+    pub fn body(&self) -> &TreatyEpochRecordV1 {
+        &self.envelope.body
+    }
+
+    pub fn body_digest(&self) -> &AdmissionDigest {
+        &self.body_digest
+    }
+
+    pub fn authority(&self) -> &PublicKey {
+        &self.envelope.signer_key
+    }
+
+    pub fn validate_active_at(&self, _now_unix_ms: u64) -> Result<(), TreatyEpochError> {
+        Err(TreatyEpochError::Stale)
+    }
+}
+
+pub fn verify_treaty_epoch_update(
+    _envelope: SignedTreatyEpochV1,
+    _pinned_authority: &PublicKey,
+) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
+    Err(TreatyEpochError::InvalidSignature)
+}
+
+pub fn sign_treaty_epoch_record(
+    _body: TreatyEpochRecordV1,
+    _backend: &dyn SigningBackend,
+    _pinned_authority: &PublicKey,
+) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
+    Err(TreatyEpochError::SigningFailed)
+}
+
+pub fn treaty_epoch_from_wire(
+    _bytes: &[u8],
+    _pinned_authority: &PublicKey,
+) -> Result<VerifiedTreatyEpochUpdate, TreatyEpochError> {
+    Err(TreatyEpochError::InvalidEncoding)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,6 +158,59 @@ mod tests {
             sign_treaty_epoch_record(record()?, &backend, &Keypair::generate().public_key()),
             Err(TreatyEpochError::AuthorityMismatch)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn signed_malformed_records_refuse_exact_structural_errors() -> TestResult {
+        let key = Keypair::generate();
+        let valid = record()?;
+        let mut cases = Vec::new();
+        let mut body = valid.clone();
+        body.schema = "chio.other-domain.v1".to_owned();
+        cases.push((body, TreatyEpochError::InvalidSchema));
+        for sequence in [0, MAX_TREATY_EPOCH_INTEGER + 1, 2] {
+            let mut body = valid.clone();
+            body.sequence = sequence;
+            cases.push((body, TreatyEpochError::InvalidSequence));
+        }
+        let mut body = valid.clone();
+        body.previous_record_sha256 = Some(AdmissionDigest::try_new("previous", "d".repeat(64))?);
+        cases.push((body, TreatyEpochError::InvalidSequence));
+        for (issued, expires) in [(100, 100), (201, 200), (100, MAX_TREATY_EPOCH_INTEGER + 1)] {
+            let mut body = valid.clone();
+            body.issued_at_unix_ms = issued;
+            body.expires_at_unix_ms = expires;
+            cases.push((body, TreatyEpochError::InvalidInterval));
+        }
+        let mut body = valid.clone();
+        body.participants.truncate(1);
+        cases.push((body, TreatyEpochError::InvalidParticipants));
+        let mut body = valid.clone();
+        body.participants[1].kernel_id = body.participants[0].kernel_id.clone();
+        cases.push((body, TreatyEpochError::InvalidParticipants));
+        let mut body = valid.clone();
+        body.participants[1].public_key = body.participants[0].public_key.clone();
+        cases.push((body, TreatyEpochError::InvalidParticipants));
+        let mut body = valid.clone();
+        body.participants[1].ladder_manifest_sha256 =
+            body.participants[0].ladder_manifest_sha256.clone();
+        cases.push((body, TreatyEpochError::InvalidParticipants));
+        let mut body = valid.clone();
+        body.participants = vec![body.participants[0].clone(); MAX_TREATY_EPOCH_PARTICIPANTS + 1];
+        cases.push((body, TreatyEpochError::InvalidParticipants));
+        for (body, expected) in cases {
+            let signed = SignedTreatyEpochV1::sign(body, &key)?;
+            assert!(signed.verify_signature()?);
+            assert!(matches!(
+                verify_treaty_epoch_update(signed, &key.public_key()),
+                Err(error) if error == expected
+            ));
+        }
+        let mut next = valid;
+        next.sequence = 2;
+        next.previous_record_sha256 = Some(AdmissionDigest::try_new("previous", "d".repeat(64))?);
+        verify_treaty_epoch_update(SignedTreatyEpochV1::sign(next, &key)?, &key.public_key())?;
         Ok(())
     }
 
