@@ -409,3 +409,15 @@ WHEN OLD.state = 'erased'
 BEGIN
     SELECT RAISE(ABORT, 'erased root opening is retained');
 END;
+
+-- REPLACE deletes the old row without firing the DELETE guard while
+-- recursive triggers are off, so no insert may land on an existing opening.
+CREATE TRIGGER root_exchange_openings_no_replace
+BEFORE INSERT ON root_exchange_openings
+WHEN EXISTS (
+    SELECT 1 FROM main.root_exchange_openings
+    WHERE capability_id = NEW.capability_id AND salt_ref = NEW.salt_ref
+)
+BEGIN
+    SELECT RAISE(ABORT, 'root opening is never replaced');
+END;

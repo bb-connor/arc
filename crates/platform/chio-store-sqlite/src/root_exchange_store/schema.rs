@@ -27,9 +27,9 @@ pub(crate) fn initialize_root_exchange_schema(
     verify_root_exchange_invariants(transaction)
 }
 
-/// Every root row passes its row check and has its mint event; every present opening has its root;
-/// every retained artifact matches its digest; every live replay binding and bearer mapping
-/// agrees with its recorded history.
+/// Every root row passes its row check and has its mint event; every present opening has its root
+/// and no recorded erasure; every retained artifact matches its digest; every live replay binding
+/// and bearer mapping agrees with its recorded history.
 pub(crate) fn verify_root_exchange_invariants(
     connection: &Connection,
 ) -> std::result::Result<(), SqliteServingOwnerError> {
@@ -81,6 +81,21 @@ fn verify_integrity(
         .map_err(|error| unreadable(&error))?;
     if let Some(capability_id) = orphan {
         return Err(RootExchangeIntegrityError::OpeningWithoutRoot { capability_id });
+    }
+    let restored: Option<String> = connection
+        .query_row(
+            "SELECT o.capability_id FROM root_exchange_openings o
+             WHERE o.state = 'present' AND EXISTS (
+                 SELECT 1 FROM root_exchange_events e
+                 WHERE e.mutation = 'erase_openings' AND e.subject = o.capability_id)
+             ORDER BY o.capability_id LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| unreadable(&error))?;
+    if let Some(capability_id) = restored {
+        return Err(RootExchangeIntegrityError::ErasedOpeningPresent { capability_id });
     }
     for retained in [Retained::Policy, Retained::Identity, Retained::Snapshot] {
         match verify_retained_table(connection, retained) {

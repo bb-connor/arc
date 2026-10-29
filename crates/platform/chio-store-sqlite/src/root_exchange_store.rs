@@ -198,6 +198,8 @@ pub enum RootExchangeIntegrityError {
     BearerMappingMismatch { token_digest: Sha256Digest },
     #[error("root opening of {capability_id} has no anchored root")]
     OpeningWithoutRoot { capability_id: String },
+    #[error("root opening of {capability_id} is present after its recorded erasure")]
+    ErasedOpeningPresent { capability_id: String },
     #[error("retained {kind} bytes differ from their digest")]
     RetainedDigestMismatch { kind: RetainedArtifact },
     #[error("root exchange store is unreadable: {0}")]

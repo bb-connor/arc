@@ -8,7 +8,7 @@ use chio_core::StoreMutationFence;
 use rusqlite::{params, OptionalExtension, Transaction};
 
 use super::bindings::{admit_bearer_token, admit_replay_key, BearerRecord, ReplayRecord};
-use super::projection::{insert_root_row, read_root_row, required_root, RootRow};
+use super::projection::{insert_root_row, read_root_row, RootRow};
 use super::reads::{retain_identity, retain_policy, retain_snapshot};
 use super::{
     canonical_blob, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintOutcome,
@@ -59,14 +59,12 @@ fn mint_transaction(
     checked: &CheckedRequest<'_>,
     now: u64,
 ) -> Result<(MintOutcome, Option<Change>)> {
-    if let Some(stored) = live_replay_root(tx, request, now)? {
-        recover(tx, request, revocation, &stored, now)?;
-        return Ok((MintOutcome::Recovered(stored), None));
+    if let Some(root) = live_replay_root(tx, request, now)? {
+        return recovered(tx, request, revocation, root, now);
     }
     if let Some(mapping) = request.bearer {
-        if let Some(stored) = live_bearer_root(tx, &mapping.token_digest, now)? {
-            recover(tx, request, revocation, &stored, now)?;
-            return Ok((MintOutcome::Recovered(stored), None));
+        if let Some(root) = live_bearer_root(tx, &mapping.token_digest, now)? {
+            return recovered(tx, request, revocation, root, now);
         }
     }
     refuse_revoked(
@@ -287,15 +285,14 @@ fn check_openings(request: &MintRequest<'_>) -> Result<()> {
     Ok(())
 }
 
-/// The root a live replay binding names, when a bearer-intake request
-/// presents the same client, artifact and request. An explicit exchange is
-/// single use, so any live binding refuses it. An expired binding is deleted
-/// so the key binds again.
+/// The root a live replay binding names, for a bearer-intake request. An
+/// explicit exchange is single use, so any live binding refuses it. An
+/// expired binding is deleted so the key binds again.
 fn live_replay_root(
     tx: &Transaction<'_>,
     request: &MintRequest<'_>,
     now: u64,
-) -> Result<Option<StoredRoot>> {
+) -> Result<Option<(RootRow, StoredRoot)>> {
     admit_replay_key(tx, &request.context.anchor.replay_key_digest, now)?;
     let replay = digest_column(&request.context.anchor.replay_key_digest);
     let binding: Option<(i64, Option<String>)> = tx
@@ -321,26 +318,16 @@ fn live_replay_root(
         return Err(RootExchangeStoreError::AssertionReplay);
     }
     let capability_id = capability_id.ok_or(RootExchangeStoreError::AssertionReplay)?;
-    let row = read_root_row(tx, &capability_id)?.ok_or_else(|| {
-        RootExchangeStoreError::AnchoredRootMissing {
-            capability_id: capability_id.clone(),
-        }
-    })?;
-    let stored = row.verify()?;
-    if row.client_id != request.client_id
-        || row.artifact_digest != request.artifact_digest
-        || row.request_digest != request.context.exchange.request_digest
-    {
-        return Err(RootExchangeStoreError::AssertionReplay);
-    }
-    Ok(Some(stored))
+    mapped_root(tx, &capability_id).map(Some)
 }
 
+/// The root a live bearer mapping names. A mapping whose root has expired is
+/// deleted so the token maps again.
 fn live_bearer_root(
     tx: &Transaction<'_>,
     token_digest: &Sha256Digest,
     now: u64,
-) -> Result<Option<StoredRoot>> {
+) -> Result<Option<(RootRow, StoredRoot)>> {
     admit_bearer_token(tx, token_digest, now)?;
     let token = digest_column(token_digest);
     let mapped: Option<String> = tx
@@ -354,9 +341,9 @@ fn live_bearer_root(
     let Some(capability_id) = mapped else {
         return Ok(None);
     };
-    let stored = required_root(tx, &capability_id)?;
+    let (row, stored) = mapped_root(tx, &capability_id)?;
     if stored.capability.expires_at > now {
-        return Ok(Some(stored));
+        return Ok(Some((row, stored)));
     }
     tx.execute(
         "DELETE FROM root_exchange_bearer_tokens WHERE token_digest = ?1",
@@ -364,6 +351,64 @@ fn live_bearer_root(
     )
     .map_err(sqlite_error)?;
     Ok(None)
+}
+
+/// The verified root a replay binding or bearer mapping names.
+fn mapped_root(tx: &Transaction<'_>, capability_id: &str) -> Result<(RootRow, StoredRoot)> {
+    let row = read_root_row(tx, capability_id)?.ok_or_else(|| {
+        RootExchangeStoreError::AnchoredRootMissing {
+            capability_id: capability_id.to_owned(),
+        }
+    })?;
+    let stored = row.verify()?;
+    Ok((row, stored))
+}
+
+/// Recovery through either the replay key or the bearer mapping: the stored
+/// root was minted for the same client, artifact and request, its own replay
+/// binding still stands, and it passes the checks a fresh mint would.
+fn recovered(
+    tx: &Transaction<'_>,
+    request: &MintRequest<'_>,
+    revocation: &dyn MintRevocationCheck,
+    (row, stored): (RootRow, StoredRoot),
+    now: u64,
+) -> Result<(MintOutcome, Option<Change>)> {
+    if row.client_id != request.client_id
+        || row.artifact_digest != request.artifact_digest
+        || row.request_digest != request.context.exchange.request_digest
+    {
+        return Err(RootExchangeStoreError::AssertionReplay);
+    }
+    original_binding_stands(tx, &row, now)?;
+    recover(tx, request, revocation, &stored, now)?;
+    Ok((MintOutcome::Recovered(stored), None))
+}
+
+/// The root's own replay binding agrees with its recorded history, and a live
+/// row for that key names this root at the instant it was bound.
+fn original_binding_stands(tx: &Transaction<'_>, row: &RootRow, now: u64) -> Result<()> {
+    admit_replay_key(tx, &row.replay_key_digest, now)?;
+    let live: Option<(Option<String>, i64)> = tx
+        .query_row(
+            "SELECT capability_id, bound_at FROM root_exchange_replay WHERE replay_key_digest = ?1",
+            [digest_column(&row.replay_key_digest)],
+            |live| Ok((live.get(0)?, live.get(1)?)),
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    match live {
+        None => Ok(()),
+        Some((Some(capability_id), bound_at))
+            if capability_id == row.capability_id
+                && stored_u64(bound_at)? == row.replay_bound_at =>
+        {
+            Ok(())
+        }
+        Some(_) => Err(RootExchangeStoreError::ReplayBindingMismatch {
+            replay_key_digest: row.replay_key_digest,
+        }),
+    }
 }
 
 /// A recovered root passes the checks a fresh mint would.
