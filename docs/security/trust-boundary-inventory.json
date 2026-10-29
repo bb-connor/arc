@@ -23080,6 +23080,9 @@
       "document::original-json-reader::UntrustedJsonText",
       "from_request::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
     ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs": [
+      "handle_admin_revoke_capability::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode"
+    ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs": [
       "load::original-json-reader::UntrustedJsonText"
     ],

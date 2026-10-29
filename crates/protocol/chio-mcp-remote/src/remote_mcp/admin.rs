@@ -539,7 +539,9 @@ async fn handle_admin_revoke_capability(
     else {
         return invalid_revocation_request();
     };
-    let Ok(AdminRevokeRequest { target, reason }) = serde_json::from_slice(&body) else {
+    let Ok(AdminRevokeRequest { target, reason }) =
+        crate::input::decode::<AdminRevokeRequest>(&body, MAX_REVOCATION_REQUEST_BYTES)
+    else {
         return invalid_revocation_request();
     };
     let AdminRevocationTarget::CapabilityId { capability_id } = target;
