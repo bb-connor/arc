@@ -18,6 +18,11 @@ use crate::{
 
 /// Passes after which a regeneration that has not converged is refused.
 const MAX_PASSES: usize = 4;
+/// Fixture trees whose bytes bind the file identity of the SQLite store that
+/// generated them, so no two regenerations match. The proof-room check step
+/// verifies them against their sources; convergence ignores their bytes.
+const SOURCE_BOUND_FIXTURE_DIRS: &[&str] =
+    &["fixtures/proof-room/public-stages/recursive-runtime-swarm/"];
 
 /// How one step runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1395,7 +1400,14 @@ fn tree_state(root: &Path) -> Result<Vec<u8>, XtaskError> {
         if entry.len() < 4 {
             continue;
         }
-        let path = root.join(String::from_utf8_lossy(&entry[3..]).as_ref());
+        let relative = String::from_utf8_lossy(&entry[3..]);
+        if SOURCE_BOUND_FIXTURE_DIRS
+            .iter()
+            .any(|dir| relative.starts_with(dir))
+        {
+            continue;
+        }
+        let path = root.join(relative.as_ref());
         if path.is_file() {
             let bytes = std::fs::read(&path)
                 .map_err(|error| XtaskError::Io(path.display().to_string(), error))?;
