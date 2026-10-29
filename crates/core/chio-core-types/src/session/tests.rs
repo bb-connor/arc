@@ -654,7 +654,6 @@ fn session_anchor_signing_binds_auth_context_and_reference() {
     let anchor = SessionAnchor::sign(body, &kp).unwrap();
     let reference = anchor.reference().unwrap();
 
-    assert!(anchor.verify_integrity_embedded_key().unwrap());
     assert!(anchor.verify_signature(&kp.public_key()).unwrap());
     assert!(matches!(
         anchor.verify_signature(&Keypair::from_seed(&[0x5a; 32]).public_key()),

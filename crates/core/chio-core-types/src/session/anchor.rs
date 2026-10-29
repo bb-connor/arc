@@ -221,12 +221,6 @@ impl SessionAnchor {
         ))
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
-        self.verify_signature(&self.kernel_key)
-    }
-
     pub fn anchor_hash(&self) -> Result<String> {
         let canonical = canonical_json_bytes(&self.body())?;
         Ok(sha256_hex(&canonical))
