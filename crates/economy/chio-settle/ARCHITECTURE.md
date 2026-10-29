@@ -28,7 +28,7 @@ The trait requires concurrent safety and ordered batching; it supplies no queue.
 | `observe` | Escrow/bond snapshots, confirmation/dispute-window assessment, execution receipt projection, and recovery actions. |
 | `hook`, `outcome_store`, `retry` | Observation/outcome schemas, typed failure reasons, leased claims, retry decisions, and dead letters. |
 | `payments` and `payments_approval` | x402 approval binding and Circle/paymaster checks. |
-| `finding_enforcement/{verify,plan,publish,reconcile,observation_source}` | Pinned authority and collateral verification, impairment intent preparation, remote adapters, and post-dispatch recovery. |
+| `finding_enforcement/{verify,plan,publish,reconcile,observation_source,remote_http}` | Pinned authority and collateral verification, impairment intent preparation, remote adapters, and post-dispatch recovery. |
 | `channel` | Asset/funding/open artifacts, signatures, reservations, state, lifecycle projections, replay, terminal outcomes, disputes, close, and release authorization. |
 | `solana`, `ccip`, `automation`, `ops` | Instruction preparation, coordination messages, watchdog evidence, and operator controls/reports. |
 | `input` | Bounded original-byte canonical JSON decoding for ingress. |
@@ -99,6 +99,8 @@ exact snapshot digest and allocation binding, and permitted destinations.
 Reconciliation authenticates historical dispatched inputs without renewing
 fresh dispatch authority. Remote observation/publisher adapters require explicit
 configuration; their existence does not provision the external services.
+Each adapter post resolves the endpoint name again, checks every address in
+that answer against the strict HTTPS contract and dials only those addresses.
 
 `channel::ChannelSignatureV1` signs canonical payloads containing a domain,
 signer id, epoch, public key, and artifact body. Verifiers check expected identity
@@ -127,7 +129,8 @@ Circle and paymaster helpers validate supplied policy without contacting rails.
 artifacts, canonical serialization, economic continuity, and validation.
 `chio-open-market` supplies penalty evidence; `chio-federation` supplies verified
 FROST authority. `chio-web3-bindings` and Alloy encode official Solidity ABIs.
-`chio-egress-contract`, `reqwest`, and `tokio` support bounded RPC transport.
+`chio-egress-contract`, `reqwest`, and `tokio` support bounded RPC transport;
+the finding adapters post through `chio-egress-contract`'s blocking agent.
 `secp256k1`, hashes, base58, `secrecy`, and `zeroize` support signing/key handling
 and chain encodings. Serde provides strict artifact shapes.
 

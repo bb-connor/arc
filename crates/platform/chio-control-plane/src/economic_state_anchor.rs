@@ -1,5 +1,4 @@
 use std::fmt;
-use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -19,7 +18,7 @@ use chio_core::economic_continuity::{
     VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
     MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
 };
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{system_lookup, ContractLookup};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -63,8 +62,6 @@ pub enum EconomicStateAnchorConfigError {
     InvalidBearerToken,
     #[error("economic anchor timeout must be greater than zero")]
     InvalidTimeout,
-    #[error("failed to build economic anchor HTTP client: {0}")]
-    HttpClient(String),
     #[error("invalid economic anchor HTTP egress contract: {0}")]
     InvalidEgressContract(String),
     #[error("invalid economic anchor pins: {0}")]
@@ -108,49 +105,37 @@ trait EconomicStateAnchorTransport: Send + Sync {
     fn post(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, EconomicStateAnchorError>;
 }
 
+#[derive(Debug)]
 struct HttpsEconomicStateAnchorTransport {
-    client: reqwest::blocking::Client,
+    http: crate::anchor_egress::AnchorClient,
     base_url: String,
-    bearer_token: Arc<str>,
-    egress_contract: HttpEgressContract,
-}
-
-impl fmt::Debug for HttpsEconomicStateAnchorTransport {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("HttpsEconomicStateAnchorTransport")
-            .field("base_url", &self.base_url)
-            .field("bearer_token", &"[REDACTED]")
-            .finish_non_exhaustive()
-    }
 }
 
 impl HttpsEconomicStateAnchorTransport {
     fn new(
         config: &RemoteEconomicStateAnchorConfig,
     ) -> Result<Self, EconomicStateAnchorConfigError> {
+        Self::with_lookup(config, system_lookup())
+    }
+
+    fn with_lookup(
+        config: &RemoteEconomicStateAnchorConfig,
+        lookup: ContractLookup,
+    ) -> Result<Self, EconomicStateAnchorConfigError> {
         let endpoint = url::Url::parse(&config.base_url)
             .map_err(|error| EconomicStateAnchorConfigError::InvalidUrl(error.to_string()))?;
-        let egress_contract = crate::anchor_egress::strict_https_contract(
+        let http = crate::anchor_egress::AnchorClient::new(
             &endpoint,
             "control-plane.economic-state-anchor",
             crate::integer::count(ECONOMIC_STATE_RESPONSE_LIMIT),
+            &config.bearer_token,
+            config.timeout,
+            lookup,
         )
         .map_err(EconomicStateAnchorConfigError::InvalidEgressContract)?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: this blocking anchor client
-        // denies redirects and proxies, and each request is contract-preflighted.
-        let client = reqwest::blocking::Client::builder()
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .timeout(config.timeout)
-            .build()
-            .map_err(|error| EconomicStateAnchorConfigError::HttpClient(error.to_string()))?;
         Ok(Self {
-            client,
+            http,
             base_url: config.base_url.trim_end_matches('/').to_owned(),
-            bearer_token: Arc::from(config.bearer_token.as_str()),
-            egress_contract,
         })
     }
 }
@@ -163,37 +148,9 @@ impl EconomicStateAnchorTransport for HttpsEconomicStateAnchorTransport {
             ));
         }
         let endpoint = format!("{}{path}", self.base_url);
-        self.egress_contract
-            .enforce_url_with_dns(&endpoint, 0)
-            .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
-        let response = self
-            .client
-            .post(endpoint)
-            .bearer_auth(self.bearer_token.as_ref())
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(body.to_vec())
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract was
-            // enforced immediately above for this exact URL.
-            .send()
-            .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
-        if !response.status().is_success() {
-            return Err(EconomicStateAnchorError::Unavailable(format!(
-                "economic anchor returned HTTP {}",
-                response.status()
-            )));
-        }
-        if let Some(length) = response.content_length() {
-            self.egress_contract
-                .enforce_response_bytes(length)
-                .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
-        }
-        let mut body = Vec::new();
-        response
-            .take(crate::integer::count(ECONOMIC_STATE_RESPONSE_LIMIT) + 1)
-            .read_to_end(&mut body)
-            .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
-        self.egress_contract
-            .enforce_response_bytes(crate::integer::count(body.len()))
+        let body = self
+            .http
+            .post_json(&endpoint, body)
             .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
         ensure_bounded_response(&body)?;
         Ok(body)
@@ -480,6 +437,38 @@ mod tests {
     use super::*;
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+    #[test]
+    fn anchor_name_answering_loopback_is_refused_before_connecting() -> TestResult {
+        use crate::anchor_egress::test_support::{answer_with, SilentListener};
+
+        let listener = SilentListener::bind()?;
+        let config = RemoteEconomicStateAnchorConfig {
+            base_url: "https://economic-anchor.example".to_owned(),
+            bearer_token: "fixture-token".to_owned(),
+            timeout: Duration::from_secs(5),
+            pins: pins(),
+        };
+        let transport =
+            HttpsEconomicStateAnchorTransport::with_lookup(&config, answer_with(listener.addr()))?;
+
+        let error = match transport.post(ECONOMIC_STATE_READ_PATH, b"{}") {
+            Ok(body) => return Err(format!("loopback answer was dialed: {body:?}").into()),
+            Err(error) => error,
+        };
+
+        assert!(
+            matches!(
+                error,
+                EconomicStateAnchorError::Unavailable(ref details)
+                    if details
+                        == "loopback egress target denied: economic-anchor.example resolved to 127.0.0.1"
+            ),
+            "{error:?}"
+        );
+        assert!(!listener.connected()?);
+        Ok(())
+    }
 
     fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
         match mutex.lock() {

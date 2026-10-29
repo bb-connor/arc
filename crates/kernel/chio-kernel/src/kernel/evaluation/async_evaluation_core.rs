@@ -48,7 +48,7 @@ impl ChioKernel {
             );
             return self.build_emergency_stop_deny_response_with_metadata(
                 request,
-                EMERGENCY_STOP_DENY_REASON,
+                &Denial::new(ClientDenialCode::EmergencyStop, EMERGENCY_STOP_DENY_REASON),
                 now,
                 None,
                 extra_metadata.clone(),
@@ -96,14 +96,14 @@ impl ChioKernel {
         {
             Ok(admission) => admission,
             Err(error) => {
-                let msg = error.to_string();
+                let denial = Denial::from_error(&error);
                 warn!(
                     request_id = %request.request_id,
-                    reason = %redacted!(&msg),
+                    reason = %redacted!(denial.detail()),
                     "receipt federation admission failed pre-dispatch"
                 );
                 return self.build_negotiation_failclosed_deny_response_with_metadata(
-                    request, &msg, now, None, None,
+                    request, &denial, now, None, None,
                 );
             }
         };
@@ -133,30 +133,30 @@ impl ChioKernel {
         if let Err(error) = self.ensure_federated_receipt_persistence_ready(
             request.federated_origin_kernel_id.as_deref(),
         ) {
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             warn!(
                 request_id = %request.request_id,
-                reason = %redacted!(&msg),
+                reason = %redacted!(denial.detail()),
                 "federated receipt persistence unavailable pre-dispatch"
             );
             return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 extra_metadata.clone(),
             );
         }
         if let Err(error) = self.ensure_tcb_locks_healthy() {
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             warn!(
                 request_id = %request.request_id,
-                reason = %redacted!(&msg),
+                reason = %redacted!(denial.detail()),
                 "tcb lock poisoned pre-dispatch"
             );
             return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 extra_metadata.clone(),
@@ -164,30 +164,30 @@ impl ChioKernel {
         }
         self.ensure_post_effect_evidence_latch_clear()?;
         if let Err(error) = self.ensure_receipt_persistence_ready() {
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             warn!(
                 request_id = %request.request_id,
-                reason = %redacted!(&msg),
+                reason = %redacted!(denial.detail()),
                 "receipt persistence unavailable pre-dispatch"
             );
             return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 extra_metadata.clone(),
             );
         }
         if let Err(error) = self.ensure_revocation_durability_ready() {
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             warn!(
                 request_id = %request.request_id,
-                reason = %redacted!(&msg),
+                reason = %redacted!(denial.detail()),
                 "revocation durability unavailable pre-dispatch"
             );
             return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 extra_metadata.clone(),
@@ -195,11 +195,14 @@ impl ChioKernel {
         }
 
         if let Err(error) = request.validate_authorization_extensions() {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "authorization extension rejected");
+            let denial = Denial::new(
+                ClientDenialCode::GovernedTransactionDenied,
+                error.to_string(),
+            );
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "authorization extension rejected");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -207,11 +210,11 @@ impl ChioKernel {
         }
 
         if let Err(error) = self.validate_finding_memory_write_admission(request) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "Finding memory write rejected pre-dispatch");
+            let denial = Denial::from_error(&error);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "Finding memory write rejected pre-dispatch");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -231,11 +234,14 @@ impl ChioKernel {
             request.federated_origin_kernel_id.as_deref(),
             now,
         ) {
-            let msg = format!("capability verification failed: {reason}");
-            warn!(request_id = %request.request_id, msg = %redacted!(&msg), "capability rejected");
+            let denial = Denial::new(
+                ClientDenialCode::CapabilityInvalid,
+                format!("capability verification failed: {reason}"),
+            );
+            warn!(request_id = %request.request_id, msg = %redacted!(denial.detail()), "capability rejected");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -243,11 +249,11 @@ impl ChioKernel {
         }
 
         if let Err(e) = check_time_bounds(cap, now) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            let denial = Denial::from_error(&e);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "capability rejected");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -255,11 +261,11 @@ impl ChioKernel {
         }
 
         if let Err(e) = self.check_tool_call_revocation_admission(request) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            let denial = Denial::from_error(&e);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "capability rejected");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -271,11 +277,11 @@ impl ChioKernel {
         }
 
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+            let denial = Denial::from_error(&e);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "capability rejected");
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(extra_metadata.clone(), IdentityDisposition::Reusable),
@@ -291,11 +297,11 @@ impl ChioKernel {
         ) {
             Ok(grants) => grants,
             Err(error) => {
-                let msg = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+                let denial = Denial::from_error(&error);
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "capability rejected");
                 return self.build_deny_response_with_metadata(
                     request,
-                    &msg,
+                    &denial,
                     now,
                     None,
                     RefusalReceiptMetadata::new(
@@ -312,7 +318,7 @@ impl ChioKernel {
                     warn!(request_id = %request.request_id, reason, "delivery contract denied");
                     return self.build_deny_response_with_metadata(
                         request,
-                        reason,
+                        &Denial::new(ClientDenialCode::DeliveryContractUnsupported, reason),
                         now,
                         None,
                         RefusalReceiptMetadata::new(
@@ -332,7 +338,7 @@ impl ChioKernel {
             if let Some(reason) = self.caller_reservation_profile_denial(request, dpop_required) {
                 return self.build_deny_response_with_metadata(
                     request,
-                    reason,
+                    &Denial::new(ClientDenialCode::SessionUnsupported, reason),
                     now,
                     None,
                     RefusalReceiptMetadata::new(
@@ -355,11 +361,11 @@ impl ChioKernel {
         ) && self.execution_nonce_preflight_required(request);
         if !reserving_preflight && !dispatch_mode.caller_executed() {
             if let Err(e) = self.ensure_registered_tool_target(request) {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
+                let denial = Denial::from_error(&e);
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "tool target not registered");
                 return self.build_deny_response_with_metadata(
                     request,
-                    &msg,
+                    &denial,
                     now,
                     None,
                     RefusalReceiptMetadata::new(
@@ -384,11 +390,11 @@ impl ChioKernel {
                 let Some(disposition) = error.receipt_disposition else {
                     return Err(*error.error);
                 };
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable admission denied");
+                let denial = Denial::new(error.error.client_denial_code(), error.to_string());
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "durable admission denied");
                 return self.build_deny_response_with_metadata(
                     request,
-                    &reason,
+                    &denial,
                     now,
                     None,
                     RefusalReceiptMetadata::new(
@@ -418,8 +424,8 @@ impl ChioKernel {
         // Persistence was confirmed healthy at the pre-dispatch gate above, so the
         // writer-backed lineage write can run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
+            let denial = Denial::from_error(&error);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "failed to persist capability lineage");
             if let Some(response) = self.compensate_durable_admission_after_pre_dispatch_cleanup(
                 durable_admission
                     .as_ref()
@@ -428,7 +434,7 @@ impl ChioKernel {
                 None,
                 None,
                 DurableRefusalResponse {
-                    reason: &msg,
+                    denial: &denial,
                     cancelled: false,
                     matched_grant_index: None,
                     metadata: extra_metadata.clone(),
@@ -439,7 +445,7 @@ impl ChioKernel {
             }
             return self.build_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 None,
                 RefusalReceiptMetadata::new(
@@ -560,10 +566,13 @@ impl ChioKernel {
             let runtime_metadata =
                 merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
             if !runtime_admission.allowed {
-                let msg = runtime_admission
-                    .reason
-                    .unwrap_or_else(|| "runtime admission denied".to_string());
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
+                let denial = Denial::new(
+                    ClientDenialCode::RuntimeAdmissionDenied,
+                    runtime_admission
+                        .reason
+                        .unwrap_or_else(|| "runtime admission denied".to_string()),
+                );
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "runtime admission denied");
                 let (runtime_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_hook_denial(
                         durable_admission
@@ -588,7 +597,7 @@ impl ChioKernel {
                                 None,
                                 None,
                                 DurableRefusalResponse {
-                                    reason: &msg,
+                                    denial: &denial,
                                     cancelled: false,
                                     matched_grant_index: Some(matching.index),
                                     metadata: runtime_metadata.clone(),
@@ -603,7 +612,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_runtime_admission_deny_response_with_metadata(
                         request,
-                        &msg,
+                        &denial,
                         now,
                         Some(matching.index),
                         RefusalReceiptMetadata::new(
@@ -636,11 +645,11 @@ impl ChioKernel {
                         durable_admission.as_mut(),
                         now_unix_ms,
                     ) {
-                        let msg = error.to_string();
+                        let denial = Denial::from_error(&error);
                         return self.build_pre_dispatch_cleanup_deny_response(
                             PreDispatchCleanupDeny {
                                 request,
-                                reason: &msg,
+                                denial: &denial,
                                 timestamp: now,
                                 matched_grant_index: grant_index,
                                 cap,
@@ -731,7 +740,7 @@ impl ChioKernel {
                     }
                 }
                 Err(error) => {
-                    let msg = error.to_string();
+                    let denial = Denial::from_error(&error);
                     let (runtime_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_admission
@@ -760,7 +769,7 @@ impl ChioKernel {
                                     None,
                                     None,
                                     DurableRefusalResponse {
-                                        reason: &msg,
+                                        denial: &denial,
                                         cancelled: false,
                                         matched_grant_index: receipt_grant_index,
                                         metadata: merge_metadata_objects(
@@ -780,7 +789,7 @@ impl ChioKernel {
                         || {
                             self.build_monetary_deny_response_with_metadata(
                                 request,
-                                &msg,
+                                &denial,
                                 now,
                                 &matching_grants,
                                 cap,
@@ -813,8 +822,8 @@ impl ChioKernel {
             // A recorded budget denial still wins, since it carries the
             // stuck-reservation evidence the loop broke out to preserve.
             if budget_error.is_none() {
-                if let Some(denial) = guard_denial {
-                    let msg = denial.error.to_string();
+                if let Some(guard) = guard_denial {
+                    let denial = Denial::from_error(&guard.error);
                     let receipt_metadata = self.merge_budget_receipt_metadata(
                         extra_metadata.clone(),
                         self.budget_backend_receipt_metadata()?,
@@ -823,7 +832,7 @@ impl ChioKernel {
                         let (receipt_grant_index, financial_metadata) =
                             self.monetary_deny_metadata(&matching_grants, cap)?;
                         if let Some(response) =
-                            self.with_pre_invocation_guard_output(&denial.output, || {
+                            self.with_pre_invocation_guard_output(&guard.output, || {
                                 self.compensate_durable_admission_after_pre_dispatch_cleanup(
                                     durable_admission
                                         .as_ref()
@@ -832,7 +841,7 @@ impl ChioKernel {
                                     None,
                                     None,
                                     DurableRefusalResponse {
-                                        reason: &msg,
+                                        denial: &denial,
                                         cancelled: false,
                                         matched_grant_index: receipt_grant_index,
                                         metadata: merge_metadata_objects(
@@ -847,10 +856,10 @@ impl ChioKernel {
                             return Ok(response);
                         }
                     }
-                    return self.with_pre_invocation_guard_output(&denial.output, || {
+                    return self.with_pre_invocation_guard_output(&guard.output, || {
                         self.build_monetary_deny_response_with_metadata(
                             request,
-                            &msg,
+                            &denial,
                             now,
                             &matching_grants,
                             cap,
@@ -871,7 +880,7 @@ impl ChioKernel {
                     "retained budget hold does not identify a matching grant".to_string(),
                 )
             });
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             if durable_admission.as_ref().is_some_and(|admission| {
                 runtime_release_retained
                     || !matches!(
@@ -901,7 +910,7 @@ impl ChioKernel {
                         None,
                         None,
                         DurableRefusalResponse {
-                            reason: &msg,
+                            denial: &denial,
                             cancelled: false,
                             matched_grant_index: receipt_grant_index,
                             metadata: merge_metadata_objects(
@@ -917,7 +926,7 @@ impl ChioKernel {
             }
             return self.build_monetary_deny_response_with_metadata(
                 request,
-                &msg,
+                &denial,
                 now,
                 &matching_grants,
                 cap,
@@ -974,12 +983,15 @@ impl ChioKernel {
         ) {
             Ok(lease_acquired) => lease_acquired,
             Err(reason) => {
-                let msg = format!("sibling-sum budget admission failed: {reason}");
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+                let denial = Denial::new(
+                    ClientDenialCode::BudgetExhausted,
+                    format!("sibling-sum budget admission failed: {reason}"),
+                );
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "capability rejected");
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                         request,
-                        reason: &msg,
+                        denial: &denial,
                         timestamp: now,
                         matched_grant_index,
                         cap,
@@ -1028,12 +1040,12 @@ impl ChioKernel {
             cap,
             durable_admission.as_ref(),
         ) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&msg), "execution nonce denied");
+            let denial = Denial::from_error(&error);
+            warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(denial.detail()), "execution nonce denied");
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason: &msg,
+                    denial: &denial,
                     timestamp: now,
                     matched_grant_index,
                     cap,
@@ -1079,14 +1091,17 @@ impl ChioKernel {
                     || !rail_is_reversible
                     || Self::is_governed_mustprepay_request(request)
                 {
-                    let reason = "output-digest delivery requires durable reversible-hold coverage";
-                    warn!(request_id = %request.request_id, reason, "delivery contract denied");
+                    let denial = Denial::new(
+                        ClientDenialCode::DeliveryContractUnsupported,
+                        "output-digest delivery requires durable reversible-hold coverage",
+                    );
+                    warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "delivery contract denied");
                     return self.with_pre_invocation_guard_output(
                         &pre_invocation_guard_output,
                         || {
                             self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                                 request,
-                                reason,
+                                denial: &denial,
                                 timestamp: now,
                                 matched_grant_index,
                                 cap,
@@ -1114,7 +1129,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                         request,
-                        reason: denial.detail(),
+                        denial: &Denial::new(ClientDenialCode::GuardDenied, denial.detail()),
                         timestamp: now,
                         matched_grant_index,
                         cap,
@@ -1137,7 +1152,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                         request,
-                        reason: denial.detail(),
+                        denial: &Denial::new(ClientDenialCode::GuardDenied, denial.detail()),
                         timestamp: now,
                         matched_grant_index,
                         cap,
@@ -1168,12 +1183,15 @@ impl ChioKernel {
             && (budget_mutation.charge_result().is_some()
                 || Self::is_governed_mustprepay_request(request))
         {
-            let reason = "financial tool dispatch requires durable admission coverage";
-            warn!(request_id = %request.request_id, reason, "financial dispatch denied");
+            let denial = Denial::new(
+                ClientDenialCode::KernelUnavailable,
+                "financial tool dispatch requires durable admission coverage",
+            );
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "financial dispatch denied");
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason,
+                    denial: &denial,
                     timestamp: now,
                     matched_grant_index,
                     cap,
@@ -1199,12 +1217,12 @@ impl ChioKernel {
                 "server \"{}\" / tool \"{}\"",
                 request.server_id, request.tool_name
             ));
-            let reason = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "tool server error");
+            let denial = Denial::from_error(&error);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "tool server error");
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason: &reason,
+                    denial: &denial,
                     timestamp: now,
                     matched_grant_index,
                     cap,
@@ -1236,12 +1254,12 @@ impl ChioKernel {
             }) {
             Ok(reservation) => reservation,
             Err(error) => {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(&reason), "dispatch credential reservation denied");
+                let denial = Denial::from_error(&error);
+                warn!(request_id = %request.request_id, rejection_code = %error.report().code, reason = %redacted!(denial.detail()), "dispatch credential reservation denied");
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                         request,
-                        reason: &reason,
+                        denial: &denial,
                         timestamp: self
                             .read_authority_time()
                             .map(|time| time.as_secs())
@@ -1341,11 +1359,12 @@ impl ChioKernel {
             if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
                 reason = format!("{reason}; {rollback_error}");
             }
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "immediate dispatch revalidation denied");
+            let denial = Denial::new(error.client_denial_code(), reason);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "immediate dispatch revalidation denied");
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason: &reason,
+                    denial: &denial,
                     timestamp: revalidation_now_unix_ms / 1000,
                     matched_grant_index,
                     cap,
@@ -1380,11 +1399,11 @@ impl ChioKernel {
                     return Err(error);
                 }
 
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed");
+                let denial = Denial::from_error(&error);
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "durable capture boundary could not be confirmed");
                 return self.build_deny_response_with_metadata(
                     request,
-                    &reason,
+                    &denial,
                     now,
                     Some(matched_grant_index),
                     RefusalReceiptMetadata::new(
@@ -1425,17 +1444,20 @@ impl ChioKernel {
                 if authorization.is_some() {
                     if let Err(error) = credential_reservation.retain_after_external_authorization()
                     {
-                        let reason = format!(
-                            "dispatch credential retention failed after payment authorization: {error}"
+                        let denial = Denial::new(
+                            ClientDenialCode::PaymentUnavailable,
+                            format!(
+                                "dispatch credential retention failed after payment authorization: {error}"
+                            ),
                         );
-                        warn!(request_id = %request.request_id, reason = %redacted!(&reason), "payment credential retention denied");
+                        warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "payment credential retention denied");
                         return self.with_pre_invocation_guard_output(
                             &pre_invocation_guard_output,
                             || {
                                 self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                                     PreDispatchCleanupDeny {
                                         request,
-                                        reason: &reason,
+                                        denial: &denial,
                                         timestamp: self
                                             .read_authority_time()
                                             .map(|time| time.as_secs())
@@ -1478,6 +1500,7 @@ impl ChioKernel {
                     } else {
                         PaymentCredentialDisposition::NonePresent
                     };
+                    let denial = Denial::new(ClientDenialCode::PaymentUnavailable, denial_reason);
                     let cleanup_metadata = self.merge_dispatch_credential_disposition_metadata(
                         extra_metadata,
                         credential_disposition,
@@ -1492,7 +1515,7 @@ impl ChioKernel {
                             || {
                                 self.build_definite_payment_denial_after_capture(
                                     request,
-                                    &denial_reason,
+                                    &denial,
                                     now,
                                     cap,
                                     &budget_mutation,
@@ -1512,7 +1535,7 @@ impl ChioKernel {
                             self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                                 PreDispatchCleanupDeny {
                                     request,
-                                    reason: &denial_reason,
+                                    denial: &denial,
                                     timestamp: now,
                                     matched_grant_index,
                                     cap,
@@ -1553,6 +1576,7 @@ impl ChioKernel {
                             PaymentCredentialDisposition::RetentionOutcomeUnknown,
                         ),
                     };
+                let denial = Denial::new(ClientDenialCode::PaymentUnavailable, denial_reason);
                 let metadata = self.merge_dispatch_credential_disposition_metadata(
                     metadata,
                     credential_disposition,
@@ -1560,7 +1584,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_deny_response_with_metadata_and_payee_binding(
                         request,
-                        &denial_reason,
+                        &denial,
                         now,
                         Some(matched_grant_index),
                         RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
@@ -1603,13 +1627,16 @@ impl ChioKernel {
                 verified_finding_admission.clone_from(admission);
             }
             if let Err(error) = post_payment_admission {
-                let reason = dispatch_admission_error_reason(&error);
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "post-payment dispatch revalidation denied");
+                let denial = Denial::new(
+                    error.client_denial_code(),
+                    dispatch_admission_error_reason(&error),
+                );
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "post-payment dispatch revalidation denied");
                 return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                         PreDispatchCleanupDeny {
                             request,
-                            reason: &reason,
+                            denial: &denial,
                             timestamp: post_payment_now_unix_ms / 1000,
                             matched_grant_index,
                             cap,
@@ -1629,12 +1656,18 @@ impl ChioKernel {
         }
 
         if let Err(refusal) = self.start_session_request_dispatch(session_id, &request.request_id) {
-            let reason = refusal.error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "session cancellation won the pre-dispatch boundary");
+            warn!(request_id = %request.request_id, reason = %redacted!(&refusal.error.to_string()), "session cancellation won the pre-dispatch boundary");
+            let denial = Denial::new(
+                refusal.error.client_denial_code(),
+                refusal
+                    .cancellation
+                    .clone()
+                    .unwrap_or_else(|| refusal.error.to_string()),
+            );
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 let cleanup = PreDispatchCleanupDeny {
                     request,
-                    reason: refusal.cancellation.as_deref().unwrap_or(&reason),
+                    denial: &denial,
                     timestamp: self
                         .read_authority_time()
                         .map(|time| time.as_secs())
@@ -1679,13 +1712,13 @@ impl ChioKernel {
             verified_finding_admission.purchase.clone_from(purchase);
         }
         if let Err(error) = pool_claim {
-            let reason = error.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding pool dispatch claim denied");
+            let denial = Denial::from_error(&error);
+            warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "finding pool dispatch claim denied");
             return self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                     PreDispatchCleanupDeny {
                         request,
-                        reason: &reason,
+                        denial: &denial,
                         timestamp: self
                             .read_authority_time()
                             .map(|time| time.as_secs())
@@ -1736,15 +1769,15 @@ impl ChioKernel {
             durable_admission.as_ref(),
         ) {
             Ok(outcome) => outcome,
-            Err(denial) => {
+            Err(rejection) => {
                 let mut denial_evidence = pre_invocation_guard_output.clone();
-                denial_evidence.evidence.push(denial.evidence);
-                let reason = denial.reason;
-                warn!(request_id = %request.request_id, reason, "security pre-dispatch denied");
+                denial_evidence.evidence.push(rejection.evidence);
+                warn!(request_id = %request.request_id, reason = rejection.reason, "security pre-dispatch denied");
+                let denial = Denial::new(ClientDenialCode::GuardDenied, rejection.reason);
                 return self.build_pre_commit_credential_rejection_response(
                     PreDispatchCleanupDeny {
                         request,
-                        reason,
+                        denial: &denial,
                         timestamp: now,
                         matched_grant_index,
                         cap,
@@ -1765,13 +1798,16 @@ impl ChioKernel {
         // Security has accepted, but dispatch has not started. Retain on
         // uncertain commit/cancellation, never before a definite security denial.
         if let Err(error) = credential_reservation.retain_if_dropped() {
-            let reason = format!("dispatch credential retention failed before dispatch: {error}");
+            let denial = Denial::new(
+                ClientDenialCode::PaymentUnavailable,
+                format!("dispatch credential retention failed before dispatch: {error}"),
+            );
             let response =
                 self.with_pre_invocation_guard_output(&pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                         PreDispatchCleanupDeny {
                             request,
-                            reason: &reason,
+                            denial: &denial,
                             timestamp: self
                                 .read_authority_time()
                                 .map(|time| time.as_secs())
@@ -1818,13 +1854,14 @@ impl ChioKernel {
             let (context, native_owner) = match commit {
                 Ok(committed) => committed,
                 Err(error) => {
-                    let reason = error.to_string();
-                    warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch preparation failed");
+                    let denial =
+                        Denial::new(ClientDenialCode::KernelUnavailable, error.to_string());
+                    warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "durable dispatch preparation failed");
                     return self.build_durable_dispatch_failure_response(
                         error,
                         PreDispatchCleanupDeny {
                             request,
-                            reason: &reason,
+                            denial: &denial,
                             timestamp: now,
                             matched_grant_index,
                             cap,
@@ -1887,11 +1924,11 @@ impl ChioKernel {
                         operation_id: admission.operation_id().to_owned(),
                     });
                 }
-                let reason = error.to_string();
+                let denial = Denial::from_error(&error);
                 return self.build_pre_commit_credential_rejection_response(
                     PreDispatchCleanupDeny {
                         request,
-                        reason: &reason,
+                        denial: &denial,
                         timestamp: now,
                         matched_grant_index,
                         cap,

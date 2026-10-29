@@ -53,11 +53,11 @@ async fn calls_reach(fixture: &HttpFixture, expected: usize) -> TestResult {
     Ok(())
 }
 
-fn tool_error(result: &Value) -> TestResult<&str> {
+fn denial_code(result: &Value) -> TestResult<&str> {
     assert_eq!(result["result"]["isError"], json!(true), "{result}");
-    Ok(result["result"]["content"][0]["text"]
+    Ok(result["result"]["structuredContent"]["code"]
         .as_str()
-        .ok_or("tool error text")?)
+        .ok_or("tool denial code")?)
 }
 
 async fn shutdown(fixture: &HttpFixture) -> TestResult {
@@ -73,27 +73,13 @@ async fn a_same_session_retry_after_a_broken_post_is_refused_without_redispatch(
 
     drop(post(&fixture, &session, &call(60, Some("same-session"))).await?);
     calls_reach(&fixture, 1).await?;
-    let started = std::time::Instant::now();
-    let retry = loop {
-        let retry =
-            terminal(post(&fixture, &session, &call(61, Some("same-session"))).await?).await?;
-        // A retry that overtakes the original is refused as in flight.
-        if tool_error(&retry)? != "session error: request same-session is already in flight"
-            || started.elapsed() > DEADLINE
-        {
-            break retry;
-        }
-        assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    };
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let retry = terminal(post(&fixture, &session, &call(61, Some("same-session"))).await?).await?;
     let calls = fixture.calls.load(Ordering::SeqCst);
     shutdown(&fixture).await?;
 
     assert_eq!(retry["id"], json!(61));
-    assert_eq!(
-        tool_error(&retry)?,
-        "session error: request same-session already has authoritative lineage in this session"
-    );
+    assert_eq!(denial_code(&retry)?, "replay_denied");
     assert_eq!(calls, 1, "the stable-id retry redispatched the tool");
     Ok(())
 }
@@ -112,13 +98,7 @@ async fn a_retry_from_another_session_is_refused_by_the_retained_operation() -> 
     shutdown(&fixture).await?;
 
     assert_eq!(retry["id"], json!(63));
-    let operation = tool_error(&retry)?
-        .strip_prefix("durable admission failed: request id conflicts with retained operation ")
-        .ok_or("expected the retained-operation conflict")?;
-    assert!(
-        operation.len() == 64 && operation.bytes().all(|byte| byte.is_ascii_hexdigit()),
-        "{operation}"
-    );
+    assert_eq!(denial_code(&retry)?, "operation_conflict");
     assert_eq!(calls, 1, "the stable-id retry redispatched the tool");
     Ok(())
 }

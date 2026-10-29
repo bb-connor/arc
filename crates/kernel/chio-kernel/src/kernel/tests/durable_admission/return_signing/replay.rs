@@ -81,11 +81,8 @@ fn completed_replay_rejects_changed_arguments_after_signer_rotation() -> TestRes
     assert!(
         matches!(
             &error,
-            KernelError::DurableAdmission(reason)
-                if reason == &format!(
-                    "request id conflicts with retained operation {}",
-                    original.binding().operation_id().as_str()
-                )
+            KernelError::OperationConflict { operation_id }
+                if operation_id == original.binding().operation_id().as_str()
         ),
         "{error:?}"
     );

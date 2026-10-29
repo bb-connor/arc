@@ -62,7 +62,7 @@ fn sqlite_nonce_preflight_retains_security_identity_across_restart() -> TestResu
         .ok_or("reloaded request")?;
     assert_eq!(reloaded.canonical_bytes(), retained.canonical_bytes());
     request.execution_nonce = Some(*preflight.execution_nonce.ok_or("nonce")?);
-    let conflict = format!("request id conflicts with retained operation {before}");
+    let conflict = before.to_string();
     for changed in [None, Some(context(&request, 2)?)] {
         let receipts = runtime.kernel.receipt_log().len();
         let denied = match changed {
@@ -72,7 +72,7 @@ fn sqlite_nonce_preflight_retains_security_identity_across_restart() -> TestResu
             None => runtime.kernel.evaluate_tool_call_blocking(&request),
         };
         assert!(
-            matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason)) if reason == &conflict),
+            matches!(&denied, Err(chio_kernel::KernelError::OperationConflict { operation_id }) if operation_id == &conflict),
             "{denied:?}"
         );
         assert_eq!(runtime.kernel.receipt_log().len(), receipts);
@@ -126,9 +126,9 @@ fn sqlite_ordinary_terminal_rejects_changed_security_identity_after_restart() ->
     let denied = runtime
         .kernel
         .evaluate_tool_call_blocking_with_security_context(&request, &context(&request, 2)?);
-    let conflict = format!("request id conflicts with retained operation {operation_id}");
+    let conflict = operation_id.to_string();
     assert!(
-        matches!(&denied, Err(chio_kernel::KernelError::DurableAdmission(reason)) if reason == &conflict),
+        matches!(&denied, Err(chio_kernel::KernelError::OperationConflict { operation_id }) if operation_id == &conflict),
         "{denied:?}"
     );
     assert_eq!(runtime.kernel.receipt_log().len(), receipts);

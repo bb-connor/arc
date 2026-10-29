@@ -351,7 +351,7 @@ fn prepare_ordinary(
                     error => kernel
                         .prepare_deny_response_with_metadata_and_payee_binding(
                             inputs.request,
-                            &error.to_string(),
+                            &Denial::from_error(&error),
                             now,
                             Some(inputs.matched_grant_index),
                             RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),

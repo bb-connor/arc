@@ -87,7 +87,10 @@ fn cancelled_replayed_invocation_preserves_original_saga() -> Result<(), Box<dyn
     let response = kernel.build_session_dispatch_refusal_response(
         PreDispatchCleanupDeny {
             request: &request,
-            reason: "session request cancelled before dispatch",
+            denial: &Denial::new(
+                ClientDenialCode::Denied,
+                "session request cancelled before dispatch",
+            ),
             timestamp: now / 1_000,
             matched_grant_index: grant_index,
             cap: &request.capability,

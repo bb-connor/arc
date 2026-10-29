@@ -227,7 +227,10 @@ impl ChioKernel {
             trusted_now_unix_ms,
             None,
             DurableRefusalResponse {
-                reason: "approval proposal deadline elapsed before dispatch",
+                denial: &Denial::new(
+                    ClientDenialCode::GovernedTransactionDenied,
+                    "approval proposal deadline elapsed before dispatch",
+                ),
                 cancelled: false,
                 matched_grant_index: None,
                 metadata: None,

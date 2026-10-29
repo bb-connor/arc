@@ -91,9 +91,6 @@ pub enum CliError {
     #[error("yaml error: {0}")]
     Yaml(#[from] yaml_serde::Error),
 
-    #[error("http error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
     #[error("{0}")]
     Chio(#[from] ChioError),
 
@@ -322,11 +319,6 @@ impl CliError {
                 "CHIO-CLI-YAML",
                 serde_json::json!({ "source": error.to_string() }),
                 "Fix the YAML syntax or schema mismatch in the provided configuration before retrying.",
-            ),
-            Self::Reqwest(error) => self.report_with_context(
-                "CHIO-CLI-HTTP",
-                serde_json::json!({ "source": error.to_string() }),
-                "Check network reachability, TLS settings, and remote endpoint availability before retrying.",
             ),
             Self::Chio(error) => {
                 let diagnostic = error.diagnostic();

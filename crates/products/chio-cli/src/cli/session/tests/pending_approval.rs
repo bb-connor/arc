@@ -259,6 +259,7 @@ fn pending_approval_projection_rejects_broken_shape_and_signed_content_bindings(
             terminal_state: response.terminal_state.clone(),
             receipt: response.receipt.clone(),
             execution_nonce: response.execution_nonce.clone(),
+            denial_code: response.denial_code,
         };
         mutate(&mut altered);
         assert!(

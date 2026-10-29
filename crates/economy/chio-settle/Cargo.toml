@@ -43,7 +43,7 @@ chio-finding = { workspace = true, optional = true }
 chio-open-market = { workspace = true, optional = true }
 chio-credit = { workspace = true, optional = true }
 chio-federation = { workspace = true, optional = true }
-chio-egress-contract = { workspace = true, features = ["reqwest-egress"], optional = true }
+chio-egress-contract = { workspace = true, features = ["reqwest-egress", "ureq-egress"], optional = true }
 chio-web3 = { workspace = true, optional = true }
 chio-web3-bindings = { version = "=0.1.0", path = "../chio-web3-bindings", default-features = false, features = ["web3"], optional = true }
 alloy-primitives = { version = "1.5.7", default-features = false, features = ["std"], optional = true }

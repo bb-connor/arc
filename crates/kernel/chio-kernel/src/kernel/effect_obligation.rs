@@ -417,7 +417,10 @@ impl<'a> PostEffectObligation<'a> {
                         .saturating_mul(1_000),
                     parts.inputs.return_context.as_ref(),
                     super::admission_coordinator::DurableRefusalResponse {
-                        reason: &refusal.reason,
+                        denial: &Denial::new(
+                            ClientDenialCode::KernelUnavailable,
+                            refusal.reason.as_str(),
+                        ),
                         cancelled: refusal.cancelled,
                         matched_grant_index: Some(parts.inputs.matched_grant_index),
                         metadata: self.kernel.ambiguous_dispatch_receipt_metadata(

@@ -87,20 +87,17 @@ async fn admission_reopened_under_v1_default_refuses_v2_default_operation() -> T
         .await;
     assert_eq!(kernel.policy_hash(), current);
 
-    let refusal = format!(
-        "request id conflicts with retained operation {}",
-        persisted.0[0].0
-    );
+    let refusal = persisted.0[0].0.to_string();
     let claim = kernel.evaluate_tool_call(&fixture.request).await;
     assert!(
-        matches!(&claim, Err(KernelError::DurableAdmission(message)) if *message == refusal),
+        matches!(&claim, Err(KernelError::OperationConflict { operation_id }) if *operation_id == refusal),
         "{claim:?}"
     );
     let mut restart = fixture.request.clone();
     restart.execution_nonce = None;
     let start = kernel.evaluate_tool_call(&restart).await;
     assert!(
-        matches!(&start, Err(KernelError::DurableAdmission(message)) if *message == refusal),
+        matches!(&start, Err(KernelError::OperationConflict { operation_id }) if *operation_id == refusal),
         "{start:?}"
     );
     assert_no_effect(&fixture)?;

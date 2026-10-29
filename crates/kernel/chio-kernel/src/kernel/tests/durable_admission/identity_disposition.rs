@@ -100,7 +100,10 @@ fn early_refusal_reuses_only_an_unoccupied_request_identity() {
         if let Some(original) = original {
             let error = result.expect_err("occupied identity cannot be advertised as reusable");
             assert!(
-                matches!(error, KernelError::DurableAdmission(_)),
+                matches!(
+                    error,
+                    KernelError::DurableAdmission(_) | KernelError::OperationConflict { .. }
+                ),
                 "{error:?}"
             );
             assert_eq!(store.operation(), original);

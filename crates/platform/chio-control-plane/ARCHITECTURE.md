@@ -163,8 +163,9 @@ crates supply the signed-carrier checks used by finding adapters.
 
 Axum and Tokio host handlers and runtime tasks. `chio-http-serve` supplies
 transport policy, listener limits, and drain support. Ureq implements the
-synchronous trust client with a fixed timeout and redirects disabled. Reqwest serves
-the economic, fiscal, and FROST anchor transports. `subtle` supplies secret
+synchronous trust client with a fixed timeout and redirects disabled. The economic,
+fiscal, and FROST anchor transports dispatch through the `BlockingContractAgent` of
+`chio-egress-contract`. `subtle` supplies secret
 comparison. The crate's `pq` feature forwards to core, kernel,
 and SQLite; `fuzz` exposes the Unix response-authority protocol fuzz boundary.
 

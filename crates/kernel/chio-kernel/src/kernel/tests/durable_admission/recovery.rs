@@ -33,8 +33,7 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
         .evaluate_tool_call_blocking(&conflict)
         .expect_err("conflicting replay must not mint another receipt");
     assert!(
-        matches!(conflict, KernelError::DurableAdmission(ref reason)
-        if reason.contains("conflicts with retained operation")),
+        matches!(conflict, KernelError::OperationConflict { .. }),
         "{conflict:?}"
     );
     assert_eq!(store.operation(), operation);
