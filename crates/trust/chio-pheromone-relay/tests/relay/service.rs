@@ -555,7 +555,13 @@ async fn loopback_http_delivery_posts_signed_batch_to_receiver() {
     );
     let server = tokio::spawn(service.serve(listener));
 
-    let client = PheromoneRelayClient::new(sender_directory, sender.clone(), NOW, 60_000).unwrap();
+    let client = PheromoneRelayClient::new(
+        sender_directory,
+        sender.clone(),
+        NOW,
+        60_000,
+        RelayProfile::LocalDev,
+    );
     let report = client
         .post_batch(
             "did:chio:llamaworks",
@@ -798,6 +804,7 @@ async fn relay_tick_delivers_leased_batches_with_real_request_signature() {
         &outbox_store,
         sender_directory,
         sender,
+        RelayProfile::LocalDev,
         "did:chio:llamaworks",
         NOW,
         4,
@@ -843,6 +850,7 @@ async fn relay_tick_rechecks_recipient_scope_before_delivery() {
         &outbox_store,
         sender_directory,
         sender,
+        RelayProfile::LocalDev,
         "did:chio:llamaworks",
         NOW,
         4,
@@ -883,6 +891,7 @@ async fn relay_tick_rejects_recipient_without_receiver_role_before_delivery() {
         &outbox_store,
         sender_directory,
         sender,
+        RelayProfile::LocalDev,
         "did:chio:llamaworks",
         NOW,
         4,
