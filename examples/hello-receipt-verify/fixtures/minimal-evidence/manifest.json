@@ -1,6 +1,6 @@
 {
   "schema": "chio.evidence_export_manifest.v1",
-  "exportedAt": 1792804489,
+  "exportedAt": 1775000060,
   "query": {
     "readBoundary": {
       "kind": "admin_all"
@@ -45,7 +45,7 @@
   "files": [
     {
       "path": "uncheckpointed-receipts.ndjson",
-      "sha256": "74f09790978f7f44e20c3095300fcabae30c5d14a1c70f39f3662af6fbec82f8",
+      "sha256": "a721343593895e39e9c40b477e6f3460d17d54fd60c0cec5f1b1ba7a8dffe7ea",
       "bytes": 89
     },
     {
@@ -55,8 +55,8 @@
     },
     {
       "path": "receipts.ndjson",
-      "sha256": "6b3cb99f037d32133f57638b3e2c8dfc379fc551fddb93b5342a40a2b5634f42",
-      "bytes": 2772
+      "sha256": "9ca3c8f2c8b7c105c62b40ab390e4761598f24bcb2d2ebcd6fecfc4d1bb64d7b",
+      "bytes": 1174
     },
     {
       "path": "child-receipts.ndjson",
@@ -90,8 +90,8 @@
     },
     {
       "path": "capability-lineage.ndjson",
-      "sha256": "9d8abf09238ddfb2e7b4b7a7bdba9a01ffa7fe08fc215984466745fa67ad23de",
-      "bytes": 969
+      "sha256": "3eacdd2b64e2b5729eae6326112325014d06afd8195d62aef947bf652696acb5",
+      "bytes": 941
     },
     {
       "path": "inclusion-proofs.ndjson",
@@ -100,8 +100,8 @@
     },
     {
       "path": "retention.json",
-      "sha256": "7a7a65cac0144acc9cb927b25bac77ed25ceda760020b449cfec86ab62dfd1e0",
-      "bytes": 76
+      "sha256": "d39d4672effc8ed2c4b80c7679f33d0d4e18cd2e6bc89f38dba3f85cbe985438",
+      "bytes": 73
     },
     {
       "path": "README.txt",
