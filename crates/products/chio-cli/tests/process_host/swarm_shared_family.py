@@ -77,9 +77,15 @@ capabilities:
         assert authority["joinReceipts"] == authority["terminalReceipts"] == []
     with sqlite3.connect(state / "swarm-runtime.db") as db:
         retired = db.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'runtime_consumed_swarm_continuations'"
-        ).fetchone()[0]
-    assert retired == 0, "swarm source retained the legacy continuation table"
+            """SELECT name FROM sqlite_master
+               WHERE name IN ('runtime_consumed_leases',
+                              'runtime_consumed_treaty_continuations',
+                              'runtime_consumed_swarm_continuations',
+                              'runtime_replay_source_seal')
+                  OR name GLOB 'runtime_replay_source_*'
+               ORDER BY name"""
+        ).fetchall()
+    assert retired == [], f"swarm source retained retired replay objects: {retired}"
     original_source = (state / "swarm-profile.json").read_bytes()
     original_bootstrap = (state / "swarm-bootstrap.json").read_bytes()
     calls = json.loads((state / "swarm-calls.json").read_text())

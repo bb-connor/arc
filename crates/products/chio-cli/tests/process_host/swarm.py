@@ -133,9 +133,15 @@ capabilities:
     )
     with sqlite3.connect(state / "swarm-runtime.db") as db:
         retired = db.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'runtime_consumed_swarm_continuations'"
-        ).fetchone()[0]
-    assert retired == 0, "swarm source retained the legacy continuation table"
+            """SELECT name FROM sqlite_master
+               WHERE name IN ('runtime_consumed_leases',
+                              'runtime_consumed_treaty_continuations',
+                              'runtime_consumed_swarm_continuations',
+                              'runtime_replay_source_seal')
+                  OR name GLOB 'runtime_replay_source_*'
+               ORDER BY name"""
+        ).fetchall()
+    assert retired == [], f"swarm source retained retired replay objects: {retired}"
 
     def effects():
         with sqlite3.connect(f"file:{state / 'mailboxes.db'}?mode=ro", uri=True) as db:
@@ -344,12 +350,13 @@ capabilities:
         assert claims[0][0] == claims[1][0], claims
         assert claims[2][0] == claims[3][0], claims
         assert claims[0][0] != claims[2][0], claims
-        assert (
-            db.execute(
-                "SELECT COUNT(*) FROM sqlite_master WHERE name GLOB 'runtime_replay_migration_*'"
-            ).fetchone()[0]
-            == 0
-        )
+        retired = db.execute(
+            """SELECT name FROM sqlite_master
+               WHERE name GLOB 'runtime_replay_migration_*'
+                  OR name = 'runtime_replay_legacy_tombstones'
+               ORDER BY name"""
+        ).fetchall()
+        assert retired == [], f"authority retained retired replay objects: {retired}"
         assert (
             db.execute("SELECT COUNT(*) FROM runtime_replay_claim_releases").fetchone()[
                 0
